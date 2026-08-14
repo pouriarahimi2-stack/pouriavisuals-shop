@@ -20,7 +20,7 @@ export default function HomePage() {
 
   const { addToCart } = useCart();
 
-  const loadData = () => {
+  useEffect(() => {
     setProducts(productService.getProducts());
     const activeBanners = bannerService.getBanners().filter((b) => b.isActive);
     setBanners(activeBanners);
@@ -29,39 +29,7 @@ export default function HomePage() {
     if (categoryService && typeof categoryService.getCategories === "function") {
       setCategories(categoryService.getCategories());
     }
-  };
-
-  useEffect(() => {
-    loadData();
-    window.addEventListener("siteInfoUpdated", loadData);
-    return () => window.removeEventListener("siteInfoUpdated", loadData);
   }, []);
-
-  const isMaintenance = siteInfo?.maintenanceMode ?? false;
-
-  // 🛠️ رندر هوشمند صفحه تعمیرات در صورت فعال بودن سوئیچ در پنل ادمین
-  if (isMaintenance) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-[#07090e] text-white text-center font-sans select-none relative overflow-hidden">
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/10 blur-[160px] pointer-events-none rounded-full" />
-        <div className="max-w-md w-full space-y-6 p-8 rounded-[2.5rem] bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl relative z-10">
-          <div className="text-5xl mb-2 animate-bounce">🛠️</div>
-          <h1 className="text-2xl font-black text-slate-100 tracking-tight">
-            سایت در حال به‌روزرسانی است
-          </h1>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            ما در حال ارتقا و بهبود فروشگاه هستیم. به زودی با امکانات و محصولات جدید بازمی‌گردیم!
-          </p>
-          <div className="pt-4 border-t border-white/10">
-            <span className="inline-flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 px-4 py-2 rounded-full border border-amber-500/20 font-bold">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-              حالت تعمیرات فعال است
-            </span>
-          </div>
-        </div>
-      </main>
-    );
-  }
 
   const filteredProducts = products.filter((product) => {
     if (selectedCategory === "all") return true;

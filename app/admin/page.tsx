@@ -12,7 +12,6 @@ import AdminHealthGuard from "@/components/admin/AdminHealthGuard";
 import AdminDashboardStats from "@/components/admin/AdminDashboardStats";
 import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import { productService } from "@/services/productService";
-import { siteInfoService } from "@/services/siteInfoService";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -32,11 +31,6 @@ export default function AdminPage() {
     } else {
       setIsAuthenticated(true);
     }
-
-    // همگام‌سازی زنده آخرین تنظیمات و حالت تعمیرات از Supabase
-    siteInfoService.fetchSiteInfo().catch((err) => {
-      console.error("خطا در همگام‌سازی اطلاعات از Supabase:", err);
-    });
 
     const isDark = document.documentElement.classList.contains("dark");
     setIsDarkMode(isDark);
@@ -903,7 +897,7 @@ function AdminAIAssistant() {
                       selectedCategory === cat
                         ? "bg-indigo-600 border-indigo-400 text-white shadow-lg"
                         : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
-                  }`}
+                    }`}
                   >
                     📂 {cat}
                   </button>

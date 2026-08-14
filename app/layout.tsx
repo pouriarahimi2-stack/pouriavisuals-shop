@@ -20,21 +20,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   const activeFontId = siteInfo?.activeFontId || "vazir";
   const activeCustomFont = siteInfo?.customFonts?.find((f) => f.id === activeFontId);
-  const isMaintenance = siteInfo?.maintenanceMode ?? false;
 
   return (
     <html lang="fa" dir="rtl" className="dark">
       <head>
         <title>{siteInfo?.storeName || "BitByPouria"}</title>
-        
-        {/* مدیریت هوشمند ایندکس گوگل بر اساس وضعیت حالت تعمیرات */}
-        {isMaintenance && (
-          <>
-            <meta name="robots" content="noindex, nofollow, noarchive" />
-            <meta name="googlebot" content="noindex, nofollow, noimageindex" />
-          </>
-        )}
-
         {/* رندر فونت‌های سفارشی تعریف‌شده در ادمین */}
         {activeCustomFont && (
           <style dangerouslySetInnerHTML={{

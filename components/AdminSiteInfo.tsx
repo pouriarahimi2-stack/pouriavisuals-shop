@@ -15,15 +15,12 @@ export default function AdminSiteInfo() {
     address: "",
     instagram: "",
     telegram: "",
-    allowGoogleIndex: true,
-    maintenanceMode: false,
+    allowGoogleIndex: true, // 🔍 کنترل مستقیم ایندکس گوگل
   });
 
   const [fontName, setFontName] = useState("");
   const [fontUrl, setFontUrl] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [savingSwitch, setSavingSwitch] = useState<boolean>(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -36,72 +33,13 @@ export default function AdminSiteInfo() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // 🔄 دریافت زنده اطلاعات از Supabase موقع بارگذاری
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      const loadedInfo = await siteInfoService.fetchSiteInfo();
-      setInfo({
-        ...loadedInfo,
-        allowGoogleIndex:
-          loadedInfo.allowGoogleIndex !== undefined ? loadedInfo.allowGoogleIndex : true,
-        maintenanceMode:
-          loadedInfo.maintenanceMode !== undefined ? loadedInfo.maintenanceMode : false,
-      });
-      setLoading(false);
-    }
-    loadData();
+    const loadedInfo = siteInfoService.getSiteInfo();
+    setInfo({
+      ...loadedInfo,
+      allowGoogleIndex: loadedInfo.allowGoogleIndex !== undefined ? loadedInfo.allowGoogleIndex : true,
+    });
   }, []);
-
-  // 🚨 عملکرد مستقل و زنده سوئیچ حالت تعمیرات (ذخیره مستقیم در Supabase)
-  const handleToggleMaintenance = async () => {
-    if (savingSwitch) return;
-    const newState = !info.maintenanceMode;
-
-    // آپدیت آنی رابط کاربر
-    setInfo((prev) => ({ ...prev, maintenanceMode: newState }));
-    setSavingSwitch(true);
-
-    try {
-      await siteInfoService.saveSiteInfo({ maintenanceMode: newState });
-      showToast(
-        newState
-          ? "🚨 حالت تعمیرات فعال شد (دسترسی کاربران محدود شد)."
-          : "✅ حالت تعمیرات غیرفعال شد (سایت در دسترس قرار گرفت)."
-      );
-    } catch (error) {
-      console.error("خطا در ذخیره حالت تعمیرات:", error);
-      showToast("❌ خطا در ذخیره حالت تعمیرات در دیتابیس!");
-      setInfo((prev) => ({ ...prev, maintenanceMode: !newState }));
-    } finally {
-      setSavingSwitch(false);
-    }
-  };
-
-  // 🌐 عملکرد مستقل و زنده سوئیچ ایندکس گوگل (ذخیره مستقیم در Supabase)
-  const handleToggleGoogleIndex = async () => {
-    if (savingSwitch) return;
-    const newState = !info.allowGoogleIndex;
-
-    // آپدیت آنی رابط کاربر
-    setInfo((prev) => ({ ...prev, allowGoogleIndex: newState }));
-    setSavingSwitch(true);
-
-    try {
-      await siteInfoService.saveSiteInfo({ allowGoogleIndex: newState });
-      showToast(
-        newState
-          ? "🌐 ایندکس گوگل فعال شد (Index / Follow)."
-          : "🛑 ایندکس گوگل غیرفعال شد (No-Index / No-Follow)."
-      );
-    } catch (error) {
-      console.error("خطا در ذخیره وضعیت ایندکس گوگل:", error);
-      showToast("❌ خطا در ذخیره وضعیت ایندکس در دیتابیس!");
-      setInfo((prev) => ({ ...prev, allowGoogleIndex: !newState }));
-    } finally {
-      setSavingSwitch(false);
-    }
-  };
 
   // 📷 آپلود و فشرده‌سازی عکس لوگو
   const handleLogoUpload = (file: File) => {
@@ -144,7 +82,7 @@ export default function AdminSiteInfo() {
     reader.readAsDataURL(file);
   };
 
-  const handleAddCustomFont = async (e: React.FormEvent) => {
+  const handleAddCustomFont = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fontName.trim() || !fontUrl.trim()) {
       showToast("⚠️ لطفاً نام و فایل/لینک فونت را وارد کنید.");
@@ -161,7 +99,7 @@ export default function AdminSiteInfo() {
     const updatedInfo = { ...info, customFonts: updatedFonts, activeFontId: newFont.id };
 
     setInfo(updatedInfo);
-    await siteInfoService.saveSiteInfo(updatedInfo);
+    siteInfoService.saveSiteInfo(updatedInfo);
     setFontName("");
     setFontUrl("");
     showToast(`✨ فونت جدید "${newFont.name}" اضافه و روی سایت فعال شد!`);
@@ -172,13 +110,13 @@ export default function AdminSiteInfo() {
       isOpen: true,
       title: "حذف فونت اختصاصی",
       message: `آیا از حذف فونت "${fontNameStr}" اطمینان دارید؟`,
-      onConfirm: async () => {
+      onConfirm: () => {
         const updatedFonts = (info.customFonts || []).filter((f) => f.id !== fontId);
         const activeId = info.activeFontId === fontId ? "vazir" : info.activeFontId;
         const updatedInfo = { ...info, customFonts: updatedFonts, activeFontId: activeId };
 
         setInfo(updatedInfo);
-        await siteInfoService.saveSiteInfo(updatedInfo);
+        siteInfoService.saveSiteInfo(updatedInfo);
         showToast(`🗑️ فونت "${fontNameStr}" با موفقیت حذف شد.`);
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
       },
@@ -191,21 +129,13 @@ export default function AdminSiteInfo() {
       isOpen: true,
       title: "ذخیره تغییرات اطلاعات سایت",
       message: "آیا از اعمال و انتشار تمام تغییرات برندینگ، سئو و اطلاعات تماس اطمینان دارید؟",
-      onConfirm: async () => {
-        await siteInfoService.saveSiteInfo(info);
-        showToast("✅ اطلاعات متنی سایت با موفقیت در دیتابیس بروزرسانی شد!");
+      onConfirm: () => {
+        siteInfoService.saveSiteInfo(info);
+        showToast("✅ اطلاعات سایت و تنظیمات ایندکس گوگل با موفقیت بروزرسانی شد!");
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
       },
     });
   };
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs font-bold text-white/50 animate-pulse">
-        در حال دریافت اطلاعات زنده از دیتابیس Supabase...
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 select-none relative text-xs font-sans text-white">
@@ -240,82 +170,6 @@ export default function AdminSiteInfo() {
         </div>
       )}
 
-      {/* 🚨 بخش سوئیچ‌های مستقل هوشمند (بدون نیاز به دکمه ثبت فرم) */}
-      <div className="liquid-glass-card p-5 space-y-4">
-        <h4 className="font-bold text-sm text-[var(--accent-blue)] flex items-center gap-2">
-          <span>⚡</span> کنترل‌کننده‌های آنی و مستقل دیتابیس
-        </h4>
-
-        {/* ۱. سوئیچ مستقل حالت تعمیرات */}
-        <div className="p-4 rounded-2xl bg-black/20 border border-white/10 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1 max-w-md">
-              <span className="font-bold text-rose-300 flex items-center gap-1.5 text-xs">
-                <span>🚧</span> حالت تعمیرات سراسری سایت (Maintenance Mode)
-              </span>
-              <p className="text-[10px] opacity-70 leading-relaxed">
-                با فعال‌سازی این گزینه، دسترسی عمومی به فروشگاه مسدود و صفحه تعمیرات نشان داده می‌شود.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={savingSwitch}
-              onClick={handleToggleMaintenance}
-              className={`px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 cursor-pointer shadow-md ${
-                info.maintenanceMode
-                  ? "bg-rose-600/30 text-rose-200 border border-rose-500/40 hover:bg-rose-600"
-                  : "bg-emerald-600/30 text-emerald-200 border border-emerald-500/40 hover:bg-emerald-600"
-              }`}
-            >
-              <span className={`w-2.5 h-2.5 rounded-full ${info.maintenanceMode ? "bg-rose-400 animate-pulse" : "bg-emerald-400"}`} />
-              <span>
-                {savingSwitch
-                  ? "در حال ذخیره..."
-                  : info.maintenanceMode
-                  ? "🔴 حالت تعمیرات: فعال است"
-                  : "✅ حالت تعمیرات: غیرفعال است"}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* ۲. سوئیچ مستقل ایندکس گوگل */}
-        <div className="p-4 rounded-2xl bg-black/20 border border-white/10 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1 max-w-md">
-              <span className="font-bold text-indigo-300 flex items-center gap-1.5 text-xs">
-                <span>🤖</span> غیرفعال‌سازی ایندکس گوگل (No-Index Guard)
-              </span>
-              <p className="text-[10px] opacity-70 leading-relaxed">
-                با خاموش کردن این گزینه، خزنده‌های گوگل سایت را ثبت نمی‌کنند (مناسب زمان توسعه یا ساخت مجدد).
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={savingSwitch}
-              onClick={handleToggleGoogleIndex}
-              className={`px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 cursor-pointer shadow-md ${
-                info.allowGoogleIndex
-                  ? "bg-emerald-600/30 text-emerald-200 border border-emerald-500/40 hover:bg-emerald-600"
-                  : "bg-rose-600/30 text-rose-200 border border-rose-500/40 hover:bg-rose-600"
-              }`}
-            >
-              <span className={`w-2.5 h-2.5 rounded-full ${info.allowGoogleIndex ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
-              <span>
-                {savingSwitch
-                  ? "در حال ذخیره..."
-                  : info.allowGoogleIndex
-                  ? "✅ ایندکس گوگل: فعال (Index)"
-                  : "🛑 ایندکس گوگل: مسدود (No-Index)"}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 🔤 بخش مدیریت فونت‌ها */}
       <div className="liquid-glass-card p-5 space-y-4">
         <h4 className="font-bold text-sm text-[var(--accent-blue)] flex items-center gap-2">
           <span>🔤</span> مدیریت و نصب فونت‌های سفارشی فروشگاه
@@ -371,10 +225,10 @@ export default function AdminSiteInfo() {
           <label className="block mb-1 opacity-80 font-bold">انتخاب فونت اصلی فعال برای تمامی صفحات سایت:</label>
           <select
             value={info.activeFontId || "vazir"}
-            onChange={async (e) => {
+            onChange={(e) => {
               const updated = { ...info, activeFontId: e.target.value };
               setInfo(updated);
-              await siteInfoService.saveSiteInfo(updated);
+              siteInfoService.saveSiteInfo(updated);
               showToast("🔤 فونت اصلی فروشگاه بروزرسانی شد.");
             }}
             className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/10 outline-none cursor-pointer font-bold"
@@ -411,7 +265,7 @@ export default function AdminSiteInfo() {
         )}
       </div>
 
-      {/* 📝 فرم ثبت مشخصات کامل و متنی فروشگاه */}
+      {/* فرم ثبت مشخصات کامل فروشگاه */}
       <form onSubmit={handleSubmit} className="liquid-glass-card p-5 space-y-4">
         <h4 className="font-bold text-sm text-[var(--accent-blue)] flex items-center gap-2">
           <span>⚙️</span> مشخصات عمومی، لوگو و راه‌های ارتباطی
@@ -527,6 +381,42 @@ export default function AdminSiteInfo() {
               onChange={(e) => setInfo({ ...info, telegram: e.target.value })}
               className="w-full p-2.5 rounded-xl bg-black/30 border border-white/10 outline-none font-mono"
             />
+          </div>
+        </div>
+
+        {/* 🔘 کنترل‌کننده دستی وضعیت ایندکس در گوگل (Googlebot indexing Toggle) */}
+        <div className="p-4 rounded-2xl bg-black/20 border border-white/10 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1 max-w-md">
+              <span className="font-bold text-indigo-300 flex items-center gap-1.5 text-xs">
+                <span>🤖</span> غیرفعال‌سازی ایندکس گوگل (No-Index Guard)
+              </span>
+              <p className="text-[10px] opacity-70 leading-relaxed">
+                با خاموش کردن این گزینه، خزنده‌های گوگل سایت را ثبت نمی‌کنند (مناسب زمان توسعه یا ساخت مجدد).
+              </p>
+            </div>
+
+            {/* کلید سوئیچ ایندکس گوگل */}
+            <button
+              type="button"
+              onClick={() => {
+                const newState = !info.allowGoogleIndex;
+                setInfo({ ...info, allowGoogleIndex: newState });
+                showToast(
+                  newState
+                    ? "🌐 ایندکس گوگل فعال شد (Index / Follow)."
+                    : "🛑 ایندکس گوگل غیرفعال شد (No-Index / No-Follow)."
+                );
+              }}
+              className={`px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 cursor-pointer shadow-md ${
+                info.allowGoogleIndex
+                  ? "bg-emerald-600/30 text-emerald-200 border border-emerald-500/40 hover:bg-emerald-600"
+                  : "bg-rose-600/30 text-rose-200 border border-rose-500/40 hover:bg-rose-600"
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full ${info.allowGoogleIndex ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
+              <span>{info.allowGoogleIndex ? "✅ ایندکس گوگل: فعال (Index)" : "🛑 ایندکس گوگل: مسدود (No-Index)"}</span>
+            </button>
           </div>
         </div>
 

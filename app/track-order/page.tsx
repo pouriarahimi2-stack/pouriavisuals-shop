@@ -2,278 +2,263 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import { orderService, Order } from "@/services/orderService";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 
 function TrackOrderContent() {
   const searchParams = useSearchParams();
-  const urlOrderId = searchParams.get("orderId");
+  const paramOrderId = searchParams.get("orderId");
   const paymentStatus = searchParams.get("payment");
-  const refId = searchParams.get("refId");
 
-  const [searchInput, setSearchInput] = useState(urlOrderId || "");
-  const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
+  const [searchCode, setSearchCode] = useState("");
+  const [foundOrder, setFoundOrder] = useState<Order | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (urlOrderId) {
-      const found = orderService.getOrderById(urlOrderId);
-      if (found) {
-        setCurrentOrder(found);
-        setErrorMsg(null);
-      } else {
-        setErrorMsg("سفارشی با این شماره در سیستم یافت نشد.");
-      }
+    setSiteInfo(siteInfoService.getSiteInfo());
+
+    if (paramOrderId) {
+      setSearchCode(paramOrderId);
+      const order = orderService.getOrderById(paramOrderId);
+      if (order) setFoundOrder(order);
     }
-  }, [urlOrderId]);
+  }, [paramOrderId]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    setCurrentOrder(null);
+    setFoundOrder(null);
 
-    if (!searchInput.trim()) {
+    const cleanCode = searchCode.trim().toUpperCase();
+    if (!cleanCode) {
       setErrorMsg("لطفاً شماره سفارش را وارد کنید.");
       return;
     }
 
-    const found = orderService.getOrderById(searchInput.trim());
-    if (found) {
-      setCurrentOrder(found);
+    const matchOrder = orderService.getOrderById(cleanCode);
+    if (matchOrder) {
+      setFoundOrder(matchOrder);
     } else {
-      setErrorMsg("هیچ سفارشی با این شماره ثبت نشده است.");
+      setErrorMsg("هیچ سفارشی با این شماره پیدا نشد.");
     }
   };
 
-  // نگاشت مراحل وضعیت سفارش برای نمایش Timeline
-  const getStatusStep = (status: string) => {
-    switch (status) {
-      case "pending":
-        return 1;
-      case "processing":
-        return 2;
-      case "shipped":
-        return 3;
-      case "completed":
-        return 4;
-      default:
-        return 1;
-    }
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 text-xs text-white">
-      {/* پیام بازگشت از درگاه پرداخت */}
-      {paymentStatus === "success" && (
-        <div className="p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 space-y-2 text-center animate-fadeIn shadow-2xl backdrop-blur-xl">
-          <span className="text-3xl block">🎉</span>
-          <h3 className="font-black text-sm">پرداخت با موفقیت انجام شد!</h3>
-          <p className="opacity-80">
-            تراکنش شما تایید گردید و سفارش در دست پردازش انبار قرار گرفت.
-          </p>
-          {refId && (
-            <p className="font-mono text-[11px] pt-1">
-              کد پیگیری بانکی: <strong className="text-white">{refId}</strong>
+    <main className="min-h-screen pb-16 select-none">
+      {/* هدر هنگام پرینت مخفی می‌شود */}
+      <div className="print:hidden">
+        <Header />
+      </div>
+
+      <div className="max-w-3xl mx-auto px-4 mt-8 space-y-6">
+        {/* پیام تشکر پس از پرداخت موفق - در پرینت مخفی است */}
+        {paymentStatus === "success" && foundOrder && (
+          <div className="print:hidden liquid-glass-card p-6 text-center space-y-3 border-green-500/30 bg-green-500/10 text-green-400 animate-fadeIn shadow-2xl">
+            <span className="text-4xl block">🎉</span>
+            <h2 className="text-base font-black leading-relaxed">
+              {foundOrder.customerName} عزیز، ممنونیم بابت اعتماد شما؛ در اسرع وقت محصول شما به دستتون خواهد رسید. ✨
+            </h2>
+            <p className="text-xs opacity-80">
+              شماره پیگیری سفارش شما: <span className="font-mono font-bold text-white">#{foundOrder.id}</span>
             </p>
-          )}
-        </div>
-      )}
-
-      {paymentStatus === "failed" && (
-        <div className="p-5 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-300 space-y-2 text-center animate-fadeIn shadow-2xl backdrop-blur-xl">
-          <span className="text-3xl block">❌</span>
-          <h3 className="font-black text-sm">پرداخت ناموفق بود یا لغو شد</h3>
-          <p className="opacity-80">
-            در صورت کسر وجه از حساب شما، حداکثر ظرف ۷۲ ساعت توسط بانک بازگردانده می‌شود.
-          </p>
-        </div>
-      )}
-
-      {/* فرم جستجوی کد پیگیری */}
-      <section className="p-6 md:p-8 rounded-[2.5rem] bg-white/[0.03] border border-white/10 space-y-4 text-center backdrop-blur-2xl shadow-2xl">
-        <div className="space-y-1">
-          <h1 className="text-lg font-black text-indigo-300 flex items-center justify-center gap-2">
-            <span>🔍</span> پیگیری هوشمند وضعیت سفارش
-          </h1>
-          <p className="opacity-60 text-[11px]">
-            شماره سفارش خود را وارد کنید تا آخرین وضعیت مرسوله را مشاهده نمایید.
-          </p>
-        </div>
-
-        <form onSubmit={handleSearch} className="max-w-md mx-auto flex gap-2 pt-2">
-          <input
-            type="text"
-            placeholder="مثلاً: ORD-172345678"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="flex-1 p-3 rounded-2xl bg-black/40 border border-white/15 text-xs text-white font-mono outline-none focus:border-indigo-500 transition"
-          />
-          <button
-            type="submit"
-            className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer transition shadow-lg shrink-0"
-          >
-            جستجو 🔎
-          </button>
-        </form>
-
-        {errorMsg && (
-          <p className="text-rose-400 font-bold text-[11px] pt-2 animate-pulse">⚠️ {errorMsg}</p>
+          </div>
         )}
-      </section>
 
-      {/* جزئیات و تایم‌لاین وضعیت سفارش */}
-      {currentOrder && (
-        <section className="p-6 md:p-8 rounded-[2.5rem] bg-white/[0.03] border border-white/10 space-y-8 backdrop-blur-2xl shadow-2xl animate-fadeIn">
-          {/* هدر فاکتور */}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
-            <div className="space-y-1">
-              <span className="text-[10px] text-indigo-400 font-bold block">شماره فاکتور:</span>
-              <h2 className="text-base font-black font-mono text-white">#{currentOrder.id}</h2>
-            </div>
+        {paymentStatus === "failed" && (
+          <div className="print:hidden liquid-glass-card p-6 text-center space-y-2 border-red-500/30 bg-red-500/10 text-red-400 animate-fadeIn">
+            <span className="text-4xl block">❌</span>
+            <h2 className="text-base font-black">پرداخت ناموفق یا لغو شد!</h2>
+            <p className="text-xs opacity-80">در صورت کسر وجه از حساب، مبلغ طی ۷۲ ساعت به حساب شما بازمی‌گردد.</p>
+          </div>
+        )}
 
-            <div className="flex items-center gap-2">
-              <span className="opacity-60">وضعیت پرداخت:</span>
-              <span
-                className={`px-3 py-1 rounded-full font-bold text-[11px] ${
-                  currentOrder.paymentStatus === "paid"
-                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                }`}
-              >
-                {currentOrder.paymentStatus === "paid" ? "✅ پرداخت شده" : "⏳ در انتظار پرداخت"}
-              </span>
-            </div>
+        {/* بخش جستجو و عنوان - در پرینت مخفی است */}
+        <div className="print:hidden space-y-4">
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-black">📦 پیگیری سفارش و فاکتور فروشگاه</h1>
+            <p className="text-xs opacity-70">
+              شماره سفارش خود (مثلاً <span className="font-mono">ORD-849201</span>) را وارد کنید.
+            </p>
           </div>
 
-          {/* نوار پیشرفت جابجایی (Status Timeline) */}
-          <div className="space-y-3">
-            <h4 className="font-extrabold text-xs text-indigo-300">📍 وضعیت فیزیکی مرسوله:</h4>
-            <div className="grid grid-cols-4 gap-2 text-center pt-2">
-              {[
-                { step: 1, title: "ثبت سفارش", icon: "📝" },
-                { step: 2, title: "پردازش انبار", icon: "📦" },
-                { step: 3, title: "تحویل پست", icon: "🚚" },
-                { step: 4, title: "تحویل خریدار", icon: "🏠" },
-              ].map((s) => {
-                const currentStep = getStatusStep(currentOrder.status);
-                const isPassed = currentStep >= s.step;
-                return (
-                  <div key={s.step} className="space-y-2">
-                    <div
-                      className={`w-10 h-10 mx-auto rounded-2xl flex items-center justify-center text-sm font-bold transition-all ${
-                        isPassed
-                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/40 scale-110"
-                          : "bg-white/5 border border-white/10 opacity-40"
-                      }`}
-                    >
-                      {s.icon}
-                    </div>
-                    <span className={`block text-[10px] font-bold ${isPassed ? "text-indigo-300" : "opacity-40"}`}>
-                      {s.title}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <form onSubmit={handleSearch} className="liquid-glass-card p-4 flex gap-2">
+            <input
+              type="text"
+              value={searchCode}
+              onChange={(e) => setSearchCode(e.target.value)}
+              placeholder="کد سفارش..."
+              className="flex-1 p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--glass-border)] text-xs font-mono uppercase outline-none focus:border-[var(--accent-blue)]"
+            />
+            <button
+              type="submit"
+              className="px-6 py-3 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs cursor-pointer hover:opacity-90 transition shadow-md shrink-0"
+            >
+              جستجو 🔍
+            </button>
+          </form>
 
-          {/* کد رهگیری پستی (در صورت وجود) */}
-          {currentOrder.trackingCode && (
-            <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between">
-              <span className="font-bold">📫 کد رهگیری ۲۴ رقمی پست پیشتاز:</span>
-              <span className="font-mono font-black text-indigo-300 text-sm tracking-wider select-all">
-                {currentOrder.trackingCode}
-              </span>
+          {errorMsg && (
+            <div className="liquid-glass-card p-4 text-center text-xs text-red-400 font-bold border-red-500/20">
+              {errorMsg}
             </div>
           )}
+        </div>
 
-          {/* مشخصات گیرنده و آدرس */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-2xl bg-black/20 border border-white/5">
-            <div className="space-y-1">
-              <span className="opacity-60 block text-[10px]">تحویل‌گیرنده:</span>
-              <span className="font-bold">
-                {currentOrder.firstName} {currentOrder.lastName} ({currentOrder.phone})
-              </span>
+        {/* فاکتور رسمی قابل چاپ */}
+        {foundOrder && (
+          <div className="space-y-4">
+            {/* دکمه پرینت فاکتور - در چاپ مخفی می‌شود */}
+            <div className="print:hidden flex justify-end">
+              <button
+                onClick={handlePrint}
+                className="px-5 py-2.5 rounded-xl bg-green-600 text-white font-bold text-xs hover:bg-green-700 transition shadow-lg cursor-pointer flex items-center gap-2"
+              >
+                🖨️ چاپ فاکتور رسمی / دریافت PDF
+              </button>
             </div>
-            <div className="space-y-1">
-              <span className="opacity-60 block text-[10px]">کد پستی:</span>
-              <span className="font-mono font-bold">{currentOrder.postalCode}</span>
-            </div>
-            <div className="md:col-span-2 space-y-1 pt-2 border-t border-white/5">
-              <span className="opacity-60 block text-[10px]">آدرس دقیق ارسال:</span>
-              <p className="leading-relaxed opacity-90">{currentOrder.address}</p>
-            </div>
-          </div>
 
-          {/* لیست کالاهای اقلام سفارش */}
-          <div className="space-y-3">
-            <h4 className="font-extrabold text-xs text-indigo-300">📦 اقلام خریده شده:</h4>
-            <div className="space-y-2">
-              {currentOrder.items?.map((item: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={item.image || "/placeholder.png"}
-                      alt={item.title}
-                      className="w-10 h-10 object-cover rounded-xl bg-black/30"
-                    />
-                    <div>
-                      <h5 className="font-bold text-xs">{item.title}</h5>
-                      <span className="text-[10px] opacity-60 font-mono">
-                        تعداد: {item.quantity} عدد
-                      </span>
-                    </div>
+            {/* کارت اصلی فاکتور رسمی */}
+            <div className="liquid-glass-card print:bg-white print:text-black print:border-black/20 print:shadow-none p-8 space-y-6 text-xs animate-fadeIn border border-[var(--glass-border)] rounded-3xl">
+              
+              {/* سربرگ فاکتور */}
+              <div className="flex justify-between items-start border-b border-white/10 print:border-black/20 pb-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    {siteInfo?.logoUrl && (
+                      <img src={siteInfo.logoUrl} alt="Logo" className="w-8 h-8 object-contain" />
+                    )}
+                    <h2 className="text-xl font-black text-[var(--accent-blue)] print:text-black">
+                      {siteInfo?.storeName || "BitByPouria"}
+                    </h2>
                   </div>
-                  <span className="font-mono font-bold text-indigo-300">
-                    {((item.discountPrice ?? item.price) * item.quantity).toLocaleString("fa-IR")} تومان
+                  <p className="text-[11px] opacity-70 print:opacity-100">فاکتور رسمی فروش کالا و خدمات</p>
+                </div>
+
+                <div className="text-left space-y-1 font-mono text-[11px]">
+                  <p><strong className="font-sans opacity-70">شماره فاکتور:</strong> #{foundOrder.id}</p>
+                  <p><strong className="font-sans opacity-70">تاریخ صدور:</strong> {new Date(foundOrder.createdAt).toLocaleDateString("fa-IR")}</p>
+                  <p>
+                    <strong className="font-sans opacity-70">وضعیت پرداخت:</strong>{" "}
+                    <span className={foundOrder.paymentStatus === "paid" ? "text-green-400 print:text-black font-bold" : "text-red-400 print:text-black"}>
+                      {foundOrder.paymentStatus === "paid" ? "✅ پرداخت شده" : "❌ پرداخت نشده"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* جدول مشخصات فروشنده و خریدار */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px] p-4 rounded-2xl bg-black/5 dark:bg-white/5 print:bg-gray-100 border border-[var(--glass-border)] print:border-black/10">
+                {/* مشخصات فروشنده */}
+                <div className="space-y-1">
+                  <span className="font-bold text-[var(--accent-blue)] print:text-black block border-b border-white/10 print:border-black/10 pb-1 mb-2">
+                    🏢 مشخصات فروشنده:
+                  </span>
+                  <p><strong>فروشگاه:</strong> {siteInfo?.storeName || "BitByPouria"}</p>
+                  <p><strong>تلفن پشتیبانی:</strong> {siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</p>
+                  <p><strong>ایمیل:</strong> {siteInfo?.email || "support@bitbypouria.com"}</p>
+                  <p><strong>آدرس:</strong> {siteInfo?.address || "تهران، خیابان ولیعصر"}</p>
+                </div>
+
+                {/* مشخصات خریدار */}
+                <div className="space-y-1">
+                  <span className="font-bold text-[var(--accent-blue)] print:text-black block border-b border-white/10 print:border-black/10 pb-1 mb-2">
+                    👤 مشخصات خریدار:
+                  </span>
+                  <p><strong>نام و نام خانوادگی:</strong> {foundOrder.customerName}</p>
+                  <p><strong>شماره تماس:</strong> <span className="font-mono">{foundOrder.customerPhone}</span></p>
+                  <p><strong>کد پستی ده رقمی:</strong> <span className="font-mono">{foundOrder.postalCode || "-"}</span></p>
+                  <p><strong>آدرس تحویل:</strong> {foundOrder.customerAddress}</p>
+                </div>
+              </div>
+
+              {/* جدول اقلام فاکتور */}
+              <div className="space-y-3">
+                <h4 className="font-bold opacity-80">📋 جدول اقلام خریداری شده:</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 print:border-black/20 bg-black/10 dark:bg-white/5 print:bg-gray-200">
+                        <th className="p-2.5 font-bold">ردیف</th>
+                        <th className="p-2.5 font-bold">شرح کالا / خدمات</th>
+                        <th className="p-2.5 font-bold text-center">تعداد</th>
+                        <th className="p-2.5 font-bold text-left">قیمت واحد (تومان)</th>
+                        <th className="p-2.5 font-bold text-left">مبلغ کل (تومان)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10 print:divide-black/10">
+                      {foundOrder.items.map((item, idx) => {
+                        const unitPrice = item.discountPrice ?? item.price;
+                        const totalPrice = unitPrice * item.quantity;
+                        return (
+                          <tr key={idx}>
+                            <td className="p-2.5 text-center font-mono">{idx + 1}</td>
+                            <td className="p-2.5 font-bold flex items-center gap-2">
+                              {item.image && (
+                                <img src={item.image} alt={item.title} className="w-8 h-8 object-cover rounded-lg print:hidden" />
+                              )}
+                              <span>{item.title}</span>
+                            </td>
+                            <td className="p-2.5 text-center font-mono font-bold">{item.quantity}</td>
+                            <td className="p-2.5 text-left font-mono">{unitPrice.toLocaleString("fa-IR")}</td>
+                            <td className="p-2.5 text-left font-mono font-bold">{totalPrice.toLocaleString("fa-IR")}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* جمع محاسبات فاکتور */}
+              <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 print:bg-gray-100 border border-[var(--glass-border)] print:border-black/10 space-y-2 text-xs">
+                <div className="flex justify-between opacity-80">
+                  <span>جمع کل اقلام:</span>
+                  <span className="font-mono">{foundOrder.totalAmount.toLocaleString("fa-IR")} تومان</span>
+                </div>
+                {foundOrder.discountAmount > 0 && (
+                  <div className="flex justify-between text-green-400 print:text-black font-bold">
+                    <span>مبلغ تخفیف:</span>
+                    <span className="font-mono">- {foundOrder.discountAmount.toLocaleString("fa-IR")} تومان</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-black text-[var(--accent-blue)] print:text-black pt-2 border-t border-white/10 print:border-black/10">
+                  <span>مبلغ قابل پرداخت:</span>
+                  <span className="font-mono">{foundOrder.finalAmount.toLocaleString("fa-IR")} تومان</span>
+                </div>
+              </div>
+
+              {/* پانویس فاکتور */}
+              <div className="pt-4 border-t border-white/10 print:border-black/20 flex justify-between items-end text-[10px] opacity-70 print:opacity-100">
+                <div>
+                  <p>• این فاکتور به‌صورت الکترونیکی و هوشمند صادر شده و معتبر می‌باشد.</p>
+                  <p>• از اعتماد و خرید شما سپاسگزاریم.</p>
+                </div>
+                <div className="text-center font-bold">
+                  <p>مهر و امضای فروشگاه</p>
+                  <span className="block mt-4 text-[var(--accent-blue)] print:text-black font-black">
+                    {siteInfo?.storeName || "BitByPouria"}
                   </span>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* خلاصه فاکتور مالی */}
-          <div className="p-4 rounded-2xl bg-black/30 border border-white/10 space-y-2 font-bold">
-            <div className="flex justify-between opacity-70">
-              <span>مبلغ کل کالاها:</span>
-              <span className="font-mono">{currentOrder.totalAmount.toLocaleString("fa-IR")} تومان</span>
-            </div>
-            {currentOrder.discountAmount > 0 && (
-              <div className="flex justify-between text-emerald-400">
-                <span>تخفیف اعمال‌شده:</span>
-                <span className="font-mono">
-                  - {currentOrder.discountAmount.toLocaleString("fa-IR")} تومان
-                </span>
               </div>
-            )}
-            <div className="flex justify-between text-sm text-indigo-300 pt-2 border-t border-white/10 font-black">
-              <span>مبلغ نهایی پرداختی:</span>
-              <span className="font-mono text-base">
-                {currentOrder.finalAmount.toLocaleString("fa-IR")} تومان
-              </span>
+
             </div>
           </div>
-        </section>
-      )}
-    </div>
+        )}
+      </div>
+    </main>
   );
 }
 
 export default function TrackOrderPage() {
   return (
-    <div className="min-h-screen bg-[#07090e] text-white font-sans flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
-      <Header />
-      <main className="flex-1">
-        <Suspense fallback={<div className="text-center py-20 text-xs">درحال دریافت اطلاعات...</div>}>
-          <TrackOrderContent />
-        </Suspense>
-      </main>
-      <Footer />
-    </div>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">درحال بارگذاری فاکتور...</div>}>
+      <TrackOrderContent />
+    </Suspense>
   );
 }

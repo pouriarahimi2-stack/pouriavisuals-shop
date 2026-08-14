@@ -43,3 +43,6 @@ next-env.d.ts
 .vercel
 backup.bat 
 pouriavisuals-shop/ 
+*.zip 
+backup.bat 
+pouriavisuals-shop/ 

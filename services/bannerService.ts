@@ -1,68 +1,90 @@
-export interface HeroBanner {
+import { supabase } from "@/lib/supabase";
+
+export interface Banner {
   id: string;
   title: string;
-  subtitle: string;
-  buttonText: string;
-  buttonLink: string;
-  imageUrl: string;
-  badgeText?: string;
-  isActive: boolean;
+  subtitle?: string;
+  image_url: string;
+  link_url?: string;
+  position?: "hero" | "middle" | "side";
+  is_active: boolean;
+  created_at?: string;
 }
 
-const STORAGE_KEY = "app_banners_db";
-
-const DEFAULT_BANNERS: HeroBanner[] = [
-  {
-    id: "banner-1",
-    title: "نسل جدید جادو با آیفون ۱۶ پرو",
-    subtitle: "با بدنه تیتانیومی بسیار سبک و پردازنده فوق‌العاده قوی A18 Pro",
-    buttonText: "خرید و بررسی",
-    buttonLink: "#products",
-    imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1200",
-    badgeText: "پیش‌فروش ویژه",
-    isActive: true,
-  },
-];
+const STORAGE_KEY = "site_banners_db";
 
 export const bannerService = {
-  getBanners: (): HeroBanner[] => {
-    if (typeof window === "undefined") return DEFAULT_BANNERS;
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_BANNERS));
-      return DEFAULT_BANNERS;
-    }
+  async getAll(): Promise<Banner[]> {
     try {
-      return JSON.parse(saved);
-    } catch {
-      return DEFAULT_BANNERS;
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("banners")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          return data;
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase banners fetch failed:", err);
     }
+
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem(STORAGE_KEY);
+      if (local !== null) return JSON.parse(local);
+    }
+    return [];
   },
 
-  addBanner: (banner: Omit<HeroBanner, "id">): HeroBanner[] => {
-    const banners = bannerService.getBanners();
-    const newBanner: HeroBanner = {
-      ...banner,
-      id: `banner-${Date.now()}`,
-    };
-    const updated = [newBanner, ...banners];
+  async create(banner: Banner): Promise<{ success: boolean; data?: Banner }> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from("banners").insert([banner]).select();
+        if (!error && data && data.length > 0) {
+          const current = await this.getAll();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify([data[0], ...current]));
+          return { success: true, data: data[0] };
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase banner insert failed:", err);
+    }
+
+    const current = await this.getAll();
+    const updated = [banner, ...current];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+    return { success: true, data: banner };
   },
 
-  updateBanner: (updatedBanner: HeroBanner): HeroBanner[] => {
-    const banners = bannerService.getBanners();
-    const updated = banners.map((b) =>
-      b.id === updatedBanner.id ? updatedBanner : b
-    );
+  async update(id: string, updates: Partial<Banner>): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("banners").update(updates).eq("id", id);
+      }
+    } catch (err) {
+      console.warn("Supabase banner update failed:", err);
+    }
+
+    const current = await this.getAll();
+    const updated = current.map((b) => (b.id === id ? { ...b, ...updates } : b));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+    return true;
   },
 
-  deleteBanner: (id: string): HeroBanner[] => {
-    const banners = bannerService.getBanners();
-    const updated = banners.filter((b) => b.id !== id);
+  async delete(id: string): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("banners").delete().eq("id", id);
+      }
+    } catch (err) {
+      console.warn("Supabase banner delete failed:", err);
+    }
+
+    const current = await this.getAll();
+    const updated = current.filter((b) => b.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+    return true;
   },
 };

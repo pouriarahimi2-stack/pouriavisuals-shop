@@ -1,50 +1,109 @@
+import { supabase } from "@/lib/supabase";
+
 export interface MenuItem {
   id: string;
-  label: string;
-  href: string;
+  title: string;
+  url: string;
+  order_index?: number;
+  is_active: boolean;
+  created_at?: string;
 }
 
-const STORAGE_KEY = "app_menu_items_db";
-
-const DEFAULT_MENU_ITEMS: MenuItem[] = [
-  { id: "1", label: "خانه", href: "/" },
-  { id: "2", label: "محصولات", href: "/#products" },
-  { id: "3", label: "پیگیری سفارش", href: "/track-order" },
-];
+const STORAGE_KEY = "site_menus_db";
 
 export const menuService = {
-  getMenuItems(): MenuItem[] {
-    if (typeof window === "undefined") return DEFAULT_MENU_ITEMS;
+  // دریافت تمامی منوها از Supabase با کش محلی
+  async getAll(): Promise<MenuItem[]> {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_MENU_ITEMS));
-        return DEFAULT_MENU_ITEMS;
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("menus")
+          .select("*")
+          .order("order_index", { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          }
+          return data;
+        }
       }
-      return JSON.parse(saved);
-    } catch {
-      return DEFAULT_MENU_ITEMS;
+    } catch (err) {
+      console.warn("Supabase menus fetch failed:", err);
     }
-  },
 
-  saveMenuItems(items: MenuItem[]): void {
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      const local = localStorage.getItem(STORAGE_KEY);
+      if (local !== null) return JSON.parse(local);
     }
+
+    return [
+      { id: "menu-1", title: "صفحه اصلی", url: "/", order_index: 1, is_active: true },
+      { id: "menu-2", title: "محصولات", url: "/products", order_index: 2, is_active: true },
+      { id: "menu-3", title: "مجله و بلاگ", url: "/blog", order_index: 3, is_active: true },
+      { id: "menu-4", title: "پیگیری سفارش", url: "/track-order", order_index: 4, is_active: true },
+      { id: "menu-5", title: "درباره ما", url: "/about", order_index: 5, is_active: true },
+      { id: "menu-6", title: "تماس با ما", url: "/contact", order_index: 6, is_active: true },
+    ];
   },
 
-  addMenuItem(item: Omit<MenuItem, "id">): MenuItem {
-    const items = this.getMenuItems();
-    const newItem = { ...item, id: Date.now().toString() };
-    const updated = [...items, newItem];
-    this.saveMenuItems(updated);
-    return newItem;
+  // الیاس‌های مورد نیاز برای سازگاری کامل با Footer.tsx و Navbar
+  async getMenuItems(): Promise<MenuItem[]> {
+    return this.getAll();
   },
 
-  deleteMenuItem(id: string): MenuItem[] {
-    const items = this.getMenuItems();
-    const updated = items.filter((i) => i.id !== id);
-    this.saveMenuItems(updated);
-    return updated;
+  async getMenus(): Promise<MenuItem[]> {
+    return this.getAll();
+  },
+
+  async create(menu: MenuItem): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("menus").insert([menu]);
+      }
+    } catch (err) {
+      console.warn("Supabase menu create failed:", err);
+    }
+
+    const current = await this.getAll();
+    const updated = [...current, menu];
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+    return true;
+  },
+
+  async update(id: string, updates: Partial<MenuItem>): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("menus").update(updates).eq("id", id);
+      }
+    } catch (err) {
+      console.warn("Supabase menu update failed:", err);
+    }
+
+    const current = await this.getAll();
+    const updated = current.map((m) => (m.id === id ? { ...m, ...updates } : m));
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+    return true;
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("menus").delete().eq("id", id);
+      }
+    } catch (err) {
+      console.warn("Supabase menu delete failed:", err);
+    }
+
+    const current = await this.getAll();
+    const updated = current.filter((m) => m.id !== id);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+    return true;
   },
 };

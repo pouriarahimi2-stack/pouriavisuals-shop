@@ -55,7 +55,7 @@ export default function AdminGlobalSearch() {
     setSelectedBlog(null);
   };
 
-  // 🔍 جستجوی هوشمند
+  // 🔍 جستجوی هوشمند و یکپارچه
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
@@ -65,20 +65,28 @@ export default function AdminGlobalSearch() {
     const q = query.toLowerCase().trim();
     const matchedResults: SearchResultItem[] = [];
 
-    // ۱. محصولات
+    // ۱. جستجو در محصولات
     try {
-      const products = productService ? productService.getProducts() : [];
+      let products: any[] = [];
+      if (typeof productService.getProducts === "function") {
+        products = productService.getProducts();
+      } else if (typeof productService.getAll === "function") {
+        const local = localStorage.getItem("apple_shop_products_cache");
+        if (local) products = JSON.parse(local);
+      }
       products.forEach((p) => {
         if (
           p.name?.toLowerCase().includes(q) ||
+          p.title_fa?.toLowerCase().includes(q) ||
           p.category?.toLowerCase().includes(q) ||
+          p.category_id?.toLowerCase().includes(q) ||
           p.price?.toString().includes(q)
         ) {
           matchedResults.push({
             id: p.id,
             type: "product",
             title: p.name,
-            subtitle: `دسته‌بندی: ${p.category || "عمومی"} | قیمت: ${Number(p.price || 0).toLocaleString("fa-IR")} تومان`,
+            subtitle: `دسته‌بندی: ${p.category_id || p.category || "عمومی"} | قیمت: ${Number(p.price || 0).toLocaleString("fa-IR")} تومان`,
             badge: "📦 محصول",
             rawItem: p,
           });
@@ -88,20 +96,28 @@ export default function AdminGlobalSearch() {
       console.error(err);
     }
 
-    // ۲. سفارشات
+    // ۲. جستجو در سفارشات
     try {
-      const orders: Order[] = orderService ? orderService.getOrders() : [];
-      orders.forEach((o) => {
+      let orders: Order[] = [];
+      if (typeof orderService.getOrders === "function") {
+        orders = orderService.getOrders();
+      } else {
+        orders = JSON.parse(localStorage.getItem("admin_orders_cache") || localStorage.getItem("site_orders") || localStorage.getItem("orders") || "[]");
+      }
+      orders.forEach((o: any) => {
+        const cName = o.customer_name || o.customerName || "";
+        const cPhone = o.customer_phone || o.customerPhone || o.phone || "";
+        const total = o.total_amount || o.finalAmount || o.totalPrice || 0;
         if (
           o.id?.toLowerCase().includes(q) ||
-          o.customerName?.toLowerCase().includes(q) ||
-          o.customerPhone?.includes(q)
+          cName.toLowerCase().includes(q) ||
+          cPhone.includes(q)
         ) {
           matchedResults.push({
             id: o.id,
             type: "order",
-            title: `سفارش #${o.id} - ${o.customerName}`,
-            subtitle: `شماره تماس: ${o.customerPhone} | مبلغ: ${(o.finalAmount || 0).toLocaleString("fa-IR")} تومان`,
+            title: `سفارش #${o.id} - ${cName}`,
+            subtitle: `تلفن: ${cPhone} | مبلغ: ${Number(total).toLocaleString("fa-IR")} تومان`,
             badge: "📑 سفارش",
             rawItem: o,
           });
@@ -111,7 +127,7 @@ export default function AdminGlobalSearch() {
       console.error(err);
     }
 
-    // ۳. مقالات
+    // ۳. جستجو در مقالات سئو
     try {
       const blogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
       blogs.forEach((b: any) => {
@@ -120,7 +136,7 @@ export default function AdminGlobalSearch() {
             id: b.id,
             type: "blog",
             title: b.title,
-            subtitle: `تاریخ: ${b.createdAt || "ثبت نشده"}`,
+            subtitle: `تاریخ: ${b.createdAt || "امروز"} | وضعیت: ${b.isVisible !== false ? "نمایش" : "مخفی"}`,
             badge: "📚 مقاله",
             rawItem: b,
           });
@@ -134,17 +150,23 @@ export default function AdminGlobalSearch() {
   }, [query]);
 
   // ⚡ اکشن‌های مستقیم روی محصولات
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
-    productService.updateProduct(selectedProduct.id, selectedProduct);
-    showToast("✅ مشخصات و قیمت محصول با موفقیت بروزرسانی شد!");
+    if (typeof productService.saveProduct === "function") {
+      await productService.saveProduct(selectedProduct);
+    } else if (typeof productService.updateProduct === "function") {
+      productService.updateProduct(selectedProduct.id, selectedProduct);
+    }
+    showToast("✅ مشخصات و موجودی کالا بروزرسانی شد!");
     setSelectedProduct(null);
   };
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
     if (confirm("آیا از حذف این محصول اطمینان دارید؟")) {
-      productService.deleteProduct(id);
+      if (typeof productService.deleteProduct === "function") {
+        await productService.deleteProduct(id);
+      }
       showToast("🗑️ محصول با موفقیت حذف شد.");
       setSelectedProduct(null);
       setQuery("");
@@ -153,7 +175,14 @@ export default function AdminGlobalSearch() {
 
   // ⚡ اکشن‌های مستقیم روی سفارشات
   const handleOrderStatusChange = (orderId: string, newStatus: Order["status"]) => {
-    orderService.updateOrderStatus(orderId, newStatus);
+    if (typeof orderService.updateOrderStatus === "function") {
+      orderService.updateOrderStatus(orderId, newStatus);
+    }
+    const localOrders = JSON.parse(localStorage.getItem("admin_orders_cache") || localStorage.getItem("site_orders") || "[]");
+    const updated = localOrders.map((o: any) => (o.id === orderId ? { ...o, status: newStatus } : o));
+    localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
+    localStorage.setItem("site_orders", JSON.stringify(updated));
+
     if (selectedOrder) setSelectedOrder({ ...selectedOrder, status: newStatus });
     showToast("🔄 وضعیت سفارش بروزرسانی شد.");
   };
@@ -183,46 +212,45 @@ export default function AdminGlobalSearch() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-sans select-none text-xs">
-      {/* پیام توست */}
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans select-none text-xs text-[var(--text-primary)]">
       {toast && (
-        <div className="fixed bottom-6 left-6 z-50 px-5 py-3 rounded-2xl bg-indigo-900 text-white font-bold shadow-2xl border border-white/20 animate-bounce">
+        <div className="fixed bottom-6 left-6 z-50 px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold shadow-2xl border border-white/20 animate-bounce">
           {toast}
         </div>
       )}
 
-      <div className="liquid-glass-card max-w-2xl w-full p-5 space-y-4 border-white/20 shadow-2xl bg-slate-950/95 text-white rounded-3xl">
-        {/* کادر ورودی سرچ */}
-        <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-          <span className="text-base">🚀</span>
+      <div className="liquid-glass-card max-w-2xl w-full p-5 space-y-4 border border-[var(--card-border)] shadow-2xl bg-[var(--modal-bg)] text-[var(--text-primary)] rounded-3xl">
+        {/* کادر ورودی جستجو */}
+        <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-3">
+          <span className="text-base">🔍</span>
           <input
             type="text"
             autoFocus
-            placeholder="دستیار هوشمند: نام محصول، شماره سفارش، خریدار یا عنوان مقاله را جستجو و در لحظه ویرایش کنید..."
+            placeholder="جستجوی سریع: نام محصول، شناسه فاکتور، تلفن خریدار یا عنوان مقاله..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-white placeholder:text-white/40"
+            className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
           />
           <button
             onClick={() => setIsOpen(false)}
-            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-[10px] font-bold text-white/70"
+            className="px-2.5 py-1 rounded-xl bg-[var(--input-bg)] hover:opacity-80 text-[10px] font-bold text-[var(--text-secondary)] border border-[var(--card-border)] cursor-pointer"
           >
             Esc ✕
           </button>
         </div>
 
-        {/* نتایج سرچ */}
+        {/* لیست نتایج */}
         {!selectedProduct && !selectedOrder && !selectedBlog && (
           <div className="max-h-80 overflow-y-auto space-y-2">
             {query.trim() && results.length === 0 && (
-              <div className="text-center py-8 text-white/50 text-[11px]">
-                موردی مطابق با «{query}» در دیتابیس یافت نشد.
+              <div className="text-center py-8 text-[var(--text-secondary)] text-[11px] font-bold">
+                موردی مطابق با «{query}» در پایگاه داده یافت نشد.
               </div>
             )}
 
             {!query.trim() && (
-              <div className="text-center py-6 text-white/40 text-[11px]">
-                نام آیتم مورد نظر را وارد کنید تا ابزارهای تغییر در لحظه برای شما فعال شود.
+              <div className="text-center py-6 text-[var(--text-secondary)] text-[11px] font-bold">
+                کلمه کلیدی مورد نظر را بنویسید تا ابزارهای تغییر در لحظه فعال شوند.
               </div>
             )}
 
@@ -234,18 +262,18 @@ export default function AdminGlobalSearch() {
                   if (res.type === "order") setSelectedOrder(res.rawItem);
                   if (res.type === "blog") setSelectedBlog(res.rawItem);
                 }}
-                className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-indigo-400 transition cursor-pointer flex justify-between items-center gap-3 group"
+                className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex justify-between items-center gap-3 group"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-indigo-200 group-hover:text-indigo-400 transition">
+                    <span className="font-extrabold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition">
                       {res.title}
                     </span>
                   </div>
-                  <p className="text-[10px] opacity-60 leading-relaxed">{res.subtitle}</p>
+                  <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed font-medium">{res.subtitle}</p>
                 </div>
 
-                <span className="px-3 py-1 rounded-xl bg-indigo-600/30 text-indigo-200 border border-indigo-500/30 text-[10px] font-bold shrink-0">
+                <span className="px-3 py-1 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-[10px] font-bold shrink-0">
                   {res.badge} ⚡ مدیریت
                 </span>
               </div>
@@ -255,62 +283,62 @@ export default function AdminGlobalSearch() {
 
         {/* 🛠️ پنل ویرایش سریع محصول */}
         {selectedProduct && (
-          <form onSubmit={handleSaveProduct} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3 animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-              <span className="font-extrabold text-indigo-300">📦 ویرایش سریع محصول: {selectedProduct.name}</span>
-              <button type="button" onClick={() => setSelectedProduct(null)} className="text-white/60 hover:text-white">✕ بازگشت</button>
+          <form onSubmit={handleSaveProduct} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 animate-fadeIn">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2">
+              <span className="font-extrabold text-[var(--accent-blue)]">📦 ویرایش سریع کالا: {selectedProduct.name}</span>
+              <button type="button" onClick={() => setSelectedProduct(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold cursor-pointer">✕ بازگشت</button>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block opacity-70 font-bold mb-1">نام محصول</label>
+                <label className="block text-[var(--text-secondary)] font-bold mb-1">نام محصول</label>
                 <input
                   type="text"
                   value={selectedProduct.name}
                   onChange={(e) => setSelectedProduct({ ...selectedProduct, name: e.target.value })}
-                  className="w-full p-2 rounded-xl bg-black/30 border border-white/10 outline-none"
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-[var(--accent-blue)]"
                 />
               </div>
               <div>
-                <label className="block opacity-70 font-bold mb-1">قیمت (تومان)</label>
+                <label className="block text-[var(--text-secondary)] font-bold mb-1">قیمت (تومان)</label>
                 <input
                   type="number"
                   value={selectedProduct.price}
                   onChange={(e) => setSelectedProduct({ ...selectedProduct, price: Number(e.target.value) })}
-                  className="w-full p-2 rounded-xl bg-black/30 border border-white/10 outline-none font-mono"
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-mono font-bold focus:border-[var(--accent-blue)]"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block opacity-70 font-bold mb-1">دسته‌بندی</label>
+                <label className="block text-[var(--text-secondary)] font-bold mb-1">دسته‌بندی</label>
                 <input
                   type="text"
-                  value={selectedProduct.category || ""}
-                  onChange={(e) => setSelectedProduct({ ...selectedProduct, category: e.target.value })}
-                  className="w-full p-2 rounded-xl bg-black/30 border border-white/10 outline-none"
+                  value={selectedProduct.category_id || selectedProduct.category || ""}
+                  onChange={(e) => setSelectedProduct({ ...selectedProduct, category_id: e.target.value, category: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-[var(--accent-blue)]"
                 />
               </div>
               <div>
-                <label className="block opacity-70 font-bold mb-1">موجودی انبار</label>
+                <label className="block text-[var(--text-secondary)] font-bold mb-1">موجودی انبار</label>
                 <input
                   type="number"
                   value={selectedProduct.stock || 0}
                   onChange={(e) => setSelectedProduct({ ...selectedProduct, stock: Number(e.target.value) })}
-                  className="w-full p-2 rounded-xl bg-black/30 border border-white/10 outline-none font-mono"
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-mono font-bold focus:border-[var(--accent-blue)]"
                 />
               </div>
             </div>
 
             <div className="flex gap-2 pt-2">
-              <button type="submit" className="flex-1 py-2 rounded-xl bg-indigo-600 font-bold hover:bg-indigo-500 transition">
+              <button type="submit" className="flex-1 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold hover:opacity-90 transition shadow-md cursor-pointer">
                 ذخیره تغییرات 💾
               </button>
               <button
                 type="button"
                 onClick={() => handleDeleteProduct(selectedProduct.id)}
-                className="px-4 py-2 rounded-xl bg-rose-600/30 text-rose-300 border border-rose-500/30 font-bold hover:bg-rose-600 transition"
+                className="px-4 py-2.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
               >
                 🗑️ حذف
               </button>
@@ -320,27 +348,30 @@ export default function AdminGlobalSearch() {
 
         {/* 🛠️ پنل اکشن سریع سفارش */}
         {selectedOrder && (
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3 animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-              <span className="font-extrabold text-indigo-300">📑 اکشن سریع سفارش #{selectedOrder.id}</span>
-              <button type="button" onClick={() => setSelectedOrder(null)} className="text-white/60 hover:text-white">✕ بازگشت</button>
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 animate-fadeIn">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2">
+              <span className="font-extrabold text-[var(--accent-blue)]">📑 اکشن سریع سفارش #{selectedOrder.id}</span>
+              <button type="button" onClick={() => setSelectedOrder(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold cursor-pointer">✕ بازگشت</button>
             </div>
 
-            <div className="space-y-1.5 opacity-90">
-              <p><strong>خریدار:</strong> {selectedOrder.customerName} ({selectedOrder.customerPhone})</p>
-              <p><strong>آدرس ارسال:</strong> {selectedOrder.customerAddress}</p>
-              <p><strong>مبلغ فاکتور:</strong> <span className="font-mono text-indigo-300 font-bold">{selectedOrder.finalAmount.toLocaleString("fa-IR")}</span> تومان</p>
+            <div className="space-y-1.5 text-[var(--text-secondary)] font-medium">
+              <p><strong className="text-[var(--text-primary)]">خریدار:</strong> {(selectedOrder as any).customer_name || selectedOrder.customerName} ({(selectedOrder as any).customer_phone || selectedOrder.customerPhone || selectedOrder.phone})</p>
+              <p><strong className="text-[var(--text-primary)]">آدرس ارسال:</strong> {(selectedOrder as any).shipping_address || selectedOrder.customerAddress || selectedOrder.address}</p>
+              <p><strong className="text-[var(--text-primary)]">مبلغ فاکتور:</strong> <span className="font-mono text-[var(--accent-blue)] font-bold">{Number((selectedOrder as any).total_amount || selectedOrder.finalAmount || selectedOrder.total || 0).toLocaleString("fa-IR")}</span> تومان</p>
             </div>
 
-            <div className="flex items-center gap-2 pt-2 border-t border-white/10">
-              <label className="font-bold">تغییر وضعیت پستی:</label>
+            <div className="flex items-center gap-2 pt-2 border-t border-[var(--card-border)]">
+              <label className="font-bold text-[var(--text-primary)]">تغییر وضعیت سفارش:</label>
               <select
                 value={selectedOrder.status}
                 onChange={(e) => handleOrderStatusChange(selectedOrder.id, e.target.value as Order["status"])}
-                className="p-2 rounded-xl bg-slate-900 border border-white/20 font-bold outline-none cursor-pointer"
+                className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none cursor-pointer focus:border-[var(--accent-blue)]"
               >
-                <option value="pending">⏳ در حال پردازش</option>
-                <option value="completed">✅ تکمیل شده</option>
+                <option value="pending">⏳ در حال پردازش / در انتظار</option>
+                <option value="paid">💳 پرداخت شده</option>
+                <option value="processing">📦 در حال بسته‌بندی</option>
+                <option value="shipped">🚚 ارسال شده</option>
+                <option value="delivered">✅ تحویل شده</option>
                 <option value="cancelled">❌ لغو شده</option>
               </select>
             </div>
@@ -349,24 +380,24 @@ export default function AdminGlobalSearch() {
 
         {/* 🛠️ پنل اکشن سریع مقاله */}
         {selectedBlog && (
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3 animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-              <span className="font-extrabold text-indigo-300">📚 مقاله: {selectedBlog.title}</span>
-              <button type="button" onClick={() => setSelectedBlog(null)} className="text-white/60 hover:text-white">✕ بازگشت</button>
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 animate-fadeIn">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2">
+              <span className="font-extrabold text-[var(--accent-blue)]">📚 مقاله: {selectedBlog.title}</span>
+              <button type="button" onClick={() => setSelectedBlog(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold cursor-pointer">✕ بازگشت</button>
             </div>
 
-            <p className="opacity-70">تاریخ ثبت: {selectedBlog.createdAt || "امروز"}</p>
+            <p className="text-[var(--text-secondary)] font-medium">تاریخ انتشار: {selectedBlog.createdAt || "امروز"}</p>
 
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => handleToggleBlogVisibility(selectedBlog.id)}
-                className="flex-1 py-2 rounded-xl bg-indigo-600 font-bold hover:bg-indigo-500 transition"
+                className="flex-1 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold hover:opacity-90 transition shadow-md cursor-pointer"
               >
                 {selectedBlog.isVisible !== false ? "👁️ مخفی‌سازی در سایت" : "✅ انتشار و نمایش"}
               </button>
               <button
                 onClick={() => handleDeleteBlog(selectedBlog.id)}
-                className="px-4 py-2 rounded-xl bg-rose-600/30 text-rose-300 border border-rose-500/30 font-bold hover:bg-rose-600 transition"
+                className="px-4 py-2.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
               >
                 🗑️ حذف مقاله
               </button>

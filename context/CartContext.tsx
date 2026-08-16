@@ -11,6 +11,7 @@ export interface CartItem {
   discountPrice?: number;
   image: string;
   quantity: number;
+  selectedColor?: string;
 }
 
 export interface CustomerDetails {
@@ -22,6 +23,7 @@ export interface CustomerDetails {
   isPhoneVerified?: boolean;
   otpHash?: string;
   otpSentAt?: string;
+  notes?: string;
 }
 
 interface CartContextType {
@@ -33,9 +35,9 @@ interface CartContextType {
   isCartOpen: boolean;
   toggleCart: () => void;
   appliedCoupon: Coupon | null;
-  applyCoupon: (code: string) => { success: boolean; message: string };
+  applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
   removeCoupon: () => void;
-  submitOrder: (customer: CustomerDetails) => Order;
+  submitOrder: (customer: CustomerDetails) => Promise<Order>;
   toastMessage: string | null;
 }
 
@@ -67,11 +69,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addToCart = (product: Omit<CartItem, "quantity">) => {
-    const existing = cartItems.find((item) => item.id === product.id);
+    const existing = cartItems.find((item) => item.id === product.id && item.selectedColor === product.selectedColor);
     let updated: CartItem[];
     if (existing) {
       updated = cartItems.map((item) =>
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        item.id === product.id && item.selectedColor === product.selectedColor
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
       );
     } else {
       updated = [...cartItems, { ...product, quantity: 1 }];
@@ -106,11 +110,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setAppliedCoupon(null);
   };
 
-  const applyCoupon = (code: string) => {
-    const result = couponService.validateCoupon(code);
+  const applyCoupon = async (code: string) => {
+    const cleanCode = code.trim().toUpperCase();
+    const rawTotal = cartItems.reduce(
+      (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
+      0
+    );
+
+    const result = await couponService.validateCoupon(cleanCode, rawTotal);
     if (result.valid && result.coupon) {
       setAppliedCoupon(result.coupon);
-      showToast(`🎉 کد تخفیف "${code.toUpperCase()}" اعمال شد.`);
+      showToast(`🎉 کد تخفیف "${cleanCode}" با موفقیت اعمال شد.`);
       return { success: true, message: "کد تخفیف اعمال شد!" };
     }
     showToast(`⚠️ ${result.message}`);
@@ -122,7 +132,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     showToast("کد تخفیف حذف شد.");
   };
 
-  const submitOrder = (customer: CustomerDetails): Order => {
+  const submitOrder = async (customer: CustomerDetails): Promise<Order> => {
     const rawTotal = cartItems.reduce(
       (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
       0
@@ -130,40 +140,81 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     let discountAmount = 0;
     if (appliedCoupon) {
-      discountAmount = (rawTotal * appliedCoupon.discountPercent) / 100;
-      if (appliedCoupon.maxDiscount && discountAmount > appliedCoupon.maxDiscount) {
-        discountAmount = appliedCoupon.maxDiscount;
+      if (appliedCoupon.discount_type === "percent") {
+        discountAmount = (rawTotal * Number(appliedCoupon.discount_value)) / 100;
+        if (appliedCoupon.max_discount_amount && discountAmount > Number(appliedCoupon.max_discount_amount)) {
+          discountAmount = Number(appliedCoupon.max_discount_amount);
+        }
+      } else {
+        discountAmount = Number(appliedCoupon.discount_value);
       }
     }
 
     const finalAmount = Math.max(0, rawTotal - discountAmount);
 
-    const newOrder = orderService.addOrder({
-      customerName: `${customer.firstName} ${customer.lastName}`,
+    const orderPayload = {
+      customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+      customer_name: `${customer.firstName} ${customer.lastName}`.trim(),
       customerPhone: customer.phone,
-      isPhoneVerified: customer.isPhoneVerified ?? true,
-      otpHash: customer.otpHash,
-      otpSentAt: customer.otpSentAt,
+      customer_phone: customer.phone,
       customerAddress: customer.address,
+      shipping_address: customer.address,
       postalCode: customer.postalCode,
-      isPostalCodeVerifiedGNAF: true,
+      notes: customer.notes,
       items: cartItems.map((i) => ({
+        product_id: i.id,
         productId: i.id,
+        product_name: i.title,
         title: i.title,
-        price: i.price,
-        discountPrice: i.discountPrice,
+        product_price: i.discountPrice ?? i.price,
+        price: i.discountPrice ?? i.price,
         quantity: i.quantity,
+        selected_color: i.selectedColor,
+        total_price: (i.discountPrice ?? i.price) * i.quantity,
         image: i.image,
       })),
       totalAmount: rawTotal,
+      total_amount: finalAmount,
       discountAmount,
       finalAmount,
-      paymentStatus: "unpaid",
-    });
+      status: "paid" as const,
+      payment_method: "درگاه آنلاین شتاب",
+    };
+
+    let createdOrder: any;
+    if (typeof orderService.addOrder === "function") {
+      createdOrder = await orderService.addOrder(orderPayload);
+    } else {
+      createdOrder = { id: `ORD-${Date.now().toString().slice(-6)}`, ...orderPayload, created_at: new Date().toISOString() };
+      const local = JSON.parse(localStorage.getItem("admin_orders_cache") || localStorage.getItem("site_orders") || "[]");
+      local.unshift(createdOrder);
+      localStorage.setItem("admin_orders_cache", JSON.stringify(local));
+      localStorage.setItem("site_orders", JSON.stringify(local));
+    }
+
+    // ثبت خودکار ترخیص کالا در لاگ انبارداری
+    try {
+      const savedLogs = JSON.parse(localStorage.getItem("inventory_stock_logs") || "[]");
+      const now = new Date();
+      cartItems.forEach((item) => {
+        savedLogs.unshift({
+          id: `log-${Date.now()}-${Math.random()}`,
+          productId: item.id,
+          productName: item.title,
+          type: "out",
+          quantity: item.quantity,
+          date: now.toLocaleDateString("fa-IR"),
+          time: now.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }),
+          reason: `ثبت سفارش جدید آنلاین (${createdOrder.customer_name || createdOrder.customerName})`,
+          operator: "درگاه تسویه‌حساب مشتری",
+        });
+      });
+      localStorage.setItem("inventory_stock_logs", JSON.stringify(savedLogs));
+    } catch {}
 
     clearCart();
     setIsCartOpen(false);
-    return newOrder;
+    return createdOrder;
   };
 
   return (
@@ -185,7 +236,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     >
       {children}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-slate-900/95 text-white font-bold text-xs shadow-2xl border border-white/20 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-[var(--modal-bg)] text-[var(--text-primary)] font-bold text-xs shadow-2xl border border-[var(--card-border)] animate-bounce">
           {toastMessage}
         </div>
       )}

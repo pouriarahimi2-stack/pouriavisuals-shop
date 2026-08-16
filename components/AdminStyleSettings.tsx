@@ -12,7 +12,6 @@ export default function AdminStyleSettings() {
   const [accentColor, setAccentColor] = useState("#0071e3");
 
   useEffect(() => {
-    // لود تنظیمات از LocalStorage در صورت وجود
     const savedName = localStorage.getItem("app_store_name");
     const savedFont = localStorage.getItem("app_font");
     if (savedName) setStoreName(savedName);
@@ -28,42 +27,42 @@ export default function AdminStyleSettings() {
   };
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={handleSaveSettings} className="liquid-glass-card p-6 space-y-6">
-        <h3 className="text-lg font-bold flex items-center gap-2 border-b border-[var(--glass-border)] pb-3">
+    <div className="space-y-6 font-sans text-xs text-[var(--text-primary)] select-none">
+      <form onSubmit={handleSaveSettings} className="liquid-glass-card p-6 md:p-8 rounded-3xl space-y-6 border border-[var(--card-border)] shadow-xl">
+        <h3 className="text-base font-black flex items-center gap-2 border-b border-[var(--card-border)] pb-3 text-[var(--accent-blue)]">
           <span>🎨</span> تنظیمات برندینگ و فونت سایت
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* نام فروشگاه */}
           <div className="space-y-2">
-            <label className="text-xs font-bold">نام برند / فروشگاه:</label>
+            <label className="text-xs font-bold text-[var(--text-secondary)]">نام برند / فروشگاه:</label>
             <input
               type="text"
               value={storeName}
               onChange={(e) => setStoreName(e.target.value)}
-              className="w-full p-3 rounded-xl bg-white/50 dark:bg-black/50 border border-[var(--glass-border)] text-sm outline-none"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
             />
           </div>
 
           {/* ایموجی لوگو */}
           <div className="space-y-2">
-            <label className="text-xs font-bold">ایموجی لوگو:</label>
+            <label className="text-xs font-bold text-[var(--text-secondary)]">ایموجی لوگو:</label>
             <input
               type="text"
               value={storeEmoji}
               onChange={(e) => setStoreEmoji(e.target.value)}
-              className="w-full p-3 rounded-xl bg-white/50 dark:bg-black/50 border border-[var(--glass-border)] text-sm outline-none"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
             />
           </div>
 
           {/* انتخاب فونت اصلی سایت */}
           <div className="space-y-2">
-            <label className="text-xs font-bold">فونت اصلی سایت:</label>
+            <label className="text-xs font-bold text-[var(--text-secondary)]">فونت اصلی سایت:</label>
             <select
               value={selectedFont}
               onChange={(e) => setSelectedFont(e.target.value)}
-              className="w-full p-3 rounded-xl bg-white/50 dark:bg-black/50 border border-[var(--glass-border)] text-sm outline-none"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer focus:border-[var(--accent-blue)]"
             >
               <option value="Vazirmatn">وزیر متن (Vazirmatn)</option>
               <option value="Shabnam">شبنم (Shabnam)</option>
@@ -74,33 +73,33 @@ export default function AdminStyleSettings() {
 
           {/* رنگ اصلی (Accent Color) */}
           <div className="space-y-2">
-            <label className="text-xs font-bold">رنگ اصلی دکمه‌ها (Accent Color):</label>
+            <label className="text-xs font-bold text-[var(--text-secondary)]">رنگ اصلی دکمه‌ها (Accent Color):</label>
             <div className="flex items-center gap-3">
               <input
                 type="color"
                 value={accentColor}
                 onChange={(e) => setAccentColor(e.target.value)}
-                className="w-12 h-11 p-1 rounded-xl cursor-pointer bg-transparent border border-[var(--glass-border)]"
+                className="w-12 h-11 p-1 rounded-xl cursor-pointer bg-transparent border border-[var(--card-border)]"
               />
-              <span className="text-xs font-mono">{accentColor}</span>
+              <span className="text-xs font-mono font-bold text-[var(--text-primary)]">{accentColor}</span>
             </div>
           </div>
         </div>
 
         {/* متن نوار اعلانات */}
         <div className="space-y-2">
-          <label className="text-xs font-bold">متن نوار اعلانات هدر:</label>
+          <label className="text-xs font-bold text-[var(--text-secondary)]">متن نوار اعلانات هدر:</label>
           <input
             type="text"
             value={announcement}
             onChange={(e) => setAnnouncement(e.target.value)}
-            className="w-full p-3 rounded-xl bg-white/50 dark:bg-black/50 border border-[var(--glass-border)] text-sm outline-none"
+            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
           />
         </div>
 
         <button
           type="submit"
-          className="py-3 px-6 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-sm cursor-pointer shadow-md hover:opacity-90 transition-opacity"
+          className="py-3.5 px-6 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer shadow-md hover:opacity-90 transition"
         >
           ذخیره تغییرات برندینگ 💾
         </button>

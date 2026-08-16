@@ -1,49 +1,62 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import ClientLayoutEnhancer from "@/components/ClientLayoutEnhancer";
+import ThemeProvider from "@/ThemeProvider";
 import { CartProvider } from "@/context/CartContext";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import LayoutShell from "@/components/LayoutShell";
+import AIAssistantChat from "@/components/AIAssistantChat";
+import { siteInfoService } from "@/services/siteInfoService";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+};
 
-  const loadSiteInfo = () => {
-    setSiteInfo(siteInfoService.getSiteInfo());
-  };
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const info = await siteInfoService.getAll();
+    const storeTitle = info?.storeName || info?.siteTitle || "Tech Store";
+    const aboutDesc = info?.aboutText || info?.aboutUs || "مرجع تخصصی خرید محصولات اصل";
 
-  useEffect(() => {
-    loadSiteInfo();
-    window.addEventListener("siteInfoUpdated", loadSiteInfo);
-    return () => window.removeEventListener("siteInfoUpdated", loadSiteInfo);
-  }, []);
+    return {
+      title: {
+        default: storeTitle,
+        template: `%s | ${storeTitle}`,
+      },
+      description: aboutDesc,
+      icons: {
+        icon: info?.logo || "/favicon.ico",
+      },
+    };
+  } catch (error) {
+    return {
+      title: "Tech Store",
+      description: "فروشگاه تخصصی محصولات دیجیتال",
+    };
+  }
+}
 
-  const activeFontId = siteInfo?.activeFontId || "vazir";
-  const activeCustomFont = siteInfo?.customFonts?.find((f) => f.id === activeFontId);
-
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="fa" dir="rtl" className="dark">
-      <head>
-        <title>{siteInfo?.storeName || "BitByPouria"}</title>
-        {/* رندر فونت‌های سفارشی تعریف‌شده در ادمین */}
-        {activeCustomFont && (
-          <style dangerouslySetInnerHTML={{
-            __html: `
-              @font-face {
-                font-family: 'CustomAdminFont';
-                src: url('${activeCustomFont.url}');
-                font-weight: normal;
-                font-style: normal;
-              }
-              body {
-                font-family: 'CustomAdminFont', sans-serif !important;
-              }
-            `
-          }} />
-        )}
-      </head>
-      <body className={`bg-slate-950 text-white min-h-screen antialiased ${!activeCustomFont ? activeFontId : ""}`}>
-        <CartProvider>{children}</CartProvider>
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
+      <body className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors duration-200">
+        <ThemeProvider>
+          <CartProvider>
+            <ClientLayoutEnhancer />
+            <LayoutShell>
+              {children}
+            </LayoutShell>
+            <AIAssistantChat />
+          </CartProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

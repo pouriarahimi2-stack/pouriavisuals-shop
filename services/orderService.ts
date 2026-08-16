@@ -1,100 +1,134 @@
-export interface OrderItem {
-  productId: string;
-  title: string;
-  price: number;
-  discountPrice?: number;
-  quantity: number;
-  image?: string;
-}
+import { supabase } from "@/lib/supabase";
+import { productService } from "@/services/productService";
 
 export interface Order {
   id: string;
-  customerName: string;
-  customerLastName?: string;
-  customerPhone: string;
-  isPhoneVerified: boolean;
-  otpHash?: string;
-  otpSentAt?: string;
-  customerAddress: string;
+  customer_name?: string;
+  customerName?: string;
+  customer_phone?: string;
+  customerPhone?: string;
+  shipping_address?: string;
+  shippingAddress?: string;
+  postal_code?: string;
   postalCode?: string;
-  isPostalCodeVerifiedGNAF?: boolean;
-  items: OrderItem[];
-  totalAmount: number;
-  discountAmount: number;
-  finalAmount: number;
-  status: "pending" | "completed" | "cancelled";
-  paymentStatus: "paid" | "unpaid" | "failed";
-  transactionId?: string;
-  createdAt: string;
+  items?: any[];
+  cart_items?: any[];
+  total_amount?: number;
+  totalAmount?: number;
+  discount_amount?: number;
+  coupon_code?: string | null;
+  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+  tracking_code?: string;
+  created_at?: string;
 }
 
-const STORAGE_KEY = "app_orders_db";
+const STORAGE_KEY = "site_orders_db";
 
 export const orderService = {
-  getOrders(): Order[] {
-    if (typeof window === "undefined") return [];
+  async getAllOrders(): Promise<Order[]> {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  },
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-  saveOrders(orders: Order[]): void {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-    }
-  },
-
-  addOrder(
-    orderData: Omit<Order, "id" | "status" | "paymentStatus" | "createdAt"> & {
-      paymentStatus?: Order["paymentStatus"];
-      transactionId?: string;
-    }
-  ): Order {
-    const orders = this.getOrders();
-    const newOrder: Order = {
-      ...orderData,
-      id: "ORD-" + Math.floor(100000 + Math.random() * 900000),
-      status: orderData.paymentStatus === "paid" ? "completed" : "pending",
-      paymentStatus: orderData.paymentStatus || "unpaid",
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [newOrder, ...orders];
-    this.saveOrders(updated);
-    return newOrder;
-  },
-
-  updateOrderStatus(
-    id: string,
-    status: Order["status"],
-    paymentStatus?: Order["paymentStatus"]
-  ): Order[] {
-    const orders = this.getOrders();
-    const updated = orders.map((o) => {
-      if (o.id === id) {
-        return {
-          ...o,
-          status,
-          ...(paymentStatus ? { paymentStatus } : {}),
-        };
+        if (!error && data) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          }
+          return data;
+        }
       }
-      return o;
-    });
-    this.saveOrders(updated);
-    return updated;
+    } catch (err) {
+      console.warn("Supabase orders fetch error:", err);
+    }
+
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem(STORAGE_KEY);
+      if (local !== null) return JSON.parse(local);
+    }
+    return [];
   },
 
-  getOrderById(id: string): Order | undefined {
-    const orders = this.getOrders();
-    const cleanId = id.toUpperCase().replace("#", "");
-    return orders.find(
-      (o) => o.id.toUpperCase() === cleanId || o.id.toUpperCase() === `ORD-${cleanId}`
-    );
+  async getOrderById(id: string): Promise<Order | null> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (!error && data) return data;
+      }
+    } catch (err) {
+      console.warn("Supabase single order fetch error:", err);
+    }
+
+    const all = await this.getAllOrders();
+    return all.find((o) => o.id === id) || null;
   },
 
-  async verifyPostalCodeWithPostOfficeAPI(postalCode: string): Promise<{ valid: boolean; addressDetail?: string }> {
-    return { valid: true, addressDetail: "تایید شده از سامانه شاهکار / پست" };
-  }
+  // ثبت سفارش همراه با کسر هوشمند و آنی موجودی انبار کالاها
+  async createOrder(order: Order): Promise<{ success: boolean; data?: Order }> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from("orders").insert([order]).select();
+        if (!error && data && data.length > 0) {
+          // کسر هوشمند موجودی انبار در دیتابیس
+          const orderItems = order.items || order.cart_items || [];
+          for (const item of orderItems) {
+            const prodId = item.id || item.productId;
+            const qty = Number(item.quantity || 1);
+            if (prodId) {
+              const currentProd = await productService.getById(prodId);
+              if (currentProd) {
+                const currentStock = Number(currentProd.stock ?? 0);
+                const newStock = Math.max(0, currentStock - qty);
+                await productService.update(prodId, { stock: newStock });
+              }
+            }
+          }
+
+          const current = await this.getAllOrders();
+          if (typeof window !== "undefined") {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([data[0], ...current]));
+          }
+          return { success: true, data: data[0] };
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase order insert error:", err);
+    }
+
+    const current = await this.getAllOrders();
+    const updated = [order, ...current];
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+    return { success: true, data: order };
+  },
+
+  async updateOrderStatus(id: string, status: Order["status"], trackingCode?: string): Promise<boolean> {
+    const payload: any = { status };
+    if (trackingCode !== undefined) {
+      payload.tracking_code = trackingCode;
+    }
+
+    try {
+      if (supabase) {
+        await supabase.from("orders").update(payload).eq("id", id);
+      }
+    } catch (err) {
+      console.warn("Supabase order update error:", err);
+    }
+
+    const current = await this.getAllOrders();
+    const updated = current.map((o) => (o.id === id ? { ...o, ...payload } : o));
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+    return true;
+  },
 };

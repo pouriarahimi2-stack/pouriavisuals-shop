@@ -1,101 +1,112 @@
+import { supabase } from "@/lib/supabase";
+
 export interface Coupon {
   id: string;
   code: string;
-  type: "percent" | "fixed";
-  value: number; // مثلا ۱۰ درصد یا ۵۰۰۰۰ تومان
-  minOrderAmount?: number;
-  isActive: boolean;
+  type?: "percent" | "fixed";
+  discount_type?: "percent" | "fixed";
+  value?: number;
+  percent?: number;
+  amount?: number;
+  max_discount?: number | null;
+  min_order_amount?: number | null;
+  is_active: boolean;
+  created_at?: string;
 }
 
-const STORAGE_KEY = "app_coupons_db";
-
-const DEFAULT_COUPONS: Coupon[] = [
-  {
-    id: "coup-1",
-    code: "APPLE2026",
-    type: "percent",
-    value: 10,
-    minOrderAmount: 1000000,
-    isActive: true,
-  },
-  {
-    id: "coup-2",
-    code: "OFF500",
-    type: "fixed",
-    value: 500000,
-    minOrderAmount: 5000000,
-    isActive: true,
-  },
-];
+const STORAGE_KEY = "site_coupons_db";
 
 export const couponService = {
-  getCoupons: (): Coupon[] => {
-    if (typeof window === "undefined") return DEFAULT_COUPONS;
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_COUPONS));
-      return DEFAULT_COUPONS;
-    }
+  // ۱. دریافت همه کوپن‌ها مستقیماً از Supabase و همگام با کش محلی
+  async getAll(): Promise<Coupon[]> {
     try {
-      return JSON.parse(saved);
-    } catch {
-      return DEFAULT_COUPONS;
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          return data;
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase fetch failed, falling back to local DB cache:", err);
     }
+
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem(STORAGE_KEY);
+      if (local !== null) {
+        return JSON.parse(local);
+      }
+    }
+
+    return [];
   },
 
-  addCoupon: (coupon: Omit<Coupon, "id">): Coupon[] => {
-    const coupons = couponService.getCoupons();
-    const newCoupon: Coupon = {
-      ...coupon,
-      id: `coup-${Date.now()}`,
-      code: coupon.code.toUpperCase().trim(),
-    };
-    const updated = [newCoupon, ...coupons];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
-  },
-
-  deleteCoupon: (id: string): Coupon[] => {
-    const coupons = couponService.getCoupons();
-    const updated = coupons.filter((c) => c.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
-  },
-
-  toggleCouponStatus: (id: string): Coupon[] => {
-    const coupons = couponService.getCoupons();
-    const updated = coupons.map((c) =>
-      c.id === id ? { ...c, isActive: !c.isActive } : c
+  // ۲. استعلام کوپن بر اساس کد جهت اعمال تخفیف
+  async getByCode(code: string): Promise<Coupon | null> {
+    const all = await this.getAll();
+    const found = all.find(
+      (c) =>
+        c.code.trim().toUpperCase() === code.trim().toUpperCase() &&
+        c.is_active !== false
     );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+    return found || null;
   },
 
-  validateCoupon: (code: string, orderTotal: number): { isValid: boolean; discountAmount: number; message: string } => {
-    const coupons = couponService.getCoupons();
-    const coupon = coupons.find((c) => c.code.toUpperCase() === code.toUpperCase().trim());
-
-    if (!coupon) {
-      return { isValid: false, discountAmount: 0, message: "کد تخفیف معتبر نیست." };
-    }
-    if (!coupon.isActive) {
-      return { isValid: false, discountAmount: 0, message: "این کد تخفیف غیرفعال شده است." };
-    }
-    if (coupon.minOrderAmount && orderTotal < coupon.minOrderAmount) {
-      return {
-        isValid: false,
-        discountAmount: 0,
-        message: `حداقل مبلغ سفارش برای این کد ${coupon.minOrderAmount.toLocaleString("fa-IR")} تومان است.`,
-      };
+  // ۳. ایجاد کوپن جدید در دیتابیس
+  async createCoupon(coupon: Coupon): Promise<{ success: boolean; data?: Coupon }> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from("coupons").insert([coupon]).select();
+        if (!error && data && data.length > 0) {
+          const current = await this.getAll();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify([data[0], ...current]));
+          return { success: true, data: data[0] };
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase insert error, persisting locally:", err);
     }
 
-    let discount = 0;
-    if (coupon.type === "percent") {
-      discount = (orderTotal * coupon.value) / 100;
-    } else {
-      discount = coupon.value;
+    // ذخیره پایدار در لوکال
+    const current = await this.getAll();
+    const updated = [coupon, ...current];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return { success: true, data: coupon };
+  },
+
+  // ۴. فعال / غیرفعال‌سازی کوپن در دیتابیس
+  async updateStatus(id: string, is_active: boolean): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("coupons").update({ is_active }).eq("id", id);
+      }
+    } catch (err) {
+      console.warn("Supabase status update error:", err);
     }
 
-    return { isValid: true, discountAmount: discount, message: "کد تخفیف با موفقیت اعمال شد." };
+    const current = await this.getAll();
+    const updated = current.map((c) => (c.id === id ? { ...c, is_active } : c));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return true;
+  },
+
+  // ۵. حذف قطعی و دائمی کوپن از دیتابیس (بدون بازگشت پس از رفرش)
+  async deleteCoupon(id: string): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("coupons").delete().eq("id", id);
+      }
+    } catch (err) {
+      console.warn("Supabase delete error:", err);
+    }
+
+    const current = await this.getAll();
+    const updated = current.filter((c) => c.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return true;
   },
 };

@@ -1,346 +1,304 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-
-export interface MenuItem {
-  id: string;
-  title: string;
-  url: string;
-  location: "header" | "footer";
-  order: number;
-  isActive: boolean;
-}
-
-const MENU_KEY = "site_menu_items";
+import { menuService, MenuItem } from "@/services/menuService";
 
 export default function AdminMenu() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menus, setMenus] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // استیت فرم
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [location, setLocation] = useState<"header" | "footer">("header");
-  const [order, setOrder] = useState<string>("1");
+  const [formData, setFormData] = useState<{
+    title: string;
+    url: string;
+    icon: string;
+    order: number;
+    isActive: boolean;
+  }>({
+    title: "",
+    url: "/",
+    icon: "🔗",
+    order: 1,
+    isActive: true,
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const loadMenus = async () => {
+    setLoading(true);
+    const data = await menuService.getMenus();
+    setMenus(data || []);
+    setLoading(false);
   };
 
   useEffect(() => {
-    loadMenuItems();
+    loadMenus();
   }, []);
 
-  const loadMenuItems = () => {
-    const data = localStorage.getItem(MENU_KEY);
-    if (data) {
-      setMenuItems(JSON.parse(data));
-    } else {
-      // آیتم‌های پیش‌فرض منو
-      const defaultItems: MenuItem[] = [
-        { id: "menu-1", title: "صفحه اصلی", url: "/", location: "header", order: 1, isActive: true },
-        { id: "menu-2", title: "محصولات", url: "/products", location: "header", order: 2, isActive: true },
-        { id: "menu-3", title: "مجله و مقالات", url: "/blog", location: "header", order: 3, isActive: true },
-        { id: "menu-4", title: "درباره ما", url: "/about", location: "footer", order: 1, isActive: true },
-        { id: "menu-5", title: "تماس با ما", url: "/contact", location: "footer", order: 2, isActive: true },
-      ];
-      localStorage.setItem(MENU_KEY, JSON.stringify(defaultItems));
-      setMenuItems(defaultItems);
-    }
+  const handleOpenCreate = () => {
+    setEditingMenu(null);
+    setFormData({
+      title: "",
+      url: "/",
+      icon: "🔗",
+      order: menus.length + 1,
+      isActive: true,
+    });
+    setIsModalOpen(true);
   };
 
-  const saveMenuItems = (updated: MenuItem[]) => {
-    // مرتب‌سازی بر اساس ترتیب تعیین‌شده
-    const sorted = [...updated].sort((a, b) => a.order - b.order);
-    localStorage.setItem(MENU_KEY, JSON.stringify(sorted));
-    setMenuItems(sorted);
+  const handleOpenEdit = (item: MenuItem) => {
+    setEditingMenu(item);
+    setFormData({
+      title: item.title,
+      url: item.url,
+      icon: item.icon || "🔗",
+      order: item.order,
+      isActive: item.isActive,
+    });
+    setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !url.trim()) {
-      showToast("⚠️ لطفاً عنوان و آدرس لینک را وارد کنید.");
+    if (!formData.title.trim()) {
+      showToast("⚠️ عنوان منو الزامی است.");
       return;
     }
 
-    if (editingItem) {
-      const updated = menuItems.map((item) =>
-        item.id === editingItem.id
-          ? {
-              ...item,
-              title: title.trim(),
-              url: url.trim(),
-              location,
-              order: Number(order) || 1,
-            }
-          : item
-      );
-      saveMenuItems(updated);
-      showToast("✅ آیتم منو با موفقیت به‌روزرسانی شد.");
+    const payload: Partial<MenuItem> = {
+      id: editingMenu ? editingMenu.id : undefined,
+      title: formData.title.trim(),
+      url: formData.url.trim(),
+      icon: formData.icon.trim() || "🔗",
+      order: Number(formData.order || 1),
+      isActive: formData.isActive,
+    };
+
+    const res = await menuService.saveMenu(payload);
+    if (res.success) {
+      showToast(editingMenu ? "✅ منو با موفقیت ویرایش شد." : "🎉 منوی جدید به دیتابیس اضافه شد.");
+      setIsModalOpen(false);
+      loadMenus();
     } else {
-      const newItem: MenuItem = {
-        id: "menu-" + Date.now(),
-        title: title.trim(),
-        url: url.trim(),
-        location,
-        order: Number(order) || menuItems.length + 1,
-        isActive: true,
-      };
-      saveMenuItems([...menuItems, newItem]);
-      showToast("🎉 لینک جدید به منو اضافه شد.");
-    }
-
-    resetForm();
-  };
-
-  const startEdit = (item: MenuItem) => {
-    setEditingItem(item);
-    setTitle(item.title);
-    setUrl(item.url);
-    setLocation(item.location);
-    setOrder(item.order.toString());
-  };
-
-  const resetForm = () => {
-    setEditingItem(null);
-    setTitle("");
-    setUrl("");
-    setLocation("header");
-    setOrder((menuItems.length + 1).toString());
-  };
-
-  const toggleStatus = (id: string) => {
-    const updated = menuItems.map((item) =>
-      item.id === id ? { ...item, isActive: !item.isActive } : item
-    );
-    saveMenuItems(updated);
-    showToast("🔄 وضعیت نمایش لینک برعکس شد.");
-  };
-
-  const handleDelete = (id: string, itemTitle: string) => {
-    if (confirm(`آیا از حذف لینک "${itemTitle}" از منو اطمینان دارید؟`)) {
-      const updated = menuItems.filter((item) => item.id !== id);
-      saveMenuItems(updated);
-      showToast("🗑️ لینک با موفقیت حذف شد.");
+      showToast(res.error || "خطا در ذخیره منو");
     }
   };
 
-  const headerItems = menuItems.filter((item) => item.location === "header");
-  const footerItems = menuItems.filter((item) => item.location === "footer");
+  const handleDelete = async (id: string, title: string) => {
+    if (confirm(`آیا از حذف منوی "${title}" اطمینان دارید؟`)) {
+      const res = await menuService.deleteMenu(id);
+      if (res.success) {
+        showToast("🗑️ منو حذف شد.");
+        loadMenus();
+      }
+    }
+  };
+
+  const toggleStatus = async (item: MenuItem) => {
+    const res = await menuService.saveMenu({
+      id: item.id,
+      title: item.title,
+      url: item.url,
+      icon: item.icon,
+      order: item.order,
+      isActive: !item.isActive,
+    });
+    if (res.success) {
+      showToast("🔄 وضعیت نمایش منو به‌روز شد.");
+      loadMenus();
+    }
+  };
 
   return (
-    <div className="space-y-6 select-none text-xs font-sans text-white">
-      {/* توست نوتیفیکیشن */}
+    <div className="space-y-6 text-xs font-sans text-[var(--text-primary)] select-none">
       {toastMessage && (
-        <div className="fixed bottom-6 left-6 z-50 px-5 py-3 rounded-2xl bg-slate-900 text-white font-bold shadow-2xl border border-white/20 animate-bounce">
+        <div className="fixed bottom-6 left-6 z-50 px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold shadow-2xl border border-white/20 animate-bounce">
           {toastMessage}
         </div>
       )}
 
-      <div className="liquid-glass-card p-6 rounded-3xl space-y-4">
-        <div className="flex justify-between items-center border-b border-white/10 pb-4">
+      <div className="liquid-glass-card p-6 md:p-8 rounded-3xl space-y-6 border border-[var(--card-border)] shadow-xl">
+        <div className="flex flex-wrap justify-between items-center gap-4 border-b border-[var(--card-border)] pb-4">
           <div>
-            <h3 className="text-base font-black text-indigo-300 flex items-center gap-2">
-              <span>🔗</span> مدیریت ساختار و لینک‌های منوی سایت
+            <h3 className="text-base font-black text-[var(--accent-blue)] flex items-center gap-2">
+              <span>🔗</span> مدیریت ناوبری و منوهای فروشگاه
             </h3>
-            <p className="text-xs opacity-60 mt-1">تنظیم چیدمان هدر اصلی و لینک‌های مفید فوتر فروشگاه</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">کنترل ترتیب پیوندها، لینک‌های مستقیم و وضعیت انتشار در هدر و فوتر سایت</p>
           </div>
 
-          <span className="px-3 py-1 bg-indigo-600/30 text-indigo-200 border border-indigo-500/30 rounded-xl text-xs font-bold">
-            {menuItems.length} لینک فعال
-          </span>
+          <button
+            onClick={handleOpenCreate}
+            className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 text-white font-bold text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>+ ایجاد پیوند جدید</span>
+          </button>
         </div>
 
-        {/* فرم ساخت / ویرایش آیتم منو */}
-        <form onSubmit={handleSubmit} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-4">
-          <span className="font-extrabold text-xs text-indigo-200 block">
-            {editingItem ? `✏️ ویرایش آیتم منو: ${editingItem.title}` : "➕ افزودن لینک جدید به منو:"}
-          </span>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-            <div>
-              <label className="block mb-1 font-bold opacity-70">عنوان لینک *</label>
-              <input
-                type="text"
-                required
-                placeholder="مثلاً: تخفیف‌های ویژه"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-black/30 border border-white/10 outline-none font-bold"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold opacity-70">آدرس URL *</label>
-              <input
-                type="text"
-                required
-                placeholder="مثلاً: /products یا https://..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-black/30 border border-white/10 outline-none font-mono text-[11px]"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold opacity-70">موقعیت نمایش *</label>
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value as "header" | "footer")}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/10 outline-none font-bold cursor-pointer"
+        {loading ? (
+          <div className="p-12 flex justify-center">
+            <div className="w-8 h-8 border-2 border-[var(--accent-blue)] border-t-transparent animate-spin rounded-full" />
+          </div>
+        ) : menus.length === 0 ? (
+          <div className="text-center py-12 text-[var(--text-secondary)] font-bold">هنوز هیچ پیوندی تعریف نشده است.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {menus.map((item) => (
+              <div
+                key={item.id}
+                className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] transition shadow-sm"
               >
-                <option value="header">🖥️ منوی اصلی (Header)</option>
-                <option value="footer">📌 فوتر انتهای سایت (Footer)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold opacity-70">ترتیب نمایش (اولویت)</label>
-              <input
-                type="number"
-                value={order}
-                onChange={(e) => setOrder(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-black/30 border border-white/10 outline-none font-mono font-bold"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-1">
-            {editingItem && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 font-bold cursor-pointer"
-              >
-                انصراف
-              </button>
-            )}
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-bold transition cursor-pointer shadow-md"
-            >
-              {editingItem ? "ذخیره تغییرات 💾" : "ثبت در منو 🚀"}
-            </button>
-          </div>
-        </form>
-
-        {/* لیست ساختار منوها */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-          {/* منوی هدر */}
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-              <span className="font-extrabold text-xs text-indigo-300">🖥️ منوی اصلی بالای سایت (Header)</span>
-              <span className="text-[10px] opacity-60 font-bold">{headerItems.length} لینک</span>
-            </div>
-
-            {headerItems.length === 0 ? (
-              <p className="text-[11px] opacity-40 text-center py-4">هیچ لینکی در هدر تنظیم نشده است.</p>
-            ) : (
-              <div className="space-y-2">
-                {headerItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-xl bg-black/20 border border-white/10 flex justify-between items-center gap-2 hover:border-indigo-400 transition"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-md bg-indigo-600/30 text-indigo-200 border border-indigo-500/30 flex items-center justify-center font-mono font-black text-[10px]">
-                          {item.order}
-                        </span>
-                        <span className="font-bold text-xs">{item.title}</span>
-                      </div>
-                      <span className="text-[10px] opacity-50 font-mono block pr-7">{item.url}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => startEdit(item)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 font-bold text-[10px] transition cursor-pointer"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => toggleStatus(item.id)}
-                        className={`px-2 py-1 rounded-lg font-bold text-[10px] transition cursor-pointer ${
-                          item.isActive
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                            : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                        }`}
-                      >
-                        {item.isActive ? "فعال" : "مخفی"}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id, item.title)}
-                        className="p-1 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white transition cursor-pointer"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
+                      <span>{item.icon}</span>
+                      <span>{item.title}</span>
+                    </span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        item.isActive
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                          : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                      }`}
+                    >
+                      {item.isActive ? "فعال" : "مخفی"}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <p className="text-[11px] text-[var(--text-secondary)] font-mono truncate font-medium">آدرس مقصد: {item.url}</p>
+                  <p className="text-[10px] text-[var(--text-secondary)] font-bold">اولویت ترتیب: {item.order}</p>
+                </div>
 
-          {/* منوی فوتر */}
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-              <span className="font-extrabold text-xs text-indigo-300">📌 لینک‌های مفید فوتر (Footer)</span>
-              <span className="text-[10px] opacity-60 font-bold">{footerItems.length} لینک</span>
-            </div>
-
-            {footerItems.length === 0 ? (
-              <p className="text-[11px] opacity-40 text-center py-4">هیچ لینکی در فوتر تنظیم نشده است.</p>
-            ) : (
-              <div className="space-y-2">
-                {footerItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-xl bg-black/20 border border-white/10 flex justify-between items-center gap-2 hover:border-indigo-400 transition"
+                <div className="pt-2 border-t border-[var(--card-border)] flex justify-end gap-2">
+                  <button
+                    onClick={() => toggleStatus(item)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition text-[11px] cursor-pointer ${
+                      item.isActive
+                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white"
+                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
+                    }`}
                   >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-md bg-indigo-600/30 text-indigo-200 border border-indigo-500/30 flex items-center justify-center font-mono font-black text-[10px]">
-                          {item.order}
-                        </span>
-                        <span className="font-bold text-xs">{item.title}</span>
-                      </div>
-                      <span className="text-[10px] opacity-50 font-mono block pr-7">{item.url}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => startEdit(item)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 font-bold text-[10px] transition cursor-pointer"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => toggleStatus(item.id)}
-                        className={`px-2 py-1 rounded-lg font-bold text-[10px] transition cursor-pointer ${
-                          item.isActive
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                            : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                        }`}
-                      >
-                        {item.isActive ? "فعال" : "مخفی"}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id, item.title)}
-                        className="p-1 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white transition cursor-pointer"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                    {item.isActive ? "مخفی‌سازی" : "فعال‌سازی"}
+                  </button>
+                  <button
+                    onClick={() => handleOpenEdit(item)}
+                    className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 hover:bg-[var(--accent-blue)] hover:text-white font-bold transition text-[11px] cursor-pointer"
+                  >
+                    ویرایش
+                  </button>
+                  <button
+                    onClick={() => handleDelete(item.id, item.title)}
+                    className="p-1.5 px-2.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white transition cursor-pointer font-bold"
+                    title="حذف"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
+        )}
       </div>
+
+      {/* مدال افزودن و ویرایش منو */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-[var(--text-primary)]">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <h3 className="font-bold text-sm text-[var(--accent-blue)]">
+                {editingMenu ? "ویرایش پیوند منو" : "تعریف پیوند ناوبری جدید"}
+              </h3>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-xs font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4 text-xs">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان پیوند (نمایشی در سایت) *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: محصولات اپل"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">آدرس مقصد (URL) *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: /products یا https://..."
+                  value={formData.url}
+                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">آیکون (ایموجی)</label>
+                  <input
+                    type="text"
+                    value={formData.icon}
+                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-center text-base text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">اولویت نمایش (ترتیب)</label>
+                  <input
+                    type="number"
+                    value={formData.order}
+                    onChange={(e) => setFormData({ ...formData, order: Number(e.target.value) })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="menu_is_active"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-4 h-4 rounded"
+                />
+                <label htmlFor="menu_is_active" className="cursor-pointer font-bold text-[var(--text-secondary)]">
+                  این پیوند در هدر سایت نمایش داده شود
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-[var(--card-border)]">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2.5 rounded-2xl bg-black/5 dark:bg-white/10 font-bold hover:bg-black/10 cursor-pointer text-[var(--text-primary)]"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 text-white font-bold shadow-md cursor-pointer"
+                >
+                  ذخیره در دیتابیس
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

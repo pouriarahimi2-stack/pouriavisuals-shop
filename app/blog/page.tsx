@@ -6,162 +6,171 @@ import Link from "next/link";
 interface BlogPost {
   id: string;
   title: string;
-  slug?: string;
-  summary?: string;
   metaDescription?: string;
   content: string;
-  image?: string;
-  imageUrl?: string;
-  author?: string;
+  createdAt: string;
   category?: string;
-  createdAt?: string;
   isVisible?: boolean;
 }
 
-export default function BlogListPage() {
+export default function BlogArchivePage() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [selectedCat, setSelectedCat] = useState("all");
+
+  const loadBlogs = async () => {
+    setLoading(true);
+    try {
+      let combined: BlogPost[] = [];
+      try {
+        const res = await fetch("/api/blogs");
+        const data = await res.json();
+        if (data.data) combined = [...data.data];
+        else if (data.posts) combined = [...data.posts];
+      } catch (e) {
+        console.warn("API blogs load error:", e);
+      }
+
+      const localBlogs: BlogPost[] =
+        typeof window !== "undefined"
+          ? JSON.parse(localStorage.getItem("site_blogs") || "[]")
+          : [];
+
+      combined = [...combined, ...localBlogs];
+      const visible = combined.filter((p) => p.isVisible !== false);
+      const unique = Array.from(
+        new Map(visible.map((item) => [item.id || item.title, item])).values()
+      );
+
+      setPosts(unique);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadBlogs() {
-      setLoading(true);
-      try {
-        let apiPosts: BlogPost[] = [];
-        try {
-          const res = await fetch("/api/blogs");
-          if (res.ok) {
-            const data = await res.json();
-            if (data.posts) apiPosts = data.posts;
-          }
-        } catch {}
-
-        const localBlogs: BlogPost[] =
-          typeof window !== "undefined"
-            ? JSON.parse(localStorage.getItem("site_blogs") || "[]")
-            : [];
-
-        const combined = [...apiPosts, ...localBlogs];
-        const visible = combined.filter((p) => p.isVisible !== false);
-        const unique = Array.from(
-          new Map(visible.map((item) => [item.id || item.title, item])).values()
-        );
-
-        setPosts(unique);
-      } catch (err) {
-        console.error("Error loading blog posts:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadBlogs();
   }, []);
 
-  const filteredPosts = posts.filter(
-    (p) =>
-      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.summary?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const categories = Array.from(
+    new Set(posts.map((p) => p.category || "مقاله تخصصی"))
+  ).filter(Boolean);
+
+  const filteredPosts = posts.filter((p) => {
+    const matchCat =
+      selectedCat === "all" || (p.category || "مقاله تخصصی") === selectedCat;
+    const matchSearch =
+      (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.metaDescription || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.content || "").toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchSearch;
+  });
 
   return (
-    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans bg-[var(--bg-primary,#f8fafc)] text-slate-900 dark:text-slate-100 select-none transition-colors duration-300">
+    <div className="max-w-6xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
       
-      {/* هدر صفحه مقالات */}
-      <div className="text-center space-y-4 max-w-2xl mx-auto mb-12">
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-black border border-blue-500/20">
-          <span>🌐</span>
-          <span>مجله تخصصی و راهنمای خرید</span>
+      {/* هدر بخش وبلاگ */}
+      <div className="text-center space-y-3">
+        <span className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] inline-block text-2xl">
+          📚
         </span>
-        <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
-          جدیدترین مقالات و تحلیل‌های دنیای تکنولوژی
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
-          بررسی دقیق، راهنمای خرید گجت‌های هوشمند و ترفندهای کاربردی فناوری.
+        <h1 className="text-2xl md:text-4xl font-black">مجله تخصصی، راهنمای خرید و مقالات سئو</h1>
+        <p className="text-xs text-[var(--text-secondary)] font-medium max-w-xl mx-auto leading-relaxed">
+          تحلیل‌های جامع بازار، مقایسه سخت‌افزارها، مانیتورهای حرفه‌ای و نکات تخصصی حوزه تصویر و گرافیک.
         </p>
+      </div>
 
-        {/* فیلد جستجو */}
-        <div className="pt-2 max-w-md mx-auto">
+      {/* نوار جستجو و فیلتر دسته‌بندی */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setSelectedCat("all")}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+              selectedCat === "all"
+                ? "bg-[var(--accent-blue)] text-white shadow-md"
+                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
+            }`}
+          >
+            همه مقالات ({posts.length})
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCat(cat)}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+                selectedCat === cat
+                  ? "bg-[var(--accent-blue)] text-white shadow-md"
+                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div className="w-full sm:w-72">
           <input
             type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="جستجو در مقالات..."
-            className="w-full px-5 py-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-blue-500 shadow-sm transition"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 جستجو در مقالات و عناوین..."
+            className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
           />
         </div>
       </div>
 
-      {/* نمایش وضعیت */}
+      {/* لیست کارت‌های وبلاگ */}
       {loading ? (
-        <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-          <span className="text-xs font-bold text-slate-500">در حال بارگذاری مقالات...</span>
+        <div className="py-24 text-center">
+          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin mx-auto mb-3" />
+          <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری مقالات...</p>
         </div>
       ) : filteredPosts.length === 0 ? (
-        <div className="p-16 text-center rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 max-w-md mx-auto space-y-3 shadow-lg">
-          <span className="text-4xl block">📝</span>
-          <h3 className="font-black text-sm text-slate-900 dark:text-white">مقاله‌ای یافت نشد!</h3>
-          <p className="text-xs text-slate-500 font-medium">
-            {searchQuery ? "مقاله‌ای با این عبارت پیدا نشد." : "هنوز مقاله‌ای منتشر نشده است."}
-          </p>
+        <div className="p-12 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center text-xs font-bold text-[var(--text-secondary)]">
+          مقاله‌ای مطابق با جستجوی شما پیدا نشد.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPosts.map((post) => {
-            const displayImage =
-              post.image ||
-              post.imageUrl ||
-              "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600";
-
-            return (
-              <article
-                key={post.id || post.title}
-                className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col justify-between hover:border-blue-500 dark:hover:border-blue-500 transition-all duration-300 shadow-md group hover:shadow-xl"
-              >
-                <div className="w-full h-48 relative overflow-hidden bg-slate-100 dark:bg-slate-800">
-                  <img
-                    src={displayImage}
-                    alt={post.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <span className="absolute top-3 right-3 px-3 py-1 bg-blue-600 text-white rounded-xl text-[10px] font-black shadow-md">
-                    {post.category || "سئو شده"}
+          {filteredPosts.map((post) => (
+            <article
+              key={post.id || post.title}
+              className="p-6 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] transition duration-300 group"
+            >
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-[10px] font-bold">
+                  <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full">
+                    {post.category || "مقاله تخصصی"}
+                  </span>
+                  <span className="text-[var(--text-secondary)] font-mono">
+                    📅 {post.createdAt || "امروز"}
                   </span>
                 </div>
 
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                      <span>📅 {post.createdAt || "امروز"}</span>
-                      {post.author && <span>✍️ {post.author}</span>}
-                    </div>
+                <h3 className="font-extrabold text-sm text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition leading-snug line-clamp-2">
+                  {post.title}
+                </h3>
 
-                    <h2 className="font-black text-sm text-slate-900 dark:text-white leading-snug line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
-                      {post.title || "مقاله تخصصی بدون عنوان"}
-                    </h2>
+                <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed line-clamp-3">
+                  {post.metaDescription ||
+                    post.content.replace(/<[^>]*>?/gm, "").substring(0, 110) + "..."}
+                </p>
+              </div>
 
-                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed font-medium">
-                      {post.summary ||
-                        post.metaDescription ||
-                        post.content?.replace(/<[^>]*>?/gm, "").substring(0, 110) + "..."}
-                    </p>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                    <Link
-                      href={`/blog/${post.id || post.slug || "view"}`}
-                      className="text-xs font-black text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                    >
-                      <span>مطالعه کامل مقاله</span>
-                      <span>←</span>
-                    </Link>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+              <div className="pt-4 border-t border-[var(--card-border)] flex justify-between items-center">
+                <Link
+                  href={`/blog/${post.id}`}
+                  className="text-xs font-black text-[var(--accent-blue)] hover:underline flex items-center gap-1"
+                >
+                  <span>مطالعه کامل مقاله</span>
+                  <span>←</span>
+                </Link>
+                <span className="text-[10px] text-[var(--text-secondary)] font-bold">
+                  📖 ۳ دقیقه زمان مطالعه
+                </span>
+              </div>
+            </article>
+          ))}
         </div>
       )}
     </div>

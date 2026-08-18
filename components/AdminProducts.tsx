@@ -5,409 +5,465 @@ import { productService, Product } from "@/services/productService";
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // جستجو و فیلتر دسته‌بندی
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
-
-  // وضعیت مدال افزودن / ویرایش
-  const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedCat, setSelectedCat] = useState("all");
 
-  // فیلدهای فرم
+  // استیت‌های فرم ایجاد/ویرایش کالا
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [price, setPrice] = useState("");
-  const [originalPrice, setOriginalPrice] = useState("");
-  const [stock, setStock] = useState("");
-  const [image, setImage] = useState("");
+  const [price, setPrice] = useState<number>(0);
+  const [originalPrice, setOriginalPrice] = useState<number>(0);
+  const [category, setCategory] = useState("مانیتور");
+  const [stock, setStock] = useState<number>(10);
   const [description, setDescription] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+  const [newGalleryInput, setNewGalleryInput] = useState("");
+  const [isSpecialOffer, setIsSpecialOffer] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(true);
 
-  // افزودن دسته‌بندی جدید
-  const [newCatInput, setNewCatInput] = useState("");
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
 
-  const loadData = async () => {
+  const loadProducts = async () => {
     setLoading(true);
     try {
-      const [prods, cats] = await Promise.all([
-        productService.getAll(),
-        productService.getCategories(),
-      ]);
-      setProducts(prods || []);
-      const uniqueCats = Array.from(new Set((cats || []).filter(Boolean)));
-      setCategories(uniqueCats);
-    } catch (err) {
-      console.error("Error loading products data:", err);
+      const data = await productService.getAll();
+      setProducts(data);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadProducts();
+
+    const handleUpdate = (e: any) => {
+      if (e.detail) setProducts(e.detail);
+      else loadProducts();
+    };
+    window.addEventListener("products_updated", handleUpdate);
+    return () => window.removeEventListener("products_updated", handleUpdate);
   }, []);
 
-  const openCreateModal = () => {
+  const handleOpenCreateModal = () => {
     setEditingProduct(null);
     setName("");
-    setCategory(categories[0] || "عمومی");
-    setPrice("");
-    setOriginalPrice("");
-    setStock("10");
-    setImage("");
+    setPrice(0);
+    setOriginalPrice(0);
+    setCategory("مانیتور");
+    setStock(10);
     setDescription("");
-    setShowModal(true);
+    setImageUrl("");
+    setGalleryUrls([]);
+    setIsSpecialOffer(false);
+    setIsAvailable(true);
+    setIsModalOpen(true);
   };
 
-  const openEditModal = (p: Product) => {
+  const handleOpenEditModal = (p: Product) => {
     setEditingProduct(p);
-    setName(p.name || "");
-    setCategory(p.category || p.category_id || categories[0] || "عمومی");
-    setPrice(String(p.price || ""));
-    setOriginalPrice(String(p.original_price || p.originalPrice || ""));
-    setStock(String(p.stock ?? 10));
-    setImage(p.image || p.images?.[0] || "");
+    setName(p.name);
+    setPrice(p.price || 0);
+    setOriginalPrice(p.originalPrice || p.price || 0);
+    setCategory(p.category || "عمومی");
+    setStock(p.stock ?? 10);
     setDescription(p.description || "");
-    setShowModal(true);
+    setImageUrl(p.images?.[0] || p.image || "");
+    setGalleryUrls(p.images || (p.image ? [p.image] : []));
+    setIsSpecialOffer(p.isSpecialOffer ?? false);
+    setIsAvailable(p.is_available ?? true);
+    setIsModalOpen(true);
   };
 
-  const handleSaveProduct = async (e: React.FormEvent) => {
+  const handleAddGalleryImage = () => {
+    if (!newGalleryInput.trim()) return;
+    setGalleryUrls([...galleryUrls, newGalleryInput.trim()]);
+    setNewGalleryInput("");
+  };
+
+  const handleRemoveGalleryImage = (idx: number) => {
+    setGalleryUrls(galleryUrls.filter((_, i) => i !== idx));
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !price) return;
+    if (!name.trim() || price <= 0) return;
 
-    setSubmitting(true);
-    const prodData: Product = {
-      id: editingProduct ? editingProduct.id : `prod-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      name: name.trim(),
-      category: category.trim() || "عمومی",
-      category_id: category.trim() || "عمومی",
-      price: Number(price),
-      original_price: originalPrice ? Number(originalPrice) : undefined,
-      originalPrice: originalPrice ? Number(originalPrice) : undefined,
-      stock: stock ? Number(stock) : 0,
-      image: image.trim() || "/placeholder.png",
-      images: [image.trim() || "/placeholder.png"],
-      description: description.trim(),
-      updated_at: new Date().toISOString(),
-    };
-
+    setSaving(true);
     try {
-      if (editingProduct) {
-        await productService.update(editingProduct.id, prodData);
-      } else {
-        prodData.created_at = new Date().toISOString();
-        await productService.create(prodData);
-      }
+      const finalImages = galleryUrls.length > 0 ? galleryUrls : imageUrl ? [imageUrl] : [];
+      const productPayload = {
+        name: name.trim(),
+        price: Number(price),
+        originalPrice: originalPrice > price ? Number(originalPrice) : undefined,
+        category: category.trim(),
+        stock: Number(stock),
+        description: description.trim(),
+        image: imageUrl.trim() || finalImages[0] || "",
+        images: finalImages,
+        isSpecialOffer,
+        is_available: isAvailable && stock > 0,
+      };
 
-      await loadData();
-      setShowModal(false);
-    } catch (err) {
-      console.error("Save product failed:", err);
-      alert("خطا در ذخیره‌سازی در دیتابیس.");
+      if (editingProduct) {
+        const updated = await productService.update(editingProduct.id, productPayload);
+        if (updated) {
+          showToast(`محصول «${name}» با موفقیت ویرایش شد.`);
+          setIsModalOpen(false);
+        }
+      } else {
+        const created = await productService.create(productPayload);
+        if (created) {
+          showToast(`محصول جدید «${name}» در فروشگاه و دیتابیس ثبت گردید.`);
+          setIsModalOpen(false);
+        }
+      }
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف دائمی این محصول از پایگاه داده اطمینان دارید؟")) return;
-    await productService.delete(id);
-    await loadData();
+  const handleDelete = async (id: string, prodName: string) => {
+    if (confirm(`آیا از حذف محصول «${prodName}» از فروشگاه اطمینان دارید؟`)) {
+      await productService.delete(id);
+      showToast("محصول حذف گردید.");
+    }
   };
 
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCatInput.trim()) return;
-    await productService.addCategory(newCatInput.trim());
-    setNewCatInput("");
-    await loadData();
-  };
+  const categories = Array.from(new Set(products.map((p) => p.category || "عمومی"))).filter(Boolean);
 
   const filteredProducts = products.filter((p) => {
-    const matchesCat =
-      selectedCategoryFilter === "all" ||
-      p.category === selectedCategoryFilter ||
-      p.category_id === selectedCategoryFilter;
-    const matchesQuery =
-      (p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCat && matchesQuery;
+    const matchCat = selectedCat === "all" || (p.category || "عمومی") === selectedCat;
+    const matchSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.description || "").toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchSearch;
   });
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]">
-      {/* سربرگ مدیریت کاتالوگ */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 rounded-3xl shadow-xl">
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      
+      {toast && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black flex items-center gap-2 shadow-lg animate-fadeIn">
+          <span>✓</span>
+          <span>{toast}</span>
+        </div>
+      )}
+
+      {/* هدر بخش محصولات */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📦</span> مدیریت کاتالوگ و محصولات (Database Live)
-          </h2>
+          <h3 className="font-black text-base flex items-center gap-2 text-[var(--accent-blue)]">
+            <span>📦</span> مدیریت کاتالوگ و محصولات فروشگاه
+          </h3>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ثبت، ویرایش و حذف دائمی کالاها بدون بازگشت به حالت دیفالت پس از رفرش
+            تعریف کالای جدید، قیمت‌گذاری، گالری چندتصویره، موجودی انبار و برچسب‌های فروش ویژه
           </p>
         </div>
 
         <button
-          onClick={openCreateModal}
-          className="px-5 py-3 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 text-white font-black text-xs transition flex items-center gap-2 shadow-lg shadow-blue-500/20 cursor-pointer"
+          onClick={handleOpenCreateModal}
+          className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center gap-1.5"
         >
           <span>➕</span>
           <span>افزودن محصول جدید</span>
         </button>
       </div>
 
-      {/* جستجو و ثبت دسته‌بندی جدید */}
-      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
-        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="🔍 جستجوی نام یا مشخصات کالا..."
-            className="flex-1 px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)]"
-          />
-
-          <form onSubmit={handleAddCategory} className="flex gap-2">
-            <input
-              type="text"
-              value={newCatInput}
-              onChange={(e) => setNewCatInput(e.target.value)}
-              placeholder="نام دسته جدید..."
-              className="px-3.5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)]"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] font-bold text-xs transition cursor-pointer"
-            >
-              + ثبت دسته
-            </button>
-          </form>
-        </div>
-
-        {/* نوار دسته‌بندی‌های فعال با key کاملاً یکتا */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+      {/* فیلتر و جستجو */}
+      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none text-xs">
           <button
-            key="cat-pill-all"
-            onClick={() => setSelectedCategoryFilter("all")}
-            className={`px-4 py-2 rounded-2xl font-bold text-xs transition cursor-pointer flex-shrink-0 ${
-              selectedCategoryFilter === "all"
+            onClick={() => setSelectedCat("all")}
+            className={`px-4 py-2 rounded-xl font-black transition cursor-pointer ${
+              selectedCat === "all"
                 ? "bg-[var(--accent-blue)] text-white shadow-md"
-                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
             }`}
           >
-            همه محصولات ({products.length})
+            همه دسته‌ها ({products.length})
           </button>
-
-          {categories.map((cat, idx) => (
+          {categories.map((cat) => (
             <button
-              key={`cat-pill-${cat}-${idx}`}
-              onClick={() => setSelectedCategoryFilter(cat)}
-              className={`px-4 py-2 rounded-2xl font-bold text-xs transition cursor-pointer flex-shrink-0 ${
-                selectedCategoryFilter === cat
+              key={cat}
+              onClick={() => setSelectedCat(cat)}
+              className={`px-4 py-2 rounded-xl font-black transition cursor-pointer ${
+                selectedCat === cat
                   ? "bg-[var(--accent-blue)] text-white shadow-md"
-                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
               }`}
             >
               {cat}
             </button>
           ))}
         </div>
+
+        <div className="w-full sm:w-64">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 جستجو در نام و مشخصات کالا..."
+            className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+          />
+        </div>
       </div>
 
-      {/* شبکه نمایش محصولات با key یکتا */}
-      {loading ? (
-        <div className="py-16 text-center">
-          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin mx-auto" />
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="p-12 text-center bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl text-xs text-[var(--text-secondary)] font-bold shadow-xl">
-          هیچ محصولی در این دسته‌بندی یافت نشد.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredProducts.map((p, idx) => {
-            const itemKey = p.id ? `product-${p.id}` : `product-idx-${idx}`;
-            const displayImg = p.image || p.images?.[0] || "/placeholder.png";
-
-            return (
-              <div
-                key={itemKey}
-                className="group rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 space-y-3 shadow-xl hover:border-[var(--accent-blue)] transition flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="w-full h-40 bg-[var(--input-bg)] rounded-2xl overflow-hidden flex items-center justify-center p-3">
-                    <img
-                      src={displayImg}
-                      alt={p.name}
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform"
-                    />
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] text-[var(--accent-blue)] font-bold block mb-1">
-                      {p.category || p.category_id || "عمومی"}
+      {/* جدول نمایش لیست محصولات */}
+      <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
+        {loading ? (
+          <div className="py-16 text-center text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری کاتالوگ محصولات...</div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="py-16 text-center text-xs font-bold text-[var(--text-secondary)]">محصولی با این مشخصات یافت نشد.</div>
+        ) : (
+          <table className="w-full text-right text-xs">
+            <thead>
+              <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
+                <th className="pb-3 px-2">تصویر و نام کالا</th>
+                <th className="pb-3 px-2">دسته‌بندی</th>
+                <th className="pb-3 px-2">قیمت نهایی</th>
+                <th className="pb-3 px-2">موجودی</th>
+                <th className="pb-3 px-2">برچسب‌ها</th>
+                <th className="pb-3 px-2 text-center">عملیات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--card-border)]">
+              {filteredProducts.map((p) => (
+                <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                  <td className="py-3 px-2">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={p.images?.[0] || p.image || ""}
+                        alt={p.name}
+                        className="w-11 h-11 rounded-xl object-contain bg-[var(--input-bg)] p-1 border border-[var(--card-border)]"
+                      />
+                      <span className="font-extrabold text-xs text-[var(--text-primary)]">{p.name}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 font-bold text-[var(--text-secondary)]">{p.category || "عمومی"}</td>
+                  <td className="py-3 px-2 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                    {(p.price || 0).toLocaleString("fa-IR")} تومان
+                  </td>
+                  <td className="py-3 px-2 font-mono font-bold">
+                    <span className={(p.stock ?? 0) <= 3 ? "text-rose-500 font-black" : ""}>
+                      {p.stock ?? 0} عدد
                     </span>
-                    <h4 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-2 leading-snug">
-                      {p.name}
-                    </h4>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2 border-t border-[var(--card-border)]">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-[10px] text-[var(--text-secondary)] font-medium">قیمت:</span>
-                    <span className="font-mono font-bold text-[var(--accent-blue)]">
-                      {Number(p.price || 0).toLocaleString("fa-IR")} تومان
-                    </span>
-                  </div>
-
-                  <div className="flex gap-2 pt-1">
+                  </td>
+                  <td className="py-3 px-2">
+                    {p.isSpecialOffer && (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px] border border-rose-500/30">
+                        🔥 ویژه
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-2 text-center flex items-center justify-center gap-2">
                     <button
-                      onClick={() => openEditModal(p)}
-                      className="flex-1 py-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold text-[11px] hover:bg-amber-500 hover:text-white transition cursor-pointer"
+                      onClick={() => handleOpenEditModal(p)}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
                     >
                       ✏️ ویرایش
                     </button>
                     <button
-                      onClick={() => handleDelete(p.id)}
-                      className="px-3.5 py-2 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[11px] hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                      onClick={() => handleDelete(p.id, p.name)}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
                     >
-                      🗑️
+                      🗑️ حذف
                     </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {/* مدال ساخت / ویرایش کالا */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="max-w-xl w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-xs">
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+          <form
+            onSubmit={handleFormSubmit}
+            className="max-w-2xl w-full max-h-[92vh] overflow-y-auto rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs"
+          >
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h3 className="font-black text-sm text-[var(--accent-blue)]">
-                {editingProduct ? "✏️ ویرایش مشخصات محصول" : "➕ افزودن محصول جدید به دیتابیس"}
-              </h3>
+              <h4 className="font-black text-sm text-[var(--accent-blue)]">
+                {editingProduct ? `✏️ ویرایش محصول «${editingProduct.name}»` : "➕ ثبت محصول جدید"}
+              </h4>
               <button
                 type="button"
-                onClick={() => setShowModal(false)}
-                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center font-bold text-xs"
+                onClick={() => setIsModalOpen(false)}
+                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveProduct} className="space-y-3 text-right">
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کامل محصول *</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="sm:col-span-2">
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کامل کالا *</label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="مثال: iPhone 16 Pro Max 256GB"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] text-right"
+                  placeholder="مثال: مانیتور ۲۷ اینچ 4K مخصوص تدوین"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">دسته‌بندی *</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs cursor-pointer text-right"
-                  >
-                    {categories.map((c, i) => (
-                      <option key={`cat-select-opt-${c}-${i}`} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">موجودی انبار (تعداد)</label>
-                  <input
-                    type="number"
-                    value={stock}
-                    onChange={(e) => setStock(e.target.value)}
-                    placeholder="10"
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-center focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">قیمت فروش (تومان) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="مثال: 95000000"
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">قیمت قبل از تخفیف (اختیاری)</label>
-                  <input
-                    type="number"
-                    value={originalPrice}
-                    onChange={(e) => setOriginalPrice(e.target.value)}
-                    placeholder="مثال: 105000000"
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-center focus:border-[var(--accent-blue)]"
-                  />
-                </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">قیمت نهایی فروش (تومان) *</label>
+                <input
+                  type="number"
+                  required
+                  min={1000}
+                  value={price}
+                  onChange={(e) => setPrice(Number(e.target.value))}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">آدرس لینک تصویر محصول (URL)</label>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">قیمت قبلی (جهت نمایش خط‌خورده)</label>
+                <input
+                  type="number"
+                  value={originalPrice}
+                  onChange={(e) => setOriginalPrice(Number(e.target.value))}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">دسته‌بندی کالا *</label>
                 <input
                   type="text"
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
-                  placeholder="https://... یا /iphone.png"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-left focus:border-[var(--accent-blue)]"
+                  required
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="مانیتور، سخت‌افزار، تجهیزات تصویر"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیحات و مشخصات کوتاه</label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="توضیحات فنی و ویژگی‌های شاخص..."
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed text-right focus:border-[var(--accent-blue)]"
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">موجودی انبار *</label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  value={stock}
+                  onChange={(e) => setStock(Number(e.target.value))}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
                 />
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-[var(--card-border)]">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-secondary)] cursor-pointer"
-                >
-                  انصراف
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
-                >
-                  {submitting ? "در حال ثبت..." : "ذخیره در دیتابیس 💾"}
-                </button>
+              <div className="sm:col-span-2">
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">آدرس اینترنتی تصویر اصلی (Image URL) *</label>
+                <input
+                  type="text"
+                  required
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://... یا /products/item.png"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
               </div>
-            </form>
-          </div>
+
+              {/* گالری چند تصویره */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="block font-bold text-[var(--text-secondary)]">تصاویر آلبوم و گالری کالا:</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newGalleryInput}
+                    onChange={(e) => setNewGalleryInput(e.target.value)}
+                    placeholder="URL تصویر گالری..."
+                    className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-xs text-[var(--text-primary)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddGalleryImage}
+                    className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
+                  >
+                    + افزودن به گالری
+                  </button>
+                </div>
+
+                {galleryUrls.length > 0 && (
+                  <div className="flex gap-2 flex-wrap pt-1">
+                    {galleryUrls.map((url, i) => (
+                      <div key={i} className="relative group w-14 h-14 rounded-xl border border-[var(--card-border)] overflow-hidden bg-black/5 p-1">
+                        <img src={url} alt="" className="w-full h-full object-contain" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveGalleryImage(i)}
+                          className="absolute inset-0 bg-rose-600/80 text-white font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیحات و نقد و بررسی تخصصی</label>
+                <textarea
+                  rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="مشخصات پنل، نرخ تازه‌سازی، پورت‌ها و ویژگی‌های کلیدی..."
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium leading-relaxed text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div className="flex items-center gap-4 sm:col-span-2 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer font-bold">
+                  <input
+                    type="checkbox"
+                    checked={isSpecialOffer}
+                    onChange={(e) => setIsSpecialOffer(e.target.checked)}
+                    className="w-4 h-4 accent-[var(--accent-blue)]"
+                  />
+                  <span>نمایش در بخش پیشنهاد شگفت‌انگیز 🔥</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer font-bold">
+                  <input
+                    type="checkbox"
+                    checked={isAvailable}
+                    onChange={(e) => setIsAvailable(e.target.checked)}
+                    className="w-4 h-4 accent-[var(--accent-blue)]"
+                  />
+                  <span>قابل خرید و فعال در ویترین</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)]"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {saving ? "در حال ذخیره‌سازی..." : "ذخیره در دیتابیس 💾"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

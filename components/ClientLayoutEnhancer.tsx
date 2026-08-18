@@ -5,66 +5,41 @@ import { siteInfoService } from "@/services/siteInfoService";
 
 export default function ClientLayoutEnhancer() {
   useEffect(() => {
-    let currentStoreTitle = "";
-
-    const applyTitle = (title: string) => {
-      if (!title || typeof document === "undefined") return;
-      currentStoreTitle = title;
-      if (document.title !== title) {
-        document.title = title;
+    const applyTitle = (info: any) => {
+      if (!info) return;
+      const sName = info.storeName || info.site_name || "";
+      const sTitle = info.siteTitle || info.site_title || info.description || "";
+      if (sName) {
+        document.title = sTitle ? `${sName} | ${sTitle}` : sName;
       }
     };
 
-    // ۱. خواندن سریع از کش لوکال
-    try {
-      const cached = localStorage.getItem("site_info_db");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        const t = parsed.storeName || parsed.siteTitle;
-        if (t) applyTitle(t);
-      }
-    } catch {}
+    async function init() {
+      const data = await siteInfoService.getAll();
+      applyTitle(data);
+    }
+    init();
 
-    // ۲. همگام‌سازی از سرویس دیتابیس
-    siteInfoService.getAll().then((info) => {
-      const t = info?.storeName || info?.siteTitle;
-      if (t) applyTitle(t);
-    });
+    // دریافت رویداد درون صفحه
+    const handleUpdate = (e: any) => {
+      if (e.detail) applyTitle(e.detail);
+    };
+    window.addEventListener("site_info_updated", handleUpdate);
 
-    // ۳. ناظر هوشمند (MutationObserver) برای جلوگیری از بازنویسی تایتل توسط Next.js
-    const titleElement = document.querySelector("title");
-    const observer = new MutationObserver(() => {
-      if (currentStoreTitle && document.title !== currentStoreTitle) {
-        document.title = currentStoreTitle;
-      }
-    });
-
-    if (titleElement) {
-      observer.observe(titleElement, { childList: true, characterData: true, subtree: true });
+    // دریافت پیام زنده از تب‌های دیگر (بدون رفرش)
+    let channel: BroadcastChannel | null = null;
+    if ("BroadcastChannel" in window) {
+      channel = new BroadcastChannel("site_info_sync_channel");
+      channel.onmessage = (event) => {
+        if (event.data?.type === "SYNC_SITE_INFO") {
+          applyTitle(event.data.data);
+        }
+      };
     }
 
-    // ۴. شنود تغییرات زنده از پنل ادمین
-    const handleUpdate = (event: any) => {
-      const updated = event.detail;
-      const t = updated?.storeName || updated?.siteTitle;
-      if (t) applyTitle(t);
-    };
-
-    window.addEventListener("site_info_updated", handleUpdate);
-    window.addEventListener("storage", () => {
-      const cached = localStorage.getItem("site_info_db");
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          const t = parsed.storeName || parsed.siteTitle;
-          if (t) applyTitle(t);
-        } catch {}
-      }
-    });
-
     return () => {
-      observer.disconnect();
       window.removeEventListener("site_info_updated", handleUpdate);
+      if (channel) channel.close();
     };
   }, []);
 

@@ -6,14 +6,14 @@ import AdminProducts from "@/components/AdminProducts";
 import AdminCoupons from "@/components/AdminCoupons";
 import AdminBanners from "@/components/AdminBanners";
 import AdminMenu from "@/components/AdminMenu";
-import AdminOrders from "@/components/AdminOrders";
+import OrderManager from "@/components/admin/OrderManager";
 import AdminSiteInfo from "@/components/AdminSiteInfo";
 import AdminInventoryManager from "@/components/AdminInventoryManager";
 import AdminHealthGuard from "@/components/admin/AdminHealthGuard";
 import AdminDashboardStats from "@/components/admin/AdminDashboardStats";
 import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import AdminCustomers from "@/components/admin/AdminCustomers";
-import { productService } from "@/services/productService";
+import { productService, Product } from "@/services/productService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
 
@@ -112,6 +112,15 @@ export default function AdminPage() {
       } catch (e) {}
     }
     loadInfo();
+
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
+    window.addEventListener("site_info_updated", handleSiteUpdate);
+
+    return () => {
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
+    };
   }, [router]);
 
   const loadAllAdmins = async () => {
@@ -233,7 +242,6 @@ export default function AdminPage() {
     }
   };
 
-  // آرایه مدیریت تب‌ها با ساختار شیک و آیکون‌های اختصاصی
   const navTabs = [
     { id: "products", label: "محصولات", icon: "📦", allowed: ["super_admin", "product_manager"] },
     { id: "inventory", label: "انبارداری", icon: "📥", allowed: ["super_admin", "product_manager"] },
@@ -326,6 +334,7 @@ export default function AdminPage() {
 
           <a
             href="/"
+            target="_blank"
             className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[var(--text-primary)] text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
           >
             🏠 مشاهده سایت
@@ -348,7 +357,7 @@ export default function AdminPage() {
         </>
       )}
 
-      {/* نوار ناوبری بازطراحی‌شده به سبک Segmented Dock شیک اپل */}
+      {/* نوار ناوبری تب‌ها */}
       <div className="relative p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl backdrop-blur-2xl overflow-x-auto scrollbar-none">
         <div className="flex items-center gap-1.5 min-w-max">
           {navTabs.map((tab) => {
@@ -376,7 +385,7 @@ export default function AdminPage() {
         {activeTab === "products" && (userRole === "super_admin" || userRole === "product_manager") && <AdminProducts />}
         {activeTab === "inventory" && (userRole === "super_admin" || userRole === "product_manager") && <AdminInventoryManager />}
         {activeTab === "blogs" && (userRole === "super_admin" || userRole === "content_editor") && <AdminBlogManager />}
-        {activeTab === "orders" && userRole === "super_admin" && <AdminOrders />}
+        {activeTab === "orders" && userRole === "super_admin" && <OrderManager />}
         {activeTab === "coupons" && userRole === "super_admin" && <AdminCoupons />}
         {activeTab === "customers" && userRole === "super_admin" && <AdminCustomers />}
         {activeTab === "banners" && userRole === "super_admin" && <AdminBanners />}
@@ -649,7 +658,7 @@ export default function AdminPage() {
   );
 }
 
-// 📝 کامپوننت ویراستار مقالات سئو
+// 📝 کامپوننت ویراستار مقالات سئو متصل به API و پایگاه‌داده
 function AdminBlogManager() {
   const [blogs, setBlogs] = useState<any[]>([]);
   const [editingBlog, setEditingBlog] = useState<any | null>(null);
@@ -660,7 +669,17 @@ function AdminBlogManager() {
     loadBlogs();
   }, []);
 
-  const loadBlogs = () => {
+  const loadBlogs = async () => {
+    try {
+      const res = await fetch("/api/blogs");
+      const json = await res.json();
+      if (json.data && json.data.length > 0) {
+        setBlogs(json.data);
+        localStorage.setItem("site_blogs", JSON.stringify(json.data));
+        return;
+      }
+    } catch (e) {}
+
     const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
     setBlogs(localBlogs);
   };
@@ -750,12 +769,20 @@ function AdminBlogManager() {
     if (url) exec("insertImage", url);
   };
 
-  const handleSaveBlogEdit = (e: React.FormEvent) => {
+  const handleSaveBlogEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBlog) return;
 
     const currentHtml = editorRef.current?.innerHTML || editingBlog.content;
     const finalBlog = { ...editingBlog, content: currentHtml };
+
+    try {
+      await fetch("/api/blogs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(finalBlog),
+      });
+    } catch (e) {}
 
     const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
     const idx = localBlogs.findIndex((b: any) => b.id === finalBlog.id);
@@ -954,13 +981,13 @@ function AdminBlogManager() {
   );
 }
 
-// 🤖 دستیار هوشمند سئو
+// 🤖 دستیار هوشمند سئو و بازارسنجی
 function AdminAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectorModalOpen, setSelectorModalOpen] = useState(false);
   const [input, setInput] = useState("");
 
-  const [productsList, setProductsList] = useState<any[]>([]);
+  const [productsList, setProductsList] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -1001,7 +1028,7 @@ function AdminAIAssistant() {
 
   const categoryProducts = selectedCategory === "all"
     ? productsList
-    : productsList.filter((p) => (p.category_id || p.category || "عمومی") === selectedCategory);
+    : productsList.filter((p) => (p.category || "عمومی") === selectedCategory);
 
   const toggleProductSelection = (id: string) => {
     setSelectedProductIds((prev) =>
@@ -1411,7 +1438,7 @@ function AdminAIAssistant() {
                       <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
                         <div>
                           <span className="text-[10px] text-[var(--accent-blue)] font-bold block opacity-80 mb-0.5">
-                            {p.category_id || p.category || "کالای عمومی"}
+                            {p.category || "کالای عمومی"}
                           </span>
                           <h4 className="font-extrabold text-xs leading-snug line-clamp-2 text-[var(--text-primary)]">
                             {p.name}

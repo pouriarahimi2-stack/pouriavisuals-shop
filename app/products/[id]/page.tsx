@@ -1,364 +1,293 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
-import Image from "next/image";
+import React, { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { productService, Product } from "@/services/productService";
 import { useCart } from "@/context/CartContext";
 import ProductReviews from "@/components/ProductReviews";
 
-export default function ProductDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState<string>("");
-  const [selectedColor, setSelectedColor] = useState<string>("");
+  const [activeImage, setActiveImage] = useState<string>("");
   const [quantity, setQuantity] = useState(1);
-  const [isAdded, setIsAdded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"desc" | "specs" | "shipping" | "reviews">("desc");
+
   const { addToCart } = useCart();
 
   useEffect(() => {
-    async function load() {
+    async function loadProduct() {
       setLoading(true);
       try {
-        let data: Product | null = null;
-        if (typeof productService.getById === "function") {
-          data = await productService.getById(resolvedParams.id);
-        }
-
-        if (!data) {
-          const all = (await productService.getAll()) || [];
-          data =
-            all.find(
-              (p: any) =>
-                p.id === resolvedParams.id ||
-                String(p.id) === String(resolvedParams.id)
-            ) || null;
-        }
-
+        const data = await productService.getById(id);
         if (data) {
           setProduct(data);
-          const firstImg =
-            data.images && data.images.length > 0
-              ? data.images[0]
-              : data.image || "";
-          setSelectedImage(firstImg);
-          if (data.colors && data.colors.length > 0) {
-            setSelectedColor(data.colors[0].name);
-          }
+          const defaultImg = data.images && data.images.length > 0 ? data.images[0] : (data.image || "");
+          setActiveImage(defaultImg);
         }
       } catch (err) {
-        console.error("Error loading product:", err);
+        console.error("Error loading product detail:", err);
       } finally {
         setLoading(false);
       }
     }
-    load();
-  }, [resolvedParams.id]);
+    loadProduct();
+  }, [id]);
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-4 bg-[var(--bg-primary)] text-[var(--text-primary)] select-none">
-        <div className="w-10 h-10 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin" />
-        <p className="text-xs text-[var(--text-secondary)] font-bold">
-          در حال بارگذاری اطلاعات کالا...
-        </p>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans">
+        <div className="w-10 h-10 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری اطلاعات کالا...</p>
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-5 text-center px-4 bg-[var(--bg-primary)] text-[var(--text-primary)] select-none">
-        <div className="p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] max-w-md space-y-4 shadow-xl">
-          <span className="text-4xl block">🔍</span>
-          <h2 className="text-base font-black">محصول مورد نظر یافت نشد</h2>
-          <p className="text-[var(--text-secondary)] text-xs font-medium leading-relaxed">
-            ممکن است کالا حذف شده باشد یا شناسه وارد شده نادرست باشد.
-          </p>
-          <Link
-            href="/products"
-            className="inline-block px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md cursor-pointer"
-          >
-            مشاهده همه محصولات
-          </Link>
-        </div>
+      <div className="max-w-3xl mx-auto px-4 py-24 text-center space-y-4 font-sans select-none" dir="rtl">
+        <div className="text-5xl">📦</div>
+        <h2 className="text-xl font-black text-[var(--text-primary)]">محصول مورد نظر یافت نشد!</h2>
+        <p className="text-xs text-[var(--text-secondary)]">ممکن است این کالا حذف شده باشد یا موجودی آن به پایان رسیده باشد.</p>
+        <Link
+          href="/#products"
+          className="inline-block px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-lg"
+        >
+          ← بازگشت به کاتالوگ کالاها
+        </Link>
       </div>
     );
   }
 
-  const imagesList =
-    product.images && product.images.length > 0
-      ? product.images
-      : [selectedImage].filter(Boolean);
-
-  const formattedPrice = Number(product.price).toLocaleString("fa-IR");
-  const originalPrice = product.original_price || product.originalPrice;
-  const formattedOriginalPrice = originalPrice
-    ? Number(originalPrice).toLocaleString("fa-IR")
-    : null;
-  const discount = product.discount_percent || product.discountPercent || 0;
-  const isOutOfStock = product.stock !== undefined && product.stock <= 0;
-
-  const handleAddToCart = () => {
-    addToCart({
-      id: product.id,
-      title: product.name,
-      price: product.price,
-      discountPrice: originalPrice ? product.price : undefined,
-      image: selectedImage || (product.images?.[0] || product.image || ""),
-      selectedColor: selectedColor || undefined,
-      quantity: quantity,
-    });
-    setIsAdded(true);
-    setTimeout(() => setIsAdded(false), 2000);
-  };
+  const images = product.images && product.images.length > 0 ? product.images : [product.image || ""];
+  const isAvailable = product.is_available !== false && (product.stock === undefined || product.stock > 0);
+  const specsEntries = product.specs ? Object.entries(product.specs) : [];
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans bg-[var(--bg-primary)] text-[var(--text-primary)] select-none transition-colors duration-300">
+    <div className="max-w-6xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
       
-      {/* نوار راهنما (Breadcrumb) */}
-      <nav className="flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-8 font-medium">
-        <Link href="/" className="hover:text-[var(--accent-blue)] transition">
-          صفحه اصلی
-        </Link>
+      {/* مسیر ناوبری (Breadcrumb) */}
+      <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-bold">
+        <Link href="/" className="hover:text-[var(--accent-blue)] transition">صفحه اصلی</Link>
         <span>/</span>
-        <Link
-          href="/products"
-          className="hover:text-[var(--accent-blue)] transition"
-        >
-          {product.category_id || product.category || "کالای دیجیتال"}
-        </Link>
+        <Link href="/#products" className="hover:text-[var(--accent-blue)] transition">محصولات</Link>
         <span>/</span>
-        <span className="text-[var(--text-primary)] font-extrabold truncate max-w-xs">
-          {product.name}
-        </span>
-      </nav>
+        <span className="text-[var(--text-primary)] truncate max-w-xs">{product.name}</span>
+      </div>
 
-      {/* بخش اصلی گالری و اطلاعات خرید */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+      {/* بخش معرفی اصلی و گالری تصویر */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
         
-        {/* گالری تصاویر محصول */}
-        <div className="lg:col-span-7 flex flex-col-reverse md:flex-row gap-4 items-center">
-          {imagesList.length > 1 && (
-            <div className="flex md:flex-col gap-3 overflow-x-auto p-1 max-h-[480px]">
-              {imagesList.map((img, idx) => (
+        {/* گالری تصاویر */}
+        <div className="space-y-4">
+          <div className="w-full h-80 md:h-[420px] rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] overflow-hidden flex items-center justify-center p-6 relative">
+            <img
+              src={activeImage || images[0] || ""}
+              alt={product.name}
+              className="w-full h-full object-contain transition-all duration-300"
+            />
+            {!isAvailable && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center">
+                <span className="px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-black">
+                  ناموجود در انبار
+                </span>
+              </div>
+            )}
+          </div>
+
+          {images.length > 1 && (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {images.map((imgUrl, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setSelectedImage(img)}
-                  className={`relative w-16 h-16 rounded-2xl overflow-hidden border-2 bg-[var(--input-bg)] transition cursor-pointer flex-shrink-0 ${
-                    selectedImage === img
-                      ? "border-[var(--accent-blue)] ring-2 ring-[var(--accent-blue)]/20 scale-105"
-                      : "border-[var(--card-border)] opacity-70 hover:opacity-100"
+                  onClick={() => setActiveImage(imgUrl)}
+                  className={`w-20 h-20 rounded-2xl overflow-hidden border-2 cursor-pointer transition shrink-0 bg-[var(--input-bg)] p-1 ${
+                    activeImage === imgUrl
+                      ? "border-[var(--accent-blue)] scale-105 shadow-md"
+                      : "border-[var(--card-border)] opacity-60 hover:opacity-100"
                   }`}
                 >
-                  <Image
-                    src={img}
-                    alt={`${product.name} ${idx + 1}`}
-                    fill
-                    sizes="64px"
-                    className="object-contain p-1.5"
-                  />
+                  <img src={imgUrl} alt="" className="w-full h-full object-contain" />
                 </button>
               ))}
             </div>
           )}
-
-          {/* فریم تصویر اصلی */}
-          <div className="relative w-full aspect-square max-h-[480px] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex items-center justify-center p-8 overflow-hidden">
-            {selectedImage ? (
-              <Image
-                src={selectedImage}
-                alt={product.name}
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-contain p-6 transition-all duration-500 hover:scale-105"
-              />
-            ) : (
-              <div className="text-[var(--text-secondary)] text-xs font-bold">
-                بدون تصویر
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* مشخصات و دکمه افزودن به سبد خرید */}
-        <div className="lg:col-span-5 space-y-6">
-          <div>
-            <span className="text-[11px] font-black uppercase tracking-widest text-[var(--accent-blue)]">
-              {product.brand || "فروشگاه تخصصی Tech"}
-            </span>
-            <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] mt-1">
+        {/* مشخصات و خرید */}
+        <div className="space-y-6 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-1 rounded-full font-bold">
+                {product.category || product.category_id || "کالای دیجیتال"}
+              </span>
+              <span
+                className={`text-[11px] font-bold px-3 py-1 rounded-full ${
+                  isAvailable
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                }`}
+              >
+                {isAvailable ? "موجود در انبار" : "ناموجود"}
+              </span>
+            </div>
+
+            <h1 className="text-2xl md:text-3xl font-black leading-tight text-[var(--text-primary)]">
               {product.name}
             </h1>
+
             {product.title_fa && (
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium leading-relaxed">
-                {product.title_fa}
-              </p>
+              <p className="text-xs text-[var(--text-secondary)] font-medium">{product.title_fa}</p>
             )}
+
+            <p className="text-xs leading-relaxed text-[var(--text-secondary)] font-medium line-clamp-3">
+              {product.description || "توضیحات تکمیلی برای این محصول ثبت نشده است."}
+            </p>
           </div>
 
-          {/* انتخاب رنگ */}
-          {product.colors && product.colors.length > 0 && (
-            <div className="space-y-2.5 pt-2">
-              <span className="text-xs font-bold text-[var(--text-primary)]">
-                رنگ انتخابی:{" "}
-                <strong className="text-[var(--accent-blue)]">
-                  {selectedColor}
-                </strong>
-              </span>
-              <div className="flex flex-wrap items-center gap-2.5">
-                {product.colors.map((c, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedColor(c.name)}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-bold transition cursor-pointer ${
-                      selectedColor === c.name
-                        ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] ring-2 ring-[var(--accent-blue)]/20"
-                        : "border-[var(--card-border)] bg-[var(--input-bg)] text-[var(--text-secondary)] hover:border-[var(--accent-blue)]"
-                    }`}
-                  >
-                    <span
-                      className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-sm"
-                      style={{ backgroundColor: c.hex }}
-                    />
-                    <span>{c.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* باکس گارانتی و ارسال */}
-          <div className="rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 space-y-2.5 text-xs font-medium text-[var(--text-secondary)] shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>
-                {product.warranty || "گارانتی اصالت و سلامت فیزیکی ۱۸ ماهه"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[var(--accent-blue)] font-bold">⚡</span>
-              <span>ارسال سریع با بسته‌بندی ایمن و کد پیگیری پیامکی</span>
-            </div>
-          </div>
-
-          {/* باکس قیمت و افزودن به سبد خرید */}
-          <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-lg">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs text-[var(--text-secondary)] font-bold">
-                قیمت نهایی:
-              </span>
-              <div className="text-right">
-                {formattedOriginalPrice && (
-                  <div className="flex items-center gap-2 justify-end mb-1">
-                    <span className="text-[10px] bg-rose-500 text-white font-bold px-1.5 py-0.5 rounded-lg">
-                      %{discount} تخفیف
-                    </span>
-                    <span className="text-xs text-[var(--text-secondary)] line-through font-mono">
-                      {formattedOriginalPrice}
-                    </span>
-                  </div>
-                )}
-                <div className="text-2xl font-black text-[var(--accent-blue)] font-mono">
-                  {formattedPrice}{" "}
-                  <span className="text-xs font-normal text-[var(--text-secondary)]">
-                    تومان
+          {/* باکس قیمت و دکمه افزودن */}
+          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت واحد کالا:</span>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-black text-[var(--accent-blue)]">
+                  {(product.price || 0).toLocaleString("fa-IR")} تومان
+                </span>
+                {product.original_price && product.original_price > product.price && (
+                  <span className="text-xs line-through text-slate-400 font-mono">
+                    {product.original_price.toLocaleString("fa-IR")}
                   </span>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* کنترل تعداد کالا */}
-            <div className="flex items-center justify-between pt-2 border-t border-[var(--card-border)]">
-              <span className="text-xs font-bold text-[var(--text-secondary)]">
-                تعداد:
-              </span>
-              <div className="flex items-center gap-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl p-1">
+            <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-2xl px-4 py-3 font-bold text-xs">
                 <button
-                  type="button"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="w-8 h-8 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center font-black text-sm cursor-pointer hover:opacity-80 transition"
+                  className="hover:text-[var(--accent-blue)] cursor-pointer px-1 text-sm font-black"
                 >
                   -
                 </button>
-                <span className="font-mono font-black text-xs w-6 text-center">
-                  {quantity}
-                </span>
+                <span className="font-mono text-sm">{quantity}</span>
                 <button
-                  type="button"
                   onClick={() => setQuantity((q) => q + 1)}
-                  className="w-8 h-8 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center font-black text-sm cursor-pointer hover:opacity-80 transition"
+                  className="hover:text-[var(--accent-blue)] cursor-pointer px-1 text-sm font-black"
                 >
                   +
                 </button>
               </div>
-            </div>
 
-            <button
-              onClick={handleAddToCart}
-              disabled={isOutOfStock}
-              className={`w-full py-4 rounded-2xl font-black text-xs transition shadow-lg flex items-center justify-center gap-2 cursor-pointer ${
-                isOutOfStock
-                  ? "bg-zinc-500 text-white cursor-not-allowed opacity-50"
-                  : isAdded
-                  ? "bg-emerald-500 text-white shadow-emerald-500/20 scale-[0.99]"
-                  : "bg-[var(--accent-blue)] hover:opacity-90 text-white shadow-blue-500/20"
-              }`}
-            >
-              {isOutOfStock
-                ? "موجودی این محصول به اتمام رسیده است"
-                : isAdded
-                ? "✓ با موفقیت به سبد خرید اضافه شد"
-                : "افزودن به سبد خرید 🛍️"}
-            </button>
+              <button
+                disabled={!isAvailable}
+                onClick={() => {
+                  for (let i = 0; i < quantity; i++) {
+                    addToCart({
+                      id: product.id,
+                      name: product.name,
+                      price: product.price,
+                      image: activeImage || images[0] || "",
+                      stock: product.stock ?? 10,
+                    });
+                  }
+                }}
+                className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-xl flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                <span>🛒 افزودن به سبد خرید ({quantity} عدد)</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* مشخصات فنی و توضیحات محصول */}
-      <div className="mt-16 pt-12 border-t border-[var(--card-border)] grid grid-cols-1 md:grid-cols-12 gap-8">
-        <div className="md:col-span-6 space-y-3">
-          <h3 className="text-sm font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📝</span> نقد و بررسی تخصصی محصول
-          </h3>
-          <p className="text-xs leading-relaxed text-[var(--text-secondary)] font-medium whitespace-pre-line text-justify">
-            {product.description || "توضیحاتی برای این کالا ثبت نشده است."}
-          </p>
+      {/* تب‌های تکمیلی: مشخصات، توضیحات و نظرات */}
+      <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        <div className="flex gap-2 border-b border-[var(--card-border)] pb-4 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab("desc")}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 ${
+              activeTab === "desc"
+                ? "bg-[var(--accent-blue)] text-white shadow-md"
+                : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            📝 توضیحات جامع
+          </button>
+          <button
+            onClick={() => setActiveTab("specs")}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 ${
+              activeTab === "specs"
+                ? "bg-[var(--accent-blue)] text-white shadow-md"
+                : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            ⚙️ مشخصات فنی ({specsEntries.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("shipping")}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 ${
+              activeTab === "shipping"
+                ? "bg-[var(--accent-blue)] text-white shadow-md"
+                : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            🚚 شرایط ارسال و گارانتی
+          </button>
+          <button
+            onClick={() => setActiveTab("reviews")}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 ${
+              activeTab === "reviews"
+                ? "bg-[var(--accent-blue)] text-white shadow-md"
+                : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            💬 دیدگاه‌های کاربران
+          </button>
         </div>
 
-        <div className="md:col-span-6 space-y-3">
-          <h3 className="text-sm font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚙️</span> مشخصات فنی کالا (Specs)
-          </h3>
-          {product.specs && Object.keys(product.specs).length > 0 ? (
-            <div className="rounded-2xl border border-[var(--card-border)] overflow-hidden divide-y divide-[var(--card-border)] bg-[var(--input-bg)]">
-              {Object.entries(product.specs).map(([key, value], idx) => (
-                <div key={idx} className="flex justify-between p-3 text-xs">
-                  <span className="text-[var(--text-secondary)] font-bold">
-                    {key}
-                  </span>
-                  <span className="text-[var(--text-primary)] font-semibold">
-                    {String(value)}
-                  </span>
-                </div>
-              ))}
+        <div className="min-h-[160px] pt-2">
+          {activeTab === "desc" && (
+            <div className="text-sm leading-loose text-[var(--text-secondary)] font-medium whitespace-pre-line">
+              {product.description || "توضیحاتی برای این کالا ثبت نشده است."}
             </div>
-          ) : (
-            <p className="text-xs text-[var(--text-secondary)] font-bold">
-              مشخصات فنی ثبت نشده است.
-            </p>
+          )}
+
+          {activeTab === "specs" && (
+            <div className="space-y-2">
+              {specsEntries.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {specsEntries.map(([key, val], idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
+                    >
+                      <span className="text-[var(--text-secondary)] font-bold">{key}:</span>
+                      <span className="font-semibold text-[var(--text-primary)]">{String(val)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--text-secondary)] font-bold">مشخصات فنی ثبت نشده است.</p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "shipping" && (
+            <div className="space-y-3 text-xs text-[var(--text-secondary)] font-medium leading-relaxed">
+              <p>🛡️ {product.warranty || "گارانتی اصالت، سلامت فیزیکی و ۷ روز ضمانت بازگشت کالا"}</p>
+              <p>📦 ارسال سراسری سریع از طریق پست پیشتاز با بسته‌بندی ایمن</p>
+              <p>⚡ تحویل اکسپرس برای مشتریان شهر تهران در سریع‌ترین زمان ممکن</p>
+            </div>
+          )}
+
+          {activeTab === "reviews" && (
+            <ProductReviews productId={product.id} />
           )}
         </div>
       </div>
-
-      {/* ماژول نظرات و امتیازدهی کاربران */}
-      <ProductReviews productId={product.id} />
     </div>
   );
 }

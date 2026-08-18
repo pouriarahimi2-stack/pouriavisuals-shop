@@ -2,198 +2,274 @@
 
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
+import { supabase } from "@/lib/supabase";
 
-interface StockLog {
+interface InventoryLog {
   id: string;
-  productId: string;
-  productName: string;
-  type: "in" | "out";
-  quantity: number;
-  date: string;
-  time: string;
+  product_id: string;
+  product_name: string;
+  type: "in" | "out" | "adjustment";
+  amount: number;
+  previous_stock: number;
+  new_stock: number;
   reason: string;
-  operator: string;
+  created_at: string;
 }
 
 export default function AdminInventoryManager() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [logs, setLogs] = useState<StockLog[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [type, setType] = useState<"in" | "out">("in");
-  const [quantity, setQuantity] = useState<number>(1);
-  const [reason, setReason] = useState("");
+  const [logs, setLogs] = useState<InventoryLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterLowStock, setFilterLowStock] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // مودال ورود/خروج کالا
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [changeType, setChangeType] = useState<"in" | "out">("in");
+  const [changeAmount, setChangeAmount] = useState<number>(1);
+  const [changeReason, setChangeReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const prods = await productService.getAll();
+      setProducts(prods);
+
+      if (supabase) {
+        const { data } = await supabase
+          .from("inventory_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(50);
+        if (data) setLogs(data);
+      } else {
+        const localLogs = JSON.parse(localStorage.getItem("inventory_logs") || "[]");
+        setLogs(localLogs);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
+
+    const handleProductUpdate = (e: any) => {
+      if (e.detail) setProducts(e.detail);
+      else loadData();
+    };
+    window.addEventListener("products_updated", handleProductUpdate);
+    return () => window.removeEventListener("products_updated", handleProductUpdate);
   }, []);
 
-  const loadData = async () => {
-    const prods = await productService.getAll();
-    setProducts(prods || []);
-    if (prods && prods.length > 0) setSelectedProductId(prods[0].id);
-
-    const savedLogs = JSON.parse(localStorage.getItem("inventory_stock_logs") || "[]");
-    setLogs(savedLogs);
-  };
-
-  const handleStockSubmit = (e: React.FormEvent) => {
+  const handleStockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProductId || quantity <= 0) return;
+    if (!selectedProduct || changeAmount <= 0) return;
 
-    const prod = products.find((p) => p.id === selectedProductId);
-    if (!prod) return;
+    setSubmitting(true);
+    const currentStock = selectedProduct.stock ?? 0;
+    const newStock =
+      changeType === "in"
+        ? currentStock + changeAmount
+        : Math.max(0, currentStock - changeAmount);
 
-    const now = new Date();
-    const newLog: StockLog = {
-      id: `log-${Date.now()}`,
-      productId: prod.id,
-      productName: prod.name,
-      type,
-      quantity,
-      date: now.toLocaleDateString("fa-IR"),
-      time: now.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }),
-      reason: reason.trim() || (type === "in" ? "ورود به انبار (خرید جدید)" : "ترخیص و ارسال به مشتری"),
-      operator: "مدیر ارشد",
-    };
+    try {
+      // ۱. به‌روزرسانی موجودی در سرویس محصولات
+      await productService.update(selectedProduct.id, {
+        stock: newStock,
+        is_available: newStock > 0,
+      });
 
-    const updatedLogs = [newLog, ...logs];
-    setLogs(updatedLogs);
-    localStorage.setItem("inventory_stock_logs", JSON.stringify(updatedLogs));
+      // ۲. ثبت لاگ ورود و خروج انبار
+      const newLog: InventoryLog = {
+        id: `log_${Date.now()}`,
+        product_id: selectedProduct.id,
+        product_name: selectedProduct.name,
+        type: changeType,
+        amount: changeAmount,
+        previous_stock: currentStock,
+        new_stock: newStock,
+        reason: changeReason.trim() || (changeType === "in" ? "ورود به انبار (خرید/تولید)" : "خروج از انبار (فروش دستی/مرجوعی)"),
+        created_at: new Date().toISOString(),
+      };
 
-    setQuantity(1);
-    setReason("");
-    alert("✅ گردش انبار با موفقیت ثبت گردید.");
+      if (supabase) {
+        await supabase.from("inventory_logs").insert([newLog]);
+      }
+
+      const updatedLogs = [newLog, ...logs];
+      setLogs(updatedLogs);
+      localStorage.setItem("inventory_logs", JSON.stringify(updatedLogs));
+
+      showToast(`موجودی کالای "${selectedProduct.name}" با موفقیت به ${newStock} تغییر یافت.`);
+      setSelectedProduct(null);
+      setChangeAmount(1);
+      setChangeReason("");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const filteredProducts = products.filter((p) => {
+    const matchSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.category || "").toLowerCase().includes(search.toLowerCase());
+    const isLow = (p.stock ?? 0) <= 3;
+    return matchSearch && (filterLowStock ? isLow : true);
+  });
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]">
-      {/* فرم ثبت ورود/خروج جدید */}
-      <div className="p-6 rounded-3xl bg-zinc-900/80 border border-zinc-800 backdrop-blur-2xl space-y-4 shadow-xl">
-        <div className="flex items-center gap-2.5 border-b border-zinc-800 pb-3">
-          <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold">
-            📥
-          </div>
-          <div>
-            <h3 className="text-sm font-extrabold text-white">سامانه مدیریت ورود و خروج انبار</h3>
-            <p className="text-[11px] text-zinc-400 font-medium">ثبت تاریخ، ساعت دقیق، تعداد و دلیل ورود یا ترخیص کالا</p>
-          </div>
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      
+      {toast && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black flex items-center gap-2 shadow-lg animate-fadeIn">
+          <span>✓</span>
+          <span>{toast}</span>
+        </div>
+      )}
+
+      {/* هدر بخش انبارداری */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h3 className="font-black text-base flex items-center gap-2 text-[var(--accent-blue)]">
+            <span>🏢</span> سامانه مدیریت انبار و پایش موجودی کالاها
+          </h3>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            ثبت ورود و خروج انبار، کنترل لحظه‌ای تیراژ کالاها و لاگ‌های گردش انبار
+          </p>
         </div>
 
-        <form onSubmit={handleStockSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <div>
-            <label className="block mb-1.5 font-bold text-zinc-300">انتخاب کالا:</label>
-            <select
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white font-bold outline-none focus:border-blue-500 cursor-pointer"
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setFilterLowStock(!filterLowStock)}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-black transition cursor-pointer border ${
+              filterLowStock
+                ? "bg-rose-500 text-white border-rose-500 shadow-md"
+                : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]"
+            }`}
+          >
+            ⚠️ کالاهای رو به اتمام (کمتر از ۳ عدد)
+          </button>
 
-          <div>
-            <label className="block mb-1.5 font-bold text-zinc-300">نوع عملیات:</label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setType("in")}
-                className={`flex-1 py-2.5 rounded-xl font-bold transition cursor-pointer text-xs ${
-                  type === "in" ? "bg-emerald-600 text-white shadow-md" : "bg-zinc-800 text-zinc-400 border border-zinc-700"
-                }`}
-              >
-                ➕ ورود کالا
-              </button>
-              <button
-                type="button"
-                onClick={() => setType("out")}
-                className={`flex-1 py-2.5 rounded-xl font-bold transition cursor-pointer text-xs ${
-                  type === "out" ? "bg-rose-600 text-white shadow-md" : "bg-zinc-800 text-zinc-400 border border-zinc-700"
-                }`}
-              >
-                ➖ خروج کالا
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block mb-1.5 font-bold text-zinc-300">تعداد:</label>
-            <input
-              type="number"
-              min="1"
-              required
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white font-mono font-bold outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block mb-1.5 font-bold text-zinc-300">علت یا شماره حواله:</label>
-            <input
-              type="text"
-              placeholder="مثلاً: فاکتور خرید پارت جدید"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white font-medium outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div className="sm:col-span-2 lg:col-span-4 flex justify-end pt-1">
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black transition cursor-pointer shadow-lg shadow-blue-600/30 text-xs flex items-center gap-1.5"
-            >
-              <span>⚡ ثبت رسمی در لاگ انبار</span>
-            </button>
-          </div>
-        </form>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 جستجو در اقلام انبار..."
+            className="px-4 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] w-56"
+          />
+        </div>
       </div>
 
-      {/* لیست و جدول لاگ‌های ثبت شده */}
-      <div className="p-6 rounded-3xl bg-zinc-900/80 border border-zinc-800 backdrop-blur-2xl space-y-4 shadow-xl">
-        <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-          <h4 className="text-xs font-black text-white">تاریخچه و دفتر کل گردش انبار</h4>
-          <span className="text-[11px] font-bold text-zinc-400 bg-zinc-800 px-3 py-1 rounded-full border border-zinc-700">
-            {logs.length} رکورد
-          </span>
-        </div>
+      {/* جدول موجودی اقلام */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
+        {loading ? (
+          <div className="py-16 text-center text-xs font-bold text-[var(--text-secondary)]">در حال بررسی انبار...</div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="py-16 text-center text-xs font-bold text-[var(--text-secondary)]">کالایی یافت نشد.</div>
+        ) : (
+          <table className="w-full text-right text-xs">
+            <thead>
+              <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
+                <th className="pb-3 px-2">تصویر و نام کالا</th>
+                <th className="pb-3 px-2">دسته‌بندی</th>
+                <th className="pb-3 px-2">موجودی فعلی</th>
+                <th className="pb-3 px-2">وضعیت دسترسی</th>
+                <th className="pb-3 px-2 text-center">عملیات انبار</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--card-border)]">
+              {filteredProducts.map((p) => {
+                const stock = p.stock ?? 0;
+                return (
+                  <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={p.images?.[0] || p.image || ""}
+                          alt=""
+                          className="w-10 h-10 rounded-xl object-contain bg-[var(--input-bg)] p-1 border border-[var(--card-border)]"
+                        />
+                        <span className="font-extrabold text-xs text-[var(--text-primary)]">{p.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 font-bold text-[var(--text-secondary)]">{p.category || "عمومی"}</td>
+                    <td className="py-3 px-2 font-mono font-black text-sm">
+                      <span className={stock === 0 ? "text-rose-500" : stock <= 3 ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}>
+                        {stock} عدد
+                      </span>
+                    </td>
+                    <td className="py-3 px-2">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        stock > 0 && p.is_available !== false
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                      }`}>
+                        {stock > 0 && p.is_available !== false ? "موجود در ویترین" : "ناموجود"}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <button
+                        onClick={() => setSelectedProduct(p)}
+                        className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-[11px] hover:opacity-90 transition cursor-pointer shadow-md"
+                      >
+                        🔄 ورود / خروج کالا
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
+      {/* آخرین گردش‌های ثبت‌شده در انبار */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+        <h4 className="font-black text-sm text-[var(--text-primary)]">📋 آخرین سوابق و لاگ‌های گردش انبار</h4>
         {logs.length === 0 ? (
-          <div className="text-center py-10 text-xs text-zinc-500 font-bold">
-            هیچ لاگ ورود و خروجی هنوز ثبت نشده است.
-          </div>
+          <p className="text-xs text-[var(--text-secondary)] font-bold py-4 text-center">گردش انباری ثبت نشده است.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs border-collapse">
+            <table className="w-full text-right text-xs">
               <thead>
-                <tr className="border-b border-zinc-800 text-zinc-400">
-                  <th className="p-3 font-bold">نوع</th>
-                  <th className="p-3 font-bold">نام کالا</th>
-                  <th className="p-3 font-bold">تعداد</th>
-                  <th className="p-3 font-bold">تاریخ و ساعت</th>
-                  <th className="p-3 font-bold">دلیل / شرح حواله</th>
+                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
+                  <th className="pb-3 px-2">نام محصول</th>
+                  <th className="pb-3 px-2">عملیات</th>
+                  <th className="pb-3 px-2">تعداد</th>
+                  <th className="pb-3 px-2">تغییر موجودی</th>
+                  <th className="pb-3 px-2">دلیل / توضیح</th>
+                  <th className="pb-3 px-2">تاریخ و زمان</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-zinc-800/30 transition">
-                    <td className="p-3">
-                      {log.type === "in" ? (
-                        <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-[10px]">
-                          + ورود
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-[10px]">
-                          - خروج
-                        </span>
-                      )}
+              <tbody className="divide-y divide-[var(--card-border)]">
+                {logs.slice(0, 10).map((log) => (
+                  <tr key={log.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                    <td className="py-3 px-2 font-bold">{log.product_name}</td>
+                    <td className="py-3 px-2">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        log.type === "in"
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                      }`}>
+                        {log.type === "in" ? "📥 ورود به انبار" : "📤 خروج از انبار"}
+                      </span>
                     </td>
-                    <td className="p-3 font-bold text-white">{log.productName}</td>
-                    <td className="p-3 font-mono font-extrabold text-blue-400">{log.quantity} عدد</td>
-                    <td className="p-3 font-mono text-zinc-400 text-[11px]">{log.date} - {log.time}</td>
-                    <td className="p-3 text-zinc-300 font-medium">{log.reason}</td>
+                    <td className="py-3 px-2 font-mono font-bold">{log.amount} عدد</td>
+                    <td className="py-3 px-2 font-mono text-[11px] text-[var(--text-secondary)]">
+                      {log.previous_stock} ← <strong className="text-[var(--text-primary)]">{log.new_stock}</strong>
+                    </td>
+                    <td className="py-3 px-2 text-[11px] text-[var(--text-secondary)]">{log.reason}</td>
+                    <td className="py-3 px-2 font-mono text-[10px] text-[var(--text-secondary)]">
+                      {new Date(log.created_at).toLocaleDateString("fa-IR")}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -201,6 +277,97 @@ export default function AdminInventoryManager() {
           </div>
         )}
       </div>
+
+      {/* مودال ورود و خروج کالا */}
+      {selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+          <form onSubmit={handleStockSubmit} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div>
+                <h4 className="font-black text-sm text-[var(--accent-blue)]">ثبت حواله ورود/خروج کالا</h4>
+                <p className="text-[11px] text-[var(--text-secondary)] font-bold mt-0.5">{selectedProduct.name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedProduct(null)}
+                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نوع عملیات انبار *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setChangeType("in")}
+                    className={`py-2.5 rounded-xl font-bold transition cursor-pointer ${
+                      changeType === "in"
+                        ? "bg-emerald-600 text-white shadow-md"
+                        : "bg-[var(--input-bg)] border border-[var(--card-border)]"
+                    }`}
+                  >
+                    📥 ورود به انبار (+)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChangeType("out")}
+                    className={`py-2.5 rounded-xl font-bold transition cursor-pointer ${
+                      changeType === "out"
+                        ? "bg-rose-600 text-white shadow-md"
+                        : "bg-[var(--input-bg)] border border-[var(--card-border)]"
+                    }`}
+                  >
+                    📤 خروج از انبار (-)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">تعداد اقلام *</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  value={changeAmount}
+                  onChange={(e) => setChangeAmount(Number(e.target.value))}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">علت یا شماره فاکتور ورودی/خروجی</label>
+                <input
+                  type="text"
+                  placeholder="مثال: فاکتور خرید شرکت، کسری دستی و..."
+                  value={changeReason}
+                  onChange={(e) => setChangeReason(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
+              <button
+                type="button"
+                onClick={() => setSelectedProduct(null)}
+                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)]"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? "در حال ثبت..." : "ثبت حواله انبار 💾"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,90 +1,123 @@
 import { supabase } from "@/lib/supabase";
 
-export interface Banner {
+export interface BannerItem {
   id: string;
   title: string;
   subtitle?: string;
-  image_url: string;
-  link_url?: string;
-  position?: "hero" | "middle" | "side";
-  is_active: boolean;
-  created_at?: string;
+  imageUrl: string;
+  linkUrl: string;
+  position: "main_slider" | "grid_top" | "grid_bottom" | "sidebar";
+  order: number;
+  isActive: boolean;
 }
 
-const STORAGE_KEY = "site_banners_db";
+const LOCAL_STORAGE_KEY = "site_banners_list";
 
 export const bannerService = {
-  async getAll(): Promise<Banner[]> {
+  async getAll(): Promise<BannerItem[]> {
     try {
       if (supabase) {
         const { data, error } = await supabase
           .from("banners")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("order", { ascending: true });
 
-        if (!error && data) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-          return data;
-        }
-      }
-    } catch (err) {
-      console.warn("Supabase banners fetch failed:", err);
-    }
-
-    if (typeof window !== "undefined") {
-      const local = localStorage.getItem(STORAGE_KEY);
-      if (local !== null) return JSON.parse(local);
-    }
-    return [];
-  },
-
-  async create(banner: Banner): Promise<{ success: boolean; data?: Banner }> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase.from("banners").insert([banner]).select();
         if (!error && data && data.length > 0) {
-          const current = await this.getAll();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify([data[0], ...current]));
-          return { success: true, data: data[0] };
+          const mapped: BannerItem[] = data.map((d: any) => ({
+            id: d.id,
+            title: d.title,
+            subtitle: d.subtitle,
+            imageUrl: d.image_url || d.imageUrl,
+            linkUrl: d.link_url || d.linkUrl,
+            position: d.position,
+            order: d.order,
+            isActive: d.is_active ?? d.isActive ?? true,
+          }));
+
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+          return mapped;
         }
       }
-    } catch (err) {
-      console.warn("Supabase banner insert failed:", err);
-    }
 
-    const current = await this.getAll();
-    const updated = [banner, ...current];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return { success: true, data: banner };
+      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (local) return JSON.parse(local);
+
+      // بنرهای پیش‌فرض اولیه در صورت خالی بودن دیتابیس
+      const defaults: BannerItem[] = [
+        {
+          id: "ban_1",
+          title: "مانیتورهای تخصصی تدوین و رنگ",
+          subtitle: "کالیبراسیون حرفه‌ای 4K و 8K",
+          imageUrl: "/banners/main-slider-1.jpg",
+          linkUrl: "/#products",
+          position: "main_slider",
+          order: 1,
+          isActive: true,
+        },
+        {
+          id: "ban_2",
+          title: "تجهیزات نورپردازی استودیو",
+          subtitle: "ارسال پیشتاز به سراسر کشور",
+          imageUrl: "/banners/main-slider-2.jpg",
+          linkUrl: "/#products",
+          position: "main_slider",
+          order: 2,
+          isActive: true,
+        },
+        {
+          id: "ban_3",
+          title: "کارت‌های کپچر و استریم حرفه‌ای",
+          subtitle: "تخفیف‌های ویژه فصل",
+          imageUrl: "/banners/grid-banner-1.jpg",
+          linkUrl: "/#products",
+          position: "grid_top",
+          order: 1,
+          isActive: true,
+        },
+      ];
+      return defaults;
+    } catch (e) {
+      console.error("Error loading banners:", e);
+      return [];
+    }
   },
 
-  async update(id: string, updates: Partial<Banner>): Promise<boolean> {
+  async saveAll(items: BannerItem[]): Promise<boolean> {
     try {
-      if (supabase) {
-        await supabase.from("banners").update(updates).eq("id", id);
-      }
-    } catch (err) {
-      console.warn("Supabase banner update failed:", err);
-    }
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
 
-    const current = await this.getAll();
-    const updated = current.map((b) => (b.id === id ? { ...b, ...updates } : b));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return true;
+      if (supabase) {
+        const payload = items.map((item) => ({
+          id: item.id,
+          title: item.title,
+          subtitle: item.subtitle,
+          image_url: item.imageUrl,
+          link_url: item.linkUrl,
+          position: item.position,
+          order: item.order,
+          is_active: item.isActive,
+        }));
+
+        await supabase.from("banners").delete().neq("id", "0");
+        await supabase.from("banners").insert(payload);
+      }
+
+      this.broadcast(items);
+      return true;
+    } catch (e) {
+      console.error("Error saving banners:", e);
+      return false;
+    }
   },
 
-  async delete(id: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("banners").delete().eq("id", id);
+  broadcast(banners: BannerItem[]) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("banners_updated", { detail: banners }));
+      if ("BroadcastChannel" in window) {
+        const channel = new BroadcastChannel("banners_sync_channel");
+        channel.postMessage({ type: "SYNC_BANNERS", data: banners });
+        channel.close();
       }
-    } catch (err) {
-      console.warn("Supabase banner delete failed:", err);
     }
-
-    const current = await this.getAll();
-    const updated = current.filter((b) => b.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return true;
   },
 };

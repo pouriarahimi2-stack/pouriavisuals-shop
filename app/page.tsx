@@ -3,44 +3,79 @@
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
 import { bannerService, Banner } from "@/services/bannerService";
-import { categoryService, Category } from "@/services/categoryService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const { addToCart } = useCart();
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [prods, bans, cats] = await Promise.all([
-          productService.getAll(),
-          bannerService.getAll ? bannerService.getAll() : (bannerService.getActive ? bannerService.getActive() : []),
-          categoryService && categoryService.getAll ? categoryService.getAll() : productService.getCategories(),
-        ]);
+  const loadData = async () => {
+    try {
+      const [prods, bans] = await Promise.all([
+        productService.getAll(),
+        bannerService.getAll ? bannerService.getAll() : (bannerService.getActive ? bannerService.getActive() : []),
+      ]);
 
-        setProducts(prods || []);
-        setBanners((bans || []).filter((b: any) => b.is_active !== false));
-
-        // سازگاری با هر دو ساختار Category شیء یا آرایه استرینگ
-        if (cats && cats.length > 0) {
-          if (typeof cats[0] === "string") {
-            setCategories(cats.map((c: any, index: number) => ({ id: String(index), name: c, slug: c })));
-          } else {
-            setCategories(cats);
-          }
-        }
-      } catch (e) {
-        console.error("Error loading home page Supabase data:", e);
-      }
+      setProducts(prods || []);
+      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
+    } catch (e) {
+      console.error("Error loading home page data:", e);
     }
+  };
+
+  useEffect(() => {
     loadData();
+
+    // دریافت بلادرنگ انتخاب دسته‌بندی از هدر
+    const handleCategoryChange = (e: any) => {
+      setSelectedCategory(e.detail || "all");
+    };
+
+    // دریافت بلادرنگ آپدیت کالاها و بنرها از پنل ادمین
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail) setProducts(e.detail);
+      else loadData();
+    };
+
+    const handleBannersUpdate = (e: any) => {
+      if (e.detail) setBanners(e.detail.filter((b: any) => b.is_active !== false && b.isActive !== false));
+      else loadData();
+    };
+
+    window.addEventListener("category_selected", handleCategoryChange);
+    window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("banners_updated", handleBannersUpdate);
+
+    // کانال هماهنگی زنده بین تب‌های مرورگر
+    let prodChannel: BroadcastChannel | null = null;
+    let banChannel: BroadcastChannel | null = null;
+
+    if ("BroadcastChannel" in window) {
+      prodChannel = new BroadcastChannel("products_sync_channel");
+      prodChannel.onmessage = (event) => {
+        if (event.data?.type === "SYNC_PRODUCTS") setProducts(event.data.data);
+      };
+
+      banChannel = new BroadcastChannel("banners_sync_channel");
+      banChannel.onmessage = (event) => {
+        if (event.data?.type === "SYNC_BANNERS") {
+          setBanners(event.data.data.filter((b: any) => b.is_active !== false && b.isActive !== false));
+        }
+      };
+    }
+
+    return () => {
+      window.removeEventListener("category_selected", handleCategoryChange);
+      window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("banners_updated", handleBannersUpdate);
+      if (prodChannel) prodChannel.close();
+      if (banChannel) banChannel.close();
+    };
   }, []);
 
   const filteredProducts = products.filter((product) => {
@@ -51,7 +86,7 @@ export default function HomePage() {
   });
 
   return (
-    <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300">
+    <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
       <div className="max-w-6xl mx-auto px-4 space-y-10 mt-6">
         {/* ویترین بنرهای اصلی */}
         {banners.length > 0 && (
@@ -65,10 +100,10 @@ export default function HomePage() {
                 }}
               >
                 <div className="max-w-xl space-y-4 z-10 text-white">
-                  {(banner.badge || banner.badgeText) && (
+                  {(banner.badge || banner.badgeText || banner.badge_text) && (
                     <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/20 text-white border border-white/30 text-[11px] font-black tracking-wide backdrop-blur-md shadow-sm">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      {banner.badge || banner.badgeText}
+                      {banner.badge || banner.badgeText || banner.badge_text}
                     </span>
                   )}
                   <h1 className="text-3xl md:text-5xl font-black leading-tight tracking-tight text-white drop-shadow-md">
@@ -79,7 +114,7 @@ export default function HomePage() {
                   </p>
                   <div className="pt-2">
                     <a
-                      href={banner.link || banner.link_url || banner.buttonLink || "/"}
+                      href={banner.link || banner.link_url || banner.buttonLink || "/#products"}
                       className="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-white text-gray-900 font-extrabold text-xs hover:bg-slate-100 transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95"
                     >
                       <span>{banner.button_text || banner.buttonText || "مشاهده و بررسی"}</span>
@@ -92,54 +127,33 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* نوار دسته‌بندی کالاها */}
-        <section className="flex justify-center my-6">
-          <div className="w-full max-w-5xl px-3 py-2.5 rounded-2xl liquid-glass-card flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setSelectedCategory("all")}
-              className={`py-2 px-4 rounded-xl transition-all duration-300 cursor-pointer select-none text-xs whitespace-nowrap font-bold ${
-                selectedCategory === "all"
-                  ? "bg-[var(--accent-blue)] text-white shadow-md font-extrabold"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5"
-              }`}
-            >
-              همه کالاها
-            </button>
-
-            {categories.map((cat) => {
-              const catSlug = cat.slug || cat.name;
-              const isActive = selectedCategory === cat.name || selectedCategory === cat.slug;
-              return (
-                <button
-                  key={cat.id || cat.name}
-                  type="button"
-                  onClick={() => setSelectedCategory(catSlug)}
-                  className={`py-2 px-4 rounded-xl transition-all duration-300 cursor-pointer select-none text-xs whitespace-nowrap font-bold ${
-                    isActive
-                      ? "bg-[var(--accent-blue)] text-white shadow-md font-extrabold"
-                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5"
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* کاتالوگ محصولات */}
+        {/* کاتالوگ محصولات با نشانگر دسته فعال */}
         <section id="products" className="space-y-6 relative">
           <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4 px-1">
             <div>
               <h3 className="text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
                 <span>📦</span> محصولات ویژه‌ی فروشگاه
               </h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">تجهیزات و کالاهای اورجینال با ضمانت معتبر</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+                {selectedCategory === "all" ? "تمامی کالاهای موجود با گارانتی معتبر" : `نمایش دسته‌بندی: ${selectedCategory}`}
+              </p>
             </div>
-            <span className="px-3 py-1 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--text-secondary)]">
-              {filteredProducts.length} کالا
-            </span>
+            <div className="flex items-center gap-2">
+              {selectedCategory !== "all" && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory("all");
+                    window.dispatchEvent(new CustomEvent("category_selected", { detail: "all" }));
+                  }}
+                  className="text-xs text-[var(--accent-blue)] hover:underline font-bold cursor-pointer"
+                >
+                  نمایش همه
+                </button>
+              )}
+              <span className="px-3 py-1 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--text-secondary)]">
+                {filteredProducts.length} کالا
+              </span>
+            </div>
           </div>
 
           {filteredProducts.length === 0 ? (
@@ -162,7 +176,7 @@ export default function HomePage() {
         </section>
 
         {/* بخش مجله و مقالات تخصصی */}
-        <section className="p-8 rounded-[2.5rem] liquid-glass-card space-y-6 my-12">
+        <section className="p-8 rounded-[2.5rem] liquid-glass-card space-y-6 my-12 border border-[var(--card-border)] bg-[var(--modal-bg)]/40 shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
               <h3 className="text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
@@ -205,12 +219,13 @@ function HomeBlogSection() {
         try {
           const res = await fetch("/api/blogs");
           const data = await res.json();
-          if (data.posts) combined = [...data.posts];
+          if (data.data) combined = [...data.data];
+          else if (data.posts) combined = [...data.posts];
         } catch {}
 
         const localBlogs = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("site_blogs") || "[]") : [];
         combined = [...combined, ...localBlogs];
-        const visiblePosts = combined.filter((p) => p.isVisible !== false);
+        const visiblePosts = combined.filter((p) => p.isVisible !== false && p.published !== false);
         const unique = Array.from(
           new Map(visiblePosts.map((item) => [item.id || item.title, item])).values()
         );
@@ -239,14 +254,14 @@ function HomeBlogSection() {
         >
           <div className="space-y-2">
             <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)] font-bold">
-              <span>📅 {post.createdAt || "امروز"}</span>
-              <span className="text-[var(--accent-blue)]">مقاله تخصصی</span>
+              <span>📅 {post.createdAt || post.created_at || "امروز"}</span>
+              <span className="text-[var(--accent-blue)]">{post.category || "مقاله تخصصی"}</span>
             </div>
             <h4 className="font-extrabold text-xs line-clamp-2 text-[var(--text-primary)] leading-snug">
               {post.title}
             </h4>
             <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
-              {post.metaDescription || post.content?.substring(0, 80) + "..."}
+              {post.metaDescription || post.excerpt || post.summary || post.content?.substring(0, 80) + "..."}
             </p>
           </div>
           <Link
@@ -318,6 +333,7 @@ function AIAssistantChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          message: userMsg,
           prompt: userMsg,
           role: "customer",
           productsData: productsData,
@@ -333,12 +349,12 @@ function AIAssistantChat() {
         matchedProductObj = productsData.find((p) => p.id === data.matchedProductId) || null;
       }
 
-      if (data.response) {
+      if (data.response || data.reply) {
         setMessages((prev) => [
           ...prev,
           {
             role: "model",
-            text: data.response,
+            text: data.response || data.reply,
             matchedProduct: matchedProductObj,
           },
         ]);
@@ -361,12 +377,12 @@ function AIAssistantChat() {
           className="p-4 rounded-full bg-[var(--accent-blue)] text-white shadow-2xl hover:scale-105 transition cursor-pointer flex items-center gap-2 text-xs font-black border border-white/20"
         >
           <span>📸</span>
-          <span>جستجوی هوشمند با عکس</span>
+          <span>دستیار هوشمند و جستجوی عکس</span>
         </button>
       )}
 
       {isOpen && (
-        <div className="w-80 sm:w-96 h-[520px] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-2xl">
+        <div className="w-80 sm:w-96 h-[520px] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-2xl animate-fadeIn">
           <div className="p-4 border-b border-[var(--card-border)] flex justify-between items-center bg-black/5 dark:bg-white/5">
             <div className="flex items-center gap-2">
               <span className="p-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs">🔍</span>
@@ -397,7 +413,7 @@ function AIAssistantChat() {
                       className="w-full max-h-36 object-cover rounded-xl border border-white/20"
                     />
                   )}
-                  {m.text && <p className="font-medium">{m.text}</p>}
+                  {m.text && <p className="font-medium whitespace-pre-line">{m.text}</p>}
                 </div>
 
                 {m.matchedProduct && (
@@ -419,7 +435,7 @@ function AIAssistantChat() {
                       onClick={() =>
                         addToCart({
                           id: m.matchedProduct!.id,
-                          title: m.matchedProduct!.name,
+                          name: m.matchedProduct!.name,
                           price: m.matchedProduct!.price,
                           image: m.matchedProduct!.images?.[0] || m.matchedProduct!.image || "",
                         })
@@ -468,7 +484,7 @@ function AIAssistantChat() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="توضیح یا سوال (اختیاری)..."
-              className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs text-[var(--text-primary)]"
+              className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs text-[var(--text-primary)] font-medium"
             />
             <button
               onClick={handleSend}
@@ -497,7 +513,7 @@ function HomeProductCard({
   const isAvailable = product.is_available !== false && (product.stock === undefined || product.stock > 0);
 
   return (
-    <div className="rounded-[2rem] liquid-glass-card p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] transition duration-300 group">
+    <div className="rounded-[2rem] liquid-glass-card p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] transition duration-300 group border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
       <div
         onClick={() => onOpenDetails(product)}
         className="relative w-full h-56 rounded-2xl overflow-hidden bg-black/5 dark:bg-black/40 flex items-center justify-center cursor-pointer border border-[var(--card-border)]"
@@ -553,9 +569,10 @@ function HomeProductCard({
         onClick={() => {
           onAddToCart({
             id: product.id,
-            title: product.name,
+            name: product.name,
             price: product.price,
             image: displayImage,
+            stock: product.stock ?? 10,
           });
         }}
         disabled={!isAvailable}
@@ -751,9 +768,10 @@ function ProductDetailsModal({
                     for (let i = 0; i < quantity; i++) {
                       onAddToCart({
                         id: product.id,
-                        title: product.name,
+                        name: product.name,
                         price: product.price,
                         image: activeImage || product.image || "",
+                        stock: product.stock ?? 10,
                       });
                     }
                     onClose();

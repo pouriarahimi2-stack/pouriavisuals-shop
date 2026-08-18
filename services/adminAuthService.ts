@@ -5,194 +5,173 @@ export type AdminRole = "super_admin" | "product_manager" | "content_editor";
 export interface AdminUser {
   id: string;
   username: string;
+  password?: string;
   full_name: string;
   role: AdminRole;
+  created_at?: string;
 }
 
-const LOCAL_ADMINS_KEY = "apple_shop_admins_cache";
+const LOCAL_STORAGE_KEY = "admin_accounts_list";
 
 export const adminAuthService = {
-  async login(username: string, password: string): Promise<{ success: boolean; user?: AdminUser; message?: string }> {
+  async getAllAdmins(): Promise<AdminUser[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("admin_users")
+          .select("id, username, full_name, role, created_at");
+
+        if (!error && data && data.length > 0) {
+          return data;
+        }
+      }
+
+      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (local) return JSON.parse(local);
+
+      // ادمین پیش‌فرض سیستم در صورت عدم وجود دیتابیس
+      const defaultAdmins: AdminUser[] = [
+        {
+          id: "master-admin",
+          username: "admin",
+          password: "adminpassword",
+          full_name: "مدیر ارشد سیستم",
+          role: "super_admin",
+          created_at: new Date().toISOString(),
+        },
+      ];
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(defaultAdmins));
+      return defaultAdmins;
+    } catch (e) {
+      console.error("Error loading admin list:", e);
+      return [];
+    }
+  },
+
+  async login(username: string, pass: string): Promise<{ success: boolean; user?: AdminUser; message?: string }> {
     const cleanUser = username.trim();
-    const cleanPass = password.trim();
+    const cleanPass = pass.trim();
 
     try {
-      const { data, error } = await supabase
-        .from("admin_users")
-        .select("id, username, full_name, role, password")
-        .eq("username", cleanUser)
-        .maybeSingle();
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("admin_users")
+          .select("*")
+          .eq("username", cleanUser)
+          .eq("password", cleanPass)
+          .single();
 
-      if (!error && data) {
-        if (data.password === cleanPass) {
-          const user: AdminUser = {
+        if (!error && data) {
+          const authenticatedUser: AdminUser = {
             id: data.id,
             username: data.username,
             full_name: data.full_name,
-            role: data.role as AdminRole,
+            role: data.role,
           };
-          return { success: true, user };
-        } else {
-          return { success: false, message: "رمز عبور وارد شده نادرست است." };
+          this.setSession(authenticatedUser);
+          return { success: true, user: authenticatedUser };
         }
       }
-    } catch {}
 
-    // Fallback لوکال
-    if (typeof window !== "undefined") {
-      const localAdmins: any[] = JSON.parse(localStorage.getItem(LOCAL_ADMINS_KEY) || "[]");
-      const found = localAdmins.find((a) => a.username === cleanUser && a.password === cleanPass);
+      // بررسی لوکال در صورت آفلاین بودن
+      const localList: AdminUser[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+      const found = localList.find((u) => u.username === cleanUser && u.password === cleanPass);
+
       if (found) {
-        return {
-          success: true,
-          user: { id: found.id, username: found.username, full_name: found.full_name, role: found.role },
+        const authenticatedUser: AdminUser = {
+          id: found.id,
+          username: found.username,
+          full_name: found.full_name,
+          role: found.role,
         };
+        this.setSession(authenticatedUser);
+        return { success: true, user: authenticatedUser };
       }
-    }
 
-    if (cleanUser === "admin" && (cleanPass === "pouria_admin2026" || cleanPass === "admin123")) {
-      return {
-        success: true,
-        user: { id: "master-admin", username: "admin", full_name: "مدیر ارشد سیستم", role: "super_admin" },
-      };
+      return { success: false, message: "نام کاربری یا کلمه عبور وارد شده نادرست است." };
+    } catch (e) {
+      console.error("Login attempt error:", e);
+      return { success: false, message: "خطا در ارتباط با سرور احراز هویت." };
     }
+  },
 
-    return { success: false, message: "کاربری با این مشخصات یافت نشد." };
+  setSession(user: AdminUser) {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("isAdminLoggedIn", "true");
+      localStorage.setItem("admin_current_user", JSON.stringify(user));
+      document.cookie = `admin_session=true; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax;`;
+      document.cookie = `admin_role=${user.role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax;`;
+    }
+  },
+
+  async createAdmin(newAdmin: Omit<AdminUser, "id" | "created_at">): Promise<{ success: boolean; message?: string }> {
+    const adminObj: AdminUser = {
+      id: `admin_${Date.now()}`,
+      username: newAdmin.username.trim(),
+      password: newAdmin.password?.trim(),
+      full_name: newAdmin.full_name?.trim() || newAdmin.username.trim(),
+      role: newAdmin.role,
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      if (supabase) {
+        const { error } = await supabase.from("admin_users").insert([adminObj]);
+        if (error) {
+          return { success: false, message: "این نام کاربری از قبل در سیستم ثبت شده است." };
+        }
+      }
+
+      const localList: AdminUser[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+      localList.push(adminObj);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localList));
+
+      return { success: true };
+    } catch (e) {
+      console.error("Create admin error:", e);
+      return { success: false, message: "خطا در ثبت کاربر ادمین جدید." };
+    }
   },
 
   async updateCredentials(
-    userId: string,
+    targetId: string,
     newUsername: string,
     newPassword?: string,
     newFullName?: string
   ): Promise<{ success: boolean; message?: string }> {
-    const cleanUser = newUsername.trim();
-    const payload: any = {
-      username: cleanUser,
-      updated_at: new Date().toISOString(),
-    };
-    if (newPassword && newPassword.trim()) payload.password = newPassword.trim();
-    if (newFullName && newFullName.trim()) payload.full_name = newFullName.trim();
-
     try {
-      // بررسی تکراری نبودن نام کاربری برای کاربران دیگر
-      const { data: existUser } = await supabase
-        .from("admin_users")
-        .select("id")
-        .eq("username", cleanUser)
-        .neq("id", userId)
-        .maybeSingle();
+      const updates: any = { username: newUsername.trim() };
+      if (newPassword) updates.password = newPassword.trim();
+      if (newFullName) updates.full_name = newFullName.trim();
 
-      if (existUser) {
-        return { success: false, message: "این نام کاربری قبلاً توسط ادمین دیگری رزرو شده است." };
+      if (supabase) {
+        await supabase.from("admin_users").update(updates).eq("id", targetId);
       }
 
-      if (userId === "master-admin") {
-        const { error: upsertErr } = await supabase.from("admin_users").upsert({
-          username: cleanUser,
-          password: newPassword ? newPassword.trim() : "pouria_admin2026",
-          full_name: newFullName ? newFullName.trim() : "مدیر ارشد",
-          role: "super_admin",
-        });
-        if (upsertErr) throw upsertErr;
-      } else {
-        const { error } = await supabase.from("admin_users").update(payload).eq("id", userId);
-        if (error) throw error;
-      }
+      const localList: AdminUser[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+      const updatedList = localList.map((u) => (u.id === targetId ? { ...u, ...updates } : u));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
 
-      return { success: true, message: "مشخصات و رمز عبور با موفقیت بروزرسانی شد." };
-    } catch (err: any) {
-      // ذخیره در کش محلی در صورت بروز قطعی شبکه
-      if (typeof window !== "undefined") {
-        const localAdmins: any[] = JSON.parse(localStorage.getItem(LOCAL_ADMINS_KEY) || "[]");
-        const idx = localAdmins.findIndex((a) => a.id === userId || a.username === cleanUser);
-        if (idx >= 0) {
-          localAdmins[idx] = { ...localAdmins[idx], ...payload };
-        } else {
-          localAdmins.push({ id: userId, role: "super_admin", ...payload });
-        }
-        localStorage.setItem(LOCAL_ADMINS_KEY, JSON.stringify(localAdmins));
-        return { success: true, message: "تغییرات با موفقیت ذخیره شد." };
-      }
-      return { success: false, message: err?.message || "خطا در برقراری ارتباط با پایگاه داده." };
-    }
-  },
-
-  async getAllAdmins(): Promise<AdminUser[]> {
-    try {
-      const { data, error } = await supabase
-        .from("admin_users")
-        .select("id, username, full_name, role")
-        .order("created_at", { ascending: false });
-
-      if (!error && data) return data;
-    } catch {}
-
-    if (typeof window !== "undefined") {
-      const localAdmins: any[] = JSON.parse(localStorage.getItem(LOCAL_ADMINS_KEY) || "[]");
-      if (localAdmins.length > 0) return localAdmins;
-    }
-
-    return [{ id: "master-admin", username: "admin", full_name: "مدیر ارشد سیستم", role: "super_admin" }];
-  },
-
-  async createAdmin(adminData: {
-    username: string;
-    password: string;
-    full_name: string;
-    role: AdminRole;
-  }): Promise<{ success: boolean; message?: string }> {
-    const cleanUser = adminData.username.trim();
-    const cleanPass = adminData.password.trim();
-
-    try {
-      const { data: existUser } = await supabase
-        .from("admin_users")
-        .select("id")
-        .eq("username", cleanUser)
-        .maybeSingle();
-
-      if (existUser) {
-        return { success: false, message: "این نام کاربری تکراری است. لطفاً نام دیگری انتخاب کنید." };
-      }
-
-      const { error } = await supabase.from("admin_users").insert({
-        username: cleanUser,
-        password: cleanPass,
-        full_name: adminData.full_name.trim(),
-        role: adminData.role,
-      });
-
-      if (error) throw error;
-
-      return { success: true, message: "ادمین جدید با موفقیت ایجاد شد." };
-    } catch (err: any) {
-      if (typeof window !== "undefined") {
-        const localAdmins: any[] = JSON.parse(localStorage.getItem(LOCAL_ADMINS_KEY) || "[]");
-        localAdmins.push({
-          id: `admin-${Date.now()}`,
-          username: cleanUser,
-          password: cleanPass,
-          full_name: adminData.full_name.trim(),
-          role: adminData.role,
-        });
-        localStorage.setItem(LOCAL_ADMINS_KEY, JSON.stringify(localAdmins));
-        return { success: true, message: "ادمین جدید با موفقیت ذخیره شد." };
-      }
-      return { success: false, message: err?.message || "خطا در ایجاد ادمین جدید." };
+      return { success: true };
+    } catch (e) {
+      console.error("Update credentials error:", e);
+      return { success: false, message: "خطا در به‌روزرسانی مشخصات." };
     }
   },
 
   async deleteAdmin(adminId: string): Promise<boolean> {
     try {
-      await supabase.from("admin_users").delete().eq("id", adminId);
-    } catch {}
+      if (supabase) {
+        await supabase.from("admin_users").delete().eq("id", adminId);
+      }
 
-    if (typeof window !== "undefined") {
-      const localAdmins: any[] = JSON.parse(localStorage.getItem(LOCAL_ADMINS_KEY) || "[]");
-      const filtered = localAdmins.filter((a) => a.id !== adminId);
-      localStorage.setItem(LOCAL_ADMINS_KEY, JSON.stringify(filtered));
+      const localList: AdminUser[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+      const updatedList = localList.filter((u) => u.id !== adminId);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+      return true;
+    } catch (e) {
+      console.error("Delete admin error:", e);
+      return false;
     }
-    return true;
   },
 };

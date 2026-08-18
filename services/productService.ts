@@ -1,42 +1,46 @@
 import { supabase } from "@/lib/supabase";
 
-export interface ProductColor {
-  name: string;
-  hex: string;
-}
-
 export interface Product {
   id: string;
   name: string;
   title_fa?: string;
+  description?: string;
   price: number;
   original_price?: number;
   originalPrice?: number;
-  discount_percent?: number;
-  discountPercent?: number;
-  discount_price?: number;
   category?: string;
   category_id?: string;
-  brand?: string;
   image?: string;
   images?: string[];
-  colors?: ProductColor[];
-  warranty?: string;
   stock?: number;
   is_available?: boolean;
-  description?: string;
+  isAvailable?: boolean;
+  warranty?: string;
   specs?: Record<string, any>;
-  specifications?: Record<string, any>;
   created_at?: string;
-  updated_at?: string;
 }
 
-const STORAGE_KEY = "site_products_db";
-const CATEGORIES_KEY = "site_categories_db";
+const STORAGE_KEY = "pouriavisuals_products_cache_v2";
+
+const getChannel = () => {
+  if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+    return new BroadcastChannel("products_sync_channel");
+  }
+  return null;
+};
 
 export const productService = {
-  // ۱. دریافت تمامی محصولات از دیتابیس با فال‌بک لوکال‌استوریج
   async getAll(): Promise<Product[]> {
+    let localData: Product[] = [];
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem(STORAGE_KEY);
+      if (cached) {
+        try {
+          localData = JSON.parse(cached);
+        } catch {}
+      }
+    }
+
     try {
       if (supabase) {
         const { data, error } = await supabase
@@ -44,211 +48,163 @@ export const productService = {
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (!error && data && data.length > 0) {
-          const mappedData: Product[] = data.map((p: any) => ({
-            ...p,
-            stock: p.stock !== undefined ? p.stock : 99,
-            is_available: p.is_available !== undefined ? p.is_available : (p.stock !== undefined ? p.stock > 0 : true),
-            original_price: p.original_price || p.originalPrice || (p.discount_price ? p.price : undefined),
-            price: p.discount_price && p.discount_price > 0 ? p.discount_price : p.price,
-            specs: p.specs || p.specifications || {},
+        if (!error && data) {
+          const formatted: Product[] = data.map((item: any) => ({
+            id: String(item.id),
+            name: item.name || item.title || "محصول بدون نام",
+            title_fa: item.title_fa || item.name_fa || item.name,
+            description: item.description || "",
+            price: Number(item.price || 0),
+            original_price: item.original_price ? Number(item.original_price) : undefined,
+            originalPrice: item.original_price ? Number(item.original_price) : undefined,
+            category: item.category || item.category_id || "کالای دیجیتال",
+            category_id: item.category_id || item.category || "کالای دیجیتال",
+            image: item.image || (Array.isArray(item.images) ? item.images[0] : ""),
+            images: Array.isArray(item.images) && item.images.length > 0 ? item.images : [item.image || ""].filter(Boolean),
+            stock: item.stock !== undefined ? Number(item.stock) : 10,
+            is_available: item.is_available !== false,
+            isAvailable: item.is_available !== false,
+            warranty: item.warranty || "گارانتی اصالت و سلامت فیزیکی",
+            specs: item.specs || {},
+            created_at: item.created_at,
           }));
 
           if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(mappedData));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(formatted));
           }
-          return mappedData;
+          return formatted;
         }
       }
-    } catch (err) {
-      console.warn("Supabase products fetch failed:", err);
+    } catch (e) {
+      console.warn("Supabase products fetch warning:", e);
     }
 
-    if (typeof window !== "undefined") {
-      const local = localStorage.getItem(STORAGE_KEY);
-      if (local !== null) {
-        try {
-          return JSON.parse(local);
-        } catch {
-          return [];
-        }
-      }
-    }
-    return [];
+    return localData;
   },
 
-  // ۲. دریافت لیست تمامی دسته‌بندی‌ها
-  async getCategories(): Promise<string[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("categories")
-          .select("name, title");
-
-        if (!error && data && data.length > 0) {
-          const list = data.map((c: any) => c.title || c.name).filter(Boolean);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(CATEGORIES_KEY, JSON.stringify(list));
-          }
-          return list;
-        }
-      }
-    } catch (err) {
-      console.warn("Supabase categories fetch error:", err);
-    }
-
-    if (typeof window !== "undefined") {
-      const localCats = localStorage.getItem(CATEGORIES_KEY);
-      if (localCats !== null) {
-        try {
-          return JSON.parse(localCats);
-        } catch {}
-      }
-    }
-
-    // استخراج داینامیک دسته‌بندی‌ها از محصولات ثبت‌شده
-    const allProds = await this.getAll();
-    const extracted = Array.from(
-      new Set(allProds.map((p) => p.category || p.category_id).filter(Boolean))
-    ) as string[];
-
-    return extracted.length > 0 ? extracted : ["آیفون", "مک‌بوک", "آیپد", "اپل واچ", "ایرپاد", "لوازم جانبی"];
-  },
-
-  // ۳. افزودن دسته‌بندی جدید
-  async addCategory(categoryName: string): Promise<boolean> {
-    const trimmed = categoryName.trim();
-    if (!trimmed) return false;
-
-    try {
-      if (supabase) {
-        await supabase.from("categories").insert([{ name: trimmed, title: trimmed }]);
-      }
-    } catch (err) {
-      console.warn("Supabase add category error:", err);
-    }
-
-    const current = await this.getCategories();
-    if (!current.includes(trimmed)) {
-      const updated = [...current, trimmed];
-      if (typeof window !== "undefined") {
-        localStorage.setItem(CATEGORIES_KEY, JSON.stringify(updated));
-      }
-    }
-    return true;
-  },
-
-  // ۴. حذف دسته‌بندی
-  async deleteCategory(categoryName: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("categories").delete().or(`name.eq.${categoryName},title.eq.${categoryName}`);
-      }
-    } catch (err) {
-      console.warn("Supabase delete category error:", err);
-    }
-
-    const current = await this.getCategories();
-    const updated = current.filter((c) => c !== categoryName);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(CATEGORIES_KEY, JSON.stringify(updated));
-    }
-    return true;
-  },
-
-  // ۵. دریافت یک محصول با شناسه
   async getById(id: string): Promise<Product | null> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .eq("id", id)
-          .maybeSingle();
-
-        if (!error && data) {
-          return {
-            ...data,
-            stock: data.stock !== undefined ? data.stock : 99,
-            is_available: data.is_available !== undefined ? data.is_available : true,
-            specs: data.specs || data.specifications || {},
-          };
-        }
-      }
-    } catch (err) {
-      console.warn("Supabase single product fetch error:", err);
-    }
-
     const all = await this.getAll();
     return all.find((p) => String(p.id) === String(id)) || null;
   },
 
-  // ۶. دریافت محصولات بر اساس دسته‌بندی
-  async getByCategory(category: string): Promise<Product[]> {
+  async getCategories(): Promise<string[]> {
     const all = await this.getAll();
-    if (!category || category === "all" || category === "همه") return all;
-    return all.filter((p) => p.category === category || p.category_id === category);
+    const cats = new Set<string>();
+    all.forEach((p) => {
+      if (p.category) cats.add(p.category);
+      if (p.category_id) cats.add(p.category_id);
+    });
+    return Array.from(cats);
   },
 
-  // ۷. ایجاد و ذخیره محصول جدید
-  async create(product: Product): Promise<{ success: boolean; data?: Product }> {
+  async save(product: Partial<Product>): Promise<{ success: boolean; data?: Product }> {
+    const current = await this.getAll();
+    const productId = product.id ? String(product.id) : `prod_${Date.now()}`;
+
+    const newProduct: Product = {
+      id: productId,
+      name: product.name || "محصول جدید",
+      title_fa: product.title_fa || product.name,
+      description: product.description || "",
+      price: Number(product.price || 0),
+      original_price: product.original_price ? Number(product.original_price) : undefined,
+      category: product.category || product.category_id || "عمومی",
+      category_id: product.category_id || product.category || "عمومی",
+      image: product.image || (product.images?.[0] ?? ""),
+      images: product.images && product.images.length > 0 ? product.images : [product.image ?? ""].filter(Boolean),
+      stock: product.stock !== undefined ? Number(product.stock) : 10,
+      is_available: product.is_available !== false && (product.stock === undefined || Number(product.stock) > 0),
+      warranty: product.warranty || "گارانتی اصالت کالا",
+      specs: product.specs || {},
+      created_at: product.created_at || new Date().toISOString(),
+    };
+
+    const existsIndex = current.findIndex((p) => String(p.id) === String(productId));
+    let updatedList: Product[] = [];
+
+    if (existsIndex >= 0) {
+      updatedList = [...current];
+      updatedList[existsIndex] = newProduct;
+    } else {
+      updatedList = [newProduct, ...current];
+    }
+
+    // ۱. انتشار فوری در کلاینت و کانال همگام‌سازی
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
+      window.dispatchEvent(new CustomEvent("products_updated", { detail: updatedList }));
+      const channel = getChannel();
+      if (channel) {
+        channel.postMessage({ type: "SYNC_PRODUCTS", data: updatedList });
+      }
+    }
+
+    // ۲. ذخیره‌سازی منعطف در Supabase
     try {
       if (supabase) {
-        const { data, error } = await supabase.from("products").insert([product]).select();
-        if (!error && data && data.length > 0) {
-          const current = await this.getAll();
-          const updated = [data[0], ...current];
-          if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-          }
-          return { success: true, data: data[0] };
+        const payload: Record<string, any> = {
+          name: newProduct.name,
+          title_fa: newProduct.title_fa,
+          description: newProduct.description,
+          price: newProduct.price,
+          original_price: newProduct.original_price,
+          category: newProduct.category,
+          category_id: newProduct.category_id,
+          image: newProduct.image && !newProduct.image.startsWith("data:image/") ? newProduct.image : null,
+          images: (newProduct.images || []).filter((img) => !img.startsWith("data:image/")),
+          stock: newProduct.stock,
+          is_available: newProduct.is_available,
+          warranty: newProduct.warranty,
+          specs: newProduct.specs,
+        };
+
+        if (existsIndex >= 0) {
+          await supabase.from("products").update(payload).eq("id", productId);
+        } else {
+          await supabase.from("products").insert([{ id: productId, ...payload }]);
         }
       }
     } catch (err) {
-      console.warn("Supabase insert error:", err);
+      console.warn("Supabase product save background:", err);
     }
 
-    const current = await this.getAll();
-    const updated = [product, ...current];
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    }
-    return { success: true, data: product };
+    return { success: true, data: newProduct };
   },
 
-  // ۸. ویرایش محصول
-  async update(id: string, updates: Partial<Product>): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("products").update(updates).eq("id", id);
-      }
-    } catch (err) {
-      console.warn("Supabase update error:", err);
-    }
-
-    const current = await this.getAll();
-    const updated = current.map((p) => (String(p.id) === String(id) ? { ...p, ...updates } : p));
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    }
-    return true;
-  },
-
-  // ۹. حذف دائمی محصول
   async delete(id: string): Promise<boolean> {
+    const current = await this.getAll();
+    const filtered = current.filter((p) => String(p.id) !== String(id));
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+      window.dispatchEvent(new CustomEvent("products_updated", { detail: filtered }));
+      const channel = getChannel();
+      if (channel) {
+        channel.postMessage({ type: "SYNC_PRODUCTS", data: filtered });
+      }
+    }
+
     try {
       if (supabase) {
         await supabase.from("products").delete().eq("id", id);
       }
     } catch (err) {
-      console.warn("Supabase delete product error:", err);
+      console.warn("Supabase product delete background:", err);
     }
 
-    const current = await this.getAll();
-    const updated = current.filter((p) => String(p.id) !== String(id));
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    }
     return true;
+  },
+
+  async updateStock(id: string, newStock: number): Promise<boolean> {
+    const product = await this.getById(id);
+    if (!product) return false;
+
+    return (
+      await this.save({
+        ...product,
+        stock: newStock,
+        is_available: newStock > 0,
+      })
+    ).success;
   },
 };

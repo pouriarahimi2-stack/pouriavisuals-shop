@@ -1,44 +1,11 @@
-import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import ClientLayoutEnhancer from "@/components/ClientLayoutEnhancer";
-import ThemeProvider from "@/ThemeProvider";
+import React from "react";
+import ThemeProvider from "@/components/ThemeProvider";
 import { CartProvider } from "@/context/CartContext";
 import LayoutShell from "@/components/LayoutShell";
-import AIAssistantChat from "@/components/AIAssistantChat";
-import { siteInfoService } from "@/services/siteInfoService";
+import ClientLayoutEnhancer from "@/components/ClientLayoutEnhancer";
 
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
-  ],
-  width: "device-width",
-  initialScale: 1,
-};
-
-export async function generateMetadata(): Promise<Metadata> {
-  try {
-    const info = await siteInfoService.getAll();
-    const storeTitle = info?.storeName || info?.siteTitle || "Tech Store";
-    const aboutDesc = info?.aboutText || info?.aboutUs || "مرجع تخصصی خرید محصولات اصل";
-
-    return {
-      title: {
-        default: storeTitle,
-        template: `%s | ${storeTitle}`,
-      },
-      description: aboutDesc,
-      icons: {
-        icon: info?.logo || "/favicon.ico",
-      },
-    };
-  } catch (error) {
-    return {
-      title: "Tech Store",
-      description: "فروشگاه تخصصی محصولات دیجیتال",
-    };
-  }
-}
+export const dynamic = "force-dynamic";
 
 export default function RootLayout({
   children,
@@ -47,14 +14,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <body className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors duration-200">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+      </head>
+      <body className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 font-sans antialiased">
         <ThemeProvider>
           <CartProvider>
             <ClientLayoutEnhancer />
-            <LayoutShell>
-              {children}
-            </LayoutShell>
-            <AIAssistantChat />
+            <LayoutShell>{children}</LayoutShell>
           </CartProvider>
         </ThemeProvider>
       </body>

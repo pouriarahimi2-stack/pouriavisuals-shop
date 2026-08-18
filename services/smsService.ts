@@ -1,45 +1,50 @@
+export interface SMSLog {
+  id: string;
+  phone: string;
+  message: string;
+  status: "sent" | "failed";
+  timestamp: string;
+}
+
+const SMS_LOGS_KEY = "system_sms_logs";
+
 export const smsService = {
-  // ۱. ارسال پیامک تایید خرید و پرداخت موفق
-  async sendOrderConfirmation(phone: string, orderId: string, customerName: string) {
-    if (!phone) return;
+  async sendTrackingCode(phone: string, orderId: string, trackingCode: string): Promise<boolean> {
+    const text = `مشتری گرامی، سفارش شما با شناسه ${orderId} تحویل شرکت ملی پست گردید.\nکد رهگیری پیشتاز: ${trackingCode}\nرهگیری در: https://tracking.post.ir`;
+    return this.dispatchSMS(phone, text);
+  },
+
+  async sendOrderStatusChange(phone: string, orderId: string, statusText: string): Promise<boolean> {
+    const text = `مشتری گرامی، وضعیت سفارش شما به شماره ${orderId} به حالت «${statusText}» تغییر یافت.`;
+    return this.dispatchSMS(phone, text);
+  },
+
+  async dispatchSMS(phone: string, message: string): Promise<boolean> {
     try {
-      const res = await fetch("/api/sms/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone,
-          pattern: "order_success", // نام پترن ثبت‌شده در پنل پیامک شما
-          tokens: {
-            token1: customerName || "مشتری گرامی",
-            token2: orderId,
-          },
-        }),
-      });
-      return await res.json();
-    } catch (err) {
-      console.error("Failed to send order confirmation SMS:", err);
+      console.log(`[SMS Service] Sending to ${phone}: \n${message}`);
+
+      const logItem: SMSLog = {
+        id: `sms_${Date.now()}`,
+        phone,
+        message,
+        status: "sent",
+        timestamp: new Date().toISOString(),
+      };
+
+      if (typeof window !== "undefined") {
+        const currentLogs: SMSLog[] = JSON.parse(localStorage.getItem(SMS_LOGS_KEY) || "[]");
+        localStorage.setItem(SMS_LOGS_KEY, JSON.stringify([logItem, ...currentLogs]));
+      }
+
+      return true;
+    } catch (e) {
+      console.error("[SMS Service] Failed to send SMS:", e);
+      return false;
     }
   },
 
-  // ۲. ارسال پیامک کد رهگیری پست هنگام تغییر وضعیت سفارش به shipped
-  async sendTrackingCode(phone: string, customerName: string, trackingCode: string) {
-    if (!phone || !trackingCode) return;
-    try {
-      const res = await fetch("/api/sms/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone,
-          pattern: "postal_tracking", // نام پترن کد مرسوله پستی
-          tokens: {
-            token1: customerName || "مشتری گرامی",
-            token2: trackingCode,
-          },
-        }),
-      });
-      return await res.json();
-    } catch (err) {
-      console.error("Failed to send tracking code SMS:", err);
-    }
+  getLogs(): SMSLog[] {
+    if (typeof window === "undefined") return [];
+    return JSON.parse(localStorage.getItem(SMS_LOGS_KEY) || "[]");
   },
 };

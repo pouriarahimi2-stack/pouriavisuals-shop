@@ -2,205 +2,194 @@
 
 import React, { useState, useEffect } from "react";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import Link from "next/link";
 
 export default function ContactPage() {
-  const [info, setInfo] = useState<SiteInfo | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    contact: "",
-    message: "",
-  });
-  const [sent, setSent] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState(false);
 
   useEffect(() => {
     async function loadInfo() {
       try {
-        if (typeof siteInfoService.getSiteInfo === "function") {
-          const res = siteInfoService.getSiteInfo();
-          if (res) setInfo(res);
-        } else if (typeof siteInfoService.getAll === "function") {
-          const res = await siteInfoService.getAll();
-          if (res) setInfo(res);
-        }
-      } catch {
-        if (typeof window !== "undefined") {
-          const local = JSON.parse(localStorage.getItem("site_info_cache") || "{}");
-          setInfo(local);
-        }
+        const info = await siteInfoService.getAll();
+        setSiteInfo(info);
+      } catch (e) {
+        console.error("Contact load error:", e);
       }
     }
     loadInfo();
+
+    const handleUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmitTicket = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.contact.trim() || !formData.message.trim()) return;
+    if (!fullName.trim() || !phone.trim() || !message.trim()) return;
 
-    setIsSubmitting(true);
+    setSubmitting(true);
     setTimeout(() => {
-      setIsSubmitting(false);
-      setSent(true);
-      setFormData({ name: "", contact: "", message: "" });
+      setSubmitting(false);
+      setSuccessMsg(true);
+      setFullName("");
+      setPhone("");
+      setSubject("");
+      setMessage("");
     }, 600);
   };
 
-  const instagramLink = info?.instagram || (info as any)?.instagramUrl || "https://instagram.com";
-  const telegramLink = info?.telegram || (info as any)?.telegramUrl || "https://t.me";
+  const phoneNum = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+  const emailAddr = siteInfo?.email || "info@pouriavisuals.ir";
+  const addressText = siteInfo?.address || "تهران، خیابان ولیعصر";
+  const siteName = siteInfo?.site_name || "پوریا ویژوالز";
 
   return (
-    <main className="min-h-[80vh] pb-16 font-sans text-[var(--text-primary)] select-none">
-      <div className="max-w-4xl mx-auto px-4 mt-12 space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-black text-[var(--text-primary)]">📞 تماس با ما</h1>
-          <p className="text-xs text-[var(--text-secondary)] font-medium">
-            راه‌های ارتباطی و فرم ارسال پیام مستقیم
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* اطلاعات ارتباطی */}
-          <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 text-xs shadow-xl flex flex-col justify-between">
-            <div className="space-y-4">
-              <h3 className="font-bold text-sm text-[var(--accent-blue)]">اطلاعات ارتباطی:</h3>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-                  <span className="p-2 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-lg">
-                    📞
-                  </span>
-                  <div>
-                    <span className="text-[10px] text-[var(--text-secondary)] block font-bold">
-                      شماره تماس:
-                    </span>
-                    <span className="font-bold font-mono text-[var(--text-primary)]">
-                      {info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-                  <span className="p-2 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-lg">
-                    ✉️
-                  </span>
-                  <div>
-                    <span className="text-[10px] text-[var(--text-secondary)] block font-bold">
-                      ایمیل:
-                    </span>
-                    <span className="font-mono font-bold text-[var(--text-primary)]">
-                      {info?.email || "info@bitbypouria.com"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-                  <span className="p-2 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-lg">
-                    📍
-                  </span>
-                  <div>
-                    <span className="text-[10px] text-[var(--text-secondary)] block font-bold">
-                      آدرس:
-                    </span>
-                    <span className="font-bold text-[var(--text-primary)] leading-relaxed">
-                      {info?.address || "تهران، خیابان ولیعصر، برج فناوری"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-[var(--card-border)] flex gap-2">
-              <a
-                href={instagramLink}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center font-bold hover:border-[var(--accent-blue)] transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
-              >
-                <span>📷</span>
-                <span>اینستاگرام</span>
-              </a>
-              <a
-                href={telegramLink}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center font-bold hover:border-[var(--accent-blue)] transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
-              >
-                <span>✈️</span>
-                <span>تلگرام</span>
-              </a>
-            </div>
-          </div>
-
-          {/* فرم ارسال پیام */}
-          <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 text-xs shadow-xl">
-            <h3 className="font-bold text-sm text-[var(--accent-blue)]">ارسال پیام مستقیم:</h3>
-
-            {sent ? (
-              <div className="p-8 text-center space-y-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-3xl border border-emerald-500/20 animate-fadeIn">
-                <span className="text-4xl block">✅</span>
-                <p className="font-black text-sm">پیام شما با موفقیت ارسال شد.</p>
-                <p className="text-xs text-[var(--text-secondary)] font-medium">
-                  در اسرع وقت با شما تماس خواهیم گرفت.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setSent(false)}
-                  className="mt-2 text-xs text-[var(--accent-blue)] font-bold hover:underline cursor-pointer"
-                >
-                  ارسال پیام جدید
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-3.5">
-                <div>
-                  <input
-                    type="text"
-                    placeholder="نام و نام خانوادگی *"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-[var(--accent-blue)] transition"
-                  />
-                </div>
-
-                <div>
-                  <input
-                    type="text"
-                    placeholder="شماره تماس یا ایمیل *"
-                    required
-                    value={formData.contact}
-                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-mono font-bold outline-none focus:border-[var(--accent-blue)] transition"
-                  />
-                </div>
-
-                <div>
-                  <textarea
-                    rows={4}
-                    placeholder="متن پیام شما..."
-                    required
-                    value={formData.message}
-                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium outline-none leading-relaxed focus:border-[var(--accent-blue)] transition"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold cursor-pointer hover:opacity-90 transition shadow-lg shadow-blue-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
-                  ) : (
-                    <span>ارسال پیام 🚀</span>
-                  )}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
+    <div className="max-w-5xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
+      
+      {/* هدر صفحه تماس */}
+      <div className="text-center space-y-2">
+        <span className="p-3 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] inline-block text-2xl">
+          📞
+        </span>
+        <h1 className="text-2xl md:text-3xl font-black">تماس با پشتیبانی و مشاوره تخصصی</h1>
+        <p className="text-xs text-[var(--text-secondary)] font-medium">
+          پاسخگوی سوالات شما در خصوص تجهیزات، مانیتورهای تدوین و هماهنگی سفارشات هستیم
+        </p>
       </div>
-    </main>
+
+      {successMsg && (
+        <div className="p-5 rounded-3xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 space-y-1 shadow-xl animate-fadeIn text-xs font-bold">
+          <p className="font-black text-sm">✓ پیام شما با موفقیت دریافت گردید.</p>
+          <p className="font-medium opacity-90">کارشناسان تیم پشتیبانی به‌زودی با شماره همراه شما تماس خواهند گرفت.</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* ستون راست: اطلاعات تماس و آدرس */}
+        <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
+          <h3 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
+            🏢 اطلاعات دفتر مرکزی {siteName}
+          </h3>
+
+          <div className="space-y-4 text-[var(--text-secondary)] font-medium leading-relaxed">
+            <div className="flex items-start gap-3">
+              <span className="text-base mt-0.5">📞</span>
+              <div>
+                <strong className="text-[var(--text-primary)] block mb-0.5">شماره تماس پشتیبانی:</strong>
+                <span className="font-mono font-bold text-[var(--accent-blue)] text-sm">{phoneNum}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="text-base mt-0.5">✉️</span>
+              <div>
+                <strong className="text-[var(--text-primary)] block mb-0.5">ایمیل ارتباطی:</strong>
+                <span className="font-mono font-bold">{emailAddr}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="text-base mt-0.5">📍</span>
+              <div>
+                <strong className="text-[var(--text-primary)] block mb-0.5">نشانی حضوری:</strong>
+                <span>{addressText}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="text-base mt-0.5">⏰</span>
+              <div>
+                <strong className="text-[var(--text-primary)] block mb-0.5">ساعات کاری:</strong>
+                <span>شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-[var(--card-border)]">
+            <Link
+              href="/track-order"
+              className="w-full py-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold text-center block transition"
+            >
+              🔍 رهگیری مرسولات پستی ←
+            </Link>
+          </div>
+        </div>
+
+        {/* ستون چپ: فرم ارسال پیام و تیکت */}
+        <form onSubmit={handleSubmitTicket} className="lg:col-span-2 p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
+          <h3 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
+            ✉️ ارسال پیام یا درخواست مشاوره
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی *</label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="مثال: پوریا رسولی"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره موبایل جهت پاسخگویی *</label>
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">موضوع پیام</label>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="مثال: استعلام گارانتی مانیتور، همکاری سازمانی و..."
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن پیام یا پرسش شما *</label>
+              <textarea
+                rows={5}
+                required
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="توضیحات خود را بنویسید..."
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] leading-relaxed focus:border-[var(--accent-blue)]"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl cursor-pointer disabled:opacity-50"
+            >
+              {submitting ? "در حال ارسال..." : "ارسال پیام به واحد پشتیبانی 🚀"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

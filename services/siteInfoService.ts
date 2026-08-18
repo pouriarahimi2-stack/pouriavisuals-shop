@@ -2,148 +2,121 @@ import { supabase } from "@/lib/supabase";
 
 export interface SiteInfo {
   id?: string;
-  storeName?: string;
-  store_name?: string;
-  siteTitle?: string;
-  site_title?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  aboutText?: string;
-  about_text?: string;
-  aboutUs?: string;
+  site_name: string;
+  tagline?: string;
+  description?: string;
+  phone: string;
+  email: string;
+  address: string;
   logo?: string;
-  logo_url?: string;
-  logoUrl?: string;
-  instagram?: string;
-  telegram?: string;
-  whatsapp?: string;
   allowGoogleIndex?: boolean;
-  allow_google_index?: boolean;
-  updated_at?: string;
+  socials?: {
+    instagram?: string;
+    telegram?: string;
+    whatsapp?: string;
+    youtube?: string;
+  };
 }
 
-const STORAGE_KEY = "site_info_db";
+const LOCAL_STORAGE_KEY = "site_global_info";
 
 export const siteInfoService = {
   async getAll(): Promise<SiteInfo> {
-    const defaultData: SiteInfo = {
-      id: "main_config",
-      storeName: "Tech Store",
-      siteTitle: "Tech Store",
-      phone: "۰۲۱-۸۸۸۸۸۸۸۸",
-      email: "info@techstore.com",
-      address: "تهران، خیابان ولیعصر، برج فناوری",
-      aboutText: "مرجع تخصصی خرید محصولات اصل با تضمین اصالت و بهترین قیمت.",
-      aboutUs: "مرجع تخصصی خرید محصولات اصل با تضمین اصالت و بهترین قیمت.",
-      logo: "",
-      logoUrl: "",
-      instagram: "tech_store",
-      telegram: "tech_store",
-      allowGoogleIndex: true,
-    };
-
-    // اولویت با خواندن مستقیم از دیتابیس Supabase
     try {
       if (supabase) {
         const { data, error } = await supabase
           .from("site_info")
           .select("*")
           .limit(1)
-          .maybeSingle();
+          .single();
 
         if (!error && data) {
-          const unified: SiteInfo = {
-            id: data.id || "main_config",
-            storeName: data.store_name || data.storeName || defaultData.storeName,
-            siteTitle: data.site_title || data.siteTitle || defaultData.siteTitle,
-            phone: data.phone || defaultData.phone,
-            email: data.email || defaultData.email,
-            address: data.address || defaultData.address,
-            aboutText: data.about_text || data.aboutText || data.aboutUs || defaultData.aboutText,
-            aboutUs: data.about_text || data.aboutText || data.aboutUs || defaultData.aboutUs,
-            logo: data.logo_url || data.logo || data.logoUrl || "",
-            logoUrl: data.logo_url || data.logo || data.logoUrl || "",
-            instagram: data.instagram || defaultData.instagram,
-            telegram: data.telegram || defaultData.telegram,
-            whatsapp: data.whatsapp || "",
-            allowGoogleIndex: data.allow_google_index !== false && data.allowGoogleIndex !== false,
-            updated_at: data.updated_at,
+          const mapped: SiteInfo = {
+            id: data.id,
+            site_name: data.site_name || data.siteName,
+            tagline: data.tagline,
+            description: data.description,
+            phone: data.phone,
+            email: data.email,
+            address: data.address,
+            logo: data.logo,
+            allowGoogleIndex: data.allow_google_index ?? data.allowGoogleIndex ?? true,
+            socials: typeof data.socials === "string" ? JSON.parse(data.socials) : data.socials,
           };
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(unified));
-          }
-          return unified;
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+          return mapped;
         }
       }
-    } catch (err) {
-      console.warn("Supabase site info fetch warning:", err);
-    }
 
-    if (typeof window !== "undefined") {
-      const local = localStorage.getItem(STORAGE_KEY);
-      if (local) {
-        try {
-          return { ...defaultData, ...JSON.parse(local) };
-        } catch {}
-      }
-    }
+      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (local) return JSON.parse(local);
 
-    return defaultData;
+      // اطلاعات پیش‌فرض برند
+      const defaults: SiteInfo = {
+        site_name: "پوریا ویژوالز",
+        tagline: "مرجع تخصصی تجهیزات تصویر و دیجیتال",
+        description: "ارائه‌دهنده تخصصی تجهیزات مانیتورینگ، ابزارهای تدوین و سخت‌افزارهای مدرن بصری با گارانتی اصالت کالا.",
+        phone: "۰۲۱-۸۸۸۸۸۸۸۸",
+        email: "info@pouriavisuals.ir",
+        address: "تهران، خیابان ولیعصر",
+        allowGoogleIndex: true,
+        socials: {
+          instagram: "https://instagram.com",
+          telegram: "https://t.me",
+        },
+      };
+      return defaults;
+    } catch (e) {
+      console.error("Error loading site info:", e);
+      return {
+        site_name: "پوریا ویژوالز",
+        phone: "۰۲۱-۸۸۸۸۸۸۸۸",
+        email: "info@pouriavisuals.ir",
+        address: "تهران، خیابان ولیعصر",
+        allowGoogleIndex: true,
+      };
+    }
   },
 
-  async getSiteInfo(): Promise<SiteInfo> {
-    return this.getAll();
-  },
-
-  async update(info: Partial<SiteInfo>): Promise<{ success: boolean; data?: SiteInfo }> {
-    const current = await this.getAll();
-    const merged: SiteInfo = {
-      ...current,
-      ...info,
-      updated_at: new Date().toISOString(),
-    };
-
-    const targetTitle = merged.storeName || merged.siteTitle || "Tech Store";
-
-    if (typeof document !== "undefined") {
-      document.title = targetTitle;
-    }
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-      window.dispatchEvent(new CustomEvent("site_info_updated", { detail: merged }));
-    }
-
+  async update(info: SiteInfo): Promise<boolean> {
     try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(info));
+
       if (supabase) {
-        const dbPayload = {
-          id: "main_config",
-          store_name: merged.storeName || merged.store_name,
-          site_title: merged.siteTitle || merged.site_title,
-          phone: merged.phone,
-          email: merged.email,
-          address: merged.address,
-          about_text: merged.aboutText || merged.aboutUs || merged.about_text,
-          logo_url: merged.logo || merged.logoUrl || merged.logo_url,
-          instagram: merged.instagram,
-          telegram: merged.telegram,
-          whatsapp: merged.whatsapp,
-          allow_google_index: merged.allowGoogleIndex !== false,
-          updated_at: merged.updated_at,
+        const payload = {
+          site_name: info.site_name,
+          tagline: info.tagline,
+          description: info.description,
+          phone: info.phone,
+          email: info.email,
+          address: info.address,
+          logo: info.logo,
+          allow_google_index: info.allowGoogleIndex,
+          socials: info.socials,
         };
 
-        await supabase.from("site_info").upsert([dbPayload], { onConflict: "id" });
+        const { data } = await supabase.from("site_info").select("id").limit(1);
+        if (data && data.length > 0) {
+          await supabase.from("site_info").update(payload).eq("id", data[0].id);
+        } else {
+          await supabase.from("site_info").insert([payload]);
+        }
       }
-    } catch (err) {
-      console.warn("Supabase update error:", err);
+
+      // انتشار رویداد بلادرنگ
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("site_info_updated", { detail: info }));
+        if ("BroadcastChannel" in window) {
+          const channel = new BroadcastChannel("site_info_sync_channel");
+          channel.postMessage({ type: "SYNC_SITE_INFO", data: info });
+          channel.close();
+        }
+      }
+
+      return true;
+    } catch (e) {
+      console.error("Error saving site info:", e);
+      return false;
     }
-
-    return { success: true, data: merged };
-  },
-
-  async updateSiteInfo(info: Partial<SiteInfo>): Promise<{ success: boolean; data?: SiteInfo }> {
-    return this.update(info);
   },
 };

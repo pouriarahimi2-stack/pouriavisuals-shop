@@ -1,45 +1,70 @@
 import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
-// آرایه موقت برای ذخیره مقالات در لایه سرور
-let blogPosts: any[] = [];
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ success: true, posts: blogPosts });
+  try {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("blogs")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        return NextResponse.json({ success: true, data });
+      }
+    }
+
+    return NextResponse.json({ success: true, data: [] });
+  } catch (err) {
+    console.error("API Blogs GET Error:", err);
+    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, metaDescription, keywords, content } = body;
+    const { title, content, metaDescription, keywords, category } = body;
 
     if (!title || !content) {
-      return NextResponse.json(
-        { success: false, message: "عنوان و متن مقاله الزامی است." },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "عنوان و متن مقاله الزامی است." }, { status: 400 });
     }
 
     const newPost = {
-      id: Date.now().toString(),
+      id: `blog_${Date.now()}`,
       title,
-      metaDescription: metaDescription || "",
-      keywords: keywords || "",
       content,
-      createdAt: new Date().toLocaleDateString("fa-IR"),
+      meta_description: metaDescription || "",
+      keywords: keywords || "",
+      category: category || "مقاله تخصصی",
+      is_visible: true,
+      created_at: new Date().toISOString(),
     };
 
-    // افزودن مقاله جدید به ابتدای آرایه
-    blogPosts.unshift(newPost);
+    if (supabase) {
+      const { error } = await supabase.from("blogs").insert([newPost]);
+      if (error) {
+        console.error("Supabase blog insert error:", error);
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      message: "مقاله با موفقیت منتشر شد!",
-      post: newPost,
+      post: {
+        id: newPost.id,
+        title: newPost.title,
+        content: newPost.content,
+        metaDescription: newPost.meta_description,
+        keywords: newPost.keywords,
+        category: newPost.category,
+        isVisible: newPost.is_visible,
+        createdAt: new Date().toLocaleDateString("fa-IR"),
+      },
     });
-  } catch (error: any) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error("API Blogs POST Error:", err);
+    return NextResponse.json({ success: false, message: "خطا در ثبت مقاله." }, { status: 500 });
   }
 }

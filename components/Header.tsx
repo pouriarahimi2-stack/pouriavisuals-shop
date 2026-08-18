@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { menuService, MenuItem } from "@/services/menuService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { categoryService, Category } from "@/services/categoryService";
+import { productService } from "@/services/productService";
 
 function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   const cleanCode = postalCode
@@ -52,8 +54,12 @@ export default function Header() {
   const submitOrder = cartContext?.submitOrder;
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [siteInfo, setSiteInfo] = useState<any>(null);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -88,6 +94,27 @@ export default function Header() {
 
   const finalTotal = Math.max(0, rawTotal - discountAmount);
 
+  async function fetchLiveSiteInfo() {
+    try {
+      const [info, menus, cats] = await Promise.all([
+        siteInfoService.getSiteInfo ? siteInfoService.getSiteInfo() : (siteInfoService as any).getAll(),
+        menuService.getAll(),
+        categoryService && categoryService.getAll ? categoryService.getAll() : productService.getCategories(),
+      ]);
+      if (info) setSiteInfo(info);
+      if (menus) setMenuItems(menus.filter((m: any) => m.isActive !== false));
+      if (cats && cats.length > 0) {
+        if (typeof cats[0] === "string") {
+          setCategories(cats.map((c: any, index: number) => ({ id: String(index), name: c, slug: c })));
+        } else {
+          setCategories(cats);
+        }
+      }
+    } catch (e) {
+      console.error("Header init error:", e);
+    }
+  }
+
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -114,22 +141,24 @@ export default function Header() {
     };
 
     mediaQuery.addEventListener("change", handler);
-
-    async function fetchLiveSiteInfo() {
-      try {
-        const [info, menus] = await Promise.all([
-          siteInfoService.getAll(),
-          menuService.getAll(),
-        ]);
-        setSiteInfo(info);
-        setMenuItems(menus.filter((m) => m.isActive));
-      } catch (e) {
-        console.error("Header init error:", e);
-      }
-    }
     fetchLiveSiteInfo();
 
-    return () => mediaQuery.removeEventListener("change", handler);
+    const handleUpdate = () => fetchLiveSiteInfo();
+    window.addEventListener("site_info_updated", handleUpdate);
+
+    // بستن خودکار دراپ داون هنگام کلیک بیرون
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+        setIsCategoryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handler);
+      window.removeEventListener("site_info_updated", handleUpdate);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   useEffect(() => {
@@ -149,6 +178,15 @@ export default function Header() {
     } else {
       document.documentElement.classList.remove("dark");
       localStorage.setItem("theme", "light");
+    }
+  };
+
+  const handleSelectCategory = (catSlug: string) => {
+    setSelectedCategory(catSlug);
+    setIsCategoryOpen(false);
+    // ارسال رویداد جهت فیلتر شدن محصولات در صفحه اصلی
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("category_selected", { detail: catSlug }));
     }
   };
 
@@ -275,21 +313,23 @@ export default function Header() {
   };
 
   const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false;
+  const currentStoreName = siteInfo?.storeName || siteInfo?.site_name || siteInfo?.name || "فروشگاه";
+  const currentLogoUrl = siteInfo?.logoUrl || siteInfo?.logo_url;
 
   return (
     <header className="sticky top-4 z-40 max-w-6xl mx-auto px-4 select-none font-sans text-[var(--text-primary)]">
-      <div className="liquid-glass-card px-6 py-3.5 flex items-center justify-between gap-4 rounded-3xl backdrop-blur-2xl shadow-xl border border-[var(--card-border)]">
+      <div className="liquid-glass-card px-6 py-3.5 flex items-center justify-between gap-4 rounded-3xl backdrop-blur-2xl shadow-xl border border-[var(--card-border)] relative">
         
-        {/* برند و لوگو و نشانگر وضعیت گوگل */}
-        <div className="flex items-center gap-2.5">
+        {/* راست: لوگو، نام سایت و دکمه شکیل دسته‌بندی‌ها */}
+        <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-2.5 font-black text-lg">
-            {siteInfo?.logoUrl ? (
-              <img src={siteInfo.logoUrl} alt={siteInfo.storeName} className="w-8 h-8 object-contain rounded-lg" />
+            {currentLogoUrl ? (
+              <img src={currentLogoUrl} alt={currentStoreName} className="w-8 h-8 object-contain rounded-lg" />
             ) : (
               <span className="w-8 h-8 rounded-xl bg-[var(--accent-blue)] text-white flex items-center justify-center text-sm font-bold shadow-md">⚡</span>
             )}
             <span className="text-[var(--text-primary)]">
-              {siteInfo?.storeName || "فروشگاه"}
+              {currentStoreName}
             </span>
           </Link>
 
@@ -300,10 +340,73 @@ export default function Header() {
                 : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"
             }`}
           />
+
+          {/* دکمه منوی دسته‌بندی سه‌خط مدرن */}
+          <div className="relative" ref={categoryDropdownRef}>
+            <button
+              onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all duration-300 border cursor-pointer ${
+                isCategoryOpen || selectedCategory !== "all"
+                  ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
+                  : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)]"
+              }`}
+            >
+              <div className="flex flex-col gap-0.5 justify-center items-center w-4 h-4">
+                <span className={`h-0.5 w-3.5 rounded-full transition-all ${isCategoryOpen || selectedCategory !== "all" ? "bg-white" : "bg-[var(--text-primary)]"}`}></span>
+                <span className={`h-0.5 w-2.5 rounded-full transition-all ${isCategoryOpen || selectedCategory !== "all" ? "bg-white" : "bg-[var(--text-primary)]"}`}></span>
+                <span className={`h-0.5 w-3.5 rounded-full transition-all ${isCategoryOpen || selectedCategory !== "all" ? "bg-white" : "bg-[var(--text-primary)]"}`}></span>
+              </div>
+              <span>دسته‌بندی‌ها</span>
+              <span className="text-[10px] opacity-70">▾</span>
+            </button>
+
+            {/* دراپ داون مدرن شیشه‌ای دسته‌بندی‌ها */}
+            {isCategoryOpen && (
+              <div className="absolute top-12 right-0 w-56 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
+                <div className="px-3 py-1.5 text-[10px] font-black text-[var(--text-secondary)] border-b border-[var(--card-border)] mb-1 flex items-center justify-between">
+                  <span>منوی کالاها</span>
+                  <span className="text-[9px] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] px-2 py-0.5 rounded-full">
+                    {categories.length + 1} دسته
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => handleSelectCategory("all")}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    selectedCategory === "all"
+                      ? "bg-[var(--accent-blue)] text-white shadow-sm"
+                      : "text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">📦 همه کالاها</span>
+                  {selectedCategory === "all" && <span>✓</span>}
+                </button>
+
+                {categories.map((cat) => {
+                  const slug = cat.slug || cat.name;
+                  const isActive = selectedCategory === slug;
+                  return (
+                    <button
+                      key={cat.id || cat.name}
+                      onClick={() => handleSelectCategory(slug)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        isActive
+                          ? "bg-[var(--accent-blue)] text-white shadow-sm"
+                          : "text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">🏷️ {cat.name}</span>
+                      {isActive && <span>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* منوی ناوبری هدر */}
-        <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-[var(--text-secondary)]">
+        {/* وسط: منوی ناوبری لینک‌های اصلی */}
+        <nav className="hidden md:flex items-center gap-5 text-xs font-bold text-[var(--text-secondary)]">
           {menuItems.map((item) => (
             <Link
               key={item.id}
@@ -315,12 +418,12 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* دکمه‌های کنترل تم و سبد خرید */}
+        {/* چپ: کنترل تم و سبد خرید */}
         <div className="flex items-center gap-3">
           <button
             onClick={toggleDarkMode}
             className="p-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] transition cursor-pointer text-xs border border-[var(--card-border)] text-[var(--text-primary)] font-bold"
-            title="تغییر حالت تم (روشن / تاریک)"
+            title="تغییر تم"
           >
             {isDarkMode ? "🌙" : "☀️"}
           </button>

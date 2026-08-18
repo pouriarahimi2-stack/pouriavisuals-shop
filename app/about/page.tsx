@@ -2,74 +2,46 @@
 
 import React, { useState, useEffect } from "react";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import Link from "next/link";
 
 export default function AboutPage() {
-  const [info, setInfo] = useState<SiteInfo | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
   useEffect(() => {
-    async function loadInfo() {
-      try {
-        if (typeof siteInfoService.getSiteInfo === "function") {
-          const res = siteInfoService.getSiteInfo();
-          if (res) setInfo(res);
-        } else if (typeof siteInfoService.getAll === "function") {
-          const res = await siteInfoService.getAll();
-          if (res) setInfo(res);
-        }
-      } catch {
-        if (typeof window !== "undefined") {
-          const local = JSON.parse(localStorage.getItem("site_info_cache") || "{}");
-          setInfo(local);
-        }
-      }
+    async function load() {
+      const data = await siteInfoService.getAll();
+      if (data) setSiteInfo(data);
     }
-    loadInfo();
+    load();
   }, []);
 
-  const storeName = info?.storeName || (info as any)?.siteTitle || "فروشگاه تخصصی Tech";
-  const aboutText =
-    info?.aboutText ||
-    (info as any)?.aboutUs ||
-    "فروشگاه تخصصی ما با هدف ارائه برترین و باکیفیت‌ترین کالاهای حوزه فناوری و تکنولوژی فعالیت خود را آغاز نموده است. ما متعهد به اصالت ۱۰۰٪ کالاها، ارسال سریع و گارانتی معتبر هستیم.";
+  const storeName = siteInfo?.storeName || (siteInfo as any)?.site_name || "فروشگاه تخصصی";
+  const aboutText = siteInfo?.aboutText || siteInfo?.description || "فروشگاه تخصصی محصولات حوزه تکنولوژی";
 
   return (
-    <main className="min-h-[80vh] pb-16 font-sans text-[var(--text-primary)] select-none">
-      <div className="max-w-3xl mx-auto px-4 mt-12 space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-black text-[var(--text-primary)]">
-            ℹ️ درباره {storeName}
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] font-medium">
-            آشنایی بیشتر با اهداف و خدمات مجموعه ما
-          </p>
-        </div>
-
-        <div className="p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-6 text-xs sm:text-sm leading-relaxed shadow-xl">
-          <p className="whitespace-pre-line text-[var(--text-secondary)] font-medium leading-8 text-justify">
-            {aboutText}
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-[var(--card-border)] text-center text-xs">
-            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-2xl block">🚀</span>
-              <h4 className="font-extrabold text-[var(--text-primary)]">ارسال اکسپرس</h4>
-              <p className="text-[10px] text-[var(--text-secondary)] font-medium">تحویل سریع به سراسر کشور</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-2xl block">🛡️</span>
-              <h4 className="font-extrabold text-[var(--text-primary)]">ضمانت اصالت</h4>
-              <p className="text-[10px] text-[var(--text-secondary)] font-medium">۱۰۰٪ کالای اصلی و با کیفیت</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-2xl block">🎧</span>
-              <h4 className="font-extrabold text-[var(--text-primary)]">پشتیبانی ۲۴/۷</h4>
-              <p className="text-[10px] text-[var(--text-secondary)] font-medium">پاسخگویی سریع به مشتریان</p>
-            </div>
+    <div className="min-h-[70vh] max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <div className="p-8 md:p-12 rounded-[2.5rem] liquid-glass-card border border-[var(--card-border)] space-y-6 shadow-2xl backdrop-blur-2xl">
+        <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-4">
+          <span className="p-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xl">🏢</span>
+          <div>
+            <h1 className="text-2xl font-black text-[var(--text-primary)]">درباره {storeName}</h1>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 font-bold">آشنایی با تاریخچه، خدمات و تعهدات ما</p>
           </div>
         </div>
+
+        <div className="space-y-4 text-sm leading-relaxed text-[var(--text-secondary)] font-medium whitespace-pre-line">
+          {aboutText}
+        </div>
+
+        <div className="pt-6 border-t border-[var(--card-border)] flex gap-4">
+          <Link
+            href="/"
+            className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md"
+          >
+            بازگشت به صفحه اصلی ←
+          </Link>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

@@ -1,31 +1,31 @@
 import { supabase } from "@/lib/supabase";
-import { productService } from "@/services/productService";
+
+export interface OrderItem {
+  id: string;
+  title: string;
+  price: number;
+  quantity: number;
+}
 
 export interface Order {
   id: string;
-  customer_name?: string;
-  customerName?: string;
-  customer_phone?: string;
-  customerPhone?: string;
-  shipping_address?: string;
-  shippingAddress?: string;
-  postal_code?: string;
+  customerName: string;
+  phone: string;
+  address: string;
   postalCode?: string;
-  items?: any[];
-  cart_items?: any[];
-  total_amount?: number;
-  totalAmount?: number;
-  discount_amount?: number;
-  coupon_code?: string | null;
-  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
-  tracking_code?: string;
-  created_at?: string;
+  items: OrderItem[];
+  totalAmount: number;
+  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+  trackingCode?: string;
+  shippingMethod?: "express" | "regular";
+  notes?: string;
+  createdAt: string;
 }
 
-const STORAGE_KEY = "site_orders_db";
+const LOCAL_STORAGE_KEY = "site_orders";
 
 export const orderService = {
-  async getAllOrders(): Promise<Order[]> {
+  async getAll(): Promise<Order[]> {
     try {
       if (supabase) {
         const { data, error } = await supabase
@@ -34,101 +34,117 @@ export const orderService = {
           .order("created_at", { ascending: false });
 
         if (!error && data) {
-          if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-          }
-          return data;
+          const mapped: Order[] = data.map((d: any) => ({
+            id: d.id,
+            customerName: d.customer_name || d.customerName,
+            phone: d.phone,
+            address: d.address,
+            postalCode: d.postal_code || d.postalCode,
+            items: typeof d.items === "string" ? JSON.parse(d.items) : (d.items || []),
+            totalAmount: d.total_amount || d.totalAmount,
+            status: d.status,
+            trackingCode: d.tracking_code || d.trackingCode,
+            shippingMethod: d.shipping_method || d.shippingMethod,
+            notes: d.notes,
+            createdAt: d.created_at || d.createdAt,
+          }));
+
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+          return mapped;
         }
       }
-    } catch (err) {
-      console.warn("Supabase orders fetch error:", err);
-    }
 
-    if (typeof window !== "undefined") {
-      const local = localStorage.getItem(STORAGE_KEY);
-      if (local !== null) return JSON.parse(local);
+      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (local) return JSON.parse(local);
+      return [];
+    } catch (e) {
+      console.error("Error loading orders:", e);
+      return [];
     }
-    return [];
   },
 
-  async getOrderById(id: string): Promise<Order | null> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .eq("id", id)
-          .maybeSingle();
+  async getById(id: string): Promise<Order | null> {
+    const orders = await this.getAll();
+    return orders.find((o) => o.id.toLowerCase() === id.toLowerCase().trim()) || null;
+  },
 
-        if (!error && data) return data;
+  async getByPhone(phone: string): Promise<Order[]> {
+    const orders = await this.getAll();
+    const cleanPhone = phone.trim();
+    return orders.filter((o) => o.phone && o.phone.includes(cleanPhone));
+  },
+
+  async create(order: Order): Promise<Order | null> {
+    try {
+      const all = await this.getAll();
+      const updated = [order, ...all];
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+
+      if (supabase) {
+        await supabase.from("orders").insert([
+          {
+            id: order.id,
+            customer_name: order.customerName,
+            phone: order.phone,
+            address: order.address,
+            postal_code: order.postalCode,
+            items: order.items,
+            total_amount: order.totalAmount,
+            status: order.status,
+            tracking_code: order.trackingCode,
+            shipping_method: order.shippingMethod,
+            notes: order.notes,
+            created_at: order.createdAt,
+          },
+        ]);
       }
-    } catch (err) {
-      console.warn("Supabase single order fetch error:", err);
-    }
 
-    const all = await this.getAllOrders();
-    return all.find((o) => o.id === id) || null;
+      this.broadcast(updated);
+      return order;
+    } catch (e) {
+      console.error("Error creating order:", e);
+      return null;
+    }
   },
 
-  // ثبت سفارش همراه با کسر هوشمند و آنی موجودی انبار کالاها
-  async createOrder(order: Order): Promise<{ success: boolean; data?: Order }> {
+  async updateStatus(id: string, status: Order["status"], trackingCode?: string): Promise<boolean> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase.from("orders").insert([order]).select();
-        if (!error && data && data.length > 0) {
-          // کسر هوشمند موجودی انبار در دیتابیس
-          const orderItems = order.items || order.cart_items || [];
-          for (const item of orderItems) {
-            const prodId = item.id || item.productId;
-            const qty = Number(item.quantity || 1);
-            if (prodId) {
-              const currentProd = await productService.getById(prodId);
-              if (currentProd) {
-                const currentStock = Number(currentProd.stock ?? 0);
-                const newStock = Math.max(0, currentStock - qty);
-                await productService.update(prodId, { stock: newStock });
-              }
-            }
-          }
-
-          const current = await this.getAllOrders();
-          if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify([data[0], ...current]));
-          }
-          return { success: true, data: data[0] };
+      const all = await this.getAll();
+      const updated = all.map((o) => {
+        if (o.id === id) {
+          return {
+            ...o,
+            status,
+            trackingCode: trackingCode !== undefined ? trackingCode : o.trackingCode,
+          };
         }
-      }
-    } catch (err) {
-      console.warn("Supabase order insert error:", err);
-    }
+        return o;
+      });
 
-    const current = await this.getAllOrders();
-    const updated = [order, ...current];
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+
+      if (supabase) {
+        const updatePayload: any = { status };
+        if (trackingCode !== undefined) updatePayload.tracking_code = trackingCode;
+        await supabase.from("orders").update(updatePayload).eq("id", id);
+      }
+
+      this.broadcast(updated);
+      return true;
+    } catch (e) {
+      console.error("Error updating order status:", e);
+      return false;
     }
-    return { success: true, data: order };
   },
 
-  async updateOrderStatus(id: string, status: Order["status"], trackingCode?: string): Promise<boolean> {
-    const payload: any = { status };
-    if (trackingCode !== undefined) {
-      payload.tracking_code = trackingCode;
-    }
-
-    try {
-      if (supabase) {
-        await supabase.from("orders").update(payload).eq("id", id);
-      }
-    } catch (err) {
-      console.warn("Supabase order update error:", err);
-    }
-
-    const current = await this.getAllOrders();
-    const updated = current.map((o) => (o.id === id ? { ...o, ...payload } : o));
+  broadcast(orders: Order[]) {
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent("orders_updated", { detail: orders }));
+      if ("BroadcastChannel" in window) {
+        const channel = new BroadcastChannel("orders_sync_channel");
+        channel.postMessage({ type: "SYNC_ORDERS", data: orders });
+        channel.close();
+      }
     }
-    return true;
   },
 };

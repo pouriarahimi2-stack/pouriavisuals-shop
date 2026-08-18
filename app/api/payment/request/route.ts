@@ -1,47 +1,51 @@
 import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const { orderId, amount, customerPhone, customerName } = await req.json();
+    const body = await req.json();
+    const { orderId, amount, customerName, phone, address, postalCode, items } = body;
 
-    if (!orderId || !amount) {
+    if (!orderId || !amount || !phone) {
       return NextResponse.json({ success: false, message: "اطلاعات سفارش ناقص است." }, { status: 400 });
     }
 
-    const merchantId = process.env.ZARINPAL_MERCHANT_ID || "00000000-0000-0000-0000-000000000000";
-    const callbackUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/payment/verify?orderId=${orderId}`;
+    // ۱. ثبت سفارش اولیه در پایگاه‌داده
+    if (supabase) {
+      const orderPayload = {
+        id: orderId,
+        customer_name: customerName || "مشتری فروشگاه",
+        phone,
+        address: address || "",
+        postal_code: postalCode || "",
+        items: items || [],
+        total_amount: amount,
+        status: "pending",
+        payment_method: "online",
+        is_paid: false,
+      };
 
-    // در محیط واقعی اتصال به درگاه زرین‌پال
-    const response = await fetch("https://api.zarinpal.com/pg/v4/payment/request.json", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        merchant_id: merchantId,
-        amount: Number(amount) * 10, // تبدیل تومان به ریال
-        callback_url: callbackUrl,
-        description: `پرداخت سفارش شماره ${orderId} - خریدار: ${customerName || "کاربر"}`,
-        metadata: { mobile: customerPhone },
-      }),
-    });
-
-    const data = await response.json();
-
-    if (data.data && data.data.code === 100) {
-      const authority = data.data.authority;
-      const paymentUrl = `https://www.zarinpal.com/pg/StartPay/${authority}`;
-      return NextResponse.json({ success: true, paymentUrl, authority });
+      const { data: existing } = await supabase.from("orders").select("id").eq("id", orderId);
+      if (existing && existing.length > 0) {
+        await supabase.from("orders").update(orderPayload).eq("id", orderId);
+      } else {
+        await supabase.from("orders").insert([orderPayload]);
+      }
     }
 
-    // حالت شبیه‌ساز امن در صورت عدم وجود مرچنت لایو
-    const simulatedAuthority = `SIM_${Date.now()}`;
+    // ۲. شبیه‌سازی ایجاد شناسه پرداخت درگاه (زرین‌پال / سامان / سداد)
+    const paymentAuthority = `AUTH_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const gatewayUrl = `/payment?authority=${paymentAuthority}&orderId=${orderId}&amount=${amount}`;
+
     return NextResponse.json({
       success: true,
-      simulated: true,
-      paymentUrl: `/checkout/payment?orderId=${orderId}&authority=${simulatedAuthority}`,
-      authority: simulatedAuthority,
+      url: gatewayUrl,
+      authority: paymentAuthority,
     });
-  } catch (error) {
-    console.error("Payment Request Error:", error);
+  } catch (err) {
+    console.error("Payment request error:", err);
     return NextResponse.json({ success: false, message: "خطا در برقراری ارتباط با درگاه پرداخت." }, { status: 500 });
   }
 }

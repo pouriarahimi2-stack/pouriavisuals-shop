@@ -2,119 +2,107 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { menuService, MenuItem } from "@/services/menuService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 
 export default function Footer() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
-  const [menus, setMenus] = useState<MenuItem[]>([]);
 
   useEffect(() => {
-    async function loadFooterData() {
+    async function loadInfo() {
       try {
-        const [info, menuList] = await Promise.all([
-          siteInfoService.getAll(),
-          menuService.getAll(),
-        ]);
+        const info = await siteInfoService.getAll();
         setSiteInfo(info);
-        setMenus((menuList || []).filter((m) => m.is_active !== false));
-      } catch (err) {
-        console.error("Error loading footer data:", err);
+      } catch (e) {
+        console.error("Footer load error:", e);
       }
     }
-    loadFooterData();
+    loadInfo();
+
+    const handleUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
+  const phoneNum = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+  const addressText = siteInfo?.address || "تهران، خیابان ولیعصر";
+  const siteName = siteInfo?.site_name || "پوریا ویژوالز";
+
   return (
-    <footer className="bg-[var(--modal-bg)] border-t border-[var(--card-border)] font-sans select-none text-[var(--text-primary)] mt-16 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          
-          {/* ستون اطلاعات و درباره فروشگاه */}
-          <div className="md:col-span-2 space-y-4">
-            <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-bold text-lg shadow-md">
-                
-              </span>
-              <span className="text-base font-black">
-                {siteInfo?.storeName || siteInfo?.siteTitle || "فروشگاه تخصصی محصولات اپل"}
-              </span>
+    <footer className="mt-20 border-t border-[var(--card-border)] bg-[var(--modal-bg)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300" dir="rtl">
+      <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-xs">
+        
+        {/* ستون ۱: معرفی برند */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black">
+              ⚡
             </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium max-w-md">
-              {siteInfo?.aboutText || siteInfo?.aboutUs || "مرجع تخصصی خرید جدیدترین محصولات و لوازم جانبی اصل اپل با تضمین بهترین قیمت، ضمانت اصالت کالا و ارسال سریع به سراسر کشور."}
+            <h3 className="font-black text-sm">{siteName}</h3>
+          </div>
+          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium">
+            {siteInfo?.about_text ||
+              "مرجع تخصصی فروش، کالیبراسیون و مشاوره مانیتورهای حرفه‌ای تدوین، کالرگریدینگ و تجهیزات استودیویی در ایران."}
+          </p>
+        </div>
+
+        {/* ستون ۲: دسترسی سریع */}
+        <div className="space-y-2.5">
+          <h4 className="font-black text-xs text-[var(--text-primary)]">دسترسی سریع</h4>
+          <ul className="space-y-2 text-[var(--text-secondary)] font-medium">
+            <li>
+              <Link href="/#products" className="hover:text-[var(--accent-blue)] transition">
+                کاتالوگ تجهیزات و مانیتورها
+              </Link>
+            </li>
+            <li>
+              <Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">
+                استعلام و پیگیری مرسوله پستی
+              </Link>
+            </li>
+            <li>
+              <Link href="/blog" className="hover:text-[var(--accent-blue)] transition">
+                مجله تخصصی و مقالات سئو
+              </Link>
+            </li>
+            <li>
+              <Link href="/contact" className="hover:text-[var(--accent-blue)] transition">
+                تماس با پشتیبانی و نشانی
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        {/* ستون ۳: اطلاعات پشتیبانی */}
+        <div className="space-y-2.5">
+          <h4 className="font-black text-xs text-[var(--text-primary)]">اطلاعات ارتباطی</h4>
+          <div className="space-y-2 text-[var(--text-secondary)] font-medium leading-relaxed">
+            <p>
+              <strong>تلفن:</strong> <span className="font-mono text-[var(--accent-blue)]">{phoneNum}</span>
+            </p>
+            <p>
+              <strong>ایمیل:</strong> <span className="font-mono">{siteInfo?.email || "info@pouriavisuals.ir"}</span>
+            </p>
+            <p>
+              <strong>نشانی:</strong> {addressText}
             </p>
           </div>
-
-          {/* دسترسی سریع / منوها */}
-          <div className="space-y-3 text-xs">
-            <h4 className="font-black text-sm text-[var(--text-primary)]">دسترسی سریع</h4>
-            <ul className="space-y-2">
-              {menus.map((item) => (
-                <li key={item.id}>
-                  <Link
-                    href={item.url}
-                    className="text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition font-medium"
-                  >
-                    {item.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* ارتباط با ما و شبکه‌های اجتماعی */}
-          <div className="space-y-3 text-xs">
-            <h4 className="font-black text-sm text-[var(--text-primary)]">ارتباط و پشتیبانی</h4>
-            <div className="space-y-2 text-[var(--text-secondary)] font-medium">
-              {siteInfo?.phone && (
-                <p className="flex items-center gap-2">
-                  <span>📞</span>
-                  <span className="font-mono" dir="ltr">{siteInfo.phone}</span>
-                </p>
-              )}
-              {siteInfo?.email && (
-                <p className="flex items-center gap-2">
-                  <span>✉️</span>
-                  <span className="font-mono">{siteInfo.email}</span>
-                </p>
-              )}
-              {siteInfo?.address && (
-                <p className="flex items-center gap-2">
-                  <span>📍</span>
-                  <span>{siteInfo.address}</span>
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              {siteInfo?.instagram && (
-                <a
-                  href={`https://instagram.com/${siteInfo.instagram.replace('@', '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition"
-                >
-                  📷 اینستاگرام
-                </a>
-              )}
-              {siteInfo?.telegram && (
-                <a
-                  href={`https://t.me/${siteInfo.telegram.replace('@', '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition"
-                >
-                  ✈️ تلگرام
-                </a>
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* کپی‌رایت */}
-        <div className="border-t border-[var(--card-border)] mt-8 pt-6 text-center text-[11px] text-[var(--text-secondary)] font-medium">
-          © {new Date().getFullYear()} تمامی حقوق محفوظ است. طراحی و توسعه فروشگاه تخصصی
+        {/* ستون ۴: نمادهای اعتماد و حقوق معنوی */}
+        <div className="space-y-3">
+          <h4 className="font-black text-xs text-[var(--text-primary)]">ضمانت و پشتیبانی</h4>
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5 text-[11px] text-[var(--text-secondary)] leading-relaxed">
+            <p className="font-bold text-[var(--text-primary)]">✓ ضمانت اصالت کالا</p>
+            <p>تمامی بسته‌ها با پست پیشتاز بیمه‌شده و بسته‌بندی ضدضربه ارسال می‌گردند.</p>
+          </div>
         </div>
+      </div>
+
+      {/* کپی‌رایت انتهای صفحه */}
+      <div className="border-t border-[var(--card-border)] py-4 text-center text-[10px] text-[var(--text-secondary)] font-medium">
+        تمامی حقوق مادی و معنوی برای مجموعه {siteName} محفوظ است © {new Date().getFullYear()}
       </div>
     </footer>
   );

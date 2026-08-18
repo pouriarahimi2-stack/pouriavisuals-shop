@@ -2,215 +2,284 @@
 
 import React, { useState } from "react";
 import { useCart } from "@/context/CartContext";
-import CheckoutModal from "@/components/CheckoutModal";
+import { orderService } from "@/services/orderService";
+import { couponService } from "@/services/couponService";
+import { productService } from "@/services/productService";
+import { smsService } from "@/services/smsService";
+import { useRouter } from "next/navigation";
 
 export default function CartDrawer() {
-  const cartContext = useCart();
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [orderSuccessId, setOrderSuccessId] = useState<string | null>(null);
+  const router = useRouter();
+  const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, totalPrice } = useCart();
 
-  const items = cartContext.cartItems || cartContext.cart || [];
-  const isOpen = cartContext.isCartOpen ?? false;
+  // استیت‌های تکمیل فرم خرید
+  const [customerName, setCustomerName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [couponMsg, setCouponMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const closeCart = () => {
-    if (typeof cartContext.toggleCart === "function") {
-      cartContext.toggleCart();
-    } else if (typeof cartContext.setIsCartOpen === "function") {
-      cartContext.setIsCartOpen(false);
+  if (!isCartOpen) return null;
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponMsg(null);
+
+    const result = await couponService.validateAndApply(couponCode.trim(), totalPrice);
+    if (result.isValid) {
+      setDiscountAmount(result.discountAmount);
+      setAppliedCoupon(couponCode.trim().toUpperCase());
+      setCouponMsg({ type: "success", text: `کد تخفیف اعمال شد (${result.discountAmount.toLocaleString("fa-IR")} تومان کسر گردید).` });
+    } else {
+      setCouponMsg({ type: "error", text: result.message || "کد تخفیف نامعتبر یا منقضی شده است." });
     }
   };
 
-  const handleOpenCheckout = () => {
-    closeCart(); // کشوی سبد خرید بسته می‌شود تا مدال پرداخت روی صفحه به صورت شفاف باز شود
-    setCheckoutOpen(true);
-  };
+  const finalPayable = Math.max(0, totalPrice - discountAmount);
 
-  const handleUpdateQuantity = (id: string, newQty: number, delta?: number) => {
-    if (typeof cartContext.updateQuantity === "function") {
-      if (delta !== undefined) {
-        cartContext.updateQuantity(id, delta);
-      } else {
-        cartContext.updateQuantity(id, newQty);
+  const handleFinalCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerName.trim() || !phone.trim() || !address.trim() || cartItems.length === 0) return;
+
+    setSubmitting(true);
+    try {
+      // ۱. ساخت و ذخیره سفارش در دیتابیس Supabase
+      const newOrder = await orderService.create({
+        customerName: customerName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        postalCode: postalCode.trim() || undefined,
+        items: cartItems.map((item) => ({
+          productId: item.id,
+          title: item.title,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+        })),
+        totalAmount: finalPayable,
+        discountAmount: discountAmount > 0 ? discountAmount : undefined,
+        couponCode: appliedCoupon || undefined,
+        status: "processing",
+      });
+
+      if (newOrder) {
+        // ۲. کسر موجودی فیزیکی کالاها در دیتابیس
+        for (const item of cartItems) {
+          try {
+            const currentProd = await productService.getById(item.id);
+            if (currentProd) {
+              const newStk = Math.max(0, (currentProd.stock ?? 1) - item.quantity);
+              await productService.update(item.id, {
+                stock: newStk,
+                is_available: newStk > 0,
+              });
+            }
+          } catch (err) {
+            console.error("Stock update error:", err);
+          }
+        }
+
+        // ۳. ارسال پیامک تایید سفارش
+        await smsService.sendOrderStatusChange(phone.trim(), newOrder.id, "در حال پردازش و انبارداری");
+
+        // ۴. پاکسازی سبد و هدایت به صفحه رهگیری
+        clearCart();
+        setIsCartOpen(false);
+        router.push(`/track-order?orderId=${newOrder.id}&success=true`);
       }
+    } catch (e) {
+      alert("خطا در ثبت نهایی فاکتور. لطفاً مجدداً تلاش نمایید.");
+    } finally {
+      setSubmitting(false);
     }
   };
-
-  const handleRemove = (id: string) => {
-    if (typeof cartContext.removeFromCart === "function") {
-      cartContext.removeFromCart(id);
-    }
-  };
-
-  const totalCount = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
-  const rawSubtotal = items.reduce(
-    (sum: number, item: any) => sum + (item.discountPrice ?? item.price) * (item.quantity || 1),
-    0
-  );
 
   return (
-    <>
-      {/* پیام موفقیت ثبت سفارش با بالاترین لایه (z-[80]) */}
-      {orderSuccessId && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn select-none font-sans">
-          <div className="max-w-md w-full p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center space-y-4 shadow-2xl">
-            <span className="text-4xl block">🎉</span>
-            <h3 className="text-base font-black text-emerald-600 dark:text-emerald-400">سفارش شما با موفقیت ثبت گردید!</h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              کد پیگیری سفارش شما: <strong className="font-mono text-[var(--text-primary)] text-sm">{orderSuccessId}</strong>
-            </p>
-            <button
-              onClick={() => setOrderSuccessId(null)}
-              className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs shadow-md cursor-pointer hover:opacity-90 transition"
-            >
-              متوجه شدم
-            </button>
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md font-sans select-none animate-fadeIn" dir="rtl">
+      <div className="w-full max-w-lg bg-[var(--modal-bg)] border-r border-[var(--card-border)] h-full shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)]">
+        
+        {/* هدر کشو */}
+        <div className="p-5 border-b border-[var(--card-border)] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🛒</span>
+            <h3 className="font-black text-sm text-[var(--text-primary)]">سبد خرید شما</h3>
+            <span className="px-2 py-0.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-mono font-bold text-xs">
+              {cartItems.length} قلم
+            </span>
           </div>
+
+          <button
+            onClick={() => setIsCartOpen(false)}
+            className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold text-xs hover:border-[var(--accent-blue)] transition cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
-      )}
 
-      {/* مدال تسویه‌حساب و پرداخت فاکتور */}
-      <CheckoutModal
-        isOpen={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        onSuccess={(id) => {
-          setOrderSuccessId(id);
-        }}
-      />
-
-      {/* کشوی سبد خرید (فقط زمانی که isOpen فعال است باز می‌شود) */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm font-sans text-[var(--text-primary)] animate-fadeIn select-none">
-          {/* بک‌دراپ تیره برای بستن با کلیک خارج از کادر */}
-          <div className="absolute inset-0 cursor-pointer" onClick={closeCart} />
-
-          {/* سایدبار سبد خرید */}
-          <div className="relative w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] rounded-l-3xl p-6 flex flex-col justify-between shadow-2xl z-10">
-            
-            {/* هدر */}
-            <div className="flex items-center justify-between pb-4 border-b border-[var(--card-border)]">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🛒</span>
-                <h2 className="text-base font-black text-[var(--text-primary)]">سبد خرید شما</h2>
-                <span className="text-xs bg-[var(--accent-blue)] text-white font-bold px-2 py-0.5 rounded-full">
-                  {totalCount} عدد
-                </span>
-              </div>
-              <button
-                onClick={closeCart}
-                className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 hover:opacity-80 transition cursor-pointer font-bold text-[var(--text-primary)]"
-              >
-                ✕
-              </button>
+        {/* لیست اقلام سبد خرید */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+          {cartItems.length === 0 ? (
+            <div className="py-24 text-center text-[var(--text-secondary)] space-y-2 font-bold">
+              <span className="text-4xl block">🛍️</span>
+              <p>سبد خرید شما در حال حاضر خالی است.</p>
             </div>
-
-            {/* لیست اقلام سبد خرید */}
-            <div className="flex-1 overflow-y-auto my-4 space-y-3 pr-1 scrollbar-none">
-              {items.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-[var(--text-muted)] space-y-2">
-                  <span className="text-5xl">🛍️</span>
-                  <p className="font-bold text-[var(--text-primary)]">سبد خرید شما خالی است</p>
-                  <p className="text-xs">محصولات مورد نظر خود را اضافه کنید.</p>
-                </div>
-              ) : (
-                items.map((item: any) => (
+          ) : (
+            <>
+              <div className="space-y-3">
+                {cartItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-sm"
+                    className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3"
                   >
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt={item.title || item.name}
-                        className="w-16 h-16 object-contain rounded-xl border border-[var(--card-border)] bg-[var(--modal-bg)] p-1 shrink-0"
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-xs truncate text-[var(--text-primary)]">
-                        {item.title || item.name}
-                      </h4>
-                      {item.selectedColor && (
-                        <span className="text-[10px] text-[var(--accent-blue)] font-bold block mt-0.5">
-                          رنگ: {item.selectedColor}
-                        </span>
+                    <div className="flex items-center gap-3">
+                      {item.image && (
+                        <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-contain bg-[var(--modal-bg)] p-1" />
                       )}
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs font-black text-[var(--accent-blue)] font-mono">
-                          {(item.discountPrice ?? item.price).toLocaleString("fa-IR")} تومان
+                      <div>
+                        <h4 className="font-bold text-xs text-[var(--text-primary)] line-clamp-1">{item.title}</h4>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold block mt-0.5">
+                          {(item.price || 0).toLocaleString("fa-IR")} تومان
                         </span>
-                        {item.discountPrice && (
-                          <span className="text-[10px] line-through text-[var(--text-muted)] font-mono">
-                            {item.price.toLocaleString("fa-IR")}
-                          </span>
-                        )}
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <button
-                        onClick={() => handleRemove(item.id)}
-                        className="text-[11px] font-bold text-rose-500 hover:opacity-75 transition cursor-pointer"
-                      >
-                        حذف
-                      </button>
-                      <div className="flex items-center gap-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl px-2 py-1">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl p-1">
                         <button
-                          onClick={() => {
-                            if (item.quantity > 1) {
-                              handleUpdateQuantity(item.id, item.quantity - 1, -1);
-                            } else {
-                              handleRemove(item.id);
-                            }
-                          }}
-                          className="w-5 h-5 flex items-center justify-center font-bold cursor-pointer text-[var(--text-primary)] hover:text-[var(--accent-blue)]"
-                        >
-                          -
-                        </button>
-                        <span className="text-xs font-black w-4 text-center font-mono text-[var(--text-primary)]">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1, 1)}
-                          className="w-5 h-5 flex items-center justify-center font-bold cursor-pointer text-[var(--text-primary)] hover:text-[var(--accent-blue)]"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="w-6 h-6 flex items-center justify-center font-bold text-xs hover:text-[var(--accent-blue)]"
                         >
                           +
                         </button>
+                        <span className="font-mono font-black text-xs px-2">{item.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          className="w-6 h-6 flex items-center justify-center font-bold text-xs hover:text-[var(--accent-blue)]"
+                        >
+                          -
+                        </button>
                       </div>
+
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500 hover:text-white transition"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
 
-            {/* فاکتور و دکمه تسویه‌حساب */}
-            {items.length > 0 && (
-              <div className="pt-4 border-t border-[var(--card-border)] space-y-3">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-[var(--text-secondary)] font-bold">جمع کل اقلام:</span>
-                  <span className="font-black text-sm text-[var(--accent-blue)] font-mono">
-                    {rawSubtotal.toLocaleString("fa-IR")} تومان
-                  </span>
-                </div>
-
-                <button
-                  onClick={handleOpenCheckout}
-                  className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 transition shadow-lg text-center"
-                >
-                  ادامه فرآیند خرید و تسویه‌حساب 💳
-                </button>
-                
-                {typeof cartContext.clearCart === "function" && (
+              {/* فرم تخفیف */}
+              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+                <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder="مثال: OFF100"
+                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+                  />
                   <button
-                    onClick={cartContext.clearCart}
-                    className="w-full py-1 text-[11px] text-rose-500 hover:underline text-center cursor-pointer font-bold"
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition"
                   >
-                    خالی کردن سبد خرید
+                    اعمال
                   </button>
+                </div>
+                {couponMsg && (
+                  <p className={`text-[10px] font-bold ${couponMsg.type === "success" ? "text-emerald-600" : "text-rose-500"}`}>
+                    {couponMsg.text}
+                  </p>
                 )}
               </div>
-            )}
-          </div>
+
+              {/* فرم اطلاعات ارسال */}
+              <form id="checkout-form" onSubmit={handleFinalCheckout} className="space-y-3 pt-2">
+                <span className="font-black text-xs text-[var(--accent-blue)] block">📋 مشخصات دریافت‌کننده و نشانی پستی:</span>
+                
+                <input
+                  type="text"
+                  required
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="نام و نام خانوادگی تحویل‌گیرنده *"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)]"
+                />
+
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="شماره موبایل جهت پیامک رهگیری پستی *"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)]"
+                />
+
+                <input
+                  type="text"
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="نشانی دقیق پستی (استان، شهر، خیابان، پلاک، واحد) *"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-xs focus:border-[var(--accent-blue)]"
+                />
+
+                <input
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="کد پستی ۱۰ رقمی (اختیاری)"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)]"
+                />
+              </form>
+            </>
+          )}
         </div>
-      )}
-    </>
+
+        {/* فوتر سبد و دکمه پرداخت */}
+        {cartItems.length > 0 && (
+          <div className="p-5 border-t border-[var(--card-border)] bg-[var(--input-bg)] space-y-3 text-xs">
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[var(--text-secondary)]">
+                <span>جمع کل اقلام:</span>
+                <span className="font-mono font-bold">{totalPrice.toLocaleString("fa-IR")} تومان</span>
+              </div>
+
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-rose-500 font-bold">
+                  <span>تخفیف اعمال‌شده:</span>
+                  <span className="font-mono">-{discountAmount.toLocaleString("fa-IR")} تومان</span>
+                </div>
+              )}
+
+              <div className="flex justify-between text-sm font-black pt-1 border-t border-[var(--card-border)]">
+                <span>مبلغ نهایی قابل پرداخت:</span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                  {finalPayable.toLocaleString("fa-IR")} تومان
+                </span>
+              </div>
+            </div>
+
+            <button
+              form="checkout-form"
+              type="submit"
+              disabled={submitting}
+              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <span>💳</span>
+              <span>{submitting ? "در حال ثبت سفارش..." : "تکمیل نهایی و صدور فاکتور رسمی"}</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

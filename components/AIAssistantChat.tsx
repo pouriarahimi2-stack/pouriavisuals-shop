@@ -1,195 +1,286 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useRef } from "react";
-import { productService, Product } from "@/services/productService";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import React, { useState, useRef } from 'react';
+import Image from 'next/image';
 
-interface Message {
-  sender: "user" | "ai";
-  text: string;
-  time: string;
-}
-
-export default function AIAssistant() {
+export default function AIAssistantChat() {
   const [isOpen, setIsOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
-  const [inputMsg, setInputMsg] = useState("");
-  const [typing, setTyping] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
+  const [mode, setMode] = useState<'chat' | 'vision'>('chat');
+
+  // استیت‌های گفتگوی متنی
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
     {
-      sender: "ai",
-      text: "سلام! من دستیار هوشمند فروشگاه پوریا ویژوالز هستم. چه راهنمایی یا مشاوره‌ای درباره مشخصات فنی کالاها و مانیتورها نیاز دارید؟",
-      time: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }),
+      role: 'assistant',
+      text: 'سلام! 👋 من دستیار هوشمند پوریا ویژوالز هستم. چطور می‌توانم در انتخاب مانیتور و تجهیزات کالیبراسیون و رنگ به شما کمک کنم؟',
     },
   ]);
+  const [loadingChat, setLoadingChat] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // استیت‌های تحلیل تصویر / ویژن
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [visionPrompt, setVisionPrompt] = useState('');
+  const [visionAnalysis, setVisionAnalysis] = useState<string | null>(null);
+  const [loadingVision, setLoadingVision] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    async function loadContextData() {
-      try {
-        const [prods, info] = await Promise.all([
-          productService.getAll(),
-          siteInfoService.getAll(),
-        ]);
-        setProducts(prods);
-        setSiteInfo(info);
-      } catch (e) {
-        console.error("AI Assistant load context error:", e);
+  // ارسال چت متنی
+  const handleSendChat = async () => {
+    if (!input.trim() || loadingChat) return;
+    const userText = input;
+    setInput('');
+    setMessages((prev) => [...prev, { role: 'user', text: userText }]);
+    setLoadingChat(true);
+
+    try {
+      const res = await fetch('/api/ai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: userText, role: 'customer' }),
+      });
+      const data = await res.json();
+      if (data && data.response) {
+        setMessages((prev) => [...prev, { role: 'assistant', text: data.response }]);
+      } else {
+        setMessages((prev) => [...prev, { role: 'assistant', text: 'پاسخی دریافت نشد. لطفاً مجدداً امتحان کنید.' }]);
       }
+    } catch {
+      setMessages((prev) => [...prev, { role: 'assistant', text: 'خطا در برقراری ارتباط با سامانه هوش مصنوعی.' }]);
+    } finally {
+      setLoadingChat(false);
     }
-    loadContextData();
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isOpen]);
-
-  const generateAnswer = (query: string): string => {
-    const q = query.toLowerCase().trim();
-
-    // پاسخ‌های مربوط به تماس و پشتیبانی
-    if (q.includes("تماس") || q.includes("آدرس") || q.includes("تلفن") || q.includes("پشتیبانی")) {
-      const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
-      const addr = siteInfo?.address || "تهران، خیابان ولیعصر";
-      return `برای تماس مستقیم با کارشناسان، شماره تماس ${phone} و نشانی دفتر ما ${addr} در خدمت شماست.`;
-    }
-
-    // پاسخ‌های مربوط به ارسال و پیگیری
-    if (q.includes("ارسال") || q.includes("پست") || q.includes("رهگیری") || q.includes("پیشتاز")) {
-      return "تمامی سفارشات با پست پیشتاز بیمه‌شده ارسال می‌شوند و پس از ثبت، کد ۲۴ رقمی رهگیری پیامک شده و از صفحه «پیگیری سفارش» قابل استعلام است.";
-    }
-
-    // جستجو در محصولات موجود
-    const matchingProducts = products.filter((p) => {
-      const matchName = p.name.toLowerCase().includes(q);
-      const matchCat = (p.category || "").toLowerCase().includes(q);
-      const matchDesc = (p.description || "").toLowerCase().includes(q);
-      return matchName || matchCat || matchDesc;
-    });
-
-    if (matchingProducts.length > 0) {
-      const p = matchingProducts[0];
-      const stockText = (p.stock ?? 0) > 0 ? "موجود در انبار" : "در حال حاضر ناموجود";
-      return `کالای «${p.name}» با قیمت ${(p.price || 0).toLocaleString("fa-IR")} تومان در دسته‌بندی ${p.category || "تجهیزات"} (${stockText}) است.\nتوضیحات: ${p.description || "دارای گارانتی اصالت کالا"}`;
-    }
-
-    // پاسخ عمومی هوشمند
-    return "برای راهنمایی دقیق‌تر، می‌توانید نام محصول مورد نظر، رده قیمتی یا نوع کاربری (مثل تدوین ویدیو، مانیتور کالیبره، گیمینگ یا ادیت رنگ) را بفرمایید تا مشخصات فنی دقیق را خدمتتون توضیح دهم.";
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputMsg.trim()) return;
-
-    const userText = inputMsg.trim();
-    const timeNow = new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
-
-    const userMsg: Message = { sender: "user", text: userText, time: timeNow };
-    setMessages((prev) => [...prev, userMsg]);
-    setInputMsg("");
-    setTyping(true);
-
-    setTimeout(() => {
-      const aiResponse = generateAnswer(userText);
-      const aiMsg: Message = {
-        sender: "ai",
-        text: aiResponse,
-        time: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }),
+  // انتخاب عکس از دستگاه
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+        setVisionAnalysis(null);
       };
-      setMessages((prev) => [...prev, aiMsg]);
-      setTyping(false);
-    }, 700);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // آنالیز هوشمند تصویر
+  const handleAnalyzeImage = async () => {
+    if (!selectedImage || loadingVision) return;
+    setLoadingVision(true);
+    setVisionAnalysis(null);
+
+    try {
+      const promptToSend = visionPrompt.trim()
+        ? visionPrompt
+        : 'این تصویر مانیتور یا ستاپ تصویری را به دقت تحلیل کن و در خصوص کالیبراسیون، پنل و تجهیزات پیشنهادی راهنمایی تخصصی ارائه بده.';
+
+      const res = await fetch('/api/ai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptToSend,
+          image: selectedImage,
+          role: 'vision_analyzer',
+        }),
+      });
+
+      const data = await res.json();
+      if (data && data.response) {
+        setVisionAnalysis(data.response);
+      } else {
+        setVisionAnalysis('امکان تحلیل تصویر وجود نداشت. لطفاً تصویر واضح‌تری آپلود کنید.');
+      }
+    } catch {
+      setVisionAnalysis('خطا در تحلیل تصویر. اتصال اینترنت خود را بررسی کنید.');
+    } finally {
+      setLoadingVision(false);
+    }
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans select-none" dir="rtl">
-      {/* دکمه شناور باز کردن دستیار */}
+    <div className="fixed bottom-6 left-6 z-50 font-sans" dir="rtl">
+      {/* دکمه شناور یکپارچه و جذاب */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="p-4 rounded-full bg-[var(--accent-blue)] text-white shadow-2xl hover:scale-105 transition duration-300 flex items-center gap-2 font-black text-xs cursor-pointer"
+          className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full shadow-2xl border border-white/20 transition-all hover:scale-105 active:scale-95 cursor-pointer group"
         >
-          <span className="text-xl">🤖</span>
-          <span className="hidden sm:inline">مشاوره هوشمند خرید</span>
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg animate-pulse">
+            ✨
+          </div>
+          <div className="flex flex-col text-right leading-tight">
+            <span className="text-xs font-black tracking-wide">دستیار هوشمند پوریا ویژوالز</span>
+            <span className="text-[10px] text-blue-100 font-medium">مشاوره خرید کالا و تحلیل عکس مانیتور</span>
+          </div>
         </button>
       )}
 
-      {/* پنجره گفتگو شیشه‌ای */}
+      {/* مدال جامع دوکاره */}
       {isOpen && (
-        <div className="w-80 sm:w-96 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col h-[520px] backdrop-blur-2xl animate-fadeIn text-[var(--text-primary)]">
-          {/* هدر چت */}
-          <div className="p-5 border-b border-[var(--card-border)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] flex items-center justify-center text-lg">
-                🤖
+        <div className="w-[340px] sm:w-[460px] h-[580px] bg-slate-900/95 backdrop-blur-2xl border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col justify-between overflow-hidden text-slate-100 animate-fadeIn">
+          {/* هدر مدال */}
+          <div className="p-4 border-b border-slate-800 bg-slate-800/70 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-base font-black shadow-md">
+                ⚡
               </div>
               <div>
-                <h4 className="font-black text-xs text-[var(--text-primary)]">مشاور هوشمند پوریا ویژوالز</h4>
-                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block">
-                  ● آنلاین و متصل به کاتالوگ
-                </span>
+                <h4 className="text-xs font-black text-white">مرکز هوش مصنوعی پوریا ویژوالز</h4>
+                <p className="text-[10px] text-slate-400">راهنمای تخصصی سیستم‌های مانیتورینگ رنگ و تدوین</p>
               </div>
             </div>
-
             <button
               onClick={() => setIsOpen(false)}
-              className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold text-xs hover:border-[var(--accent-blue)] transition cursor-pointer"
+              className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold transition cursor-pointer"
             >
               ✕
             </button>
           </div>
 
-          {/* پیام‌ها */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
-            {messages.map((m, idx) => (
-              <div
-                key={idx}
-                className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"}`}
-              >
-                <div
-                  className={`p-3.5 rounded-2xl max-w-[85%] leading-relaxed font-medium ${
-                    m.sender === "user"
-                      ? "bg-[var(--accent-blue)] text-white rounded-br-none"
-                      : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-bl-none"
-                  }`}
-                  style={{ whiteSpace: "pre-line" }}
-                >
-                  {m.text}
-                </div>
-                <span className="text-[9px] text-[var(--text-secondary)] font-mono mt-1 px-1">{m.time}</span>
-              </div>
-            ))}
-
-            {typing && (
-              <div className="flex items-center gap-1.5 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] w-20">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)] animate-bounce" />
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)] animate-bounce [animation-delay:0.2s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)] animate-bounce [animation-delay:0.4s]" />
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+          {/* تب سوییچر بین حالت‌ها */}
+          <div className="p-2 bg-slate-950/60 border-b border-slate-800 flex gap-2">
+            <button
+              onClick={() => setMode('chat')}
+              className={`flex-1 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                mode === 'chat'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <span>💬</span>
+              <span>مشاوره خرید کالا</span>
+            </button>
+            <button
+              onClick={() => setMode('vision')}
+              className={`flex-1 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                mode === 'vision'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <span>📸</span>
+              <span>تحلیل عکس و مانیتور</span>
+            </button>
           </div>
 
-          {/* فرم ارسال پیام */}
-          <form onSubmit={handleSendMessage} className="p-3 border-t border-[var(--card-border)] flex gap-2">
-            <input
-              type="text"
-              value={inputMsg}
-              onChange={(e) => setInputMsg(e.target.value)}
-              placeholder="پرسش درباره مانیتورها، قیمت و مشخصات..."
-              className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-            />
-            <button
-              type="submit"
-              className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-md"
-            >
-              ارسال
-            </button>
-          </form>
+          {/* محتوای تب چت */}
+          {mode === 'chat' && (
+            <>
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs leading-relaxed scrollbar-thin">
+                {messages.map((m, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3.5 rounded-2xl max-w-[88%] ${
+                      m.role === 'user'
+                        ? 'mr-auto bg-blue-600 text-white rounded-br-none font-medium'
+                        : 'ml-auto bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none font-medium'
+                    }`}
+                  >
+                    {m.text}
+                  </div>
+                ))}
+                {loadingChat && (
+                  <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700 text-blue-400 text-xs animate-pulse">
+                    🔍 در حال جستجو و پردازش پاسخ تخصصی...
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 border-t border-slate-800 bg-slate-900/90 flex gap-2">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                  placeholder="سؤال خود را درباره کالیبراسیون و مانیتورها بنویسید..."
+                  className="flex-1 px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleSendChat}
+                  disabled={loadingChat}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                >
+                  ارسال
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* محتوای تب تحلیل عکس */}
+          {mode === 'vision' && (
+            <div className="flex-1 p-4 overflow-y-auto space-y-4 text-xs scrollbar-thin flex flex-col justify-between">
+              <div className="space-y-3">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                {!selectedImage ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-8 text-center cursor-pointer bg-slate-800/40 hover:bg-slate-800/80 transition flex flex-col items-center justify-center gap-2"
+                  >
+                    <div className="text-3xl">📷</div>
+                    <span className="font-black text-slate-200">آپلود عکس مانیتور یا ستاپ کاری</span>
+                    <span className="text-[11px] text-slate-400">کلیک کنید یا تصویر را اینجا رها کنید</span>
+                  </div>
+                ) : (
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-700 bg-black/40 p-2">
+                    <div className="relative w-full h-40">
+                      <Image
+                        src={selectedImage}
+                        alt="Uploaded preview"
+                        fill
+                        className="object-contain rounded-xl"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedImage(null);
+                        setVisionAnalysis(null);
+                      }}
+                      className="absolute top-3 left-3 bg-rose-600/90 text-white p-1.5 rounded-xl text-[10px] font-bold hover:bg-rose-700 transition cursor-pointer"
+                    >
+                      حذف عکس ✕
+                    </button>
+                  </div>
+                )}
+
+                {selectedImage && (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={visionPrompt}
+                      onChange={(e) => setVisionPrompt(e.target.value)}
+                      placeholder="توضیح اختیاری (مثلاً: این مانیتور برای کالرگریدینگ مناسب است؟)..."
+                      className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 outline-none focus:border-indigo-500"
+                    />
+
+                    <button
+                      onClick={handleAnalyzeImage}
+                      disabled={loadingVision}
+                      className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:opacity-95 text-white font-black text-xs rounded-xl shadow-lg transition cursor-pointer disabled:opacity-50"
+                    >
+                      {loadingVision ? '🔬 در حال تحلیل هوشمند پیکسل‌ها و مشخصات...' : '🚀 شروع آنالیز هوشمند تصویر'}
+                    </button>
+                  </div>
+                )}
+
+                {visionAnalysis && (
+                  <div className="p-4 rounded-2xl bg-slate-800/90 border border-slate-700 text-slate-200 leading-relaxed font-medium space-y-2">
+                    <div className="flex items-center gap-1.5 text-indigo-400 font-bold">
+                      <span>📊 نتیجه ارزیابی:</span>
+                    </div>
+                    <p className="whitespace-pre-line text-[11px]">{visionAnalysis}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

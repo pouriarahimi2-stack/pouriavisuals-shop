@@ -1,242 +1,140 @@
-"use client";
+'use client';
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { couponService, Coupon } from "@/services/couponService";
-import { orderService, Order } from "@/services/orderService";
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export interface CartItem {
-  id: string;
-  title: string;
+  id: string | number;
+  title?: string;
+  name?: string;
+  title_fa?: string;
   price: number;
-  discountPrice?: number;
-  image: string;
+  image?: string;
+  image_url?: string;
   quantity: number;
-  selectedColor?: string;
-}
-
-export interface CustomerDetails {
-  firstName: string;
-  lastName: string;
-  phone: string;
-  address: string;
-  postalCode: string;
-  isPhoneVerified?: boolean;
-  otpHash?: string;
-  otpSentAt?: string;
-  notes?: string;
 }
 
 interface CartContextType {
-  cartItems: CartItem[];
-  addToCart: (item: Omit<CartItem, "quantity">) => void;
-  removeFromCart: (id: string) => void;
-  updateQuantity: (id: string, delta: number) => void;
+  cart: CartItem[];
+  addToCart: (product: any) => void;
+  removeFromCart: (id: string | number) => void;
+  updateQuantity: (id: string | number, delta: number) => void;
   clearCart: () => void;
   isCartOpen: boolean;
-  toggleCart: () => void;
-  appliedCoupon: Coupon | null;
-  applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
-  removeCoupon: () => void;
-  submitOrder: (customer: CustomerDetails) => Promise<Order>;
+  setIsCartOpen: (open: boolean) => void;
+  totalPrice: number;
+  totalCount: number;
   toastMessage: string | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
+  // لود سبد خرید از LocalStorage
   useEffect(() => {
-    const saved = localStorage.getItem("app_cart_db");
-    if (saved) {
-      try {
-        setCartItems(JSON.parse(saved));
-      } catch {}
+    try {
+      const saved = localStorage.getItem('pv_cart');
+      if (saved) {
+        setCart(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error(e);
     }
   }, []);
 
-  const saveCart = (items: CartItem[]) => {
-    setCartItems(items);
-    localStorage.setItem("app_cart_db", JSON.stringify(items));
-  };
-
-  const addToCart = (product: Omit<CartItem, "quantity">) => {
-    const existing = cartItems.find((item) => item.id === product.id && item.selectedColor === product.selectedColor);
-    let updated: CartItem[];
-    if (existing) {
-      updated = cartItems.map((item) =>
-        item.id === product.id && item.selectedColor === product.selectedColor
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      );
-    } else {
-      updated = [...cartItems, { ...product, quantity: 1 }];
+  // ذخیره در LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('pv_cart', JSON.stringify(cart));
+    } catch (e) {
+      console.error(e);
     }
-    saveCart(updated);
-    showToast(`🛒 "${product.title}" به سبد خرید اضافه شد.`);
+  }, [cart]);
+
+  const addToCart = (product: any) => {
+    const productId = product.id;
+    const productName = product.title || product.title_fa || product.name || 'محصول پوریا ویژوالز';
+    const productPrice = Number(product.price) || 0;
+    const productImage = product.image_url || product.image || (Array.isArray(product.images) ? product.images[0] : '') || '/placeholder.png';
+
+    setCart((prev) => {
+      const existing = prev.find((item) => String(item.id) === String(productId));
+      if (existing) {
+        return prev.map((item) =>
+          String(item.id) === String(productId)
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: productId,
+          title: productName,
+          name: productName,
+          price: productPrice,
+          image: productImage,
+          image_url: productImage,
+          quantity: 1,
+        },
+      ];
+    });
+
+    setToastMessage(`"${productName}" به سبد خرید اضافه شد.`);
+    setIsCartOpen(true);
+
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
   };
 
-  const removeFromCart = (id: string) => {
-    const item = cartItems.find((i) => i.id === id);
-    const updated = cartItems.filter((i) => i.id !== id);
-    saveCart(updated);
-    if (item) showToast(`🗑️ "${item.title}" از سبد خرید حذف شد.`);
+  const removeFromCart = (id: string | number) => {
+    setCart((prev) => prev.filter((item) => String(item.id) !== String(id)));
   };
 
-  const updateQuantity = (id: string, delta: number) => {
-    const updated = cartItems
-      .map((item) => {
-        if (item.id === id) {
-          const newQty = item.quantity + delta;
-          return newQty > 0 ? { ...item, quantity: newQty } : null;
-        }
-        return item;
-      })
-      .filter(Boolean) as CartItem[];
-    saveCart(updated);
+  const updateQuantity = (id: string | number, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (String(item.id) === String(id)) {
+            const newQty = item.quantity + delta;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as CartItem[]
+    );
   };
 
   const clearCart = () => {
-    setCartItems([]);
-    localStorage.removeItem("app_cart_db");
-    setAppliedCoupon(null);
+    setCart([]);
   };
 
-  const applyCoupon = async (code: string) => {
-    const cleanCode = code.trim().toUpperCase();
-    const rawTotal = cartItems.reduce(
-      (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
-      0
-    );
-
-    const result = await couponService.validateCoupon(cleanCode, rawTotal);
-    if (result.valid && result.coupon) {
-      setAppliedCoupon(result.coupon);
-      showToast(`🎉 کد تخفیف "${cleanCode}" با موفقیت اعمال شد.`);
-      return { success: true, message: "کد تخفیف اعمال شد!" };
-    }
-    showToast(`⚠️ ${result.message}`);
-    return { success: false, message: result.message };
-  };
-
-  const removeCoupon = () => {
-    setAppliedCoupon(null);
-    showToast("کد تخفیف حذف شد.");
-  };
-
-  const submitOrder = async (customer: CustomerDetails): Promise<Order> => {
-    const rawTotal = cartItems.reduce(
-      (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
-      0
-    );
-
-    let discountAmount = 0;
-    if (appliedCoupon) {
-      if (appliedCoupon.discount_type === "percent") {
-        discountAmount = (rawTotal * Number(appliedCoupon.discount_value)) / 100;
-        if (appliedCoupon.max_discount_amount && discountAmount > Number(appliedCoupon.max_discount_amount)) {
-          discountAmount = Number(appliedCoupon.max_discount_amount);
-        }
-      } else {
-        discountAmount = Number(appliedCoupon.discount_value);
-      }
-    }
-
-    const finalAmount = Math.max(0, rawTotal - discountAmount);
-
-    const orderPayload = {
-      customerName: `${customer.firstName} ${customer.lastName}`.trim(),
-      customer_name: `${customer.firstName} ${customer.lastName}`.trim(),
-      customerPhone: customer.phone,
-      customer_phone: customer.phone,
-      customerAddress: customer.address,
-      shipping_address: customer.address,
-      postalCode: customer.postalCode,
-      notes: customer.notes,
-      items: cartItems.map((i) => ({
-        product_id: i.id,
-        productId: i.id,
-        product_name: i.title,
-        title: i.title,
-        product_price: i.discountPrice ?? i.price,
-        price: i.discountPrice ?? i.price,
-        quantity: i.quantity,
-        selected_color: i.selectedColor,
-        total_price: (i.discountPrice ?? i.price) * i.quantity,
-        image: i.image,
-      })),
-      totalAmount: rawTotal,
-      total_amount: finalAmount,
-      discountAmount,
-      finalAmount,
-      status: "paid" as const,
-      payment_method: "درگاه آنلاین شتاب",
-    };
-
-    let createdOrder: any;
-    if (typeof orderService.addOrder === "function") {
-      createdOrder = await orderService.addOrder(orderPayload);
-    } else {
-      createdOrder = { id: `ORD-${Date.now().toString().slice(-6)}`, ...orderPayload, created_at: new Date().toISOString() };
-      const local = JSON.parse(localStorage.getItem("admin_orders_cache") || localStorage.getItem("site_orders") || "[]");
-      local.unshift(createdOrder);
-      localStorage.setItem("admin_orders_cache", JSON.stringify(local));
-      localStorage.setItem("site_orders", JSON.stringify(local));
-    }
-
-    // ثبت خودکار ترخیص کالا در لاگ انبارداری
-    try {
-      const savedLogs = JSON.parse(localStorage.getItem("inventory_stock_logs") || "[]");
-      const now = new Date();
-      cartItems.forEach((item) => {
-        savedLogs.unshift({
-          id: `log-${Date.now()}-${Math.random()}`,
-          productId: item.id,
-          productName: item.title,
-          type: "out",
-          quantity: item.quantity,
-          date: now.toLocaleDateString("fa-IR"),
-          time: now.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }),
-          reason: `ثبت سفارش جدید آنلاین (${createdOrder.customer_name || createdOrder.customerName})`,
-          operator: "درگاه تسویه‌حساب مشتری",
-        });
-      });
-      localStorage.setItem("inventory_stock_logs", JSON.stringify(savedLogs));
-    } catch {}
-
-    clearCart();
-    setIsCartOpen(false);
-    return createdOrder;
-  };
+  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <CartContext.Provider
       value={{
-        cartItems,
+        cart,
         addToCart,
         removeFromCart,
         updateQuantity,
         clearCart,
         isCartOpen,
-        toggleCart: () => setIsCartOpen((prev) => !prev),
-        appliedCoupon,
-        applyCoupon,
-        removeCoupon,
-        submitOrder,
+        setIsCartOpen,
+        totalPrice,
+        totalCount,
         toastMessage,
       }}
     >
       {children}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-[var(--modal-bg)] text-[var(--text-primary)] font-bold text-xs shadow-2xl border border-[var(--card-border)] animate-bounce">
+        <div className="fixed bottom-5 left-5 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-slide-up text-sm font-medium">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
           {toastMessage}
         </div>
       )}
@@ -246,6 +144,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
 export function useCart() {
   const context = useContext(CartContext);
-  if (!context) throw new Error("useCart must be used within CartProvider");
+  if (!context) {
+    throw new Error('useCart must be used within a CartProvider');
+  }
   return context;
 }

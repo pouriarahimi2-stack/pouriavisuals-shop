@@ -56,10 +56,10 @@ export default function AdminPage() {
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
   useEffect(() => {
-    const loggedIn = localStorage.getItem("isAdminLoggedIn");
+    const loggedIn = localStorage.getItem("isAdminLoggedIn") || localStorage.getItem("pv_admin_session");
     const storedUser = localStorage.getItem("admin_current_user");
 
-    if (loggedIn !== "true") {
+    if (loggedIn !== "true" && !loggedIn) {
       setIsAuthenticated(false);
       router.replace("/admin/login");
     } else {
@@ -68,8 +68,8 @@ export default function AdminPage() {
         try {
           const parsed: AdminUser = JSON.parse(storedUser);
           setCurrentUser(parsed);
-          setNewUsername(parsed.username);
-          setNewFullName(parsed.full_name);
+          setNewUsername(parsed.username || "");
+          setNewFullName(parsed.full_name || "");
 
           if (parsed.role === "content_editor") {
             setActiveTab("blogs");
@@ -80,7 +80,7 @@ export default function AdminPage() {
           setCurrentUser({
             id: "master-admin",
             username: "admin",
-            full_name: "مدیر ارشد سیستم",
+            full_name: "مدیر ارشد پوریا ویژوالز",
             role: "super_admin",
           });
         }
@@ -88,7 +88,7 @@ export default function AdminPage() {
         setCurrentUser({
           id: "master-admin",
           username: "admin",
-          full_name: "مدیر ارشد سیستم",
+          full_name: "مدیر ارشد پوریا ویژوالز",
           role: "super_admin",
         });
       }
@@ -124,12 +124,17 @@ export default function AdminPage() {
   }, [router]);
 
   const loadAllAdmins = async () => {
-    const list = await adminAuthService.getAllAdmins();
-    setAdminList(list);
+    try {
+      const list = await adminAuthService.getAllAdmins();
+      setAdminList(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setAdminList([]);
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem("isAdminLoggedIn");
+    localStorage.removeItem("pv_admin_session");
     localStorage.removeItem("admin_current_user");
     document.cookie = "admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
     document.cookie = "admin_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
@@ -159,7 +164,7 @@ export default function AdminPage() {
 
     setIsUpdatingPassword(true);
     try {
-      const targetId = currentUser?.id || "master-admin";
+      const targetId = currentUser?.id || "admin_master";
       const res = await adminAuthService.updateCredentials(
         targetId,
         newUsername,
@@ -167,7 +172,7 @@ export default function AdminPage() {
         newFullName || undefined
       );
 
-      if (res.success) {
+      if (res && res.success) {
         setPasswordMsg({ type: "success", text: "✨ مشخصات و رمز عبور با موفقیت به‌روزرسانی شد." });
         if (currentUser) {
           const updatedUser = { ...currentUser, username: newUsername, full_name: newFullName || currentUser.full_name };
@@ -176,7 +181,7 @@ export default function AdminPage() {
         }
         setTimeout(() => setShowPasswordModal(false), 1800);
       } else {
-        setPasswordMsg({ type: "error", text: res.message || "خطا در تغییر مشخصات." });
+        setPasswordMsg({ type: "error", text: res?.message || "خطا در تغییر مشخصات." });
       }
     } catch {
       setPasswordMsg({ type: "error", text: "خطا در برقراری ارتباط." });
@@ -203,14 +208,14 @@ export default function AdminPage() {
         role: newAdminRole,
       });
 
-      if (res.success) {
+      if (res && res.success) {
         setAdminCreateMsg({ type: "success", text: "🎉 ادمین جدید با موفقیت ایجاد شد." });
         setNewAdminUsername("");
         setNewAdminPassword("");
         setNewAdminFullName("");
         loadAllAdmins();
       } else {
-        setAdminCreateMsg({ type: "error", text: res.message || "خطا در ایجاد کاربر." });
+        setAdminCreateMsg({ type: "error", text: res?.message || "خطا در ایجاد کاربر." });
       }
     } catch {
       setAdminCreateMsg({ type: "error", text: "خطا در ارتباط با سرور." });
@@ -232,7 +237,7 @@ export default function AdminPage() {
   const getRoleBadge = (role: AdminRole) => {
     switch (role) {
       case "super_admin":
-        return <span className="px-2.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 font-black text-[10px]">👑 مدیر ارشد</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 font-black text-[10px]">👑 مدیر ارشد</span>;
       case "product_manager":
         return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و کالا</span>;
       case "content_editor":
@@ -256,7 +261,7 @@ export default function AdminPage() {
 
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center text-[var(--text-primary)] text-xs font-bold animate-pulse font-sans">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-200 text-xs font-bold animate-pulse font-sans">
         در حال بررسی سطح دسترسی امنیتی...
       </div>
     );
@@ -265,18 +270,18 @@ export default function AdminPage() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-[var(--text-primary)] bg-[var(--bg-primary)] transition-colors duration-300 select-none">
+    <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 transition-colors duration-300 select-none" dir="rtl">
       <AdminGlobalSearch />
 
       {/* هدر بالایی پنل ادمین */}
-      <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
+      <header className="p-4 md:p-5 rounded-3xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center text-[var(--accent-blue)] text-lg font-black shadow-sm">
+          <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
             ⚡
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل پیشرفته فروشگاه</h1>
+              <h1 className="text-base font-black text-slate-900 dark:text-white">کنترل پنل پیشرفته فروشگاه</h1>
               <span
                 title={isGoogleIndexAllowed ? "ایندکس گوگل فعال است" : "ایندکس گوگل غیرفعال است"}
                 className={`w-2.5 h-2.5 rounded-full ${
@@ -285,8 +290,8 @@ export default function AdminPage() {
               />
               {getRoleBadge(userRole)}
             </div>
-            <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
-              مدیر آنلاین: <strong className="text-[var(--text-primary)]">{currentUser?.full_name || currentUser?.username}</strong>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+              مدیر آنلاین: <strong className="text-slate-800 dark:text-slate-200">{currentUser?.full_name || currentUser?.username}</strong>
             </p>
           </div>
         </div>
@@ -298,7 +303,7 @@ export default function AdminPage() {
                 setShowAdminManagerModal(true);
                 loadAllAdmins();
               }}
-              className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[var(--text-primary)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
               <span>👥</span>
               <span>مدیریت ادمین‌ها</span>
@@ -310,7 +315,7 @@ export default function AdminPage() {
               setPasswordMsg(null);
               setShowPasswordModal(true);
             }}
-            className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[var(--text-primary)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
           >
             <span>🔐</span>
             <span>تغییر رمز</span>
@@ -318,7 +323,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
-            className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[var(--text-primary)] transition cursor-pointer text-xs flex items-center justify-center shadow-sm"
+            className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer text-xs flex items-center justify-center shadow-sm"
             title="جستجوی سریع (Ctrl+K)"
           >
             🔍
@@ -326,7 +331,7 @@ export default function AdminPage() {
 
           <button
             onClick={toggleDarkMode}
-            className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[var(--text-primary)] transition cursor-pointer text-xs shadow-sm font-bold"
+            className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer text-xs shadow-sm font-bold"
             title="تم شب / روز"
           >
             {isDarkMode ? "🌙" : "☀️"}
@@ -335,7 +340,7 @@ export default function AdminPage() {
           <a
             href="/"
             target="_blank"
-            className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[var(--text-primary)] text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
           >
             🏠 مشاهده سایت
           </a>
@@ -358,7 +363,7 @@ export default function AdminPage() {
       )}
 
       {/* نوار ناوبری تب‌ها */}
-      <div className="relative p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl backdrop-blur-2xl overflow-x-auto scrollbar-none">
+      <div className="relative p-1.5 rounded-3xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xl backdrop-blur-2xl overflow-x-auto scrollbar-none">
         <div className="flex items-center gap-1.5 min-w-max">
           {navTabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -368,8 +373,8 @@ export default function AdminPage() {
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`relative px-4 py-2.5 rounded-2xl text-xs font-black transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                   isActive
-                    ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25 scale-[1.02]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                 }`}
               >
                 <span className="text-sm">{tab.icon}</span>
@@ -381,7 +386,7 @@ export default function AdminPage() {
       </div>
 
       {/* محتوای تب فعال */}
-      <div>
+      <div className="bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-3xl p-6 shadow-2xl backdrop-blur-sm">
         {activeTab === "products" && (userRole === "super_admin" || userRole === "product_manager") && <AdminProducts />}
         {activeTab === "inventory" && (userRole === "super_admin" || userRole === "product_manager") && <AdminInventoryManager />}
         {activeTab === "blogs" && (userRole === "super_admin" || userRole === "content_editor") && <AdminBlogManager />}
@@ -398,20 +403,20 @@ export default function AdminPage() {
       {/* مدال تغییر کلمه عبور */}
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-5 shadow-2xl text-[var(--text-primary)]">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+          <div className="max-w-md w-full rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-7 space-y-5 shadow-2xl text-slate-800 dark:text-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center text-[var(--accent-blue)]">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500">
                   🔐
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-[var(--text-primary)]">تغییر مشخصات و کلمه عبور</h3>
-                  <p className="text-[11px] text-[var(--text-secondary)] font-medium">امنیت دسترسی حساب مدیریت</p>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">تغییر مشخصات و کلمه عبور</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">امنیت دسترسی حساب مدیریت</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPasswordModal(false)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold hover:border-blue-500 transition cursor-pointer"
               >
                 ✕
               </button>
@@ -432,41 +437,41 @@ export default function AdminPage() {
 
             <form onSubmit={handleUpdatePassword} className="space-y-4 text-xs">
               <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام نمایشی:</label>
+                <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">نام نمایشی:</label>
                 <input
                   type="text"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
                   placeholder="مثلاً: پوریا"
-                  className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-[var(--accent-blue)] transition text-xs"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-bold focus:border-blue-500 transition text-xs"
                 />
               </div>
 
               <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام کاربری لاگین:</label>
+                <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">نام کاربری لاگین:</label>
                 <input
                   type="text"
                   required
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-mono font-bold focus:border-[var(--accent-blue)] transition text-xs"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono font-bold focus:border-blue-500 transition text-xs"
                 />
               </div>
 
               <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کلمه عبور جدید:</label>
+                <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">کلمه عبور جدید:</label>
                 <div className="relative">
                   <input
                     type={showNewPass ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="حداقل ۶ کاراکتر..."
-                    className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-mono focus:border-[var(--accent-blue)] transition text-xs pl-11"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono focus:border-blue-500 transition text-xs pl-11"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPass(!showNewPass)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm cursor-pointer p-1"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm cursor-pointer p-1"
                   >
                     {showNewPass ? "👁️‍🗨️" : "👁️"}
                   </button>
@@ -474,37 +479,37 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تکرار کلمه عبور جدید:</label>
+                <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">تکرار کلمه عبور جدید:</label>
                 <div className="relative">
                   <input
                     type={showConfirmPass ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="تکرار رمز جدید..."
-                    className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-mono focus:border-[var(--accent-blue)] transition text-xs pl-11"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono focus:border-blue-500 transition text-xs pl-11"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPass(!showConfirmPass)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm cursor-pointer p-1"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm cursor-pointer p-1"
                   >
                     {showConfirmPass ? "👁️‍🗨️" : "👁️"}
                   </button>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--card-border)]">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowPasswordModal(false)}
-                  className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] hover:opacity-80 font-bold cursor-pointer text-[var(--text-secondary)] transition text-xs border border-[var(--card-border)]"
+                  className="px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:opacity-80 font-bold cursor-pointer text-slate-600 dark:text-slate-400 transition text-xs border border-slate-200 dark:border-slate-700"
                 >
                   انصراف
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdatingPassword}
-                  className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black transition cursor-pointer shadow-lg disabled:opacity-50 text-xs hover:opacity-90"
+                  className="px-6 py-2.5 rounded-2xl bg-blue-600 text-white font-black transition cursor-pointer shadow-lg disabled:opacity-50 text-xs hover:bg-blue-700"
                 >
                   {isUpdatingPassword ? "در حال ثبت..." : "ذخیره مشخصات 💾"}
                 </button>
@@ -517,27 +522,27 @@ export default function AdminPage() {
       {/* مدال مدیریت ادمین‌ها */}
       {showAdminManagerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-6 shadow-2xl text-[var(--text-primary)]">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-7 space-y-6 shadow-2xl text-slate-800 dark:text-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center text-[var(--accent-blue)] text-lg">
+                <div className="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg">
                   👥
                 </div>
                 <div>
-                  <h3 className="font-black text-sm text-[var(--text-primary)]">سامانه مدیریت ادمین‌ها و سطوح دسترسی</h3>
-                  <p className="text-[11px] text-[var(--text-secondary)] font-medium">تفکیک وظایف نویسنده مقالات و مدیر انبار</p>
+                  <h3 className="font-black text-sm text-slate-900 dark:text-white">سامانه مدیریت ادمین‌ها و سطوح دسترسی</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">تفکیک وظایف نویسنده مقالات و مدیر انبار</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAdminManagerModal(false)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold hover:border-blue-500 transition cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateAdmin} className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
-              <span className="font-extrabold text-xs text-[var(--accent-blue)] block">➕ ساخت ادمین جدید:</span>
+            <form onSubmit={handleCreateAdmin} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+              <span className="font-extrabold text-xs text-blue-600 dark:text-blue-400 block">➕ ساخت ادمین جدید:</span>
 
               {adminCreateMsg && (
                 <div
@@ -554,23 +559,23 @@ export default function AdminPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی:</label>
+                  <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">نام و نام خانوادگی:</label>
                   <input
                     type="text"
                     required
                     placeholder="مثلاً: علی رضایی"
                     value={newAdminFullName}
                     onChange={(e) => setNewAdminFullName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-[var(--accent-blue)]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-bold focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">سطح دسترسی (Role):</label>
+                  <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">سطح دسترسی (Role):</label>
                   <select
                     value={newAdminRole}
                     onChange={(e) => setNewAdminRole(e.target.value as AdminRole)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-[var(--accent-blue)] cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-bold focus:border-blue-500 cursor-pointer"
                   >
                     <option value="product_manager">📦 مدیر کالا (فقط محصولات و کاتالوگ)</option>
                     <option value="content_editor">✍️ نویسنده (فقط مقالات سئو)</option>
@@ -579,19 +584,19 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام کاربری جهت ورود:</label>
+                  <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">نام کاربری جهت ورود:</label>
                   <input
                     type="text"
                     required
                     placeholder="username..."
                     value={newAdminUsername}
                     onChange={(e) => setNewAdminUsername(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-mono font-bold focus:border-[var(--accent-blue)]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono font-bold focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کلمه عبور ورود:</label>
+                  <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">کلمه عبور ورود:</label>
                   <div className="relative">
                     <input
                       type={showAdminPass ? "text" : "password"}
@@ -599,12 +604,12 @@ export default function AdminPage() {
                       placeholder="••••••••"
                       value={newAdminPassword}
                       onChange={(e) => setNewAdminPassword(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-mono focus:border-[var(--accent-blue)] pl-10"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono focus:border-blue-500 pl-10"
                     />
                     <button
                       type="button"
                       onClick={() => setShowAdminPass(!showAdminPass)}
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm cursor-pointer p-1"
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm cursor-pointer p-1"
                     >
                       {showAdminPass ? "👁️‍🗨️" : "👁️"}
                     </button>
@@ -616,7 +621,7 @@ export default function AdminPage() {
                 <button
                   type="submit"
                   disabled={isCreatingAdmin}
-                  className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 text-white font-bold text-xs transition shadow-md cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-md cursor-pointer disabled:opacity-50"
                 >
                   {isCreatingAdmin ? "در حال ایجاد..." : "افزودن ادمین جدید 🚀"}
                 </button>
@@ -624,17 +629,17 @@ export default function AdminPage() {
             </form>
 
             <div className="space-y-3">
-              <span className="font-bold text-xs text-[var(--text-secondary)] block">لیست مدیران فعال:</span>
+              <span className="font-bold text-xs text-slate-600 dark:text-slate-400 block">لیست مدیران فعال:</span>
               <div className="space-y-2">
                 {adminList.map((adm) => (
                   <div
                     key={adm.id}
-                    className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 text-xs"
+                    className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <strong className="text-[var(--text-primary)] font-black">{adm.full_name}</strong>
-                        <span className="font-mono text-[var(--text-secondary)] text-[11px]">({adm.username})</span>
+                        <strong className="text-slate-900 dark:text-white font-black">{adm.full_name}</strong>
+                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">({adm.username})</span>
                       </div>
                       <div>{getRoleBadge(adm.role)}</div>
                     </div>
@@ -673,15 +678,19 @@ function AdminBlogManager() {
     try {
       const res = await fetch("/api/blogs");
       const json = await res.json();
-      if (json.data && json.data.length > 0) {
+      if (json.data && Array.isArray(json.data) && json.data.length > 0) {
         setBlogs(json.data);
         localStorage.setItem("site_blogs", JSON.stringify(json.data));
         return;
       }
     } catch (e) {}
 
-    const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
-    setBlogs(localBlogs);
+    try {
+      const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
+      setBlogs(Array.isArray(localBlogs) ? localBlogs : []);
+    } catch (e) {
+      setBlogs([]);
+    }
   };
 
   const handleCreateNewArticle = () => {
@@ -701,18 +710,20 @@ function AdminBlogManager() {
         const currentHtml = editorRef.current?.innerHTML || "";
         const updatedBlog = { ...editingBlog, content: currentHtml };
 
-        const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
-        const idx = localBlogs.findIndex((b: any) => b.id === editingBlog.id);
-        let updatedList;
-        if (idx >= 0) {
-          updatedList = localBlogs.map((b: any) => (b.id === editingBlog.id ? updatedBlog : b));
-        } else {
-          updatedList = [updatedBlog, ...localBlogs];
-        }
-        localStorage.setItem("site_blogs", JSON.stringify(updatedList));
-        setBlogs(updatedList);
-        setAutoSaveStatus("⚡ پیش‌نویس خودکار ذخیره شد");
-        setTimeout(() => setAutoSaveStatus(""), 2000);
+        try {
+          const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
+          const idx = localBlogs.findIndex((b: any) => b.id === editingBlog.id);
+          let updatedList;
+          if (idx >= 0) {
+            updatedList = localBlogs.map((b: any) => (b.id === editingBlog.id ? updatedBlog : b));
+          } else {
+            updatedList = [updatedBlog, ...localBlogs];
+          }
+          localStorage.setItem("site_blogs", JSON.stringify(updatedList));
+          setBlogs(updatedList);
+          setAutoSaveStatus("⚡ پیش‌نویس خودکار ذخیره شد");
+          setTimeout(() => setAutoSaveStatus(""), 2000);
+        } catch (e) {}
       }, 2000);
 
       return () => clearTimeout(timer);
@@ -741,17 +752,17 @@ function AdminBlogManager() {
 
   const insertTable = () => {
     const tableHtml = `
-      <table border="1" style="width:100%; border-collapse:collapse; margin:10px 0; border:1px solid var(--card-border);">
+      <table border="1" style="width:100%; border-collapse:collapse; margin:10px 0; border:1px solid #334155;">
         <thead>
-          <tr style="background:var(--input-bg);">
-            <th style="padding:8px; color:var(--text-primary);">عنوان ۱</th>
-            <th style="padding:8px; color:var(--text-primary);">عنوان ۲</th>
+          <tr style="background:#1e293b;">
+            <th style="padding:8px; color:#f8fafc;">عنوان ۱</th>
+            <th style="padding:8px; color:#f8fafc;">عنوان ۲</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="padding:8px; color:var(--text-secondary);">محتوا ۱</td>
-            <td style="padding:8px; color:var(--text-secondary);">محتوا ۲</td>
+            <td style="padding:8px; color:#cbd5e1;">محتوا ۱</td>
+            <td style="padding:8px; color:#cbd5e1;">محتوا ۲</td>
           </tr>
         </tbody>
       </table>
@@ -784,37 +795,40 @@ function AdminBlogManager() {
       });
     } catch (e) {}
 
-    const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
-    const idx = localBlogs.findIndex((b: any) => b.id === finalBlog.id);
-    let updated;
-    if (idx >= 0) {
-      updated = localBlogs.map((b: any) => (b.id === finalBlog.id ? finalBlog : b));
-    } else {
-      updated = [finalBlog, ...localBlogs];
-    }
+    try {
+      const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
+      const idx = localBlogs.findIndex((b: any) => b.id === finalBlog.id);
+      let updated;
+      if (idx >= 0) {
+        updated = localBlogs.map((b: any) => (b.id === finalBlog.id ? finalBlog : b));
+      } else {
+        updated = [finalBlog, ...localBlogs];
+      }
 
-    localStorage.setItem("site_blogs", JSON.stringify(updated));
-    setBlogs(updated);
+      localStorage.setItem("site_blogs", JSON.stringify(updated));
+      setBlogs(updated);
+    } catch (e) {}
+
     setEditingBlog(null);
     alert("🎉 مقاله با موفقیت ذخیره و منتشر شد!");
   };
 
   return (
-    <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-6 text-[var(--text-primary)] font-sans select-none shadow-xl">
-      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-[var(--card-border)] pb-4">
+    <div className="space-y-6 text-slate-800 dark:text-slate-100 font-sans select-none">
+      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h3 className="text-base font-black text-[var(--accent-blue)]">📚 مدیریت و نگارش مقالات سئو</h3>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ویرایشگر متنی با امکانات فرمت‌بندی، جداول و ذخیره خودکار</p>
+          <h3 className="text-base font-black text-blue-600 dark:text-blue-400">📚 مدیریت و نگارش مقالات سئو</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">ویرایشگر متنی با امکانات فرمت‌بندی، جداول و ذخیره خودکار</p>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span className="px-3 py-1 bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 rounded-xl text-xs font-bold">
+          <span className="px-3 py-1 bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 rounded-xl text-xs font-bold">
             {blogs.length} مقاله موجود
           </span>
 
           <button
             onClick={handleCreateNewArticle}
-            className="px-4 py-2 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 text-white font-extrabold text-xs transition flex items-center gap-1.5 shadow-md cursor-pointer"
+            className="px-4 py-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs transition flex items-center gap-1.5 shadow-md cursor-pointer"
           >
             <span>➕</span>
             <span>نگارش مقاله جدید</span>
@@ -823,7 +837,7 @@ function AdminBlogManager() {
       </div>
 
       {blogs.length === 0 ? (
-        <div className="text-center py-12 text-xs text-[var(--text-secondary)] space-y-2 font-bold">
+        <div className="text-center py-12 text-xs text-slate-500 dark:text-slate-400 space-y-2 font-bold">
           <p>هنوز مقاله‌ای ثبت نشده است. با دکمه «نگارش مقاله جدید» اولین مقاله را بسازید.</p>
         </div>
       ) : (
@@ -831,10 +845,10 @@ function AdminBlogManager() {
           {blogs.map((blog) => (
             <div
               key={blog.id}
-              className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-wrap justify-between items-center gap-4 hover:border-[var(--accent-blue)] transition"
+              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-wrap justify-between items-center gap-4 hover:border-blue-500 transition"
             >
               <div className="space-y-1 max-w-xl">
-                <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-bold">
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-bold">
                   <span>📅 {blog.createdAt || "امروز"}</span>
                   <span
                     className={`px-2 py-0.5 rounded font-bold ${
@@ -844,7 +858,7 @@ function AdminBlogManager() {
                     {blog.isVisible !== false ? "نمایش در سایت" : "مخفی شده"}
                   </span>
                 </div>
-                <h4 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-1">{blog.title || "مقاله بدون عنوان"}</h4>
+                <h4 className="font-extrabold text-xs text-slate-900 dark:text-white line-clamp-1">{blog.title || "مقاله بدون عنوان"}</h4>
               </div>
 
               <div className="flex items-center gap-2 text-xs">
@@ -859,7 +873,7 @@ function AdminBlogManager() {
                   onClick={() => toggleVisibility(blog.id)}
                   className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer text-[11px] ${
                     blog.isVisible !== false
-                      ? "bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 hover:bg-[var(--accent-blue)] hover:text-white"
+                      ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white"
                       : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
                   }`}
                 >
@@ -881,41 +895,41 @@ function AdminBlogManager() {
       {/* مدال ویرایش مقاله */}
       {editingBlog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <form onSubmit={handleSaveBlogEdit} className="max-w-5xl w-full max-h-[94vh] overflow-y-auto p-6 space-y-4 border border-[var(--card-border)] shadow-2xl bg-[var(--modal-bg)] text-[var(--text-primary)] rounded-3xl">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+          <form onSubmit={handleSaveBlogEdit} className="max-w-5xl w-full max-h-[94vh] overflow-y-auto p-6 space-y-4 border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-3xl">
+            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="font-extrabold text-sm text-[var(--accent-blue)]">✏️ ویرایشگر سند و نگارش مقاله سئو</h3>
+                <h3 className="font-extrabold text-sm text-blue-600 dark:text-blue-400">✏️ ویرایشگر سند و نگارش مقاله سئو</h3>
                 {autoSaveStatus && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold animate-pulse">{autoSaveStatus}</span>}
               </div>
-              <button type="button" onClick={() => setEditingBlog(null)} className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer">
+              <button type="button" onClick={() => setEditingBlog(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">
                 ✕ بستن
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان اصلی مقاله (Title):</label>
+                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">عنوان اصلی مقاله (Title):</label>
                 <input
                   type="text"
                   required
                   placeholder="عنوان جذاب سئو شده بنویسید..."
                   value={editingBlog.title}
                   onChange={(e) => setEditingBlog({ ...editingBlog, title: e.target.value })}
-                  className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none font-bold text-slate-900 dark:text-white focus:border-blue-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="block font-bold text-[var(--text-secondary)]">نوار ابزار کامل ویرایش:</label>
-                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs select-none items-center">
-                  <select onChange={(e) => exec("fontName", e.target.value)} className="p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-primary)] outline-none cursor-pointer">
+                <label className="block font-bold text-slate-600 dark:text-slate-400">نوار ابزار کامل ویرایش:</label>
+                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs select-none items-center">
+                  <select onChange={(e) => exec("fontName", e.target.value)} className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-800 dark:text-white outline-none cursor-pointer">
                     <option value="vazir">فونت: وزیرمتن</option>
                     <option value="yekan">فونت: ایران‌یکان</option>
                     <option value="shabnam">فونت: شبنم</option>
                     <option value="tahoma">فونت: Tahoma</option>
                   </select>
 
-                  <select onChange={(e) => exec("fontSize", e.target.value)} className="p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-primary)] outline-none cursor-pointer">
+                  <select onChange={(e) => exec("fontSize", e.target.value)} className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-800 dark:text-white outline-none cursor-pointer">
                     <option value="3">سایز معمولی</option>
                     <option value="1">خیلی کوچک</option>
                     <option value="2">کوچک</option>
@@ -925,20 +939,20 @@ function AdminBlogManager() {
                     <option value="7">تیتر بزرگ (H1)</option>
                   </select>
 
-                  <div className="w-[1px] h-6 bg-[var(--card-border)] my-auto" />
+                  <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-700 my-auto" />
 
                   <button type="button" onClick={() => exec("bold")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-black" title="Bold"><b>B</b></button>
                   <button type="button" onClick={() => exec("italic")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg italic" title="Italic"><i>I</i></button>
                   <button type="button" onClick={() => exec("underline")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg underline" title="Underline"><u>U</u></button>
 
-                  <div className="w-[1px] h-6 bg-[var(--card-border)] my-auto" />
+                  <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-700 my-auto" />
 
                   <button type="button" onClick={() => exec("justifyRight")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="راست‌چین">👉</button>
                   <button type="button" onClick={() => exec("justifyCenter")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="وسط‌چین">↔️</button>
                   <button type="button" onClick={() => exec("justifyLeft")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="چپ‌چین">👈</button>
-                  <button type="button" onClick={() => exec("justifyFull")} className="px-2.5 py-1 bg-[var(--accent-blue)] text-white rounded-lg font-bold" title="Justify">≡ جاستیفای</button>
+                  <button type="button" onClick={() => exec("justifyFull")} className="px-2.5 py-1 bg-blue-600 text-white rounded-lg font-bold" title="Justify">≡ جاستیفای</button>
 
-                  <div className="w-[1px] h-6 bg-[var(--card-border)] my-auto" />
+                  <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-700 my-auto" />
 
                   <button type="button" onClick={insertTable} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-bold">📊 جدول</button>
                   <button type="button" onClick={insertLink} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-bold">🔗 لینک</button>
@@ -947,29 +961,29 @@ function AdminBlogManager() {
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن مقاله:</label>
+                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">متن مقاله:</label>
                 <div
                   ref={editorRef}
                   contentEditable
                   suppressContentEditableWarning
                   dangerouslySetInnerHTML={{ __html: editingBlog.content || "" }}
-                  className="w-full min-h-[350px] max-h-[500px] overflow-y-auto p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed text-xs focus:border-[var(--accent-blue)] font-sans shadow-inner text-[var(--text-primary)]"
+                  className="w-full min-h-[350px] max-h-[500px] overflow-y-auto p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none leading-relaxed text-xs focus:border-blue-500 font-sans shadow-inner text-slate-900 dark:text-white"
                   style={{ textAlign: "justify" }}
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setEditingBlog(null)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--card-border)] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 cursor-pointer"
               >
                 انصراف
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 shadow-md cursor-pointer"
+                className="px-6 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer"
               >
                 ذخیره و انتشار مقاله 💾
               </button>
@@ -1014,10 +1028,11 @@ function AdminAIAssistant() {
       if (typeof window !== "undefined") {
         try {
           const prods = (await productService.getAll()) || [];
-          setProductsList(prods || []);
+          const validProds = Array.isArray(prods) ? prods : [];
+          setProductsList(validProds);
 
           const cats = Array.from(
-            new Set((prods || []).map((p: any) => p.category_id || p.category || "عمومی"))
+            new Set(validProds.map((p: any) => p.category_id || p.category || "عمومی"))
           ).filter(Boolean) as string[];
           setCategories(cats);
         } catch (e) {}
@@ -1037,7 +1052,7 @@ function AdminAIAssistant() {
   };
 
   const handleSelectAllCategory = () => {
-    const currentCatIds = categoryProducts.map((p) => p.id);
+    const currentCatIds = categoryProducts.map((p) => String(p.id));
     const allSelected = currentCatIds.every((id) => selectedProductIds.includes(id));
 
     if (allSelected) {
@@ -1051,7 +1066,7 @@ function AdminAIAssistant() {
     if (selectedProductIds.length === productsList.length) {
       setSelectedProductIds([]);
     } else {
-      setSelectedProductIds(productsList.map((p) => p.id));
+      setSelectedProductIds(productsList.map((p) => String(p.id)));
     }
   };
 
@@ -1066,7 +1081,7 @@ function AdminAIAssistant() {
     setLoading(true);
 
     try {
-      const targetProducts = productsList.filter((p) => selectedProductIds.includes(p.id));
+      const targetProducts = productsList.filter((p) => selectedProductIds.includes(String(p.id)));
 
       const validHistory = updatedMessages
         .slice(0, -1)
@@ -1088,7 +1103,7 @@ function AdminAIAssistant() {
       });
 
       const data = await res.json();
-      if (data.response) {
+      if (data && data.response) {
         setMessages((prev) => [...prev, { role: "model", text: data.response }]);
       }
     } catch (e) {
@@ -1103,8 +1118,8 @@ function AdminAIAssistant() {
 
   const handleMarketAnalysis = () => {
     setSelectorModalOpen(false);
-    const targetProducts = productsList.filter((p) => selectedProductIds.includes(p.id));
-    const names = targetProducts.map((p) => p.name).join(" ، ");
+    const targetProducts = productsList.filter((p) => selectedProductIds.includes(String(p.id)));
+    const names = targetProducts.map((p: any) => p.name || p.title || p.title_fa).join(" ، ");
 
     const promptText = `محصولات انتخابی زیر (${targetProducts.length} کالا):
     [ ${names} ]
@@ -1115,8 +1130,8 @@ function AdminAIAssistant() {
 
   const handleSEOArticleGen = () => {
     setSelectorModalOpen(false);
-    const targetProducts = productsList.filter((p) => selectedProductIds.includes(p.id));
-    const names = targetProducts.map((p) => p.name).join(" ، ");
+    const targetProducts = productsList.filter((p) => selectedProductIds.includes(String(p.id)));
+    const names = targetProducts.map((p: any) => p.name || p.title || p.title_fa).join(" ، ");
 
     const promptText = `برای محصولات انتخابی زیر:
     [ ${names} ]
@@ -1183,7 +1198,7 @@ function AdminAIAssistant() {
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         const existingBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
         const newPostItem = data.post || {
           id: Date.now().toString(),
@@ -1207,11 +1222,11 @@ function AdminAIAssistant() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans">
+    <div className="fixed bottom-6 right-6 z-50 font-sans" dir="rtl">
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="p-4 rounded-full bg-[var(--accent-blue)] text-white border border-white/20 shadow-2xl hover:scale-105 transition cursor-pointer flex items-center gap-2 text-xs font-bold"
+          className="p-4 rounded-full bg-blue-600 text-white border border-white/20 shadow-2xl hover:scale-105 transition cursor-pointer flex items-center gap-2 text-xs font-bold"
         >
           <span>🚀</span>
           <span>مدیر هوشمند سئو و بازارسنجی</span>
@@ -1219,27 +1234,27 @@ function AdminAIAssistant() {
       )}
 
       {isOpen && (
-        <div className="w-80 sm:w-[540px] lg:w-[720px] h-[660px] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-2xl">
-          <div className="p-4 border-b border-[var(--card-border)] flex justify-between items-center bg-black/5 dark:bg-white/5">
+        <div className="w-80 sm:w-[540px] lg:w-[720px] h-[660px] rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col justify-between overflow-hidden text-slate-800 dark:text-slate-100 backdrop-blur-2xl">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/40">
             <div className="flex items-center gap-2">
-              <span className="p-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs">📊</span>
+              <span className="p-2 rounded-xl bg-blue-600 text-white text-xs">📊</span>
               <div>
-                <h4 className="font-extrabold text-xs">مدیر ارشد رشد، سئو و بازارسنجی</h4>
-                <p className="text-[9px] text-[var(--text-secondary)] font-medium">پایش زنده وب ایران و استراتژی قیمت‌گذاری</p>
+                <h4 className="font-extrabold text-xs text-slate-900 dark:text-white">مدیر ارشد رشد، سئو و بازارسنجی</h4>
+                <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">پایش زنده وب ایران و استراتژی قیمت‌گذاری</p>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 cursor-pointer"
+              className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 cursor-pointer"
             >
               ✕
             </button>
           </div>
 
-          <div className="p-3 bg-[var(--input-bg)] border-b border-[var(--card-border)] flex items-center justify-between text-xs">
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <span className="text-[var(--accent-blue)] font-bold">🎯 هدف فعال:</span>
-              <span className="bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 px-3 py-1 rounded-xl text-[11px] font-extrabold">
+              <span className="text-blue-600 dark:text-blue-400 font-bold">🎯 هدف فعال:</span>
+              <span className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 px-3 py-1 rounded-xl text-[11px] font-extrabold">
                 {selectedProductIds.length === 0
                   ? "هیچ محصولی انتخاب نشده"
                   : `${selectedProductIds.length} محصول انتخاب شده`}
@@ -1247,7 +1262,7 @@ function AdminAIAssistant() {
             </div>
             <button
               onClick={() => setSelectorModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 text-white font-bold text-xs transition shadow-md cursor-pointer flex items-center gap-1"
+              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-md cursor-pointer flex items-center gap-1"
             >
               <span>🖼️</span>
               <span>مشاهده کارت‌های محصولات</span>
@@ -1260,12 +1275,12 @@ function AdminAIAssistant() {
                 <div
                   className={`p-4 rounded-2xl max-w-[98%] space-y-2 ${
                     m.role === "user"
-                      ? "mr-auto bg-[var(--accent-blue)] text-white font-medium"
-                      : "ml-auto bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] shadow-inner"
+                      ? "mr-auto bg-blue-600 text-white font-medium"
+                      : "ml-auto bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 shadow-inner"
                   }`}
                 >
                   {m.role === "model" && idx > 0 && (
-                    <div className="flex flex-wrap justify-end gap-2 border-b border-[var(--card-border)] pb-2 mb-2">
+                    <div className="flex flex-wrap justify-end gap-2 border-b border-slate-200 dark:border-slate-700 pb-2 mb-2">
                       <button
                         onClick={() => downloadArticleTxt(m.text, `Report_${idx}`)}
                         className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition text-[10px] font-bold flex items-center gap-1 cursor-pointer"
@@ -1274,7 +1289,7 @@ function AdminAIAssistant() {
                       </button>
                       <button
                         onClick={() => openPublishModal(m.text)}
-                        className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white hover:opacity-90 transition text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-md"
+                        className="px-3 py-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-md"
                       >
                         🚀 ویرایش و انتشار مستقیم در بلاگ
                       </button>
@@ -1282,7 +1297,7 @@ function AdminAIAssistant() {
                   )}
 
                   <div
-                    className="prose prose-xs max-w-none space-y-2 overflow-x-auto text-[var(--text-primary)]"
+                    className="prose prose-xs max-w-none space-y-2 overflow-x-auto text-slate-800 dark:text-slate-100"
                     dangerouslySetInnerHTML={{
                       __html: formatMarkdownText(m.text),
                     }}
@@ -1291,14 +1306,14 @@ function AdminAIAssistant() {
               </div>
             ))}
             {loading && (
-              <div className="p-3 rounded-2xl bg-[var(--accent-blue)]/10 border border-[var(--accent-blue)]/20 text-[var(--accent-blue)] text-[11px] animate-pulse flex items-center gap-2 font-bold">
+              <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[11px] animate-pulse flex items-center gap-2 font-bold">
                 <span>🔍</span>
                 <span>در حال آنالیز محصولات، محاسبه حاشیه سود و ساختار سئو...</span>
               </div>
             )}
           </div>
 
-          <div className="p-3 border-t border-[var(--card-border)] flex gap-2">
+          <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
             <input
               type="text"
               value={input}
@@ -1310,12 +1325,12 @@ function AdminAIAssistant() {
                   ? "لطفاً ابتدا از دکمه بالا محصول انتخاب کنید..."
                   : "درخواست آنالیز، قیمت‌گذاری یا سئو..."
               }
-              className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] disabled:opacity-40 font-medium"
+              className="flex-1 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-xs text-slate-900 dark:text-white placeholder:text-slate-400 disabled:opacity-40 font-medium"
             />
             <button
               disabled={selectedProductIds.length === 0}
               onClick={() => handleSend()}
-              className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               ارسال
             </button>
@@ -1325,30 +1340,30 @@ function AdminAIAssistant() {
 
       {selectorModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 flex flex-col justify-between text-[var(--text-primary)] shadow-2xl">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between text-slate-800 dark:text-slate-100 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
               <div>
-                <h3 className="text-base font-black text-[var(--accent-blue)] flex items-center gap-2">
+                <h3 className="text-base font-black text-blue-600 dark:text-blue-400 flex items-center gap-2">
                   <span>💎</span> کارت‌های ویترینی محصولات
                 </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
                   مشخصات کالا را بررسی کرده و جهت آنالیز/سئو انتخاب نمایید.
                 </p>
               </div>
               <button
                 onClick={() => setSelectorModalOpen(false)}
-                className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-2 rounded-xl bg-[var(--input-bg)] cursor-pointer"
+                className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white p-2 rounded-xl bg-slate-100 dark:bg-slate-800 cursor-pointer"
               >
                 ✕ بستن
               </button>
             </div>
 
-            <div className="py-3 space-y-2 border-b border-[var(--card-border)]">
+            <div className="py-3 space-y-2 border-b border-slate-200 dark:border-slate-800">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-extrabold text-[var(--accent-blue)]">📁 ۱. انتخاب دسته‌بندی:</span>
+                <span className="font-extrabold text-blue-600 dark:text-blue-400">📁 ۱. انتخاب دسته‌بندی:</span>
                 <button
                   onClick={handleSelectAllSite}
-                  className="px-3 py-1 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 hover:bg-[var(--accent-blue)] hover:text-white text-xs font-bold transition cursor-pointer"
+                  className="px-3 py-1 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white text-xs font-bold transition cursor-pointer"
                 >
                   {selectedProductIds.length === productsList.length
                     ? "✕ لغو انتخاب کل محصولات"
@@ -1361,8 +1376,8 @@ function AdminAIAssistant() {
                   onClick={() => setSelectedCategory("all")}
                   className={`px-4 py-2 rounded-2xl border transition cursor-pointer font-extrabold whitespace-nowrap ${
                     selectedCategory === "all"
-                      ? "bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white shadow-lg"
-                      : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      ? "bg-blue-600 border-blue-600 text-white shadow-lg"
+                      : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
                   }`}
                 >
                   همه دسته‌ها ({productsList.length})
@@ -1373,8 +1388,8 @@ function AdminAIAssistant() {
                     onClick={() => setSelectedCategory(cat)}
                     className={`px-4 py-2 rounded-2xl border transition cursor-pointer font-extrabold whitespace-nowrap ${
                       selectedCategory === cat
-                        ? "bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white shadow-lg"
-                        : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        ? "bg-blue-600 border-blue-600 text-white shadow-lg"
+                        : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
                     }`}
                   >
                     📂 {cat}
@@ -1385,40 +1400,41 @@ function AdminAIAssistant() {
 
             <div className="flex-1 overflow-y-auto py-4 space-y-3">
               <div className="flex justify-between items-center text-xs px-1">
-                <span className="font-bold text-[var(--text-secondary)]">
+                <span className="font-bold text-slate-500 dark:text-slate-400">
                   📦 ۲. محصولات ({categoryProducts.length} کالا در این دسته)
                 </span>
                 <button
                   onClick={handleSelectAllCategory}
-                  className="text-[var(--accent-blue)] hover:underline font-extrabold cursor-pointer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline font-extrabold cursor-pointer"
                 >
                   انتخاب همه محصولات این دسته
                 </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {categoryProducts.map((p) => {
-                  const isSelected = selectedProductIds.includes(p.id);
-                  const displayImg = p.images?.[0] || p.image || "";
+                {categoryProducts.map((p: any) => {
+                  const isSelected = selectedProductIds.includes(String(p.id));
+                  const displayImg = p.images?.[0] || p.image_url || p.image || "";
+                  const displayName = p.name || p.title || p.title_fa || "کالا";
                   return (
                     <div
                       key={p.id}
-                      onClick={() => toggleProductSelection(p.id)}
+                      onClick={() => toggleProductSelection(String(p.id))}
                       className={`group rounded-3xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between relative ${
                         isSelected
-                          ? "bg-[var(--input-bg)] border-[var(--accent-blue)] text-[var(--text-primary)] shadow-2xl scale-[1.03] ring-2 ring-[var(--accent-blue)]/50"
-                          : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)] hover:scale-[1.01]"
+                          ? "bg-slate-100 dark:bg-slate-800 border-blue-500 text-slate-900 dark:text-white shadow-2xl scale-[1.03] ring-2 ring-blue-500/50"
+                          : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-blue-500 hover:scale-[1.01]"
                       }`}
                     >
                       <div className="w-full h-36 bg-black/5 dark:bg-black/40 relative overflow-hidden flex items-center justify-center p-2">
                         {displayImg ? (
                           <img
                             src={displayImg}
-                            alt={p.name}
+                            alt={displayName}
                             className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
-                          <div className="flex flex-col items-center justify-center text-[var(--text-secondary)] text-xs">
+                          <div className="flex flex-col items-center justify-center text-slate-400 text-xs">
                             <span className="text-2xl">🖼️</span>
                             <span>بدون تصویر</span>
                           </div>
@@ -1427,8 +1443,8 @@ function AdminAIAssistant() {
                         <div
                           className={`absolute top-2 right-2 w-7 h-7 rounded-full border flex items-center justify-center transition shadow-lg ${
                             isSelected
-                              ? "bg-[var(--accent-blue)] border-white text-white font-extrabold scale-110"
-                              : "border-[var(--card-border)] bg-black/20 text-transparent"
+                              ? "bg-blue-600 border-white text-white font-extrabold scale-110"
+                              : "border-slate-300 dark:border-slate-600 bg-black/20 text-transparent"
                           }`}
                         >
                           ✓
@@ -1437,17 +1453,17 @@ function AdminAIAssistant() {
 
                       <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
                         <div>
-                          <span className="text-[10px] text-[var(--accent-blue)] font-bold block opacity-80 mb-0.5">
+                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold block opacity-80 mb-0.5">
                             {p.category || "کالای عمومی"}
                           </span>
-                          <h4 className="font-extrabold text-xs leading-snug line-clamp-2 text-[var(--text-primary)]">
-                            {p.name}
+                          <h4 className="font-extrabold text-xs leading-snug line-clamp-2 text-slate-900 dark:text-white">
+                            {displayName}
                           </h4>
                         </div>
 
-                        <div className="pt-2 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
-                          <span className="text-[10px] text-[var(--text-secondary)] font-medium">قیمت فروش:</span>
-                          <span className="font-extrabold text-[var(--accent-blue)] font-mono">
+                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-xs">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">قیمت فروش:</span>
+                          <span className="font-extrabold text-blue-600 dark:text-blue-400 font-mono">
                             {Number(p.price || 0).toLocaleString("fa-IR")} تومان
                           </span>
                         </div>
@@ -1458,10 +1474,10 @@ function AdminAIAssistant() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-[var(--card-border)] flex flex-wrap justify-between items-center gap-3">
-              <div className="text-xs font-bold text-[var(--accent-blue)] flex items-center gap-2">
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap justify-between items-center gap-3">
+              <div className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
                 <span>تعداد انتخاب شده:</span>
-                <span className="bg-[var(--accent-blue)] text-white px-3 py-1 rounded-xl text-xs font-black shadow-md">
+                <span className="bg-blue-600 text-white px-3 py-1 rounded-xl text-xs font-black shadow-md">
                   {selectedProductIds.length} کالا
                 </span>
               </div>
@@ -1472,8 +1488,8 @@ function AdminAIAssistant() {
                   onClick={handleMarketAnalysis}
                   className={`px-4 py-2.5 rounded-2xl font-bold text-xs transition flex items-center gap-2 ${
                     selectedProductIds.length > 0
-                      ? "bg-[var(--accent-blue)] text-white shadow-lg cursor-pointer hover:opacity-90"
-                      : "bg-[var(--input-bg)] text-[var(--text-secondary)] cursor-not-allowed border border-[var(--card-border)]"
+                      ? "bg-blue-600 text-white shadow-lg cursor-pointer hover:bg-blue-700"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700"
                   }`}
                 >
                   <span>🔍</span>
@@ -1485,8 +1501,8 @@ function AdminAIAssistant() {
                   onClick={handleSEOArticleGen}
                   className={`px-4 py-2.5 rounded-2xl font-bold text-xs transition flex items-center gap-2 ${
                     selectedProductIds.length > 0
-                      ? "bg-[var(--input-bg)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] border border-[var(--card-border)] cursor-pointer"
-                      : "bg-[var(--input-bg)] text-[var(--text-secondary)] cursor-not-allowed border border-[var(--card-border)]"
+                      ? "bg-slate-100 dark:bg-slate-800 hover:border-blue-500 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700"
                   }`}
                 >
                   <span>✍️</span>
@@ -1500,12 +1516,12 @@ function AdminAIAssistant() {
 
       {publishModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 text-[var(--text-primary)] shadow-2xl">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black text-[var(--accent-blue)]">📝 بررسی و انتشار مستقیم مقاله در سایت</h3>
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-4 text-slate-800 dark:text-slate-100 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-black text-blue-600 dark:text-blue-400">📝 بررسی و انتشار مستقیم مقاله در سایت</h3>
               <button
                 onClick={() => setPublishModalOpen(false)}
-                className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -1513,53 +1529,53 @@ function AdminAIAssistant() {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان مقاله (Title Tag):</label>
+                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">عنوان مقاله (Title Tag):</label>
                 <input
                   type="text"
                   value={articleToPublish.title}
                   onChange={(e) =>
                     setArticleToPublish({ ...articleToPublish, title: e.target.value })
                   }
-                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-[var(--accent-blue)]"
+                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-bold focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیحات متا (Meta Description):</label>
+                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">توضیحات متا (Meta Description):</label>
                 <input
                   type="text"
                   value={articleToPublish.metaDescription}
                   onChange={(e) =>
                     setArticleToPublish({ ...articleToPublish, metaDescription: e.target.value })
                   }
-                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن کامل مقاله (قابل ویرایش):</label>
+                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">متن کامل مقاله (قابل ویرایش):</label>
                 <textarea
                   rows={10}
                   value={articleToPublish.content}
                   onChange={(e) =>
                     setArticleToPublish({ ...articleToPublish, content: e.target.value })
                   }
-                  className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-sans leading-relaxed text-xs focus:border-[var(--accent-blue)]"
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-sans leading-relaxed text-xs focus:border-blue-500"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2 border-t border-[var(--card-border)]">
+            <div className="flex justify-end gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => setPublishModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] text-xs font-bold hover:opacity-80 cursor-pointer text-[var(--text-secondary)] border border-[var(--card-border)]"
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold hover:opacity-80 cursor-pointer text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
               >
                 انصراف
               </button>
               <button
                 disabled={publishing}
                 onClick={handleFinalPublish}
-                className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 shadow-md cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer"
               >
                 {publishing ? "در حال انتشار..." : "🌐 تایید و انتشار در وب‌سایت"}
               </button>
@@ -1575,18 +1591,18 @@ function formatMarkdownText(text: string) {
   if (!text) return "";
 
   let formatted = text
-    .replace(/^### (.*$)/gim, '<h3 class="text-sm font-black text-[var(--accent-blue)] mt-3 mb-1">$1</h3>')
-    .replace(/^## (.*$)/gim, '<h2 class="text-base font-black text-[var(--text-primary)] mt-4 mb-2 border-b border-[var(--card-border)] pb-1">$1</h2>')
-    .replace(/^# (.*$)/gim, '<h1 class="text-lg font-black text-[var(--text-primary)] mt-4 mb-2">$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-[var(--accent-blue)] font-extrabold">$1</strong>')
-    .replace(/---/g, '<hr class="border-[var(--card-border)] my-3" />')
+    .replace(/^### (.*$)/gim, '<h3 class="text-sm font-black text-blue-500 mt-3 mb-1">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2 class="text-base font-black text-slate-900 dark:text-white mt-4 mb-2 border-b border-slate-200 dark:border-slate-700 pb-1">$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1 class="text-lg font-black text-slate-900 dark:text-white mt-4 mb-2">$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-500 font-extrabold">$1</strong>')
+    .replace(/---/g, '<hr class="border-slate-200 dark:border-slate-700 my-3" />')
     .replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc opacity-90">$1</li>')
     .replace(/^\d+\. (.*$)/gim, '<li class="ml-4 list-decimal opacity-90">$1</li>');
 
   if (formatted.includes("|")) {
     const lines = formatted.split("\n");
     let inTable = false;
-    let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-[11px] text-right border-collapse rounded-xl overflow-hidden bg-[var(--input-bg)] border border-[var(--card-border)]">';
+    let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-[11px] text-right border-collapse rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">';
 
     lines.forEach((line) => {
       if (line.trim().startsWith("|")) {
@@ -1597,12 +1613,12 @@ function formatMarkdownText(text: string) {
         const isHeader = !tableHtml.includes("<tbody>");
 
         if (isHeader) {
-          tableHtml += '<thead class="bg-black/5 dark:bg-white/5 text-[var(--accent-blue)]"><tr>';
-          cells.forEach((c) => (tableHtml += `<th class="p-2.5 border-b border-[var(--card-border)] font-bold">${c.trim()}</th>`));
+          tableHtml += '<thead class="bg-black/5 dark:bg-white/5 text-blue-500"><tr>';
+          cells.forEach((c) => (tableHtml += `<th class="p-2.5 border-b border-slate-200 dark:border-slate-700 font-bold">${c.trim()}</th>`));
           tableHtml += "</tr></thead><tbody>";
         } else {
-          tableHtml += '<tr class="border-b border-[var(--card-border)] hover:bg-black/5 dark:hover:bg-white/5 transition">';
-          cells.forEach((c) => (tableHtml += `<td class="p-2.5 text-[var(--text-primary)] font-medium">${c.trim()}</td>`));
+          tableHtml += '<tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-black/5 dark:hover:bg-white/5 transition">';
+          cells.forEach((c) => (tableHtml += `<td class="p-2.5 text-slate-800 dark:text-slate-200 font-medium">${c.trim()}</td>`));
           tableHtml += "</tr>";
         }
       } else if (inTable) {

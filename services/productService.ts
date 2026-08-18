@@ -14,6 +14,7 @@ export interface Product {
   originalPrice?: number;
   discount_percent?: number;
   discountPercent?: number;
+  discount_price?: number;
   category?: string;
   category_id?: string;
   brand?: string;
@@ -22,8 +23,10 @@ export interface Product {
   colors?: ProductColor[];
   warranty?: string;
   stock?: number;
+  is_available?: boolean;
   description?: string;
   specs?: Record<string, any>;
+  specifications?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
 }
@@ -32,7 +35,7 @@ const STORAGE_KEY = "site_products_db";
 const CATEGORIES_KEY = "site_categories_db";
 
 export const productService = {
-  // ۱. دریافت تمامی محصولات از دیتابیس
+  // ۱. دریافت تمامی محصولات از دیتابیس با فال‌بک لوکال‌استوریج
   async getAll(): Promise<Product[]> {
     try {
       if (supabase) {
@@ -41,11 +44,20 @@ export const productService = {
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
+          const mappedData: Product[] = data.map((p: any) => ({
+            ...p,
+            stock: p.stock !== undefined ? p.stock : 99,
+            is_available: p.is_available !== undefined ? p.is_available : (p.stock !== undefined ? p.stock > 0 : true),
+            original_price: p.original_price || p.originalPrice || (p.discount_price ? p.price : undefined),
+            price: p.discount_price && p.discount_price > 0 ? p.discount_price : p.price,
+            specs: p.specs || p.specifications || {},
+          }));
+
           if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(mappedData));
           }
-          return data;
+          return mappedData;
         }
       }
     } catch (err) {
@@ -55,13 +67,17 @@ export const productService = {
     if (typeof window !== "undefined") {
       const local = localStorage.getItem(STORAGE_KEY);
       if (local !== null) {
-        return JSON.parse(local);
+        try {
+          return JSON.parse(local);
+        } catch {
+          return [];
+        }
       }
     }
     return [];
   },
 
-  // ۲. دریافت لیست تمامی دسته‌بندی‌ها (حل کننده ارور getCategories)
+  // ۲. دریافت لیست تمامی دسته‌بندی‌ها
   async getCategories(): Promise<string[]> {
     try {
       if (supabase) {
@@ -84,11 +100,13 @@ export const productService = {
     if (typeof window !== "undefined") {
       const localCats = localStorage.getItem(CATEGORIES_KEY);
       if (localCats !== null) {
-        return JSON.parse(localCats);
+        try {
+          return JSON.parse(localCats);
+        } catch {}
       }
     }
 
-    // استخراج داینامیک دسته‌بندی‌ها از محصولات ثبت‌شده در دیتابیس
+    // استخراج داینامیک دسته‌بندی‌ها از محصولات ثبت‌شده
     const allProds = await this.getAll();
     const extracted = Array.from(
       new Set(allProds.map((p) => p.category || p.category_id).filter(Boolean))
@@ -97,7 +115,7 @@ export const productService = {
     return extracted.length > 0 ? extracted : ["آیفون", "مک‌بوک", "آیپد", "اپل واچ", "ایرپاد", "لوازم جانبی"];
   },
 
-  // ۳. افزودن دسته‌بندی جدید به دیتابیس
+  // ۳. افزودن دسته‌بندی جدید
   async addCategory(categoryName: string): Promise<boolean> {
     const trimmed = categoryName.trim();
     if (!trimmed) return false;
@@ -120,7 +138,7 @@ export const productService = {
     return true;
   },
 
-  // ۴. حذف دسته‌بندی از دیتابیس
+  // ۴. حذف دسته‌بندی
   async deleteCategory(categoryName: string): Promise<boolean> {
     try {
       if (supabase) {
@@ -148,7 +166,14 @@ export const productService = {
           .eq("id", id)
           .maybeSingle();
 
-        if (!error && data) return data;
+        if (!error && data) {
+          return {
+            ...data,
+            stock: data.stock !== undefined ? data.stock : 99,
+            is_available: data.is_available !== undefined ? data.is_available : true,
+            specs: data.specs || data.specifications || {},
+          };
+        }
       }
     } catch (err) {
       console.warn("Supabase single product fetch error:", err);
@@ -165,7 +190,7 @@ export const productService = {
     return all.filter((p) => p.category === category || p.category_id === category);
   },
 
-  // ۷. ایجاد و ذخیره محصول جدید در دیتابیس
+  // ۷. ایجاد و ذخیره محصول جدید
   async create(product: Product): Promise<{ success: boolean; data?: Product }> {
     try {
       if (supabase) {
@@ -191,7 +216,7 @@ export const productService = {
     return { success: true, data: product };
   },
 
-  // ۸. ویرایش محصول در دیتابیس
+  // ۸. ویرایش محصول
   async update(id: string, updates: Partial<Product>): Promise<boolean> {
     try {
       if (supabase) {
@@ -209,7 +234,7 @@ export const productService = {
     return true;
   },
 
-  // ۹. حذف دائمی محصول از دیتابیس
+  // ۹. حذف دائمی محصول
   async delete(id: string): Promise<boolean> {
     try {
       if (supabase) {

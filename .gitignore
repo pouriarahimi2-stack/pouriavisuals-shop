@@ -46,3 +46,4 @@ pouriavisuals-shop/
 *.zip 
 backup.bat 
 pouriavisuals-shop/ 
+.env*

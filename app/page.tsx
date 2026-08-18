@@ -21,13 +21,21 @@ export default function HomePage() {
       try {
         const [prods, bans, cats] = await Promise.all([
           productService.getAll(),
-          bannerService.getAll ? bannerService.getAll() : bannerService.getActive(),
-          categoryService.getAll ? categoryService.getAll() : productService.getCategories(),
+          bannerService.getAll ? bannerService.getAll() : (bannerService.getActive ? bannerService.getActive() : []),
+          categoryService && categoryService.getAll ? categoryService.getAll() : productService.getCategories(),
         ]);
 
         setProducts(prods || []);
         setBanners((bans || []).filter((b: any) => b.is_active !== false));
-        setCategories(cats || []);
+
+        // سازگاری با هر دو ساختار Category شیء یا آرایه استرینگ
+        if (cats && cats.length > 0) {
+          if (typeof cats[0] === "string") {
+            setCategories(cats.map((c: any, index: number) => ({ id: String(index), name: c, slug: c })));
+          } else {
+            setCategories(cats);
+          }
+        }
       } catch (e) {
         console.error("Error loading home page Supabase data:", e);
       }
@@ -37,11 +45,9 @@ export default function HomePage() {
 
   const filteredProducts = products.filter((product) => {
     if (selectedCategory === "all") return true;
-    return (
-      product.category === selectedCategory ||
-      product.category_id === selectedCategory ||
-      product.category?.toLowerCase() === selectedCategory.toLowerCase()
-    );
+    const cat = (product.category || product.category_id || "").toLowerCase();
+    const target = selectedCategory.toLowerCase();
+    return cat === target || cat.includes(target) || target.includes(cat);
   });
 
   return (
@@ -102,12 +108,13 @@ export default function HomePage() {
             </button>
 
             {categories.map((cat) => {
+              const catSlug = cat.slug || cat.name;
               const isActive = selectedCategory === cat.name || selectedCategory === cat.slug;
               return (
                 <button
-                  key={cat.id}
+                  key={cat.id || cat.name}
                   type="button"
-                  onClick={() => setSelectedCategory(cat.slug || cat.name)}
+                  onClick={() => setSelectedCategory(catSlug)}
                   className={`py-2 px-4 rounded-xl transition-all duration-300 cursor-pointer select-none text-xs whitespace-nowrap font-bold ${
                     isActive
                       ? "bg-[var(--accent-blue)] text-white shadow-md font-extrabold"
@@ -404,7 +411,7 @@ function AIAssistantChat() {
                       <div className="flex-1 overflow-hidden">
                         <h5 className="font-bold truncate text-[11px] text-[var(--text-primary)]">{m.matchedProduct.name}</h5>
                         <p className="text-[var(--accent-blue)] font-extrabold text-[11px]">
-                          {m.matchedProduct.price.toLocaleString("fa-IR")} تومان
+                          {(m.matchedProduct.price || 0).toLocaleString("fa-IR")} تومان
                         </p>
                       </div>
                     </div>
@@ -487,6 +494,7 @@ function HomeProductCard({
 }) {
   const images = product.images && product.images.length > 0 ? product.images : [product.image || ""];
   const displayImage = images[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500";
+  const isAvailable = product.is_available !== false && (product.stock === undefined || product.stock > 0);
 
   return (
     <div className="rounded-[2rem] liquid-glass-card p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] transition duration-300 group">
@@ -513,12 +521,12 @@ function HomeProductCard({
           </span>
           <span
             className={`font-bold px-2.5 py-0.5 rounded-full ${
-              product.is_available !== false && product.stock > 0
+              isAvailable
                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                 : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
             }`}
           >
-            {product.is_available !== false && product.stock > 0 ? "موجود در انبار" : "ناموجود"}
+            {isAvailable ? "موجود در انبار" : "ناموجود"}
           </span>
         </div>
 
@@ -531,7 +539,7 @@ function HomeProductCard({
 
         <div className="flex items-center gap-2 pt-1">
           <span className="font-black text-base text-[var(--accent-blue)]">
-            {product.price.toLocaleString("fa-IR")} تومان
+            {(product.price || 0).toLocaleString("fa-IR")} تومان
           </span>
           {product.original_price && product.original_price > product.price && (
             <span className="text-xs line-through text-[var(--text-muted)] font-mono">
@@ -550,10 +558,10 @@ function HomeProductCard({
             image: displayImage,
           });
         }}
-        disabled={product.is_available === false || product.stock <= 0}
+        disabled={!isAvailable}
         className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 transition shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {product.is_available !== false && product.stock > 0 ? "افزودن به سبد خرید 🛒" : "ناموجود"}
+        {isAvailable ? "افزودن به سبد خرید 🛒" : "ناموجود"}
       </button>
     </div>
   );
@@ -574,6 +582,7 @@ function ProductDetailsModal({
   const [activeTab, setActiveTab] = useState<"desc" | "specs" | "shipping">("desc");
 
   const specsEntries = product.specs ? Object.entries(product.specs) : [];
+  const isAvailable = product.is_available !== false && (product.stock === undefined || product.stock > 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
@@ -622,12 +631,12 @@ function ProductDetailsModal({
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                    product.is_available !== false && product.stock > 0
+                    isAvailable
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                       : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
                   }`}
                 >
-                  {product.is_available !== false && product.stock > 0 ? "موجود در انبار" : "ناموجود"}
+                  {isAvailable ? "موجود در انبار" : "ناموجود"}
                 </span>
               </div>
               <h2 className="text-2xl font-black mt-1 leading-snug text-[var(--text-primary)]">{product.name}</h2>
@@ -710,7 +719,7 @@ function ProductDetailsModal({
                 <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-black text-[var(--accent-blue)]">
-                    {product.price.toLocaleString("fa-IR")} تومان
+                    {(product.price || 0).toLocaleString("fa-IR")} تومان
                   </span>
                   {product.original_price && product.original_price > product.price && (
                     <span className="text-xs line-through text-[var(--text-muted)] font-mono">
@@ -749,7 +758,7 @@ function ProductDetailsModal({
                     }
                     onClose();
                   }}
-                  disabled={product.is_available === false || product.stock <= 0}
+                  disabled={!isAvailable}
                   className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-xl flex items-center justify-center gap-2 disabled:opacity-40"
                 >
                   <span>افزودن به سبد خرید ({quantity})</span> 🛒

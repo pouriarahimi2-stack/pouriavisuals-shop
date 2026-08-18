@@ -1,11 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-url.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  'https://hooaobrxgwakqqibcfdy.supabase.co';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_4W6VSBnjKZzSUTQp13PUPg_hzw7qMeG';
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);

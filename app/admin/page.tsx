@@ -26,7 +26,7 @@ export default function AdminPage() {
     "products" | "inventory" | "blogs" | "coupons" | "customers" | "banners" | "menu" | "orders" | "siteInfo"
   >("products");
 
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
   // مدال‌ها
@@ -78,7 +78,7 @@ export default function AdminPage() {
           }
         } catch {
           setCurrentUser({
-            id: "master-admin",
+            id: "admin_master",
             username: "admin",
             full_name: "مدیر ارشد پوریا ویژوالز",
             role: "super_admin",
@@ -86,7 +86,7 @@ export default function AdminPage() {
         }
       } else {
         setCurrentUser({
-          id: "master-admin",
+          id: "admin_master",
           username: "admin",
           full_name: "مدیر ارشد پوریا ویژوالز",
           role: "super_admin",
@@ -95,9 +95,7 @@ export default function AdminPage() {
     }
 
     const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark = savedTheme === "dark" || (!savedTheme && prefersDark);
-
+    const isDark = savedTheme === "dark" || !savedTheme;
     setIsDarkMode(isDark);
     if (isDark) {
       document.documentElement.classList.add("dark");
@@ -112,15 +110,6 @@ export default function AdminPage() {
       } catch (e) {}
     }
     loadInfo();
-
-    const handleSiteUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-    };
-    window.addEventListener("site_info_updated", handleSiteUpdate);
-
-    return () => {
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
-    };
   }, [router]);
 
   const loadAllAdmins = async () => {
@@ -239,9 +228,9 @@ export default function AdminPage() {
       case "super_admin":
         return <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 font-black text-[10px]">👑 مدیر ارشد</span>;
       case "product_manager":
-        return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و کالا</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و کالا</span>;
       case "content_editor":
-        return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات</span>;
+        return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات</span>;
       default:
         return null;
     }
@@ -270,18 +259,18 @@ export default function AdminPage() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 transition-colors duration-300 select-none" dir="rtl">
+    <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto space-y-6 font-sans text-slate-100 bg-slate-950 transition-colors duration-300 select-none" dir="rtl">
       <AdminGlobalSearch />
 
       {/* هدر بالایی پنل ادمین */}
-      <header className="p-4 md:p-5 rounded-3xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
+      <header className="p-4 md:p-5 rounded-3xl bg-slate-900/90 border border-slate-800 backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
+          <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 text-lg font-black shadow-sm">
             ⚡
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-slate-900 dark:text-white">کنترل پنل پیشرفته فروشگاه</h1>
+              <h1 className="text-base font-black text-white">کنترل پنل پیشرفته فروشگاه</h1>
               <span
                 title={isGoogleIndexAllowed ? "ایندکس گوگل فعال است" : "ایندکس گوگل غیرفعال است"}
                 className={`w-2.5 h-2.5 rounded-full ${
@@ -290,8 +279,8 @@ export default function AdminPage() {
               />
               {getRoleBadge(userRole)}
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-              مدیر آنلاین: <strong className="text-slate-800 dark:text-slate-200">{currentUser?.full_name || currentUser?.username}</strong>
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+              مدیر آنلاین: <strong className="text-slate-200">{currentUser?.full_name || currentUser?.username}</strong>
             </p>
           </div>
         </div>
@@ -303,7 +292,7 @@ export default function AdminPage() {
                 setShowAdminManagerModal(true);
                 loadAllAdmins();
               }}
-              className="px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="px-3.5 py-2 rounded-2xl bg-slate-800 hover:border-blue-500 border border-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
               <span>👥</span>
               <span>مدیریت ادمین‌ها</span>
@@ -315,7 +304,7 @@ export default function AdminPage() {
               setPasswordMsg(null);
               setShowPasswordModal(true);
             }}
-            className="px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3.5 py-2 rounded-2xl bg-slate-800 hover:border-blue-500 border border-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
           >
             <span>🔐</span>
             <span>تغییر رمز</span>
@@ -323,7 +312,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
-            className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer text-xs flex items-center justify-center shadow-sm"
+            className="p-2.5 rounded-2xl bg-slate-800 hover:border-blue-500 border border-slate-700 text-slate-200 transition cursor-pointer text-xs flex items-center justify-center shadow-sm"
             title="جستجوی سریع (Ctrl+K)"
           >
             🔍
@@ -331,7 +320,7 @@ export default function AdminPage() {
 
           <button
             onClick={toggleDarkMode}
-            className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer text-xs shadow-sm font-bold"
+            className="p-2.5 rounded-2xl bg-slate-800 hover:border-blue-500 border border-slate-700 text-slate-200 transition cursor-pointer text-xs shadow-sm font-bold"
             title="تم شب / روز"
           >
             {isDarkMode ? "🌙" : "☀️"}
@@ -340,14 +329,14 @@ export default function AdminPage() {
           <a
             href="/"
             target="_blank"
-            className="px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:border-blue-500 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-2 rounded-2xl bg-slate-800 hover:border-blue-500 border border-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
           >
             🏠 مشاهده سایت
           </a>
 
           <button
             onClick={handleLogout}
-            className="px-3.5 py-2 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white text-xs font-bold transition cursor-pointer shadow-sm"
+            className="px-3.5 py-2 rounded-2xl bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white text-xs font-bold transition cursor-pointer shadow-sm"
           >
             🚪 خروج
           </button>
@@ -356,14 +345,14 @@ export default function AdminPage() {
 
       {/* نمایش آمار و سلامت */}
       {userRole !== "content_editor" && (
-        <>
+        <div className="space-y-4">
           <AdminDashboardStats />
           <AdminHealthGuard />
-        </>
+        </div>
       )}
 
       {/* نوار ناوبری تب‌ها */}
-      <div className="relative p-1.5 rounded-3xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xl backdrop-blur-2xl overflow-x-auto scrollbar-none">
+      <div className="relative p-1.5 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-2xl overflow-x-auto scrollbar-none">
         <div className="flex items-center gap-1.5 min-w-max">
           {navTabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -374,7 +363,7 @@ export default function AdminPage() {
                 className={`relative px-4 py-2.5 rounded-2xl text-xs font-black transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                   isActive
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
                 }`}
               >
                 <span className="text-sm">{tab.icon}</span>
@@ -386,7 +375,7 @@ export default function AdminPage() {
       </div>
 
       {/* محتوای تب فعال */}
-      <div className="bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-3xl p-6 shadow-2xl backdrop-blur-sm">
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-sm [&_*]:!text-slate-100 [&_input]:!bg-slate-800 [&_input]:!text-white [&_input]:!border-slate-700 [&_select]:!bg-slate-800 [&_select]:!text-white [&_select]:!border-slate-700 [&_.bg-white]:!bg-slate-800/80 [&_.bg-slate-50]:!bg-slate-800/80 [&_.border-slate-200]:!border-slate-700">
         {activeTab === "products" && (userRole === "super_admin" || userRole === "product_manager") && <AdminProducts />}
         {activeTab === "inventory" && (userRole === "super_admin" || userRole === "product_manager") && <AdminInventoryManager />}
         {activeTab === "blogs" && (userRole === "super_admin" || userRole === "content_editor") && <AdminBlogManager />}
@@ -402,21 +391,21 @@ export default function AdminPage() {
 
       {/* مدال تغییر کلمه عبور */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-md w-full rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-7 space-y-5 shadow-2xl text-slate-800 dark:text-slate-100">
-            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
+          <div className="max-w-md w-full rounded-3xl bg-slate-900 border border-slate-800 p-7 space-y-5 shadow-2xl text-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
                   🔐
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">تغییر مشخصات و کلمه عبور</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">امنیت دسترسی حساب مدیریت</p>
+                  <h3 className="font-extrabold text-sm text-white">تغییر مشخصات و کلمه عبور</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">امنیت دسترسی حساب مدیریت</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPasswordModal(false)}
-                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold hover:border-blue-500 transition cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold hover:border-blue-500 transition cursor-pointer"
               >
                 ✕
               </button>
@@ -426,8 +415,8 @@ export default function AdminPage() {
               <div
                 className={`p-3 rounded-2xl text-xs font-bold flex items-center gap-2 ${
                   passwordMsg.type === "success"
-                    ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                    : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
+                    ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"
+                    : "bg-rose-500/15 border border-rose-500/30 text-rose-400"
                 }`}
               >
                 <span>{passwordMsg.type === "success" ? "✓" : "⚠️"}</span>
@@ -437,41 +426,41 @@ export default function AdminPage() {
 
             <form onSubmit={handleUpdatePassword} className="space-y-4 text-xs">
               <div>
-                <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">نام نمایشی:</label>
+                <label className="block mb-1.5 font-bold text-slate-400">نام نمایشی:</label>
                 <input
                   type="text"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
                   placeholder="مثلاً: پوریا"
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-bold focus:border-blue-500 transition text-xs"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-white outline-none font-bold focus:border-blue-500 transition text-xs"
                 />
               </div>
 
               <div>
-                <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">نام کاربری لاگین:</label>
+                <label className="block mb-1.5 font-bold text-slate-400">نام کاربری لاگین:</label>
                 <input
                   type="text"
                   required
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono font-bold focus:border-blue-500 transition text-xs"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-white outline-none font-mono font-bold focus:border-blue-500 transition text-xs"
                 />
               </div>
 
               <div>
-                <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">کلمه عبور جدید:</label>
+                <label className="block mb-1.5 font-bold text-slate-400">کلمه عبور جدید:</label>
                 <div className="relative">
                   <input
                     type={showNewPass ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="حداقل ۶ کاراکتر..."
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono focus:border-blue-500 transition text-xs pl-11"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-white outline-none font-mono focus:border-blue-500 transition text-xs pl-11"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPass(!showNewPass)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm cursor-pointer p-1"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm cursor-pointer p-1"
                   >
                     {showNewPass ? "👁️‍🗨️" : "👁️"}
                   </button>
@@ -479,30 +468,30 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">تکرار کلمه عبور جدید:</label>
+                <label className="block mb-1.5 font-bold text-slate-400">تکرار کلمه عبور جدید:</label>
                 <div className="relative">
                   <input
                     type={showConfirmPass ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="تکرار رمز جدید..."
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono focus:border-blue-500 transition text-xs pl-11"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-white outline-none font-mono focus:border-blue-500 transition text-xs pl-11"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPass(!showConfirmPass)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm cursor-pointer p-1"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm cursor-pointer p-1"
                   >
                     {showConfirmPass ? "👁️‍🗨️" : "👁️"}
                   </button>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowPasswordModal(false)}
-                  className="px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:opacity-80 font-bold cursor-pointer text-slate-600 dark:text-slate-400 transition text-xs border border-slate-200 dark:border-slate-700"
+                  className="px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 font-bold cursor-pointer text-slate-300 transition text-xs border border-slate-700"
                 >
                   انصراف
                 </button>
@@ -521,35 +510,35 @@ export default function AdminPage() {
 
       {/* مدال مدیریت ادمین‌ها */}
       {showAdminManagerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-7 space-y-6 shadow-2xl text-slate-800 dark:text-slate-100">
-            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
+          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-slate-900 border border-slate-800 p-7 space-y-6 shadow-2xl text-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg">
+                <div className="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 text-lg">
                   👥
                 </div>
                 <div>
-                  <h3 className="font-black text-sm text-slate-900 dark:text-white">سامانه مدیریت ادمین‌ها و سطوح دسترسی</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">تفکیک وظایف نویسنده مقالات و مدیر انبار</p>
+                  <h3 className="font-black text-sm text-white">سامانه مدیریت ادمین‌ها و سطوح دسترسی</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">تفکیک وظایف نویسنده مقالات و مدیر انبار</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAdminManagerModal(false)}
-                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold hover:border-blue-500 transition cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold hover:border-blue-500 transition cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateAdmin} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
-              <span className="font-extrabold text-xs text-blue-600 dark:text-blue-400 block">➕ ساخت ادمین جدید:</span>
+            <form onSubmit={handleCreateAdmin} className="p-5 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-4">
+              <span className="font-extrabold text-xs text-blue-400 block">➕ ساخت ادمین جدید:</span>
 
               {adminCreateMsg && (
                 <div
                   className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
                     adminCreateMsg.type === "success"
-                      ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                      : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
+                      ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"
+                      : "bg-rose-500/15 border border-rose-500/30 text-rose-400"
                   }`}
                 >
                   <span>{adminCreateMsg.type === "success" ? "✓" : "⚠️"}</span>
@@ -559,23 +548,23 @@ export default function AdminPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">نام و نام خانوادگی:</label>
+                  <label className="block mb-1.5 font-bold text-slate-400">نام و نام خانوادگی:</label>
                   <input
                     type="text"
                     required
                     placeholder="مثلاً: علی رضایی"
                     value={newAdminFullName}
                     onChange={(e) => setNewAdminFullName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-bold focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none font-bold focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">سطح دسترسی (Role):</label>
+                  <label className="block mb-1.5 font-bold text-slate-400">سطح دسترسی (Role):</label>
                   <select
                     value={newAdminRole}
                     onChange={(e) => setNewAdminRole(e.target.value as AdminRole)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-bold focus:border-blue-500 cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none font-bold focus:border-blue-500 cursor-pointer"
                   >
                     <option value="product_manager">📦 مدیر کالا (فقط محصولات و کاتالوگ)</option>
                     <option value="content_editor">✍️ نویسنده (فقط مقالات سئو)</option>
@@ -584,19 +573,19 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">نام کاربری جهت ورود:</label>
+                  <label className="block mb-1.5 font-bold text-slate-400">نام کاربری جهت ورود:</label>
                   <input
                     type="text"
                     required
                     placeholder="username..."
                     value={newAdminUsername}
                     onChange={(e) => setNewAdminUsername(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono font-bold focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none font-mono font-bold focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 font-bold text-slate-600 dark:text-slate-400">کلمه عبور ورود:</label>
+                  <label className="block mb-1.5 font-bold text-slate-400">کلمه عبور ورود:</label>
                   <div className="relative">
                     <input
                       type={showAdminPass ? "text" : "password"}
@@ -604,12 +593,12 @@ export default function AdminPage() {
                       placeholder="••••••••"
                       value={newAdminPassword}
                       onChange={(e) => setNewAdminPassword(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-mono focus:border-blue-500 pl-10"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none font-mono focus:border-blue-500 pl-10"
                     />
                     <button
                       type="button"
                       onClick={() => setShowAdminPass(!showAdminPass)}
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm cursor-pointer p-1"
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm cursor-pointer p-1"
                     >
                       {showAdminPass ? "👁️‍🗨️" : "👁️"}
                     </button>
@@ -629,17 +618,17 @@ export default function AdminPage() {
             </form>
 
             <div className="space-y-3">
-              <span className="font-bold text-xs text-slate-600 dark:text-slate-400 block">لیست مدیران فعال:</span>
+              <span className="font-bold text-xs text-slate-400 block">لیست مدیران فعال:</span>
               <div className="space-y-2">
                 {adminList.map((adm) => (
                   <div
                     key={adm.id}
-                    className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs"
+                    className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-between gap-3 text-xs"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <strong className="text-slate-900 dark:text-white font-black">{adm.full_name}</strong>
-                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">({adm.username})</span>
+                        <strong className="text-white font-black">{adm.full_name}</strong>
+                        <span className="font-mono text-slate-400 text-[11px]">({adm.username})</span>
                       </div>
                       <div>{getRoleBadge(adm.role)}</div>
                     </div>
@@ -647,7 +636,7 @@ export default function AdminPage() {
                     {adm.username !== currentUser?.username && (
                       <button
                         onClick={() => handleDeleteAdmin(adm.id, adm.username)}
-                        className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
+                        className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
                       >
                         🗑️ حذف
                       </button>
@@ -663,7 +652,7 @@ export default function AdminPage() {
   );
 }
 
-// 📝 کامپوننت ویراستار مقالات سئو متصل به API و پایگاه‌داده
+// 📝 کامپوننت ویراستار مقالات سئو
 function AdminBlogManager() {
   const [blogs, setBlogs] = useState<any[]>([]);
   const [editingBlog, setEditingBlog] = useState<any | null>(null);
@@ -814,15 +803,15 @@ function AdminBlogManager() {
   };
 
   return (
-    <div className="space-y-6 text-slate-800 dark:text-slate-100 font-sans select-none">
-      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+    <div className="space-y-6 text-slate-100 font-sans select-none">
+      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 pb-4">
         <div>
-          <h3 className="text-base font-black text-blue-600 dark:text-blue-400">📚 مدیریت و نگارش مقالات سئو</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">ویرایشگر متنی با امکانات فرمت‌بندی، جداول و ذخیره خودکار</p>
+          <h3 className="text-base font-black text-blue-400">📚 مدیریت و نگارش مقالات سئو</h3>
+          <p className="text-xs text-slate-400 mt-1 font-medium">ویرایشگر متنی با امکانات فرمت‌بندی، جداول و ذخیره خودکار</p>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span className="px-3 py-1 bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 rounded-xl text-xs font-bold">
+          <span className="px-3 py-1 bg-blue-500/15 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-bold">
             {blogs.length} مقاله موجود
           </span>
 
@@ -837,7 +826,7 @@ function AdminBlogManager() {
       </div>
 
       {blogs.length === 0 ? (
-        <div className="text-center py-12 text-xs text-slate-500 dark:text-slate-400 space-y-2 font-bold">
+        <div className="text-center py-12 text-xs text-slate-400 space-y-2 font-bold">
           <p>هنوز مقاله‌ای ثبت نشده است. با دکمه «نگارش مقاله جدید» اولین مقاله را بسازید.</p>
         </div>
       ) : (
@@ -845,26 +834,26 @@ function AdminBlogManager() {
           {blogs.map((blog) => (
             <div
               key={blog.id}
-              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-wrap justify-between items-center gap-4 hover:border-blue-500 transition"
+              className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 flex flex-wrap justify-between items-center gap-4 hover:border-blue-500 transition"
             >
               <div className="space-y-1 max-w-xl">
-                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+                <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold">
                   <span>📅 {blog.createdAt || "امروز"}</span>
                   <span
                     className={`px-2 py-0.5 rounded font-bold ${
-                      blog.isVisible !== false ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                      blog.isVisible !== false ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
                     }`}
                   >
                     {blog.isVisible !== false ? "نمایش در سایت" : "مخفی شده"}
                   </span>
                 </div>
-                <h4 className="font-extrabold text-xs text-slate-900 dark:text-white line-clamp-1">{blog.title || "مقاله بدون عنوان"}</h4>
+                <h4 className="font-extrabold text-xs text-white line-clamp-1">{blog.title || "مقاله بدون عنوان"}</h4>
               </div>
 
               <div className="flex items-center gap-2 text-xs">
                 <button
                   onClick={() => setEditingBlog({ ...blog })}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
                 >
                   ✏️ ویرایش
                 </button>
@@ -873,8 +862,8 @@ function AdminBlogManager() {
                   onClick={() => toggleVisibility(blog.id)}
                   className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer text-[11px] ${
                     blog.isVisible !== false
-                      ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white"
-                      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
+                      ? "bg-blue-500/15 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white"
+                      : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
                   }`}
                 >
                   {blog.isVisible !== false ? "👁️ مخفی‌سازی" : "✅ نمایش"}
@@ -882,7 +871,7 @@ function AdminBlogManager() {
 
                 <button
                   onClick={() => deleteBlog(blog.id)}
-                  className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
+                  className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
                 >
                   🗑️ حذف
                 </button>
@@ -894,42 +883,42 @@ function AdminBlogManager() {
 
       {/* مدال ویرایش مقاله */}
       {editingBlog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <form onSubmit={handleSaveBlogEdit} className="max-w-5xl w-full max-h-[94vh] overflow-y-auto p-6 space-y-4 border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-3xl">
-            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
+          <form onSubmit={handleSaveBlogEdit} className="max-w-5xl w-full max-h-[94vh] overflow-y-auto p-6 space-y-4 border border-slate-800 shadow-2xl bg-slate-900 text-slate-100 rounded-3xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div>
-                <h3 className="font-extrabold text-sm text-blue-600 dark:text-blue-400">✏️ ویرایشگر سند و نگارش مقاله سئو</h3>
-                {autoSaveStatus && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold animate-pulse">{autoSaveStatus}</span>}
+                <h3 className="font-extrabold text-sm text-blue-400">✏️ ویرایشگر سند و نگارش مقاله سئو</h3>
+                {autoSaveStatus && <span className="text-[10px] text-emerald-400 font-bold animate-pulse">{autoSaveStatus}</span>}
               </div>
-              <button type="button" onClick={() => setEditingBlog(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">
+              <button type="button" onClick={() => setEditingBlog(null)} className="text-xs font-bold text-slate-400 hover:text-white cursor-pointer">
                 ✕ بستن
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">عنوان اصلی مقاله (Title):</label>
+                <label className="block mb-1 font-bold text-slate-400">عنوان اصلی مقاله (Title):</label>
                 <input
                   type="text"
                   required
                   placeholder="عنوان جذاب سئو شده بنویسید..."
                   value={editingBlog.title}
                   onChange={(e) => setEditingBlog({ ...editingBlog, title: e.target.value })}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none font-bold text-slate-900 dark:text-white focus:border-blue-500"
+                  className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 outline-none font-bold text-white focus:border-blue-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="block font-bold text-slate-600 dark:text-slate-400">نوار ابزار کامل ویرایش:</label>
-                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs select-none items-center">
-                  <select onChange={(e) => exec("fontName", e.target.value)} className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-800 dark:text-white outline-none cursor-pointer">
+                <label className="block font-bold text-slate-400">نوار ابزار کامل ویرایش:</label>
+                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-xs select-none items-center">
+                  <select onChange={(e) => exec("fontName", e.target.value)} className="p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-white outline-none cursor-pointer">
                     <option value="vazir">فونت: وزیرمتن</option>
                     <option value="yekan">فونت: ایران‌یکان</option>
                     <option value="shabnam">فونت: شبنم</option>
                     <option value="tahoma">فونت: Tahoma</option>
                   </select>
 
-                  <select onChange={(e) => exec("fontSize", e.target.value)} className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-800 dark:text-white outline-none cursor-pointer">
+                  <select onChange={(e) => exec("fontSize", e.target.value)} className="p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-white outline-none cursor-pointer">
                     <option value="3">سایز معمولی</option>
                     <option value="1">خیلی کوچک</option>
                     <option value="2">کوچک</option>
@@ -939,45 +928,45 @@ function AdminBlogManager() {
                     <option value="7">تیتر بزرگ (H1)</option>
                   </select>
 
-                  <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-700 my-auto" />
+                  <div className="w-[1px] h-6 bg-slate-700 my-auto" />
 
-                  <button type="button" onClick={() => exec("bold")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-black" title="Bold"><b>B</b></button>
-                  <button type="button" onClick={() => exec("italic")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg italic" title="Italic"><i>I</i></button>
-                  <button type="button" onClick={() => exec("underline")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg underline" title="Underline"><u>U</u></button>
+                  <button type="button" onClick={() => exec("bold")} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg font-black" title="Bold"><b>B</b></button>
+                  <button type="button" onClick={() => exec("italic")} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg italic" title="Italic"><i>I</i></button>
+                  <button type="button" onClick={() => exec("underline")} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg underline" title="Underline"><u>U</u></button>
 
-                  <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-700 my-auto" />
+                  <div className="w-[1px] h-6 bg-slate-700 my-auto" />
 
-                  <button type="button" onClick={() => exec("justifyRight")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="راست‌چین">👉</button>
-                  <button type="button" onClick={() => exec("justifyCenter")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="وسط‌چین">↔️</button>
-                  <button type="button" onClick={() => exec("justifyLeft")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="چپ‌چین">👈</button>
+                  <button type="button" onClick={() => exec("justifyRight")} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg" title="راست‌چین">👉</button>
+                  <button type="button" onClick={() => exec("justifyCenter")} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg" title="وسط‌چین">↔️</button>
+                  <button type="button" onClick={() => exec("justifyLeft")} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg" title="چپ‌چین">👈</button>
                   <button type="button" onClick={() => exec("justifyFull")} className="px-2.5 py-1 bg-blue-600 text-white rounded-lg font-bold" title="Justify">≡ جاستیفای</button>
 
-                  <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-700 my-auto" />
+                  <div className="w-[1px] h-6 bg-slate-700 my-auto" />
 
-                  <button type="button" onClick={insertTable} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-bold">📊 جدول</button>
-                  <button type="button" onClick={insertLink} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-bold">🔗 لینک</button>
-                  <button type="button" onClick={insertImage} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-bold">🖼️ عکس</button>
+                  <button type="button" onClick={insertTable} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg font-bold">📊 جدول</button>
+                  <button type="button" onClick={insertLink} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg font-bold">🔗 لینک</button>
+                  <button type="button" onClick={insertImage} className="px-2.5 py-1 bg-white/10 hover:opacity-80 rounded-lg font-bold">🖼️ عکس</button>
                 </div>
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">متن مقاله:</label>
+                <label className="block mb-1 font-bold text-slate-400">متن مقاله:</label>
                 <div
                   ref={editorRef}
                   contentEditable
                   suppressContentEditableWarning
                   dangerouslySetInnerHTML={{ __html: editingBlog.content || "" }}
-                  className="w-full min-h-[350px] max-h-[500px] overflow-y-auto p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none leading-relaxed text-xs focus:border-blue-500 font-sans shadow-inner text-slate-900 dark:text-white"
+                  className="w-full min-h-[350px] max-h-[500px] overflow-y-auto p-5 rounded-2xl bg-slate-800 border border-slate-700 outline-none leading-relaxed text-xs focus:border-blue-500 font-sans shadow-inner text-white"
                   style={{ textAlign: "justify" }}
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => setEditingBlog(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-400 hover:text-white border border-slate-700 cursor-pointer"
               >
                 انصراف
               </button>
@@ -1234,27 +1223,27 @@ function AdminAIAssistant() {
       )}
 
       {isOpen && (
-        <div className="w-80 sm:w-[540px] lg:w-[720px] h-[660px] rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col justify-between overflow-hidden text-slate-800 dark:text-slate-100 backdrop-blur-2xl">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/40">
+        <div className="w-80 sm:w-[540px] lg:w-[720px] h-[660px] rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl flex flex-col justify-between overflow-hidden text-slate-100 backdrop-blur-2xl">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/60">
             <div className="flex items-center gap-2">
               <span className="p-2 rounded-xl bg-blue-600 text-white text-xs">📊</span>
               <div>
-                <h4 className="font-extrabold text-xs text-slate-900 dark:text-white">مدیر ارشد رشد، سئو و بازارسنجی</h4>
-                <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">پایش زنده وب ایران و استراتژی قیمت‌گذاری</p>
+                <h4 className="font-extrabold text-xs text-white">مدیر ارشد رشد، سئو و بازارسنجی</h4>
+                <p className="text-[9px] text-slate-400 font-medium">پایش زنده وب ایران و استراتژی قیمت‌گذاری</p>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 cursor-pointer"
+              className="text-xs font-bold text-slate-400 hover:text-white p-1 cursor-pointer"
             >
               ✕
             </button>
           </div>
 
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+          <div className="p-3 bg-slate-800/80 border-b border-slate-700 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <span className="text-blue-600 dark:text-blue-400 font-bold">🎯 هدف فعال:</span>
-              <span className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 px-3 py-1 rounded-xl text-[11px] font-extrabold">
+              <span className="text-blue-400 font-bold">🎯 هدف فعال:</span>
+              <span className="bg-blue-500/15 text-blue-400 border border-blue-500/30 px-3 py-1 rounded-xl text-[11px] font-extrabold">
                 {selectedProductIds.length === 0
                   ? "هیچ محصولی انتخاب نشده"
                   : `${selectedProductIds.length} محصول انتخاب شده`}
@@ -1276,14 +1265,14 @@ function AdminAIAssistant() {
                   className={`p-4 rounded-2xl max-w-[98%] space-y-2 ${
                     m.role === "user"
                       ? "mr-auto bg-blue-600 text-white font-medium"
-                      : "ml-auto bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 shadow-inner"
+                      : "ml-auto bg-slate-800/80 border border-slate-700 text-slate-100 shadow-inner"
                   }`}
                 >
                   {m.role === "model" && idx > 0 && (
-                    <div className="flex flex-wrap justify-end gap-2 border-b border-slate-200 dark:border-slate-700 pb-2 mb-2">
+                    <div className="flex flex-wrap justify-end gap-2 border-b border-slate-700 pb-2 mb-2">
                       <button
                         onClick={() => downloadArticleTxt(m.text, `Report_${idx}`)}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition text-[10px] font-bold flex items-center gap-1 cursor-pointer"
                       >
                         📥 دانلود فایل متنی (TXT)
                       </button>
@@ -1297,7 +1286,7 @@ function AdminAIAssistant() {
                   )}
 
                   <div
-                    className="prose prose-xs max-w-none space-y-2 overflow-x-auto text-slate-800 dark:text-slate-100"
+                    className="prose prose-xs max-w-none space-y-2 overflow-x-auto text-slate-100"
                     dangerouslySetInnerHTML={{
                       __html: formatMarkdownText(m.text),
                     }}
@@ -1306,14 +1295,14 @@ function AdminAIAssistant() {
               </div>
             ))}
             {loading && (
-              <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[11px] animate-pulse flex items-center gap-2 font-bold">
+              <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] animate-pulse flex items-center gap-2 font-bold">
                 <span>🔍</span>
                 <span>در حال آنالیز محصولات، محاسبه حاشیه سود و ساختار سئو...</span>
               </div>
             )}
           </div>
 
-          <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+          <div className="p-3 border-t border-slate-800 flex gap-2">
             <input
               type="text"
               value={input}
@@ -1325,7 +1314,7 @@ function AdminAIAssistant() {
                   ? "لطفاً ابتدا از دکمه بالا محصول انتخاب کنید..."
                   : "درخواست آنالیز، قیمت‌گذاری یا سئو..."
               }
-              className="flex-1 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-xs text-slate-900 dark:text-white placeholder:text-slate-400 disabled:opacity-40 font-medium"
+              className="flex-1 p-2.5 rounded-xl bg-slate-800 border border-slate-700 outline-none text-xs text-white placeholder:text-slate-400 disabled:opacity-40 font-medium"
             />
             <button
               disabled={selectedProductIds.length === 0}
@@ -1339,31 +1328,31 @@ function AdminAIAssistant() {
       )}
 
       {selectorModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between text-slate-800 dark:text-slate-100 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 p-6 flex flex-col justify-between text-slate-100 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
               <div>
-                <h3 className="text-base font-black text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                <h3 className="text-base font-black text-blue-400 flex items-center gap-2">
                   <span>💎</span> کارت‌های ویترینی محصولات
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                <p className="text-xs text-slate-400 mt-0.5 font-medium">
                   مشخصات کالا را بررسی کرده و جهت آنالیز/سئو انتخاب نمایید.
                 </p>
               </div>
               <button
                 onClick={() => setSelectorModalOpen(false)}
-                className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white p-2 rounded-xl bg-slate-100 dark:bg-slate-800 cursor-pointer"
+                className="text-xs font-bold text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 cursor-pointer"
               >
                 ✕ بستن
               </button>
             </div>
 
-            <div className="py-3 space-y-2 border-b border-slate-200 dark:border-slate-800">
+            <div className="py-3 space-y-2 border-b border-slate-800">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-extrabold text-blue-600 dark:text-blue-400">📁 ۱. انتخاب دسته‌بندی:</span>
+                <span className="font-extrabold text-blue-400">📁 ۱. انتخاب دسته‌بندی:</span>
                 <button
                   onClick={handleSelectAllSite}
-                  className="px-3 py-1 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white text-xs font-bold transition cursor-pointer"
+                  className="px-3 py-1 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white text-xs font-bold transition cursor-pointer"
                 >
                   {selectedProductIds.length === productsList.length
                     ? "✕ لغو انتخاب کل محصولات"
@@ -1377,7 +1366,7 @@ function AdminAIAssistant() {
                   className={`px-4 py-2 rounded-2xl border transition cursor-pointer font-extrabold whitespace-nowrap ${
                     selectedCategory === "all"
                       ? "bg-blue-600 border-blue-600 text-white shadow-lg"
-                      : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                      : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
                   }`}
                 >
                   همه دسته‌ها ({productsList.length})
@@ -1389,7 +1378,7 @@ function AdminAIAssistant() {
                     className={`px-4 py-2 rounded-2xl border transition cursor-pointer font-extrabold whitespace-nowrap ${
                       selectedCategory === cat
                         ? "bg-blue-600 border-blue-600 text-white shadow-lg"
-                        : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                        : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
                     }`}
                   >
                     📂 {cat}
@@ -1400,12 +1389,12 @@ function AdminAIAssistant() {
 
             <div className="flex-1 overflow-y-auto py-4 space-y-3">
               <div className="flex justify-between items-center text-xs px-1">
-                <span className="font-bold text-slate-500 dark:text-slate-400">
+                <span className="font-bold text-slate-400">
                   📦 ۲. محصولات ({categoryProducts.length} کالا در این دسته)
                 </span>
                 <button
                   onClick={handleSelectAllCategory}
-                  className="text-blue-600 dark:text-blue-400 hover:underline font-extrabold cursor-pointer"
+                  className="text-blue-400 hover:underline font-extrabold cursor-pointer"
                 >
                   انتخاب همه محصولات این دسته
                 </button>
@@ -1422,11 +1411,11 @@ function AdminAIAssistant() {
                       onClick={() => toggleProductSelection(String(p.id))}
                       className={`group rounded-3xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between relative ${
                         isSelected
-                          ? "bg-slate-100 dark:bg-slate-800 border-blue-500 text-slate-900 dark:text-white shadow-2xl scale-[1.03] ring-2 ring-blue-500/50"
-                          : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-blue-500 hover:scale-[1.01]"
+                          ? "bg-slate-800 border-blue-500 text-white shadow-2xl scale-[1.03] ring-2 ring-blue-500/50"
+                          : "bg-slate-800/80 border-slate-700 text-slate-200 hover:border-blue-500 hover:scale-[1.01]"
                       }`}
                     >
-                      <div className="w-full h-36 bg-black/5 dark:bg-black/40 relative overflow-hidden flex items-center justify-center p-2">
+                      <div className="w-full h-36 bg-black/40 relative overflow-hidden flex items-center justify-center p-2">
                         {displayImg ? (
                           <img
                             src={displayImg}
@@ -1444,7 +1433,7 @@ function AdminAIAssistant() {
                           className={`absolute top-2 right-2 w-7 h-7 rounded-full border flex items-center justify-center transition shadow-lg ${
                             isSelected
                               ? "bg-blue-600 border-white text-white font-extrabold scale-110"
-                              : "border-slate-300 dark:border-slate-600 bg-black/20 text-transparent"
+                              : "border-slate-600 bg-black/20 text-transparent"
                           }`}
                         >
                           ✓
@@ -1453,17 +1442,17 @@ function AdminAIAssistant() {
 
                       <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
                         <div>
-                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold block opacity-80 mb-0.5">
+                          <span className="text-[10px] text-blue-400 font-bold block opacity-80 mb-0.5">
                             {p.category || "کالای عمومی"}
                           </span>
-                          <h4 className="font-extrabold text-xs leading-snug line-clamp-2 text-slate-900 dark:text-white">
+                          <h4 className="font-extrabold text-xs leading-snug line-clamp-2 text-white">
                             {displayName}
                           </h4>
                         </div>
 
-                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-xs">
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">قیمت فروش:</span>
-                          <span className="font-extrabold text-blue-600 dark:text-blue-400 font-mono">
+                        <div className="pt-2 border-t border-slate-700 flex justify-between items-center text-xs">
+                          <span className="text-[10px] text-slate-400 font-medium">قیمت فروش:</span>
+                          <span className="font-extrabold text-blue-400 font-mono">
                             {Number(p.price || 0).toLocaleString("fa-IR")} تومان
                           </span>
                         </div>
@@ -1474,8 +1463,8 @@ function AdminAIAssistant() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap justify-between items-center gap-3">
-              <div className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
+            <div className="pt-4 border-t border-slate-800 flex flex-wrap justify-between items-center gap-3">
+              <div className="text-xs font-bold text-blue-400 flex items-center gap-2">
                 <span>تعداد انتخاب شده:</span>
                 <span className="bg-blue-600 text-white px-3 py-1 rounded-xl text-xs font-black shadow-md">
                   {selectedProductIds.length} کالا
@@ -1489,7 +1478,7 @@ function AdminAIAssistant() {
                   className={`px-4 py-2.5 rounded-2xl font-bold text-xs transition flex items-center gap-2 ${
                     selectedProductIds.length > 0
                       ? "bg-blue-600 text-white shadow-lg cursor-pointer hover:bg-blue-700"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700"
+                      : "bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-700"
                   }`}
                 >
                   <span>🔍</span>
@@ -1501,8 +1490,8 @@ function AdminAIAssistant() {
                   onClick={handleSEOArticleGen}
                   className={`px-4 py-2.5 rounded-2xl font-bold text-xs transition flex items-center gap-2 ${
                     selectedProductIds.length > 0
-                      ? "bg-slate-100 dark:bg-slate-800 hover:border-blue-500 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 cursor-pointer"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700"
+                      ? "bg-slate-800 hover:border-blue-500 text-white border border-slate-700 cursor-pointer"
+                      : "bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-700"
                   }`}
                 >
                   <span>✍️</span>
@@ -1515,13 +1504,13 @@ function AdminAIAssistant() {
       )}
 
       {publishModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-4 text-slate-800 dark:text-slate-100 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-black text-blue-600 dark:text-blue-400">📝 بررسی و انتشار مستقیم مقاله در سایت</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-4 text-slate-100 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-black text-blue-400">📝 بررسی و انتشار مستقیم مقاله در سایت</h3>
               <button
                 onClick={() => setPublishModalOpen(false)}
-                className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                className="text-xs font-bold text-slate-400 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -1529,46 +1518,46 @@ function AdminAIAssistant() {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">عنوان مقاله (Title Tag):</label>
+                <label className="block mb-1 font-bold text-slate-400">عنوان مقاله (Title Tag):</label>
                 <input
                   type="text"
                   value={articleToPublish.title}
                   onChange={(e) =>
                     setArticleToPublish({ ...articleToPublish, title: e.target.value })
                   }
-                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-bold focus:border-blue-500"
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none font-bold focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">توضیحات متا (Meta Description):</label>
+                <label className="block mb-1 font-bold text-slate-400">توضیحات متا (Meta Description):</label>
                 <input
                   type="text"
                   value={articleToPublish.metaDescription}
                   onChange={(e) =>
                     setArticleToPublish({ ...articleToPublish, metaDescription: e.target.value })
                   }
-                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:border-blue-500"
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-slate-600 dark:text-slate-400">متن کامل مقاله (قابل ویرایش):</label>
+                <label className="block mb-1 font-bold text-slate-400">متن کامل مقاله (قابل ویرایش):</label>
                 <textarea
                   rows={10}
                   value={articleToPublish.content}
                   onChange={(e) =>
                     setArticleToPublish({ ...articleToPublish, content: e.target.value })
                   }
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none font-sans leading-relaxed text-xs focus:border-blue-500"
+                  className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none font-sans leading-relaxed text-xs focus:border-blue-500"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
               <button
                 onClick={() => setPublishModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold hover:opacity-80 cursor-pointer text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold hover:opacity-80 cursor-pointer text-slate-400 border border-slate-700"
               >
                 انصراف
               </button>
@@ -1591,18 +1580,18 @@ function formatMarkdownText(text: string) {
   if (!text) return "";
 
   let formatted = text
-    .replace(/^### (.*$)/gim, '<h3 class="text-sm font-black text-blue-500 mt-3 mb-1">$1</h3>')
-    .replace(/^## (.*$)/gim, '<h2 class="text-base font-black text-slate-900 dark:text-white mt-4 mb-2 border-b border-slate-200 dark:border-slate-700 pb-1">$1</h2>')
-    .replace(/^# (.*$)/gim, '<h1 class="text-lg font-black text-slate-900 dark:text-white mt-4 mb-2">$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-500 font-extrabold">$1</strong>')
-    .replace(/---/g, '<hr class="border-slate-200 dark:border-slate-700 my-3" />')
+    .replace(/^### (.*$)/gim, '<h3 class="text-sm font-black text-blue-400 mt-3 mb-1">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2 class="text-base font-black text-white mt-4 mb-2 border-b border-slate-800 pb-1">$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1 class="text-lg font-black text-white mt-4 mb-2">$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-400 font-extrabold">$1</strong>')
+    .replace(/---/g, '<hr class="border-slate-800 my-3" />')
     .replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc opacity-90">$1</li>')
     .replace(/^\d+\. (.*$)/gim, '<li class="ml-4 list-decimal opacity-90">$1</li>');
 
   if (formatted.includes("|")) {
     const lines = formatted.split("\n");
     let inTable = false;
-    let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-[11px] text-right border-collapse rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">';
+    let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-[11px] text-right border-collapse rounded-xl overflow-hidden bg-slate-800 border border-slate-700">';
 
     lines.forEach((line) => {
       if (line.trim().startsWith("|")) {
@@ -1613,12 +1602,12 @@ function formatMarkdownText(text: string) {
         const isHeader = !tableHtml.includes("<tbody>");
 
         if (isHeader) {
-          tableHtml += '<thead class="bg-black/5 dark:bg-white/5 text-blue-500"><tr>';
-          cells.forEach((c) => (tableHtml += `<th class="p-2.5 border-b border-slate-200 dark:border-slate-700 font-bold">${c.trim()}</th>`));
+          tableHtml += '<thead class="bg-slate-900 text-blue-400"><tr>';
+          cells.forEach((c) => (tableHtml += `<th class="p-2.5 border-b border-slate-700 font-bold">${c.trim()}</th>`));
           tableHtml += "</tr></thead><tbody>";
         } else {
-          tableHtml += '<tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-black/5 dark:hover:bg-white/5 transition">';
-          cells.forEach((c) => (tableHtml += `<td class="p-2.5 text-slate-800 dark:text-slate-200 font-medium">${c.trim()}</td>`));
+          tableHtml += '<tr class="border-b border-slate-700 hover:bg-slate-700/50 transition">';
+          cells.forEach((c) => (tableHtml += `<td class="p-2.5 text-slate-200 font-medium">${c.trim()}</td>`));
           tableHtml += "</tr>";
         }
       } else if (inTable) {

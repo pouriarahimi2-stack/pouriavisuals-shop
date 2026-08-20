@@ -4,20 +4,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { siteInfoService, SiteInfo } from '@/services/siteInfoService';
 
 export default function AdminSiteInfo() {
-  const [formData, setFormData] = useState<SiteInfo>({
-    site_name: '',
-    tagline: '',
-    description: '',
-    logo_url: '',
-    phone: '',
-    email: '',
-    address: '',
-    instagram: '',
-    telegram: '',
-    whatsapp: '',
-    header_announcement: '',
-    footer_text: '',
-  });
+  const [siteName, setSiteName] = useState('');
+  const [tagline, setTagline] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [address, setAddress] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [telegram, setTelegram] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [announcement, setAnnouncement] = useState('');
+  const [description, setDescription] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,11 +28,22 @@ export default function AdminSiteInfo() {
   const loadData = async () => {
     setLoading(true);
     const data = await siteInfoService.getSiteInfo();
-    setFormData(data);
+    if (data) {
+      setSiteName(data.site_name || data.siteName || '');
+      setTagline(data.tagline || '');
+      setPhone(data.phone || '');
+      setEmail(data.email || '');
+      setAddress(data.address || '');
+      setLogoUrl(data.logo_url || data.logoUrl || '');
+      setInstagram(data.instagram || '');
+      setTelegram(data.telegram || '');
+      setWhatsapp(data.whatsapp || '');
+      setAnnouncement(data.header_announcement || data.headerAnnouncement || '');
+      setDescription(data.description || data.footer_text || data.footerText || '');
+    }
     setLoading(false);
   };
 
-  // مدیریت آپلود فایل لوگو با تبدیل به DataURL و فشرده‌سازی برای ذخیره مطمئن
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -45,22 +53,39 @@ export default function AdminSiteInfo() {
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData((prev) => ({ ...prev, logo_url: reader.result as string, logoUrl: reader.result as string }));
+        setLogoUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setSaving(true);
     setStatusMessage(null);
 
-    const result = await siteInfoService.updateSiteInfo(formData);
+    const payload: SiteInfo = {
+      id: 'default_info',
+      site_name: siteName,
+      siteName: siteName,
+      tagline: tagline,
+      phone: phone,
+      email: email,
+      address: address,
+      logo_url: logoUrl,
+      logoUrl: logoUrl,
+      instagram: instagram,
+      telegram: telegram,
+      whatsapp: whatsapp,
+      header_announcement: announcement,
+      description: description,
+      footer_text: description,
+    };
+
+    const result = await siteInfoService.updateSiteInfo(payload);
 
     if (result.success) {
       setStatusMessage({ type: 'success', text: 'اطلاعات با موفقیت در دیتابیس ذخیره و منتشر شد.' });
-      if (result.data) setFormData(result.data);
     } else {
       setStatusMessage({ type: 'error', text: result.error || 'خطا در ثبت اطلاعات در دیتابیس.' });
     }
@@ -83,7 +108,7 @@ export default function AdminSiteInfo() {
           </div>
           <button
             type="button"
-            onClick={handleSubmit}
+            onClick={() => handleSubmit()}
             disabled={saving}
             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
           >
@@ -104,16 +129,16 @@ export default function AdminSiteInfo() {
         )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-8">
-          {/* بخش ۱: لوگو و هویت بصری با آپلود مستقیم */}
+          {/* لوگو */}
           <div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               🖼️ لوگو و نشان رسمی فروشگاه
             </h3>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
               <div className="w-24 h-24 rounded-2xl bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                {formData.logo_url || formData.logoUrl ? (
+                {logoUrl ? (
                   <img
-                    src={formData.logo_url || formData.logoUrl}
+                    src={logoUrl}
                     alt="لوگو فروشگاه"
                     className="w-full h-full object-contain p-2"
                   />
@@ -137,10 +162,10 @@ export default function AdminSiteInfo() {
                   >
                     بارگذاری لوگوی جدید 📤
                   </button>
-                  {(formData.logo_url || formData.logoUrl) && (
+                  {logoUrl && (
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, logo_url: '', logoUrl: '' })}
+                      onClick={() => setLogoUrl('')}
                       className="px-4 py-2 bg-rose-100 dark:bg-rose-950/40 text-rose-600 rounded-xl text-xs font-semibold hover:bg-rose-200 transition cursor-pointer"
                     >
                       حذف لوگو ✕
@@ -150,8 +175,8 @@ export default function AdminSiteInfo() {
                 <div className="w-full">
                   <input
                     type="text"
-                    value={formData.logo_url || formData.logoUrl || ''}
-                    onChange={(e) => setFormData({ ...formData, logo_url: e.target.value, logoUrl: e.target.value })}
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
                     placeholder="یا آدرس مستقیم اینترنتی لوگو (URL)..."
                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs text-gray-700 dark:text-gray-300 focus:outline-none"
                   />
@@ -160,7 +185,7 @@ export default function AdminSiteInfo() {
             </div>
           </div>
 
-          {/* بخش ۲: اطلاعات اصلی برند */}
+          {/* مشخصات اصلی */}
           <div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">🏢 مشخصات اصلی و هویت فروشگاه</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -170,10 +195,10 @@ export default function AdminSiteInfo() {
                 </label>
                 <input
                   type="text"
-                  value={formData.site_name || formData.siteName || ''}
-                  onChange={(e) => setFormData({ ...formData, site_name: e.target.value, siteName: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                  placeholder="مثال: پوریا ویژوالز | Pouria Visuals"
+                  value={siteName}
+                  onChange={(e) => setSiteName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                  placeholder="مثال: آکسون | Axon"
                   required
                 />
               </div>
@@ -184,18 +209,18 @@ export default function AdminSiteInfo() {
                 </label>
                 <input
                   type="text"
-                  value={formData.tagline || ''}
-                  onChange={(e) => setFormData({ ...formData, tagline: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                  placeholder="مثال: مرجع تخصصی مانیتور و تجهیزات بصری تدوین و رنگ"
+                  value={tagline}
+                  onChange={(e) => setTagline(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                  placeholder="مثال: نماد مسیر انتقال فوق‌سریع داده‌ها"
                 />
               </div>
             </div>
           </div>
 
-          {/* بخش ۳: اطلاعات تماس و پشتیبانی */}
+          {/* تماس */}
           <div>
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">📞 اطلاعات تماس و آدرس فیزیکی</h3>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">📞 اطلاعات تماس و آدرس</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">
@@ -203,9 +228,9 @@ export default function AdminSiteInfo() {
                 </label>
                 <input
                   type="text"
-                  value={formData.phone || ''}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
                   placeholder="021-88888888"
                 />
               </div>
@@ -214,37 +239,37 @@ export default function AdminSiteInfo() {
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">ایمیل رسمی</label>
                 <input
                   type="email"
-                  value={formData.email || ''}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                  placeholder="info@pouriavisuals.ir"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                  placeholder="info@axon.ir"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">آدرس فروشگاه / دفتر مرکزی</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">آدرس فروشگاه</label>
                 <input
                   type="text"
-                  value={formData.address || ''}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
                   placeholder="تهران، خیابان ولیعصر..."
                 />
               </div>
             </div>
           </div>
 
-          {/* بخش ۴: شبکه‌های اجتماعی */}
+          {/* شبکه‌های اجتماعی */}
           <div>
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">🌐 شبکه‌های اجتماعی و پیام‌رسان‌ها</h3>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">🌐 شبکه‌های اجتماعی</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">اینستاگرام</label>
                 <input
                   type="text"
-                  value={formData.instagram || ''}
-                  onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none"
+                  value={instagram}
+                  onChange={(e) => setInstagram(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none text-gray-900 dark:text-white"
                   placeholder="https://instagram.com/..."
                 />
               </div>
@@ -253,9 +278,9 @@ export default function AdminSiteInfo() {
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">تلگرام</label>
                 <input
                   type="text"
-                  value={formData.telegram || ''}
-                  onChange={(e) => setFormData({ ...formData, telegram: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none"
+                  value={telegram}
+                  onChange={(e) => setTelegram(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none text-gray-900 dark:text-white"
                   placeholder="https://t.me/..."
                 />
               </div>
@@ -264,38 +289,38 @@ export default function AdminSiteInfo() {
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">واتساپ</label>
                 <input
                   type="text"
-                  value={formData.whatsapp || ''}
-                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none"
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none text-gray-900 dark:text-white"
                   placeholder="https://wa.me/..."
                 />
               </div>
             </div>
           </div>
 
-          {/* بخش ۵: توضیحات فوتر و اعلان هدر */}
+          {/* اعلانات و فوتر */}
           <div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">📢 اعلانات و متن فوتر</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">نوار اعلان بالای سایت (Header Announcement)</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">نوار اعلان بالای سایت</label>
                 <input
                   type="text"
-                  value={formData.header_announcement || formData.headerAnnouncement || ''}
-                  onChange={(e) => setFormData({ ...formData, header_announcement: e.target.value, headerAnnouncement: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none"
-                  placeholder="مثال: ارسال رایگان به سراسر کشور برای خریدهای بالای ۲ میلیون تومان"
+                  value={announcement}
+                  onChange={(e) => setAnnouncement(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none text-gray-900 dark:text-white"
+                  placeholder="مثال: ارسال رایگان به سراسر کشور..."
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">توضیحات معرفی و درباره فروشگاه (فوتر)</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">توضیحات معرفی و فوتر</label>
                 <textarea
                   rows={4}
-                  value={formData.description || formData.footer_text || formData.footerText || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value, footer_text: e.target.value, footerText: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none"
-                  placeholder="توضیحات کامل جهت آشنایی مخاطبان در انتهای سایت..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none text-gray-900 dark:text-white"
+                  placeholder="توضیحات کامل جهت معرفی در فوتر سایت..."
                 />
               </div>
             </div>

@@ -7,75 +7,84 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const orderId = body.id || `ORD-${Date.now().toString().slice(-6)}`;
 
-    // فیلدهای دقیق و منطبق با جدول Supabase
+    const customerName = (body.customerName || body.customer_name || 'مشتری').trim();
+    const phone = (body.phone || '').trim();
+    const address = (body.address || '').trim();
+    const postalCode = body.postalCode || body.postal_code || null;
+    const items = Array.isArray(body.items) ? body.items : [];
+    const totalAmount = Number(body.totalAmount || body.total_amount || 0);
+    const discountAmount = Number(body.discountAmount || body.discount_amount || 0);
+    const couponCode = body.couponCode || body.coupon_code || null;
+    const status = body.status || 'processing';
+
     const orderPayload = {
       id: orderId,
-      customer_name: (body.customerName || body.customer_name || 'مشتری').trim(),
-      phone: (body.phone || '').trim(),
-      address: (body.address || '').trim(),
-      postal_code: body.postalCode || body.postal_code || null,
-      items: body.items || [],
-      total_amount: Number(body.totalAmount || body.total_amount || 0),
-      discount_amount: Number(body.discountAmount || body.discount_amount || 0),
-      coupon_code: body.couponCode || body.coupon_code || null,
-      status: body.status || 'processing',
+      customer_name: customerName,
+      phone,
+      address,
+      postal_code: postalCode,
+      items,
+      total_amount: totalAmount,
+      discount_amount: discountAmount,
+      coupon_code: couponCode,
+      status,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    // ۱. درج سفارش در جدول orders
+    // ۱. ذخیره در Supabase
     const { data, error } = await supabaseAdmin
       .from('orders')
       .upsert(orderPayload, { onConflict: 'id' })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
-      console.error('Supabase orders table error:', error);
-      throw new Error(error.message);
+      console.error('Supabase DB Error in orders:', error);
+      return NextResponse.json({ success: false, message: error.message, details: error }, { status: 400 });
     }
 
-    // ۲. کسر موجودی انبار
-    if (Array.isArray(body.items)) {
-      for (const item of body.items) {
-        const prodId = item.productId || item.id;
-        if (prodId) {
+    // ۲. کسر موجودی فیزیکی
+    if (items.length > 0) {
+      for (const itm of items) {
+        const pId = itm.productId || itm.id;
+        if (pId) {
           try {
-            const { data: prod } = await supabaseAdmin
+            const { data: pData } = await supabaseAdmin
               .from('products')
               .select('stock')
-              .eq('id', prodId)
+              .eq('id', pId)
               .maybeSingle();
 
-            if (prod && prod.stock !== null && prod.stock !== undefined) {
-              const currentStock = Number(prod.stock);
-              const newStock = Math.max(0, currentStock - Number(item.quantity || 1));
+            if (pData && pData.stock !== null && pData.stock !== undefined) {
+              const curStock = Number(pData.stock);
+              const nextStock = Math.max(0, curStock - Number(itm.quantity || 1));
               await supabaseAdmin
                 .from('products')
-                .update({ stock: newStock, is_available: newStock > 0 })
-                .eq('id', prodId);
+                .update({ stock: nextStock, is_available: nextStock > 0 })
+                .eq('id', pId);
             }
-          } catch (e) {
-            console.error('Stock decrement warning:', e);
+          } catch (stkErr) {
+            console.error('Stock decrement error:', stkErr);
           }
         }
       }
     }
 
-    // ۳. ارسال پیامک تایید سفارش به خریدار
-    if (orderPayload.phone) {
+    // ۳. ارسال پیامک
+    if (phone) {
       try {
-        await smsService.sendOrderStatusChange(orderPayload.phone, orderId, 'در حال پردازش و انبارداری');
+        await smsService.sendOrderStatusChange(phone, orderId, 'در حال پردازش و انبارداری');
       } catch (smsErr) {
-        console.error('SMS sending warning:', smsErr);
+        console.error('SMS sending error:', smsErr);
       }
     }
 
     return NextResponse.json({ success: true, data: data || orderPayload });
   } catch (err: any) {
-    console.error('API /api/orders error:', err);
+    console.error('Fatal API Error /api/orders:', err);
     return NextResponse.json(
-      { success: false, message: err.message || 'خطای داخلی در ثبت فاکتور سفارش' },
+      { success: false, message: err?.message || 'خطای غیرمنتظره در سرور', stack: err?.stack },
       { status: 500 }
     );
   }

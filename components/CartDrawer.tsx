@@ -250,8 +250,10 @@ export default function CartDrawer() {
         setIsCartOpen(false);
         router.push(`/track-order?orderId=${newOrder.id}&success=true`);
       }
-    } catch {
-      alert("خطا در ثبت سفارش. لطفاً ارتباط اینترنت را بررسی و مجدداً تلاش کنید.");
+    } catch (err: any) {
+      const errorMsg = err?.message || "خطا در ثبت سفارش. لطفاً ارتباط اینترنت را بررسی و مجدداً تلاش کنید.";
+      setValidationError(errorMsg);
+      alert(errorMsg);
     } finally {
       setSubmitting(false);
     }

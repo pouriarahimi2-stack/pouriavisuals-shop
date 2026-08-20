@@ -19,7 +19,6 @@ export interface Order {
 const LOCAL_ORDERS_KEY = 'PV_LOCAL_ORDERS_V1';
 
 export const orderService = {
-  // ثبت سفارش با اعتبارسنجی سروری و همگام‌سازی فوری
   async createOrder(payload: CreateOrderInput): Promise<{ success: boolean; orderId?: string; error?: string }> {
     try {
       const serverResult = await createOrderServer(payload);
@@ -28,13 +27,11 @@ export const orderService = {
       }
       return { success: false, error: serverResult.error };
     } catch {
-      // ثبت در کش محلی در شرایط قطعی ارتباط برای جلوگیری از پرش اطلاعات کاربر
       const fallbackId = `ORD-LOCAL-${Date.now()}`;
       return { success: true, orderId: fallbackId };
     }
   },
 
-  // واکشی لیست تمام سفارشات برای پنل ادمین
   async getOrders(): Promise<Order[]> {
     try {
       const { data, error } = await supabase
@@ -45,12 +42,19 @@ export const orderService = {
       if (error || !data) throw error;
       return data as Order[];
     } catch {
-      const local = localStorage.getItem(LOCAL_ORDERS_KEY);
+      const local = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_ORDERS_KEY) : null;
       return local ? JSON.parse(local) : [];
     }
   },
 
-  // استعلام سفارش با شناسه یا شماره موبایل (برای صفحه پیگیری سفارش)
+  async getAll(): Promise<Order[]> {
+    return this.getOrders();
+  },
+
+  async fetchOrders(): Promise<Order[]> {
+    return this.getOrders();
+  },
+
   async getOrderById(orderId: string): Promise<Order | null> {
     try {
       const { data, error } = await supabase
@@ -66,7 +70,6 @@ export const orderService = {
     }
   },
 
-  // به‌روزرسانی وضعیت سفارش از پنل ادمین با اعمال آنی (Optimistic UI)
   async updateStatus(orderId: string, status: Order['status'], trackingCode?: string): Promise<boolean> {
     try {
       const payload: Record<string, any> = { status, updated_at: new Date().toISOString() };
@@ -81,5 +84,20 @@ export const orderService = {
     } catch {
       return false;
     }
+  },
+
+  async update(id: string, payload: any) {
+    return this.updateStatus(id, payload.status, payload.tracking_code);
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('orders').delete().eq('id', id);
+      return !error;
+    } catch {
+      return false;
+    }
   }
 };
+
+export default orderService;

@@ -1,122 +1,142 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabase';
 
 export interface SiteInfo {
   id?: string;
-  site_name: string;
+  site_name?: string;
+  siteName?: string;
   tagline?: string;
   description?: string;
-  phone: string;
-  email: string;
-  address: string;
-  logo?: string;
-  allowGoogleIndex?: boolean;
-  socials?: {
-    instagram?: string;
-    telegram?: string;
-    whatsapp?: string;
-    youtube?: string;
-  };
+  logo_url?: string;
+  logoUrl?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  instagram?: string;
+  telegram?: string;
+  whatsapp?: string;
+  header_announcement?: string;
+  headerAnnouncement?: string;
+  footer_text?: string;
+  footerText?: string;
+  [key: string]: any;
 }
 
-const LOCAL_STORAGE_KEY = "site_global_info";
+const LOCAL_KEY = 'PV_SITE_INFO_CACHE_V2';
 
 export const siteInfoService = {
-  async getAll(): Promise<SiteInfo> {
+  // دریافت اطلاعات سایت از جدول site_info
+  async getSiteInfo(): Promise<SiteInfo> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("site_info")
-          .select("*")
+      const { data, error } = await supabase
+        .from('site_info')
+        .select('*')
+        .eq('id', 'default_info')
+        .maybeSingle();
+
+      if (error || !data) {
+        const { data: firstRow } = await supabase
+          .from('site_info')
+          .select('*')
           .limit(1)
-          .single();
+          .maybeSingle();
 
-        if (!error && data) {
-          const mapped: SiteInfo = {
-            id: data.id,
-            site_name: data.site_name || data.siteName,
-            tagline: data.tagline,
-            description: data.description,
-            phone: data.phone,
-            email: data.email,
-            address: data.address,
-            logo: data.logo,
-            allowGoogleIndex: data.allow_google_index ?? data.allowGoogleIndex ?? true,
-            socials: typeof data.socials === "string" ? JSON.parse(data.socials) : data.socials,
-          };
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
-          return mapped;
+        if (firstRow) {
+          const formatted = this.formatData(firstRow);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
+          }
+          return formatted;
         }
       }
 
-      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (data) {
+        const formatted = this.formatData(data);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
+        }
+        return formatted;
+      }
+    } catch {
+      // استفاده از کش در زمان نبود اینترنت
+    }
+
+    if (typeof window !== 'undefined') {
+      const local = localStorage.getItem(LOCAL_KEY);
       if (local) return JSON.parse(local);
-
-      // اطلاعات پیش‌فرض برند
-      const defaults: SiteInfo = {
-        site_name: "پوریا ویژوالز",
-        tagline: "مرجع تخصصی تجهیزات تصویر و دیجیتال",
-        description: "ارائه‌دهنده تخصصی تجهیزات مانیتورینگ، ابزارهای تدوین و سخت‌افزارهای مدرن بصری با گارانتی اصالت کالا.",
-        phone: "۰۲۱-۸۸۸۸۸۸۸۸",
-        email: "info@pouriavisuals.ir",
-        address: "تهران، خیابان ولیعصر",
-        allowGoogleIndex: true,
-        socials: {
-          instagram: "https://instagram.com",
-          telegram: "https://t.me",
-        },
-      };
-      return defaults;
-    } catch (e) {
-      console.error("Error loading site info:", e);
-      return {
-        site_name: "پوریا ویژوالز",
-        phone: "۰۲۱-۸۸۸۸۸۸۸۸",
-        email: "info@pouriavisuals.ir",
-        address: "تهران، خیابان ولیعصر",
-        allowGoogleIndex: true,
-      };
     }
+
+    return {
+      id: 'default_info',
+      site_name: '',
+      siteName: '',
+      tagline: '',
+      description: '',
+    };
   },
 
-  async update(info: SiteInfo): Promise<boolean> {
+  async get(): Promise<SiteInfo> {
+    return this.getSiteInfo();
+  },
+
+  async getAll(): Promise<SiteInfo[]> {
+    const info = await this.getSiteInfo();
+    return [info];
+  },
+
+  // ذخیره دائمی مشخصات در دیتابیس Supabase
+  async updateSiteInfo(info: Partial<SiteInfo>): Promise<{ success: boolean; data?: SiteInfo; error?: string }> {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(info));
+      const payload: Record<string, any> = {
+        id: 'default_info',
+        site_name: info.site_name || info.siteName || '',
+        tagline: info.tagline || '',
+        logo_url: info.logo_url || info.logoUrl || null,
+        phone: info.phone || null,
+      };
 
-      if (supabase) {
-        const payload = {
-          site_name: info.site_name,
-          tagline: info.tagline,
-          description: info.description,
-          phone: info.phone,
-          email: info.email,
-          address: info.address,
-          logo: info.logo,
-          allow_google_index: info.allowGoogleIndex,
-          socials: info.socials,
-        };
+      if (info.description !== undefined || info.about !== undefined) {
+        payload.description = info.description || info.about || '';
+      }
+      if (info.email !== undefined) payload.email = info.email || null;
+      if (info.address !== undefined) payload.address = info.address || null;
+      if (info.instagram !== undefined) payload.instagram = info.instagram || null;
+      if (info.telegram !== undefined) payload.telegram = info.telegram || null;
+      if (info.whatsapp !== undefined) payload.whatsapp = info.whatsapp || null;
 
-        const { data } = await supabase.from("site_info").select("id").limit(1);
-        if (data && data.length > 0) {
-          await supabase.from("site_info").update(payload).eq("id", data[0].id);
-        } else {
-          await supabase.from("site_info").insert([payload]);
-        }
+      const { data, error } = await supabase
+        .from('site_info')
+        .upsert(payload, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const formatted = this.formatData(data);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
       }
 
-      // انتشار رویداد بلادرنگ
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("site_info_updated", { detail: info }));
-        if ("BroadcastChannel" in window) {
-          const channel = new BroadcastChannel("site_info_sync_channel");
-          channel.postMessage({ type: "SYNC_SITE_INFO", data: info });
-          channel.close();
-        }
-      }
-
-      return true;
-    } catch (e) {
-      console.error("Error saving site info:", e);
-      return false;
+      return { success: true, data: formatted };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'خطا در ذخیره اطلاعات سایت' };
     }
   },
+
+  async update(info: Partial<SiteInfo>) {
+    return this.updateSiteInfo(info);
+  },
+
+  formatData(data: any): SiteInfo {
+    if (!data) return {};
+    return {
+      ...data,
+      siteName: data.site_name || data.siteName || '',
+      tagline: data.tagline || '',
+      logoUrl: data.logo_url || data.logoUrl || '',
+      headerAnnouncement: data.header_announcement || data.headerAnnouncement || '',
+      footerText: data.footer_text || data.footerText || '',
+    };
+  }
 };
+
+export default siteInfoService;

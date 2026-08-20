@@ -1,156 +1,81 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabase';
 
 export interface Coupon {
   id: string;
   code: string;
-  type: "percent" | "fixed";
-  value: number;
+  discount_percent?: number;
+  discount_amount?: number;
   min_order_amount?: number;
   max_discount_amount?: number;
+  expires_at?: string;
+  is_active: boolean;
   usage_limit?: number;
   used_count?: number;
-  is_active: boolean;
-  expires_at?: string;
   created_at?: string;
 }
 
-const LOCAL_STORAGE_KEY = "site_coupons";
-
 export const couponService = {
-  async getAll(): Promise<Coupon[]> {
+  async getCoupons(): Promise<Coupon[]> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("coupons")
-          .select("*")
-          .order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        if (!error && data) {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-          return data;
-        }
-      }
-
-      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (local) return JSON.parse(local);
-
-      // کوپن‌های اولیه پیش‌فرض
-      const defaults: Coupon[] = [
-        {
-          id: "coup_welcome",
-          code: "WELCOME10",
-          type: "percent",
-          value: 10,
-          min_order_amount: 100000,
-          max_discount_amount: 500000,
-          usage_limit: 100,
-          used_count: 0,
-          is_active: true,
-          created_at: new Date().toISOString(),
-        },
-      ];
-      return defaults;
-    } catch (e) {
-      console.error("Error loading coupons:", e);
+      if (error || !data) return [];
+      return data as Coupon[];
+    } catch {
       return [];
     }
   },
 
-  async create(coupon: Omit<Coupon, "id" | "used_count" | "created_at">): Promise<Coupon | null> {
-    const newCoupon: Coupon = {
-      id: `coup_${Date.now()}`,
-      used_count: 0,
-      created_at: new Date().toISOString(),
-      ...coupon,
-      code: coupon.code.toUpperCase().trim(),
-    };
+  async getAll(): Promise<Coupon[]> {
+    return this.getCoupons();
+  },
 
+  async saveCoupon(coupon: Partial<Coupon>): Promise<{ success: boolean; data?: Coupon }> {
     try {
-      const all = await this.getAll();
-      const updated = [newCoupon, ...all];
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+      if (coupon.id && !coupon.id.startsWith('temp-')) {
+        const { data, error } = await supabase
+          .from('coupons')
+          .update(coupon)
+          .eq('id', coupon.id)
+          .select()
+          .single();
 
-      if (supabase) {
-        await supabase.from("coupons").insert([newCoupon]);
+        if (error) throw error;
+        return { success: true, data };
+      } else {
+        const { data, error } = await supabase
+          .from('coupons')
+          .insert(coupon)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { success: true, data };
       }
-
-      this.broadcast(updated);
-      return newCoupon;
-    } catch (e) {
-      console.error("Error creating coupon:", e);
-      return null;
+    } catch {
+      return { success: false };
     }
   },
 
-  async update(id: string, updates: Partial<Coupon>): Promise<boolean> {
-    try {
-      const all = await this.getAll();
-      const updated = all.map((c) => (c.id === id ? { ...c, ...updates } : c));
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+  async create(coupon: Partial<Coupon>) {
+    return this.saveCoupon(coupon);
+  },
 
-      if (supabase) {
-        await supabase.from("coupons").update(updates).eq("id", id);
-      }
-
-      this.broadcast(updated);
-      return true;
-    } catch (e) {
-      console.error("Error updating coupon:", e);
-      return false;
-    }
+  async update(id: string, coupon: Partial<Coupon>) {
+    return this.saveCoupon({ ...coupon, id });
   },
 
   async delete(id: string): Promise<boolean> {
     try {
-      const all = await this.getAll();
-      const updated = all.filter((c) => c.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-
-      if (supabase) {
-        await supabase.from("coupons").delete().eq("id", id);
-      }
-
-      this.broadcast(updated);
-      return true;
-    } catch (e) {
-      console.error("Error deleting coupon:", e);
+      const { error } = await supabase.from('coupons').delete().eq('id', id);
+      return !error;
+    } catch {
       return false;
     }
-  },
-
-  async validate(code: string, currentTotal: number): Promise<Coupon | null> {
-    const all = await this.getAll();
-    const cleanCode = code.toUpperCase().trim();
-    const found = all.find((c) => c.code === cleanCode && c.is_active !== false);
-
-    if (!found) return null;
-
-    // بررسی تاریخ انقضا
-    if (found.expires_at && new Date(found.expires_at) < new Date()) {
-      return null;
-    }
-
-    // بررسی سقف تعداد استفاده
-    if (found.usage_limit && (found.used_count || 0) >= found.usage_limit) {
-      return null;
-    }
-
-    // بررسی حداقل مبلغ سفارش
-    if (found.min_order_amount && currentTotal < found.min_order_amount) {
-      return null;
-    }
-
-    return found;
-  },
-
-  broadcast(coupons: Coupon[]) {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("coupons_updated", { detail: coupons }));
-      if ("BroadcastChannel" in window) {
-        const channel = new BroadcastChannel("coupons_sync_channel");
-        channel.postMessage({ type: "SYNC_COUPONS", data: coupons });
-        channel.close();
-      }
-    }
-  },
+  }
 };
+
+export default couponService;

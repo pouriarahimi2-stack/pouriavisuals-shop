@@ -7,27 +7,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const orderId = body.id || `ORD-${Date.now().toString().slice(-6)}`;
 
+    // فیلدهای دقیق و منطبق با جدول Supabase
     const orderPayload = {
       id: orderId,
-      customer_name: body.customerName || body.customer_name || 'مشتری',
-      customerName: body.customerName || body.customer_name || 'مشتری',
-      phone: body.phone,
-      address: body.address,
+      customer_name: (body.customerName || body.customer_name || 'مشتری').trim(),
+      phone: (body.phone || '').trim(),
+      address: (body.address || '').trim(),
       postal_code: body.postalCode || body.postal_code || null,
-      postalCode: body.postalCode || body.postal_code || null,
       items: body.items || [],
       total_amount: Number(body.totalAmount || body.total_amount || 0),
-      totalAmount: Number(body.totalAmount || body.total_amount || 0),
       discount_amount: Number(body.discountAmount || body.discount_amount || 0),
-      discountAmount: Number(body.discountAmount || body.discount_amount || 0),
       coupon_code: body.couponCode || body.coupon_code || null,
-      couponCode: body.couponCode || body.coupon_code || null,
       status: body.status || 'processing',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    // ۱. ثبت در دیتابیس Supabase
+    // ۱. درج سفارش در جدول orders
     const { data, error } = await supabaseAdmin
       .from('orders')
       .upsert(orderPayload, { onConflict: 'id' })
@@ -35,40 +31,52 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Database order insertion error:', error);
-      throw error;
+      console.error('Supabase orders table error:', error);
+      throw new Error(error.message);
     }
 
-    // ۲. کسر هوشمند موجودی انبار محصولات
+    // ۲. کسر موجودی انبار
     if (Array.isArray(body.items)) {
       for (const item of body.items) {
         const prodId = item.productId || item.id;
         if (prodId) {
-          const { data: prod } = await supabaseAdmin
-            .from('products')
-            .select('stock')
-            .eq('id', prodId)
-            .maybeSingle();
-
-          if (prod) {
-            const currentStock = Number(prod.stock || 0);
-            const newStock = Math.max(0, currentStock - Number(item.quantity || 1));
-            await supabaseAdmin
+          try {
+            const { data: prod } = await supabaseAdmin
               .from('products')
-              .update({ stock: newStock, is_available: newStock > 0 })
-              .eq('id', prodId);
+              .select('stock')
+              .eq('id', prodId)
+              .maybeSingle();
+
+            if (prod && prod.stock !== null && prod.stock !== undefined) {
+              const currentStock = Number(prod.stock);
+              const newStock = Math.max(0, currentStock - Number(item.quantity || 1));
+              await supabaseAdmin
+                .from('products')
+                .update({ stock: newStock, is_available: newStock > 0 })
+                .eq('id', prodId);
+            }
+          } catch (e) {
+            console.error('Stock decrement warning:', e);
           }
         }
       }
     }
 
-    // ۳. ارسال پیامک وضعیت سفارش
-    if (body.phone) {
-      smsService.sendOrderStatusChange(body.phone, orderId, 'در حال پردازش و انبارداری').catch(() => {});
+    // ۳. ارسال پیامک تایید سفارش به خریدار
+    if (orderPayload.phone) {
+      try {
+        await smsService.sendOrderStatusChange(orderPayload.phone, orderId, 'در حال پردازش و انبارداری');
+      } catch (smsErr) {
+        console.error('SMS sending warning:', smsErr);
+      }
     }
 
     return NextResponse.json({ success: true, data: data || orderPayload });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || 'خطا در ثبت فاکتور سفارش' }, { status: 500 });
+    console.error('API /api/orders error:', err);
+    return NextResponse.json(
+      { success: false, message: err.message || 'خطای داخلی در ثبت فاکتور سفارش' },
+      { status: 500 }
+    );
   }
 }

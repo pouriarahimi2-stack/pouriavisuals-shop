@@ -43,7 +43,7 @@ export default function CartDrawer() {
   const router = useRouter();
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, totalPrice } = useCart();
 
-  // فیلدهای مشخصات خریدار
+  // فیلدهای اطلاعات خریدار
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [selectedProvince, setSelectedProvince] = useState("فارس");
@@ -63,10 +63,10 @@ export default function CartDrawer() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // محاسبه زنده تعداد کل اقلام موجود در سبد (بر اساس مجموع quantity)
+  // محاسبه زنده تعداد کل اقلام موجود در سبد خرید
   const totalItemUnits = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
-  // بررسی وجود کوپن فعال در سیستم برای نمایش یا عدم نمایش باکس تخفیف
+  // بررسی وجود کوپن فعال برای نمایش یا پنهان‌سازی باکس تخفیف
   useEffect(() => {
     async function checkCoupons() {
       try {
@@ -82,7 +82,7 @@ export default function CartDrawer() {
     }
   }, [isCartOpen]);
 
-  // مدیریت تغییر استان و تنظیم پیش‌فرض شهر اول
+  // مدیریت تغییر استان و تنظیم شهر اول
   const handleProvinceChange = (provName: string) => {
     setSelectedProvince(provName);
     const prov = IRAN_PROVINCES.find((p) => p.name === provName);
@@ -93,7 +93,7 @@ export default function CartDrawer() {
 
   if (!isCartOpen) return null;
 
-  // افزایش تعداد با چک کردن سقف موجودی انبار
+  // افزایش تعداد با بررسی سقف موجودی انبار
   const handleIncreaseQuantity = (item: any) => {
     const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
     if (item.quantity >= currentStock) {
@@ -107,7 +107,7 @@ export default function CartDrawer() {
     updateQuantity(item.id, -1);
   };
 
-  // اعمال هوشمند کوپن تخفیف با چک کردن دسته‌بندی و محصول
+  // بررسی و اعمال کوپن تخفیف
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
     setCouponMsg(null);
@@ -122,7 +122,6 @@ export default function CartDrawer() {
         return;
       }
 
-      // چک کردن حداقل مبلغ خرید
       if (matched.min_order_amount && totalPrice < matched.min_order_amount) {
         setCouponMsg({
           type: "error",
@@ -131,13 +130,11 @@ export default function CartDrawer() {
         return;
       }
 
-      // چک کردن تاریخ انقضا
       if (matched.expires_at && new Date(matched.expires_at) < new Date()) {
         setCouponMsg({ type: "error", text: "مهلت استفاده از این کد تخفیف به پایان رسیده است." });
         return;
       }
 
-      // محاسبه تخفیف
       let calculatedDiscount = 0;
       if (matched.discount_type === "percent") {
         calculatedDiscount = (totalPrice * matched.discount_value) / 100;
@@ -153,15 +150,16 @@ export default function CartDrawer() {
       setAppliedCoupon(codeClean);
       setCouponMsg({
         type: "success",
-        text: `کد تخفیف با موفقیت اعمال شد (${calculatedDiscount.toLocaleString("fa-IR")} تومان تخفیف).`,
+        text: `کد تخفیف اعمال شد (${calculatedDiscount.toLocaleString("fa-IR")} تومان کسر گردید).`,
       });
     } catch {
-      setCouponMsg({ type: "error", text: "خطا در ارزیابی کد تخفیف." });
+      setCouponMsg({ type: "error", text: "خطا در بررسی کد تخفیف." });
     }
   };
 
   const finalPayable = Math.max(0, totalPrice - discountAmount);
 
+  // ثبت نهایی سفارش بدون هیچ فراخوانی مستقیم در مرورگر
   const handleFinalCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
@@ -197,14 +195,13 @@ export default function CartDrawer() {
 
     if (cartItems.length === 0) return;
 
-    // ساخت آدرس استاندارد یکپارچه
     const fullConstructedAddress = `استان ${selectedProvince}، شهر ${selectedCity}، ${streetAddress.trim()}، پلاک ${buildingNo.trim()}${
       unitNo.trim() ? `، واحد ${unitNo.trim()}` : ""
     }${floorNo.trim() ? `، طبقه ${floorNo.trim()}` : ""}`;
 
     setSubmitting(true);
     try {
-      // ذخیره سفارش، کسر خودکار انبار و ارسال پیامک از طریق روت امن سروری
+      // فقط یک درخواست امن به روت سروری که دیتابیس، کسر انبار و پیامک را در سرور اجرا می‌کند
       const newOrder = await orderService.create({
         customerName: customerName.trim(),
         phone: cleanPhone,
@@ -231,7 +228,7 @@ export default function CartDrawer() {
         throw new Error("پاسخی از سرور دریافت نشد.");
       }
     } catch (err: any) {
-      const errorMsg = err?.message || "خطا در ثبت سفارش. لطفاً ارتباط اینترنت را بررسی و مجدداً تلاش کنید.";
+      const errorMsg = err?.message || "خطا در ثبت سفارش. لطفاً مجدداً تلاش کنید.";
       setValidationError(errorMsg);
       alert(errorMsg);
     } finally {
@@ -245,7 +242,7 @@ export default function CartDrawer() {
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md font-sans select-none animate-fadeIn" dir="rtl">
       <div className="w-full max-w-lg bg-[var(--modal-bg)] border-r border-[var(--card-border)] h-full shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)]">
         
-        {/* هدر دراور */}
+        {/* هدر کشو */}
         <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between">
           <button
             onClick={() => setIsCartOpen(false)}
@@ -263,7 +260,7 @@ export default function CartDrawer() {
           </div>
         </div>
 
-        {/* بدنه و اسکرول سبد خرید */}
+        {/* لیست محصولات و فرم دریافت اطلاعات */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
           {cartItems.length === 0 ? (
             <div className="py-28 text-center text-[var(--text-secondary)] space-y-2 font-bold">
@@ -272,7 +269,7 @@ export default function CartDrawer() {
             </div>
           ) : (
             <>
-              {/* لیست کارت‌های محصولات */}
+              {/* لیست کالاها */}
               <div className="space-y-3">
                 {cartItems.map((item: any) => {
                   const stockLimit = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
@@ -283,7 +280,6 @@ export default function CartDrawer() {
                       key={item.id}
                       className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm"
                     >
-                      {/* دکمه حذف و کنترل تعداد */}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => removeFromCart(item.id)}
@@ -316,7 +312,6 @@ export default function CartDrawer() {
                         </div>
                       </div>
 
-                      {/* مشخصات کالا */}
                       <div className="flex items-center gap-3 text-left">
                         <div>
                           <h4 className="font-black text-xs text-[var(--text-primary)] line-clamp-1 text-right" dir="rtl">
@@ -345,7 +340,7 @@ export default function CartDrawer() {
                 })}
               </div>
 
-              {/* باکس کد تخفیف */}
+              {/* باکس کد تخفیف هوشمند */}
               {activeCouponsExist && (
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                   <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
@@ -373,7 +368,7 @@ export default function CartDrawer() {
                 </div>
               )}
 
-              {/* فرم مشخصات و نشانی */}
+              {/* فرم مشخصات دریافت‌کننده و نشانی پستی */}
               <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
                 <div className="flex items-center gap-1.5 font-black text-xs text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
                   <span>📋</span>
@@ -510,7 +505,7 @@ export default function CartDrawer() {
           )}
         </div>
 
-        {/* فوتر مبالغ و دکمه پرداخت */}
+        {/* فوتر سبد و دکمه صدور فاکتور */}
         {cartItems.length > 0 && (
           <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs">
             <div className="space-y-1.5 font-bold">

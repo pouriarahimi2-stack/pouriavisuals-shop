@@ -1,11 +1,12 @@
-import "./globals.css";
-import React from "react";
-import ThemeProvider from "@/components/ThemeProvider";
-import { CartProvider } from "@/context/CartContext";
-import LayoutShell from "@/components/LayoutShell";
-import ClientLayoutEnhancer from "@/components/ClientLayoutEnhancer";
+import type { Metadata } from 'next';
+import './globals.css';
+import { CartProvider } from '@/context/CartContext';
+import LayoutWrapper from '@/components/LayoutWrapper';
 
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: 'Axon | فروشگاه تخصصی تجهیزات دیجیتال',
+  description: 'مرجع تخصصی فروش، مشاوره و تجهیزات استودیویی و پردازش تصویر',
+};
 
 export default function RootLayout({
   children,
@@ -13,18 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-      </head>
-      <body className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 font-sans antialiased">
-        <ThemeProvider>
-          <CartProvider>
-            <ClientLayoutEnhancer />
-            <LayoutShell>{children}</LayoutShell>
-          </CartProvider>
-        </ThemeProvider>
+    <html lang="fa" dir="rtl" className="dark">
+      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between">
+        <CartProvider>
+          <LayoutWrapper>{children}</LayoutWrapper>
+        </CartProvider>
       </body>
     </html>
   );

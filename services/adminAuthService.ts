@@ -15,7 +15,7 @@ export const adminAuthService = {
   // ورود ادمین و ایجاد کوکی ایمن سروری
   async login(username: string, passCode: string): Promise<{ success: boolean; user?: AdminUser; error?: string }> {
     try {
-      const res = await fetch('/app/api/admin/login', {
+      const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password: passCode.trim() }),
@@ -28,17 +28,6 @@ export const adminAuthService = {
 
       return { success: true, user: data.user };
     } catch {
-      // فالبک برای محیط توسعه در صورت عدم دسترسی سرور
-      const isDevFallback = username === 'admin' && passCode === 'admin123';
-      if (isDevFallback) {
-        const fallbackUser: AdminUser = {
-          id: 'dev-admin',
-          username: 'admin',
-          role: 'superadmin',
-          full_name: 'مدیر اصلی سیستم',
-        };
-        return { success: true, user: fallbackUser };
-      }
       return { success: false, error: 'خطا در برقراری ارتباط با سرور احراز هویت.' };
     }
   },
@@ -46,7 +35,7 @@ export const adminAuthService = {
   // خروج از حساب و پاک‌سازی سشن
   async logout(): Promise<void> {
     try {
-      await fetch('/app/api/admin/logout', { method: 'POST' });
+      await fetch('/api/admin/logout', { method: 'POST' });
     } finally {
       document.cookie = `${SESSION_COOKIE_NAME}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
       window.location.href = '/admin/login';
@@ -56,7 +45,7 @@ export const adminAuthService = {
   // استعلام وضعیت سشن فعلی از روی سرور
   async getCurrentSession(): Promise<AdminUser | null> {
     try {
-      const res = await fetch('/app/api/admin/session', { cache: 'no-store' });
+      const res = await fetch('/api/admin/session', { cache: 'no-store' });
       if (!res.ok) return null;
       const data = await res.json();
       return data.user || null;
@@ -65,7 +54,6 @@ export const adminAuthService = {
     }
   },
 
-  // بررسی سطح دسترسی نقش‌ها
   hasPermission(role: AdminUser['role'], requiredRole: AdminUser['role'][]): boolean {
     if (role === 'superadmin') return true;
     return requiredRole.includes(role);

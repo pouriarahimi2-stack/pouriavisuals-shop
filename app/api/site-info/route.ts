@@ -1,89 +1,77 @@
-import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
-
-// حافظه موقت پایدار در صورت در دسترس نبودن موقت دیتابیس
-let memorySiteInfo = {
-  storeName: "Tech Store",
-  siteTitle: "فروشگاه تخصصی محصولات دیجیتال",
-  phone: "09120000000",
-  email: "info@pouriavisuals.ir",
-  address: "تهران، ایران",
-  description: "فروشگاه تخصصی محصولات حوزه تکنولوژی",
-  logoUrl: "",
-  instagram: "",
-  telegram: "",
-  whatsapp: "",
-  allowGoogleIndex: true,
-};
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export async function GET() {
   try {
-    if (supabaseServer) {
-      const { data, error } = await supabaseServer
-        .from("site_info")
-        .select("*")
-        .limit(1)
-        .maybeSingle();
+    const { data, error } = await supabaseAdmin
+      .from('site_info')
+      .select('*')
+      .eq('id', 'default_info')
+      .maybeSingle();
 
-      if (!error && data) {
-        return NextResponse.json({
-          storeName: data.site_name || data.storeName || data.name || memorySiteInfo.storeName,
-          siteTitle: data.site_title || data.siteTitle || data.title || memorySiteInfo.siteTitle,
-          description: data.description || data.aboutText || memorySiteInfo.description,
-          phone: data.phone || data.supportPhone || memorySiteInfo.phone,
-          email: data.email || data.supportEmail || memorySiteInfo.email,
-          address: data.address || memorySiteInfo.address,
-          logoUrl: data.logo_url || data.logoUrl || memorySiteInfo.logoUrl,
-          instagram: data.instagram || memorySiteInfo.instagram,
-          telegram: data.telegram || memorySiteInfo.telegram,
-          whatsapp: data.whatsapp || memorySiteInfo.whatsapp,
-          allowGoogleIndex: data.allow_google_index !== undefined ? data.allow_google_index : true,
-        });
-      }
+    if (error || !data) {
+      const { data: anyRow } = await supabaseAdmin.from('site_info').select('*').limit(1).maybeSingle();
+      return NextResponse.json({ success: true, data: anyRow || {} });
     }
-  } catch (e) {
-    console.error("API GET site-info error:", e);
-  }
 
-  return NextResponse.json(memorySiteInfo);
+    return NextResponse.json({ success: true, data });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    
-    // به‌روزرسانی حافظه سرور
-    memorySiteInfo = { ...memorySiteInfo, ...body };
 
-    if (supabaseServer) {
-      const { data: rows } = await supabaseServer.from("site_info").select("id").limit(1);
+    // فیلتر کردن دقیق ستون‌هایی که در جدول site_info سوپابیس وجود دارند
+    const cleanPayload: Record<string, any> = {
+      id: 'default_info',
+      site_name: body.site_name || body.siteName || '',
+      tagline: body.tagline || '',
+      logo_url: body.logo_url || body.logoUrl || null,
+      phone: body.phone || null,
+    };
 
-      const dbPayload: Record<string, any> = {
-        site_name: body.storeName || body.site_name,
-        site_title: body.siteTitle || body.site_title,
-        description: body.aboutText || body.description,
-        phone: body.phone,
-        email: body.email,
-        address: body.address,
-        instagram: body.instagram,
-        telegram: body.telegram,
-        whatsapp: body.whatsapp,
+    // در صورتی که ستون‌های دیگر وجود داشته باشند
+    if (body.description !== undefined) cleanPayload.description = body.description;
+    if (body.email !== undefined) cleanPayload.email = body.email;
+    if (body.address !== undefined) cleanPayload.address = body.address;
+    if (body.instagram !== undefined) cleanPayload.instagram = body.instagram;
+    if (body.telegram !== undefined) cleanPayload.telegram = body.telegram;
+    if (body.whatsapp !== undefined) cleanPayload.whatsapp = body.whatsapp;
+
+    // تلاش برای ذخیره امن
+    let { data, error } = await supabaseAdmin
+      .from('site_info')
+      .upsert(cleanPayload, { onConflict: 'id' })
+      .select()
+      .maybeSingle();
+
+    // اگر دیتابیس ستون‌های اضافی را قبول نکرد، فقط ستون‌های اصلی را ذخیره کن
+    if (error) {
+      const minimalPayload = {
+        id: 'default_info',
+        site_name: cleanPayload.site_name,
+        tagline: cleanPayload.tagline,
+        logo_url: cleanPayload.logo_url,
+        phone: cleanPayload.phone,
       };
 
-      if (body.logoUrl && !body.logoUrl.startsWith("data:image/")) {
-        dbPayload.logo_url = body.logoUrl;
-      }
+      const retry = await supabaseAdmin
+        .from('site_info')
+        .upsert(minimalPayload, { onConflict: 'id' })
+        .select()
+        .maybeSingle();
 
-      if (rows && rows.length > 0) {
-        await supabaseServer.from("site_info").update(dbPayload).eq("id", rows[0].id);
-      } else {
-        await supabaseServer.from("site_info").insert([dbPayload]);
+      if (retry.error) {
+        return NextResponse.json({ success: false, message: retry.error.message }, { status: 400 });
       }
+      data = retry.data;
     }
 
-    return NextResponse.json({ success: true, data: memorySiteInfo });
+    return NextResponse.json({ success: true, data });
   } catch (err: any) {
-    console.error("API POST site-info error:", err);
-    return NextResponse.json({ success: true, data: memorySiteInfo });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

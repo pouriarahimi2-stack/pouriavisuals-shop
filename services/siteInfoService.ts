@@ -1,5 +1,3 @@
-import { supabase } from '@/lib/supabase';
-
 export interface SiteInfo {
   id?: string;
   site_name?: string;
@@ -24,40 +22,21 @@ export interface SiteInfo {
 const LOCAL_KEY = 'PV_SITE_INFO_CACHE_V2';
 
 export const siteInfoService = {
-  // دریافت اطلاعات سایت از جدول site_info
   async getSiteInfo(): Promise<SiteInfo> {
     try {
-      const { data, error } = await supabase
-        .from('site_info')
-        .select('*')
-        .eq('id', 'default_info')
-        .maybeSingle();
-
-      if (error || !data) {
-        const { data: firstRow } = await supabase
-          .from('site_info')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
-
-        if (firstRow) {
-          const formatted = this.formatData(firstRow);
+      const res = await fetch('/api/site-info', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          const formatted = this.formatData(json.data);
           if (typeof window !== 'undefined') {
             localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
           }
           return formatted;
         }
       }
-
-      if (data) {
-        const formatted = this.formatData(data);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
-        }
-        return formatted;
-      }
     } catch {
-      // استفاده از کش در زمان نبود اینترنت
+      // استفاده از کش
     }
 
     if (typeof window !== 'undefined') {
@@ -83,42 +62,27 @@ export const siteInfoService = {
     return [info];
   },
 
-  // ذخیره دائمی مشخصات در دیتابیس Supabase
   async updateSiteInfo(info: Partial<SiteInfo>): Promise<{ success: boolean; data?: SiteInfo; error?: string }> {
     try {
-      const payload: Record<string, any> = {
-        id: 'default_info',
-        site_name: info.site_name || info.siteName || '',
-        tagline: info.tagline || '',
-        logo_url: info.logo_url || info.logoUrl || null,
-        phone: info.phone || null,
-      };
+      const res = await fetch('/api/site-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(info),
+      });
 
-      if (info.description !== undefined || info.about !== undefined) {
-        payload.description = info.description || info.about || '';
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        return { success: false, error: json.message || 'خطا در ذخیره سازی' };
       }
-      if (info.email !== undefined) payload.email = info.email || null;
-      if (info.address !== undefined) payload.address = info.address || null;
-      if (info.instagram !== undefined) payload.instagram = info.instagram || null;
-      if (info.telegram !== undefined) payload.telegram = info.telegram || null;
-      if (info.whatsapp !== undefined) payload.whatsapp = info.whatsapp || null;
 
-      const { data, error } = await supabase
-        .from('site_info')
-        .upsert(payload, { onConflict: 'id' })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const formatted = this.formatData(data);
+      const formatted = this.formatData(json.data);
       if (typeof window !== 'undefined') {
         localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
       }
 
       return { success: true, data: formatted };
     } catch (err: any) {
-      return { success: false, error: err.message || 'خطا در ذخیره اطلاعات سایت' };
+      return { success: false, error: err.message || 'خطای شبکه' };
     }
   },
 

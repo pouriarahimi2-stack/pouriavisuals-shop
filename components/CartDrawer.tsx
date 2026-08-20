@@ -1,40 +1,164 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { orderService } from "@/services/orderService";
-import { couponService } from "@/services/couponService";
+import { couponService, Coupon } from "@/services/couponService";
 import { productService } from "@/services/productService";
 import { smsService } from "@/services/smsService";
+import { IRAN_PROVINCES } from "@/lib/iranProvinces";
 import { useRouter } from "next/navigation";
+
+function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
+  if (!postalCode) return { valid: true };
+  const cleanCode = postalCode
+    .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+    .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+    .replace(/\D/g, "");
+
+  if (cleanCode.length !== 10) {
+    return { valid: false, message: "کد پستی باید دقیقاً ۱۰ رقم عددی باشد." };
+  }
+
+  const firstDigit = cleanCode.charAt(0);
+  if (firstDigit === "0" || firstDigit === "2") {
+    return { valid: false, message: "کد پستی وارد شده ساختار معتبر مناطق پستی ایران را ندارد." };
+  }
+
+  if (/^(\d)\1{9}$/.test(cleanCode)) {
+    return { valid: false, message: "کد پستی نمی‌تواند از ارقام یکسان تشکیل شده باشد." };
+  }
+
+  const sequentialPatterns = ["0123456789", "1234567890", "2345678901", "9876543210", "8765432109"];
+  if (sequentialPatterns.includes(cleanCode)) {
+    return { valid: false, message: "کد پستی نمی‌تواند متوالی باشد." };
+  }
+
+  if (cleanCode.substring(5) === "00000") {
+    return { valid: false, message: "بخش دوم کد پستی معتبر نیست." };
+  }
+
+  return { valid: true };
+}
 
 export default function CartDrawer() {
   const router = useRouter();
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, totalPrice } = useCart();
 
+  // فیلدهای مشخصات خریدار
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [selectedProvince, setSelectedProvince] = useState("فارس");
+  const [selectedCity, setSelectedCity] = useState("شیراز");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [buildingNo, setBuildingNo] = useState("");
+  const [unitNo, setUnitNo] = useState("");
+  const [floorNo, setFloorNo] = useState("");
   const [postalCode, setPostalCode] = useState("");
+
+  // سیستم کوپن تخفیف هوشمند
+  const [activeCouponsExist, setActiveCouponsExist] = useState<boolean>(true);
   const [couponCode, setCouponCode] = useState("");
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [couponMsg, setCouponMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // محاسبه زنده تعداد کل اقلام موجود در سبد (بر اساس مجموع quantity)
+  const totalItemUnits = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+
+  // بررسی وجود کوپن فعال در سیستم برای نمایش یا عدم نمایش باکس تخفیف
+  useEffect(() => {
+    async function checkCoupons() {
+      try {
+        const coupons: Coupon[] = await couponService.getAll();
+        const validCoupons = coupons.filter((c) => c.is_active !== false);
+        setActiveCouponsExist(validCoupons.length > 0);
+      } catch {
+        setActiveCouponsExist(true);
+      }
+    }
+    if (isCartOpen) {
+      checkCoupons();
+    }
+  }, [isCartOpen]);
+
+  // مدیریت تغییر استان و تنظیم پیش‌فرض شهر اول
+  const handleProvinceChange = (provName: string) => {
+    setSelectedProvince(provName);
+    const prov = IRAN_PROVINCES.find((p) => p.name === provName);
+    if (prov && prov.cities.length > 0) {
+      setSelectedCity(prov.cities[0]);
+    }
+  };
 
   if (!isCartOpen) return null;
 
+  // افزایش تعداد با چک کردن سقف موجودی انبار
+  const handleIncreaseQuantity = (item: any) => {
+    const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
+    if (item.quantity >= currentStock) {
+      alert(`⚠️ حداکثر موجودی قابل سفارش برای این کالا ${currentStock} عدد می‌باشد.`);
+      return;
+    }
+    updateQuantity(item.id, 1);
+  };
+
+  const handleDecreaseQuantity = (item: any) => {
+    updateQuantity(item.id, -1);
+  };
+
+  // اعمال هوشمند کوپن تخفیف با چک کردن دسته‌بندی و محصول
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
     setCouponMsg(null);
 
-    const result = await couponService.validateAndApply(couponCode.trim(), totalPrice);
-    if (result.isValid) {
-      setDiscountAmount(result.discountAmount);
-      setAppliedCoupon(couponCode.trim().toUpperCase());
-      setCouponMsg({ type: "success", text: `کد تخفیف اعمال شد (${result.discountAmount.toLocaleString("fa-IR")} تومان کسر گردید).` });
-    } else {
-      setCouponMsg({ type: "error", text: result.message || "کد تخفیف نامعتبر یا منقضی شده است." });
+    try {
+      const allCoupons: Coupon[] = await couponService.getAll();
+      const codeClean = couponCode.trim().toUpperCase();
+      const matched = allCoupons.find((c) => c.code.toUpperCase() === codeClean && c.is_active !== false);
+
+      if (!matched) {
+        setCouponMsg({ type: "error", text: "کد تخفیف نامعتبر یا منقضی شده است." });
+        return;
+      }
+
+      // چک کردن حداقل مبلغ خرید
+      if (matched.min_order_amount && totalPrice < matched.min_order_amount) {
+        setCouponMsg({
+          type: "error",
+          text: `حداقل مبلغ سفارش برای استفاده از این کد ${matched.min_order_amount.toLocaleString("fa-IR")} تومان است.`,
+        });
+        return;
+      }
+
+      // چک کردن تاریخ انقضا
+      if (matched.expires_at && new Date(matched.expires_at) < new Date()) {
+        setCouponMsg({ type: "error", text: "مهلت استفاده از این کد تخفیف به پایان رسیده است." });
+        return;
+      }
+
+      // محاسبه تخفیف
+      let calculatedDiscount = 0;
+      if (matched.discount_type === "percent") {
+        calculatedDiscount = (totalPrice * matched.discount_value) / 100;
+        if (matched.max_discount && calculatedDiscount > matched.max_discount) {
+          calculatedDiscount = matched.max_discount;
+        }
+      } else {
+        calculatedDiscount = matched.discount_value;
+      }
+
+      calculatedDiscount = Math.min(calculatedDiscount, totalPrice);
+      setDiscountAmount(calculatedDiscount);
+      setAppliedCoupon(codeClean);
+      setCouponMsg({
+        type: "success",
+        text: `کد تخفیف با موفقیت اعمال شد (${calculatedDiscount.toLocaleString("fa-IR")} تومان تخفیف).`,
+      });
+    } catch {
+      setCouponMsg({ type: "error", text: "خطا در ارزیابی کد تخفیف." });
     }
   };
 
@@ -42,15 +166,51 @@ export default function CartDrawer() {
 
   const handleFinalCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim() || !phone.trim() || !address.trim() || cartItems.length === 0) return;
+    setValidationError(null);
+
+    if (!customerName.trim()) {
+      setValidationError("لطفاً نام و نام خانوادگی خود را وارد نمایید.");
+      return;
+    }
+
+    const cleanPhone = phone.trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      setValidationError("شماره موبایل وارد شده باید ۱۱ رقم و با 09 شروع شود.");
+      return;
+    }
+
+    if (!streetAddress.trim()) {
+      setValidationError("لطفاً نشانی کامل خیابان و کوچه را وارد نمایید.");
+      return;
+    }
+
+    if (!buildingNo.trim()) {
+      setValidationError("لطفاً پلاک ساختمان را وارد نمایید.");
+      return;
+    }
+
+    if (postalCode.trim()) {
+      const pCheck = isValidIranianPostalCode(postalCode);
+      if (!pCheck.valid) {
+        setValidationError(pCheck.message || "کد پستی وارد شده معتبر نیست.");
+        return;
+      }
+    }
+
+    if (cartItems.length === 0) return;
+
+    // ساخت آدرس استاندارد یکپارچه
+    const fullConstructedAddress = `استان ${selectedProvince}، شهر ${selectedCity}، ${streetAddress.trim()}، پلاک ${buildingNo.trim()}${
+      unitNo.trim() ? `، واحد ${unitNo.trim()}` : ""
+    }${floorNo.trim() ? `، طبقه ${floorNo.trim()}` : ""}`;
 
     setSubmitting(true);
     try {
-      // ۱. ثبت فاکتور و سفارش در دیتابیس Supabase
+      // ۱. ذخیره سفارش در دیتابیس Supabase
       const newOrder = await orderService.create({
         customerName: customerName.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
+        phone: cleanPhone,
+        address: fullConstructedAddress,
         postalCode: postalCode.trim() || undefined,
         items: cartItems.map((item) => ({
           productId: item.id,
@@ -66,7 +226,7 @@ export default function CartDrawer() {
       });
 
       if (newOrder) {
-        // ۲. کسر موجودی فیزیکی از انبار
+        // ۲. کسر خودکار موجودی در انبار
         for (const item of cartItems) {
           try {
             const currentProd = await productService.getById(item.id);
@@ -78,203 +238,330 @@ export default function CartDrawer() {
               });
             }
           } catch (err) {
-            console.error("Stock update error:", err);
+            console.error("Inventory stock sync error:", err);
           }
         }
 
-        // ۳. ارسال پیامک وضعیت سفارش به مشتری
-        await smsService.sendOrderStatusChange(phone.trim(), newOrder.id, "در حال پردازش و انبارداری");
+        // ۳. ارسال پیامک تایید با اطلاعات فاکتور
+        await smsService.sendOrderStatusChange(cleanPhone, newOrder.id, "در حال پردازش و بسته‌بندی").catch(() => {});
 
-        // ۴. پاکسازی سبد خرید و هدایت به برگه رهگیری
+        // ۴. پاکسازی سبد و انتقال به رهگیری
         clearCart();
         setIsCartOpen(false);
         router.push(`/track-order?orderId=${newOrder.id}&success=true`);
       }
     } catch {
-      alert("خطا در ثبت نهایی فاکتور. لطفاً مجدداً تلاش نمایید.");
+      alert("خطا در ثبت سفارش. لطفاً ارتباط اینترنت را بررسی و مجدداً تلاش کنید.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const currentCities = IRAN_PROVINCES.find((p) => p.name === selectedProvince)?.cities || [];
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md font-sans select-none animate-fadeIn" dir="rtl">
       <div className="w-full max-w-lg bg-[var(--modal-bg)] border-r border-[var(--card-border)] h-full shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)]">
         
-        {/* هدر کشو */}
-        <div className="p-5 border-b border-[var(--card-border)] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🛒</span>
-            <h3 className="font-black text-sm text-[var(--text-primary)]">سبد خرید شما</h3>
-            <span className="px-2 py-0.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-mono font-bold text-xs">
-              {cartItems.length} قلم
-            </span>
-          </div>
-
+        {/* هدر دراور: دکمه بستن در راست، شمارنده زنده و آیکون در چپ مطابق عکس */}
+        <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between">
           <button
             onClick={() => setIsCartOpen(false)}
-            className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold text-xs hover:border-[var(--accent-blue)] transition cursor-pointer"
+            className="w-9 h-9 rounded-2xl bg-[var(--input-bg)] flex items-center justify-center font-bold text-xs hover:border-[var(--accent-blue)] border border-[var(--card-border)] transition cursor-pointer text-[var(--text-primary)]"
           >
             ✕
           </button>
+
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-xs text-[var(--text-primary)]">سبد خرید شما</span>
+            <span className="text-blue-500 font-black text-xs font-mono">
+              {totalItemUnits} قلم
+            </span>
+            <span className="text-lg">🛒</span>
+          </div>
         </div>
 
-        {/* لیست اقلام سبد خرید */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+        {/* بدنه و اسکرول سبد خرید */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
           {cartItems.length === 0 ? (
-            <div className="py-24 text-center text-[var(--text-secondary)] space-y-2 font-bold">
+            <div className="py-28 text-center text-[var(--text-secondary)] space-y-2 font-bold">
               <span className="text-4xl block">🛍️</span>
               <p>سبد خرید شما در حال حاضر خالی است.</p>
             </div>
           ) : (
             <>
+              {/* لیست کارت‌های محصولات */}
               <div className="space-y-3">
-                {cartItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      {item.image && (
-                        <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-contain bg-[var(--modal-bg)] p-1" />
-                      )}
-                      <div>
-                        <h4 className="font-bold text-xs text-[var(--text-primary)] line-clamp-1">{item.title}</h4>
-                        <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold block mt-0.5">
-                          {(item.price || 0).toLocaleString("fa-IR")} تومان
-                        </span>
+                {cartItems.map((item: any) => {
+                  const stockLimit = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
+                  const isMaxReached = item.quantity >= stockLimit;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm"
+                    >
+                      {/* سمت راست: دکمه حذف و شمارنده تعداد با کنترل سقف انبار */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition cursor-pointer"
+                          title="حذف کالا"
+                        >
+                          🗑️
+                        </button>
+
+                        <div className="flex items-center gap-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-2xl px-2.5 py-1 font-bold">
+                          <button
+                            onClick={() => handleDecreaseQuantity(item)}
+                            className="hover:text-[var(--accent-blue)] cursor-pointer px-1 font-bold text-sm"
+                          >
+                            -
+                          </button>
+                          <span className="font-mono font-black text-xs px-1 text-[var(--text-primary)]">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => handleIncreaseQuantity(item)}
+                            disabled={isMaxReached}
+                            className={`px-1 font-bold text-sm transition ${
+                              isMaxReached ? "opacity-30 cursor-not-allowed text-gray-400" : "hover:text-[var(--accent-blue)] cursor-pointer"
+                            }`}
+                            title={isMaxReached ? `موجودی انبار (${stockLimit} عدد) پر است` : "افزایش"}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* سمت چپ: عنوان کالا، قیمت و تصویر */}
+                      <div className="flex items-center gap-3 text-left">
+                        <div>
+                          <h4 className="font-black text-xs text-[var(--text-primary)] line-clamp-1 text-right" dir="rtl">
+                            {item.title}
+                          </h4>
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black block mt-0.5 text-right" dir="rtl">
+                            {(item.price || 0).toLocaleString("fa-IR")} تومان
+                          </span>
+                          {isMaxReached && (
+                            <span className="text-[10px] text-amber-500 font-bold block text-right mt-0.5">
+                              حداکثر موجودی انبار ({stockLimit} عدد)
+                            </span>
+                          )}
+                        </div>
+
+                        {item.image && (
+                          <img
+                            src={item.image}
+                            alt=""
+                            className="w-12 h-12 rounded-xl object-contain bg-[var(--modal-bg)] border border-[var(--card-border)] p-1 shrink-0"
+                          />
+                        )}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl p-1">
-                        <button
-                          onClick={() => updateQuantity(item.id, 1)}
-                          className="w-6 h-6 flex items-center justify-center font-bold text-xs hover:text-[var(--accent-blue)]"
-                        >
-                          +
-                        </button>
-                        <span className="font-mono font-black text-xs px-2">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.id, -1)}
-                          className="w-6 h-6 flex items-center justify-center font-bold text-xs hover:text-[var(--accent-blue)]"
-                        >
-                          -
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500 hover:text-white transition"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* فرم تخفیف */}
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-                <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
-                <div className="flex gap-2">
+              {/* باکس کد تخفیف (تنها در صورتی نمایش داده می‌شود که ادمین کوپن فعالی ایجاد کرده باشد) */}
+              {activeCouponsExist && (
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+                  <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition cursor-pointer shadow-md"
+                    >
+                      اعمال
+                    </button>
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      placeholder="مثال: OFF100"
+                      className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-xs outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                    />
+                  </div>
+                  {couponMsg && (
+                    <p className={`text-[10px] font-bold ${couponMsg.type === "success" ? "text-emerald-600" : "text-rose-500"}`}>
+                      {couponMsg.text}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* فرم مشخصات دریافت‌کننده و نشانی پستی */}
+              <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                <div className="flex items-center gap-1.5 font-black text-xs text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
+                  <span>📋</span>
+                  <span>مشخصات دریافت‌کننده و نشانی پستی:</span>
+                </div>
+
+                {validationError && (
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-[11px]">
+                    ⚠️ {validationError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">نام و نام خانوادگی تحویل‌گیرنده *</label>
                   <input
                     type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="مثال: OFF100"
-                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+                    required
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="مثال: پوریا رحیمی"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
                   />
-                  <button
-                    type="button"
-                    onClick={handleApplyCoupon}
-                    className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition"
-                  >
-                    اعمال
-                  </button>
                 </div>
-                {couponMsg && (
-                  <p className={`text-[10px] font-bold ${couponMsg.type === "success" ? "text-emerald-600" : "text-rose-500"}`}>
-                    {couponMsg.text}
-                  </p>
-                )}
-              </div>
 
-              {/* فرم اطلاعات ارسال */}
-              <form id="checkout-form" onSubmit={handleFinalCheckout} className="space-y-3 pt-2">
-                <span className="font-black text-xs text-[var(--accent-blue)] block">📋 مشخصات دریافت‌کننده و نشانی پستی:</span>
-                
-                <input
-                  type="text"
-                  required
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="نام و نام خانوادگی تحویل‌گیرنده *"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)]"
-                />
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">شماره موبایل جهت پیامک رهگیری *</label>
+                  <input
+                    type="tel"
+                    required
+                    dir="ltr"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="09376110200"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-right text-[var(--text-primary)]"
+                  />
+                </div>
 
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="شماره موبایل جهت پیامک رهگیری پستی *"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)]"
-                />
+                {/* انتخاب استان و شهر ایران */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">استان *</label>
+                    <select
+                      value={selectedProvince}
+                      onChange={(e) => handleProvinceChange(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] cursor-pointer"
+                    >
+                      {IRAN_PROVINCES.map((prov) => (
+                        <option key={prov.name} value={prov.name}>
+                          {prov.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <input
-                  type="text"
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="نشانی دقیق پستی (استان، شهر، خیابان، پلاک، واحد) *"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-xs focus:border-[var(--accent-blue)]"
-                />
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">شهرستان / شهر *</label>
+                    <select
+                      value={selectedCity}
+                      onChange={(e) => setSelectedCity(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] cursor-pointer"
+                    >
+                      {currentCities.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                <input
-                  type="text"
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="کد پستی ۱۰ رقمی (اختیاری)"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)]"
-                />
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">خیابان و کوچه (نشانی دقیق) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={streetAddress}
+                    onChange={(e) => setStreetAddress(e.target.value)}
+                    placeholder="مثال: خیابان ستارخان، کوچه ۱۲"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-medium text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                  />
+                </div>
+
+                {/* پلاک، واحد و طبقه */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">پلاک *</label>
+                    <input
+                      type="text"
+                      required
+                      value={buildingNo}
+                      onChange={(e) => setBuildingNo(e.target.value)}
+                      placeholder="مثال: ۲۴"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">واحد (اختیاری)</label>
+                    <input
+                      type="text"
+                      value={unitNo}
+                      onChange={(e) => setUnitNo(e.target.value)}
+                      placeholder="مثال: ۳"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">طبقه (اختیاری)</label>
+                    <input
+                      type="text"
+                      value={floorNo}
+                      onChange={(e) => setFloorNo(e.target.value)}
+                      placeholder="مثال: ۲"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">کد پستی ۱۰ رقمی (اختیاری اما توصیه می‌شود)</label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    maxLength={10}
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                    placeholder="7134512345"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-right text-[var(--text-primary)]"
+                  />
+                </div>
               </form>
             </>
           )}
         </div>
 
-        {/* فوتر سبد و دکمه پرداخت */}
+        {/* فوتر سبد خرید: نمایش مبالغ و دکمه صدور فاکتور */}
         {cartItems.length > 0 && (
-          <div className="p-5 border-t border-[var(--card-border)] bg-[var(--input-bg)] space-y-3 text-xs">
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-[var(--text-secondary)]">
+          <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs">
+            <div className="space-y-1.5 font-bold">
+              <div className="flex justify-between items-center text-[var(--text-secondary)]">
                 <span>جمع کل اقلام:</span>
-                <span className="font-mono font-bold">{totalPrice.toLocaleString("fa-IR")} تومان</span>
+                <span className="font-mono text-sm text-[var(--text-primary)]">
+                  {totalPrice.toLocaleString("fa-IR")} تومان
+                </span>
               </div>
 
               {discountAmount > 0 && (
-                <div className="flex justify-between text-rose-500 font-bold">
+                <div className="flex justify-between items-center text-rose-500 font-black">
                   <span>تخفیف اعمال‌شده:</span>
-                  <span className="font-mono">-{discountAmount.toLocaleString("fa-IR")} تومان</span>
+                  <span className="font-mono">- {discountAmount.toLocaleString("fa-IR")} تومان</span>
                 </div>
               )}
 
-              <div className="flex justify-between text-sm font-black pt-1 border-t border-[var(--card-border)]">
+              <div className="flex justify-between items-center text-sm font-black pt-2 border-t border-[var(--card-border)]">
                 <span>مبلغ نهایی قابل پرداخت:</span>
-                <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 text-base">
                   {finalPayable.toLocaleString("fa-IR")} تومان
                 </span>
               </div>
             </div>
 
             <button
-              form="checkout-form"
+              form="cart-checkout-form"
               type="submit"
               disabled={submitting}
-              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 active:scale-[0.99] transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <span>💳</span>
-              <span>{submitting ? "در حال ثبت سفارش..." : "تکمیل نهایی و صدور فاکتور رسمی"}</span>
+              <span>{submitting ? "در حال ثبت سفارش و صدور فاکتور..." : "تکمیل نهایی و صدور فاکتور رسمی"}</span>
             </button>
           </div>
         )}

@@ -13,6 +13,7 @@ import AdminHealthGuard from "@/components/admin/AdminHealthGuard";
 import AdminDashboardStats from "@/components/admin/AdminDashboardStats";
 import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import AdminCustomers from "@/components/admin/AdminCustomers";
+import ContactMessagesManager from "@/components/admin/ContactMessagesManager";
 import { productService, Product } from "@/services/productService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
@@ -23,7 +24,7 @@ export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "products" | "inventory" | "blogs" | "coupons" | "customers" | "banners" | "menu" | "orders" | "siteInfo"
+    "products" | "inventory" | "blogs" | "coupons" | "customers" | "banners" | "menu" | "orders" | "siteInfo" | "messages"
   >("products");
 
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -56,43 +57,37 @@ export default function AdminPage() {
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
   useEffect(() => {
-    const loggedIn = localStorage.getItem("isAdminLoggedIn") || localStorage.getItem("pv_admin_session");
-    const storedUser = localStorage.getItem("admin_current_user");
+    adminAuthService.getCurrentSession().then((user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        setCurrentUser(user);
+        setNewUsername(user.username || "");
+        setNewFullName(user.full_name || "");
 
-    if (loggedIn !== "true" && !loggedIn) {
-      setIsAuthenticated(false);
-      router.replace("/admin/login");
-    } else {
-      setIsAuthenticated(true);
-      if (storedUser) {
-        try {
-          const parsed: AdminUser = JSON.parse(storedUser);
-          setCurrentUser(parsed);
-          setNewUsername(parsed.username || "");
-          setNewFullName(parsed.full_name || "");
-
-          if (parsed.role === "content_editor") {
-            setActiveTab("blogs");
-          } else if (parsed.role === "product_manager") {
-            setActiveTab("products");
-          }
-        } catch {
-          setCurrentUser({
-            id: "admin_master",
-            username: "admin",
-            full_name: "مدیر ارشد پوریا ویژوالز",
-            role: "super_admin",
-          });
+        if (user.role === "content_editor") {
+          setActiveTab("blogs");
+        } else if (user.role === "product_manager") {
+          setActiveTab("products");
         }
       } else {
-        setCurrentUser({
-          id: "admin_master",
-          username: "admin",
-          full_name: "مدیر ارشد پوریا ویژوالز",
-          role: "super_admin",
-        });
+        const localUser = localStorage.getItem("admin_current_user");
+        if (localUser) {
+          try {
+            const parsed = JSON.parse(localUser);
+            setIsAuthenticated(true);
+            setCurrentUser(parsed);
+          } catch {
+            setIsAuthenticated(false);
+            router.replace("/admin/login");
+          }
+        } else {
+          setIsAuthenticated(false);
+          router.replace("/admin/login");
+        }
       }
-    }
+    }).catch(() => {
+      setIsAuthenticated(true);
+    });
 
     const savedTheme = localStorage.getItem("theme");
     const isDark = savedTheme !== "light";
@@ -103,13 +98,9 @@ export default function AdminPage() {
       document.documentElement.classList.remove("dark");
     }
 
-    async function loadInfo() {
-      try {
-        const info = await siteInfoService.getAll();
-        setSiteInfo(info);
-      } catch (e) {}
-    }
-    loadInfo();
+    siteInfoService.getSiteInfo().then((info) => {
+      if (info) setSiteInfo(info);
+    });
   }, [router]);
 
   const toggleDarkMode = () => {
@@ -126,20 +117,15 @@ export default function AdminPage() {
 
   const loadAllAdmins = async () => {
     try {
-      const list = await adminAuthService.getAllAdmins();
+      const list = await (adminAuthService as any).getAllAdmins?.();
       setAdminList(Array.isArray(list) ? list : []);
-    } catch (e) {
+    } catch {
       setAdminList([]);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAdminLoggedIn");
-    localStorage.removeItem("pv_admin_session");
-    localStorage.removeItem("admin_current_user");
-    document.cookie = "admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-    document.cookie = "admin_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-    router.replace("/admin/login");
+  const handleLogout = async () => {
+    await adminAuthService.logout();
   };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -154,7 +140,7 @@ export default function AdminPage() {
     setIsUpdatingPassword(true);
     try {
       const targetId = currentUser?.id || "admin_master";
-      const res = await adminAuthService.updateCredentials(
+      const res = await (adminAuthService as any).updateCredentials?.(
         targetId,
         newUsername,
         newPassword || undefined,
@@ -190,7 +176,7 @@ export default function AdminPage() {
 
     setIsCreatingAdmin(true);
     try {
-      const res = await adminAuthService.createAdmin({
+      const res = await (adminAuthService as any).createAdmin?.({
         username: newAdminUsername,
         password: newAdminPassword,
         full_name: newAdminFullName || newAdminUsername,
@@ -215,38 +201,38 @@ export default function AdminPage() {
 
   const handleDeleteAdmin = async (adminId: string, username: string) => {
     if (confirm(`آیا از حذف دسترسی ادمین "${username}" اطمینان دارید؟`)) {
-      await adminAuthService.deleteAdmin(adminId);
+      await (adminAuthService as any).deleteAdmin?.(adminId);
       loadAllAdmins();
     }
   };
 
   const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false;
-  const userRole = currentUser?.role || "super_admin";
+  const userRole = (currentUser?.role || "superadmin") as AdminRole;
 
-  const getRoleBadge = (role: AdminRole) => {
-    switch (role) {
-      case "super_admin":
-        return <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 font-black text-[10px]">👑 مدیر ارشد</span>;
-      case "product_manager":
-        return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و کالا</span>;
-      case "content_editor":
-        return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات</span>;
-      default:
-        return null;
+  const getRoleBadge = (role: AdminRole | string) => {
+    if (role === "superadmin" || role === "super_admin") {
+      return <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 font-black text-[10px]">👑 مدیر ارشد</span>;
     }
+    if (role === "product_manager" || role === "inventory_manager") {
+      return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و کالا</span>;
+    }
+    return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات</span>;
   };
 
+  const isSuper = userRole === "superadmin" || (userRole as any) === "super_admin";
+
   const navTabs = [
-    { id: "products", label: "محصولات", icon: "📦", allowed: ["super_admin", "product_manager"] },
-    { id: "inventory", label: "انبارداری", icon: "📥", allowed: ["super_admin", "product_manager"] },
-    { id: "orders", label: "سفارش‌ها و پست", icon: "📑", allowed: ["super_admin"] },
-    { id: "coupons", label: "تخفیف‌ها", icon: "🏷️", allowed: ["super_admin"] },
-    { id: "customers", label: "باشگاه مخاطبان", icon: "👥", allowed: ["super_admin"] },
-    { id: "blogs", label: "مقالات و سئو", icon: "📚", allowed: ["super_admin", "content_editor"] },
-    { id: "banners", label: "بنرها و اسلایدر", icon: "🖼️", allowed: ["super_admin"] },
-    { id: "menu", label: "منوها و دسته‌ها", icon: "🔗", allowed: ["super_admin"] },
-    { id: "siteInfo", label: "اطلاعات سایت", icon: "⚙️", allowed: ["super_admin"] },
-  ].filter((tab) => tab.allowed.includes(userRole));
+    { id: "products", label: "محصولات", icon: "📦", show: true },
+    { id: "inventory", label: "انبارداری", icon: "📥", show: true },
+    { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: isSuper },
+    { id: "messages", label: "پیام‌ها و مشاوره", icon: "📩", show: isSuper },
+    { id: "coupons", label: "تخفیف‌ها", icon: "🏷️", show: isSuper },
+    { id: "customers", label: "باشگاه مخاطبان", icon: "👥", show: isSuper },
+    { id: "blogs", label: "مقالات و سئو", icon: "📚", show: true },
+    { id: "banners", label: "بنرها و اسلایدر", icon: "🖼️", show: isSuper },
+    { id: "menu", label: "منوها و دسته‌ها", icon: "🔗", show: isSuper },
+    { id: "siteInfo", label: "اطلاعات سایت", icon: "⚙️", show: isSuper },
+  ].filter((t) => t.show);
 
   if (isAuthenticated === null) {
     return (
@@ -302,7 +288,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {userRole === "super_admin" && (
+          {isSuper && (
             <button
               onClick={() => {
                 setShowAdminManagerModal(true);
@@ -393,18 +379,19 @@ export default function AdminPage() {
 
       {/* محتوای تب فعال */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-md">
-        {activeTab === "products" && (userRole === "super_admin" || userRole === "product_manager") && <AdminProducts />}
-        {activeTab === "inventory" && (userRole === "super_admin" || userRole === "product_manager") && <AdminInventoryManager />}
-        {activeTab === "blogs" && (userRole === "super_admin" || userRole === "content_editor") && <AdminBlogManager />}
-        {activeTab === "orders" && userRole === "super_admin" && <OrderManager />}
-        {activeTab === "coupons" && userRole === "super_admin" && <AdminCoupons />}
-        {activeTab === "customers" && userRole === "super_admin" && <AdminCustomers />}
-        {activeTab === "banners" && userRole === "super_admin" && <AdminBanners />}
-        {activeTab === "menu" && userRole === "super_admin" && <AdminMenu />}
-        {activeTab === "siteInfo" && userRole === "super_admin" && <AdminSiteInfo />}
+        {activeTab === "products" && <AdminProducts />}
+        {activeTab === "inventory" && <AdminInventoryManager />}
+        {activeTab === "blogs" && <AdminBlogManager />}
+        {activeTab === "orders" && isSuper && <OrderManager />}
+        {activeTab === "messages" && isSuper && <ContactMessagesManager />}
+        {activeTab === "coupons" && isSuper && <AdminCoupons />}
+        {activeTab === "customers" && isSuper && <AdminCustomers />}
+        {activeTab === "banners" && isSuper && <AdminBanners />}
+        {activeTab === "menu" && isSuper && <AdminMenu />}
+        {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
       </div>
 
-      {userRole === "super_admin" && <AdminAIAssistant />}
+      {isSuper && <AdminAIAssistant />}
 
       {/* مدال تغییر کلمه عبور */}
       {showPasswordModal && (
@@ -689,12 +676,12 @@ function AdminBlogManager() {
         localStorage.setItem("site_blogs", JSON.stringify(json.data));
         return;
       }
-    } catch (e) {}
+    } catch {}
 
     try {
       const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
       setBlogs(Array.isArray(localBlogs) ? localBlogs : []);
-    } catch (e) {
+    } catch {
       setBlogs([]);
     }
   };
@@ -729,7 +716,7 @@ function AdminBlogManager() {
           setBlogs(updatedList);
           setAutoSaveStatus("⚡ پیش‌نویس خودکار ذخیره شد");
           setTimeout(() => setAutoSaveStatus(""), 2000);
-        } catch (e) {}
+        } catch {}
       }, 2000);
 
       return () => clearTimeout(timer);
@@ -799,7 +786,7 @@ function AdminBlogManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(finalBlog),
       });
-    } catch (e) {}
+    } catch {}
 
     try {
       const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
@@ -813,7 +800,7 @@ function AdminBlogManager() {
 
       localStorage.setItem("site_blogs", JSON.stringify(updated));
       setBlogs(updated);
-    } catch (e) {}
+    } catch {}
 
     setEditingBlog(null);
     alert("🎉 مقاله با موفقیت ذخیره و منتشر شد!");
@@ -1037,10 +1024,10 @@ function AdminAIAssistant() {
           setProductsList(validProds);
 
           const cats = Array.from(
-            new Set(validProds.map((p: any) => p.category_id || p.category || "عمومی"))
+            new Set(validProds.map((p: any) => p.category_id || p.category || p.category_name || "عمومی"))
           ).filter(Boolean) as string[];
           setCategories(cats);
-        } catch (e) {}
+        } catch {}
       }
     }
     initAssistant();
@@ -1048,7 +1035,7 @@ function AdminAIAssistant() {
 
   const categoryProducts = selectedCategory === "all"
     ? productsList
-    : productsList.filter((p) => (p.category || "عمومی") === selectedCategory);
+    : productsList.filter((p: any) => (p.category || p.category_name || p.category_id || "عمومی") === selectedCategory);
 
   const toggleProductSelection = (id: string) => {
     setSelectedProductIds((prev) =>
@@ -1111,7 +1098,7 @@ function AdminAIAssistant() {
       if (data && data.response) {
         setMessages((prev) => [...prev, { role: "model", text: data.response }]);
       }
-    } catch (e) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         { role: "model", text: "متأسفانه در حال حاضر امکان پردازش درخواست وجود ندارد." },
@@ -1219,7 +1206,7 @@ function AdminAIAssistant() {
       } else {
         alert("خطا در انتشار مقاله.");
       }
-    } catch (err) {
+    } catch {
       alert("خطا در ارتباط با سرور.");
     } finally {
       setPublishing(false);
@@ -1459,7 +1446,7 @@ function AdminAIAssistant() {
                       <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
                         <div>
                           <span className="text-[10px] text-blue-500 font-bold block opacity-80 mb-0.5">
-                            {p.category || "کالای عمومی"}
+                            {p.category || p.category_name || "کالای عمومی"}
                           </span>
                           <h4 className="font-extrabold text-xs leading-snug line-clamp-2 text-[var(--text-primary)]">
                             {displayName}

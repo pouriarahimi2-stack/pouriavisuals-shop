@@ -13,37 +13,34 @@
 # testing
 /coverage
 
-# next.js
+# next.js build
 /.next/
 /out/
-
-# production
 /build
 
-# misc
-.DS_Store
-*.pem
-
-# debug
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# environment variables & secrets
 .env*
+!.env.example
 
 # vercel
-.vercel
+.vercel/
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
-.vercel
-backup.bat 
-pouriavisuals-shop/ 
-*.zip 
-backup.bat 
-pouriavisuals-shop/ 
-.env*
+# backups, archives & temporary directories
+*.zip
+backup.bat
+pouriavisuals-shop/
+
+# system & IDE files
+.DS_Store
+*.pem
+.idea/
+.vscode/

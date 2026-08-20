@@ -1,18 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  'https://hooaobrxgwakqqibcfdy.supabase.co';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-domain.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  'sb_publishable_4W6VSBnjKZzSUTQp13PUPg_hzw7qMeG';
-
-export const supabaseServer = createClient(supabaseUrl, supabaseKey, {
+export const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
   },
 });
+
+// اکسپورت مستعار برای کامپوننت‌هایی که supabaseServer ایمپورت می‌کنند
+export const supabaseServer = supabaseAdmin;
+export default supabaseAdmin;

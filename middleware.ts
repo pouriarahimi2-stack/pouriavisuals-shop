@@ -1,26 +1,23 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const adminSession = request.cookies.get("admin_session")?.value;
   const { pathname } = request.nextUrl;
 
-  const isAdminRoute = pathname.startsWith("/admin");
-  const isLoginPage = pathname === "/admin/login";
+  // بررسی مسیرهای پنل ادمین
+  if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
+    const sessionToken = request.cookies.get('pv_admin_session')?.value;
 
-  // مسدودسازی ورود کاربران احرازهویت‌نشده به بخش مدیریت
-  if (isAdminRoute && !isLoginPage && !adminSession) {
-    return NextResponse.redirect(new URL("/admin/login", request.url));
-  }
-
-  // در صورتی که ادمین لاگین است و صفحه لاگین را باز کند
-  if (isLoginPage && adminSession) {
-    return NextResponse.redirect(new URL("/admin", request.url));
+    if (!sessionToken) {
+      const loginUrl = new URL('/admin/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ['/admin/:path*'],
 };

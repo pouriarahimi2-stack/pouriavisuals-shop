@@ -1,62 +1,141 @@
-"use server";
+'use server';
 
-import { supabaseServer } from "@/lib/supabaseServer";
-import { Order } from "@/services/orderService";
-import { revalidatePath } from "next/cache";
+import { supabaseAdmin } from '@/lib/supabaseServer';
 
-// ثبت سفارش به صورت امن از سمت سرور
-export async function createOrderServer(orderData: Omit<Order, "id" | "status" | "paymentStatus" | "createdAt"> & {
-  paymentStatus?: Order["paymentStatus"];
-  transactionId?: string;
-}) {
+export interface OrderItemInput {
+  productId: string;
+  title: string;
+  price: number;
+  quantity: number;
+  image?: string;
+}
+
+export interface CreateOrderInput {
+  items: OrderItemInput[];
+  customer: {
+    fullName: string;
+    phone: string;
+    province?: string;
+    city?: string;
+    address: string;
+    postalCode: string;
+    notes?: string;
+  };
+  couponCode?: string;
+  shippingCost?: number;
+}
+
+export async function createOrderServer(payload: CreateOrderInput) {
   try {
-    const newOrderId = "ORD-" + Math.floor(100000 + Math.random() * 900000);
-    const newOrder = {
-      id: newOrderId,
-      customer_name: orderData.customerName,
-      customer_last_name: orderData.customerLastName || "",
-      customer_phone: orderData.customerPhone,
-      is_phone_verified: orderData.isPhoneVerified ?? false,
-      otp_hash: orderData.otpHash || null,
-      otp_sent_at: orderData.otpSentAt || null,
-      customer_address: orderData.customerAddress,
-      postal_code: orderData.postalCode || null,
-      is_postal_code_verified_gnaf: orderData.isPostalCodeVerifiedGNAF ?? false,
-      items: orderData.items || [],
-      total_amount: orderData.totalAmount,
-      discount_amount: orderData.discountAmount,
-      final_amount: orderData.finalAmount,
-      status: orderData.paymentStatus === "paid" ? "completed" : "pending",
-      payment_status: orderData.paymentStatus || "unpaid",
-      transaction_id: orderData.transactionId || null,
+    const { items, customer, couponCode, shippingCost = 0 } = payload;
+
+    if (!items || items.length === 0) {
+      return { success: false, error: 'سبد خرید خالی است.' };
+    }
+
+    if (!customer.phone || !customer.address || !customer.postalCode) {
+      return { success: false, error: 'اطلاعات گیرنده و آدرس ناقص است.' };
+    }
+
+    // استعلام و بررسی قیمت‌ها از دیتابیس برای جلوگیری از دستکاری قیمت در کلاینت
+    const productIds = items.map((i) => i.productId).filter(Boolean);
+    const { data: dbProducts } = await supabaseAdmin
+      .from('products')
+      .select('id, price, discount_price, stock')
+      .in('id', productIds);
+
+    let calculatedTotal = 0;
+    const validatedItems = items.map((item) => {
+      const dbProduct = dbProducts?.find((p) => p.id === item.productId);
+      const unitPrice = dbProduct
+        ? (dbProduct.discount_price && dbProduct.discount_price > 0 ? dbProduct.discount_price : dbProduct.price)
+        : item.price;
+
+      calculatedTotal += unitPrice * item.quantity;
+      return {
+        ...item,
+        price: unitPrice,
+      };
+    });
+
+    // بررسی کوپن تخفیف در سرور در صورت وجود
+    let discountAmount = 0;
+    if (couponCode) {
+      const { data: coupon } = await supabaseAdmin
+        .from('coupons')
+        .select('*')
+        .eq('code', couponCode.trim())
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (coupon) {
+        if (coupon.discount_percent) {
+          discountAmount = Math.round((calculatedTotal * coupon.discount_percent) / 100);
+        } else if (coupon.discount_amount) {
+          discountAmount = coupon.discount_amount;
+        }
+      }
+    }
+
+    const finalPayable = Math.max(0, calculatedTotal - discountAmount + shippingCost);
+
+    // ثبت نهایی سفارش در جدول orders
+    const { data: newOrder, error: insertError } = await supabaseAdmin
+      .from('orders')
+      .insert({
+        customer_name: customer.fullName,
+        phone: customer.phone,
+        province: customer.province || '',
+        city: customer.city || '',
+        address: customer.address,
+        postal_code: customer.postalCode,
+        notes: customer.notes || '',
+        items: validatedItems,
+        subtotal: calculatedTotal,
+        discount_amount: discountAmount,
+        shipping_cost: shippingCost,
+        total_amount: finalPayable,
+        payment_status: 'PENDING',
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (insertError || !newOrder) {
+      return { success: false, error: 'خطا در ثبت اطلاعات سفارش در سرور دیتابیس.' };
+    }
+
+    return {
+      success: true,
+      orderId: newOrder.id,
+      totalAmount: finalPayable,
     };
-
-    const { error } = await supabaseServer.from("orders").insert([newOrder]);
-
-    if (error) throw error;
-
-    revalidatePath("/admin");
-    return { success: true, orderId: newOrderId };
   } catch (err: any) {
-    console.error("Error creating order on server:", err);
-    return { success: false, error: err.message };
+    return { success: false, error: err.message || 'خطای غیرمنتظره در ثبت سفارش.' };
   }
 }
 
-// بروزرسانی وضعیت سفارش توسط ادمین
-export async function updateOrderStatusServer(id: string, status: Order["status"], paymentStatus?: Order["paymentStatus"]) {
+export async function updateOrderStatusServer(orderId: string, status: string, paymentStatus?: string) {
   try {
-    const payload: any = { status };
-    if (paymentStatus) payload.payment_status = paymentStatus;
+    const updateData: Record<string, any> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
 
-    const { error } = await supabaseServer
-      .from("orders")
-      .update(payload)
-      .eq("id", id);
+    if (paymentStatus) {
+      updateData.payment_status = paymentStatus;
+    }
 
-    if (error) throw error;
+    const { error } = await supabaseAdmin
+      .from('orders')
+      .update(updateData)
+      .eq('id', orderId);
 
-    revalidatePath("/admin");
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };

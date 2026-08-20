@@ -15,6 +15,7 @@ export interface CartItem {
 
 interface CartContextType {
   cart: CartItem[];
+  cartItems: CartItem[];
   addToCart: (product: any) => void;
   removeFromCart: (id: string | number) => void;
   updateQuantity: (id: string | number, delta: number) => void;
@@ -32,6 +33,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // لود سبد خرید از LocalStorage
   useEffect(() => {
@@ -43,16 +45,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error(e);
     }
+    setIsHydrated(true);
   }, []);
 
   // ذخیره در LocalStorage
   useEffect(() => {
+    if (!isHydrated) return;
     try {
       localStorage.setItem('pv_cart', JSON.stringify(cart));
     } catch (e) {
       console.error(e);
     }
-  }, [cart]);
+  }, [cart, isHydrated]);
 
   const addToCart = (product: any) => {
     const productId = product.id;
@@ -120,6 +124,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     <CartContext.Provider
       value={{
         cart,
+        cartItems: cart,
         addToCart,
         removeFromCart,
         updateQuantity,

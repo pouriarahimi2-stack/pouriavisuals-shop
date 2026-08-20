@@ -2,49 +2,63 @@ export interface SMSLog {
   id: string;
   phone: string;
   message: string;
-  status: "sent" | "failed";
-  timestamp: string;
+  status: 'sent' | 'failed' | 'simulated';
+  created_at: string;
 }
 
-const SMS_LOGS_KEY = "system_sms_logs";
+export async function sendSMS(phone: string, message: string): Promise<boolean> {
+  const cleanPhone = phone.trim().replace(/^(\+98|0098|98)/, '0');
+  
+  if (!/^09\d{9}$/.test(cleanPhone)) {
+    return false;
+  }
 
-export const smsService = {
-  async sendTrackingCode(phone: string, orderId: string, trackingCode: string): Promise<boolean> {
-    const text = `مشتری گرامی، سفارش شما با شناسه ${orderId} تحویل شرکت ملی پست گردید.\nکد رهگیری پیشتاز: ${trackingCode}\nرهگیری در: https://tracking.post.ir`;
-    return this.dispatchSMS(phone, text);
-  },
+  const smsApiKey = process.env.SMS_API_KEY || process.env.KAVENEGAR_API_KEY;
+  const isServer = typeof window === 'undefined';
 
-  async sendOrderStatusChange(phone: string, orderId: string, statusText: string): Promise<boolean> {
-    const text = `مشتری گرامی، وضعیت سفارش شما به شماره ${orderId} به حالت «${statusText}» تغییر یافت.`;
-    return this.dispatchSMS(phone, text);
-  },
-
-  async dispatchSMS(phone: string, message: string): Promise<boolean> {
-    try {
-      console.log(`[SMS Service] Sending to ${phone}: \n${message}`);
-
-      const logItem: SMSLog = {
-        id: `sms_${Date.now()}`,
-        phone,
-        message,
-        status: "sent",
-        timestamp: new Date().toISOString(),
-      };
-
-      if (typeof window !== "undefined") {
-        const currentLogs: SMSLog[] = JSON.parse(localStorage.getItem(SMS_LOGS_KEY) || "[]");
-        localStorage.setItem(SMS_LOGS_KEY, JSON.stringify([logItem, ...currentLogs]));
+  if (isServer) {
+    if (smsApiKey) {
+      try {
+        const url = `https://api.kavenegar.com/v1/${smsApiKey}/sms/send.json`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            receptor: cleanPhone,
+            message: message,
+          }),
+        });
+        const data = await res.json();
+        return data.return?.status === 200;
+      } catch {
+        return false;
       }
-
+    } else {
+      console.log(`[DEV SMS SIMULATOR] To: ${cleanPhone} | Message: ${message}`);
       return true;
-    } catch (e) {
-      console.error("[SMS Service] Failed to send SMS:", e);
-      return false;
     }
-  },
+  }
 
-  getLogs(): SMSLog[] {
-    if (typeof window === "undefined") return [];
-    return JSON.parse(localStorage.getItem(SMS_LOGS_KEY) || "[]");
-  },
+  try {
+    const res = await fetch('/api/sms/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: cleanPhone, message }),
+    });
+    const data = await res.json();
+    return Boolean(data.success);
+  } catch {
+    return false;
+  }
+}
+
+// آبجکت سازگار برای تمام کامپوننت‌های پنل و کلاینت
+export const smsService = {
+  sendSMS,
+  sendOTP: async (phone: string, code: string) => sendSMS(phone, `کد ورود شما: ${code}`),
+  sendOrderConfirmation: async (phone: string, orderId: string) => sendSMS(phone, `سفارش ${orderId} با موفقیت ثبت شد.`),
+  sendShippingNotification: async (phone: string, trackingCode: string) => sendSMS(phone, `سفارش شما ارسال شد. کد رهگیری: ${trackingCode}`),
+  getLogs: async (): Promise<SMSLog[]> => [],
 };
+
+export default smsService;

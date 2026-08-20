@@ -1,210 +1,199 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabase';
 
 export interface Product {
   id: string;
-  name: string;
-  title_fa?: string;
-  description?: string;
+  title: string;
+  slug?: string;
   price: number;
-  original_price?: number;
-  originalPrice?: number;
-  category?: string;
+  discount_price?: number;
+  stock: number;
   category_id?: string;
+  category_name?: string;
   image?: string;
   images?: string[];
-  stock?: number;
-  is_available?: boolean;
-  isAvailable?: boolean;
-  warranty?: string;
-  specs?: Record<string, any>;
+  description?: string;
+  features?: string[];
+  is_featured?: boolean;
+  is_active?: boolean;
+  rating?: number;
   created_at?: string;
+  updated_at?: string;
 }
 
-const STORAGE_KEY = "pouriavisuals_products_cache_v2";
-
-const getChannel = () => {
-  if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-    return new BroadcastChannel("products_sync_channel");
-  }
-  return null;
-};
+const LOCAL_PRODUCTS_KEY = 'PV_LOCAL_PRODUCTS_CACHE_V2';
+let memoryCache: Product[] | null = null;
 
 export const productService = {
-  async getAll(): Promise<Product[]> {
-    let localData: Product[] = [];
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      if (cached) {
-        try {
-          localData = JSON.parse(cached);
-        } catch {}
-      }
+  // ۱. دریافت لیست محصولات با لود فوق‌سریع از کش محلی و سینک همزمان با Supabase
+  async getProducts(forceRefresh = false): Promise<Product[]> {
+    if (memoryCache && !forceRefresh) {
+      return memoryCache;
     }
 
     try {
-      if (supabase) {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error || !data) {
+        throw error || new Error('خطا در دریافت لیست محصولات');
+      }
+
+      memoryCache = data as Product[];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(data));
+      }
+      return memoryCache;
+    } catch {
+      // استفاده از کش محلی در صورت بروز قطعی اینترنت
+      if (typeof window !== 'undefined') {
+        const local = localStorage.getItem(LOCAL_PRODUCTS_KEY);
+        if (local) {
+          memoryCache = JSON.parse(local);
+          return memoryCache || [];
+        }
+      }
+      return [];
+    }
+  },
+
+  // ۲. دریافت مشخصات یک محصول براساس ID یا Slug
+  async getProductById(idOrSlug: string): Promise<Product | null> {
+    if (memoryCache) {
+      const found = memoryCache.find(p => p.id === idOrSlug || p.slug === idOrSlug);
+      if (found) return found;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .or(`id.eq.${idOrSlug},slug.eq.${idOrSlug}`)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return data as Product;
+    } catch {
+      return null;
+    }
+  },
+
+  // ۳. ایجاد یا به‌روزرسانی محصول (پشتیبانی از هر دو نام متد برای کامپوننت‌های ادمین)
+  async saveProduct(product: Partial<Product>): Promise<{ success: boolean; data?: Product; error?: string }> {
+    try {
+      const payload: Record<string, any> = {
+        title: product.title,
+        price: Number(product.price) || 0,
+        discount_price: product.discount_price ? Number(product.discount_price) : null,
+        stock: Number(product.stock) || 0,
+        category_id: product.category_id || null,
+        category_name: product.category_name || '',
+        image: product.image || '',
+        images: product.images || [],
+        description: product.description || '',
+        features: product.features || [],
+        is_featured: Boolean(product.is_featured),
+        is_active: product.is_active !== undefined ? Boolean(product.is_active) : true,
+        updated_at: new Date().toISOString(),
+      };
+
+      let resultProduct: Product;
+
+      if (product.id && !product.id.startsWith('temp-')) {
+        // آپدیت محصول موجود
         const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
+          .from('products')
+          .update(payload)
+          .eq('id', product.id)
+          .select()
+          .single();
 
-        if (!error && data) {
-          const formatted: Product[] = data.map((item: any) => ({
-            id: String(item.id),
-            name: item.name || item.title || "محصول بدون نام",
-            title_fa: item.title_fa || item.name_fa || item.name,
-            description: item.description || "",
-            price: Number(item.price || 0),
-            original_price: item.original_price ? Number(item.original_price) : undefined,
-            originalPrice: item.original_price ? Number(item.original_price) : undefined,
-            category: item.category || item.category_id || "کالای دیجیتال",
-            category_id: item.category_id || item.category || "کالای دیجیتال",
-            image: item.image || (Array.isArray(item.images) ? item.images[0] : ""),
-            images: Array.isArray(item.images) && item.images.length > 0 ? item.images : [item.image || ""].filter(Boolean),
-            stock: item.stock !== undefined ? Number(item.stock) : 10,
-            is_available: item.is_available !== false,
-            isAvailable: item.is_available !== false,
-            warranty: item.warranty || "گارانتی اصالت و سلامت فیزیکی",
-            specs: item.specs || {},
-            created_at: item.created_at,
-          }));
+        if (error || !data) throw error || new Error('خطا در به‌روزرسانی محصول');
+        resultProduct = data as Product;
+      } else {
+        // ایجاد محصول جدید
+        payload.created_at = new Date().toISOString();
+        const { data, error } = await supabase
+          .from('products')
+          .insert(payload)
+          .select()
+          .single();
 
-          if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(formatted));
-          }
-          return formatted;
-        }
+        if (error || !data) throw error || new Error('خطا در ایجاد محصول جدید');
+        resultProduct = data as Product;
       }
-    } catch (e) {
-      console.warn("Supabase products fetch warning:", e);
-    }
 
-    return localData;
-  },
-
-  async getById(id: string): Promise<Product | null> {
-    const all = await this.getAll();
-    return all.find((p) => String(p.id) === String(id)) || null;
-  },
-
-  async getCategories(): Promise<string[]> {
-    const all = await this.getAll();
-    const cats = new Set<string>();
-    all.forEach((p) => {
-      if (p.category) cats.add(p.category);
-      if (p.category_id) cats.add(p.category_id);
-    });
-    return Array.from(cats);
-  },
-
-  async save(product: Partial<Product>): Promise<{ success: boolean; data?: Product }> {
-    const current = await this.getAll();
-    const productId = product.id ? String(product.id) : `prod_${Date.now()}`;
-
-    const newProduct: Product = {
-      id: productId,
-      name: product.name || "محصول جدید",
-      title_fa: product.title_fa || product.name,
-      description: product.description || "",
-      price: Number(product.price || 0),
-      original_price: product.original_price ? Number(product.original_price) : undefined,
-      category: product.category || product.category_id || "عمومی",
-      category_id: product.category_id || product.category || "عمومی",
-      image: product.image || (product.images?.[0] ?? ""),
-      images: product.images && product.images.length > 0 ? product.images : [product.image ?? ""].filter(Boolean),
-      stock: product.stock !== undefined ? Number(product.stock) : 10,
-      is_available: product.is_available !== false && (product.stock === undefined || Number(product.stock) > 0),
-      warranty: product.warranty || "گارانتی اصالت کالا",
-      specs: product.specs || {},
-      created_at: product.created_at || new Date().toISOString(),
-    };
-
-    const existsIndex = current.findIndex((p) => String(p.id) === String(productId));
-    let updatedList: Product[] = [];
-
-    if (existsIndex >= 0) {
-      updatedList = [...current];
-      updatedList[existsIndex] = newProduct;
-    } else {
-      updatedList = [newProduct, ...current];
-    }
-
-    // ۱. انتشار فوری در کلاینت و کانال همگام‌سازی
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
-      window.dispatchEvent(new CustomEvent("products_updated", { detail: updatedList }));
-      const channel = getChannel();
-      if (channel) {
-        channel.postMessage({ type: "SYNC_PRODUCTS", data: updatedList });
-      }
-    }
-
-    // ۲. ذخیره‌سازی منعطف در Supabase
-    try {
-      if (supabase) {
-        const payload: Record<string, any> = {
-          name: newProduct.name,
-          title_fa: newProduct.title_fa,
-          description: newProduct.description,
-          price: newProduct.price,
-          original_price: newProduct.original_price,
-          category: newProduct.category,
-          category_id: newProduct.category_id,
-          image: newProduct.image && !newProduct.image.startsWith("data:image/") ? newProduct.image : null,
-          images: (newProduct.images || []).filter((img) => !img.startsWith("data:image/")),
-          stock: newProduct.stock,
-          is_available: newProduct.is_available,
-          warranty: newProduct.warranty,
-          specs: newProduct.specs,
-        };
-
-        if (existsIndex >= 0) {
-          await supabase.from("products").update(payload).eq("id", productId);
+      // آپدیت آنی کش رم و لوکال استوریج (Optimistic Update)
+      if (memoryCache) {
+        const index = memoryCache.findIndex(p => p.id === resultProduct.id);
+        if (index > -1) {
+          memoryCache[index] = resultProduct;
         } else {
-          await supabase.from("products").insert([{ id: productId, ...payload }]);
+          memoryCache.unshift(resultProduct);
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(memoryCache));
         }
       }
-    } catch (err) {
-      console.warn("Supabase product save background:", err);
-    }
 
-    return { success: true, data: newProduct };
+      return { success: true, data: resultProduct };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'خطا در ذخیره‌سازی محصول' };
+    }
   },
 
-  async delete(id: string): Promise<boolean> {
-    const current = await this.getAll();
-    const filtered = current.filter((p) => String(p.id) !== String(id));
+  // متدهای همگام‌ساز برای کامپوننت‌هایی که create یا update را جدا صدا می‌زنند
+  async createProduct(product: Partial<Product>) {
+    return this.saveProduct(product);
+  },
 
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-      window.dispatchEvent(new CustomEvent("products_updated", { detail: filtered }));
-      const channel = getChannel();
-      if (channel) {
-        channel.postMessage({ type: "SYNC_PRODUCTS", data: filtered });
-      }
-    }
+  async updateProduct(id: string, product: Partial<Product>) {
+    return this.saveProduct({ ...product, id });
+  },
 
+  // ۴. حذف آنی محصول
+  async deleteProduct(id: string): Promise<boolean> {
     try {
-      if (supabase) {
-        await supabase.from("products").delete().eq("id", id);
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // حذف از کش داخلی به صورت آنی
+      if (memoryCache) {
+        memoryCache = memoryCache.filter(p => p.id !== id);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(memoryCache));
+        }
       }
-    } catch (err) {
-      console.warn("Supabase product delete background:", err);
+
+      return true;
+    } catch {
+      return false;
     }
-
-    return true;
   },
 
-  async updateStock(id: string, newStock: number): Promise<boolean> {
-    const product = await this.getById(id);
-    if (!product) return false;
+  // ۵. به‌روزرسانی موجودی انبار (Inventory Sync)
+  async updateStock(productId: string, newStock: number): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ stock: Math.max(0, newStock), updated_at: new Date().toISOString() })
+        .eq('id', productId);
 
-    return (
-      await this.save({
-        ...product,
-        stock: newStock,
-        is_available: newStock > 0,
-      })
-    ).success;
-  },
+      if (error) throw error;
+
+      if (memoryCache) {
+        const target = memoryCache.find(p => p.id === productId);
+        if (target) target.stock = Math.max(0, newStock);
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
 };

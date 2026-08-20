@@ -1,51 +1,51 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { sendSMS } from '@/services/smsService';
 
-export async function POST(req: Request) {
+const smsRateLimiter = new Map<string, { count: number; resetTime: number }>();
+const SMS_LIMIT_WINDOW = 60 * 1000; // ۱ دقیقه
+const MAX_SMS_PER_WINDOW = 3;
+
+function isIpRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = smsRateLimiter.get(ip);
+
+  if (!entry || now > entry.resetTime) {
+    smsRateLimiter.set(ip, { count: 1, resetTime: now + SMS_LIMIT_WINDOW });
+    return false;
+  }
+
+  if (entry.count >= MAX_SMS_PER_WINDOW) {
+    return true;
+  }
+
+  entry.count += 1;
+  return false;
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const { phone, pattern, tokens } = await req.json();
+    const { phone, message } = await req.json();
 
-    if (!phone || !pattern) {
+    if (!phone || !message) {
+      return NextResponse.json({ success: false, message: 'شماره تماس و متن پیام الزامی است.' }, { status: 400 });
+    }
+
+    const clientIp = req.headers.get('x-forwarded-for') || 'local-caller';
+    if (isIpRateLimited(clientIp)) {
       return NextResponse.json(
-        { success: false, message: "شماره موبایل یا الگوی پیامک مشخص نشده است." },
-        { status: 400 }
+        { success: false, message: 'تعداد درخواست‌های ارسال بیش از حد مجاز است.' },
+        { status: 429 }
       );
     }
 
-    const apiKey = process.env.SMS_API_KEY;
+    const success = await sendSMS(phone, message);
 
-    // حالت شبیه‌ساز (اگر هنوز پنل پیامکی خریداری نکرده‌اید)
-    if (!apiKey) {
-      console.log("------------------------------------------");
-      console.log(`[SMS SIMULATOR] پیامک ارسال شد به: ${phone}`);
-      console.log(`[SMS SIMULATOR] پترن قالب: ${pattern}`);
-      console.log(`[SMS SIMULATOR] متغیرها:`, tokens);
-      console.log("------------------------------------------");
-      return NextResponse.json({ success: true, simulated: true });
+    if (!success) {
+      return NextResponse.json({ success: false, message: 'خطا در ارسال پیامک از طریق درگاه.' }, { status: 500 });
     }
 
-    // ارسال واقعی بر اساس وب‌سرویس پیامک خدماتی (الگوی کاوه‌نگار / فراز اس‌ام‌اس)
-    const response = await fetch(
-      `https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          receptor: phone,
-          template: pattern,
-          token: tokens.token1 || "",
-          token2: tokens.token2 || "",
-          token3: tokens.token3 || "",
-        }),
-      }
-    );
-
-    const data = await response.json();
-    return NextResponse.json({ success: true, data });
-  } catch (error) {
-    console.error("SMS Endpoint Error:", error);
-    return NextResponse.json(
-      { success: false, message: "خطا در پردازش پیامک" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, message: 'پیامک با موفقیت ارسال شد.' });
+  } catch {
+    return NextResponse.json({ success: false, message: 'خطای سیستمی در پردازش پیامک.' }, { status: 500 });
   }
 }

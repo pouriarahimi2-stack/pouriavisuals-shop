@@ -1,76 +1,56 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { sendSMS } from '@/services/smsService';
+import { supabaseAdmin } from '@/lib/supabaseServer';
 
-// کش موقت سرور برای نگهداری وضعیت اعتبارسنجی OTP
-const otpMemoryStore = new Map<string, { code: string; expiresAt: number }>();
+const memoryRateLimit = new Map<string, { count: number; expires: number }>();
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { phone, code, action } = body;
+    const { phone } = await req.json();
 
-    if (!phone || !/^09\d{9}$/.test(phone)) {
+    if (!phone || typeof phone !== 'string') {
+      return NextResponse.json({ success: false, message: 'شماره تماس الزامی است.' }, { status: 400 });
+    }
+
+    const cleanPhone = phone.trim().replace(/^(\+98|0098|98)/, '0');
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return NextResponse.json({ success: false, message: 'شماره موبایل وارد شده صحیح نیست.' }, { status: 422 });
+    }
+
+    // محدودیت ارسال (حداکثر ۳ تلاش در ۳ دقیقه)
+    const now = Date.now();
+    const rate = memoryRateLimit.get(cleanPhone);
+    if (rate && now < rate.expires && rate.count >= 3) {
       return NextResponse.json(
-        { success: false, message: "شماره موبایل نامعتبر است." },
-        { status: 400 }
+        { success: false, message: 'درخواست‌های بیش از حد. لطفاً ۳ دقیقه دیگر مجدداً تلاش کنید.' },
+        { status: 429 }
       );
     }
 
-    // ۱. ارسال پیامک
-    if (action === "send") {
-      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 120 * 1000; // ۲ دقیقه اعتبار
+    const generatedOtp = Math.floor(10000 + Math.random() * 90000).toString();
+    const expiresAt = new Date(Date.now() + 3 * 60 * 1000).toISOString();
 
-      otpMemoryStore.set(phone, { code: generatedCode, expiresAt });
+    // ذخیره در جدول کدهای تایید در سرور (یا بازگشت پایدار)
+    await supabaseAdmin
+      .from('otps')
+      .upsert({ phone: cleanPhone, code: generatedOtp, expires_at: expiresAt }, { onConflict: 'phone' })
+      .select()
+      .maybeSingle();
 
-      console.log(`[SECURE SERVER OTP] Code for ${phone}: ${generatedCode}`);
+    // بروزرسانی شمارنده ریت لیمیت
+    memoryRateLimit.set(cleanPhone, {
+      count: (rate?.count || 0) + 1,
+      expires: rate?.expires && now < rate.expires ? rate.expires : now + 3 * 60 * 1000,
+    });
 
-      return NextResponse.json({
-        success: true,
-        message: "کد تایید ارسال گردید.",
-        simulatedCode: generatedCode,
-      });
-    }
+    // ارسال پیامک
+    await sendSMS(cleanPhone, `کد ورود شما به فروشگاه: ${generatedOtp}`);
 
-    // ۲. تایید پیامک در سرور
-    if (action === "verify") {
-      const record = otpMemoryStore.get(phone);
-
-      if (!record) {
-        return NextResponse.json(
-          { success: false, message: "کد تاییدی برای این شماره یافت نشد یا منقضی شده است." },
-          { status: 400 }
-        );
-      }
-
-      if (Date.now() > record.expiresAt) {
-        otpMemoryStore.delete(phone);
-        return NextResponse.json(
-          { success: false, message: "کد تایید منقضی شده است. مجدداً درخواست دهید." },
-          { status: 400 }
-        );
-      }
-
-      if (record.code !== String(code).trim()) {
-        return NextResponse.json(
-          { success: false, message: "کد ۶ رقمی وارد شده اشتباه است." },
-          { status: 400 }
-        );
-      }
-
-      otpMemoryStore.delete(phone);
-      return NextResponse.json({
-        success: true,
-        verified: true,
-        token: `OTP_AUTH_${Date.now()}_${phone}`,
-        message: "شماره با موفقیت تایید شد.",
-      });
-    }
-
-    return NextResponse.json({ success: false, message: "درخواست نامعتبر است." }, { status: 400 });
+    return NextResponse.json({
+      success: true,
+      message: 'کد تایید پیامک شد.',
+    });
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: "خطای داخلی سرور در پردازش پیامک." },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: 'خطا در برقراری ارتباط با سرور پیامک.' }, { status: 500 });
   }
 }

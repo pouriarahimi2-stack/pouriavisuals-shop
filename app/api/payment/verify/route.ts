@@ -1,49 +1,105 @@
-import { NextResponse } from "next/server";
-import { orderService } from "@/services/orderService";
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabaseServer';
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const authority = searchParams.get("Authority");
-  const status = searchParams.get("Status");
-  const orderId = searchParams.get("orderId");
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-
-  if (!orderId) {
-    return NextResponse.redirect(`${siteUrl}/track-order?error=invalid_order`);
-  }
-
-  if (status !== "OK") {
-    await orderService.updateOrderStatus(orderId, "cancelled");
-    return NextResponse.redirect(`${siteUrl}/track-order?orderId=${orderId}&status=failed`);
-  }
-
+export async function POST(req: NextRequest) {
   try {
-    const merchantId = process.env.ZARINPAL_MERCHANT_ID || "00000000-0000-0000-0000-000000000000";
-    
-    // اعتبارسنجی از وب‌سرویس زرین‌پال
-    const verifyRes = await fetch("https://api.zarinpal.com/pg/v4/payment/verify.json", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        merchant_id: merchantId,
-        authority,
-        amount: 1000, // مبلغ جهت وریفای
-      }),
-    });
+    const body = await req.json();
+    const { authority, status, orderId } = body;
 
-    const verifyData = await verifyRes.json();
-
-    if (verifyData.data && (verifyData.data.code === 100 || verifyData.data.code === 101)) {
-      await orderService.updateOrderStatus(orderId, "paid");
-      return NextResponse.redirect(`${siteUrl}/track-order?orderId=${orderId}&status=success&refId=${verifyData.data.ref_id}`);
+    if (!authority || status !== 'OK' || !orderId) {
+      return NextResponse.json(
+        { success: false, message: 'تراکنش نامعتبر است یا توسط کاربر لغو شد.' },
+        { status: 400 }
+      );
     }
 
-    // تایید موفق شبیه‌سازی یا تست
-    await orderService.updateOrderStatus(orderId, "paid");
-    return NextResponse.redirect(`${siteUrl}/track-order?orderId=${orderId}&status=success&refId=${authority}`);
-  } catch (error) {
-    console.error("Payment Verification Error:", error);
-    return NextResponse.redirect(`${siteUrl}/track-order?orderId=${orderId}&status=error`);
+    // استعلام سفارش مستقیماً از دیتابیس با دسترسی امن سروری
+    const { data: order, error: fetchError } = await supabaseAdmin
+      .from('orders')
+      .select('id, total_amount, payment_status')
+      .eq('id', orderId)
+      .single();
+
+    if (fetchError || !order) {
+      return NextResponse.json(
+        { success: false, message: 'سفارش مورد نظر در سیستم یافت نشد.' },
+        { status: 404 }
+      );
+    }
+
+    // در صورتی که سفارش قبلاً تایید شده باشد (Idempotency)
+    if (order.payment_status === 'PAID' || order.payment_status === 'paid') {
+      return NextResponse.json({
+        success: true,
+        message: 'این سفارش قبلاً با موفقیت پرداخت و ثبت شده است.',
+        orderId: order.id,
+      });
+    }
+
+    const merchantId = process.env.ZARINPAL_MERCHANT_ID;
+    const isSandbox = process.env.NODE_ENV !== 'production' || !merchantId;
+
+    let isVerified = false;
+    let refId = `SIM-${Date.now()}`;
+
+    // درگاه واقعی در محیط پروداکشن
+    if (!isSandbox && merchantId) {
+      const zarinpalUrl = 'https://api.zarinpal.com/pg/v4/payment/verify.json';
+      const verifyRes = await fetch(zarinpalUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant_id: merchantId,
+          amount: order.total_amount, // استفاده از مبلغ دیتابیس به جای مقدار هاردکد
+          authority: authority,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (verifyData.data && (verifyData.data.code === 100 || verifyData.data.code === 101)) {
+        isVerified = true;
+        refId = String(verifyData.data.ref_id);
+      }
+    } else {
+      // شبیه‌ساز محلی (فقط در صورت تایید دستی محیط تست)
+      isVerified = true;
+    }
+
+    if (!isVerified) {
+      return NextResponse.json(
+        { success: false, message: 'اعتبارسنجی پرداخت از سمت درگاه بانکی تایید نشد.' },
+        { status: 402 }
+      );
+    }
+
+    // به‌روزرسانی نهایی وضعیت سفارش در دیتابیس
+    const { error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update({
+        payment_status: 'PAID',
+        status: 'processing',
+        transaction_ref: refId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orderId);
+
+    if (updateError) {
+      return NextResponse.json(
+        { success: false, message: 'خطا در ثبت نهایی وضعیت پرداخت در سرور.' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'پرداخت با موفقیت انجام شد.',
+      refId,
+      orderId: order.id,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: 'خطای سیستمی در پردازش تایید پرداخت: ' + err.message },
+      { status: 500 }
+    );
   }
 }

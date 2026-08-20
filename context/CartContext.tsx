@@ -1,148 +1,185 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 export interface CartItem {
-  id: string | number;
-  title?: string;
+  id: string;
+  title: string;
   name?: string;
-  title_fa?: string;
   price: number;
-  image?: string;
-  image_url?: string;
+  discountPrice?: number;
+  image: string;
   quantity: number;
+  stock?: number;
+}
+
+export interface AppliedCoupon {
+  code: string;
+  discountPercent: number;
+  maxDiscount?: number;
 }
 
 interface CartContextType {
-  cart: CartItem[];
   cartItems: CartItem[];
-  addToCart: (product: any) => void;
-  removeFromCart: (id: string | number) => void;
-  updateQuantity: (id: string | number, delta: number) => void;
-  clearCart: () => void;
+  cart: CartItem[];
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
+  toggleCart: () => void;
+  openCart: () => void;
+  closeCart: () => void;
+  addToCart: (item: any) => void;
+  removeFromCart: (id: string) => void;
+  updateQuantity: (id: string, deltaOrQty: number) => void;
+  clearCart: () => void;
+  appliedCoupon: AppliedCoupon | null;
+  applyCoupon: (code: string) => { success: boolean; message: string };
+  removeCoupon: () => void;
   totalPrice: number;
-  totalCount: number;
-  toastMessage: string | null;
+  totalAmount: number;
+  submitOrder?: (orderData: any) => { id: string; [key: string]: any };
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
 
-  // لود سبد خرید از LocalStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('pv_cart');
-      if (saved) {
-        setCart(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    setIsHydrated(true);
+      const local = localStorage.getItem("pv_cart_items");
+      if (local) setCartItems(JSON.parse(local));
+    } catch {}
   }, []);
 
-  // ذخیره در LocalStorage
-  useEffect(() => {
-    if (!isHydrated) return;
+  const saveCart = (items: CartItem[]) => {
+    setCartItems(items);
     try {
-      localStorage.setItem('pv_cart', JSON.stringify(cart));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [cart, isHydrated]);
+      localStorage.setItem("pv_cart_items", JSON.stringify(items));
+    } catch {}
+  };
 
-  const addToCart = (product: any) => {
-    const productId = product.id;
-    const productName = product.title || product.title_fa || product.name || 'محصول پوریا ویژوالز';
-    const productPrice = Number(product.price) || 0;
-    const productImage = product.image_url || product.image || (Array.isArray(product.images) ? product.images[0] : '') || '/placeholder.png';
+  const addToCart = (item: any) => {
+    const itemId = String(item.id);
+    const itemTitle = item.title || item.name || "محصول فروشگاه";
+    const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);
+    const itemImage = item.image || item.images?.[0] || "";
 
-    setCart((prev) => {
-      const existing = prev.find((item) => String(item.id) === String(productId));
-      if (existing) {
-        return prev.map((item) =>
-          String(item.id) === String(productId)
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [
-        ...prev,
+    const existing = cartItems.find((i) => i.id === itemId);
+    let updated: CartItem[];
+
+    if (existing) {
+      updated = cartItems.map((i) =>
+        i.id === itemId ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i
+      );
+    } else {
+      updated = [
+        ...cartItems,
         {
-          id: productId,
-          title: productName,
-          name: productName,
-          price: productPrice,
-          image: productImage,
-          image_url: productImage,
-          quantity: 1,
+          id: itemId,
+          title: itemTitle,
+          name: itemTitle,
+          price: itemPrice,
+          discountPrice: item.discountPrice,
+          image: itemImage,
+          quantity: item.quantity || 1,
+          stock: item.stock,
         },
       ];
-    });
-
-    setToastMessage(`"${productName}" به سبد خرید اضافه شد.`);
+    }
+    saveCart(updated);
     setIsCartOpen(true);
-
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3000);
   };
 
-  const removeFromCart = (id: string | number) => {
-    setCart((prev) => prev.filter((item) => String(item.id) !== String(id)));
+  const removeFromCart = (id: string) => {
+    const updated = cartItems.filter((i) => i.id !== id);
+    saveCart(updated);
   };
 
-  const updateQuantity = (id: string | number, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) => {
-          if (String(item.id) === String(id)) {
-            const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: newQty } : null;
-          }
-          return item;
-        })
-        .filter(Boolean) as CartItem[]
-    );
+  const updateQuantity = (id: string, deltaOrQty: number) => {
+    const existing = cartItems.find((i) => i.id === id);
+    if (!existing) return;
+
+    let newQty = deltaOrQty;
+    // اگر تغییر به صورت دلتا (+1 یا -1) ارسال شده باشد
+    if (deltaOrQty === 1 || deltaOrQty === -1) {
+      newQty = existing.quantity + deltaOrQty;
+    }
+
+    if (newQty <= 0) {
+      removeFromCart(id);
+      return;
+    }
+
+    const updated = cartItems.map((i) => (i.id === id ? { ...i, quantity: newQty } : i));
+    saveCart(updated);
   };
 
   const clearCart = () => {
-    setCart([]);
+    saveCart([]);
+    setAppliedCoupon(null);
   };
 
-  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const openCart = () => setIsCartOpen(true);
+  const closeCart = () => setIsCartOpen(false);
+  const toggleCart = () => setIsCartOpen((prev) => !prev);
+
+  const applyCoupon = (code: string) => {
+    const clean = code.trim().toUpperCase();
+    if (clean === "OFF10" || clean === "AXON") {
+      setAppliedCoupon({ code: clean, discountPercent: 10 });
+      return { success: true, message: "کد تخفیف ۱۰٪ با موفقیت اعمال شد." };
+    }
+    return { success: false, message: "کد تخفیف وارد شده معتبر نیست." };
+  };
+
+  const removeCoupon = () => setAppliedCoupon(null);
+
+  const totalPrice = cartItems.reduce(
+    (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
+    0
+  );
+
+  const submitOrder = (orderData: any) => {
+    const orderId = `ORD-${Date.now()}`;
+    const fullOrder = {
+      id: orderId,
+      ...orderData,
+      items: cartItems,
+      totalAmount: totalPrice,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const existing = JSON.parse(localStorage.getItem("pv_orders_local") || "[]");
+      localStorage.setItem("pv_orders_local", JSON.stringify([fullOrder, ...existing]));
+    } catch {}
+    return fullOrder;
+  };
 
   return (
     <CartContext.Provider
       value={{
-        cart,
-        cartItems: cart,
+        cartItems,
+        cart: cartItems,
+        isCartOpen,
+        setIsCartOpen,
+        toggleCart,
+        openCart,
+        closeCart,
         addToCart,
         removeFromCart,
         updateQuantity,
         clearCart,
-        isCartOpen,
-        setIsCartOpen,
+        appliedCoupon,
+        applyCoupon,
+        removeCoupon,
         totalPrice,
-        totalCount,
-        toastMessage,
+        totalAmount: totalPrice,
+        submitOrder,
       }}
     >
       {children}
-      {toastMessage && (
-        <div className="fixed bottom-5 left-5 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-slide-up text-sm font-medium">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-          {toastMessage}
-        </div>
-      )}
     </CartContext.Provider>
   );
 }
@@ -150,7 +187,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 export function useCart() {
   const context = useContext(CartContext);
   if (!context) {
-    throw new Error('useCart must be used within a CartProvider');
+    throw new Error("useCart must be used within a CartProvider");
   }
   return context;
 }

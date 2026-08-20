@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { menuService, MenuItem } from "@/services/menuService";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { siteInfoService } from "@/services/siteInfoService";
 import { categoryService, Category } from "@/services/categoryService";
 import { productService } from "@/services/productService";
 
@@ -98,11 +98,11 @@ export default function Header() {
     try {
       const [info, menus, cats] = await Promise.all([
         siteInfoService.getSiteInfo ? siteInfoService.getSiteInfo() : (siteInfoService as any).getAll(),
-        menuService.getAll(),
+        menuService.getAll ? menuService.getAll() : [],
         categoryService && categoryService.getAll ? categoryService.getAll() : productService.getCategories(),
       ]);
       if (info) setSiteInfo(info);
-      if (menus) setMenuItems(menus.filter((m: any) => m.isActive !== false));
+      if (menus) setMenuItems(menus.filter((m: any) => m.isActive !== false && m.is_active !== false));
       if (cats && cats.length > 0) {
         if (typeof cats[0] === "string") {
           setCategories(cats.map((c: any, index: number) => ({ id: String(index), name: c, slug: c })));
@@ -146,7 +146,6 @@ export default function Header() {
     const handleUpdate = () => fetchLiveSiteInfo();
     window.addEventListener("site_info_updated", handleUpdate);
 
-    // بستن خودکار دراپ داون هنگام کلیک بیرون
     const handleClickOutside = (e: MouseEvent) => {
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
         setIsCategoryOpen(false);
@@ -184,7 +183,6 @@ export default function Header() {
   const handleSelectCategory = (catSlug: string) => {
     setSelectedCategory(catSlug);
     setIsCategoryOpen(false);
-    // ارسال رویداد جهت فیلتر شدن محصولات در صفحه اصلی
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("category_selected", { detail: catSlug }));
     }
@@ -313,7 +311,7 @@ export default function Header() {
   };
 
   const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false;
-  const currentStoreName = siteInfo?.storeName || siteInfo?.site_name || siteInfo?.name || "فروشگاه";
+  const currentStoreName = siteInfo?.storeName || siteInfo?.site_name || siteInfo?.siteName || siteInfo?.name || "آکسون | Axon";
   const currentLogoUrl = siteInfo?.logoUrl || siteInfo?.logo_url;
 
   return (
@@ -407,15 +405,25 @@ export default function Header() {
 
         {/* وسط: منوی ناوبری لینک‌های اصلی */}
         <nav className="hidden md:flex items-center gap-5 text-xs font-bold text-[var(--text-secondary)]">
-          {menuItems.map((item) => (
-            <Link
-              key={item.id}
-              href={item.url || (item as any).href || "#"}
-              className="hover:text-[var(--accent-blue)] transition font-bold"
-            >
-              {item.title || (item as any).label}
-            </Link>
-          ))}
+          {menuItems.length > 0 ? (
+            menuItems.map((item) => (
+              <Link
+                key={item.id}
+                href={item.url || (item as any).href || "#"}
+                className="hover:text-[var(--accent-blue)] transition font-bold"
+              >
+                {item.title || (item as any).label}
+              </Link>
+            ))
+          ) : (
+            <>
+              <Link href="/" className="hover:text-[var(--accent-blue)] transition font-bold">صفحه نخست</Link>
+              <Link href="/products" className="hover:text-[var(--accent-blue)] transition font-bold">کاتالوگ محصولات</Link>
+              <Link href="/track-order" className="hover:text-[var(--accent-blue)] transition font-bold">پیگیری سفارش پستی</Link>
+              <Link href="/blog" className="hover:text-[var(--accent-blue)] transition font-bold">مجله و مقالات سئو</Link>
+              <Link href="/contact" className="hover:text-[var(--accent-blue)] transition font-bold">تماس با ما</Link>
+            </>
+          )}
         </nav>
 
         {/* چپ: کنترل تم و سبد خرید */}
@@ -468,7 +476,7 @@ export default function Header() {
                       key={item.id}
                       className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs gap-3 shadow-sm"
                     >
-                      <img src={item.image} alt={item.title} className="w-12 h-12 object-contain rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]" />
+                      <img src={item.image} alt={item.title} className="w-12 h-12 object-contain rounded-xl bg-[var(--modal-bg)] p-1 border border-[var(--card-border)]" />
                       <div className="flex-1 space-y-1">
                         <h4 className="font-bold text-[var(--text-primary)]">{item.title}</h4>
                         <span className="text-[var(--accent-blue)] font-black block font-mono">

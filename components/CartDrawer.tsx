@@ -12,7 +12,6 @@ export default function CartDrawer() {
   const router = useRouter();
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, totalPrice } = useCart();
 
-  // استیت‌های تکمیل فرم خرید
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -47,7 +46,7 @@ export default function CartDrawer() {
 
     setSubmitting(true);
     try {
-      // ۱. ساخت و ذخیره سفارش در دیتابیس Supabase
+      // ۱. ثبت فاکتور و سفارش در دیتابیس Supabase
       const newOrder = await orderService.create({
         customerName: customerName.trim(),
         phone: phone.trim(),
@@ -67,7 +66,7 @@ export default function CartDrawer() {
       });
 
       if (newOrder) {
-        // ۲. کسر موجودی فیزیکی کالاها در دیتابیس
+        // ۲. کسر موجودی فیزیکی از انبار
         for (const item of cartItems) {
           try {
             const currentProd = await productService.getById(item.id);
@@ -83,15 +82,15 @@ export default function CartDrawer() {
           }
         }
 
-        // ۳. ارسال پیامک تایید سفارش
+        // ۳. ارسال پیامک وضعیت سفارش به مشتری
         await smsService.sendOrderStatusChange(phone.trim(), newOrder.id, "در حال پردازش و انبارداری");
 
-        // ۴. پاکسازی سبد و هدایت به صفحه رهگیری
+        // ۴. پاکسازی سبد خرید و هدایت به برگه رهگیری
         clearCart();
         setIsCartOpen(false);
         router.push(`/track-order?orderId=${newOrder.id}&success=true`);
       }
-    } catch (e) {
+    } catch {
       alert("خطا در ثبت نهایی فاکتور. لطفاً مجدداً تلاش نمایید.");
     } finally {
       setSubmitting(false);
@@ -150,14 +149,14 @@ export default function CartDrawer() {
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl p-1">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.id, 1)}
                           className="w-6 h-6 flex items-center justify-center font-bold text-xs hover:text-[var(--accent-blue)]"
                         >
                           +
                         </button>
                         <span className="font-mono font-black text-xs px-2">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.id, -1)}
                           className="w-6 h-6 flex items-center justify-center font-bold text-xs hover:text-[var(--accent-blue)]"
                         >
                           -

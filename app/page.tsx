@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
 import { bannerService, Banner } from "@/services/bannerService";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
@@ -16,19 +18,25 @@ export default function HomePage() {
 
   const loadData = async () => {
     try {
-      const [prods, bans] = await Promise.all([
-        productService.getAll(),
+      const [prods, bans, info] = await Promise.all([
+        productService.getAll ? productService.getAll() : productService.getProducts(),
         bannerService.getAll ? bannerService.getAll() : (bannerService.getActive ? bannerService.getActive() : []),
+        siteInfoService.getSiteInfo(),
       ]);
 
       setProducts(prods || []);
       setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
+      if (info) setSiteInfo(info);
     } catch (e) {
       console.error("Error loading home page data:", e);
     }
   };
 
   useEffect(() => {
+    // خواندن فوری از کش بدون تاخیر
+    const initialSite = siteInfoService.getSiteInfoSync();
+    if (initialSite) setSiteInfo(initialSite);
+
     loadData();
 
     // دریافت بلادرنگ انتخاب دسته‌بندی از هدر
@@ -47,13 +55,19 @@ export default function HomePage() {
       else loadData();
     };
 
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
+
     window.addEventListener("category_selected", handleCategoryChange);
     window.addEventListener("products_updated", handleProductsUpdate);
     window.addEventListener("banners_updated", handleBannersUpdate);
+    window.addEventListener("site_info_updated", handleSiteUpdate);
 
     // کانال هماهنگی زنده بین تب‌های مرورگر
     let prodChannel: BroadcastChannel | null = null;
     let banChannel: BroadcastChannel | null = null;
+    let siteChannel: BroadcastChannel | null = null;
 
     if ("BroadcastChannel" in window) {
       prodChannel = new BroadcastChannel("products_sync_channel");
@@ -67,20 +81,29 @@ export default function HomePage() {
           setBanners(event.data.data.filter((b: any) => b.is_active !== false && b.isActive !== false));
         }
       };
+
+      siteChannel = new BroadcastChannel("pv_site_sync");
+      siteChannel.onmessage = (event) => {
+        if (event.data?.type === "SITE_INFO_CHANGE") {
+          setSiteInfo(event.data.data);
+        }
+      };
     }
 
     return () => {
       window.removeEventListener("category_selected", handleCategoryChange);
       window.removeEventListener("products_updated", handleProductsUpdate);
       window.removeEventListener("banners_updated", handleBannersUpdate);
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
       if (prodChannel) prodChannel.close();
       if (banChannel) banChannel.close();
+      if (siteChannel) siteChannel.close();
     };
   }, []);
 
   const filteredProducts = products.filter((product) => {
     if (selectedCategory === "all") return true;
-    const cat = (product.category || product.category_id || "").toLowerCase();
+    const cat = (product.category || product.category_name || product.category_id || "").toLowerCase();
     const target = selectedCategory.toLowerCase();
     return cat === target || cat.includes(target) || target.includes(cat);
   });
@@ -89,7 +112,7 @@ export default function HomePage() {
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
       <div className="max-w-6xl mx-auto px-4 space-y-10 mt-6">
         {/* ویترین بنرهای اصلی */}
-        {banners.length > 0 && (
+        {banners.length > 0 ? (
           <section className="space-y-4">
             {banners.map((banner: any) => (
               <div
@@ -124,6 +147,21 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
+          </section>
+        ) : (
+          /* بنر پویای اطلاعات سایت در صورت نبود اسلایدر */
+          <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] p-8 md:p-12 min-h-[260px] flex items-center bg-gradient-to-l from-neutral-900 to-neutral-800 text-white shadow-2xl">
+            <div className="max-w-xl space-y-3 z-10">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-bold">
+                ضمانت اصالت و سلامت ۱۰۰٪
+              </span>
+              <h1 className="text-2xl md:text-4xl font-black">
+                {siteInfo?.site_name || siteInfo?.siteName || "فروشگاه تخصصی تجهیزات دیجیتال"}
+              </h1>
+              <p className="text-xs md:text-sm text-slate-300 font-medium">
+                {siteInfo?.tagline || "ارائه جدیدترین و برترین کالاها با گارانتی معتبر و ارسال سریع"}
+              </p>
+            </div>
           </section>
         )}
 
@@ -421,11 +459,13 @@ function AIAssistantChat() {
                     <div className="flex gap-2 items-center">
                       <img
                         src={m.matchedProduct.images?.[0] || m.matchedProduct.image || ""}
-                        alt={m.matchedProduct.name}
+                        alt={m.matchedProduct.name || m.matchedProduct.title || ""}
                         className="w-12 h-12 rounded-lg object-cover"
                       />
                       <div className="flex-1 overflow-hidden">
-                        <h5 className="font-bold truncate text-[11px] text-[var(--text-primary)]">{m.matchedProduct.name}</h5>
+                        <h5 className="font-bold truncate text-[11px] text-[var(--text-primary)]">
+                          {m.matchedProduct.name || m.matchedProduct.title}
+                        </h5>
                         <p className="text-[var(--accent-blue)] font-extrabold text-[11px]">
                           {(m.matchedProduct.price || 0).toLocaleString("fa-IR")} تومان
                         </p>
@@ -435,7 +475,7 @@ function AIAssistantChat() {
                       onClick={() =>
                         addToCart({
                           id: m.matchedProduct!.id,
-                          name: m.matchedProduct!.name,
+                          name: m.matchedProduct!.name || m.matchedProduct!.title || "",
                           price: m.matchedProduct!.price,
                           image: m.matchedProduct!.images?.[0] || m.matchedProduct!.image || "",
                         })
@@ -510,7 +550,8 @@ function HomeProductCard({
 }) {
   const images = product.images && product.images.length > 0 ? product.images : [product.image || ""];
   const displayImage = images[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500";
-  const isAvailable = product.is_available !== false && (product.stock === undefined || product.stock > 0);
+  const isAvailable = (product as any).is_available !== false && (product.stock === undefined || product.stock > 0);
+  const productName = product.title || (product as any).name || "";
 
   return (
     <div className="rounded-[2rem] liquid-glass-card p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] transition duration-300 group border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
@@ -520,7 +561,7 @@ function HomeProductCard({
       >
         <img
           src={displayImage}
-          alt={product.name}
+          alt={productName}
           className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-500"
         />
         <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center backdrop-blur-[2px]">
@@ -533,7 +574,7 @@ function HomeProductCard({
       <div className="space-y-2.5 cursor-pointer" onClick={() => onOpenDetails(product)}>
         <div className="flex items-center justify-between text-[10px]">
           <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full font-bold">
-            {product.category_id || product.category || "کالای دیجیتال"}
+            {product.category_name || product.category_id || (product as any).category || "کالای دیجیتال"}
           </span>
           <span
             className={`font-bold px-2.5 py-0.5 rounded-full ${
@@ -547,19 +588,19 @@ function HomeProductCard({
         </div>
 
         <h4 className="font-extrabold text-sm hover:text-[var(--accent-blue)] transition text-[var(--text-primary)] leading-snug line-clamp-1">
-          {product.name}
+          {productName}
         </h4>
         <p className="text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
-          {product.title_fa || product.description}
+          {(product as any).title_fa || product.description}
         </p>
 
         <div className="flex items-center gap-2 pt-1">
           <span className="font-black text-base text-[var(--accent-blue)]">
-            {(product.price || 0).toLocaleString("fa-IR")} تومان
+            {(product.discount_price || product.price || 0).toLocaleString("fa-IR")} تومان
           </span>
-          {product.original_price && product.original_price > product.price && (
+          {product.discount_price && product.discount_price < product.price && (
             <span className="text-xs line-through text-[var(--text-muted)] font-mono">
-              {product.original_price.toLocaleString("fa-IR")}
+              {product.price.toLocaleString("fa-IR")}
             </span>
           )}
         </div>
@@ -569,8 +610,8 @@ function HomeProductCard({
         onClick={() => {
           onAddToCart({
             id: product.id,
-            name: product.name,
-            price: product.price,
+            name: productName,
+            price: product.discount_price || product.price,
             image: displayImage,
             stock: product.stock ?? 10,
           });
@@ -598,8 +639,9 @@ function ProductDetailsModal({
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"desc" | "specs" | "shipping">("desc");
 
-  const specsEntries = product.specs ? Object.entries(product.specs) : [];
-  const isAvailable = product.is_available !== false && (product.stock === undefined || product.stock > 0);
+  const specsEntries = (product as any).specs ? Object.entries((product as any).specs) : [];
+  const isAvailable = (product as any).is_available !== false && (product.stock === undefined || product.stock > 0);
+  const productName = product.title || (product as any).name || "";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
@@ -616,7 +658,7 @@ function ProductDetailsModal({
             <div className="w-full h-72 md:h-96 rounded-3xl overflow-hidden bg-black/5 dark:bg-black/40 flex items-center justify-center border border-[var(--card-border)]">
               <img
                 src={activeImage || product.image || ""}
-                alt={product.name}
+                alt={productName}
                 className="w-full h-full object-contain p-4"
               />
             </div>
@@ -644,7 +686,7 @@ function ProductDetailsModal({
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-[10px] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-1 rounded-full font-bold">
-                  {product.category_id || product.category || "کالای دیجیتال"}
+                  {product.category_name || product.category_id || (product as any).category || "کالای دیجیتال"}
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
@@ -656,9 +698,9 @@ function ProductDetailsModal({
                   {isAvailable ? "موجود در انبار" : "ناموجود"}
                 </span>
               </div>
-              <h2 className="text-2xl font-black mt-1 leading-snug text-[var(--text-primary)]">{product.name}</h2>
-              {product.title_fa && (
-                <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">{product.title_fa}</p>
+              <h2 className="text-2xl font-black mt-1 leading-snug text-[var(--text-primary)]">{productName}</h2>
+              {(product as any).title_fa && (
+                <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">{(product as any).title_fa}</p>
               )}
             </div>
 
@@ -724,7 +766,7 @@ function ProductDetailsModal({
 
               {activeTab === "shipping" && (
                 <div className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-                  <p>✅ {product.warranty || "۱۸ ماه گارانتی شرکتی و سلامت فیزیکی"}</p>
+                  <p>✅ {(product as any).warranty || "۱۸ ماه گارانتی شرکتی و سلامت فیزیکی"}</p>
                   <p>✅ ارسال سریع اکسپرس با بسته‌بندی ایمن ضدضربه</p>
                   <p>✅ ضمانت ۱۰۰٪ اصالت فیزیکی و ریجستری رسمی</p>
                 </div>
@@ -736,11 +778,11 @@ function ProductDetailsModal({
                 <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-black text-[var(--accent-blue)]">
-                    {(product.price || 0).toLocaleString("fa-IR")} تومان
+                    {(product.discount_price || product.price || 0).toLocaleString("fa-IR")} تومان
                   </span>
-                  {product.original_price && product.original_price > product.price && (
+                  {product.discount_price && product.discount_price < product.price && (
                     <span className="text-xs line-through text-[var(--text-muted)] font-mono">
-                      {product.original_price.toLocaleString("fa-IR")}
+                      {product.price.toLocaleString("fa-IR")}
                     </span>
                   )}
                 </div>
@@ -768,8 +810,8 @@ function ProductDetailsModal({
                     for (let i = 0; i < quantity; i++) {
                       onAddToCart({
                         id: product.id,
-                        name: product.name,
-                        price: product.price,
+                        name: productName,
+                        price: product.discount_price || product.price,
                         image: activeImage || product.image || "",
                         stock: product.stock ?? 10,
                       });

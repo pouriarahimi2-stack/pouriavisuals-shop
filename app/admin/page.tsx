@@ -14,6 +14,7 @@ import AdminDashboardStats from "@/components/admin/AdminDashboardStats";
 import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import ContactMessagesManager from "@/components/admin/ContactMessagesManager";
+import PageBuilder from "@/components/admin/PageBuilder";
 import { productService, Product } from "@/services/productService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
@@ -24,7 +25,17 @@ export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "products" | "inventory" | "blogs" | "coupons" | "customers" | "banners" | "menu" | "orders" | "siteInfo" | "messages"
+    | "products"
+    | "inventory"
+    | "page_builder"
+    | "blogs"
+    | "coupons"
+    | "customers"
+    | "banners"
+    | "menu"
+    | "orders"
+    | "siteInfo"
+    | "messages"
   >("products");
 
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -224,6 +235,7 @@ export default function AdminPage() {
   const navTabs = [
     { id: "products", label: "محصولات", icon: "📦", show: true },
     { id: "inventory", label: "انبارداری", icon: "📥", show: true },
+    { id: "page_builder", label: "صفحه‌ساز", icon: "🏗️", show: isSuper },
     { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: isSuper },
     { id: "messages", label: "پیام‌ها و مشاوره", icon: "📩", show: isSuper },
     { id: "coupons", label: "تخفیف‌ها", icon: "🏷️", show: isSuper },
@@ -381,6 +393,7 @@ export default function AdminPage() {
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-md">
         {activeTab === "products" && <AdminProducts />}
         {activeTab === "inventory" && <AdminInventoryManager />}
+        {activeTab === "page_builder" && isSuper && <PageBuilder />}
         {activeTab === "blogs" && <AdminBlogManager />}
         {activeTab === "orders" && isSuper && <OrderManager />}
         {activeTab === "messages" && isSuper && <ContactMessagesManager />}

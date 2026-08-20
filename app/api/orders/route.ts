@@ -27,16 +27,19 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    // ۱. ثبت در دیتابیس
+    // ۱. ثبت در دیتابیس Supabase
     const { data, error } = await supabaseAdmin
       .from('orders')
       .upsert(orderPayload, { onConflict: 'id' })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Database order insertion error:', error);
+      throw error;
+    }
 
-    // ۲. کسر موجودی انبار محصولات
+    // ۲. کسر هوشمند موجودی انبار محصولات
     if (Array.isArray(body.items)) {
       for (const item of body.items) {
         const prodId = item.productId || item.id;
@@ -59,13 +62,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ۳. ارسال پیامک تایید سفارش به شماره خریدار
+    // ۳. ارسال پیامک وضعیت سفارش
     if (body.phone) {
       smsService.sendOrderStatusChange(body.phone, orderId, 'در حال پردازش و انبارداری').catch(() => {});
     }
 
     return NextResponse.json({ success: true, data: data || orderPayload });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message || 'خطا در ثبت فاکتور سفارش' }, { status: 500 });
   }
 }

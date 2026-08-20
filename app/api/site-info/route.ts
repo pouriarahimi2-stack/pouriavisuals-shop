@@ -10,8 +10,8 @@ export async function GET() {
       .maybeSingle();
 
     if (error || !data) {
-      const { data: anyRow } = await supabaseAdmin.from('site_info').select('*').limit(1).maybeSingle();
-      return NextResponse.json({ success: true, data: anyRow || {} });
+      const { data: firstRow } = await supabaseAdmin.from('site_info').select('*').limit(1).maybeSingle();
+      return NextResponse.json({ success: true, data: firstRow || {} });
     }
 
     return NextResponse.json({ success: true, data });
@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // فیلتر کردن دقیق ستون‌هایی که در جدول site_info سوپابیس وجود دارند
     const cleanPayload: Record<string, any> = {
       id: 'default_info',
       site_name: body.site_name || body.siteName || '',
@@ -33,7 +32,6 @@ export async function POST(req: NextRequest) {
       phone: body.phone || null,
     };
 
-    // در صورتی که ستون‌های دیگر وجود داشته باشند
     if (body.description !== undefined) cleanPayload.description = body.description;
     if (body.email !== undefined) cleanPayload.email = body.email;
     if (body.address !== undefined) cleanPayload.address = body.address;
@@ -41,16 +39,14 @@ export async function POST(req: NextRequest) {
     if (body.telegram !== undefined) cleanPayload.telegram = body.telegram;
     if (body.whatsapp !== undefined) cleanPayload.whatsapp = body.whatsapp;
 
-    // تلاش برای ذخیره امن
     let { data, error } = await supabaseAdmin
       .from('site_info')
       .upsert(cleanPayload, { onConflict: 'id' })
       .select()
       .maybeSingle();
 
-    // اگر دیتابیس ستون‌های اضافی را قبول نکرد، فقط ستون‌های اصلی را ذخیره کن
     if (error) {
-      const minimalPayload = {
+      const corePayload = {
         id: 'default_info',
         site_name: cleanPayload.site_name,
         tagline: cleanPayload.tagline,
@@ -60,7 +56,7 @@ export async function POST(req: NextRequest) {
 
       const retry = await supabaseAdmin
         .from('site_info')
-        .upsert(minimalPayload, { onConflict: 'id' })
+        .upsert(corePayload, { onConflict: 'id' })
         .select()
         .maybeSingle();
 

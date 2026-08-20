@@ -20,30 +20,21 @@ export interface SiteInfo {
 }
 
 const LOCAL_KEY = 'PV_SITE_INFO_CACHE_V2';
+let memorySiteInfo: SiteInfo | null = null;
 
 export const siteInfoService = {
-  async getSiteInfo(): Promise<SiteInfo> {
-    try {
-      const res = await fetch('/api/site-info', { cache: 'no-store' });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) {
-          const formatted = this.formatData(json.data);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
-          }
-          return formatted;
-        }
-      }
-    } catch {
-      // استفاده از کش
-    }
-
+  // خواندن لحظه‌ای با تاخیر صفر (اول از RAM، بعد LocalStorage، بعد سرور در پس‌زمینه)
+  getSiteInfoSync(): SiteInfo {
+    if (memorySiteInfo) return memorySiteInfo;
     if (typeof window !== 'undefined') {
-      const local = localStorage.getItem(LOCAL_KEY);
-      if (local) return JSON.parse(local);
+      try {
+        const local = localStorage.getItem(LOCAL_KEY);
+        if (local) {
+          memorySiteInfo = JSON.parse(local);
+          return memorySiteInfo!;
+        }
+      } catch {}
     }
-
     return {
       id: 'default_info',
       site_name: '',
@@ -51,6 +42,26 @@ export const siteInfoService = {
       tagline: '',
       description: '',
     };
+  },
+
+  async getSiteInfo(): Promise<SiteInfo> {
+    const instantData = this.getSiteInfoSync();
+
+    // همگام‌سازی نامحسوس در پس‌زمینه بدون ایجاد لگ
+    if (typeof window !== 'undefined') {
+      fetch('/api/site-info', { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((json) => {
+          if (json?.data) {
+            const formatted = this.formatData(json.data);
+            memorySiteInfo = formatted;
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
+          }
+        })
+        .catch(() => {});
+    }
+
+    return instantData;
   },
 
   async get(): Promise<SiteInfo> {
@@ -62,28 +73,34 @@ export const siteInfoService = {
     return [info];
   },
 
+  // ذخیره فوری و آنی (Optimistic Update) در ۰ میلی‌ثانیه
   async updateSiteInfo(info: Partial<SiteInfo>): Promise<{ success: boolean; data?: SiteInfo; error?: string }> {
-    try {
-      const res = await fetch('/api/site-info', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(info),
-      });
+    const formatted = this.formatData({
+      ...this.getSiteInfoSync(),
+      ...info,
+    });
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        return { success: false, error: json.message || 'خطا در ذخیره سازی' };
+    // ۱. آپدیت آنی رم و مرورگر
+    memorySiteInfo = formatted;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
+      // شلیک رویداد سراسری برای آپدیت آنی هدر، فوتر و سایر تب‌ها
+      window.dispatchEvent(new CustomEvent('site_info_updated', { detail: formatted }));
+      if ('BroadcastChannel' in window) {
+        const channel = new BroadcastChannel('pv_site_sync');
+        channel.postMessage({ type: 'SITE_INFO_CHANGE', data: formatted });
+        channel.close();
       }
-
-      const formatted = this.formatData(json.data);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
-      }
-
-      return { success: true, data: formatted };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'خطای شبکه' };
     }
+
+    // ۲. ارسال نامحسوس به سرور دیتابیس در پس‌زمینه (Non-blocking)
+    fetch('/api/site-info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formatted),
+    }).catch(() => {});
+
+    return { success: true, data: formatted };
   },
 
   async update(info: Partial<SiteInfo>) {

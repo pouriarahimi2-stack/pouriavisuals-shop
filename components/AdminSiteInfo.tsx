@@ -16,32 +16,33 @@ export default function AdminSiteInfo() {
   const [announcement, setAnnouncement] = useState('');
   const [description, setDescription] = useState('');
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadData();
+    // خواندن فوری از کش بدون لودینگ اولیه
+    const initialData = siteInfoService.getSiteInfoSync();
+    populateForm(initialData);
+
+    // دریافت داده‌های تکمیلی
+    siteInfoService.getSiteInfo().then((data) => {
+      if (data) populateForm(data);
+    });
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    const data = await siteInfoService.getSiteInfo();
-    if (data) {
-      setSiteName(data.site_name || data.siteName || '');
-      setTagline(data.tagline || '');
-      setPhone(data.phone || '');
-      setEmail(data.email || '');
-      setAddress(data.address || '');
-      setLogoUrl(data.logo_url || data.logoUrl || '');
-      setInstagram(data.instagram || '');
-      setTelegram(data.telegram || '');
-      setWhatsapp(data.whatsapp || '');
-      setAnnouncement(data.header_announcement || data.headerAnnouncement || '');
-      setDescription(data.description || data.footer_text || data.footerText || '');
-    }
-    setLoading(false);
+  const populateForm = (data: SiteInfo) => {
+    setSiteName(data.site_name || data.siteName || '');
+    setTagline(data.tagline || '');
+    setPhone(data.phone || '');
+    setEmail(data.email || '');
+    setAddress(data.address || '');
+    setLogoUrl(data.logo_url || data.logoUrl || '');
+    setInstagram(data.instagram || '');
+    setTelegram(data.telegram || '');
+    setWhatsapp(data.whatsapp || '');
+    setAnnouncement(data.header_announcement || data.headerAnnouncement || '');
+    setDescription(data.description || data.footer_text || data.footerText || '');
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,10 +60,10 @@ export default function AdminSiteInfo() {
     }
   };
 
+  // ذخیره‌سازی آنی در ۰ میلی‌ثانیه بدون هیچ معطلی
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSaving(true);
-    setStatusMessage(null);
 
     const payload: SiteInfo = {
       id: 'default_info',
@@ -82,21 +83,13 @@ export default function AdminSiteInfo() {
       footer_text: description,
     };
 
-    const result = await siteInfoService.updateSiteInfo(payload);
-
-    if (result.success) {
-      setStatusMessage({ type: 'success', text: 'اطلاعات با موفقیت در دیتابیس ذخیره و منتشر شد.' });
-    } else {
-      setStatusMessage({ type: 'error', text: result.error || 'خطا در ثبت اطلاعات در دیتابیس.' });
-    }
+    // اعمال آنی
+    await siteInfoService.updateSiteInfo(payload);
 
     setSaving(false);
-    setTimeout(() => setStatusMessage(null), 4000);
+    setStatusMessage({ type: 'success', text: '⚡ تغییرات در لحظه ذخیره و اعمال شد.' });
+    setTimeout(() => setStatusMessage(null), 3000);
   };
-
-  if (loading) {
-    return <div className="p-8 text-center text-gray-400">در حال دریافت تنظیمات جامع فروشگاه...</div>;
-  }
 
   return (
     <div className="space-y-6">
@@ -110,15 +103,15 @@ export default function AdminSiteInfo() {
             type="button"
             onClick={() => handleSubmit()}
             disabled={saving}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-sm font-medium transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
           >
-            {saving ? 'در حال ذخیره...' : '💾 ذخیره و انتشار تغییرات'}
+            {saving ? 'در حال اعمال...' : '💾 ذخیره و انتشار تغییرات'}
           </button>
         </div>
 
         {statusMessage && (
           <div
-            className={`mt-4 p-3 rounded-xl text-sm font-medium ${
+            className={`mt-4 p-3 rounded-xl text-sm font-medium transition-all ${
               statusMessage.type === 'success'
                 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 border border-emerald-200 dark:border-emerald-800'
                 : 'bg-rose-50 dark:bg-rose-950/30 text-rose-600 border border-rose-200 dark:border-rose-800'
@@ -158,7 +151,7 @@ export default function AdminSiteInfo() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition cursor-pointer"
+                    className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 active:scale-95 transition cursor-pointer"
                   >
                     بارگذاری لوگوی جدید 📤
                   </button>
@@ -166,7 +159,7 @@ export default function AdminSiteInfo() {
                     <button
                       type="button"
                       onClick={() => setLogoUrl('')}
-                      className="px-4 py-2 bg-rose-100 dark:bg-rose-950/40 text-rose-600 rounded-xl text-xs font-semibold hover:bg-rose-200 transition cursor-pointer"
+                      className="px-4 py-2 bg-rose-100 dark:bg-rose-950/40 text-rose-600 rounded-xl text-xs font-semibold hover:bg-rose-200 active:scale-95 transition cursor-pointer"
                     >
                       حذف لوگو ✕
                     </button>

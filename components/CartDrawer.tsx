@@ -4,8 +4,6 @@ import React, { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { orderService } from "@/services/orderService";
 import { couponService, Coupon } from "@/services/couponService";
-import { productService } from "@/services/productService";
-import { smsService } from "@/services/smsService";
 import { IRAN_PROVINCES } from "@/lib/iranProvinces";
 import { useRouter } from "next/navigation";
 
@@ -206,7 +204,7 @@ export default function CartDrawer() {
 
     setSubmitting(true);
     try {
-      // ۱. ذخیره سفارش در دیتابیس Supabase
+      // ذخیره سفارش، کسر خودکار انبار و ارسال پیامک از طریق روت امن سروری
       const newOrder = await orderService.create({
         customerName: customerName.trim(),
         phone: cleanPhone,
@@ -225,30 +223,12 @@ export default function CartDrawer() {
         status: "processing",
       });
 
-      if (newOrder) {
-        // ۲. کسر خودکار موجودی در انبار
-        for (const item of cartItems) {
-          try {
-            const currentProd = await productService.getById(item.id);
-            if (currentProd) {
-              const newStk = Math.max(0, (currentProd.stock ?? 1) - item.quantity);
-              await productService.update(item.id, {
-                stock: newStk,
-                is_available: newStk > 0,
-              });
-            }
-          } catch (err) {
-            console.error("Inventory stock sync error:", err);
-          }
-        }
-
-        // ۳. ارسال پیامک تایید با اطلاعات فاکتور
-        await smsService.sendOrderStatusChange(cleanPhone, newOrder.id, "در حال پردازش و بسته‌بندی").catch(() => {});
-
-        // ۴. پاکسازی سبد و انتقال به رهگیری
+      if (newOrder && newOrder.id) {
         clearCart();
         setIsCartOpen(false);
         router.push(`/track-order?orderId=${newOrder.id}&success=true`);
+      } else {
+        throw new Error("پاسخی از سرور دریافت نشد.");
       }
     } catch (err: any) {
       const errorMsg = err?.message || "خطا در ثبت سفارش. لطفاً ارتباط اینترنت را بررسی و مجدداً تلاش کنید.";
@@ -265,7 +245,7 @@ export default function CartDrawer() {
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md font-sans select-none animate-fadeIn" dir="rtl">
       <div className="w-full max-w-lg bg-[var(--modal-bg)] border-r border-[var(--card-border)] h-full shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)]">
         
-        {/* هدر دراور: دکمه بستن در راست، شمارنده زنده و آیکون در چپ مطابق عکس */}
+        {/* هدر دراور */}
         <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between">
           <button
             onClick={() => setIsCartOpen(false)}
@@ -303,7 +283,7 @@ export default function CartDrawer() {
                       key={item.id}
                       className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm"
                     >
-                      {/* سمت راست: دکمه حذف و شمارنده تعداد با کنترل سقف انبار */}
+                      {/* دکمه حذف و کنترل تعداد */}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => removeFromCart(item.id)}
@@ -336,7 +316,7 @@ export default function CartDrawer() {
                         </div>
                       </div>
 
-                      {/* سمت چپ: عنوان کالا، قیمت و تصویر */}
+                      {/* مشخصات کالا */}
                       <div className="flex items-center gap-3 text-left">
                         <div>
                           <h4 className="font-black text-xs text-[var(--text-primary)] line-clamp-1 text-right" dir="rtl">
@@ -365,7 +345,7 @@ export default function CartDrawer() {
                 })}
               </div>
 
-              {/* باکس کد تخفیف (تنها در صورتی نمایش داده می‌شود که ادمین کوپن فعالی ایجاد کرده باشد) */}
+              {/* باکس کد تخفیف */}
               {activeCouponsExist && (
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                   <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
@@ -393,7 +373,7 @@ export default function CartDrawer() {
                 </div>
               )}
 
-              {/* فرم مشخصات دریافت‌کننده و نشانی پستی */}
+              {/* فرم مشخصات و نشانی */}
               <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
                 <div className="flex items-center gap-1.5 font-black text-xs text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
                   <span>📋</span>
@@ -431,7 +411,7 @@ export default function CartDrawer() {
                   />
                 </div>
 
-                {/* انتخاب استان و شهر ایران */}
+                {/* انتخاب استان و شهر */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">استان *</label>
@@ -530,7 +510,7 @@ export default function CartDrawer() {
           )}
         </div>
 
-        {/* فوتر سبد خرید: نمایش مبالغ و دکمه صدور فاکتور */}
+        {/* فوتر مبالغ و دکمه پرداخت */}
         {cartItems.length > 0 && (
           <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs">
             <div className="space-y-1.5 font-bold">

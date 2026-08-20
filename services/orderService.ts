@@ -1,103 +1,93 @@
 import { supabase } from '@/lib/supabase';
-import { createOrderServer, CreateOrderInput } from '@/app/actions/orders';
+
+export interface OrderItem {
+  productId: string;
+  title: string;
+  price: number;
+  quantity: number;
+  image?: string;
+}
 
 export interface Order {
   id: string;
-  customer_name: string;
+  customerName: string;
   phone: string;
   address: string;
-  postal_code: string;
-  total_amount: number;
+  postalCode?: string;
+  items: OrderItem[];
+  totalAmount: number;
+  discountAmount?: number;
+  couponCode?: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  payment_status: 'PENDING' | 'PAID' | 'FAILED';
-  items: any[];
-  created_at: string;
-  notes?: string;
-  tracking_code?: string;
+  trackingCode?: string;
+  createdAt?: string;
 }
 
-const LOCAL_ORDERS_KEY = 'PV_LOCAL_ORDERS_V1';
-
 export const orderService = {
-  async createOrder(payload: CreateOrderInput): Promise<{ success: boolean; orderId?: string; error?: string }> {
-    try {
-      const serverResult = await createOrderServer(payload);
-      if (serverResult.success && serverResult.orderId) {
-        return { success: true, orderId: serverResult.orderId };
-      }
-      return { success: false, error: serverResult.error };
-    } catch {
-      const fallbackId = `ORD-LOCAL-${Date.now()}`;
-      return { success: true, orderId: fallbackId };
-    }
-  },
-
-  async getOrders(): Promise<Order[]> {
+  async getAll(): Promise<Order[]> {
     try {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error || !data) throw error;
-      return data as Order[];
+      if (error) throw error;
+      return (data || []).map((o: any) => ({
+        id: o.id,
+        customerName: o.customer_name || o.customerName || '',
+        phone: o.phone,
+        address: o.address,
+        postalCode: o.postal_code || o.postalCode,
+        items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []),
+        totalAmount: Number(o.total_amount || o.totalAmount || 0),
+        discountAmount: Number(o.discount_amount || o.discountAmount || 0),
+        couponCode: o.coupon_code || o.couponCode,
+        status: o.status || 'processing',
+        trackingCode: o.tracking_code || o.trackingCode,
+        createdAt: o.created_at,
+      }));
     } catch {
-      const local = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_ORDERS_KEY) : null;
-      return local ? JSON.parse(local) : [];
+      return [];
     }
   },
 
-  async getAll(): Promise<Order[]> {
-    return this.getOrders();
-  },
+  async create(orderData: Partial<Order>): Promise<Order> {
+    const orderId = orderData.id || `ORD-${Date.now().toString().slice(-6)}`;
+    const fullPayload = {
+      ...orderData,
+      id: orderId,
+    };
 
-  async fetchOrders(): Promise<Order[]> {
-    return this.getOrders();
-  },
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fullPayload),
+    });
 
-  async getOrderById(orderId: string): Promise<Order | null> {
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .maybeSingle();
-
-      if (error || !data) return null;
-      return data as Order;
-    } catch {
-      return null;
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.message || 'خطا در ثبت سفارش');
     }
+
+    return json.data;
   },
 
-  async updateStatus(orderId: string, status: Order['status'], trackingCode?: string): Promise<boolean> {
+  async updateStatus(id: string, status: Order['status'], trackingCode?: string): Promise<boolean> {
     try {
-      const payload: Record<string, any> = { status, updated_at: new Date().toISOString() };
-      if (trackingCode) payload.tracking_code = trackingCode;
+      const updateData: any = {
+        status,
+        updated_at: new Date().toISOString(),
+      };
+      if (trackingCode) updateData.tracking_code = trackingCode;
 
       const { error } = await supabase
         .from('orders')
-        .update(payload)
-        .eq('id', orderId);
+        .update(updateData)
+        .eq('id', id);
 
-      return !error;
-    } catch {
-      return false;
-    }
-  },
-
-  async update(id: string, payload: any) {
-    return this.updateStatus(id, payload.status, payload.tracking_code);
-  },
-
-  async delete(id: string): Promise<boolean> {
-    try {
-      const { error } = await supabase.from('orders').delete().eq('id', id);
       return !error;
     } catch {
       return false;
     }
   }
 };
-
-export default orderService;

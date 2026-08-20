@@ -11,10 +11,12 @@ export async function GET() {
 
     if (error || !data) {
       const { data: firstRow } = await supabaseAdmin.from('site_info').select('*').limit(1).maybeSingle();
-      return NextResponse.json({ success: true, data: firstRow || {} });
+      const resData = firstRow ? { ...firstRow.extra_data, ...firstRow } : {};
+      return NextResponse.json({ success: true, data: resData });
     }
 
-    return NextResponse.json({ success: true, data });
+    const mergedData = { ...data.extra_data, ...data };
+    return NextResponse.json({ success: true, data: mergedData });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -24,49 +26,74 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const cleanPayload: Record<string, any> = {
+    const payload: Record<string, any> = {
       id: 'default_info',
       site_name: body.site_name || body.siteName || '',
       tagline: body.tagline || '',
       logo_url: body.logo_url || body.logoUrl || null,
       phone: body.phone || null,
+      email: body.email || null,
+      address: body.address || null,
+      instagram: body.instagram || null,
+      telegram: body.telegram || null,
+      whatsapp: body.whatsapp || null,
+      header_announcement: body.header_announcement || body.headerAnnouncement || null,
+      footer_text: body.footer_text || body.footerText || body.description || null,
+      description: body.description || body.footer_text || null,
+      extra_data: {
+        email: body.email || '',
+        address: body.address || '',
+        instagram: body.instagram || '',
+        telegram: body.telegram || '',
+        whatsapp: body.whatsapp || '',
+        header_announcement: body.header_announcement || body.headerAnnouncement || '',
+        footer_text: body.footer_text || body.footerText || body.description || '',
+        description: body.description || '',
+      },
     };
-
-    if (body.description !== undefined) cleanPayload.description = body.description;
-    if (body.email !== undefined) cleanPayload.email = body.email;
-    if (body.address !== undefined) cleanPayload.address = body.address;
-    if (body.instagram !== undefined) cleanPayload.instagram = body.instagram;
-    if (body.telegram !== undefined) cleanPayload.telegram = body.telegram;
-    if (body.whatsapp !== undefined) cleanPayload.whatsapp = body.whatsapp;
 
     let { data, error } = await supabaseAdmin
       .from('site_info')
-      .upsert(cleanPayload, { onConflict: 'id' })
+      .upsert(payload, { onConflict: 'id' })
       .select()
       .maybeSingle();
 
     if (error) {
-      const corePayload = {
+      // فالبک برای حالتی که ستون‌های مستقیم در دیتابیس ساخته نشده باشند و فقط روی extra_data ذخیره شود
+      const fallbackPayload = {
         id: 'default_info',
-        site_name: cleanPayload.site_name,
-        tagline: cleanPayload.tagline,
-        logo_url: cleanPayload.logo_url,
-        phone: cleanPayload.phone,
+        site_name: payload.site_name,
+        tagline: payload.tagline,
+        logo_url: payload.logo_url,
+        phone: payload.phone,
+        extra_data: payload.extra_data,
       };
 
       const retry = await supabaseAdmin
         .from('site_info')
-        .upsert(corePayload, { onConflict: 'id' })
+        .upsert(fallbackPayload, { onConflict: 'id' })
         .select()
         .maybeSingle();
 
       if (retry.error) {
-        return NextResponse.json({ success: false, message: retry.error.message }, { status: 400 });
+        // حداقل ذخیره‌سازی ممکن بدون ارور
+        const minimal = {
+          id: 'default_info',
+          site_name: payload.site_name,
+          tagline: payload.tagline,
+          logo_url: payload.logo_url,
+          phone: payload.phone,
+        };
+        const minRetry = await supabaseAdmin.from('site_info').upsert(minimal, { onConflict: 'id' }).select().maybeSingle();
+        if (minRetry.error) return NextResponse.json({ success: false, message: minRetry.error.message }, { status: 400 });
+        data = minRetry.data;
+      } else {
+        data = retry.data;
       }
-      data = retry.data;
     }
 
-    return NextResponse.json({ success: true, data });
+    const mergedResult = { ...data?.extra_data, ...data };
+    return NextResponse.json({ success: true, data: mergedResult });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

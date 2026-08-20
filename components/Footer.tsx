@@ -1,108 +1,146 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { siteInfoService, SiteInfo } from '@/services/siteInfoService';
 
 export default function Footer() {
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [info, setInfo] = useState<SiteInfo | null>(null);
 
   useEffect(() => {
-    async function loadInfo() {
-      try {
-        const info = await siteInfoService.getAll();
-        setSiteInfo(info);
-      } catch (e) {
-        console.error("Footer load error:", e);
-      }
-    }
-    loadInfo();
+    setInfo(siteInfoService.getSiteInfoSync());
+
+    siteInfoService.getSiteInfo().then((data) => {
+      if (data) setInfo(data);
+    });
 
     const handleUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
+      if (e.detail) setInfo(e.detail);
     };
-    window.addEventListener("site_info_updated", handleUpdate);
-    return () => window.removeEventListener("site_info_updated", handleUpdate);
+
+    window.addEventListener('site_info_updated', handleUpdate);
+    return () => window.removeEventListener('site_info_updated', handleUpdate);
   }, []);
 
-  const phoneNum = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
-  const addressText = siteInfo?.address || "تهران، خیابان ولیعصر";
-  const siteName = siteInfo?.site_name || "پوریا ویژوالز";
+  const siteName = info?.site_name || info?.siteName || 'پوریا ویژوالز';
+  const tagline = info?.tagline || 'مرجع تخصصی فروش، کالیبراسیون و مشاوره مانیتورهای حرفه‌ای تدوین، کالرگریدینگ و تجهیزات استودیویی در ایران.';
+  const phone = info?.phone || '۰۲۱-۸۸۸۸۸۸۸۸';
+  const email = info?.email || 'info@pouriavisuals.ir';
+  const address = info?.address || 'تهران، خیابان ولیعصر';
+  const description = info?.footer_text || info?.footerText || info?.description || tagline;
 
   return (
-    <footer className="mt-20 border-t border-[var(--card-border)] bg-[var(--modal-bg)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-xs">
-        
-        {/* ستون ۱: معرفی برند */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black">
-              ⚡
+    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] transition-colors mt-auto" dir="rtl">
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* ستون ۱: هویت و معرفی */}
+          <div className="space-y-4 md:col-span-1">
+            <div className="flex items-center gap-3">
+              {info?.logo_url || info?.logoUrl ? (
+                <img
+                  src={info.logo_url || info.logoUrl}
+                  alt={siteName}
+                  className="w-9 h-9 object-contain rounded-xl"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                  ⚡
+                </div>
+              )}
+              <h4 className="font-extrabold text-base text-[var(--text-primary)]">{siteName}</h4>
             </div>
-            <h3 className="font-black text-sm">{siteName}</h3>
-          </div>
-          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium">
-            {siteInfo?.about_text ||
-              "مرجع تخصصی فروش، کالیبراسیون و مشاوره مانیتورهای حرفه‌ای تدوین، کالرگریدینگ و تجهیزات استودیویی در ایران."}
-          </p>
-        </div>
-
-        {/* ستون ۲: دسترسی سریع */}
-        <div className="space-y-2.5">
-          <h4 className="font-black text-xs text-[var(--text-primary)]">دسترسی سریع</h4>
-          <ul className="space-y-2 text-[var(--text-secondary)] font-medium">
-            <li>
-              <Link href="/#products" className="hover:text-[var(--accent-blue)] transition">
-                کاتالوگ تجهیزات و مانیتورها
-              </Link>
-            </li>
-            <li>
-              <Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">
-                استعلام و پیگیری مرسوله پستی
-              </Link>
-            </li>
-            <li>
-              <Link href="/blog" className="hover:text-[var(--accent-blue)] transition">
-                مجله تخصصی و مقالات سئو
-              </Link>
-            </li>
-            <li>
-              <Link href="/contact" className="hover:text-[var(--accent-blue)] transition">
-                تماس با پشتیبانی و نشانی
-              </Link>
-            </li>
-          </ul>
-        </div>
-
-        {/* ستون ۳: اطلاعات پشتیبانی */}
-        <div className="space-y-2.5">
-          <h4 className="font-black text-xs text-[var(--text-primary)]">اطلاعات ارتباطی</h4>
-          <div className="space-y-2 text-[var(--text-secondary)] font-medium leading-relaxed">
-            <p>
-              <strong>تلفن:</strong> <span className="font-mono text-[var(--accent-blue)]">{phoneNum}</span>
-            </p>
-            <p>
-              <strong>ایمیل:</strong> <span className="font-mono">{siteInfo?.email || "info@pouriavisuals.ir"}</span>
-            </p>
-            <p>
-              <strong>نشانی:</strong> {addressText}
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
+              {description}
             </p>
           </div>
-        </div>
 
-        {/* ستون ۴: نمادهای اعتماد و حقوق معنوی */}
-        <div className="space-y-3">
-          <h4 className="font-black text-xs text-[var(--text-primary)]">ضمانت و پشتیبانی</h4>
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5 text-[11px] text-[var(--text-secondary)] leading-relaxed">
-            <p className="font-bold text-[var(--text-primary)]">✓ ضمانت اصالت کالا</p>
-            <p>تمامی بسته‌ها با پست پیشتاز بیمه‌شده و بسته‌بندی ضدضربه ارسال می‌گردند.</p>
+          {/* ستون ۲: دسترسی سریع */}
+          <div className="space-y-3">
+            <h5 className="font-black text-xs text-[var(--text-primary)]">دسترسی سریع</h5>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+              <li>
+                <Link href="/products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ تجهیزات و مانیتورها</Link>
+              </li>
+              <li>
+                <Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">استعلام و پیگیری مرسوله پستی</Link>
+              </li>
+              <li>
+                <Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله تخصصی و مقالات سئو</Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-[var(--accent-blue)] transition">تماس با پشتیبانی و نشانی</Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* ستون ۳: اطلاعات ارتباطی */}
+          <div className="space-y-3">
+            <h5 className="font-black text-xs text-[var(--text-primary)]">اطلاعات ارتباطی</h5>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+              <li className="flex items-center gap-1.5">
+                <span className="font-bold">تلفن:</span>
+                <span className="font-mono text-[var(--accent-blue)]">{phone}</span>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="font-bold">ایمیل:</span>
+                <span className="font-mono">{email}</span>
+              </li>
+              <li className="flex items-start gap-1.5 leading-relaxed">
+                <span className="font-bold shrink-0">نشانی:</span>
+                <span>{address}</span>
+              </li>
+            </ul>
+
+            {/* شبکه‌های اجتماعی */}
+            <div className="flex gap-2 pt-2">
+              {info?.instagram && (
+                <a
+                  href={info.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-xl bg-[var(--input-bg)] hover:text-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition"
+                >
+                  اینستاگرام
+                </a>
+              )}
+              {info?.telegram && (
+                <a
+                  href={info.telegram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-xl bg-[var(--input-bg)] hover:text-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition"
+                >
+                  تلگرام
+                </a>
+              )}
+              {info?.whatsapp && (
+                <a
+                  href={info.whatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-xl bg-[var(--input-bg)] hover:text-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition"
+                >
+                  واتساپ
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* ستون ۴: ضمانت و پشتیبانی */}
+          <div className="space-y-3">
+            <h5 className="font-black text-xs text-[var(--text-primary)]">ضمانت و پشتیبانی</h5>
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 text-xs">
+              <div className="font-bold text-emerald-500">✓ ضمانت اصالت کالا</div>
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium">
+                تمامی بسته‌ها با پست پیشتاز بیمه‌شده و بسته‌بندی ضدضربه ارسال می‌گردند.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* کپی‌رایت انتهای صفحه */}
-      <div className="border-t border-[var(--card-border)] py-4 text-center text-[10px] text-[var(--text-secondary)] font-medium">
-        تمامی حقوق مادی و معنوی برای مجموعه {siteName} محفوظ است © {new Date().getFullYear()}
+        <div className="mt-12 pt-6 border-t border-[var(--card-border)] text-center text-[11px] text-[var(--text-muted)] font-medium">
+          تمامی حقوق مادی و معنوی برای مجموعه {siteName} محفوظ است © {new Date().getFullYear()}
+        </div>
       </div>
     </footer>
   );

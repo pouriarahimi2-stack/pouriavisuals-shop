@@ -21,9 +21,9 @@ export interface SiteInfo {
 
 const LOCAL_KEY = 'PV_SITE_INFO_CACHE_V2';
 let memorySiteInfo: SiteInfo | null = null;
+let isFetching = false;
 
 export const siteInfoService = {
-  // خواندن لحظه‌ای با تاخیر صفر (اول از RAM، بعد LocalStorage، بعد سرور در پس‌زمینه)
   getSiteInfoSync(): SiteInfo {
     if (memorySiteInfo) return memorySiteInfo;
     if (typeof window !== 'undefined') {
@@ -37,9 +37,9 @@ export const siteInfoService = {
     }
     return {
       id: 'default_info',
-      site_name: '',
-      siteName: '',
-      tagline: '',
+      site_name: 'Axon | آکسون',
+      siteName: 'Axon | آکسون',
+      tagline: 'نماد مسیر انتقال فوق‌سریع داده‌ها',
       description: '',
     };
   },
@@ -47,18 +47,22 @@ export const siteInfoService = {
   async getSiteInfo(): Promise<SiteInfo> {
     const instantData = this.getSiteInfoSync();
 
-    // همگام‌سازی نامحسوس در پس‌زمینه بدون ایجاد لگ
-    if (typeof window !== 'undefined') {
+    // جلوگیری قطعی از لوپ بی‌نهایت با پرچم isFetching
+    if (typeof window !== 'undefined' && !isFetching) {
+      isFetching = true;
       fetch('/api/site-info', { cache: 'no-store' })
         .then((res) => res.json())
         .then((json) => {
+          isFetching = false;
           if (json?.data) {
             const formatted = this.formatData(json.data);
             memorySiteInfo = formatted;
             localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          isFetching = false;
+        });
     }
 
     return instantData;
@@ -73,27 +77,18 @@ export const siteInfoService = {
     return [info];
   },
 
-  // ذخیره فوری و آنی (Optimistic Update) در ۰ میلی‌ثانیه
   async updateSiteInfo(info: Partial<SiteInfo>): Promise<{ success: boolean; data?: SiteInfo; error?: string }> {
     const formatted = this.formatData({
       ...this.getSiteInfoSync(),
       ...info,
     });
 
-    // ۱. آپدیت آنی رم و مرورگر
     memorySiteInfo = formatted;
     if (typeof window !== 'undefined') {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
-      // شلیک رویداد سراسری برای آپدیت آنی هدر، فوتر و سایر تب‌ها
       window.dispatchEvent(new CustomEvent('site_info_updated', { detail: formatted }));
-      if ('BroadcastChannel' in window) {
-        const channel = new BroadcastChannel('pv_site_sync');
-        channel.postMessage({ type: 'SITE_INFO_CHANGE', data: formatted });
-        channel.close();
-      }
     }
 
-    // ۲. ارسال نامحسوس به سرور دیتابیس در پس‌زمینه (Non-blocking)
     fetch('/api/site-info', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

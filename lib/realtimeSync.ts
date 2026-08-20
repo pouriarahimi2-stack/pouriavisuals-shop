@@ -1,42 +1,47 @@
 import { supabase } from '@/lib/supabase';
 
-type TableName = 'orders' | 'products' | 'banners' | 'site_info' | 'coupons';
+export function initRealtimeSync() {
+  if (typeof window === 'undefined') return;
 
-/**
- * اشتراک در تغییرات دیتابیس برای دریافت آنی ایونت‌های Insert, Update, Delete
- */
-export function subscribeToTable<T = any>(
-  table: TableName,
-  onPayload: (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; new: T; old: Partial<T> }) => void
-) {
-  const channel = supabase
-    .channel(`realtime_${table}_${Date.now()}`)
+  // گوش دادن به تغییرات محصولات
+  const productChannel = supabase
+    .channel('realtime_products_changes')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table },
+      { event: '*', schema: 'public', table: 'products' },
       (payload) => {
-        onPayload({
-          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
-          new: payload.new as T,
-          old: payload.old as Partial<T>,
-        });
+        window.dispatchEvent(new CustomEvent('products_updated', { detail: payload }));
       }
     )
     .subscribe();
 
-  // بازگرداندن تابع لغو اشتراک جهت پاکسازی در Cleanup کامپوننت‌ها
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}
+  // گوش دادن به تغییرات بنرها
+  const bannerChannel = supabase
+    .channel('realtime_banners_changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'banners' },
+      (payload) => {
+        window.dispatchEvent(new CustomEvent('banners_updated', { detail: payload }));
+      }
+    )
+    .subscribe();
 
-/**
- * همگام‌سازی لحظه‌ای سشن و تغییرات سراسری در سطح تب‌های مرورگر
- */
-export function emitBroadcastEvent(channelName: string, event: string, data: any) {
-  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-    const bc = new BroadcastChannel(channelName);
-    bc.postMessage({ event, data, timestamp: Date.now() });
-    bc.close();
-  }
+  // گوش دادن به تغییرات تنظیمات سایت
+  const siteInfoChannel = supabase
+    .channel('realtime_site_info_changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'site_info' },
+      (payload) => {
+        window.dispatchEvent(new CustomEvent('site_info_updated', { detail: payload.new }));
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(productChannel);
+    supabase.removeChannel(bannerChannel);
+    supabase.removeChannel(siteInfoChannel);
+  };
 }

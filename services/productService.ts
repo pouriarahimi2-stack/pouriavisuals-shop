@@ -6,9 +6,11 @@ export interface Product {
   slug?: string;
   price: number;
   discount_price?: number;
+  discountPrice?: number;
   stock: number;
   category_id?: string;
   category_name?: string;
+  category?: string;
   image?: string;
   images?: string[];
   description?: string;
@@ -24,7 +26,7 @@ const LOCAL_PRODUCTS_KEY = 'PV_LOCAL_PRODUCTS_CACHE_V2';
 let memoryCache: Product[] | null = null;
 
 export const productService = {
-  // ۱. دریافت لیست محصولات با لود فوق‌سریع از کش محلی و سینک همزمان با Supabase
+  // دریافت لیست محصولات با لود سریع
   async getProducts(forceRefresh = false): Promise<Product[]> {
     if (memoryCache && !forceRefresh) {
       return memoryCache;
@@ -36,17 +38,19 @@ export const productService = {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error || !data) {
-        throw error || new Error('خطا در دریافت لیست محصولات');
-      }
+      if (error || !data) throw error;
 
-      memoryCache = data as Product[];
+      memoryCache = (data as any[]).map(p => ({
+        ...p,
+        discountPrice: p.discount_price ?? p.discountPrice,
+        category: p.category_name ?? p.category,
+      }));
+
       if (typeof window !== 'undefined') {
-        localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(data));
+        localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(memoryCache));
       }
       return memoryCache;
     } catch {
-      // استفاده از کش محلی در صورت بروز قطعی اینترنت
       if (typeof window !== 'undefined') {
         const local = localStorage.getItem(LOCAL_PRODUCTS_KEY);
         if (local) {
@@ -58,7 +62,16 @@ export const productService = {
     }
   },
 
-  // ۲. دریافت مشخصات یک محصول براساس ID یا Slug
+  // متدهای همگام‌ساز (سازگار با صدا زدن‌های getAll و fetchAll در کامپوننت‌های ادمین)
+  async getAll(): Promise<Product[]> {
+    return this.getProducts();
+  },
+
+  async fetchProducts(): Promise<Product[]> {
+    return this.getProducts();
+  },
+
+  // دریافت یک محصول
   async getProductById(idOrSlug: string): Promise<Product | null> {
     if (memoryCache) {
       const found = memoryCache.find(p => p.id === idOrSlug || p.slug === idOrSlug);
@@ -73,22 +86,30 @@ export const productService = {
         .maybeSingle();
 
       if (error || !data) return null;
-      return data as Product;
+      return {
+        ...data,
+        discountPrice: data.discount_price ?? data.discountPrice,
+        category: data.category_name ?? data.category,
+      } as Product;
     } catch {
       return null;
     }
   },
 
-  // ۳. ایجاد یا به‌روزرسانی محصول (پشتیبانی از هر دو نام متد برای کامپوننت‌های ادمین)
+  async getById(id: string): Promise<Product | null> {
+    return this.getProductById(id);
+  },
+
+  // ایجاد یا ویرایش محصول با اعمال آنی (Optimistic UI)
   async saveProduct(product: Partial<Product>): Promise<{ success: boolean; data?: Product; error?: string }> {
     try {
       const payload: Record<string, any> = {
         title: product.title,
         price: Number(product.price) || 0,
-        discount_price: product.discount_price ? Number(product.discount_price) : null,
+        discount_price: product.discount_price !== undefined ? Number(product.discount_price) : (product.discountPrice !== undefined ? Number(product.discountPrice) : null),
         stock: Number(product.stock) || 0,
         category_id: product.category_id || null,
-        category_name: product.category_name || '',
+        category_name: product.category_name || product.category || '',
         image: product.image || '',
         images: product.images || [],
         description: product.description || '',
@@ -101,7 +122,6 @@ export const productService = {
       let resultProduct: Product;
 
       if (product.id && !product.id.startsWith('temp-')) {
-        // آپدیت محصول موجود
         const { data, error } = await supabase
           .from('products')
           .update(payload)
@@ -109,10 +129,9 @@ export const productService = {
           .select()
           .single();
 
-        if (error || !data) throw error || new Error('خطا در به‌روزرسانی محصول');
+        if (error || !data) throw error;
         resultProduct = data as Product;
       } else {
-        // ایجاد محصول جدید
         payload.created_at = new Date().toISOString();
         const { data, error } = await supabase
           .from('products')
@@ -120,17 +139,17 @@ export const productService = {
           .select()
           .single();
 
-        if (error || !data) throw error || new Error('خطا در ایجاد محصول جدید');
+        if (error || !data) throw error;
         resultProduct = data as Product;
       }
 
-      // آپدیت آنی کش رم و لوکال استوریج (Optimistic Update)
+      // به‌روزرسانی کش کلاینت
       if (memoryCache) {
         const index = memoryCache.findIndex(p => p.id === resultProduct.id);
         if (index > -1) {
-          memoryCache[index] = resultProduct;
+          memoryCache[index] = { ...resultProduct, discountPrice: resultProduct.discount_price, category: resultProduct.category_name };
         } else {
-          memoryCache.unshift(resultProduct);
+          memoryCache.unshift({ ...resultProduct, discountPrice: resultProduct.discount_price, category: resultProduct.category_name });
         }
         if (typeof window !== 'undefined') {
           localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(memoryCache));
@@ -143,16 +162,23 @@ export const productService = {
     }
   },
 
-  // متدهای همگام‌ساز برای کامپوننت‌هایی که create یا update را جدا صدا می‌زنند
+  async create(product: Partial<Product>) {
+    return this.saveProduct(product);
+  },
+
   async createProduct(product: Partial<Product>) {
     return this.saveProduct(product);
+  },
+
+  async update(id: string, product: Partial<Product>) {
+    return this.saveProduct({ ...product, id });
   },
 
   async updateProduct(id: string, product: Partial<Product>) {
     return this.saveProduct({ ...product, id });
   },
 
-  // ۴. حذف آنی محصول
+  // حذف محصول
   async deleteProduct(id: string): Promise<boolean> {
     try {
       const { error } = await supabase
@@ -162,21 +188,23 @@ export const productService = {
 
       if (error) throw error;
 
-      // حذف از کش داخلی به صورت آنی
       if (memoryCache) {
         memoryCache = memoryCache.filter(p => p.id !== id);
         if (typeof window !== 'undefined') {
           localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(memoryCache));
         }
       }
-
       return true;
     } catch {
       return false;
     }
   },
 
-  // ۵. به‌روزرسانی موجودی انبار (Inventory Sync)
+  async delete(id: string): Promise<boolean> {
+    return this.deleteProduct(id);
+  },
+
+  // آپدیت موجودی
   async updateStock(productId: string, newStock: number): Promise<boolean> {
     try {
       const { error } = await supabase
@@ -190,10 +218,11 @@ export const productService = {
         const target = memoryCache.find(p => p.id === productId);
         if (target) target.stock = Math.max(0, newStock);
       }
-
       return true;
     } catch {
       return false;
     }
   }
 };
+
+export default productService;

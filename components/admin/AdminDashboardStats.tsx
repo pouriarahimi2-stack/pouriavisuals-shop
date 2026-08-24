@@ -1,3 +1,4 @@
+// components/admin/AdminDashboardStats.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -18,18 +19,42 @@ export default function AdminDashboardStats() {
     try {
       const [prodsRes, ordersRes, msgsRes, postsRes] = await Promise.all([
         supabase.from("products").select("id, price, discount_price, stock, is_available"),
-        supabase.from("orders").select("id, total_amount, final_amount, status"),
+        supabase.from("orders").select("id, total_amount, status"),
         supabase.from("contact_messages").select("id, is_read"),
         supabase.from("posts").select("id"),
       ]);
 
       const prods = prodsRes.data || [];
-      const orders = ordersRes.data || [];
+      let orders = ordersRes.data || [];
       const msgs = msgsRes.data || [];
       const posts = postsRes.data || [];
 
-      const totalRevenue = orders.reduce((sum, o: any) => sum + Number(o.final_amount || o.total_amount || 0), 0);
-      const lowStock = prods.filter((p: any) => (p.stock !== null && p.stock !== undefined && Number(p.stock) < 3)).length;
+      // در صورت بروز خطا در دسترسی مستقیم به جدول سفارش‌ها، از کش محلی استفاده می‌شود
+      if (ordersRes.error || orders.length === 0) {
+        if (typeof window !== "undefined") {
+          try {
+            const localOrders = JSON.parse(
+              localStorage.getItem("admin_orders_cache") ||
+              localStorage.getItem("site_orders") ||
+              "[]"
+            );
+            if (Array.isArray(localOrders) && localOrders.length > 0) {
+              orders = localOrders;
+            }
+          } catch {}
+        }
+      }
+
+      const totalRevenue = orders.reduce((sum, o: any) => {
+        const val = Number(o.total_amount || o.totalAmount || o.final_amount || o.finalAmount || 0);
+        return sum + (isNaN(val) ? 0 : val);
+      }, 0);
+
+      const lowStock = prods.filter((p: any) => {
+        const stockNum = p.stock !== null && p.stock !== undefined ? Number(p.stock) : 10;
+        return stockNum < 3;
+      }).length;
+
       const unreadMsgs = msgs.filter((m: any) => !m.is_read).length;
 
       setStats({
@@ -50,6 +75,7 @@ export default function AdminDashboardStats() {
   useEffect(() => {
     loadStats();
 
+    // اتصال وب‌سوکت بلادرنگ برای به‌روزرسانی لحظه‌ای آمار بدون رفرش
     const channel = supabase
       .channel("dashboard-stats-realtime-master")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadStats())
@@ -65,6 +91,7 @@ export default function AdminDashboardStats() {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-sans select-none text-xs" dir="rtl">
+      {/* ۱. کاتالوگ کالاها */}
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-[var(--accent-blue)] transition">
         <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
           <span>کاتالوگ کالاها</span>
@@ -76,6 +103,7 @@ export default function AdminDashboardStats() {
         <span className="text-[10px] text-[var(--text-secondary)] font-medium block">ثبت‌شده در ویترین فعال</span>
       </div>
 
+      {/* ۲. فاکتورها و سفارش‌ها */}
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-[var(--accent-blue)] transition">
         <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
           <span>فاکتورها و سفارش‌ها</span>
@@ -87,6 +115,7 @@ export default function AdminDashboardStats() {
         <span className="text-[10px] text-[var(--text-secondary)] font-medium block">کل فاکتورهای ثبت‌شده</span>
       </div>
 
+      {/* ۳. موجودی بحرانی انبار */}
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-amber-500 transition">
         <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
           <span>موجودی بحرانی انبار</span>
@@ -98,6 +127,7 @@ export default function AdminDashboardStats() {
         <span className="text-[10px] text-[var(--text-secondary)] font-medium block">موجودی کمتر از ۳ عدد در انبار</span>
       </div>
 
+      {/* ۴. مجموع تراکنش‌های موفق */}
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-emerald-500 transition">
         <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
           <span>مجموع فروش و تراکنش‌ها</span>

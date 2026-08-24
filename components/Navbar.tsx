@@ -71,39 +71,42 @@ export default function Navbar() {
   };
 
   const activeLinks = menuItems.filter((m) => m.isActive !== false);
+  const logoSrc = siteInfo?.logo_url || (siteInfo as any)?.logoUrl;
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || "پوریا ویژوالز";
+  const tagline = siteInfo?.tagline || "مرجع تخصصی مانیتور و تجهیزات بصری";
 
   return (
-    <nav className="sticky top-0 z-40 bg-[var(--modal-bg)]/85 backdrop-blur-2xl border-b border-[var(--card-border)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+    <nav className="sticky top-0 z-40 bg-[var(--modal-bg)]/90 backdrop-blur-2xl border-b border-[var(--card-border)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300 shadow-sm" dir="rtl">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
         
-        {/* لوگو و نام فروشگاه */}
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            {siteInfo?.logo_url ? (
-              <img src={siteInfo.logo_url} alt="Logo" className="w-10 h-10 object-contain rounded-2xl" />
+        {/* لوگو بزرگ‌تر و نام فروشگاه */}
+        <div className="flex items-center gap-4">
+          <Link href="/" className="flex items-center gap-3 group">
+            {logoSrc ? (
+              <img src={logoSrc} alt="Logo" className="w-14 h-14 object-contain rounded-2xl shadow-md group-hover:scale-105 transition duration-300" />
             ) : (
-              <div className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black shadow-lg group-hover:scale-105 transition">
+              <div className="w-14 h-14 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black text-xl shadow-lg group-hover:scale-105 transition duration-300">
                 ⚡
               </div>
             )}
             <div>
-              <h1 className="font-black text-sm md:text-base leading-tight">
-                {siteInfo?.site_name || "پوریا ویژوالز"}
+              <h1 className="font-black text-base md:text-lg leading-tight tracking-tight">
+                {storeName}
               </h1>
-              <span className="text-[10px] text-[var(--text-secondary)] font-medium block">
-                {siteInfo?.tagline || "مرجع تخصصی مانیتور و تجهیزات بصری"}
+              <span className="text-[11px] text-[var(--text-secondary)] font-semibold block mt-0.5">
+                {tagline}
               </span>
             </div>
           </Link>
         </div>
 
-        {/* منوی پیوندهای دسکتاپ */}
-        <div className="hidden md:flex items-center gap-1">
+        {/* منوی پیوندهای دسکتاپ (کاملاً مرتب و استایل‌بندی شده) */}
+        <div className="hidden md:flex items-center gap-2 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {activeLinks.map((item) => (
             <Link
               key={item.id}
               href={item.url}
-              className="px-4 py-2 rounded-2xl text-xs font-black text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)] transition"
+              className="px-4 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition-all duration-300"
             >
               {item.title}
             </Link>
@@ -111,10 +114,10 @@ export default function Navbar() {
         </div>
 
         {/* دکمه‌های تم، سبد خرید و منوی موبایل */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm"
+            className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-sm hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm"
             title="تغییر حالت شب و روز"
           >
             {isDarkMode ? "🌙" : "☀️"}
@@ -122,9 +125,9 @@ export default function Navbar() {
 
           <button
             onClick={() => setIsCartOpen(true)}
-            className="relative px-4 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg flex items-center gap-2 cursor-pointer"
+            className="relative px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg flex items-center gap-2.5 cursor-pointer active:scale-95"
           >
-            <span>🛒</span>
+            <span className="text-base">🛒</span>
             <span className="hidden sm:inline">سبد خرید</span>
             {totalItems > 0 && (
               <span className="w-5 h-5 rounded-full bg-white text-[var(--accent-blue)] flex items-center justify-center font-mono font-black text-[10px] shadow">
@@ -136,7 +139,7 @@ export default function Navbar() {
           {/* دکمه منوی موبایل */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
+            className="md:hidden p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-sm cursor-pointer"
           >
             {isMobileMenuOpen ? "✕" : "☰"}
           </button>
@@ -151,7 +154,7 @@ export default function Navbar() {
               key={item.id}
               href={item.url}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="block p-3 rounded-2xl bg-[var(--input-bg)] font-black text-xs text-[var(--text-primary)] hover:border-[var(--accent-blue)] border border-transparent transition"
+              className="block p-3.5 rounded-2xl bg-[var(--input-bg)] font-black text-xs text-[var(--text-primary)] hover:border-[var(--accent-blue)] border border-transparent transition"
             >
               {item.title}
             </Link>

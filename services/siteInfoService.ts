@@ -4,7 +4,6 @@ export interface SiteInfo {
   id?: string;
   site_name?: string;
   siteName?: string;
-  name?: string;
   tagline?: string;
   phone?: string;
   email?: string;
@@ -13,15 +12,14 @@ export interface SiteInfo {
   logoUrl?: string;
   footer_logo_url?: string;
   footerLogoUrl?: string;
+  allow_google_index?: boolean;
+  allowGoogleIndex?: boolean;
   instagram?: string;
   telegram?: string;
   whatsapp?: string;
   header_announcement?: string;
-  headerAnnouncement?: string;
   description?: string;
   footer_text?: string;
-  footerText?: string;
-  allowGoogleIndex?: boolean;
 }
 
 let cachedSiteInfo: SiteInfo | null = null;
@@ -50,18 +48,20 @@ export const siteInfoService = {
         .maybeSingle();
 
       if (error) {
-        console.error("Error fetching site_info from Supabase:", error);
+        console.error("Error fetching site_info:", error);
         return this.getSiteInfoSync();
       }
 
       if (data) {
+        const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
         const mapped: SiteInfo = {
           ...data,
           siteName: data.site_name,
           logoUrl: data.logo_url,
           footerLogoUrl: data.footer_logo_url,
+          allowGoogleIndex: isAllowed,
+          allow_google_index: isAllowed,
           footerText: data.footer_text || data.description,
-          headerAnnouncement: data.header_announcement,
         };
         cachedSiteInfo = mapped;
         if (typeof window !== "undefined") {
@@ -76,13 +76,15 @@ export const siteInfoService = {
     }
   },
 
-  async getAll(): Promise<SiteInfo | null> {
-    return this.getSiteInfo();
-  },
-
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      const dbPayload = {
+      const isAllowed = payload.allowGoogleIndex !== undefined 
+        ? payload.allowGoogleIndex 
+        : payload.allow_google_index !== undefined 
+        ? payload.allow_google_index 
+        : true;
+
+      const dbPayload: any = {
         site_name: payload.site_name || payload.siteName || "",
         tagline: payload.tagline || "",
         phone: payload.phone || "",
@@ -90,15 +92,15 @@ export const siteInfoService = {
         address: payload.address || "",
         logo_url: payload.logo_url || payload.logoUrl || "",
         footer_logo_url: payload.footer_logo_url || payload.footerLogoUrl || "",
+        allow_google_index: isAllowed,
         instagram: payload.instagram || "",
         telegram: payload.telegram || "",
         whatsapp: payload.whatsapp || "",
-        header_announcement: payload.header_announcement || payload.headerAnnouncement || "",
-        footer_text: payload.footer_text || payload.footerText || payload.description || "",
-        description: payload.description || payload.footer_text || payload.footerText || "",
+        header_announcement: payload.header_announcement || "",
+        footer_text: payload.footer_text || payload.description || "",
+        description: payload.description || payload.footer_text || "",
       };
 
-      // بررسی وجود سطر قبلی
       const { data: existing } = await supabase.from("site_info").select("id").limit(1).maybeSingle();
 
       let resultData;
@@ -126,6 +128,8 @@ export const siteInfoService = {
         siteName: resultData.site_name,
         logoUrl: resultData.logo_url,
         footerLogoUrl: resultData.footer_logo_url,
+        allowGoogleIndex: resultData.allow_google_index !== false,
+        allow_google_index: resultData.allow_google_index !== false,
       };
 
       cachedSiteInfo = updatedMapped;
@@ -138,5 +142,5 @@ export const siteInfoService = {
       console.error("Error updating site_info:", err);
       return null;
     }
-  },
+  }
 };

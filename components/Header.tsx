@@ -145,13 +145,22 @@ export default function Header() {
 
     fetchLiveSiteInfo();
 
-    const handleUpdate = () => fetchLiveSiteInfo();
-    window.addEventListener("site_info_updated", handleUpdate);
+    // هندلر رویداد لوکال برای انتشار آنی
+    const handleLiveUpdate = (e: any) => {
+      if (e.detail) {
+        setSiteInfo(e.detail);
+      } else {
+        fetchLiveSiteInfo();
+      }
+    };
+    window.addEventListener("site_info_updated", handleLiveUpdate);
 
+    // وب‌سوکت بلادرنگ بر روی دیتابیس Supabase
     const siteChannel = supabase
-      .channel("header-sync-channel")
+      .channel("header-realtime-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchLiveSiteInfo())
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchLiveSiteInfo())
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => fetchLiveSiteInfo())
       .subscribe();
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -179,7 +188,7 @@ export default function Header() {
     loadAllProducts();
 
     return () => {
-      window.removeEventListener("site_info_updated", handleUpdate);
+      window.removeEventListener("site_info_updated", handleLiveUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("mousedown", handleClickOutsideSearch);
       supabase.removeChannel(siteChannel);
@@ -374,7 +383,8 @@ export default function Header() {
     }
   };
 
-  const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false;
+  // تشخیص وضعیت ایندکس با بررسی هر دو فیلد برای هماهنگی با وب‌سوکت
+  const isGoogleIndexAllowed = siteInfo?.allow_google_index !== false && siteInfo?.allowGoogleIndex !== false;
   const currentStoreName = siteInfo?.storeName || siteInfo?.site_name || siteInfo?.siteName || siteInfo?.name || "آکسون | Axon";
   const currentLogoUrl = siteInfo?.logoUrl || siteInfo?.logo_url;
 
@@ -382,7 +392,7 @@ export default function Header() {
     <header className="sticky top-3 z-40 max-w-7xl mx-auto px-4 select-none font-sans text-[var(--text-primary)]" dir="rtl">
       <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-6 py-3.5 flex items-center justify-between gap-4 rounded-3xl shadow-xl border border-[var(--card-border)] relative">
         
-        {/* راست: لوگوی بزرگ‌تر که کاملاً کادر را پر می‌کند */}
+        {/* راست: لوگوی بزرگ‌تر و نشانگر نئون ایندکس گوگل */}
         <div className="flex items-center gap-4 shrink-0">
           <Link href="/" className="flex items-center gap-3.5 group">
             <div className="w-16 h-16 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition">
@@ -398,6 +408,7 @@ export default function Header() {
                   {currentStoreName}
                 </span>
                 <span
+                  title={isGoogleIndexAllowed ? "ایندکس گوگل: فعال (Online)" : "ایندکس گوگل: مخفی (No-Index)"}
                   className={`w-2 h-2 rounded-full transition-all duration-500 ${
                     isGoogleIndexAllowed
                       ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse"

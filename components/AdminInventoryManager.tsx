@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 interface InventoryLog {
   id: string;
-  product_id: string;
+  product_id: string | number;
   product_name: string;
   type: "in" | "out" | "adjustment";
   amount: number;
@@ -40,7 +40,7 @@ export default function AdminInventoryManager() {
     setLoading(true);
     try {
       const prods = await productService.getAll();
-      setProducts(prods);
+      setProducts(prods || []);
 
       if (supabase) {
         const { data } = await supabase
@@ -53,6 +53,8 @@ export default function AdminInventoryManager() {
         const localLogs = JSON.parse(localStorage.getItem("inventory_logs") || "[]");
         setLogs(localLogs);
       }
+    } catch (err) {
+      console.error("Error loading inventory data:", err);
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,7 @@ export default function AdminInventoryManager() {
     loadData();
 
     const handleProductUpdate = (e: any) => {
-      if (e.detail) setProducts(e.detail);
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
       else loadData();
     };
     window.addEventListener("products_updated", handleProductUpdate);
@@ -80,18 +82,21 @@ export default function AdminInventoryManager() {
         ? currentStock + changeAmount
         : Math.max(0, currentStock - changeAmount);
 
+    const productName = selectedProduct.name || selectedProduct.title || "کالا";
+
     try {
       // ۱. به‌روزرسانی موجودی در سرویس محصولات
       await productService.update(selectedProduct.id, {
         stock: newStock,
         is_available: newStock > 0,
+        isAvailable: newStock > 0,
       });
 
       // ۲. ثبت لاگ ورود و خروج انبار
       const newLog: InventoryLog = {
         id: `log_${Date.now()}`,
         product_id: selectedProduct.id,
-        product_name: selectedProduct.name,
+        product_name: productName,
         type: changeType,
         amount: changeAmount,
         previous_stock: currentStock,
@@ -108,18 +113,23 @@ export default function AdminInventoryManager() {
       setLogs(updatedLogs);
       localStorage.setItem("inventory_logs", JSON.stringify(updatedLogs));
 
-      showToast(`موجودی کالای "${selectedProduct.name}" با موفقیت به ${newStock} تغییر یافت.`);
+      showToast(`موجودی کالای "${productName}" با موفقیت به ${newStock} تغییر یافت.`);
       setSelectedProduct(null);
       setChangeAmount(1);
       setChangeReason("");
+      await loadData();
+    } catch (err) {
+      console.error("Error updating inventory:", err);
+      showToast("خطا در ثبت اطلاعات انبار.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const filteredProducts = products.filter((p) => {
+    const prodName = p.name || p.title || "";
     const matchSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      prodName.toLowerCase().includes(search.toLowerCase()) ||
       (p.category || "").toLowerCase().includes(search.toLowerCase());
     const isLow = (p.stock ?? 0) <= 3;
     return matchSearch && (filterLowStock ? isLow : true);
@@ -188,16 +198,19 @@ export default function AdminInventoryManager() {
             <tbody className="divide-y divide-[var(--card-border)]">
               {filteredProducts.map((p) => {
                 const stock = p.stock ?? 0;
+                const prodName = p.name || p.title || "کالا";
+                const prodImg = p.images?.[0] || p.image || p.image_url || "";
+                const isAvail = p.is_available !== undefined ? p.is_available : (p.isAvailable !== false);
                 return (
                   <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-3">
                         <img
-                          src={p.images?.[0] || p.image || ""}
-                          alt=""
+                          src={prodImg}
+                          alt={prodName}
                           className="w-10 h-10 rounded-xl object-contain bg-[var(--input-bg)] p-1 border border-[var(--card-border)]"
                         />
-                        <span className="font-extrabold text-xs text-[var(--text-primary)]">{p.name}</span>
+                        <span className="font-extrabold text-xs text-[var(--text-primary)]">{prodName}</span>
                       </div>
                     </td>
                     <td className="py-3 px-2 font-bold text-[var(--text-secondary)]">{p.category || "عمومی"}</td>
@@ -208,11 +221,11 @@ export default function AdminInventoryManager() {
                     </td>
                     <td className="py-3 px-2">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        stock > 0 && p.is_available !== false
+                        stock > 0 && isAvail
                           ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                           : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
                       }`}>
-                        {stock > 0 && p.is_available !== false ? "موجود در ویترین" : "ناموجود"}
+                        {stock > 0 && isAvail ? "موجود در ویترین" : "ناموجود"}
                       </span>
                     </td>
                     <td className="py-3 px-2 text-center">
@@ -285,12 +298,14 @@ export default function AdminInventoryManager() {
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
               <div>
                 <h4 className="font-black text-sm text-[var(--accent-blue)]">ثبت حواله ورود/خروج کالا</h4>
-                <p className="text-[11px] text-[var(--text-secondary)] font-bold mt-0.5">{selectedProduct.name}</p>
+                <p className="text-[11px] text-[var(--text-secondary)] font-bold mt-0.5">
+                  {selectedProduct.name || selectedProduct.title}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedProduct(null)}
-                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -306,7 +321,7 @@ export default function AdminInventoryManager() {
                     className={`py-2.5 rounded-xl font-bold transition cursor-pointer ${
                       changeType === "in"
                         ? "bg-emerald-600 text-white shadow-md"
-                        : "bg-[var(--input-bg)] border border-[var(--card-border)]"
+                        : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)]"
                     }`}
                   >
                     📥 ورود به انبار (+)
@@ -317,7 +332,7 @@ export default function AdminInventoryManager() {
                     className={`py-2.5 rounded-xl font-bold transition cursor-pointer ${
                       changeType === "out"
                         ? "bg-rose-600 text-white shadow-md"
-                        : "bg-[var(--input-bg)] border border-[var(--card-border)]"
+                        : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)]"
                     }`}
                   >
                     📤 خروج از انبار (-)
@@ -353,7 +368,7 @@ export default function AdminInventoryManager() {
               <button
                 type="button"
                 onClick={() => setSelectedProduct(null)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)]"
+                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
               >
                 انصراف
               </button>

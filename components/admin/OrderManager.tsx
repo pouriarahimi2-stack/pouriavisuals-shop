@@ -24,7 +24,10 @@ export default function OrderManager() {
     setLoading(true);
     try {
       const data = await orderService.getAll();
-      setOrders(data);
+      setOrders(data || []);
+    } catch (err) {
+      console.error("Error loading orders:", err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -34,7 +37,7 @@ export default function OrderManager() {
     loadOrders();
 
     const handleOrdersUpdate = (e: any) => {
-      if (e.detail) setOrders(e.detail);
+      if (e.detail && Array.isArray(e.detail)) setOrders(e.detail);
       else loadOrders();
     };
     window.addEventListener("orders_updated", handleOrdersUpdate);
@@ -44,7 +47,7 @@ export default function OrderManager() {
   const openOrderModal = (ord: Order) => {
     setSelectedOrder(ord);
     setNewStatus(ord.status);
-    setTrackingInput(ord.trackingCode || "");
+    setTrackingInput(ord.trackingCode || ord.tracking_code || "");
   };
 
   const handleSaveOrderStatus = async (e: React.FormEvent) => {
@@ -56,15 +59,30 @@ export default function OrderManager() {
       const isShipped = newStatus === "shipped";
       const tracking = trackingInput.trim() || undefined;
 
-      await orderService.updateStatus(selectedOrder.id, newStatus, tracking);
+      const success = await orderService.updateStatus(selectedOrder.id, newStatus, tracking);
 
-      // در صورت ثبت کد رهگیری جدید و تغییر وضعیت به ارسال، پیامک رهگیری ارسال می‌شود
-      if (isShipped && tracking && tracking !== selectedOrder.trackingCode) {
-        smsService.sendTrackingCode(selectedOrder.phone, selectedOrder.id, tracking);
+      if (success) {
+        // در صورت ثبت کد رهگیری جدید و تغییر وضعیت به ارسال، پیامک رهگیری ارسال می‌شود
+        const phone = selectedOrder.customer?.phone || (selectedOrder as any).phone;
+        const currentTracking = selectedOrder.trackingCode || selectedOrder.tracking_code;
+
+        if (isShipped && tracking && tracking !== currentTracking && phone && smsService && typeof smsService.sendTrackingCode === "function") {
+          try {
+            await smsService.sendTrackingCode(phone, selectedOrder.id, tracking);
+          } catch (smsErr) {
+            console.error("SMS Error:", smsErr);
+          }
+        }
+
+        showToast(`وضعیت سفارش ${selectedOrder.id} با موفقیت به‌روزرسانی شد.`);
+        setSelectedOrder(null);
+        await loadOrders();
+      } else {
+        showToast("خطا در به‌روزرسانی وضعیت سفارش.");
       }
-
-      showToast(`وضعیت سفارش ${selectedOrder.id} با موفقیت به‌روزرسانی شد.`);
-      setSelectedOrder(null);
+    } catch (err) {
+      console.error("Order update error:", err);
+      showToast("خطای سیستمی در ارتباط با دیتابیس.");
     } finally {
       setSubmitting(false);
     }
@@ -72,11 +90,17 @@ export default function OrderManager() {
 
   const filteredOrders = orders.filter((ord) => {
     const matchStatus = statusFilter === "all" || ord.status === statusFilter;
+    const orderIdStr = String(ord.id || "");
+    const custName = ord.customer?.fullName || ord.customer?.name || (ord as any).customerName || "";
+    const custPhone = ord.customer?.phone || (ord as any).phone || "";
+    const trackingStr = ord.trackingCode || ord.tracking_code || "";
+
     const matchSearch =
-      ord.id.toLowerCase().includes(search.toLowerCase()) ||
-      (ord.customerName && ord.customerName.toLowerCase().includes(search.toLowerCase())) ||
-      (ord.phone && ord.phone.includes(search)) ||
-      (ord.trackingCode && ord.trackingCode.includes(search));
+      orderIdStr.toLowerCase().includes(search.toLowerCase()) ||
+      custName.toLowerCase().includes(search.toLowerCase()) ||
+      custPhone.includes(search) ||
+      trackingStr.includes(search);
+
     return matchStatus && matchSearch;
   });
 
@@ -160,34 +184,42 @@ export default function OrderManager() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--card-border)]">
-              {filteredOrders.map((ord) => (
-                <tr key={ord.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                  <td className="py-3 px-2 font-mono font-black text-[var(--accent-blue)]">{ord.id}</td>
-                  <td className="py-3 px-2 font-bold">{ord.customerName}</td>
-                  <td className="py-3 px-2 font-mono text-[var(--text-secondary)]">{ord.phone}</td>
-                  <td className="py-3 px-2 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                    {(ord.totalAmount || 0).toLocaleString("fa-IR")} تومان
-                  </td>
-                  <td className="py-3 px-2 font-mono text-[11px]">
-                    {ord.trackingCode ? (
-                      <span className="px-2 py-0.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold">
-                        {ord.trackingCode}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--text-secondary)] opacity-50">ثبت نشده</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-2">{getStatusBadge(ord.status)}</td>
-                  <td className="py-3 px-2 text-center">
-                    <button
-                      onClick={() => openOrderModal(ord)}
-                      className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] hover:opacity-90 transition cursor-pointer shadow-md"
-                    >
-                      ✏️ مدیریت و بارنامه
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredOrders.map((ord) => {
+                const cName = ord.customer?.fullName || ord.customer?.name || (ord as any).customerName || "خریدار";
+                const cPhone = ord.customer?.phone || (ord as any).phone || "---";
+                const total = ord.finalAmount || ord.final_amount || ord.totalAmount || (ord as any).total_amount || 0;
+                const trackCode = ord.trackingCode || ord.tracking_code;
+                const orderNum = ord.orderNumber || ord.order_number || ord.id;
+
+                return (
+                  <tr key={ord.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                    <td className="py-3 px-2 font-mono font-black text-[var(--accent-blue)]">{orderNum}</td>
+                    <td className="py-3 px-2 font-bold">{cName}</td>
+                    <td className="py-3 px-2 font-mono text-[var(--text-secondary)]">{cPhone}</td>
+                    <td className="py-3 px-2 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                      {Number(total).toLocaleString("fa-IR")} تومان
+                    </td>
+                    <td className="py-3 px-2 font-mono text-[11px]">
+                      {trackCode ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold">
+                          {trackCode}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--text-secondary)] opacity-50">ثبت نشده</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-2">{getStatusBadge(ord.status)}</td>
+                    <td className="py-3 px-2 text-center">
+                      <button
+                        onClick={() => openOrderModal(ord)}
+                        className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] hover:opacity-90 transition cursor-pointer shadow-md"
+                      >
+                        ✏️ مدیریت و بارنامه
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -199,13 +231,15 @@ export default function OrderManager() {
           <form onSubmit={handleSaveOrderStatus} className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-5 shadow-2xl text-[var(--text-primary)] text-xs">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
               <div>
-                <h4 className="font-black text-sm text-[var(--accent-blue)]">مدیریت سفارش {selectedOrder.id}</h4>
-                <p className="text-[11px] text-[var(--text-secondary)] font-bold mt-0.5">خریدار: {selectedOrder.customerName}</p>
+                <h4 className="font-black text-sm text-[var(--accent-blue)]">مدیریت سفارش {selectedOrder.orderNumber || selectedOrder.order_number || selectedOrder.id}</h4>
+                <p className="text-[11px] text-[var(--text-secondary)] font-bold mt-0.5">
+                  خریدار: {selectedOrder.customer?.fullName || selectedOrder.customer?.name || (selectedOrder as any).customerName}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -213,10 +247,23 @@ export default function OrderManager() {
 
             {/* مشخصات نشانی و اقلام */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] space-y-2 text-[11px] leading-relaxed">
-              <p><strong className="text-[var(--text-secondary)]">شماره تماس:</strong> <span className="font-mono">{selectedOrder.phone}</span></p>
-              <p><strong className="text-[var(--text-secondary)]">کد پستی:</strong> <span className="font-mono">{selectedOrder.postalCode || "ثبت نشده"}</span></p>
-              <p><strong className="text-[var(--text-secondary)]">نشانی پستی:</strong> {selectedOrder.address}</p>
-              {selectedOrder.notes && <p><strong className="text-[var(--text-secondary)]">یادداشت سفارش:</strong> {selectedOrder.notes}</p>}
+              <p>
+                <strong className="text-[var(--text-secondary)]">شماره تماس:</strong>{" "}
+                <span className="font-mono">{selectedOrder.customer?.phone || (selectedOrder as any).phone}</span>
+              </p>
+              <p>
+                <strong className="text-[var(--text-secondary)]">کد پستی:</strong>{" "}
+                <span className="font-mono">{selectedOrder.customer?.postalCode || (selectedOrder as any).postalCode || "ثبت نشده"}</span>
+              </p>
+              <p>
+                <strong className="text-[var(--text-secondary)]">نشانی پستی:</strong>{" "}
+                {selectedOrder.customer?.address || (selectedOrder as any).address || "ثبت نشده"}
+              </p>
+              {selectedOrder.notes && (
+                <p>
+                  <strong className="text-[var(--text-secondary)]">یادداشت سفارش:</strong> {selectedOrder.notes}
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -256,7 +303,7 @@ export default function OrderManager() {
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)]"
+                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
               >
                 انصراف
               </button>

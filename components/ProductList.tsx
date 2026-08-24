@@ -45,10 +45,10 @@ export default function ProductList() {
   const categories = Array.from(new Set(products.map((p) => p.category || "عمومی"))).filter(Boolean);
 
   const filtered = products.filter((p) => {
-    const isAvail = p.is_available !== false && (p.stock ?? 1) > 0;
+    const isAvail = p.is_active !== false && (p.stock ?? 1) > 0;
     const matchCat = selectedCategory === "all" || (p.category || "عمومی") === selectedCategory;
     const matchSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
     return isAvail && matchCat && matchSearch;
   });
@@ -106,9 +106,31 @@ export default function ProductList() {
 
       {/* گرید محصولات */}
       {loading ? (
-        <div className="py-24 text-center">
-          <div className="w-8 h-8 border-2 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری کاتالوگ...</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-pulse">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="p-5 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 flex flex-col justify-between"
+            >
+              <div className="space-y-4">
+                <div className="w-full h-48 rounded-3xl bg-[var(--input-bg)] relative overflow-hidden flex items-center justify-center">
+                  <div className="absolute inset-0 bg-slate-200/50 dark:bg-slate-800/50" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 w-16 bg-slate-200/60 dark:bg-slate-800/60 rounded-full" />
+                  <div className="h-4 w-3/4 bg-slate-200/80 dark:bg-slate-800/80 rounded-full" />
+                  <div className="h-3 w-5/6 bg-slate-200/40 dark:bg-slate-800/40 rounded-full" />
+                </div>
+              </div>
+              <div className="pt-4 border-t border-[var(--card-border)] space-y-3 mt-4">
+                <div className="flex justify-between items-center">
+                  <div className="h-3 w-12 bg-slate-200/40 dark:bg-slate-800/40 rounded-full" />
+                  <div className="h-5 w-24 bg-slate-200/80 dark:bg-slate-800/80 rounded-full" />
+                </div>
+                <div className="h-10 w-full bg-slate-200/60 dark:bg-slate-800/60 rounded-2xl" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-16 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] text-center text-xs font-bold text-[var(--text-secondary)] shadow-xl">
@@ -129,14 +151,14 @@ export default function ProductList() {
                     {displayImg ? (
                       <img
                         src={displayImg}
-                        alt={prod.name}
+                        alt={prod.title}
                         className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
                       />
                     ) : (
                       <span className="text-3xl opacity-40">🖼️</span>
                     )}
 
-                    {prod.isSpecialOffer && (
+                    {prod.is_featured && (
                       <span className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-black text-[10px] shadow-lg">
                         🔥 پیشنهاد ویژه
                       </span>
@@ -149,7 +171,7 @@ export default function ProductList() {
                       {prod.category || "تجهیزات"}
                     </span>
                     <h3 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-2 leading-snug">
-                      {prod.name}
+                      {prod.title}
                     </h3>
                     <p className="text-[11px] text-[var(--text-secondary)] font-medium line-clamp-2 leading-relaxed">
                       {prod.description || "دارای گارانتی اصالت و ضمانت بازگشت وجه ۷ روزه"}
@@ -162,13 +184,13 @@ export default function ProductList() {
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
                     <div className="text-left">
-                      {prod.originalPrice && prod.originalPrice > prod.price && (
+                      {prod.discountPrice && prod.discountPrice < prod.price && (
                         <span className="block text-[10px] text-[var(--text-secondary)] line-through font-mono">
-                          {prod.originalPrice.toLocaleString("fa-IR")}
+                          {prod.price.toLocaleString("fa-IR")}
                         </span>
                       )}
                       <span className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
-                        {Number(prod.price || 0).toLocaleString("fa-IR")} تومان
+                        {Number(prod.discountPrice || prod.price || 0).toLocaleString("fa-IR")} تومان
                       </span>
                     </div>
                   </div>
@@ -177,8 +199,8 @@ export default function ProductList() {
                     onClick={() =>
                       addToCart({
                         id: prod.id,
-                        title: prod.name,
-                        price: prod.price,
+                        title: prod.title,
+                        price: prod.discountPrice || prod.price,
                         image: displayImg,
                       })
                     }

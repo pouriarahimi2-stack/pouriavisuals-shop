@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 export interface CartItem {
-  id: string;
+  id: string | number;
   title: string;
   name?: string;
   price: number;
@@ -11,6 +11,7 @@ export interface CartItem {
   image: string;
   quantity: number;
   stock?: number;
+  category?: string;
 }
 
 export interface AppliedCoupon {
@@ -22,14 +23,15 @@ export interface AppliedCoupon {
 interface CartContextType {
   cartItems: CartItem[];
   cart: CartItem[];
+  totalItems: number;
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
   toggleCart: () => void;
   openCart: () => void;
   closeCart: () => void;
   addToCart: (item: any) => void;
-  removeFromCart: (id: string) => void;
-  updateQuantity: (id: string, deltaOrQty: number) => void;
+  removeFromCart: (id: string | number) => void;
+  updateQuantity: (id: string | number, deltaOrQty: number) => void;
   clearCart: () => void;
   appliedCoupon: AppliedCoupon | null;
   applyCoupon: (code: string) => { success: boolean; message: string };
@@ -50,28 +52,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       const local = localStorage.getItem("pv_cart_items");
       if (local) setCartItems(JSON.parse(local));
-    } catch {}
+    } catch (err) {
+      console.error("Error loading cart from localStorage:", err);
+    }
   }, []);
 
   const saveCart = (items: CartItem[]) => {
     setCartItems(items);
     try {
       localStorage.setItem("pv_cart_items", JSON.stringify(items));
-    } catch {}
+    } catch (err) {
+      console.error("Error saving cart to localStorage:", err);
+    }
   };
 
   const addToCart = (item: any) => {
     const itemId = String(item.id);
     const itemTitle = item.title || item.name || "محصول فروشگاه";
     const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);
-    const itemImage = item.image || item.images?.[0] || "";
+    const itemImage = item.image || item.image_url || item.images?.[0] || "/placeholder.png";
 
-    const existing = cartItems.find((i) => i.id === itemId);
+    const existing = cartItems.find((i) => String(i.id) === itemId);
     let updated: CartItem[];
 
     if (existing) {
       updated = cartItems.map((i) =>
-        i.id === itemId ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i
+        String(i.id) === itemId ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i
       );
     } else {
       updated = [
@@ -81,10 +87,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           title: itemTitle,
           name: itemTitle,
           price: itemPrice,
-          discountPrice: item.discountPrice,
+          discountPrice: item.discountPrice ? Number(item.discountPrice) : undefined,
           image: itemImage,
           quantity: item.quantity || 1,
-          stock: item.stock,
+          stock: item.stock !== undefined ? Number(item.stock) : undefined,
+          category: item.category,
         },
       ];
     }
@@ -92,13 +99,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsCartOpen(true);
   };
 
-  const removeFromCart = (id: string) => {
-    const updated = cartItems.filter((i) => i.id !== id);
+  const removeFromCart = (id: string | number) => {
+    const updated = cartItems.filter((i) => String(i.id) !== String(id));
     saveCart(updated);
   };
 
-  const updateQuantity = (id: string, deltaOrQty: number) => {
-    const existing = cartItems.find((i) => i.id === id);
+  const updateQuantity = (id: string | number, deltaOrQty: number) => {
+    const existing = cartItems.find((i) => String(i.id) === String(id));
     if (!existing) return;
 
     let newQty = deltaOrQty;
@@ -112,7 +119,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const updated = cartItems.map((i) => (i.id === id ? { ...i, quantity: newQty } : i));
+    const updated = cartItems.map((i) => (String(i.id) === String(id) ? { ...i, quantity: newQty } : i));
     saveCart(updated);
   };
 
@@ -136,6 +143,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeCoupon = () => setAppliedCoupon(null);
 
+  const totalItems = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+
   const totalPrice = cartItems.reduce(
     (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
     0
@@ -153,7 +162,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       const existing = JSON.parse(localStorage.getItem("pv_orders_local") || "[]");
       localStorage.setItem("pv_orders_local", JSON.stringify([fullOrder, ...existing]));
-    } catch {}
+    } catch (err) {
+      console.error("Error saving local order:", err);
+    }
     return fullOrder;
   };
 
@@ -162,6 +173,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       value={{
         cartItems,
         cart: cartItems,
+        totalItems,
         isCartOpen,
         setIsCartOpen,
         toggleCart,

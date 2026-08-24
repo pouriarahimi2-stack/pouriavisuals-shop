@@ -4,9 +4,16 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCart } from '../context/CartContext';
+import { useRouter } from 'next/navigation';
 
 export default function ProductCard({ product }: { product: any }) {
   const { addToCart } = useCart();
+  const router = useRouter();
+
+  const handleQuickBuy = () => {
+    addToCart(product);
+    router.push('/checkout');
+  };
 
   const title = product.title || product.title_fa || product.name || 'محصول بدون عنوان';
   const price = Number(product.price) || 0;
@@ -42,20 +49,38 @@ export default function ProductCard({ product }: { product: any }) {
         </p>
       </div>
 
-      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between mt-auto">
-        <div className="flex flex-col">
-          <span className="text-xs text-slate-400">قیمت:</span>
-          <span className="text-base font-black text-blue-600 dark:text-blue-400">
-            {price.toLocaleString('fa-IR')} <span className="text-xs font-normal">تومان</span>
-          </span>
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col gap-3 mt-auto">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-xs text-slate-400">قیمت:</span>
+            <span className="text-base font-black text-blue-600 dark:text-blue-400">
+              {price.toLocaleString('fa-IR')} <span className="text-xs font-normal">تومان</span>
+            </span>
+          </div>
+
+          <Link
+            href={`/products/${product.id}`}
+            className="text-[11px] font-black text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition flex items-center gap-1"
+          >
+            مشخصات محصول 🔍
+          </Link>
         </div>
 
-        <button
-          onClick={() => addToCart(product)}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-blue-500/20"
-        >
-          <span>افزودن به سبد خرید</span>
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => addToCart(product)}
+            className="py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-200 text-[11px] font-black rounded-xl transition-all flex items-center justify-center gap-1.5 border border-slate-200/80 dark:border-slate-700"
+          >
+            <span>🛒 سبد خرید</span>
+          </button>
+
+          <button
+            onClick={handleQuickBuy}
+            className="py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20"
+          >
+            <span>⚡ خرید سریع</span>
+          </button>
+        </div>
       </div>
     </div>
   );

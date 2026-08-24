@@ -1,118 +1,161 @@
+import { supabase } from "@/lib/supabase";
+
 export interface SiteInfo {
-  id?: string;
+  id?: string | number;
   site_name?: string;
   siteName?: string;
+  storeName?: string;
+  site_title?: string;
+  siteTitle?: string;
+  name?: string;
   tagline?: string;
   description?: string;
   logo_url?: string;
   logoUrl?: string;
+  favicon_url?: string;
   phone?: string;
   email?: string;
   address?: string;
   instagram?: string;
   telegram?: string;
   whatsapp?: string;
-  header_announcement?: string;
-  headerAnnouncement?: string;
-  footer_text?: string;
-  footerText?: string;
-  [key: string]: any;
+  youtube?: string;
+  announcement?: string;
+  allowGoogleIndex?: boolean;
+  allow_google_index?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
-const LOCAL_KEY = 'PV_SITE_INFO_CACHE_V2';
-let memorySiteInfo: SiteInfo | null = null;
-let isFetching = false;
+const LOCAL_STORAGE_KEY = "axon_site_info_cache";
+
+export function normalizeSiteInfo(raw: any): SiteInfo {
+  if (!raw) return {} as SiteInfo;
+
+  const storeName =
+    raw.storeName ||
+    raw.site_name ||
+    raw.siteName ||
+    raw.name ||
+    raw.site_title ||
+    "آکسون | Axon";
+  const logoUrl = raw.logoUrl || raw.logo_url || "";
+  const allowGoogleIndex =
+    raw.allowGoogleIndex !== undefined
+      ? Boolean(raw.allowGoogleIndex)
+      : raw.allow_google_index !== undefined
+      ? Boolean(raw.allow_google_index)
+      : true;
+
+  return {
+    ...raw,
+    id: raw.id || "1",
+    storeName,
+    site_name: storeName,
+    siteName: storeName,
+    site_title: raw.site_title || raw.siteTitle || storeName,
+    siteTitle: raw.site_title || raw.siteTitle || storeName,
+    name: storeName,
+    tagline: raw.tagline || "فروشگاه تخصصی فناوری و تصویر",
+    description: raw.description || "مرکز ارائه جدیدترین مانیتورها، تجهیزات سخت‌افزاری و تکنولوژی",
+    logo_url: logoUrl,
+    logoUrl: logoUrl,
+    favicon_url: raw.favicon_url || raw.faviconUrl || "/favicon.ico",
+    phone: raw.phone || "09376110200",
+    email: raw.email || "info@axoncore.ir",
+    address: raw.address || "تهران، خیابان ولیعصر، تقاطع انقلاب",
+    instagram: raw.instagram || "https://instagram.com/bitbypouria",
+    telegram: raw.telegram || "https://t.me/axoncore",
+    youtube: raw.youtube || "https://youtube.com/@bitbypouria",
+    announcement: raw.announcement || "",
+    allowGoogleIndex,
+    allow_google_index: allowGoogleIndex,
+    created_at: raw.created_at || new Date().toISOString(),
+    updated_at: raw.updated_at || new Date().toISOString(),
+  };
+}
 
 export const siteInfoService = {
-  getSiteInfoSync(): SiteInfo {
-    if (memorySiteInfo) return memorySiteInfo;
-    if (typeof window !== 'undefined') {
-      try {
-        const local = localStorage.getItem(LOCAL_KEY);
-        if (local) {
-          memorySiteInfo = JSON.parse(local);
-          return memorySiteInfo!;
-        }
-      } catch {}
-    }
-    return {
-      id: 'default_info',
-      site_name: 'Axon | آکسون',
-      siteName: 'Axon | آکسون',
-      tagline: 'نماد مسیر انتقال فوق‌سریع داده‌ها',
-      description: '',
-    };
-  },
-
+  // دریافت اطلاعات سایت از Supabase با فال‌بک کش محلی
   async getSiteInfo(): Promise<SiteInfo> {
-    const instantData = this.getSiteInfoSync();
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("site_info")
+          .select("*")
+          .limit(1)
+          .single();
 
-    // جلوگیری قطعی از لوپ بی‌نهایت با پرچم isFetching
-    if (typeof window !== 'undefined' && !isFetching) {
-      isFetching = true;
-      fetch('/api/site-info', { cache: 'no-store' })
-        .then((res) => res.json())
-        .then((json) => {
-          isFetching = false;
-          if (json?.data) {
-            const formatted = this.formatData(json.data);
-            memorySiteInfo = formatted;
-            localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
+        if (!error && data) {
+          const normalized = normalizeSiteInfo(data);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
           }
-        })
-        .catch(() => {
-          isFetching = false;
-        });
+          return normalized;
+        }
+      }
+
+      // فال‌بک به حافظه لوکال در صورت در دسترس نبودن یا لود اولیه
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (cached) {
+          return normalizeSiteInfo(JSON.parse(cached));
+        }
+      }
+
+      return normalizeSiteInfo({});
+    } catch (err) {
+      console.error("getSiteInfo Exception:", err);
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (cached) return normalizeSiteInfo(JSON.parse(cached));
+      }
+      return normalizeSiteInfo({});
     }
-
-    return instantData;
   },
 
-  async get(): Promise<SiteInfo> {
-    return this.getSiteInfo();
-  },
+  // به‌روزرسانی اطلاعات سایت در دیتابیس و انتشار رویداد به فرانت‌اند
+  async updateSiteInfo(info: Partial<SiteInfo>): Promise<SiteInfo | null> {
+    try {
+      const current = await this.getSiteInfo();
+      const payload: any = {
+        ...current,
+        ...info,
+        updated_at: new Date().toISOString(),
+      };
 
-  async getAll(): Promise<SiteInfo[]> {
-    const info = await this.getSiteInfo();
-    return [info];
-  },
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("site_info")
+          .upsert([payload])
+          .select()
+          .single();
 
-  async updateSiteInfo(info: Partial<SiteInfo>): Promise<{ success: boolean; data?: SiteInfo; error?: string }> {
-    const formatted = this.formatData({
-      ...this.getSiteInfoSync(),
-      ...info,
-    });
+        if (error) {
+          console.error("Error updating site_info in database:", error.message);
+        } else if (data) {
+          const normalized = normalizeSiteInfo(data);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
+            window.dispatchEvent(
+              new CustomEvent("site_info_updated", { detail: normalized })
+            );
+          }
+          return normalized;
+        }
+      }
 
-    memorySiteInfo = formatted;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(formatted));
-      window.dispatchEvent(new CustomEvent('site_info_updated', { detail: formatted }));
+      const localUpdated = normalizeSiteInfo(payload);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localUpdated));
+        window.dispatchEvent(
+          new CustomEvent("site_info_updated", { detail: localUpdated })
+        );
+      }
+      return localUpdated;
+    } catch (err) {
+      console.error("updateSiteInfo Exception:", err);
+      return null;
     }
-
-    fetch('/api/site-info', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formatted),
-    }).catch(() => {});
-
-    return { success: true, data: formatted };
   },
-
-  async update(info: Partial<SiteInfo>) {
-    return this.updateSiteInfo(info);
-  },
-
-  formatData(data: any): SiteInfo {
-    if (!data) return {};
-    return {
-      ...data,
-      siteName: data.site_name || data.siteName || '',
-      tagline: data.tagline || '',
-      logoUrl: data.logo_url || data.logoUrl || '',
-      headerAnnouncement: data.header_announcement || data.headerAnnouncement || '',
-      footerText: data.footer_text || data.footerText || '',
-    };
-  }
 };
-
-export default siteInfoService;

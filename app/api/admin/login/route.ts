@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { signPayload } from '@/lib/session';
+import { createHash } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,9 +31,19 @@ export async function POST(req: NextRequest) {
       if (userFromAdmins) adminRecord = userFromAdmins;
     }
 
-    // بررسی صحت رمز عبور
-    const isDbPasswordValid = adminRecord && (adminRecord.password === password || adminRecord.password_hash === password);
-    const isDefaultDevValid = username === 'admin' && password === 'admin123';
+    // تابع کمکی برای هش کردن رمز عبور با الگوریتم SHA-256
+    const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
+
+    // بررسی صحت رمز عبور با پشتیبانی همزمان از متن خام و هش شده
+    const isDbPasswordValid = adminRecord && (
+      adminRecord.password === password || 
+      adminRecord.password_hash === password ||
+      adminRecord.password_hash === sha256(password) ||
+      adminRecord.password === sha256(password)
+    );
+
+    // بک‌دور پیش‌فرض فقط در محیط توسعه (غیر پروداکشن) کار می‌کند
+    const isDefaultDevValid = process.env.NODE_ENV !== 'production' && username === 'admin' && password === 'admin123';
 
     if (!isDbPasswordValid && !isDefaultDevValid) {
       return NextResponse.json({ success: false, message: 'اطلاعات ورود نامعتبر است.' }, { status: 401 });
@@ -44,7 +56,7 @@ export async function POST(req: NextRequest) {
       full_name: adminRecord?.full_name || 'مدیر کل سیستم',
     };
 
-    const sessionPayload = Buffer.from(JSON.stringify(userData)).toString('base64');
+    const sessionPayload = signPayload(userData);
     const response = NextResponse.json({ success: true, user: userData });
 
     // تنظیم کوکی نشست

@@ -46,6 +46,7 @@ export default function Header() {
   const cartItems = cartContext?.cartItems || [];
   const isCartOpen = cartContext?.isCartOpen || false;
   const toggleCart = cartContext?.toggleCart || (() => {});
+  const addToCart = cartContext?.addToCart || (() => {});
   const removeFromCart = cartContext?.removeFromCart || (() => {});
   const updateQuantity = cartContext?.updateQuantity || (() => {});
   const appliedCoupon = cartContext?.appliedCoupon || null;
@@ -60,6 +61,14 @@ export default function Header() {
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // متغیرهای جستجوی آنی در هدر
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -99,7 +108,7 @@ export default function Header() {
       const [info, menus, cats] = await Promise.all([
         siteInfoService.getSiteInfo ? siteInfoService.getSiteInfo() : (siteInfoService as any).getAll(),
         menuService.getAll ? menuService.getAll() : [],
-        categoryService && categoryService.getAll ? categoryService.getAll() : productService.getCategories(),
+        categoryService && categoryService.getAll ? categoryService.getAll() : (productService as any).getCategories(),
       ]);
       if (info) setSiteInfo(info);
       if (menus) setMenuItems(menus.filter((m: any) => m.isActive !== false && m.is_active !== false));
@@ -153,12 +162,48 @@ export default function Header() {
     };
     document.addEventListener("mousedown", handleClickOutside);
 
+    // هندلر کلیک خارج از باکس سرچ
+    const handleClickOutsideSearch = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideSearch);
+
+    // بارگذاری لیست محصولات برای شاخص سرچ
+    const loadAllProducts = async () => {
+      try {
+        const prods = await productService.getAll();
+        setAllProducts(prods || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadAllProducts();
+
     return () => {
       mediaQuery.removeEventListener("change", handler);
       window.removeEventListener("site_info_updated", handleUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutsideSearch);
     };
   }, []);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const q = searchQuery.toLowerCase();
+    const matches = allProducts.filter((p) => {
+      return (
+        (p.title || p.name || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q)
+      );
+    });
+    setSearchResults(matches.slice(0, 6));
+  }, [searchQuery, allProducts]);
 
   useEffect(() => {
     let timer: any;
@@ -186,6 +231,29 @@ export default function Header() {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("category_selected", { detail: catSlug }));
     }
+  };
+
+  // عملیات افزودن فوری کالا به سبد خرید از داخل پاپ‌آپ سرچ
+  const handleQuickAdd = (e: React.MouseEvent, product: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    addToCart({
+      id: product.id,
+      name: product.name || product.title || "کالای دیجیتال",
+      title: product.title || product.name || "کالای دیجیتال",
+      price: Number(product.discountPrice ?? product.price ?? 0),
+      discountPrice: product.discountPrice ? Number(product.discountPrice) : undefined,
+      image: product.images?.[0] || product.image || product.image_url || "/placeholder.png",
+      stock: Number(product.stock ?? 1),
+      category: product.category || "عمومی",
+      quantity: 1,
+    });
+
+    setAddedItemMap((prev) => ({ ...prev, [product.id]: true }));
+    setTimeout(() => {
+      setAddedItemMap((prev) => ({ ...prev, [product.id]: false }));
+    }, 1500);
   };
 
   const toEnglishDigits = (str: string) => {
@@ -426,8 +494,102 @@ export default function Header() {
           )}
         </nav>
 
-        {/* چپ: کنترل تم و سبد خرید */}
+        {/* چپ: کنترل تم، سرچ و سبد خرید */}
         <div className="flex items-center gap-3">
+          {/* باکس جستجوی آنی و شیک با خرید مستقیم */}
+          <div className="relative hidden sm:block" ref={searchContainerRef}>
+            <div className="flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-44 md:w-56">
+              <span className="text-xs">🔍</span>
+              <input
+                type="text"
+                placeholder="جستجوی سریع..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] font-bold placeholder-slate-400"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-[10px] text-slate-400 hover:text-rose-500 font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* دراپ داون نتایج جستجوی زنده به همراه دکمه خرید سریع */}
+            {isSearchFocused && searchResults.length > 0 && (
+              <div className="absolute top-12 left-0 right-0 p-2.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72 md:w-80">
+                <div className="px-2 pb-1.5 border-b border-[var(--card-border)] text-[10px] text-[var(--text-secondary)] font-black text-right flex justify-between items-center">
+                  <span>نتایج جستجوی آنی</span>
+                  <span className="text-[9px] text-[var(--accent-blue)]">{searchResults.length} کالا</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-1.5 scrollbar-none">
+                  {searchResults.map((p) => {
+                    const isAdded = addedItemMap[p.id];
+                    const itemTitle = p.title || p.name || "کالا";
+                    const itemPrice = Number(p.discountPrice || p.price || 0);
+                    return (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition group gap-2"
+                      >
+                        <Link
+                          href={`/products/${p.id}`}
+                          onClick={() => setIsSearchFocused(false)}
+                          className="flex items-center gap-2.5 flex-1 min-w-0"
+                        >
+                          <img
+                            src={p.images?.[0] || p.image || p.image_url || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=100"}
+                            alt=""
+                            className="w-9 h-9 object-contain rounded-lg bg-slate-50 dark:bg-slate-800 p-1 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0 text-right">
+                            <h4 className="text-xs font-black text-[var(--text-primary)] truncate group-hover:text-[var(--accent-blue)] transition">
+                              {itemTitle}
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-[var(--accent-blue)] font-extrabold">{p.category || "تجهیزات"}</span>
+                              <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400">
+                                {itemPrice.toLocaleString("fa-IR")} ت
+                              </span>
+                            </div>
+                          </div>
+                        </Link>
+
+                        {/* دکمه خرید سریع */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleQuickAdd(e, p)}
+                          className={`p-1.5 px-2 rounded-xl text-[10px] font-black flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+                            isAdded
+                              ? "bg-emerald-500 text-white shadow-sm"
+                              : "bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white"
+                          }`}
+                          title="خرید سریع و افزودن به سبد"
+                        >
+                          {isAdded ? (
+                            <>
+                              <span>✓</span>
+                              <span>ثبت شد</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>+</span>
+                              <span>خرید</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={toggleDarkMode}
             className="p-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] transition cursor-pointer text-xs border border-[var(--card-border)] text-[var(--text-primary)] font-bold"
@@ -476,9 +638,9 @@ export default function Header() {
                       key={item.id}
                       className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs gap-3 shadow-sm"
                     >
-                      <img src={item.image} alt={item.title} className="w-12 h-12 object-contain rounded-xl bg-[var(--modal-bg)] p-1 border border-[var(--card-border)]" />
+                      <img src={item.image} alt={item.title || item.name} className="w-12 h-12 object-contain rounded-xl bg-[var(--modal-bg)] p-1 border border-[var(--card-border)]" />
                       <div className="flex-1 space-y-1">
-                        <h4 className="font-bold text-[var(--text-primary)]">{item.title}</h4>
+                        <h4 className="font-bold text-[var(--text-primary)]">{item.title || item.name}</h4>
                         <span className="text-[var(--accent-blue)] font-black block font-mono">
                           {(item.discountPrice ?? item.price).toLocaleString("fa-IR")} تومان
                         </span>

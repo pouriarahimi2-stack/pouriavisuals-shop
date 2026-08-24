@@ -1,83 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const aiRateLimiter = new Map<string, { count: number; lastReset: number }>();
-const AI_WINDOW = 60 * 1000; // ۱ دقیقه
-const MAX_AI_REQUESTS = 10;
-
-function checkAiRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = aiRateLimiter.get(ip);
-
-  if (!entry || now - entry.lastReset > AI_WINDOW) {
-    aiRateLimiter.set(ip, { count: 1, lastReset: now });
-    return false;
-  }
-
-  if (entry.count >= MAX_AI_REQUESTS) {
-    return true;
-  }
-
-  entry.count += 1;
-  return false;
-}
+import { supabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   try {
     const { message, history } = await req.json();
 
     if (!message || typeof message !== 'string') {
-      return NextResponse.json({ success: false, message: 'متن پیام الزامی است.' }, { status: 400 });
-    }
-
-    const clientIp = req.headers.get('x-forwarded-for') || 'local-user';
-    if (checkAiRateLimit(clientIp)) {
       return NextResponse.json(
-        { success: false, message: 'تعداد درخواست‌ها بیش از حد مجاز است. لطفاً کمی صبر کنید.' },
-        { status: 429 }
+        { error: 'متن پیام الزامی است.' },
+        { status: 400 }
       );
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+    // دریافت لیست محصولات موجود جهت ارائه اطلاعات دقیق توسط هوش مصنوعی
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, name, title, price, stock, category, is_available')
+      .limit(30);
 
-    // ارسال امن به OpenRouter از طریق هدر Authorization (نه Query Param)
-    if (apiKey) {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://axoncore.ir';
+
+    const systemPrompt = `شما دستیار هوشمند و مشاور خرید رسمی فروشگاه AxonCore (به آدرس ${siteUrl}) هستید.
+وظیفه شما راهنمایی خریداران با لحنی صمیمی، حرفه‌ای و به زبان فارسی است.
+اطلاعات محصولات موجود:
+${JSON.stringify(products || [], null, 2)}
+
+قوانین پاسخ‌دهی:
+۱. فقط بر اساس موجودی و مشخصات محصولات بالا راهنمایی کن.
+۲. لینک محصولات را به صورت مستقیم و با ساختار ${siteUrl}/products/[id] به کاربر پیشنهاد بده.
+۳. در صورت ناموجود بودن کالا، آن را با صراحت بگو و جایگزین مناسب معرفی کن.`;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'کلید ارتباط با هوش مصنوعی تنظیم نشده است.' },
+        { status: 500 }
+      );
+    }
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://my-apple-store.local',
-          'X-Title': 'Apple Store Assistant',
+          'HTTP-Referer': siteUrl,
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-001',
-          messages: [
+          contents: [
             {
-              role: 'system',
-              content: 'شما دستیار هوشمند و مشاور تخصصی فروشگاه محصولات اپل و لوازم جانبی هستید. با لحنی مودبانه، حرفه‌ای و به زبان فارسی پاسخ دهید.',
+              role: 'user',
+              parts: [{ text: systemPrompt }],
             },
-            ...(Array.isArray(history) ? history.slice(-6) : []),
-            { role: 'user', content: message },
+            ...(history || []).map((h: { role: string; content: string }) => ({
+              role: h.role === 'user' ? 'user' : 'model',
+              parts: [{ text: h.content }],
+            })),
+            {
+              role: 'user',
+              parts: [{ text: message }],
+            },
           ],
         }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const reply = data.choices?.[0]?.message?.content;
-        if (reply) {
-          return NextResponse.json({ success: true, reply });
-        }
       }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('AI API Error:', errText);
+      return NextResponse.json(
+        { error: 'خطا در ارتباط با سرویس هوش مصنوعی.' },
+        { status: response.status }
+      );
     }
 
-    // پاسخ هوشمند سریع لوکال در صورت عدم دسترسی به API خارجی
-    const fallbackReply = 'درود! من در حال حاضر دستیار فروشگاه هستم. برای راهنمایی درباره موجودی آیفون، مک‌بوک یا پیگیری سفارش در خدمت شما هستم.';
-    return NextResponse.json({ success: true, reply: fallbackReply });
-  } catch {
+    const data = await response.json();
+    const reply =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      'متأسفانه در حال حاضر پاسخی دریافت نشد.';
+
+    return NextResponse.json({ reply });
+  } catch (error: any) {
+    console.error('AI Assistant Route Error:', error);
     return NextResponse.json(
-      { success: true, reply: 'متاسفانه در حال حاضر ارتباط با سرور هوش مصنوعی برقرار نشد. لطفاً مجدداً پیام دهید.' },
-      { status: 200 }
+      { error: 'خطای داخلی سرور در پردازش درخواست.' },
+      { status: 500 }
     );
   }
 }

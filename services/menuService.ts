@@ -1,17 +1,46 @@
 import { supabase } from "@/lib/supabase";
 
 export interface MenuItem {
-  id: string;
+  id: string | number;
   title: string;
+  name?: string;
+  label?: string;
   url: string;
+  href?: string;
   order: number;
-  is_active: boolean;
-  category_slug?: string;
+  isActive?: boolean;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 const LOCAL_STORAGE_KEY = "site_menu_items";
 
+export function normalizeMenuItem(raw: any, index: number = 0): MenuItem {
+  if (!raw) return {} as MenuItem;
+
+  const id = raw.id || `menu_${Date.now()}_${index}`;
+  const title = raw.title || raw.name || raw.label || "پیوند";
+  const url = raw.url || raw.href || "#";
+  const order = Number(raw.order ?? index + 1);
+  const isActive = raw.isActive !== undefined ? Boolean(raw.isActive) : (raw.is_active !== undefined ? Boolean(raw.is_active) : true);
+
+  return {
+    ...raw,
+    id,
+    title,
+    name: title,
+    label: title,
+    url,
+    href: url,
+    order,
+    isActive,
+    is_active: isActive,
+    created_at: raw.created_at || new Date().toISOString(),
+  };
+}
+
 export const menuService = {
+  // دریافت لیست تمام آیتم‌های منو
   async getAll(): Promise<MenuItem[]> {
     try {
       if (supabase) {
@@ -21,54 +50,69 @@ export const menuService = {
           .order("order", { ascending: true });
 
         if (!error && data && data.length > 0) {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-          return data;
+          const mapped = data.map((d: any, idx: number) => normalizeMenuItem(d, idx));
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+          }
+          return mapped;
         }
       }
 
-      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (local) return JSON.parse(local);
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (local) {
+          return JSON.parse(local).map((d: any, idx: number) => normalizeMenuItem(d, idx));
+        }
+      }
 
-      // آیتم‌های پیش‌فرض در صورت خالی بودن دیتابیس
       const defaults: MenuItem[] = [
-        { id: "menu_1", title: "صفحه اصلی", url: "/", order: 1, is_active: true },
-        { id: "menu_2", title: "محصولات", url: "/#products", order: 2, is_active: true },
-        { id: "menu_3", title: "مجله تخصصی", url: "/blog", order: 3, is_active: true },
-        { id: "menu_4", title: "پیگیری سفارش", url: "/track-order", order: 4, is_active: true },
-        { id: "menu_5", title: "تماس با ما", url: "/contact", order: 5, is_active: true },
+        { id: "m_1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
+        { id: "m_2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
+        { id: "m_3", title: "پیگیری مرسوله پستی", url: "/track-order", order: 3, isActive: true },
+        { id: "m_4", title: "مجله و مقالات سئو", url: "/blog", order: 4, isActive: true },
+        { id: "m_5", title: "تماس با پشتیبانی", url: "/contact", order: 5, isActive: true },
       ];
-      return defaults;
+
+      return defaults.map((d, idx) => normalizeMenuItem(d, idx));
     } catch (e) {
-      console.error("Error fetching menu items:", e);
+      console.error("Error loading menu:", e);
       return [];
     }
   },
 
+  async getMenuItems(): Promise<MenuItem[]> {
+    return this.getAll();
+  },
+
+  // ذخیره کل آیتم‌ها
   async saveAll(items: MenuItem[]): Promise<boolean> {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+      const normalized = items.map((d, idx) => normalizeMenuItem(d, idx));
 
-      if (supabase) {
-        // حذف و جایگزینی آیتم‌های منو در دیتابیس
-        await supabase.from("menu_items").delete().neq("id", "0");
-        await supabase.from("menu_items").insert(items);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
       }
 
-      // انتشار رویداد بلادرنگ در تب جاری
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("menu_updated", { detail: items }));
+      if (supabase) {
+        const payload = normalized.map((item) => ({
+          id: item.id,
+          title: item.title,
+          url: item.url,
+          order: item.order,
+          is_active: item.isActive,
+        }));
 
-        // هماهنگی با سایر تب‌ها
-        if ("BroadcastChannel" in window) {
-          const channel = new BroadcastChannel("menu_sync_channel");
-          channel.postMessage({ type: "SYNC_MENU", data: items });
-          channel.close();
-        }
+        await supabase.from("menu_items").delete().neq("id", "0");
+        await supabase.from("menu_items").insert(payload);
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("menu_updated", { detail: normalized }));
       }
 
       return true;
     } catch (e) {
-      console.error("Error saving menu items:", e);
+      console.error("Error saving menu:", e);
       return false;
     }
   },

@@ -10,7 +10,7 @@ export default function AdminOrders() {
   const [activeTab, setActiveTab] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | number | null>(null);
 
   // استیت مدال ثبت کد رهگیری پستی و ارسال پیامک
   const [trackingModal, setTrackingModal] = useState<{
@@ -23,9 +23,12 @@ export default function AdminOrders() {
     setLoading(true);
     try {
       let data: Order[] = [];
-      if (typeof orderService.getAllOrders === "function") {
-        data = await orderService.getAllOrders();
+      if (typeof orderService.getAll === "function") {
+        data = await orderService.getAll();
+      } else if (typeof (orderService as any).getAllOrders === "function") {
+        data = await (orderService as any).getAllOrders();
       }
+
       if (!data || data.length === 0) {
         data = JSON.parse(
           localStorage.getItem("admin_orders_cache") ||
@@ -45,33 +48,35 @@ export default function AdminOrders() {
     fetchOrders();
   }, []);
 
-  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
-    const targetOrder = orders.find((o) => o.id === orderId);
+  const handleStatusUpdate = async (orderId: string | number, newStatus: string) => {
+    const targetOrder = orders.find((o) => String(o.id) === String(orderId));
 
     // در صورت تغییر وضعیت به ارسال شده، فرم کد پستی و ارسال پیامک باز شود
     if (newStatus === "shipped" && targetOrder) {
       setTrackingModal({
         open: true,
         order: targetOrder,
-        code: targetOrder.tracking_code || "",
+        code: targetOrder.tracking_code || targetOrder.trackingCode || "",
       });
       return;
     }
 
     setUpdatingId(orderId);
     try {
-      if (typeof orderService.updateOrderStatus === "function") {
-        await orderService.updateOrderStatus(orderId, newStatus as any);
+      if (typeof orderService.updateStatus === "function") {
+        await orderService.updateStatus(orderId, newStatus as any);
+      } else if (typeof (orderService as any).updateOrderStatus === "function") {
+        await (orderService as any).updateOrderStatus(orderId, newStatus as any);
       }
 
       const updated = orders.map((o) =>
-        o.id === orderId ? { ...o, status: newStatus as any } : o
+        String(o.id) === String(orderId) ? { ...o, status: newStatus as any } : o
       );
       setOrders(updated);
       localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
       localStorage.setItem("site_orders", JSON.stringify(updated));
 
-      if (selectedOrder && selectedOrder.id === orderId) {
+      if (selectedOrder && String(selectedOrder.id) === String(orderId)) {
         setSelectedOrder({ ...selectedOrder, status: newStatus as any });
       }
     } catch (err) {
@@ -90,38 +95,48 @@ export default function AdminOrders() {
     setUpdatingId(orderId);
 
     try {
-      if (typeof orderService.updateOrderStatus === "function") {
-        await orderService.updateOrderStatus(orderId, "shipped");
+      if (typeof orderService.updateStatus === "function") {
+        await orderService.updateStatus(orderId, "shipped", code);
+      } else if (typeof (orderService as any).updateOrderStatus === "function") {
+        await (orderService as any).updateOrderStatus(orderId, "shipped");
       }
 
       const updated = orders.map((o) =>
-        o.id === orderId
-          ? { ...o, status: "shipped" as any, tracking_code: code }
+        String(o.id) === String(orderId)
+          ? { ...o, status: "shipped" as any, tracking_code: code, trackingCode: code }
           : o
       );
       setOrders(updated);
       localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
       localStorage.setItem("site_orders", JSON.stringify(updated));
 
-      if (selectedOrder && selectedOrder.id === orderId) {
+      if (selectedOrder && String(selectedOrder.id) === String(orderId)) {
         setSelectedOrder({
           ...selectedOrder,
           status: "shipped" as any,
           tracking_code: code,
+          trackingCode: code,
         });
       }
 
       // ارسال پیامک خودکار کد رهگیری پست
       const phone =
-        trackingModal.order.customer_phone ||
+        trackingModal.order.customer?.phone ||
+        (trackingModal.order as any).customer_phone ||
         (trackingModal.order as any).customerPhone;
       const name =
-        trackingModal.order.customer_name ||
+        trackingModal.order.customer?.fullName ||
+        trackingModal.order.customer?.name ||
+        (trackingModal.order as any).customer_name ||
         (trackingModal.order as any).customerName ||
         "مشتری گرامی";
 
-      if (phone) {
-        await smsService.sendTrackingCode(phone, name, code);
+      if (phone && smsService && typeof smsService.sendTrackingCode === "function") {
+        try {
+          await smsService.sendTrackingCode(phone, name, code);
+        } catch (smsErr) {
+          console.error("SMS Error:", smsErr);
+        }
       }
 
       alert("✅ سفارش به وضعیت «ارسال شده» تغییر یافت و پیامک کد رهگیری برای مشتری ارسال گردید.");
@@ -142,9 +157,13 @@ export default function AdminOrders() {
     }
 
     const headers = ["شناسه سفارش,نام خریدار,شماره تماس,مبلغ کل (تومان),وضعیت,کد رهگیری پستی,تاریخ ثبت\n"];
-    const rows = orders.map((o: any) =>
-      `"${o.id}","${o.customer_name || o.customerName || ""}","${o.customer_phone || o.customerPhone || ""}","${o.total_amount || o.totalAmount || 0}","${o.status || ""}","${o.tracking_code || ""}","${o.created_at || ""}"\n`
-    );
+    const rows = orders.map((o: any) => {
+      const cName = o.customer?.fullName || o.customer?.name || o.customer_name || o.customerName || "";
+      const cPhone = o.customer?.phone || o.customer_phone || o.customerPhone || "";
+      const total = o.finalAmount || o.final_amount || o.totalAmount || o.total_amount || 0;
+      const track = o.trackingCode || o.tracking_code || "";
+      return `"${o.id}","${cName}","${cPhone}","${total}","${o.status || ""}","${track}","${o.created_at || ""}"\n`;
+    });
 
     const blob = new Blob(["\uFEFF" + headers.concat(rows).join("")], {
       type: "text/csv;charset=utf-8;",
@@ -163,10 +182,10 @@ export default function AdminOrders() {
     if (!printWindow) return;
 
     const items = order.items || (order as any).cart_items || [];
-    const customerName = order.customer_name || (order as any).customerName || "خریدار محترم";
-    const customerPhone = order.customer_phone || (order as any).customerPhone || "---";
-    const address = order.shipping_address || (order as any).shippingAddress || (order as any).address || "ثبت نشده";
-    const total = Number(order.total_amount || (order as any).totalAmount || 0).toLocaleString("fa-IR");
+    const customerName = order.customer?.fullName || order.customer?.name || (order as any).customer_name || (order as any).customerName || "خریدار محترم";
+    const customerPhone = order.customer?.phone || (order as any).customer_phone || (order as any).customerPhone || "---";
+    const address = order.customer?.address || (order as any).customer_address || (order as any).shipping_address || (order as any).address || "ثبت نشده";
+    const total = Number(order.finalAmount || order.final_amount || order.totalAmount || (order as any).total_amount || 0).toLocaleString("fa-IR");
 
     printWindow.document.write(`
       <html dir="rtl" lang="fa">
@@ -187,8 +206,8 @@ export default function AdminOrders() {
         </head>
         <body>
           <div class="header">
-            <h1 class="title">فاکتور رسمی فروش کالا - فروشگاه تخصصی Tech</h1>
-            <p>شماره سفارش: ${order.id} | تاریخ: ${order.created_at ? new Date(order.created_at).toLocaleDateString("fa-IR") : new Date().toLocaleDateString("fa-IR")}</p>
+            <h1 class="title">فاکتور رسمی فروش کالا - فروشگاه AXONCORE</h1>
+            <p>شماره سفارش: ${order.orderNumber || order.order_number || order.id} | تاریخ: ${order.created_at ? new Date(order.created_at).toLocaleDateString("fa-IR") : new Date().toLocaleDateString("fa-IR")}</p>
           </div>
           <div class="info-grid">
             <div class="box">
@@ -266,9 +285,9 @@ export default function AdminOrders() {
 
   const filteredOrders = orders.filter((o: any) => {
     const matchesTab = activeTab === "all" || o.status === activeTab;
-    const name = o.customer_name || o.customerName || "";
-    const phone = o.customer_phone || o.customerPhone || "";
-    const id = o.id || "";
+    const name = o.customer?.fullName || o.customer?.name || o.customer_name || o.customerName || "";
+    const phone = o.customer?.phone || o.customer_phone || o.customerPhone || "";
+    const id = String(o.id || "");
     const matchesSearch =
       name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       phone.includes(searchQuery) ||
@@ -278,7 +297,7 @@ export default function AdminOrders() {
   });
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]">
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
       {/* سربرگ مدیریت سفارش‌ها و دکمه‌های کنترل */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 rounded-3xl shadow-xl">
@@ -379,29 +398,33 @@ export default function AdminOrders() {
                 {filteredOrders.map((order: any) => {
                   const items = order.items || order.cart_items || [];
                   const isUpdating = updatingId === order.id;
+                  const cName = order.customer?.fullName || order.customer?.name || order.customer_name || order.customerName || "بدون نام";
+                  const cPhone = order.customer?.phone || order.customer_phone || order.customerPhone || "---";
+                  const total = order.finalAmount || order.final_amount || order.totalAmount || order.total_amount || 0;
+                  const trackCode = order.trackingCode || order.tracking_code;
 
                   return (
                     <tr key={order.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
                       <td className="p-4 font-mono font-bold text-[var(--accent-blue)]">{order.id}</td>
                       <td className="p-4">
                         <div className="font-black text-[var(--text-primary)]">
-                          {order.customer_name || order.customerName || "بدون نام"}
+                          {cName}
                         </div>
                         <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">
                           {items.length} قلم کالا
                         </div>
                       </td>
                       <td className="p-4 font-mono text-[var(--text-primary)]">
-                        {order.customer_phone || order.customerPhone || "---"}
+                        {cPhone}
                       </td>
                       <td className="p-4 font-mono font-black text-[var(--accent-blue)]">
-                        {Number(order.total_amount || order.totalAmount || 0).toLocaleString("fa-IR")}
+                        {Number(total).toLocaleString("fa-IR")}
                       </td>
                       <td className="p-4">{getStatusBadge(order.status)}</td>
                       <td className="p-4 font-mono text-[11px] text-[var(--text-secondary)]">
-                        {order.tracking_code ? (
+                        {trackCode ? (
                           <span className="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)]">
-                            {order.tracking_code}
+                            {trackCode}
                           </span>
                         ) : (
                           "---"
@@ -475,16 +498,16 @@ export default function AdminOrders() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                 <h4 className="font-black text-[var(--accent-blue)]">👤 مشخصات گیرنده:</h4>
-                <p><strong>نام خریدار:</strong> {selectedOrder.customer_name || (selectedOrder as any).customerName}</p>
-                <p><strong>تلفن همراه:</strong> <span className="font-mono">{selectedOrder.customer_phone || (selectedOrder as any).customerPhone}</span></p>
-                <p><strong>آدرس گیرنده:</strong> {selectedOrder.shipping_address || (selectedOrder as any).shippingAddress || (selectedOrder as any).address || "ثبت نشده"}</p>
+                <p><strong>نام خریدار:</strong> {selectedOrder.customer?.fullName || selectedOrder.customer?.name || (selectedOrder as any).customer_name || (selectedOrder as any).customerName}</p>
+                <p><strong>تلفن همراه:</strong> <span className="font-mono">{selectedOrder.customer?.phone || (selectedOrder as any).customer_phone || (selectedOrder as any).customerPhone}</span></p>
+                <p><strong>آدرس گیرنده:</strong> {selectedOrder.customer?.address || (selectedOrder as any).customer_address || (selectedOrder as any).shipping_address || (selectedOrder as any).address || "ثبت نشده"}</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                 <h4 className="font-black text-[var(--accent-blue)]">💳 اطلاعات مالی:</h4>
-                <p><strong>مبلغ کل:</strong> <span className="font-mono font-black">{Number(selectedOrder.total_amount || (selectedOrder as any).totalAmount || 0).toLocaleString("fa-IR")} تومان</span></p>
+                <p><strong>مبلغ کل:</strong> <span className="font-mono font-black">{Number(selectedOrder.finalAmount || selectedOrder.final_amount || selectedOrder.totalAmount || (selectedOrder as any).total_amount || 0).toLocaleString("fa-IR")} تومان</span></p>
                 <p><strong>وضعیت فعلی:</strong> {getStatusBadge(selectedOrder.status)}</p>
-                <p><strong>کد مرسوله پستی:</strong> <span className="font-mono">{selectedOrder.tracking_code || "هنوز صادر نشده"}</span></p>
+                <p><strong>کد مرسوله پستی:</strong> <span className="font-mono">{selectedOrder.trackingCode || selectedOrder.tracking_code || "هنوز صادر نشده"}</span></p>
               </div>
             </div>
 
@@ -495,8 +518,8 @@ export default function AdminOrders() {
                 {(selectedOrder.items || (selectedOrder as any).cart_items || []).map((item: any, i: number) => (
                   <div key={i} className="p-3.5 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
-                      {item.image && (
-                        <img src={item.image} alt={item.title} className="w-10 h-10 object-contain rounded-lg bg-[var(--modal-bg)] p-1" />
+                      {(item.image || item.image_url) && (
+                        <img src={item.image || item.image_url} alt={item.title || item.name} className="w-10 h-10 object-contain rounded-lg bg-[var(--modal-bg)] p-1" />
                       )}
                       <div>
                         <div className="font-black text-[var(--text-primary)]">{item.title || item.name}</div>
@@ -550,7 +573,7 @@ export default function AdminOrders() {
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
               لطفاً کد ۲۴ رقمی بارنامه پستی را وارد نمایید. به محض تایید، وضعیت سفارش به «ارسال شده» تغییر کرده و پیامک رهگیری به شماره{" "}
               <strong className="text-[var(--text-primary)] font-mono">
-                {trackingModal.order?.customer_phone || (trackingModal.order as any)?.customerPhone}
+                {trackingModal.order?.customer?.phone || (trackingModal.order as any)?.customer_phone || (trackingModal.order as any)?.customerPhone}
               </strong>{" "}
               ارسال می‌گردد.
             </p>

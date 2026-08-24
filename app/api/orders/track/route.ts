@@ -1,48 +1,93 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+import { normalizeOrder } from '@/services/orderService';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get("query")?.trim();
+    const query = searchParams.get('query');
 
-    if (!query) {
-      return NextResponse.json({ success: false, message: "شناسه فاکتور یا شماره موبایل الزامی است." }, { status: 400 });
+    if (!query || !query.trim()) {
+      return NextResponse.json(
+        { success: false, message: 'شناسه سفارش یا شماره تماس الزامی است.' },
+        { status: 400 }
+      );
     }
 
-    const cleanDigits = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
+    const cleanQuery = query.trim();
 
-    let dbQuery = supabaseAdmin.from("orders").select("*");
+    // جستجو در فیلدهای مختلف سفارش در جدول orders
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .or(`order_number.eq.${cleanQuery},id.eq.${cleanQuery},customer_phone.eq.${cleanQuery},tracking_code.eq.${cleanQuery}`)
+      .order('created_at', { ascending: false });
 
-    if (query.toUpperCase().startsWith("ORD-")) {
-      dbQuery = dbQuery.eq("id", query.toUpperCase());
-    } else if (cleanDigits.length >= 10) {
-      dbQuery = dbQuery.eq("phone", cleanDigits);
-    } else {
-      dbQuery = dbQuery.or(`id.ilike.%${query}%,phone.ilike.%${cleanDigits}%`);
+    if (error) {
+      console.error('Database query error:', error.message);
+      return NextResponse.json(
+        { success: false, message: 'خطا در واکشی اطلاعات از پایگاه داده.' },
+        { status: 500 }
+      );
     }
 
-    const { data, error } = await dbQuery.order("created_at", { ascending: false });
+    // در صورتی که فیلدهای تخت پیدا نشد، بررسی کل سفارشات برای تطبیق درون آبجکت customer
+    let matchedOrders = data || [];
 
-    if (error) throw error;
+    if (matchedOrders.length === 0) {
+      const { data: allOrders } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-    const normalizedOrders = (data || []).map((o: any) => ({
-      id: o.id,
-      customerName: o.customer_name || o.customerName || "مشتری گرامی",
-      phone: o.phone,
-      address: o.address,
-      postalCode: o.postal_code || o.postalCode,
-      items: typeof o.items === "string" ? JSON.parse(o.items) : (o.items || []),
-      totalAmount: Number(o.total_amount || o.totalAmount || 0),
-      discountAmount: Number(o.discount_amount || o.discountAmount || 0),
-      couponCode: o.coupon_code || o.couponCode,
-      status: o.status || "processing",
-      trackingCode: o.tracking_code || o.trackingCode,
-      createdAt: o.created_at,
-    }));
+      matchedOrders = (allOrders || []).filter((ord: any) => {
+        const norm = normalizeOrder(ord);
+        return (
+          String(norm.id) === cleanQuery ||
+          norm.orderNumber === cleanQuery ||
+          norm.customer.phone === cleanQuery ||
+          norm.trackingCode === cleanQuery
+        );
+      });
+    }
 
-    return NextResponse.json({ success: true, data: normalizedOrders });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err?.message || "خطا در بازیابی اطلاعات سفارش" }, { status: 500 });
+    if (matchedOrders.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'هیچ سفارشی با این مشخصات یافت نشد.',
+        data: [],
+      });
+    }
+
+    // فرمت‌بندی خروجی منطبق با استیت‌های کامپوننت فرانت‌اند
+    const formattedData = matchedOrders.map((ord: any) => {
+      const norm = normalizeOrder(ord);
+      return {
+        id: norm.orderNumber || norm.id,
+        orderNumber: norm.orderNumber,
+        customerName: norm.customer.fullName || norm.customer.name || 'مشتری گرامی',
+        phone: norm.customer.phone,
+        address: norm.customer.address,
+        postalCode: norm.customer.postalCode,
+        items: norm.items,
+        totalAmount: norm.finalAmount || norm.totalAmount,
+        discountAmount: norm.discountAmount,
+        status: norm.status,
+        trackingCode: norm.trackingCode,
+        createdAt: norm.created_at,
+      };
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: formattedData,
+    });
+  } catch (error: any) {
+    console.error('Track API Error:', error);
+    return NextResponse.json(
+      { success: false, message: 'خطای داخلی سرور در رهگیری سفارش.' },
+      { status: 500 }
+    );
   }
 }

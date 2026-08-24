@@ -19,8 +19,8 @@ export default function HomePage() {
   const loadData = async () => {
     try {
       const [prods, bans, info] = await Promise.all([
-        productService.getAll ? productService.getAll() : productService.getProducts(),
-        bannerService.getAll ? bannerService.getAll() : (bannerService.getActive ? bannerService.getActive() : []),
+        productService.getAll ? productService.getAll() : (productService as any).getProducts(),
+        bannerService.getAll ? bannerService.getAll() : ((bannerService as any).getActive ? (bannerService as any).getActive() : []),
         siteInfoService.getSiteInfo(),
       ]);
 
@@ -33,10 +33,6 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    // خواندن فوری از کش بدون تاخیر
-    const initialSite = siteInfoService.getSiteInfoSync();
-    if (initialSite) setSiteInfo(initialSite);
-
     loadData();
 
     // دریافت بلادرنگ انتخاب دسته‌بندی از هدر
@@ -46,13 +42,16 @@ export default function HomePage() {
 
     // دریافت بلادرنگ آپدیت کالاها و بنرها از پنل ادمین
     const handleProductsUpdate = (e: any) => {
-      if (e.detail) setProducts(e.detail);
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
       else loadData();
     };
 
     const handleBannersUpdate = (e: any) => {
-      if (e.detail) setBanners(e.detail.filter((b: any) => b.is_active !== false && b.isActive !== false));
-      else loadData();
+      if (e.detail && Array.isArray(e.detail)) {
+        setBanners(e.detail.filter((b: any) => b.is_active !== false && b.isActive !== false));
+      } else {
+        loadData();
+      }
     };
 
     const handleSiteUpdate = (e: any) => {
@@ -69,7 +68,7 @@ export default function HomePage() {
     let banChannel: BroadcastChannel | null = null;
     let siteChannel: BroadcastChannel | null = null;
 
-    if ("BroadcastChannel" in window) {
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
       prodChannel = new BroadcastChannel("products_sync_channel");
       prodChannel.onmessage = (event) => {
         if (event.data?.type === "SYNC_PRODUCTS") setProducts(event.data.data);
@@ -103,7 +102,7 @@ export default function HomePage() {
 
   const filteredProducts = products.filter((product) => {
     if (selectedCategory === "all") return true;
-    const cat = (product.category || product.category_name || product.category_id || "").toLowerCase();
+    const cat = (product.category || (product as any).category_name || (product as any).category_id || "").toLowerCase();
     const target = selectedCategory.toLowerCase();
     return cat === target || cat.includes(target) || target.includes(cat);
   });
@@ -156,7 +155,7 @@ export default function HomePage() {
                 ضمانت اصالت و سلامت ۱۰۰٪
               </span>
               <h1 className="text-2xl md:text-4xl font-black">
-                {siteInfo?.site_name || siteInfo?.siteName || "فروشگاه تخصصی تجهیزات دیجیتال"}
+                {siteInfo?.site_name || siteInfo?.siteName || "فروشگاه تخصصی تجهیزات دیجیتال AXONCORE"}
               </h1>
               <p className="text-xs md:text-sm text-slate-300 font-medium">
                 {siteInfo?.tagline || "ارائه جدیدترین و برترین کالاها با گارانتی معتبر و ارسال سریع"}
@@ -299,7 +298,7 @@ function HomeBlogSection() {
               {post.title}
             </h4>
             <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
-              {post.metaDescription || post.excerpt || post.summary || post.content?.substring(0, 80) + "..."}
+              {post.metaDescription || post.excerpt || post.summary || (post.content ? post.content.substring(0, 80) + "..." : "")}
             </p>
           </div>
           <Link
@@ -384,7 +383,7 @@ function AIAssistantChat() {
 
       let matchedProductObj: Product | null = null;
       if (data.matchedProductId) {
-        matchedProductObj = productsData.find((p) => p.id === data.matchedProductId) || null;
+        matchedProductObj = productsData.find((p) => String(p.id) === String(data.matchedProductId)) || null;
       }
 
       if (data.response || data.reply) {
@@ -458,7 +457,7 @@ function AIAssistantChat() {
                   <div className="ml-auto w-[85%] p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)] space-y-2 animate-fadeIn">
                     <div className="flex gap-2 items-center">
                       <img
-                        src={m.matchedProduct.images?.[0] || m.matchedProduct.image || ""}
+                        src={m.matchedProduct.images?.[0] || m.matchedProduct.image || m.matchedProduct.image_url || ""}
                         alt={m.matchedProduct.name || m.matchedProduct.title || ""}
                         className="w-12 h-12 rounded-lg object-cover"
                       />
@@ -477,7 +476,7 @@ function AIAssistantChat() {
                           id: m.matchedProduct!.id,
                           name: m.matchedProduct!.name || m.matchedProduct!.title || "",
                           price: m.matchedProduct!.price,
-                          image: m.matchedProduct!.images?.[0] || m.matchedProduct!.image || "",
+                          image: m.matchedProduct!.images?.[0] || m.matchedProduct!.image || m.matchedProduct!.image_url || "",
                         })
                       }
                       className="w-full py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[10px] hover:opacity-90 transition cursor-pointer shadow-md"
@@ -548,10 +547,12 @@ function HomeProductCard({
   onAddToCart: (item: any) => void;
   onOpenDetails: (product: Product) => void;
 }) {
-  const images = product.images && product.images.length > 0 ? product.images : [product.image || ""];
+  const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
   const displayImage = images[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500";
-  const isAvailable = (product as any).is_available !== false && (product.stock === undefined || product.stock > 0);
-  const productName = product.title || (product as any).name || "";
+  const isAvailable = (product as any).is_available !== false && (product.isAvailable !== false) && (product.stock === undefined || product.stock > 0);
+  const productName = product.title || product.name || "";
+  const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
+  const oldPrice = Number(product.originalPrice ?? product.price ?? 0);
 
   return (
     <div className="rounded-[2rem] liquid-glass-card p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] transition duration-300 group border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
@@ -574,7 +575,7 @@ function HomeProductCard({
       <div className="space-y-2.5 cursor-pointer" onClick={() => onOpenDetails(product)}>
         <div className="flex items-center justify-between text-[10px]">
           <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full font-bold">
-            {product.category_name || product.category_id || (product as any).category || "کالای دیجیتال"}
+            {product.category || (product as any).category_name || "کالای دیجیتال"}
           </span>
           <span
             className={`font-bold px-2.5 py-0.5 rounded-full ${
@@ -596,11 +597,11 @@ function HomeProductCard({
 
         <div className="flex items-center gap-2 pt-1">
           <span className="font-black text-base text-[var(--accent-blue)]">
-            {(product.discount_price || product.price || 0).toLocaleString("fa-IR")} تومان
+            {currentPrice.toLocaleString("fa-IR")} تومان
           </span>
-          {product.discount_price && product.discount_price < product.price && (
+          {oldPrice > currentPrice && (
             <span className="text-xs line-through text-[var(--text-muted)] font-mono">
-              {product.price.toLocaleString("fa-IR")}
+              {oldPrice.toLocaleString("fa-IR")}
             </span>
           )}
         </div>
@@ -611,7 +612,8 @@ function HomeProductCard({
           onAddToCart({
             id: product.id,
             name: productName,
-            price: product.discount_price || product.price,
+            title: productName,
+            price: currentPrice,
             image: displayImage,
             stock: product.stock ?? 10,
           });
@@ -634,14 +636,16 @@ function ProductDetailsModal({
   onClose: () => void;
   onAddToCart: (item: any) => void;
 }) {
-  const images = product.images && product.images.length > 0 ? product.images : [product.image || ""];
+  const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
   const [activeImage, setActiveImage] = useState(images[0]);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"desc" | "specs" | "shipping">("desc");
 
-  const specsEntries = (product as any).specs ? Object.entries((product as any).specs) : [];
-  const isAvailable = (product as any).is_available !== false && (product.stock === undefined || product.stock > 0);
-  const productName = product.title || (product as any).name || "";
+  const specsEntries = product.specs ? Object.entries(product.specs) : [];
+  const isAvailable = (product as any).is_available !== false && (product.isAvailable !== false) && (product.stock === undefined || product.stock > 0);
+  const productName = product.title || product.name || "";
+  const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
+  const oldPrice = Number(product.originalPrice ?? product.price ?? 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
@@ -657,7 +661,7 @@ function ProductDetailsModal({
           <div className="space-y-4">
             <div className="w-full h-72 md:h-96 rounded-3xl overflow-hidden bg-black/5 dark:bg-black/40 flex items-center justify-center border border-[var(--card-border)]">
               <img
-                src={activeImage || product.image || ""}
+                src={activeImage || product.image || product.image_url || ""}
                 alt={productName}
                 className="w-full h-full object-contain p-4"
               />
@@ -686,7 +690,7 @@ function ProductDetailsModal({
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-[10px] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-1 rounded-full font-bold">
-                  {product.category_name || product.category_id || (product as any).category || "کالای دیجیتال"}
+                  {product.category || (product as any).category_name || "کالای دیجیتال"}
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
@@ -778,11 +782,11 @@ function ProductDetailsModal({
                 <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-black text-[var(--accent-blue)]">
-                    {(product.discount_price || product.price || 0).toLocaleString("fa-IR")} تومان
+                    {currentPrice.toLocaleString("fa-IR")} تومان
                   </span>
-                  {product.discount_price && product.discount_price < product.price && (
+                  {oldPrice > currentPrice && (
                     <span className="text-xs line-through text-[var(--text-muted)] font-mono">
-                      {product.price.toLocaleString("fa-IR")}
+                      {oldPrice.toLocaleString("fa-IR")}
                     </span>
                   )}
                 </div>
@@ -811,8 +815,9 @@ function ProductDetailsModal({
                       onAddToCart({
                         id: product.id,
                         name: productName,
-                        price: product.discount_price || product.price,
-                        image: activeImage || product.image || "",
+                        title: productName,
+                        price: currentPrice,
+                        image: activeImage || product.image || product.image_url || "",
                         stock: product.stock ?? 10,
                       });
                     }

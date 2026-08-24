@@ -27,7 +27,10 @@ export default function AdminCoupons() {
     setLoading(true);
     try {
       const data = await couponService.getAll();
-      setCoupons(data);
+      setCoupons(data || []);
+    } catch (err) {
+      console.error("Error loading coupons:", err);
+      setCoupons([]);
     } finally {
       setLoading(false);
     }
@@ -37,7 +40,7 @@ export default function AdminCoupons() {
     loadCoupons();
 
     const handleUpdate = (e: any) => {
-      if (e.detail) setCoupons(e.detail);
+      if (e.detail && Array.isArray(e.detail)) setCoupons(e.detail);
       else loadCoupons();
     };
     window.addEventListener("coupons_updated", handleUpdate);
@@ -54,12 +57,17 @@ export default function AdminCoupons() {
       const created = await couponService.create({
         code: code.toUpperCase().trim(),
         type,
+        discount_type: type,
         value: Number(value),
-        min_order_amount: Number(minOrder) || undefined,
-        max_discount_amount: Number(maxDiscount) || undefined,
-        usage_limit: Number(usageLimit) || undefined,
+        discount_value: Number(value),
+        discountPercent: type === "percent" ? Number(value) : undefined,
+        min_order_amount: Number(minOrder) > 0 ? Number(minOrder) : undefined,
+        max_discount_amount: Number(maxDiscount) > 0 ? Number(maxDiscount) : undefined,
+        max_discount: Number(maxDiscount) > 0 ? Number(maxDiscount) : undefined,
+        maxDiscount: Number(maxDiscount) > 0 ? Number(maxDiscount) : undefined,
+        usage_limit: Number(usageLimit) > 0 ? Number(usageLimit) : undefined,
         is_active: true,
-        expires_at: expiresAt || undefined,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       });
 
       if (created) {
@@ -70,21 +78,38 @@ export default function AdminCoupons() {
         setMaxDiscount(0);
         setUsageLimit(50);
         setExpiresAt("");
+        await loadCoupons();
+      } else {
+        showToast("خطا در ایجاد کد تخفیف.");
       }
+    } catch (err) {
+      console.error("Create coupon error:", err);
+      showToast("خطای سیستمی در برقراری ارتباط با دیتابیس.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleToggleStatus = async (id: string, currentStatus: boolean) => {
-    await couponService.update(id, { is_active: !currentStatus });
-    showToast("وضعیت کد تخفیف به‌روزرسانی شد.");
+  const handleToggleStatus = async (id: string | number, currentStatus?: boolean) => {
+    const nextStatus = currentStatus !== undefined ? !currentStatus : false;
+    const success = await couponService.update(id, { is_active: nextStatus });
+    if (success) {
+      showToast("وضعیت کد تخفیف به‌روزرسانی شد.");
+      await loadCoupons();
+    } else {
+      showToast("خطا در تغییر وضعیت.");
+    }
   };
 
-  const handleDelete = async (id: string, couponCode: string) => {
+  const handleDelete = async (id: string | number, couponCode: string) => {
     if (confirm(`آیا از حذف کد تخفیف "${couponCode}" اطمینان دارید؟`)) {
-      await couponService.delete(id);
-      showToast("کد تخفیف حذف گردید.");
+      const success = await couponService.delete(id);
+      if (success) {
+        showToast("کد تخفیف حذف گردید.");
+        await loadCoupons();
+      } else {
+        showToast("خطا در حذف کد تخفیف.");
+      }
     }
   };
 
@@ -232,42 +257,49 @@ export default function AdminCoupons() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--card-border)]">
-              {coupons.map((c) => (
-                <tr key={c.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                  <td className="py-3 px-2 font-mono font-black text-sm text-[var(--accent-blue)] tracking-wider">
-                    {c.code}
-                  </td>
-                  <td className="py-3 px-2 font-mono font-black">
-                    {c.type === "percent" ? `${c.value}% تخفیف` : `${c.value.toLocaleString("fa-IR")} تومان`}
-                  </td>
-                  <td className="py-3 px-2 text-[11px] text-[var(--text-secondary)]">
-                    {c.min_order_amount ? `حداقل خرید: ${c.min_order_amount.toLocaleString("fa-IR")} ت` : "بدون حداقل خرید"}
-                  </td>
-                  <td className="py-3 px-2 font-mono font-bold text-[var(--text-secondary)]">
-                    {c.used_count || 0} / {c.usage_limit || "نامحدود"}
-                  </td>
-                  <td className="py-3 px-2">
-                    <button
-                      onClick={() => handleToggleStatus(c.id, c.is_active)}
-                      className={`px-3 py-1 rounded-xl text-[10px] font-black transition cursor-pointer ${
-                        c.is_active
-                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                          : "bg-gray-500/15 text-gray-500 border border-gray-500/30"
-                      }`}
-                    >
-                      {c.is_active ? "فعال و معتبر" : "غیرفعال"}
-                    </button>
-                  </td>
-                  <td className="py-3 px-2 text-center">
-                    <button
-                      onClick={() => handleDelete(c.id, c.code)}
-                      className="px-3 py-1 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                    >
-                      🗑️ حذف
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {coupons.map((c) => {
+                const couponType = c.type || c.discount_type || "percent";
+                const couponVal = Number(c.value ?? c.discount_value ?? c.discountPercent ?? 0);
+                const isItemActive = c.is_active !== undefined ? c.is_active : true;
+                const minAmount = Number(c.min_order_amount ?? 0);
+
+                return (
+                  <tr key={c.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                    <td className="py-3 px-2 font-mono font-black text-sm text-[var(--accent-blue)] tracking-wider">
+                      {c.code}
+                    </td>
+                    <td className="py-3 px-2 font-mono font-black">
+                      {couponType === "percent" ? `${couponVal}% تخفیف` : `${couponVal.toLocaleString("fa-IR")} تومان`}
+                    </td>
+                    <td className="py-3 px-2 text-[11px] text-[var(--text-secondary)]">
+                      {minAmount > 0 ? `حداقل خرید: ${minAmount.toLocaleString("fa-IR")} ت` : "بدون حداقل خرید"}
+                    </td>
+                    <td className="py-3 px-2 font-mono font-bold text-[var(--text-secondary)]">
+                      {c.used_count || 0} / {c.usage_limit || "نامحدود"}
+                    </td>
+                    <td className="py-3 px-2">
+                      <button
+                        onClick={() => handleToggleStatus(c.id, isItemActive)}
+                        className={`px-3 py-1 rounded-xl text-[10px] font-black transition cursor-pointer ${
+                          isItemActive
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                            : "bg-gray-500/15 text-gray-500 border border-gray-500/30"
+                        }`}
+                      >
+                        {isItemActive ? "فعال و معتبر" : "غیرفعال"}
+                      </button>
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <button
+                        onClick={() => handleDelete(c.id, c.code)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
+                      >
+                        🗑️ حذف
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

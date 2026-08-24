@@ -40,10 +40,10 @@ export default function AdminMenu() {
 
         if (!error && data && data.length > 0) {
           const mapped: MenuItem[] = data.map((d: any) => ({
-            id: d.id,
+            id: String(d.id),
             title: d.title,
             url: d.url,
-            order: d.order,
+            order: Number(d.order ?? 0),
             isActive: d.is_active ?? d.isActive ?? true,
           }));
 

@@ -35,7 +35,10 @@ export default function AdminProducts() {
     setLoading(true);
     try {
       const data = await productService.getAll();
-      setProducts(data);
+      setProducts(data || []);
+    } catch (err) {
+      console.error("Error loading products:", err);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -45,8 +48,11 @@ export default function AdminProducts() {
     loadProducts();
 
     const handleUpdate = (e: any) => {
-      if (e.detail) setProducts(e.detail);
-      else loadProducts();
+      if (e.detail && Array.isArray(e.detail)) {
+        setProducts(e.detail);
+      } else {
+        loadProducts();
+      }
     };
     window.addEventListener("products_updated", handleUpdate);
     return () => window.removeEventListener("products_updated", handleUpdate);
@@ -69,16 +75,16 @@ export default function AdminProducts() {
 
   const handleOpenEditModal = (p: Product) => {
     setEditingProduct(p);
-    setName(p.name);
+    setName(p.name || p.title || "");
     setPrice(p.price || 0);
-    setOriginalPrice(p.originalPrice || p.price || 0);
+    setOriginalPrice(p.originalPrice || p.discountPrice || p.price || 0);
     setCategory(p.category || "عمومی");
     setStock(p.stock ?? 10);
     setDescription(p.description || "");
-    setImageUrl(p.images?.[0] || p.image || "");
-    setGalleryUrls(p.images || (p.image ? [p.image] : []));
-    setIsSpecialOffer(p.isSpecialOffer ?? false);
-    setIsAvailable(p.is_available ?? true);
+    setImageUrl(p.images?.[0] || p.image || p.image_url || "");
+    setGalleryUrls(p.images && p.images.length > 0 ? p.images : (p.image ? [p.image] : []));
+    setIsSpecialOffer(Boolean((p as any).isSpecialOffer || p.isFeatured));
+    setIsAvailable(p.is_available !== undefined ? p.is_available : (p.isAvailable ?? true));
     setIsModalOpen(true);
   };
 
@@ -98,17 +104,22 @@ export default function AdminProducts() {
 
     setSaving(true);
     try {
-      const finalImages = galleryUrls.length > 0 ? galleryUrls : imageUrl ? [imageUrl] : [];
-      const productPayload = {
+      const finalImages = galleryUrls.length > 0 ? galleryUrls : imageUrl ? [imageUrl.trim()] : [];
+      const primaryImage = imageUrl.trim() || finalImages[0] || "";
+
+      const productPayload: Partial<Product> = {
         name: name.trim(),
+        title: name.trim(),
         price: Number(price),
         originalPrice: originalPrice > price ? Number(originalPrice) : undefined,
         category: category.trim(),
         stock: Number(stock),
         description: description.trim(),
-        image: imageUrl.trim() || finalImages[0] || "",
+        image: primaryImage,
+        image_url: primaryImage,
         images: finalImages,
-        isSpecialOffer,
+        isFeatured: isSpecialOffer,
+        isAvailable: isAvailable && stock > 0,
         is_available: isAvailable && stock > 0,
       };
 
@@ -117,32 +128,47 @@ export default function AdminProducts() {
         if (updated) {
           showToast(`محصول «${name}» با موفقیت ویرایش شد.`);
           setIsModalOpen(false);
+          await loadProducts();
+        } else {
+          showToast("خطا در ویرایش محصول.");
         }
       } else {
         const created = await productService.create(productPayload);
         if (created) {
           showToast(`محصول جدید «${name}» در فروشگاه و دیتابیس ثبت گردید.`);
           setIsModalOpen(false);
+          await loadProducts();
+        } else {
+          showToast("خطا در ثبت محصول جدید.");
         }
       }
+    } catch (err) {
+      console.error("Product submit error:", err);
+      showToast("خطای سیستمی در برقراری ارتباط با دیتابیس.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string, prodName: string) => {
+  const handleDelete = async (id: string | number, prodName: string) => {
     if (confirm(`آیا از حذف محصول «${prodName}» از فروشگاه اطمینان دارید؟`)) {
-      await productService.delete(id);
-      showToast("محصول حذف گردید.");
+      const success = await productService.delete(id);
+      if (success) {
+        showToast("محصول حذف گردید.");
+        await loadProducts();
+      } else {
+        showToast("خطا در حذف محصول.");
+      }
     }
   };
 
   const categories = Array.from(new Set(products.map((p) => p.category || "عمومی"))).filter(Boolean);
 
   const filteredProducts = products.filter((p) => {
+    const prodName = p.name || p.title || "";
     const matchCat = selectedCat === "all" || (p.category || "عمومی") === selectedCat;
     const matchSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      prodName.toLowerCase().includes(search.toLowerCase()) ||
       (p.description || "").toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
@@ -235,50 +261,55 @@ export default function AdminProducts() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--card-border)]">
-              {filteredProducts.map((p) => (
-                <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                  <td className="py-3 px-2">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={p.images?.[0] || p.image || ""}
-                        alt={p.name}
-                        className="w-11 h-11 rounded-xl object-contain bg-[var(--input-bg)] p-1 border border-[var(--card-border)]"
-                      />
-                      <span className="font-extrabold text-xs text-[var(--text-primary)]">{p.name}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-2 font-bold text-[var(--text-secondary)]">{p.category || "عمومی"}</td>
-                  <td className="py-3 px-2 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                    {(p.price || 0).toLocaleString("fa-IR")} تومان
-                  </td>
-                  <td className="py-3 px-2 font-mono font-bold">
-                    <span className={(p.stock ?? 0) <= 3 ? "text-rose-500 font-black" : ""}>
-                      {p.stock ?? 0} عدد
-                    </span>
-                  </td>
-                  <td className="py-3 px-2">
-                    {p.isSpecialOffer && (
-                      <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px] border border-rose-500/30">
-                        🔥 ویژه
+              {filteredProducts.map((p) => {
+                const prodName = p.name || p.title || "کالای بدون نام";
+                const prodImg = p.images?.[0] || p.image || p.image_url || "";
+                const isSpecial = Boolean((p as any).isSpecialOffer || p.isFeatured);
+                return (
+                  <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={prodImg}
+                          alt={prodName}
+                          className="w-11 h-11 rounded-xl object-contain bg-[var(--input-bg)] p-1 border border-[var(--card-border)]"
+                        />
+                        <span className="font-extrabold text-xs text-[var(--text-primary)]">{prodName}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 font-bold text-[var(--text-secondary)]">{p.category || "عمومی"}</td>
+                    <td className="py-3 px-2 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                      {(p.price || 0).toLocaleString("fa-IR")} تومان
+                    </td>
+                    <td className="py-3 px-2 font-mono font-bold">
+                      <span className={(p.stock ?? 0) <= 3 ? "text-rose-500 font-black" : ""}>
+                        {p.stock ?? 0} عدد
                       </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-2 text-center flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => handleOpenEditModal(p)}
-                      className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                    >
-                      ✏️ ویرایش
-                    </button>
-                    <button
-                      onClick={() => handleDelete(p.id, p.name)}
-                      className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                    >
-                      🗑️ حذف
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 px-2">
+                      {isSpecial && (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px] border border-rose-500/30">
+                          🔥 ویژه
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-2 text-center flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleOpenEditModal(p)}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
+                      >
+                        ✏️ ویرایش
+                      </button>
+                      <button
+                        onClick={() => handleDelete(p.id, prodName)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
+                      >
+                        🗑️ حذف
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -293,12 +324,12 @@ export default function AdminProducts() {
           >
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
               <h4 className="font-black text-sm text-[var(--accent-blue)]">
-                {editingProduct ? `✏️ ویرایش محصول «${editingProduct.name}»` : "➕ ثبت محصول جدید"}
+                {editingProduct ? `✏️ ویرایش محصول «${name}»` : "➕ ثبت محصول جدید"}
               </h4>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -430,7 +461,7 @@ export default function AdminProducts() {
                     type="checkbox"
                     checked={isSpecialOffer}
                     onChange={(e) => setIsSpecialOffer(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent-blue)]"
+                    className="w-4 h-4 accent-[var(--accent-blue)] cursor-pointer"
                   />
                   <span>نمایش در بخش پیشنهاد شگفت‌انگیز 🔥</span>
                 </label>
@@ -440,7 +471,7 @@ export default function AdminProducts() {
                     type="checkbox"
                     checked={isAvailable}
                     onChange={(e) => setIsAvailable(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent-blue)]"
+                    className="w-4 h-4 accent-[var(--accent-blue)] cursor-pointer"
                   />
                   <span>قابل خرید و فعال در ویترین</span>
                 </label>
@@ -451,7 +482,7 @@ export default function AdminProducts() {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)]"
+                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
               >
                 انصراف
               </button>

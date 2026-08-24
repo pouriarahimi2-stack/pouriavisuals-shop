@@ -15,7 +15,7 @@ export default function AdminBanners() {
   const [imageUrl, setImageUrl] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [position, setPosition] = useState<BannerItem["position"]>("main_slider");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -26,7 +26,10 @@ export default function AdminBanners() {
     setLoading(true);
     try {
       const data = await bannerService.getAll();
-      setBanners(data);
+      setBanners(data || []);
+    } catch (err) {
+      console.error("Error loading banners:", err);
+      setBanners([]);
     } finally {
       setLoading(false);
     }
@@ -36,7 +39,7 @@ export default function AdminBanners() {
     loadBanners();
 
     const handleUpdate = (e: any) => {
-      if (e.detail) setBanners(e.detail);
+      if (e.detail && Array.isArray(e.detail)) setBanners(e.detail);
       else loadBanners();
     };
     window.addEventListener("banners_updated", handleUpdate);
@@ -60,13 +63,15 @@ export default function AdminBanners() {
 
     if (editingId) {
       const updated = banners.map((b) =>
-        b.id === editingId
+        String(b.id) === String(editingId)
           ? {
               ...b,
               title: title.trim(),
               subtitle: subtitle.trim() || undefined,
               imageUrl,
+              image_url: imageUrl,
               linkUrl: linkUrl.trim(),
+              link_url: linkUrl.trim(),
               position,
             }
           : b
@@ -80,7 +85,9 @@ export default function AdminBanners() {
         title: title.trim(),
         subtitle: subtitle.trim() || undefined,
         imageUrl,
+        image_url: imageUrl,
         linkUrl: linkUrl.trim(),
+        link_url: linkUrl.trim(),
         position,
         order: banners.length + 1,
         isActive: true,
@@ -99,24 +106,24 @@ export default function AdminBanners() {
 
   const handleStartEdit = (b: BannerItem) => {
     setEditingId(b.id);
-    setTitle(b.title);
+    setTitle(b.title || "");
     setSubtitle(b.subtitle || "");
-    setImageUrl(b.imageUrl);
-    setLinkUrl(b.linkUrl);
-    setPosition(b.position);
+    setImageUrl(b.imageUrl || (b as any).image_url || (b as any).image || "");
+    setLinkUrl(b.linkUrl || (b as any).link_url || (b as any).link || "");
+    setPosition(b.position || "main_slider");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleToggleActive = (id: string) => {
+  const handleToggleActive = (id: string | number) => {
     const updated = banners.map((b) =>
-      b.id === id ? { ...b, isActive: !b.isActive } : b
+      String(b.id) === String(id) ? { ...b, isActive: !b.isActive } : b
     );
     setBanners(updated);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: string | number) => {
     if (confirm("آیا از حذف این بنر اطمینان دارید؟")) {
-      const updated = banners.filter((b) => b.id !== id);
+      const updated = banners.filter((b) => String(b.id) !== String(id));
       setBanners(updated);
     }
   };
@@ -143,6 +150,9 @@ export default function AdminBanners() {
       } else {
         showToast("خطا در ذخیره‌سازی بنرها.");
       }
+    } catch (err) {
+      console.error("Save banners error:", err);
+      showToast("خطای سیستمی در برقراری ارتباط.");
     } finally {
       setSaving(false);
     }
@@ -158,6 +168,8 @@ export default function AdminBanners() {
         return "بنر دوتایی ردیف دوم";
       case "sidebar":
         return "سایدبار تبلیغاتی";
+      default:
+        return "اسلایدر اصلی";
     }
   };
 
@@ -302,74 +314,77 @@ export default function AdminBanners() {
           <div className="py-12 text-center text-xs font-bold text-[var(--text-secondary)]">هیچ بنری ثبت نشده است.</div>
         ) : (
           <div className="space-y-3">
-            {banners.map((item, index) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 text-xs"
-              >
-                <div className="flex items-center gap-4">
-                  <span className="w-7 h-7 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center font-mono font-black text-xs text-[var(--text-secondary)]">
-                    {index + 1}
-                  </span>
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    className="w-20 h-12 object-cover rounded-xl border border-[var(--card-border)]"
-                  />
-                  <div>
-                    <h5 className="font-black text-xs text-[var(--text-primary)]">{item.title}</h5>
-                    {item.subtitle && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{item.subtitle}</p>}
-                    <span className="inline-block mt-1 px-2.5 py-0.5 rounded-lg bg-[var(--modal-bg)] text-[10px] font-bold text-[var(--accent-blue)]">
-                      {getPositionLabel(item.position)}
+            {banners.map((item, index) => {
+              const displayImg = item.imageUrl || (item as any).image_url || (item as any).image || "";
+              return (
+                <div
+                  key={item.id}
+                  className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 text-xs"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="w-7 h-7 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center font-mono font-black text-xs text-[var(--text-secondary)]">
+                      {index + 1}
                     </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl p-1">
-                    <button
-                      disabled={index === 0}
-                      onClick={() => handleMove(index, "up")}
-                      className="px-2 py-1 hover:text-[var(--accent-blue)] disabled:opacity-30 cursor-pointer font-bold"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      disabled={index === banners.length - 1}
-                      onClick={() => handleMove(index, "down")}
-                      className="px-2 py-1 hover:text-[var(--accent-blue)] disabled:opacity-30 cursor-pointer font-bold"
-                    >
-                      ▼
-                    </button>
+                    <img
+                      src={displayImg}
+                      alt={item.title}
+                      className="w-20 h-12 object-cover rounded-xl border border-[var(--card-border)]"
+                    />
+                    <div>
+                      <h5 className="font-black text-xs text-[var(--text-primary)]">{item.title}</h5>
+                      {item.subtitle && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{item.subtitle}</p>}
+                      <span className="inline-block mt-1 px-2.5 py-0.5 rounded-lg bg-[var(--modal-bg)] text-[10px] font-bold text-[var(--accent-blue)]">
+                        {getPositionLabel(item.position)}
+                      </span>
+                    </div>
                   </div>
 
-                  <button
-                    onClick={() => handleToggleActive(item.id)}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition cursor-pointer ${
-                      item.isActive
-                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                        : "bg-gray-500/15 text-gray-500 border border-gray-500/30"
-                    }`}
-                  >
-                    {item.isActive ? "فعال در سایت" : "غیرفعال"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl p-1">
+                      <button
+                        disabled={index === 0}
+                        onClick={() => handleMove(index, "up")}
+                        className="px-2 py-1 hover:text-[var(--accent-blue)] disabled:opacity-30 cursor-pointer font-bold"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        disabled={index === banners.length - 1}
+                        onClick={() => handleMove(index, "down")}
+                        className="px-2 py-1 hover:text-[var(--accent-blue)] disabled:opacity-30 cursor-pointer font-bold"
+                      >
+                        ▼
+                      </button>
+                    </div>
 
-                  <button
-                    onClick={() => handleStartEdit(item)}
-                    className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                  >
-                    ✏️
-                  </button>
+                    <button
+                      onClick={() => handleToggleActive(item.id)}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition cursor-pointer ${
+                        item.isActive
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                          : "bg-gray-500/15 text-gray-500 border border-gray-500/30"
+                      }`}
+                    >
+                      {item.isActive ? "فعال در سایت" : "غیرفعال"}
+                    </button>
 
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                  >
-                    🗑️
-                  </button>
+                    <button
+                      onClick={() => handleStartEdit(item)}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
+                    >
+                      ✏️
+                    </button>
+
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

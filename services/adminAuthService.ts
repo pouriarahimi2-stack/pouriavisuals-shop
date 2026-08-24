@@ -1,61 +1,99 @@
-import { supabase } from '@/lib/supabase';
+import { AdminRole, AdminUser } from "@/lib/adminContracts";
+import { supabase } from "@/lib/supabase";
 
-export interface AdminUser {
-  id: string;
-  username: string;
-  role: 'superadmin' | 'editor' | 'inventory_manager' | 'support';
-  full_name?: string;
-  avatar_url?: string;
-  created_at?: string;
-}
+const LOCAL_ADMINS_KEY = "admin_users_data";
+const CURRENT_SESSION_KEY = "current_admin_session";
 
-const SESSION_COOKIE_NAME = 'pv_admin_session';
+const DEFAULT_SUPER_ADMIN: AdminUser = {
+  id: "admin-root",
+  username: "admin",
+  name: "مدیر ارشد",
+  role: "super_admin",
+  created_at: new Date().toISOString(),
+};
 
 export const adminAuthService = {
-  // ورود ادمین و ایجاد کوکی ایمن سروری
-  async login(username: string, passCode: string): Promise<{ success: boolean; user?: AdminUser; error?: string }> {
+  // بررسی سشن فعال
+  getCurrentSession(): AdminUser | null {
+    if (typeof window === "undefined") return null;
     try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password: passCode.trim() }),
-      });
+      const stored = localStorage.getItem(CURRENT_SESSION_KEY);
+      if (!stored) return DEFAULT_SUPER_ADMIN;
+      return JSON.parse(stored);
+    } catch {
+      return DEFAULT_SUPER_ADMIN;
+    }
+  },
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.message || 'نام کاربری یا رمز عبور اشتباه است.' };
+  // ذخیره ورود
+  setSession(user: AdminUser) {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(CURRENT_SESSION_KEY, JSON.stringify(user));
+    }
+  },
+
+  // خروج از حساب
+  logout() {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(CURRENT_SESSION_KEY);
+    }
+  },
+
+  // دریافت لیست همه ادمین‌ها
+  async getAllAdmins(): Promise<AdminUser[]> {
+    try {
+      const { data, error } = await supabase.from("admin_users").select("*");
+      if (!error && data && data.length > 0) {
+        return data.map((u: any) => ({
+          id: u.id,
+          username: u.username,
+          name: u.name || u.username,
+          role: (u.role as AdminRole) || "support",
+          created_at: u.created_at,
+        }));
       }
-
-      return { success: true, user: data.user };
-    } catch {
-      return { success: false, error: 'خطا در برقراری ارتباط با سرور احراز هویت.' };
+    } catch (e) {
+      console.warn("Supabase admin fetch fallback to localStorage");
     }
+
+    if (typeof window !== "undefined") {
+      const local = localStorage.getItem(LOCAL_ADMINS_KEY);
+      if (local) {
+        try {
+          return JSON.parse(local);
+        } catch {}
+      }
+    }
+    return [DEFAULT_SUPER_ADMIN];
   },
 
-  // خروج از حساب و پاک‌سازی سشن
-  async logout(): Promise<void> {
-    try {
-      await fetch('/api/admin/logout', { method: 'POST' });
-    } finally {
-      document.cookie = `${SESSION_COOKIE_NAME}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
-      window.location.href = '/admin/login';
+  // بررسی سطح دسترسی نقش به تب مشخص
+  hasPermission(role: AdminRole, tab: string): boolean {
+    if (role === "super_admin") return true;
+
+    switch (tab) {
+      case "products":
+        return ["super_admin", "product_manager"].includes(role);
+      case "inventory":
+        return ["super_admin", "product_manager", "inventory_manager"].includes(role);
+      case "orders":
+        return ["super_admin", "support"].includes(role);
+      case "articles":
+        return ["super_admin", "content_editor"].includes(role);
+      case "banners":
+      case "pages":
+      case "menus":
+      case "site-settings":
+        return ["super_admin", "content_editor"].includes(role);
+      case "contacts":
+      case "customers":
+        return ["super_admin", "support"].includes(role);
+      case "accounts":
+        return role === "super_admin";
+      default:
+        return true;
     }
   },
-
-  // استعلام وضعیت سشن فعلی از روی سرور
-  async getCurrentSession(): Promise<AdminUser | null> {
-    try {
-      const res = await fetch('/api/admin/session', { cache: 'no-store' });
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data.user || null;
-    } catch {
-      return null;
-    }
-  },
-
-  hasPermission(role: AdminUser['role'], requiredRole: AdminUser['role'][]): boolean {
-    if (role === 'superadmin') return true;
-    return requiredRole.includes(role);
-  }
 };
+
+export default adminAuthService;

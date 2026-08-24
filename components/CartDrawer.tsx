@@ -7,6 +7,11 @@ import { couponService, Coupon } from "@/services/couponService";
 import { IRAN_PROVINCES } from "@/lib/iranProvinces";
 import { useRouter } from "next/navigation";
 
+interface CartDrawerProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
 function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   if (!postalCode) return { valid: true };
   const cleanCode = postalCode
@@ -39,9 +44,16 @@ function isValidIranianPostalCode(postalCode: string): { valid: boolean; message
   return { valid: true };
 }
 
-export default function CartDrawer() {
+export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }: CartDrawerProps = {}) {
   const router = useRouter();
-  const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, totalPrice } = useCart();
+  const cartContext = useCart();
+  const cartItems = cartContext?.cartItems || [];
+  const isCartOpen = propIsOpen !== undefined ? propIsOpen : (cartContext?.isCartOpen || false);
+  const setIsCartOpen = propOnClose || cartContext?.setIsCartOpen || (() => {});
+  const removeFromCart = cartContext?.removeFromCart || (() => {});
+  const updateQuantity = cartContext?.updateQuantity || (() => {});
+  const clearCart = cartContext?.clearCart || (() => {});
+  const totalPrice = cartContext?.totalPrice || 0;
 
   // فیلدهای اطلاعات خریدار
   const [customerName, setCustomerName] = useState("");
@@ -71,7 +83,7 @@ export default function CartDrawer() {
     async function checkCoupons() {
       try {
         const coupons: Coupon[] = await couponService.getAll();
-        const validCoupons = coupons.filter((c) => c.is_active !== false);
+        const validCoupons = (coupons || []).filter((c) => c.is_active !== false);
         setActiveCouponsExist(validCoupons.length > 0);
       } catch {
         setActiveCouponsExist(true);
@@ -115,7 +127,7 @@ export default function CartDrawer() {
     try {
       const allCoupons: Coupon[] = await couponService.getAll();
       const codeClean = couponCode.trim().toUpperCase();
-      const matched = allCoupons.find((c) => c.code.toUpperCase() === codeClean && c.is_active !== false);
+      const matched = (allCoupons || []).find((c) => c.code.toUpperCase() === codeClean && c.is_active !== false);
 
       if (!matched) {
         setCouponMsg({ type: "error", text: "کد تخفیف نامعتبر یا منقضی شده است." });
@@ -159,7 +171,7 @@ export default function CartDrawer() {
 
   const finalPayable = Math.max(0, totalPrice - discountAmount);
 
-  // ثبت نهایی سفارش بدون هیچ فراخوانی مستقیم در مرورگر
+  // ثبت نهایی سفارش در دیتابیس
   const handleFinalCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
@@ -201,29 +213,41 @@ export default function CartDrawer() {
 
     setSubmitting(true);
     try {
-      // فقط یک درخواست امن به روت سروری که دیتابیس، کسر انبار و پیامک را در سرور اجرا می‌کند
-      const newOrder = await orderService.create({
-        customerName: customerName.trim(),
-        phone: cleanPhone,
-        address: fullConstructedAddress,
-        postalCode: postalCode.trim() || undefined,
+      const orderPayload = {
+        customer: {
+          fullName: customerName.trim(),
+          name: customerName.trim(),
+          phone: cleanPhone,
+          province: selectedProvince,
+          city: selectedCity,
+          address: fullConstructedAddress,
+          postalCode: postalCode.trim() || undefined,
+        },
         items: cartItems.map((item) => ({
           productId: item.id,
-          title: item.title,
-          price: item.price,
-          quantity: item.quantity,
-          image: item.image,
+          product_id: item.id,
+          title: item.title || item.name || "کالا",
+          name: item.name || item.title || "کالا",
+          price: Number(item.price) || 0,
+          quantity: Number(item.quantity) || 1,
+          image: item.image || item.images?.[0] || "",
         })),
-        totalAmount: finalPayable,
+        totalAmount: totalPrice,
         discountAmount: discountAmount > 0 ? discountAmount : undefined,
-        couponCode: appliedCoupon || undefined,
-        status: "processing",
-      });
+        finalAmount: finalPayable,
+        status: "processing" as const,
+        paymentStatus: "pending" as const,
+      };
 
-      if (newOrder && newOrder.id) {
+      const newOrder = await orderService.create(orderPayload);
+
+      if (newOrder && (newOrder.id || (newOrder as any).orderNumber)) {
         clearCart();
-        setIsCartOpen(false);
-        router.push(`/track-order?orderId=${newOrder.id}&success=true`);
+        if (typeof setIsCartOpen === "function") {
+          setIsCartOpen(false);
+        }
+        const targetId = newOrder.orderNumber || newOrder.id;
+        router.push(`/track-order?orderId=${targetId}&success=true`);
       } else {
         throw new Error("پاسخی از سرور دریافت نشد.");
       }
@@ -245,7 +269,9 @@ export default function CartDrawer() {
         {/* هدر کشو */}
         <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between">
           <button
-            onClick={() => setIsCartOpen(false)}
+            onClick={() => {
+              if (typeof setIsCartOpen === "function") setIsCartOpen(false);
+            }}
             className="w-9 h-9 rounded-2xl bg-[var(--input-bg)] flex items-center justify-center font-bold text-xs hover:border-[var(--accent-blue)] border border-[var(--card-border)] transition cursor-pointer text-[var(--text-primary)]"
           >
             ✕
@@ -315,7 +341,7 @@ export default function CartDrawer() {
                       <div className="flex items-center gap-3 text-left">
                         <div>
                           <h4 className="font-black text-xs text-[var(--text-primary)] line-clamp-1 text-right" dir="rtl">
-                            {item.title}
+                            {item.title || item.name}
                           </h4>
                           <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black block mt-0.5 text-right" dir="rtl">
                             {(item.price || 0).toLocaleString("fa-IR")} تومان
@@ -327,9 +353,9 @@ export default function CartDrawer() {
                           )}
                         </div>
 
-                        {item.image && (
+                        {(item.image || item.images?.[0]) && (
                           <img
-                            src={item.image}
+                            src={item.image || item.images?.[0]}
                             alt=""
                             className="w-12 h-12 rounded-xl object-contain bg-[var(--modal-bg)] border border-[var(--card-border)] p-1 shrink-0"
                           />

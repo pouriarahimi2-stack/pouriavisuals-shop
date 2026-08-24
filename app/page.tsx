@@ -6,6 +6,7 @@ import { bannerService, Banner } from "@/services/bannerService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -20,7 +21,7 @@ export default function HomePage() {
     try {
       const [prods, bans, info] = await Promise.all([
         productService.getAll ? productService.getAll() : (productService as any).getProducts(),
-        bannerService.getAll ? bannerService.getAll() : ((bannerService as any).getActive ? (bannerService as any).getActive() : []),
+        bannerService.getAll ? bannerService.getAll() : [],
         siteInfoService.getSiteInfo(),
       ]);
 
@@ -35,68 +36,41 @@ export default function HomePage() {
   useEffect(() => {
     loadData();
 
-    // دریافت بلادرنگ انتخاب دسته‌بندی از هدر
+    // گوش دادن به تغییرات دسته‌بندی از هدر
     const handleCategoryChange = (e: any) => {
       setSelectedCategory(e.detail || "all");
     };
-
-    // دریافت بلادرنگ آپدیت کالاها و بنرها از پنل ادمین
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
-      else loadData();
-    };
-
-    const handleBannersUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) {
-        setBanners(e.detail.filter((b: any) => b.is_active !== false && b.isActive !== false));
-      } else {
-        loadData();
-      }
-    };
-
-    const handleSiteUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-    };
-
     window.addEventListener("category_selected", handleCategoryChange);
-    window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("banners_updated", handleBannersUpdate);
-    window.addEventListener("site_info_updated", handleSiteUpdate);
 
-    // کانال هماهنگی زنده بین تب‌های مرورگر
-    let prodChannel: BroadcastChannel | null = null;
-    let banChannel: BroadcastChannel | null = null;
-    let siteChannel: BroadcastChannel | null = null;
-
-    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-      prodChannel = new BroadcastChannel("products_sync_channel");
-      prodChannel.onmessage = (event) => {
-        if (event.data?.type === "SYNC_PRODUCTS") setProducts(event.data.data);
-      };
-
-      banChannel = new BroadcastChannel("banners_sync_channel");
-      banChannel.onmessage = (event) => {
-        if (event.data?.type === "SYNC_BANNERS") {
-          setBanners(event.data.data.filter((b: any) => b.is_active !== false && b.isActive !== false));
+    // اتصال بلادرنگ (Realtime) با وب‌سوکت Supabase برای کالاها و بنرها
+    const channel = supabase
+      .channel("public-db-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        () => {
+          loadData();
         }
-      };
-
-      siteChannel = new BroadcastChannel("pv_site_sync");
-      siteChannel.onmessage = (event) => {
-        if (event.data?.type === "SITE_INFO_CHANGE") {
-          setSiteInfo(event.data.data);
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "banners" },
+        () => {
+          loadData();
         }
-      };
-    }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
 
     return () => {
       window.removeEventListener("category_selected", handleCategoryChange);
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("banners_updated", handleBannersUpdate);
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
-      if (prodChannel) prodChannel.close();
-      if (banChannel) banChannel.close();
-      if (siteChannel) siteChannel.close();
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -148,17 +122,17 @@ export default function HomePage() {
             ))}
           </section>
         ) : (
-          /* بنر پویای اطلاعات سایت در صورت نبود اسلایدر */
+          /* بنر اطلاعات پیش‌فرض سایت از دیتابیس */
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] p-8 md:p-12 min-h-[260px] flex items-center bg-gradient-to-l from-neutral-900 to-neutral-800 text-white shadow-2xl">
             <div className="max-w-xl space-y-3 z-10">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-bold">
-                ضمانت اصالت و سلامت ۱۰۰٪
+                سیستم کاملاً زنده و متصل به دیتابیس
               </span>
               <h1 className="text-2xl md:text-4xl font-black">
-                {siteInfo?.site_name || siteInfo?.siteName || "فروشگاه تخصصی تجهیزات دیجیتال AXONCORE"}
+                {siteInfo?.site_name || siteInfo?.siteName || "فروشگاه آنلاین"}
               </h1>
               <p className="text-xs md:text-sm text-slate-300 font-medium">
-                {siteInfo?.tagline || "ارائه جدیدترین و برترین کالاها با گارانتی معتبر و ارسال سریع"}
+                {siteInfo?.tagline || "لطفاً محصولات و بنرها را از طریق پنل ادمین وارد کنید."}
               </p>
             </div>
           </section>
@@ -172,7 +146,7 @@ export default function HomePage() {
                 <span>📦</span> محصولات ویژه‌ی فروشگاه
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-                {selectedCategory === "all" ? "تمامی کالاهای موجود با گارانتی معتبر" : `نمایش دسته‌بندی: ${selectedCategory}`}
+                {selectedCategory === "all" ? "تمامی کالاهای موجود" : `نمایش دسته‌بندی: ${selectedCategory}`}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -195,8 +169,8 @@ export default function HomePage() {
 
           {filteredProducts.length === 0 ? (
             <div className="rounded-3xl liquid-glass-card p-16 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2">
-              <span className="text-3xl block">🔍</span>
-              <p>هیچ محصولی در این دسته‌بندی یافت نشد.</p>
+              <span className="text-3xl block">📦</span>
+              <p>دیتابیس خالی است. محصولات خود را از پنل ادمین اضافه کنید تا اینجا به صورت زنده نمایش داده شوند.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
@@ -212,14 +186,14 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* بخش مجله و مقالات تخصصی */}
+        {/* بخش مجله و مقالات تخصصی (متصل به دیتابیس) */}
         <section className="p-8 rounded-[2.5rem] liquid-glass-card space-y-6 my-12 border border-[var(--card-border)] bg-[var(--modal-bg)]/40 shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
               <h3 className="text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
                 <span>📚</span> مجله تخصصی و راهنمای خرید
               </h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">جدیدترین تحلیل‌های بازار و راهنمای انتخاب کالا</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">جدیدترین مقالات و تحلیل‌های بازار</p>
             </div>
             <Link
               href="/blog"
@@ -250,34 +224,39 @@ function HomeBlogSection() {
   const [posts, setPosts] = useState<any[]>([]);
 
   useEffect(() => {
-    async function load() {
+    async function loadBlogs() {
       try {
-        let combined: any[] = [];
-        try {
-          const res = await fetch("/api/blogs");
-          const data = await res.json();
-          if (data.data) combined = [...data.data];
-          else if (data.posts) combined = [...data.posts];
-        } catch {}
-
-        const localBlogs = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("site_blogs") || "[]") : [];
-        combined = [...combined, ...localBlogs];
-        const visiblePosts = combined.filter((p) => p.isVisible !== false && p.published !== false);
-        const unique = Array.from(
-          new Map(visiblePosts.map((item) => [item.id || item.title, item])).values()
-        );
-        setPosts(unique.slice(0, 3));
+        const res = await fetch("/api/blogs");
+        const data = await res.json();
+        const items = data.data || data.posts || [];
+        setPosts(items.filter((p: any) => p.isVisible !== false && p.published !== false).slice(0, 3));
       } catch (e) {
-        console.error("Error loading home blogs:", e);
+        console.error("Error loading blogs from DB:", e);
       }
     }
-    load();
+    loadBlogs();
+
+    // بروزرسانی بلادرنگ مقالات از طریق وب‌سوکت
+    const blogChannel = supabase
+      .channel("public-blogs-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "posts" },
+        () => {
+          loadBlogs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(blogChannel);
+    };
   }, []);
 
   if (posts.length === 0) {
     return (
       <div className="text-center py-6 text-xs text-[var(--text-muted)] font-bold">
-        هنوز مقاله‌ای منتشر نشده است.
+        هنوز مقاله‌ای در دیتابیس ثبت نشده است.
       </div>
     );
   }
@@ -633,8 +612,8 @@ function ProductDetailsModal({
   onAddToCart,
 }: {
   product: Product;
-  onClose: () => void;
   onAddToCart: (item: any) => void;
+  onClose: () => void;
 }) {
   const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
   const [activeImage, setActiveImage] = useState(images[0]);

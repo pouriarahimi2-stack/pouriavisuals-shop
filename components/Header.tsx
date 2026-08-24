@@ -61,6 +61,7 @@ export default function Header() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,20 +106,16 @@ export default function Header() {
 
   async function fetchLiveSiteInfo() {
     try {
-      const [info, menus, cats] = await Promise.all([
+      const [info, menus, cats, prods] = await Promise.all([
         siteInfoService.getSiteInfo ? siteInfoService.getSiteInfo() : (siteInfoService as any).getAll(),
         menuService.getAll ? menuService.getAll() : [],
-        categoryService && categoryService.getAll ? categoryService.getAll() : (productService as any).getCategories(),
+        categoryService && categoryService.getAll ? categoryService.getAll() : [],
+        productService.getAll ? productService.getAll() : [],
       ]);
       if (info) setSiteInfo(info);
       if (menus) setMenuItems(menus.filter((m: any) => m.isActive !== false && m.is_active !== false));
-      if (cats && cats.length > 0) {
-        if (typeof cats[0] === "string") {
-          setCategories(cats.map((c: any, index: number) => ({ id: String(index), name: c, slug: c })));
-        } else {
-          setCategories(cats);
-        }
-      }
+      if (cats) setCategories(cats);
+      if (prods) setAllProducts(prods);
     } catch (e) {
       console.error("Header init error:", e);
     }
@@ -145,7 +142,6 @@ export default function Header() {
 
     fetchLiveSiteInfo();
 
-    // هندلر رویداد لوکال برای انتشار آنی
     const handleLiveUpdate = (e: any) => {
       if (e.detail) {
         setSiteInfo(e.detail);
@@ -155,7 +151,6 @@ export default function Header() {
     };
     window.addEventListener("site_info_updated", handleLiveUpdate);
 
-    // وب‌سوکت بلادرنگ بر روی دیتابیس Supabase
     const siteChannel = supabase
       .channel("header-realtime-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchLiveSiteInfo())
@@ -177,16 +172,6 @@ export default function Header() {
     };
     document.addEventListener("mousedown", handleClickOutsideSearch);
 
-    const loadAllProducts = async () => {
-      try {
-        const prods = await productService.getAll();
-        setAllProducts(prods || []);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    loadAllProducts();
-
     return () => {
       window.removeEventListener("site_info_updated", handleLiveUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
@@ -201,13 +186,11 @@ export default function Header() {
       return;
     }
     const q = searchQuery.toLowerCase();
-    const matches = allProducts.filter((p) => {
-      return (
-        (p.title || p.name || "").toLowerCase().includes(q) ||
-        (p.category || "").toLowerCase().includes(q) ||
-        (p.description || "").toLowerCase().includes(q)
-      );
-    });
+    const matches = allProducts.filter((p) =>
+      (p.title || p.name || "").toLowerCase().includes(q) ||
+      (p.category || "").toLowerCase().includes(q) ||
+      (p.description || "").toLowerCase().includes(q)
+    );
     setSearchResults(matches.slice(0, 6));
   }, [searchQuery, allProducts]);
 
@@ -234,6 +217,7 @@ export default function Header() {
   const handleSelectCategory = (catSlug: string) => {
     setSelectedCategory(catSlug);
     setIsCategoryOpen(false);
+    setMobileMenuOpen(false);
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("category_selected", { detail: catSlug }));
     }
@@ -383,28 +367,35 @@ export default function Header() {
     }
   };
 
-  // تشخیص وضعیت ایندکس با بررسی هر دو فیلد برای هماهنگی با وب‌سوکت
   const isGoogleIndexAllowed = siteInfo?.allow_google_index !== false && siteInfo?.allowGoogleIndex !== false;
   const currentStoreName = siteInfo?.storeName || siteInfo?.site_name || siteInfo?.siteName || siteInfo?.name || "آکسون | Axon";
   const currentLogoUrl = siteInfo?.logoUrl || siteInfo?.logo_url;
 
   return (
-    <header className="sticky top-3 z-40 max-w-7xl mx-auto px-4 select-none font-sans text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-6 py-3.5 flex items-center justify-between gap-4 rounded-3xl shadow-xl border border-[var(--card-border)] relative">
+    <header className="sticky top-2 sm:top-3 z-40 max-w-7xl mx-auto px-2 sm:px-4 font-sans text-[var(--text-primary)]" dir="rtl">
+      <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-4 rounded-2xl sm:rounded-3xl shadow-xl border border-[var(--card-border)] relative">
         
-        {/* راست: لوگوی بزرگ‌تر و نشانگر نئون ایندکس گوگل */}
-        <div className="flex items-center gap-4 shrink-0">
-          <Link href="/" className="flex items-center gap-3.5 group">
-            <div className="w-16 h-16 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition">
+        {/* راست: لوگو، نشانگر ایندکس و دکمه همبرگری موبایل */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="xl:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
+            title="منو"
+          >
+            ☰
+          </button>
+
+          <Link href="/" className="flex items-center gap-2 sm:gap-3.5 group">
+            <div className="w-11 h-11 sm:w-16 sm:h-16 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition">
               {currentLogoUrl ? (
                 <img src={currentLogoUrl} alt={currentStoreName} className="w-full h-full object-contain" />
               ) : (
-                <span className="text-2xl font-black text-[var(--accent-blue)]">⚡</span>
+                <span className="text-xl sm:text-2xl font-black text-[var(--accent-blue)]">⚡</span>
               )}
             </div>
             <div className="flex flex-col text-right">
-              <div className="flex items-center gap-2">
-                <span className="text-base font-black text-[var(--text-primary)] leading-tight tracking-tight">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs sm:text-base font-black text-[var(--text-primary)] leading-tight tracking-tight">
                   {currentStoreName}
                 </span>
                 <span
@@ -416,14 +407,14 @@ export default function Header() {
                   }`}
                 />
               </div>
-              <span className="text-[10px] font-bold text-[var(--accent-blue)] mt-0.5">
+              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] mt-0.5">
                 {siteInfo?.tagline || "تجهیزات تخصصی دیجیتال"}
               </span>
             </div>
           </Link>
 
-          {/* دکمه دسته‌بندی‌ها */}
-          <div className="relative" ref={categoryDropdownRef}>
+          {/* منوی دسته‌بندی‌ها */}
+          <div className="relative hidden sm:block" ref={categoryDropdownRef}>
             <button
               onClick={() => setIsCategoryOpen(!isCategoryOpen)}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all duration-300 border cursor-pointer ${
@@ -439,13 +430,6 @@ export default function Header() {
 
             {isCategoryOpen && (
               <div className="absolute top-12 right-0 w-56 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
-                <div className="px-3 py-1.5 text-[10px] font-black text-[var(--text-secondary)] border-b border-[var(--card-border)] mb-1 flex items-center justify-between">
-                  <span>منوی کالاها</span>
-                  <span className="text-[9px] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] px-2 py-0.5 rounded-full">
-                    {categories.length + 1} دسته
-                  </span>
-                </div>
-
                 <button
                   onClick={() => handleSelectCategory("all")}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
@@ -481,7 +465,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* وسط: منوی ناوبری مدرن */}
+        {/* وسط: منوی ناوبری دسکتاپ */}
         <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {menuItems.length > 0 ? (
             menuItems.map((item) => (
@@ -504,10 +488,10 @@ export default function Header() {
           )}
         </nav>
 
-        {/* چپ: ابزارها */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* چپ: ابزارهای جستجو، تغییر تم و سبد خرید */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <div className="relative hidden md:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-44 lg:w-52">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 lg:w-48">
               <span className="text-xs opacity-70">🔍</span>
               <input
                 type="text"
@@ -521,15 +505,11 @@ export default function Header() {
 
             {isSearchFocused && searchResults.length > 0 && (
               <div className="absolute top-12 left-0 right-0 p-2.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72 md:w-80">
-                <div className="px-2 pb-1.5 border-b border-[var(--card-border)] text-[10px] text-[var(--text-secondary)] font-black text-right flex justify-between items-center">
-                  <span>نتایج جستجوی آنی</span>
-                  <span className="text-[9px] text-[var(--accent-blue)]">{searchResults.length} کالا</span>
-                </div>
                 <div className="max-h-64 overflow-y-auto space-y-1.5">
                   {searchResults.map((p) => (
                     <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition gap-2">
                       <Link href={`/products/${p.id}`} onClick={() => setIsSearchFocused(false)} className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <img src={p.images?.[0] || p.image || p.image_url || "/placeholder.png"} alt="" className="w-9 h-9 object-contain rounded-lg bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
+                        <img src={p.images?.[0] || p.image || p.image_url || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
                         <div className="flex-1 min-w-0 text-right">
                           <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
                           <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400">{Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت</span>
@@ -545,11 +525,11 @@ export default function Header() {
             )}
           </div>
 
-          <button onClick={toggleDarkMode} className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer" title="تغییر تم">
+          <button onClick={toggleDarkMode} className="p-2 sm:p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer" title="تغییر تم">
             {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          <button onClick={toggleCart} className="relative px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-md cursor-pointer flex items-center gap-2">
+          <button onClick={toggleCart} className="relative px-3 sm:px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-md cursor-pointer flex items-center gap-1.5 sm:gap-2">
             <span>🛒</span>
             <span className="hidden sm:inline">سبد خرید</span>
             {totalCartCount > 0 && (
@@ -560,6 +540,29 @@ export default function Header() {
           </button>
         </div>
       </div>
+
+      {/* منوی بازشونده کشویی موبایل و تبلت */}
+      {mobileMenuOpen && (
+        <div className="xl:hidden mt-2 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-3 animate-fadeIn">
+          <div className="flex flex-col space-y-2 text-xs font-bold">
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="p-2.5 rounded-2xl hover:bg-[var(--input-bg)] transition flex items-center gap-2">
+              <span>🏠</span> صفحه نخست
+            </Link>
+            <Link href="/products" onClick={() => setMobileMenuOpen(false)} className="p-2.5 rounded-2xl hover:bg-[var(--input-bg)] transition flex items-center gap-2">
+              <span>📦</span> کاتالوگ محصولات
+            </Link>
+            <Link href="/track-order" onClick={() => setMobileMenuOpen(false)} className="p-2.5 rounded-2xl hover:bg-[var(--input-bg)] transition flex items-center gap-2">
+              <span>🚚</span> پیگیری مرسوله پستی
+            </Link>
+            <Link href="/blog" onClick={() => setMobileMenuOpen(false)} className="p-2.5 rounded-2xl hover:bg-[var(--input-bg)] transition flex items-center gap-2">
+              <span>📚</span> مجله تخصصی و مقالات
+            </Link>
+            <Link href="/contact" onClick={() => setMobileMenuOpen(false)} className="p-2.5 rounded-2xl hover:bg-[var(--input-bg)] transition flex items-center gap-2">
+              <span>📞</span> تماس با ما
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* سایدبار کشویی سبد خرید */}
       {isCartOpen && (

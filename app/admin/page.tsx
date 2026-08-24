@@ -137,7 +137,6 @@ export default function AdminPage() {
 
     fetchSiteInfoLive();
 
-    // همگام‌سازی بلادرنگ تنظیمات و ایندکس گوگل با وب‌سوکت
     const channel = supabase
       .channel("admin-siteinfo-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
@@ -163,14 +162,11 @@ export default function AdminPage() {
   };
 
   const handleToggleGoogleIndex = async () => {
-    const currentState = siteInfo?.allowGoogleIndex !== false;
+    const currentState = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
     const nextState = !currentState;
     
-    // به‌روزرسانی سریع در استیت محلی
-    setSiteInfo((prev) => prev ? { ...prev, allowGoogleIndex: nextState } : null);
-
-    // ارسال مستقیم به دیتابیس Supabase
-    await siteInfoService.updateSiteInfo({ allowGoogleIndex: nextState });
+    setSiteInfo((prev) => prev ? { ...prev, allowGoogleIndex: nextState, allow_google_index: nextState } : null);
+    await siteInfoService.updateSiteInfo({ allowGoogleIndex: nextState, allow_google_index: nextState });
   };
 
   const loadAllAdmins = async () => {
@@ -277,7 +273,7 @@ export default function AdminPage() {
 
   if (!isAuthenticated) return null;
 
-  const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false;
+  const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
   const userRole = (currentUser?.role || "superadmin") as AdminRole;
 
   const getRoleBadge = (role: AdminRole | string) => {
@@ -309,7 +305,7 @@ export default function AdminPage() {
   return (
     <div
       dir="rtl"
-      className={`min-h-screen p-4 md:p-8 max-w-7xl mx-auto space-y-6 font-sans transition-colors duration-300 select-none ${
+      className={`min-h-screen p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans transition-colors duration-300 select-none ${
         isDarkMode ? "bg-[#070b14] text-slate-100" : "bg-slate-100 text-slate-800"
       }`}
       style={
@@ -326,7 +322,7 @@ export default function AdminPage() {
     >
       <AdminGlobalSearch />
 
-      {/* هدر بالایی پنل ادمین با سوییچ ایندکس گوگل و مدیریت نشست */}
+      {/* هدر بالایی پنل ادمین */}
       <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
@@ -337,7 +333,7 @@ export default function AdminPage() {
               <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل پیشرفته فروشگاه</h1>
               <button
                 onClick={handleToggleGoogleIndex}
-                title={isGoogleIndexAllowed ? "ایندکس گوگل فعال است (برای تغییر کلیک کنید)" : "ایندکس گوگل غیرفعال است (برای تغییر کلیک کنید)"}
+                title={isGoogleIndexAllowed ? "ایندکس گوگل فعال است (کلیک برای تغییر)" : "ایندکس گوگل غیرفعال است (کلیک برای تغییر)"}
                 className="flex items-center gap-1.5 cursor-pointer group"
               >
                 <span
@@ -390,7 +386,6 @@ export default function AdminPage() {
             🔍
           </button>
 
-          {/* دکمه سوییچ تم لایت / دارک */}
           <button
             onClick={toggleDarkMode}
             className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-blue-500 border border-[var(--card-border)] text-[var(--text-primary)] transition cursor-pointer text-xs shadow-sm font-bold flex items-center justify-center"
@@ -424,19 +419,19 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* نوار ناوبری تب‌ها */}
-      <div className="relative p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl backdrop-blur-2xl overflow-x-auto scrollbar-none">
-        <div className="flex items-center gap-1.5 min-w-max">
+      {/* نوار ناوبری تب‌های میانی - ساختار شبکه‌ای منعطف و ریسپانسیو بدون اسکرول افقی */}
+      <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl backdrop-blur-2xl">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
           {navTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`relative px-4 py-2.5 rounded-2xl text-xs font-black transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+                className={`px-3.5 py-2.5 rounded-2xl text-xs font-black transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 ${
                   isActive
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
+                    : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-blue-500/50 border border-[var(--card-border)]"
                 }`}
               >
                 <span className="text-sm">{tab.icon}</span>
@@ -448,7 +443,7 @@ export default function AdminPage() {
       </div>
 
       {/* محتوای تب فعال */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-md">
+      <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-md">
         {activeTab === "products" && <AdminProducts />}
         {activeTab === "inventory" && <AdminInventoryManager />}
         {activeTab === "page_builder" && isSuper && <PageBuilder />}
@@ -749,7 +744,6 @@ function AdminBlogManager() {
   useEffect(() => {
     loadBlogs();
 
-    // وب‌سوکت بلادرنگ مقالات
     const channel = supabase
       .channel("admin-blogs-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
@@ -1252,7 +1246,7 @@ function AdminAIAssistant() {
       )}
 
       {isOpen && (
-        <div className="w-80 sm:w-[540px] lg:w-[720px] h-[660px] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-2xl">
+        <div className="w-[92vw] sm:w-[540px] lg:w-[720px] h-[660px] max-h-[90vh] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-2xl animate-fadeIn">
           <div className="p-4 border-b border-[var(--card-border)] flex justify-between items-center bg-[var(--input-bg)]">
             <div className="flex items-center gap-2">
               <span className="p-2 rounded-xl bg-blue-600 text-white text-xs">📊</span>
@@ -1358,7 +1352,7 @@ function AdminAIAssistant() {
 
       {selectorModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 flex flex-col justify-between text-[var(--text-primary)] shadow-2xl">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 sm:p-6 flex flex-col justify-between text-[var(--text-primary)] shadow-2xl">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
               <div>
                 <h3 className="text-base font-black text-blue-500 flex items-center gap-2">

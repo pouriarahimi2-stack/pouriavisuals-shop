@@ -1,286 +1,254 @@
-'use client';
+"use client";
 
-import React, { useState, useRef } from 'react';
-import Image from 'next/image';
+import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+  productId?: string;
+}
 
 export default function AIAssistantChat() {
   const [isOpen, setIsOpen] = useState(false);
-  const [mode, setMode] = useState<'chat' | 'vision'>('chat');
-
-  // استیت‌های گفتگوی متنی
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      role: 'assistant',
-      text: 'سلام! 👋 من دستیار هوشمند پوریا ویژوالز هستم. چطور می‌توانم در انتخاب مانیتور و تجهیزات کالیبراسیون و رنگ به شما کمک کنم؟',
+      role: "assistant",
+      text: "درود! من دستیار هوشمند و مشاور تخصصی آکسون هستم. ⚡\nمی‌توانید درباره مقایسه مانیتورها، دقت رنگ و کالیبراسیون، تجهیزات استودیویی و استریم سوال بپرسید یا عکس تجهیزات خود را برای بررسی بفرستید.",
     },
   ]);
-  const [loadingChat, setLoadingChat] = useState(false);
-
-  // استیت‌های تحلیل تصویر / ویژن
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [visionPrompt, setVisionPrompt] = useState('');
-  const [visionAnalysis, setVisionAnalysis] = useState<string | null>(null);
-  const [loadingVision, setLoadingVision] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ارسال چت متنی
-  const handleSendChat = async () => {
-    if (!input.trim() || loadingChat) return;
-    const userText = input;
-    setInput('');
-    setMessages((prev) => [...prev, { role: 'user', text: userText }]);
-    setLoadingChat(true);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
-    try {
-      const res = await fetch('/api/ai-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: userText, role: 'customer' }),
-      });
-      const data = await res.json();
-      if (data && data.response) {
-        setMessages((prev) => [...prev, { role: 'assistant', text: data.response }]);
-      } else {
-        setMessages((prev) => [...prev, { role: 'assistant', text: 'پاسخی دریافت نشد. لطفاً مجدداً امتحان کنید.' }]);
-      }
-    } catch {
-      setMessages((prev) => [...prev, { role: 'assistant', text: 'خطا در برقراری ارتباط با سامانه هوش مصنوعی.' }]);
-    } finally {
-      setLoadingChat(false);
-    }
-  };
-
-  // انتخاب عکس از دستگاه
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        alert("حجم تصویر نباید بیشتر از ۳ مگابایت باشد.");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setSelectedImage(reader.result as string);
-        setVisionAnalysis(null);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // آنالیز هوشمند تصویر
-  const handleAnalyzeImage = async () => {
-    if (!selectedImage || loadingVision) return;
-    setLoadingVision(true);
-    setVisionAnalysis(null);
+  const handleSend = async (suggestedText?: string) => {
+    const textToSend = suggestedText || input.trim();
+    if ((!textToSend && !selectedImage) || loading) return;
+
+    const userMsg = textToSend || "📷 [ارسال تصویر جهت بررسی و تحلیل]";
+    const currentImg = selectedImage;
+
+    setInput("");
+    setSelectedImage(null);
+
+    const updatedChat: ChatMessage[] = [...messages, { role: "user", text: userMsg }];
+    setMessages(updatedChat);
+    setLoading(true);
 
     try {
-      const promptToSend = visionPrompt.trim()
-        ? visionPrompt
-        : 'این تصویر مانیتور یا ستاپ تصویری را به دقت تحلیل کن و در خصوص کالیبراسیون، پنل و تجهیزات پیشنهادی راهنمایی تخصصی ارائه بده.';
+      // ارسال تاریخچه کامل گفتگو جهت پیوستگی پاسخ‌ها
+      const historyContext = updatedChat.map((m) => ({
+        role: m.role,
+        text: m.text,
+      }));
 
-      const res = await fetch('/api/ai-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: promptToSend,
-          image: selectedImage,
-          role: 'vision_analyzer',
+          message: userMsg,
+          prompt: userMsg,
+          history: historyContext,
+          imageBase64: currentImg,
+          role: "customer",
         }),
       });
 
       const data = await res.json();
-      if (data && data.response) {
-        setVisionAnalysis(data.response);
-      } else {
-        setVisionAnalysis('امکان تحلیل تصویر وجود نداشت. لطفاً تصویر واضح‌تری آپلود کنید.');
-      }
+      const botReply = data.response || data.reply || "در زمینه سوال شما کاتالوگ فروشگاه گزینه‌های بسیار مناسبی دارد.";
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: botReply,
+          productId: data.matchedProductId || undefined,
+        },
+      ]);
     } catch {
-      setVisionAnalysis('خطا در تحلیل تصویر. اتصال اینترنت خود را بررسی کنید.');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "متاسفانه در پردازش پاسخ خطایی رخ داد. لطفاً مجدداً تلاش فرمایید.",
+        },
+      ]);
     } finally {
-      setLoadingVision(false);
+      setLoading(false);
     }
   };
 
+  const formatText = (text: string) => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-500 font-extrabold">$1</strong>')
+      .replace(/^• (.*$)/gim, '<li class="mr-3 list-disc">$1</li>')
+      .replace(/^🔹 (.*$)/gim, '<div class="flex items-center gap-1.5 my-1 text-emerald-600 dark:text-emerald-400 font-bold"><span>🔹</span><span>$1</span></div>');
+  };
+
   return (
-    <div className="fixed bottom-6 left-6 z-50 font-sans" dir="rtl">
-      {/* دکمه شناور یکپارچه و جذاب */}
+    <div className="fixed bottom-6 left-6 z-50 font-sans select-none" dir="rtl">
+      {/* دکمه شناور باز کردن چت */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full shadow-2xl border border-white/20 transition-all hover:scale-105 active:scale-95 cursor-pointer group"
+          className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white shadow-2xl hover:scale-105 transition flex items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 active:scale-95"
         >
-          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg animate-pulse">
-            ✨
-          </div>
-          <div className="flex flex-col text-right leading-tight">
-            <span className="text-xs font-black tracking-wide">دستیار هوشمند پوریا ویژوالز</span>
-            <span className="text-[10px] text-blue-100 font-medium">مشاوره خرید کالا و تحلیل عکس مانیتور</span>
-          </div>
+          <span className="text-sm">🤖</span>
+          <span>دستیار هوشمند و جستجوی عکس</span>
         </button>
       )}
 
-      {/* مدال جامع دوکاره */}
+      {/* پنجره تعاملی گفتگو */}
       {isOpen && (
-        <div className="w-[340px] sm:w-[460px] h-[580px] bg-slate-900/95 backdrop-blur-2xl border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col justify-between overflow-hidden text-slate-100 animate-fadeIn">
-          {/* هدر مدال */}
-          <div className="p-4 border-b border-slate-800 bg-slate-800/70 flex items-center justify-between">
+        <div className="w-[92vw] sm:w-[420px] h-[560px] max-h-[85vh] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-2xl animate-fadeIn">
+          
+          {/* هدر چت */}
+          <div className="p-3.5 border-b border-[var(--card-border)] flex justify-between items-center bg-[var(--input-bg)]/70">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-base font-black shadow-md">
+              <div className="w-8 h-8 rounded-xl bg-[var(--accent-blue)] text-white flex items-center justify-center text-sm shadow-md">
                 ⚡
               </div>
               <div>
-                <h4 className="text-xs font-black text-white">مرکز هوش مصنوعی پوریا ویژوالز</h4>
-                <p className="text-[10px] text-slate-400">راهنمای تخصصی سیستم‌های مانیتورینگ رنگ و تدوین</p>
+                <h4 className="text-xs font-black text-[var(--text-primary)]">مشاور هوشمند و تخصصی آکسون</h4>
+                <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  پاسخگوی ۲۴ ساعته بر پایه هوش مصنوعی
+                </span>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold transition cursor-pointer"
+              className="w-7 h-7 rounded-xl bg-[var(--input-bg)] hover:text-rose-500 border border-[var(--card-border)] flex items-center justify-center text-xs font-bold transition cursor-pointer"
             >
               ✕
             </button>
           </div>
 
-          {/* تب سوییچر بین حالت‌ها */}
-          <div className="p-2 bg-slate-950/60 border-b border-slate-800 flex gap-2">
-            <button
-              onClick={() => setMode('chat')}
-              className={`flex-1 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                mode === 'chat'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <span>💬</span>
-              <span>مشاوره خرید کالا</span>
-            </button>
-            <button
-              onClick={() => setMode('vision')}
-              className={`flex-1 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                mode === 'vision'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <span>📸</span>
-              <span>تحلیل عکس و مانیتور</span>
-            </button>
+          {/* بدنه پیام‌ها */}
+          <div className="p-4 flex-1 overflow-y-auto space-y-3.5 text-xs leading-relaxed">
+            {messages.map((m, idx) => (
+              <div key={idx} className="space-y-2">
+                <div
+                  className={`p-3.5 rounded-2xl max-w-[88%] leading-relaxed ${
+                    m.role === "user"
+                      ? "mr-auto bg-[var(--accent-blue)] text-white font-medium shadow-md rounded-br-none"
+                      : "ml-auto bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-bl-none shadow-sm"
+                  }`}
+                >
+                  <div
+                    className="whitespace-pre-line space-y-1"
+                    dangerouslySetInnerHTML={{ __html: formatText(m.text) }}
+                  />
+
+                  {/* دکمه انتقال مستقیم به کارت محصول در صورت پیشنهاد کالا */}
+                  {m.productId && (
+                    <div className="pt-2 mt-2 border-t border-[var(--card-border)]">
+                      <Link
+                        href={`/products/${m.productId}`}
+                        onClick={() => setIsOpen(false)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white text-[11px] font-black hover:opacity-90 transition shadow-sm"
+                      >
+                        <span>🛍️</span>
+                        <span>مشاهده مشخصات و خرید این محصول</span>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {loading && (
+              <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] text-[var(--text-secondary)] animate-pulse font-bold flex items-center gap-2 max-w-[70%]">
+                <span className="text-sm">🧠</span>
+                <span>در حال نگارش پاسخ تخصصی و تحلیل...</span>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
 
-          {/* محتوای تب چت */}
-          {mode === 'chat' && (
-            <>
-              <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs leading-relaxed scrollbar-thin">
-                {messages.map((m, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-3.5 rounded-2xl max-w-[88%] ${
-                      m.role === 'user'
-                        ? 'mr-auto bg-blue-600 text-white rounded-br-none font-medium'
-                        : 'ml-auto bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none font-medium'
-                    }`}
-                  >
-                    {m.text}
-                  </div>
-                ))}
-                {loadingChat && (
-                  <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700 text-blue-400 text-xs animate-pulse">
-                    🔍 در حال جستجو و پردازش پاسخ تخصصی...
-                  </div>
-                )}
-              </div>
-
-              <div className="p-3 border-t border-slate-800 bg-slate-900/90 flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-                  placeholder="سؤال خود را درباره کالیبراسیون و مانیتورها بنویسید..."
-                  className="flex-1 px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 outline-none focus:border-blue-500"
-                />
-                <button
-                  onClick={handleSendChat}
-                  disabled={loadingChat}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-                >
-                  ارسال
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* محتوای تب تحلیل عکس */}
-          {mode === 'vision' && (
-            <div className="flex-1 p-4 overflow-y-auto space-y-4 text-xs scrollbar-thin flex flex-col justify-between">
-              <div className="space-y-3">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageChange}
-                  accept="image/*"
-                  className="hidden"
-                />
-
-                {!selectedImage ? (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-8 text-center cursor-pointer bg-slate-800/40 hover:bg-slate-800/80 transition flex flex-col items-center justify-center gap-2"
-                  >
-                    <div className="text-3xl">📷</div>
-                    <span className="font-black text-slate-200">آپلود عکس مانیتور یا ستاپ کاری</span>
-                    <span className="text-[11px] text-slate-400">کلیک کنید یا تصویر را اینجا رها کنید</span>
-                  </div>
-                ) : (
-                  <div className="relative rounded-2xl overflow-hidden border border-slate-700 bg-black/40 p-2">
-                    <div className="relative w-full h-40">
-                      <Image
-                        src={selectedImage}
-                        alt="Uploaded preview"
-                        fill
-                        className="object-contain rounded-xl"
-                      />
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSelectedImage(null);
-                        setVisionAnalysis(null);
-                      }}
-                      className="absolute top-3 left-3 bg-rose-600/90 text-white p-1.5 rounded-xl text-[10px] font-bold hover:bg-rose-700 transition cursor-pointer"
-                    >
-                      حذف عکس ✕
-                    </button>
-                  </div>
-                )}
-
-                {selectedImage && (
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={visionPrompt}
-                      onChange={(e) => setVisionPrompt(e.target.value)}
-                      placeholder="توضیح اختیاری (مثلاً: این مانیتور برای کالرگریدینگ مناسب است؟)..."
-                      className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 outline-none focus:border-indigo-500"
-                    />
-
-                    <button
-                      onClick={handleAnalyzeImage}
-                      disabled={loadingVision}
-                      className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:opacity-95 text-white font-black text-xs rounded-xl shadow-lg transition cursor-pointer disabled:opacity-50"
-                    >
-                      {loadingVision ? '🔬 در حال تحلیل هوشمند پیکسل‌ها و مشخصات...' : '🚀 شروع آنالیز هوشمند تصویر'}
-                    </button>
-                  </div>
-                )}
-
-                {visionAnalysis && (
-                  <div className="p-4 rounded-2xl bg-slate-800/90 border border-slate-700 text-slate-200 leading-relaxed font-medium space-y-2">
-                    <div className="flex items-center gap-1.5 text-indigo-400 font-bold">
-                      <span>📊 نتیجه ارزیابی:</span>
-                    </div>
-                    <p className="whitespace-pre-line text-[11px]">{visionAnalysis}</p>
-                  </div>
-                )}
-              </div>
+          {/* پیشنهادات سریع برای شروع */}
+          {messages.length === 1 && (
+            <div className="px-3 py-1 flex flex-wrap gap-1.5">
+              <button
+                onClick={() => handleSend("بهترین مانیتور برای تدوین و اصلاح رنگ چیست؟")}
+                className="px-2.5 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition cursor-pointer"
+              >
+                🖥️ بهترین مانیتور تدوین؟
+              </button>
+              <button
+                onClick={() => handleSend("تفاوت پنل IPS و OLED در چیست؟")}
+                className="px-2.5 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition cursor-pointer"
+              >
+                🎨 تفاوت IPS و OLED؟
+              </button>
             </div>
           )}
+
+          {/* پیش‌نمایش تصویر قبل از ارسال */}
+          {selectedImage && (
+            <div className="p-2.5 px-4 bg-[var(--input-bg)] border-t border-[var(--card-border)] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <img src={selectedImage} alt="Upload preview" className="w-10 h-10 object-cover rounded-xl border border-[var(--card-border)]" />
+                <span className="text-[11px] text-[var(--text-secondary)] font-bold">عکس ضمیمه شد (آماده تحلیل)</span>
+              </div>
+              <button onClick={() => setSelectedImage(null)} className="text-rose-500 font-black text-xs cursor-pointer p-1">
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* فیلد ورودی پیام و آپلود عکس */}
+          <div className="p-3 border-t border-[var(--card-border)] flex items-center gap-2 bg-[var(--modal-bg)]">
+            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-sm cursor-pointer transition"
+              title="ارسال عکس قطعه یا مانیتور"
+            >
+              📷
+            </button>
+
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              placeholder="پرسش تخصصی، راهنمایی خرید یا نام کالا..."
+              className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] font-medium"
+            />
+
+            <button
+              type="button"
+              onClick={() => handleSend()}
+              disabled={loading || (!input.trim() && !selectedImage)}
+              className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition disabled:opacity-40 cursor-pointer shadow-md"
+            >
+              ارسال
+            </button>
+          </div>
         </div>
       )}
     </div>

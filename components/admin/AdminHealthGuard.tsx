@@ -29,11 +29,10 @@ export default function AdminHealthGuard() {
 
     setLastChecked(new Date().toLocaleTimeString("fa-IR"));
 
-    // محاسبه تقریبی حجم دیتای محلی ذخیره‌شده در کلاینت
     try {
       let total = 0;
       for (const x in localStorage) {
-        if (localStorage.hasOwnProperty(x)) {
+        if (Object.prototype.hasOwnProperty.call(localStorage, x)) {
           total += (localStorage[x].length + x.length) * 2;
         }
       }
@@ -45,30 +44,29 @@ export default function AdminHealthGuard() {
 
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 30000); // چک سلامت خودکار هر ۳۰ ثانیه
-
+    const interval = setInterval(checkHealth, 25000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-sans select-none text-xs">
+    <div className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-sans select-none text-xs" dir="rtl">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-sm font-black shadow-sm">
+        <div className="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-sm font-black shadow-sm">
           🛡️
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-[var(--text-primary)]">سامانه پایش پایداری و سلامت سیستم (Health Guard)</span>
-            <span className="text-[10px] text-[var(--text-muted)] font-mono">آخرین پایش: {lastChecked || "هم‌اکنون"}</span>
+            <span className="font-extrabold text-[var(--text-primary)]">سامانه پایش پایداری، سرعت و سلامت دیتابیس (Health Guard)</span>
+            <span className="text-[10px] text-[var(--text-secondary)] font-mono">آخرین تست: {lastChecked || "هم‌اکنون"}</span>
           </div>
-          <span className="text-[11px] text-[var(--text-secondary)] font-medium">پایش لحظه‌ای اتصال پایگاه‌داده، وب‌سوکت و حافظه موقت</span>
+          <span className="text-[11px] text-[var(--text-secondary)] font-medium">پایش مستمر زمان پاسخ‌گویی کوئری‌ها و وضعیت کانال‌های وب‌سوکت</span>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+        <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
           <span
-            className={`w-2 h-2 rounded-full ${
+            className={`w-2.5 h-2.5 rounded-full ${
               dbStatus === "connected"
                 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"
                 : dbStatus === "checking"
@@ -77,26 +75,26 @@ export default function AdminHealthGuard() {
             }`}
           />
           <span className="font-bold text-[var(--text-primary)]">
-            {dbStatus === "connected" ? "دیتابیس Supabase: متصل و پایدار" : dbStatus === "checking" ? "در حال پایش..." : "خطا در اتصال دیتابیس"}
+            {dbStatus === "connected" ? "دیتابیس Supabase: متصل و پایدار" : dbStatus === "checking" ? "در حال پایش..." : "خطا در اتصال پایگاه‌داده"}
           </span>
         </div>
 
         {responseTime !== null && (
-          <div className="px-3.5 py-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[var(--text-primary)] font-bold flex items-center gap-1.5">
-            <span>⚡ زمان پاسخ:</span>
-            <span className={`${responseTime < 300 ? "text-emerald-500" : responseTime < 800 ? "text-amber-500" : "text-rose-500"}`}>
+          <div className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[var(--text-primary)] font-bold flex items-center gap-1.5">
+            <span>⚡ پاسخ سرور:</span>
+            <span className={`${responseTime < 350 ? "text-emerald-500" : responseTime < 800 ? "text-amber-500" : "text-rose-500"}`}>
               {responseTime}ms
             </span>
           </div>
         )}
 
-        <div className="px-3.5 py-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[var(--text-secondary)] font-bold">
-          📦 کش مرورگر: {cacheSize} KB
+        <div className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[var(--text-secondary)] font-bold">
+          📦 حجم کش مرورگر: {cacheSize} KB
         </div>
 
         <button
           onClick={checkHealth}
-          className="p-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-blue-500 text-[var(--text-primary)] transition cursor-pointer"
+          className="p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] transition cursor-pointer"
           title="پایش دستی مجدد"
         >
           🔄

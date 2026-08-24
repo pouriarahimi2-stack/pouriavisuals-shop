@@ -9,6 +9,7 @@ export default function PageBuilder() {
   const [selectedPage, setSelectedPage] = useState<CustomPage | null>(null);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [isPublished, setIsPublished] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -16,16 +17,15 @@ export default function PageBuilder() {
 
   const fetchPages = async () => {
     const data = await pageService.getAll();
-    setPages(data);
+    setPages(data || []);
   };
 
   useEffect(() => {
     fetchPages();
 
-    // همگام‌سازی بلادرنگ وب‌سوکت روی جدول صفحات
     const pageChannel = supabase
-      .channel("pagebuilder-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "pages" }, () => {
+      .channel("pagebuilder-realtime-master")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_pages" }, () => {
         fetchPages();
       })
       .subscribe();
@@ -39,6 +39,7 @@ export default function PageBuilder() {
     setSelectedPage(page);
     setTitle(page.title);
     setSlug(page.slug);
+    setMetaDescription(page.meta_description || "");
     setBlocks(page.content || []);
     setIsPublished(page.is_published !== false);
   };
@@ -47,6 +48,7 @@ export default function PageBuilder() {
     setSelectedPage(null);
     setTitle("");
     setSlug("");
+    setMetaDescription("");
     setBlocks([]);
     setIsPublished(true);
   };
@@ -82,7 +84,7 @@ export default function PageBuilder() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !slug.trim()) {
-      setStatusMessage({ type: "error", text: "عنوان و نامک (Slug) الزامی هستند." });
+      setStatusMessage({ type: "error", text: "عنوان و نامک (Slug) صفحه الزامی هستند." });
       return;
     }
 
@@ -91,6 +93,7 @@ export default function PageBuilder() {
       id: selectedPage?.id,
       title: title.trim(),
       slug: slug.trim().toLowerCase().replace(/\s+/g, "-"),
+      meta_description: metaDescription.trim() || undefined,
       content: blocks,
       is_published: isPublished,
     };
@@ -99,7 +102,7 @@ export default function PageBuilder() {
     setSaving(false);
 
     if (result) {
-      setStatusMessage({ type: "success", text: "⚡ صفحه با موفقیت در دیتابیس ذخیره و منتشر شد." });
+      setStatusMessage({ type: "success", text: "⚡ صفحه اختصاصی با موفقیت در دیتابیس ذخیره و منتشر شد." });
       setSelectedPage(result);
       fetchPages();
     } else {
@@ -120,11 +123,13 @@ export default function PageBuilder() {
   };
 
   return (
-    <div className="space-y-8 font-sans" dir="rtl">
+    <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm">
         <div>
-          <h2 className="text-lg font-black text-[var(--text-primary)]">🎨 صفحه‌ساز پیشرفته و لایو</h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ساخت و چیدمان صفحات فرود و اختصاصی با ذخیره‌سازی ابری Realtime</p>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🏗️</span> صفحه‌ساز هوشمند و چیدمان صفحات اختصاصی
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ساخت لندینگ‌های اختصاصی، لندینگ‌های تبلیغاتی و معرفی محصول با ذخیره‌سازی بلادرنگ</p>
         </div>
         <button
           onClick={handleCreateNew}
@@ -147,28 +152,27 @@ export default function PageBuilder() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* سایدبار لیست صفحات موجود */}
         <div className="lg:col-span-1 bg-[var(--modal-bg)] p-5 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             📑 صفحات ثبت‌شده ({pages.length})
           </h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {pages.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-muted)] font-medium text-center py-4">هنوز صفحه‌ای ثبت نشده است.</p>
+              <p className="text-[11px] text-[var(--text-secondary)] font-medium text-center py-4">هنوز صفحه‌ای ثبت نشده است.</p>
             ) : (
               pages.map((p) => (
                 <div
-                  key={p.id}
+                  key={p.id || p.slug}
                   onClick={() => handleSelectPage(p)}
                   className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
-                    selectedPage?.id === p.id
+                    selectedPage?.slug === p.slug
                       ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
                       : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
                   }`}
                 >
                   <div className="overflow-hidden">
                     <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{p.title}</h4>
-                    <span className="text-[10px] text-[var(--text-muted)] font-mono">/{p.slug}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] font-mono">/{p.slug}</span>
                   </div>
                   <span className={`w-2 h-2 rounded-full ${p.is_published ? "bg-emerald-500" : "bg-slate-400"}`} />
                 </div>
@@ -177,12 +181,11 @@ export default function PageBuilder() {
           </div>
         </div>
 
-        {/* بخش ویرایشگر چیدمان صفحه */}
         <div className="lg:col-span-3 space-y-6">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-sm">
+          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-sm text-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">عنوان صفحه *</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">عنوان صفحه (Title) *</label>
                 <input
                   type="text"
                   value={title}
@@ -193,7 +196,7 @@ export default function PageBuilder() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">نامک انگلیسی (Slug) *</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">نامک انگلیسی آدرس (Slug) *</label>
                 <input
                   type="text"
                   value={slug}
@@ -205,44 +208,53 @@ export default function PageBuilder() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">توضیحات متای سئو (Meta Description)</label>
+              <input
+                type="text"
+                value={metaDescription}
+                onChange={(e) => setMetaDescription(e.target.value)}
+                placeholder="توضیحات خلاصه این صفحه برای موتورهای جستجو..."
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="checkbox"
-                id="isPub"
+                id="isPubPageAdmin"
                 checked={isPublished}
                 onChange={(e) => setIsPublished(e.target.checked)}
                 className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
               />
-              <label htmlFor="isPub" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
-                صفحه فعال و برای عموم کاربران منتشر شود
+              <label htmlFor="isPubPageAdmin" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
+                صفحه فعال و قابل دسترسی در آدرس اختصاصی باشد
               </label>
             </div>
 
-            {/* جعبه‌ابزار بلاک‌ها */}
             <div className="border-t border-[var(--card-border)] pt-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-[var(--text-primary)]">🧱 افزودن بخش (بلاک ساختمانی):</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-black text-[var(--text-primary)]">🧱 افزودن بخش ساختمانی (بلاک):</span>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => addBlock("hero")} className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
-                    + بخش هدر و شعار (Hero)
+                  <button type="button" onClick={() => addBlock("hero")} className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
+                    + هدر و شعار (Hero)
                   </button>
-                  <button type="button" onClick={() => addBlock("text")} className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
+                  <button type="button" onClick={() => addBlock("text")} className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
                     + بلوک متن و محتوا
                   </button>
-                  <button type="button" onClick={() => addBlock("banner")} className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
+                  <button type="button" onClick={() => addBlock("banner")} className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
                     + بنر تصویری و لینک
                   </button>
-                  <button type="button" onClick={() => addBlock("products")} className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
-                    + ردیف محصولات ویژه
+                  <button type="button" onClick={() => addBlock("products")} className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
+                    + ردیف کالاها
                   </button>
                 </div>
               </div>
 
-              {/* لیست بلاک‌های ایجادشده */}
               <div className="space-y-4 pt-2">
                 {blocks.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-[var(--text-muted)] border-2 border-dashed border-[var(--card-border)] rounded-2xl font-medium">
-                    هیچ بلاکی به این صفحه اضافه نشده است. از دکمه‌های بالا بخش‌های مورد نظرتان را اضافه کنید.
+                  <div className="p-8 text-center text-xs text-[var(--text-secondary)] border-2 border-dashed border-[var(--card-border)] rounded-2xl font-medium">
+                    هیچ بخشی به این صفحه اضافه نشده است. از دکمه‌های بالا المان‌های مورد نظر را اضافه کنید.
                   </div>
                 ) : (
                   blocks.map((block, idx) => (
@@ -251,29 +263,28 @@ export default function PageBuilder() {
                         <span>
                           بخش {idx + 1}: <strong className="text-[var(--accent-blue)] uppercase">{block.type}</strong>
                         </span>
-                        <div className="flex items-center gap-1">
-                          <button type="button" onClick={() => moveBlock(idx, "up")} disabled={idx === 0} className="p-1 px-2 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer">▲</button>
-                          <button type="button" onClick={() => moveBlock(idx, "down")} disabled={idx === blocks.length - 1} className="p-1 px-2 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer">▼</button>
-                          <button type="button" onClick={() => removeBlock(block.id)} className="p-1 px-2 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition cursor-pointer">✕</button>
+                        <div className="flex items-center gap-1.5">
+                          <button type="button" onClick={() => moveBlock(idx, "up")} disabled={idx === 0} className="p-1 px-2.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer">▲</button>
+                          <button type="button" onClick={() => moveBlock(idx, "down")} disabled={idx === blocks.length - 1} className="p-1 px-2.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer">▼</button>
+                          <button type="button" onClick={() => removeBlock(block.id)} className="p-1 px-2.5 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition cursor-pointer">✕</button>
                         </div>
                       </div>
 
-                      {/* فیلدهای اختصاصی بر اساس نوع بلاک */}
                       {block.type === "hero" && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                           <input
                             type="text"
-                            placeholder="عنوان هیرو..."
+                            placeholder="عنوان بخش هیرو..."
                             value={block.data.title || ""}
                             onChange={(e) => updateBlockData(block.id, "title", e.target.value)}
-                            className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold"
+                            className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold"
                           />
                           <input
                             type="text"
-                            placeholder="زیرعنوان / متن تکمیلی..."
+                            placeholder="زیرعنوان و متن تکمیلی..."
                             value={block.data.subtitle || ""}
                             onChange={(e) => updateBlockData(block.id, "subtitle", e.target.value)}
-                            className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs"
+                            className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs"
                           />
                         </div>
                       )}
@@ -281,10 +292,10 @@ export default function PageBuilder() {
                       {block.type === "text" && (
                         <textarea
                           rows={3}
-                          placeholder="متن محتوای این بخش..."
+                          placeholder="متن کامل و محتوای این بخش..."
                           value={block.data.text || ""}
                           onChange={(e) => updateBlockData(block.id, "text", e.target.value)}
-                          className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs"
+                          className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs leading-relaxed font-medium"
                         />
                       )}
 
@@ -292,17 +303,17 @@ export default function PageBuilder() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                           <input
                             type="text"
-                            placeholder="آدرس اینترنتی عکس بنر (Image URL)..."
+                            placeholder="آدرس اینترنتی تصویر بنر (Image URL)..."
                             value={block.data.imageUrl || ""}
                             onChange={(e) => updateBlockData(block.id, "imageUrl", e.target.value)}
-                            className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono"
+                            className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono"
                           />
                           <input
                             type="text"
                             placeholder="لینک مقصد هنگام کلیک (Link URL)..."
                             value={block.data.linkUrl || ""}
                             onChange={(e) => updateBlockData(block.id, "linkUrl", e.target.value)}
-                            className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono"
+                            className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono"
                           />
                         </div>
                       )}
@@ -311,10 +322,10 @@ export default function PageBuilder() {
                         <div className="text-xs space-y-2">
                           <input
                             type="text"
-                            placeholder="عنوان بخش کالاها (مثال: منتخب مانیتورهای استودیویی)..."
+                            placeholder="عنوان ردیف کالاها (مثال: منتخب مانیتورهای ۴K)..."
                             value={block.data.heading || ""}
                             onChange={(e) => updateBlockData(block.id, "heading", e.target.value)}
-                            className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold"
+                            className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold"
                           />
                         </div>
                       )}
@@ -324,14 +335,13 @@ export default function PageBuilder() {
               </div>
             </div>
 
-            {/* دکمه‌های ذخیره‌سازی */}
             <div className="flex gap-3 pt-4 border-t border-[var(--card-border)]">
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
+                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
               >
-                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار در دیتابیس"}
+                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار صفحه"}
               </button>
               {selectedPage?.id && (
                 <button
@@ -353,7 +363,7 @@ export default function PageBuilder() {
 function getDefaultDataForBlock(type: PageBlock["type"]): Record<string, any> {
   switch (type) {
     case "hero":
-      return { title: "عنوان اصلی صفحه", subtitle: "توضیحات و راهنمای خرید" };
+      return { title: "عنوان اصلی بخش", subtitle: "توضیحات و راهنمای خرید" };
     case "text":
       return { text: "محتوای متنی سفارشی را اینجا وارد کنید..." };
     case "banner":

@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 interface SearchResult {
   id: string;
-  type: "product" | "order" | "blog";
+  type: "product" | "order" | "blog" | "message";
   title: string;
   subtitle: string;
   extra?: string;
@@ -43,15 +43,15 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
       const q = query.trim().toLowerCase();
 
       try {
-        const [prodsRes, ordersRes, postsRes] = await Promise.all([
-          supabase.from("products").select("id, title, name, price, category").limit(5),
-          supabase.from("orders").select("id, first_name, last_name, phone, total_amount").limit(5),
-          supabase.from("posts").select("id, title, category").limit(5),
+        const [prodsRes, ordersRes, postsRes, msgsRes] = await Promise.all([
+          supabase.from("products").select("id, title, name, price, category").limit(8),
+          supabase.from("orders").select("id, customer_name, customer, phone, total_amount").limit(8),
+          supabase.from("posts").select("id, title, category").limit(8),
+          supabase.from("contact_messages").select("id, full_name, phone, subject").limit(8),
         ]);
 
         const combined: SearchResult[] = [];
 
-        // فیلتر محصولات
         (prodsRes.data || [])
           .filter((p: any) => (p.title || p.name || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q))
           .forEach((p: any) => {
@@ -59,25 +59,30 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
               id: p.id,
               type: "product",
               title: p.title || p.name,
-              subtitle: `کالا | دسته: ${p.category || "عمومی"}`,
-              extra: `${Number(p.price || 0).toLocaleString("fa-IR")} تومان`,
+              subtitle: `کالا | دسته‌بندی: ${p.category || "عمومی"}`,
+              extra: `${Number(p.price || 0).toLocaleString("fa-IR")} ت`,
             });
           });
 
-        // فیلتر سفارش‌ها
         (ordersRes.data || [])
-          .filter((o: any) => (o.phone || "").includes(q) || `${o.first_name || ""} ${o.last_name || ""}`.toLowerCase().includes(q))
+          .filter((o: any) => {
+            const phone = o.phone || o.customer?.phone || "";
+            const name = o.customer_name || o.customer?.fullName || o.customer?.name || "";
+            const id = String(o.id || "");
+            return phone.includes(q) || name.toLowerCase().includes(q) || id.toLowerCase().includes(q);
+          })
           .forEach((o: any) => {
+            const name = o.customer_name || o.customer?.fullName || o.customer?.name || "مشتری";
+            const phone = o.phone || o.customer?.phone || "---";
             combined.push({
               id: o.id,
               type: "order",
-              title: `سفارش: ${o.first_name || ""} ${o.last_name || ""}`.trim() || o.phone,
-              subtitle: `فاکتور مشتری | تلفن: ${o.phone}`,
-              extra: `${Number(o.total_amount || 0).toLocaleString("fa-IR")} تومان`,
+              title: `سفارش ${o.id} - ${name}`,
+              subtitle: `شماره تماس: ${phone}`,
+              extra: `${Number(o.total_amount || 0).toLocaleString("fa-IR")} ت`,
             });
           });
 
-        // فیلتر مقالات
         (postsRes.data || [])
           .filter((post: any) => (post.title || "").toLowerCase().includes(q) || (post.category || "").toLowerCase().includes(q))
           .forEach((post: any) => {
@@ -89,13 +94,24 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
             });
           });
 
+        (msgsRes.data || [])
+          .filter((msg: any) => (msg.full_name || "").toLowerCase().includes(q) || (msg.subject || "").toLowerCase().includes(q) || (msg.phone || "").includes(q))
+          .forEach((msg: any) => {
+            combined.push({
+              id: msg.id,
+              type: "message",
+              title: `پیام از طرف ${msg.full_name}`,
+              subtitle: `موضوع: ${msg.subject || "پشتیبانی"} - تلفن: ${msg.phone}`,
+            });
+          });
+
         setResults(combined);
       } catch (err) {
         console.error("Global search error:", err);
       } finally {
         setSearching(false);
       }
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [query]);
@@ -106,51 +122,52 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
     if (type === "product") onSelectTab("products");
     if (type === "order") onSelectTab("orders");
     if (type === "blog") onSelectTab("blogs");
+    if (type === "message") onSelectTab("messages");
   };
 
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/75 backdrop-blur-md animate-fadeIn" dir="rtl">
-          <div className="w-full max-w-xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden font-sans text-[var(--text-primary)]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 p-4 bg-black/75 backdrop-blur-md animate-fadeIn" dir="rtl">
+          <div className="w-full max-w-2xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden font-sans text-[var(--text-primary)]">
             <div className="p-4 border-b border-[var(--card-border)] flex items-center gap-3 bg-[var(--input-bg)]">
-              <span className="text-base">🔍</span>
+              <span className="text-lg">🔍</span>
               <input
                 type="text"
                 autoFocus
-                placeholder="جستجو میان محصولات، فاکتورهای سفارش، شماره تماس و مقالات..."
+                placeholder="جستجو در محصولات، فاکتورهای سفارش، مشتریان، پیام‌ها و مقالات وبلاگ..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               />
-              <span className="text-[10px] font-mono bg-black/10 dark:bg-white/10 px-2 py-1 rounded-lg text-[var(--text-muted)] font-bold">
+              <span className="text-[10px] font-mono bg-black/10 dark:bg-white/10 px-2.5 py-1 rounded-xl text-[var(--text-secondary)] font-bold">
                 ESC
               </span>
             </div>
 
-            <div className="p-3 max-h-80 overflow-y-auto space-y-1.5 text-xs">
+            <div className="p-3 max-h-96 overflow-y-auto space-y-2 text-xs">
               {searching ? (
-                <div className="text-center py-6 text-[var(--text-muted)] font-bold animate-pulse">
-                  در حال جستجوی بلادرنگ در دیتابیس...
+                <div className="text-center py-8 text-[var(--text-secondary)] font-bold animate-pulse">
+                  در حال جستجوی بلادرنگ در پایگاه داده...
                 </div>
               ) : results.length === 0 ? (
-                <div className="text-center py-6 text-[var(--text-muted)] font-medium">
-                  {query ? "هیچ نتیجه‌ای یافت نشد." : "عبارت مورد نظر را تایپ کنید (مثلاً نام کالا یا شماره موبایل)"}
+                <div className="text-center py-8 text-[var(--text-secondary)] font-medium">
+                  {query ? "موردی مطابق با جستجوی شما یافت نشد." : "نام کالا، شماره فاکتور یا شماره موبایل را وارد نمایید."}
                 </div>
               ) : (
                 results.map((item) => (
                   <div
                     key={`${item.type}-${item.id}`}
                     onClick={() => handleNavigate(item.type)}
-                    className="p-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-transparent transition cursor-pointer flex items-center justify-between gap-3"
+                    className="p-3.5 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-transparent transition cursor-pointer flex items-center justify-between gap-3 shadow-sm"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="p-2 rounded-xl bg-black/5 dark:bg-white/5 text-sm">
-                        {item.type === "product" ? "📦" : item.type === "order" ? "📄" : "📚"}
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center text-sm shadow-inner">
+                        {item.type === "product" ? "📦" : item.type === "order" ? "📑" : item.type === "blog" ? "📚" : "✉️"}
                       </span>
                       <div>
                         <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{item.title}</h4>
-                        <span className="text-[10px] text-[var(--text-secondary)]">{item.subtitle}</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-medium">{item.subtitle}</span>
                       </div>
                     </div>
                     {item.extra && (

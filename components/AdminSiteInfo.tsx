@@ -47,13 +47,26 @@ export default function AdminSiteInfo() {
     siteInfoService.getSiteInfo().then((data) => {
       if (data) populateForm(data);
     });
+
+    const channel = supabase
+      .channel("site-info-admin-realtime-master")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
+        siteInfoService.getSiteInfo().then((data) => {
+          if (data) populateForm(data);
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, isFooter: boolean = false) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setStatusMessage({ type: 'error', text: 'حجم تصویر نباید بیشتر از ۲ مگابایت باشد.' });
+      if (file.size > 3 * 1024 * 1024) {
+        setStatusMessage({ type: 'error', text: 'حجم تصویر نباید بیشتر از ۳ مگابایت باشد.' });
         return;
       }
       const reader = new FileReader();
@@ -73,35 +86,31 @@ export default function AdminSiteInfo() {
     setSaving(true);
 
     const payload: any = {
-      site_name: siteName,
-      siteName: siteName,
-      tagline: tagline,
-      phone: phone,
-      email: email,
-      address: address,
-      logo_url: logoUrl,
-      logoUrl: logoUrl,
-      footer_logo_url: footerLogoUrl,
-      footerLogoUrl: footerLogoUrl,
+      site_name: siteName.trim(),
+      siteName: siteName.trim(),
+      tagline: tagline.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      address: address.trim(),
+      logo_url: logoUrl.trim(),
+      logoUrl: logoUrl.trim(),
+      footer_logo_url: footerLogoUrl.trim(),
+      footerLogoUrl: footerLogoUrl.trim(),
       allow_google_index: allowGoogleIndex,
       allowGoogleIndex: allowGoogleIndex,
-      instagram: instagram,
-      telegram: telegram,
-      whatsapp: whatsapp,
-      header_announcement: announcement,
-      description: description,
-      footer_text: description,
+      instagram: instagram.trim(),
+      telegram: telegram.trim(),
+      whatsapp: whatsapp.trim(),
+      header_announcement: announcement.trim(),
+      description: description.trim(),
+      footer_text: description.trim(),
     };
 
     const res = await siteInfoService.updateSiteInfo(payload);
-    
-    // به‌روزرسانی مستقیم ستون ایندکس گوگل در جدول پایگاه داده
-    await supabase.from("site_info").update({ allow_google_index: allowGoogleIndex }).neq("id", "00000000-0000-0000-0000-000000000000");
-
     setSaving(false);
 
     if (res) {
-      setStatusMessage({ type: 'success', text: '⚡ تنظیمات و وضعیت ایندکس گوگل با موفقیت در دیتابیس ذخیره و منتشر شد.' });
+      setStatusMessage({ type: 'success', text: '⚡ مشخصات برند و وضعیت ایندکس گوگل با موفقیت در دیتابیس ذخیره و منتشر شد.' });
     } else {
       setStatusMessage({ type: 'error', text: 'خطا در ذخیره‌سازی اطلاعات در دیتابیس.' });
     }
@@ -109,11 +118,13 @@ export default function AdminSiteInfo() {
   };
 
   return (
-    <div className="space-y-6 font-sans" dir="rtl">
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--text-primary)]">⚙️ تنظیمات عمومی، سئو و هویت برند</h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">کنترل وضعیت ایندکس گوگل، لوگوهای هدر و فوتر و اطلاعات تماس</p>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>⚙️</span> تنظیمات عمومی، سئو، هویت برند و لوگوها
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">کنترل وضعیت ایندکس گوگل، لوگوهای هدر و فوتر، شبکه‌های اجتماعی و اطلاعات تماس</p>
         </div>
         <button
           type="button"
@@ -137,7 +148,6 @@ export default function AdminSiteInfo() {
         </div>
       )}
 
-      {/* بخش وضعیت ایندکس گوگل و نشانگر نئون */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3.5">
           <span
@@ -149,12 +159,12 @@ export default function AdminSiteInfo() {
           />
           <div>
             <h4 className="text-sm font-black text-[var(--text-primary)]">
-              وضعیت ایندکس و ربات‌های گوگل (Google Indexing)
+              وضعیت ایندکس و دسترسی ربات‌های گوگل (Google Search Indexing)
             </h4>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
               {allowGoogleIndex
-                ? "سایت برای موتورهای جستجو باز و ایندکس فعال است (نشانگر سبز)."
-                : "سایت در حالت تعمیر قرار دارد و از دید گوگل مخفی است (نشانگر قرمز)."}
+                ? "سایت برای موتورهای جستجو فعال و صفحات ایندکس می‌شوند (نشانگر سبز)."
+                : "سایت در حالت تعمیر و بازسازی قرار دارد و از دید گوگل مخفی است (نشانگر قرمز)."}
             </p>
           </div>
         </div>
@@ -172,12 +182,10 @@ export default function AdminSiteInfo() {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-8 shadow-sm">
-        {/* لوگوها */}
+      <form onSubmit={handleSubmit} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-8 shadow-sm text-xs">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* لوگوی هدر */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-[var(--text-primary)]">🖼️ لوگو اصلی هدر سایت</h3>
+            <h3 className="text-xs font-bold text-[var(--text-primary)]">🖼️ لوگوی اصلی هدر سایت</h3>
             <div className="flex items-center gap-4 p-4 bg-[var(--input-bg)] rounded-2xl border border-[var(--card-border)]">
               <div className="w-20 h-20 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                 {logoUrl ? <img src={logoUrl} alt="Header Logo" className="w-full h-full object-contain p-1" /> : <span className="text-2xl">🏢</span>}
@@ -185,15 +193,14 @@ export default function AdminSiteInfo() {
               <div className="space-y-2 flex-1">
                 <input type="file" ref={fileInputRef} onChange={(e) => handleLogoUpload(e, false)} accept="image/*" className="hidden" />
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">بارگذاری 📤</button>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">بارگذاری تصویر 📤</button>
                   {logoUrl && <button type="button" onClick={() => setLogoUrl('')} className="px-3 py-1.5 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>}
                 </div>
-                <input type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="آدرس اینترنتی لوگو..." className="w-full p-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)]" />
+                <input type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="یا درج لینک عکس لوگو..." className="w-full p-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)]" />
               </div>
             </div>
           </div>
 
-          {/* لوگوی فوتر */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-[var(--text-primary)]">⚓ آیکون اختصاصی فوتر (پاورقی)</h3>
             <div className="flex items-center gap-4 p-4 bg-[var(--input-bg)] rounded-2xl border border-[var(--card-border)]">
@@ -203,19 +210,18 @@ export default function AdminSiteInfo() {
               <div className="space-y-2 flex-1">
                 <input type="file" ref={footerFileInputRef} onChange={(e) => handleLogoUpload(e, true)} accept="image/*" className="hidden" />
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => footerFileInputRef.current?.click()} className="px-3 py-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">بارگذاری 📤</button>
+                  <button type="button" onClick={() => footerFileInputRef.current?.click()} className="px-3 py-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">بارگذاری تصویر 📤</button>
                   {footerLogoUrl && <button type="button" onClick={() => setFooterLogoUrl('')} className="px-3 py-1.5 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>}
                 </div>
-                <input type="text" value={footerLogoUrl} onChange={(e) => setFooterLogoUrl(e.target.value)} placeholder="آدرس اینترنتی آیکون فوتر..." className="w-full p-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)]" />
+                <input type="text" value={footerLogoUrl} onChange={(e) => setFooterLogoUrl(e.target.value)} placeholder="یا درج لینک آیکون فوتر..." className="w-full p-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)]" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* مشخصات اصلی */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[var(--card-border)] pt-6">
           <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی فروشگاه *</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی برند / فروشگاه *</label>
             <input type="text" value={siteName} onChange={(e) => setSiteName(e.target.value)} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-bold text-[var(--text-primary)]" required />
           </div>
           <div>
@@ -223,19 +229,27 @@ export default function AdminSiteInfo() {
             <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-bold text-[var(--text-primary)]" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">تلفن پشتیبانی</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">تلفن پشتیبانی و مشاوره</label>
             <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)]" />
           </div>
           <div>
             <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">ایمیل رسمی</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)]" />
           </div>
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">لینک اینستاگرام</label>
+            <input type="text" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="https://instagram.com/..." className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)]" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">لینک تلگرام</label>
+            <input type="text" value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="https://t.me/..." className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)]" />
+          </div>
           <div className="md:col-span-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">آدرس فروشگاه</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">نشانی پستی فروشگاه و دفتر مرکزی</label>
             <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs text-[var(--text-primary)]" />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">متن معرفی در فوتر</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">متن معرفی در فوتر سایت</label>
             <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs leading-relaxed text-[var(--text-primary)]" />
           </div>
         </div>

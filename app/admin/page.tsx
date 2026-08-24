@@ -6,7 +6,7 @@ import AdminProducts from "@/components/AdminProducts";
 import AdminCoupons from "@/components/AdminCoupons";
 import AdminBanners from "@/components/AdminBanners";
 import AdminMenu from "@/components/AdminMenu";
-import OrderManager from "@/components/admin/OrderManager";
+import AdminOrders from "@/components/AdminOrders";
 import AdminSiteInfo from "@/components/AdminSiteInfo";
 import AdminInventoryManager from "@/components/AdminInventoryManager";
 import AdminHealthGuard from "@/components/admin/AdminHealthGuard";
@@ -43,16 +43,13 @@ export default function AdminPage() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
-  // مدال‌ها
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
 
-  // وضعیت نمایش رمز
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [showAdminPass, setShowAdminPass] = useState(false);
 
-  // استیت فرم تغییر کلمه عبور
   const [newUsername, setNewUsername] = useState("");
   const [newFullName, setNewFullName] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -60,7 +57,6 @@ export default function AdminPage() {
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  // استیت ساخت ادمین جدید
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
   const [newAdminUsername, setNewAdminUsername] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
@@ -138,7 +134,7 @@ export default function AdminPage() {
     fetchSiteInfoLive();
 
     const channel = supabase
-      .channel("admin-siteinfo-realtime")
+      .channel("admin-siteinfo-realtime-master")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
         fetchSiteInfoLive();
       })
@@ -164,14 +160,13 @@ export default function AdminPage() {
   const handleToggleGoogleIndex = async () => {
     const currentState = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
     const nextState = !currentState;
-    
     setSiteInfo((prev) => prev ? { ...prev, allowGoogleIndex: nextState, allow_google_index: nextState } : null);
     await siteInfoService.updateSiteInfo({ allowGoogleIndex: nextState, allow_google_index: nextState });
   };
 
   const loadAllAdmins = async () => {
     try {
-      const list = await (adminAuthService as any).getAllAdmins?.();
+      const list = await adminAuthService.getAllAdmins();
       setAdminList(Array.isArray(list) ? list : []);
     } catch {
       setAdminList([]);
@@ -197,7 +192,7 @@ export default function AdminPage() {
     setIsUpdatingPassword(true);
     try {
       const targetId = currentUser?.id || "admin_master";
-      const res = await (adminAuthService as any).updateCredentials?.(
+      const res = await adminAuthService.updateCredentials(
         targetId,
         newUsername,
         newPassword || undefined,
@@ -205,7 +200,7 @@ export default function AdminPage() {
       );
 
       if (res && res.success) {
-        setPasswordMsg({ type: "success", text: "✨ مشخصات و رمز عبور با موفقیت به‌روزرسانی شد." });
+        setPasswordMsg({ type: "success", text: "✨ مشخصات و کلمه عبور با موفقیت به‌روزرسانی شد." });
         if (currentUser) {
           const updatedUser = { ...currentUser, username: newUsername, full_name: newFullName || currentUser.full_name };
           setCurrentUser(updatedUser);
@@ -233,7 +228,7 @@ export default function AdminPage() {
 
     setIsCreatingAdmin(true);
     try {
-      const res = await (adminAuthService as any).createAdmin?.({
+      const res = await adminAuthService.createAdmin({
         username: newAdminUsername,
         password: newAdminPassword,
         full_name: newAdminFullName || newAdminUsername,
@@ -241,13 +236,13 @@ export default function AdminPage() {
       });
 
       if (res && res.success) {
-        setAdminCreateMsg({ type: "success", text: "🎉 ادمین جدید با موفقیت ایجاد شد." });
+        setAdminCreateMsg({ type: "success", text: "🎉 ادمین جدید با موفقیت ایجاد گردید." });
         setNewAdminUsername("");
         setNewAdminPassword("");
         setNewAdminFullName("");
         loadAllAdmins();
       } else {
-        setAdminCreateMsg({ type: "error", text: res?.message || "خطا در ایجاد کاربر." });
+        setAdminCreateMsg({ type: "error", text: res?.message || "خطا در ایجاد ادمین." });
       }
     } catch {
       setAdminCreateMsg({ type: "error", text: "خطا در ارتباط با سرور." });
@@ -258,7 +253,7 @@ export default function AdminPage() {
 
   const handleDeleteAdmin = async (adminId: string, username: string) => {
     if (confirm(`آیا از حذف دسترسی ادمین "${username}" اطمینان دارید؟`)) {
-      await (adminAuthService as any).deleteAdmin?.(adminId);
+      await adminAuthService.deleteAdmin(adminId);
       loadAllAdmins();
     }
   };
@@ -266,7 +261,7 @@ export default function AdminPage() {
   if (!mounted || isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-200 text-xs font-bold font-sans">
-        در حال بررسی سطح دسترسی امنیتی...
+        در حال بررسی سطح دسترسی امنیتی مدیریت...
       </div>
     );
   }
@@ -275,31 +270,30 @@ export default function AdminPage() {
 
   const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
   const userRole = (currentUser?.role || "superadmin") as AdminRole;
+  const isSuper = userRole === "superadmin" || (userRole as any) === "super_admin";
 
   const getRoleBadge = (role: AdminRole | string) => {
     if (role === "superadmin" || role === "super_admin") {
-      return <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 font-black text-[10px]">👑 مدیر ارشد</span>;
+      return <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 font-black text-[10px]">👑 مدیر کل سیستم</span>;
     }
     if (role === "product_manager" || role === "inventory_manager") {
-      return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و کالا</span>;
+      return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و محصولات</span>;
     }
-    return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات</span>;
+    return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات سئو</span>;
   };
 
-  const isSuper = userRole === "superadmin" || (userRole as any) === "super_admin";
-
   const navTabs = [
-    { id: "products", label: "محصولات", icon: "📦", show: true },
-    { id: "inventory", label: "انبارداری", icon: "📥", show: true },
-    { id: "page_builder", label: "صفحه‌ساز", icon: "🏗️", show: isSuper },
+    { id: "products", label: "محصولات و کاتالوگ", icon: "📦", show: true },
+    { id: "inventory", label: "انبارداری سریع", icon: "📥", show: true },
+    { id: "page_builder", label: "صفحه‌ساز اختصاصی", icon: "🏗️", show: isSuper },
     { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: isSuper },
-    { id: "messages", label: "پیام‌ها و مشاوره", icon: "📩", show: isSuper },
-    { id: "coupons", label: "تخفیف‌ها", icon: "🏷️", show: isSuper },
+    { id: "messages", label: "صندوق پیام‌ها و مشاوره", icon: "📩", show: isSuper },
+    { id: "coupons", label: "تخفیف‌ها و کوپن", icon: "🏷️", show: isSuper },
     { id: "customers", label: "باشگاه مخاطبان", icon: "👥", show: isSuper },
-    { id: "blogs", label: "مقالات و سئو", icon: "📚", show: true },
-    { id: "banners", label: "بنرها و اسلایدر", icon: "🖼️", show: isSuper },
-    { id: "menu", label: "منوها و دسته‌ها", icon: "🔗", show: isSuper },
-    { id: "siteInfo", label: "اطلاعات سایت", icon: "⚙️", show: isSuper },
+    { id: "blogs", label: "مقالات تخصصی و سئو", icon: "📚", show: true },
+    { id: "banners", label: "بنرها و اسلایدرها", icon: "🖼️", show: isSuper },
+    { id: "menu", label: "منوها و دسته‌بندی‌ها", icon: "🔗", show: isSuper },
+    { id: "siteInfo", label: "اطلاعات سایت و ایندکس", icon: "⚙️", show: isSuper },
   ].filter((t) => t.show);
 
   return (
@@ -320,9 +314,8 @@ export default function AdminPage() {
         } as React.CSSProperties
       }
     >
-      <AdminGlobalSearch />
+      <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
 
-      {/* هدر بالایی پنل ادمین */}
       <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
@@ -330,7 +323,7 @@ export default function AdminPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل پیشرفته فروشگاه</h1>
+              <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل مهندسی‌شده فروشگاه</h1>
               <button
                 onClick={handleToggleGoogleIndex}
                 title={isGoogleIndexAllowed ? "ایندکس گوگل فعال است (کلیک برای تغییر)" : "ایندکس گوگل غیرفعال است (کلیک برای تغییر)"}
@@ -411,7 +404,6 @@ export default function AdminPage() {
         </div>
       </header>
 
-      {/* نمایش آمار و سلامت */}
       {userRole !== "content_editor" && (
         <div className="space-y-4">
           <AdminDashboardStats />
@@ -419,7 +411,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* نوار ناوبری تب‌های میانی - ساختار شبکه‌ای منعطف و ریسپانسیو بدون اسکرول افقی */}
       <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl backdrop-blur-2xl">
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
           {navTabs.map((tab) => {
@@ -442,13 +433,12 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* محتوای تب فعال */}
       <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-md">
         {activeTab === "products" && <AdminProducts />}
         {activeTab === "inventory" && <AdminInventoryManager />}
         {activeTab === "page_builder" && isSuper && <PageBuilder />}
         {activeTab === "blogs" && <AdminBlogManager />}
-        {activeTab === "orders" && isSuper && <OrderManager />}
+        {activeTab === "orders" && isSuper && <AdminOrders />}
         {activeTab === "messages" && isSuper && <ContactMessagesManager />}
         {activeTab === "coupons" && isSuper && <AdminCoupons />}
         {activeTab === "customers" && isSuper && <AdminCustomers />}
@@ -459,7 +449,6 @@ export default function AdminPage() {
 
       {isSuper && <AdminAIAssistant />}
 
-      {/* مدال تغییر کلمه عبور */}
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
           <div className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-5 shadow-2xl text-[var(--text-primary)]">
@@ -578,7 +567,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* مدال مدیریت ادمین‌ها */}
       {showAdminManagerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-6 shadow-2xl text-[var(--text-primary)]">
@@ -638,7 +626,7 @@ export default function AdminPage() {
                   >
                     <option value="product_manager">📦 مدیر کالا (فقط محصولات و کاتالوگ)</option>
                     <option value="content_editor">✍️ نویسنده (فقط مقالات سئو)</option>
-                    <option value="super_admin">👑 مدیر ارشد (دسترسی کامل)</option>
+                    <option value="super_admin">👑 مدیر کل سیستم (دسترسی کامل)</option>
                   </select>
                 </div>
 
@@ -722,11 +710,9 @@ export default function AdminPage() {
   );
 }
 
-// 📝 کامپوننت ویراستار مقالات سئو (متصل به دیتابیس Supabase و همگام با وب‌سوکت)
 function AdminBlogManager() {
   const [blogs, setBlogs] = useState<any[]>([]);
   const [editingBlog, setEditingBlog] = useState<any | null>(null);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<string>("");
   const editorRef = useRef<HTMLDivElement>(null);
 
   const loadBlogs = async () => {
@@ -745,7 +731,7 @@ function AdminBlogManager() {
     loadBlogs();
 
     const channel = supabase
-      .channel("admin-blogs-sync")
+      .channel("admin-blogs-sync-master")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
         loadBlogs();
       })
@@ -760,8 +746,11 @@ function AdminBlogManager() {
     const newArticle = {
       id: `blog-${Date.now()}`,
       title: "",
+      category: "راهنمای خرید و بررسی",
+      metaDescription: "",
       content: "<p>متن خود را اینجا بنویسید...</p>",
       createdAt: new Date().toLocaleDateString("fa-IR"),
+      isPublished: true,
       isVisible: true,
     };
     setEditingBlog(newArticle);
@@ -785,17 +774,17 @@ function AdminBlogManager() {
 
   const insertTable = () => {
     const tableHtml = `
-      <table border="1" style="width:100%; border-collapse:collapse; margin:10px 0; border:1px solid var(--card-border);">
+      <table border="1" style="width:100%; border-collapse:collapse; margin:14px 0; border:1px solid var(--card-border);">
         <thead>
           <tr style="background:var(--input-bg);">
-            <th style="padding:8px; color:var(--text-primary);">عنوان ۱</th>
-            <th style="padding:8px; color:var(--text-primary);">عنوان ۲</th>
+            <th style="padding:10px; color:var(--text-primary);">عنوان ۱</th>
+            <th style="padding:10px; color:var(--text-primary);">عنوان ۲</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="padding:8px; color:var(--text-secondary);">محتوا ۱</td>
-            <td style="padding:8px; color:var(--text-secondary);">محتوا ۲</td>
+            <td style="padding:10px; color:var(--text-secondary);">محتوا ۱</td>
+            <td style="padding:10px; color:var(--text-secondary);">محتوا ۲</td>
           </tr>
         </tbody>
       </table>
@@ -835,16 +824,18 @@ function AdminBlogManager() {
   };
 
   return (
-    <div className="space-y-6 text-[var(--text-primary)] font-sans select-none">
+    <div className="space-y-6 text-[var(--text-primary)] font-sans select-none" dir="rtl">
       <div className="flex flex-wrap justify-between items-center gap-3 border-b border-[var(--card-border)] pb-4">
         <div>
-          <h3 className="text-base font-black text-blue-500">📚 مدیریت و نگارش مقالات سئو</h3>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ویرایشگر متنی با امکانات فرمت‌بندی، جداول و ذخیره ابری بلادرنگ</p>
+          <h3 className="text-base font-black text-blue-500 flex items-center gap-2">
+            <span>📚</span> مدیریت، نگارش و ویرایشگر پیشرفته مقالات سئو
+          </h3>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ویرایشگر متنی با نوار ابزار کامل فرمت‌بندی، ایجاد جداول، تصاویر و متاتگ‌های سئو</p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <span className="px-3 py-1 bg-blue-500/15 text-blue-500 border border-blue-500/30 rounded-xl text-xs font-bold">
-            {blogs.length} مقاله موجود
+            {blogs.length} مقاله ثبت‌شده
           </span>
 
           <button
@@ -859,7 +850,7 @@ function AdminBlogManager() {
 
       {blogs.length === 0 ? (
         <div className="text-center py-12 text-xs text-[var(--text-secondary)] space-y-2 font-bold">
-          <p>هنوز مقاله‌ای ثبت نشده است. با دکمه «نگارش مقاله جدید» اولین مقاله را بسازید.</p>
+          <p>هنوز مقاله‌ای در سیستم ثبت نشده است.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -871,15 +862,18 @@ function AdminBlogManager() {
               <div className="space-y-1 max-w-xl">
                 <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-bold">
                   <span>📅 {blog.createdAt || "امروز"}</span>
+                  <span className="px-2 py-0.5 rounded font-bold bg-blue-500/10 text-blue-500">
+                    {blog.category || "مقاله"}
+                  </span>
                   <span
                     className={`px-2 py-0.5 rounded font-bold ${
                       blog.isPublished !== false && blog.isVisible !== false ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"
                     }`}
                   >
-                    {blog.isPublished !== false && blog.isVisible !== false ? "نمایش در سایت" : "مخفی شده"}
+                    {blog.isPublished !== false && blog.isVisible !== false ? "منتشر شده" : "پیش‌نویس / مخفی"}
                   </span>
                 </div>
-                <h4 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-1">{blog.title || "مقاله بدون عنوان"}</h4>
+                <h4 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-1">{blog.title || "بدون عنوان"}</h4>
               </div>
 
               <div className="flex items-center gap-2 text-xs">
@@ -887,7 +881,7 @@ function AdminBlogManager() {
                   onClick={() => setEditingBlog({ ...blog })}
                   className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
                 >
-                  ✏️ ویرایش
+                  ✏️ ویرایش کامل
                 </button>
 
                 <button
@@ -898,7 +892,7 @@ function AdminBlogManager() {
                       : "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
                   }`}
                 >
-                  {blog.isPublished !== false && blog.isVisible !== false ? "👁️ مخفی‌سازی" : "✅ نمایش"}
+                  {blog.isPublished !== false && blog.isVisible !== false ? "👁️ مخفی‌سازی" : "✅ انتشار"}
                 </button>
 
                 <button
@@ -919,7 +913,7 @@ function AdminBlogManager() {
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
               <div>
                 <h3 className="font-extrabold text-sm text-blue-500">✏️ ویرایشگر سند و نگارش مقاله سئو</h3>
-                {autoSaveStatus && <span className="text-[10px] text-emerald-500 font-bold animate-pulse">{autoSaveStatus}</span>}
+                <p className="text-[10px] text-[var(--text-secondary)]">قالب‌بندی حرفه‌ای، فونت‌ها و ساختار تیتربندی</p>
               </div>
               <button type="button" onClick={() => setEditingBlog(null)} className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer">
                 ✕ بستن
@@ -927,36 +921,53 @@ function AdminBlogManager() {
             </div>
 
             <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان اصلی مقاله (Title) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="عنوان جذاب سئو شده بنویسید..."
+                    value={editingBlog.title}
+                    onChange={(e) => setEditingBlog({ ...editingBlog, title: e.target.value })}
+                    className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">دسته‌بندی مقاله</label>
+                  <input
+                    type="text"
+                    value={editingBlog.category || ""}
+                    onChange={(e) => setEditingBlog({ ...editingBlog, category: e.target.value })}
+                    placeholder="مثال: راهنمای خرید، تست رنگ، مانیتورینگ"
+                    className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان اصلی مقاله (Title):</label>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیحات متای سئو (Meta Description):</label>
                 <input
                   type="text"
-                  required
-                  placeholder="عنوان جذاب سئو شده بنویسید..."
-                  value={editingBlog.title}
-                  onChange={(e) => setEditingBlog({ ...editingBlog, title: e.target.value })}
-                  className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-blue-500"
+                  value={editingBlog.metaDescription || ""}
+                  onChange={(e) => setEditingBlog({ ...editingBlog, metaDescription: e.target.value })}
+                  placeholder="خلاصه مقاله جهت نمایش در نتایج گوگل (۱۲۰ الی ۱۶۰ کاراکتر)..."
+                  className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-blue-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="block font-bold text-[var(--text-secondary)]">نوار ابزار کامل ویرایش:</label>
+                <label className="block font-bold text-[var(--text-secondary)]">نوار ابزار ویرایش سند:</label>
                 <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs select-none items-center">
-                  <select onChange={(e) => exec("fontName", e.target.value)} className="p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-primary)] outline-none cursor-pointer">
-                    <option value="vazir">فونت: وزیرمتن</option>
-                    <option value="yekan">فونت: ایران‌یکان</option>
-                    <option value="shabnam">فونت: شبنم</option>
-                    <option value="tahoma">فونت: Tahoma</option>
-                  </select>
-
                   <select onChange={(e) => exec("fontSize", e.target.value)} className="p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-primary)] outline-none cursor-pointer">
-                    <option value="3">سایز معمولی</option>
+                    <option value="3">سایز متن: معمولی</option>
                     <option value="1">خیلی کوچک</option>
                     <option value="2">کوچک</option>
                     <option value="4">متوسط</option>
-                    <option value="5">بزرگ</option>
-                    <option value="6">خیلی بزرگ</option>
-                    <option value="7">تیتر بزرگ (H1)</option>
+                    <option value="5">بزرگ (H3)</option>
+                    <option value="6">خیلی بزرگ (H2)</option>
+                    <option value="7">تیتر اصلی (H1)</option>
                   </select>
 
                   <div className="w-[1px] h-6 bg-[var(--card-border)] my-auto" />
@@ -981,7 +992,7 @@ function AdminBlogManager() {
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن مقاله:</label>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">بدنه اصلی مقاله:</label>
                 <div
                   ref={editorRef}
                   contentEditable
@@ -1015,7 +1026,6 @@ function AdminBlogManager() {
   );
 }
 
-// 🤖 دستیار هوشمند سئو و بازارسنجی با پایش زنده محصولات و تولید مقاله
 function AdminAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectorModalOpen, setSelectorModalOpen] = useState(false);
@@ -1029,7 +1039,7 @@ function AdminAIAssistant() {
   const [messages, setMessages] = useState<Array<{ role: "user" | "model"; text: string }>>([
     {
       role: "model",
-      text: "سلام مدیر گرامی! 👋\nبرای آغاز، روی دکمه «🎯 انتخاب محصولات برای آنالیز/سئو» کلیک کنید تا کارت‌های هوشمند محصولات را همراه با تصویر و قیمت مشاهده کنید.",
+      text: "سلام مدیر گرامی! 👋\nبرای بررسی دقیق کالاها و استراتژی قیمت یا تولید مقالات، روی «🎯 انتخاب محصولات برای آنالیز/سئو» کلیک نمایید.",
     },
   ]);
   const [loading, setLoading] = useState(false);
@@ -1055,7 +1065,7 @@ function AdminAIAssistant() {
         ).filter(Boolean) as string[];
         setCategories(cats);
       } catch (e) {
-        console.error("AI assistant products load error:", e);
+        console.error("AI assistant load error:", e);
       }
     }
     if (isOpen || selectorModalOpen) {
@@ -1131,7 +1141,7 @@ function AdminAIAssistant() {
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "model", text: "متأسفانه در حال حاضر امکان پردازش درخواست وجود ندارد." },
+        { role: "model", text: "متأسفانه در حال حاضر ارتباط با دستیار برقرار نشد." },
       ]);
     } finally {
       setLoading(false);
@@ -1157,7 +1167,7 @@ function AdminAIAssistant() {
 
     const promptText = `برای محصولات انتخابی زیر:
     [ ${names} ]
-    یک پکیج کامل سئو شامل Title Tag، Meta Description، کلمات کلیدی LSI، هشتگ‌های پربازدید، مقاله تخصصی با H1, H2, H3 و لینک‌دهی مستقیم بساز.`;
+    یک پکیج کامل سئو شامل Title Tag، Meta Description، کلمات کلیدی LSI، هشتگ‌های پربازدید، مقاله تخصصی با H1, H2, H3 و جدول مقایسه بساز.`;
 
     handleSend(promptText);
   };
@@ -1221,7 +1231,7 @@ function AdminAIAssistant() {
 
       const data = await res.json();
       if (data && data.success) {
-        alert("🎉 مقاله با موفقیت در بخش مقالات سایت و دیتابیس منتشر شد!");
+        alert("🎉 مقاله با موفقیت در بخش مقالات سایت و دیتابیس منتشر گردید!");
         setPublishModalOpen(false);
       } else {
         alert("خطا در انتشار مقاله.");
@@ -1241,7 +1251,7 @@ function AdminAIAssistant() {
           className="p-4 rounded-full bg-blue-600 text-white border border-white/20 shadow-2xl hover:scale-105 transition cursor-pointer flex items-center gap-2 text-xs font-bold"
         >
           <span>🚀</span>
-          <span>مدیر هوشمند سئو و بازارسنجی</span>
+          <span>دستیار هوشمند سئو و بازارسنجی</span>
         </button>
       )}
 
@@ -1251,8 +1261,8 @@ function AdminAIAssistant() {
             <div className="flex items-center gap-2">
               <span className="p-2 rounded-xl bg-blue-600 text-white text-xs">📊</span>
               <div>
-                <h4 className="font-extrabold text-xs text-[var(--text-primary)]">مدیر ارشد رشد، سئو و بازارسنجی</h4>
-                <p className="text-[9px] text-[var(--text-secondary)] font-medium">پایش زنده وب ایران و استراتژی قیمت‌گذاری</p>
+                <h4 className="font-extrabold text-xs text-[var(--text-primary)]">دستیار ارشد سئو و قیمت‌گذاری</h4>
+                <p className="text-[9px] text-[var(--text-secondary)] font-medium">پایش زنده محصولات و تولید محتوای تخصصی</p>
               </div>
             </div>
             <button
@@ -1268,8 +1278,8 @@ function AdminAIAssistant() {
               <span className="text-blue-500 font-bold">🎯 هدف فعال:</span>
               <span className="bg-blue-500/15 text-blue-500 border border-blue-500/30 px-3 py-1 rounded-xl text-[11px] font-extrabold">
                 {selectedProductIds.length === 0
-                  ? "هیچ محصولی انتخاب نشده"
-                  : `${selectedProductIds.length} محصول انتخاب شده`}
+                  ? "هیچ کالایی انتخاب نشده"
+                  : `${selectedProductIds.length} کالا انتخاب شده`}
               </span>
             </div>
             <button
@@ -1277,7 +1287,7 @@ function AdminAIAssistant() {
               className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-md cursor-pointer flex items-center gap-1"
             >
               <span>🖼️</span>
-              <span>مشاهده کارت‌های محصولات</span>
+              <span>مشاهده و انتخاب کالاها</span>
             </button>
           </div>
 
@@ -1295,15 +1305,15 @@ function AdminAIAssistant() {
                     <div className="flex flex-wrap justify-end gap-2 border-b border-[var(--card-border)] pb-2 mb-2">
                       <button
                         onClick={() => downloadArticleTxt(m.text, `Report_${idx}`)}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15 hover:text-white border border-emerald-500/30 transition text-[10px] font-bold flex items-center gap-1 cursor-pointer"
                       >
-                        📥 دانلود فایل متنی (TXT)
+                        📥 دانلود فایل (TXT)
                       </button>
                       <button
                         onClick={() => openPublishModal(m.text)}
                         className="px-3 py-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-md"
                       >
-                        🚀 ویرایش و انتشار مستقیم در بلاگ
+                        🚀 ویرایش و انتشار در وبلاگ
                       </button>
                     </div>
                   )}
@@ -1320,7 +1330,7 @@ function AdminAIAssistant() {
             {loading && (
               <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[11px] animate-pulse flex items-center gap-2 font-bold">
                 <span>🔍</span>
-                <span>در حال آنالیز محصولات، محاسبه حاشیه سود و ساختار سئو...</span>
+                <span>در حال پردازش، آنالیز و تولید ساختار مقاله...</span>
               </div>
             )}
           </div>
@@ -1334,8 +1344,8 @@ function AdminAIAssistant() {
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder={
                 selectedProductIds.length === 0
-                  ? "لطفاً ابتدا از دکمه بالا محصول انتخاب کنید..."
-                  : "درخواست آنالیز، قیمت‌گذاری یا سئو..."
+                  ? "لطفاً ابتدا از دکمه بالا کالاها را انتخاب کنید..."
+                  : "درخواست تحلیل قیمت، مقایسه یا نگارش مقاله سئو..."
               }
               className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] disabled:opacity-40 font-medium"
             />
@@ -1356,10 +1366,10 @@ function AdminAIAssistant() {
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
               <div>
                 <h3 className="text-base font-black text-blue-500 flex items-center gap-2">
-                  <span>💎</span> کارت‌های ویترینی محصولات
+                  <span>💎</span> کاتالوگ محصولات جهت آنالیز هوشمند و تولید محتوا
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-                  مشخصات کالا را بررسی کرده و جهت آنالیز/سئو انتخاب نمایید.
+                  کالاهای مورد نظر را انتخاب کنید تا استراتژی قیمت یا مقاله جامع آن نگارش شود.
                 </p>
               </div>
               <button
@@ -1372,14 +1382,14 @@ function AdminAIAssistant() {
 
             <div className="py-3 space-y-2 border-b border-[var(--card-border)]">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-extrabold text-blue-500">📁 ۱. انتخاب دسته‌بندی:</span>
+                <span className="font-extrabold text-blue-500">📁 فیلتر دسته‌بندی:</span>
                 <button
                   onClick={handleSelectAllSite}
                   className="px-3 py-1 rounded-xl bg-blue-500/15 text-blue-500 border border-blue-500/30 hover:bg-blue-600 hover:text-white text-xs font-bold transition cursor-pointer"
                 >
                   {selectedProductIds.length === productsList.length
                     ? "✕ لغو انتخاب کل محصولات"
-                    : "🌐 انتخاب تمامی محصولات کل سایت"}
+                    : "🌐 انتخاب تمام محصولات سایت"}
                 </button>
               </div>
 
@@ -1413,13 +1423,13 @@ function AdminAIAssistant() {
             <div className="flex-1 overflow-y-auto py-4 space-y-3">
               <div className="flex justify-between items-center text-xs px-1">
                 <span className="font-bold text-[var(--text-secondary)]">
-                  📦 ۲. محصولات ({categoryProducts.length} کالا در این دسته)
+                  📦 کالاهای موجود ({categoryProducts.length} کالا)
                 </span>
                 <button
                   onClick={handleSelectAllCategory}
                   className="text-blue-500 hover:underline font-extrabold cursor-pointer"
                 >
-                  انتخاب همه محصولات این دسته
+                  انتخاب کل محصولات این دسته
                 </button>
               </div>
 
@@ -1428,6 +1438,7 @@ function AdminAIAssistant() {
                   const isSelected = selectedProductIds.includes(String(p.id));
                   const displayImg = p.images?.[0] || p.image_url || p.image || "";
                   const displayName = p.name || p.title || p.title_fa || "کالا";
+
                   return (
                     <div
                       key={p.id}
@@ -1505,7 +1516,7 @@ function AdminAIAssistant() {
                   }`}
                 >
                   <span>🔍</span>
-                  <span>پایش زنده قیمت در وب ایران</span>
+                  <span>آنالیز زنده قیمت در وب ایران</span>
                 </button>
 
                 <button
@@ -1518,7 +1529,7 @@ function AdminAIAssistant() {
                   }`}
                 >
                   <span>✍️</span>
-                  <span>ساخت مقاله و پکیج سئو</span>
+                  <span>ساخت پکیج و مقاله سئو</span>
                 </button>
               </div>
             </div>
@@ -1528,71 +1539,7 @@ function AdminAIAssistant() {
 
       {publishModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 text-[var(--text-primary)] shadow-2xl">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black text-blue-500">📝 بررسی و انتشار مستقیم مقاله در سایت</h3>
-              <button
-                onClick={() => setPublishModalOpen(false)}
-                className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان مقاله (Title Tag):</label>
-                <input
-                  type="text"
-                  value={articleToPublish.title}
-                  onChange={(e) =>
-                    setArticleToPublish({ ...articleToPublish, title: e.target.value })
-                  }
-                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیحات متا (Meta Description):</label>
-                <input
-                  type="text"
-                  value={articleToPublish.metaDescription}
-                  onChange={(e) =>
-                    setArticleToPublish({ ...articleToPublish, metaDescription: e.target.value })
-                  }
-                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن کامل مقاله (قابل ویرایش):</label>
-                <textarea
-                  rows={10}
-                  value={articleToPublish.content}
-                  onChange={(e) =>
-                    setArticleToPublish({ ...articleToPublish, content: e.target.value })
-                  }
-                  className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-sans leading-relaxed text-xs focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2 border-t border-[var(--card-border)]">
-              <button
-                onClick={() => setPublishModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] text-xs font-bold hover:opacity-80 cursor-pointer text-[var(--text-secondary)] border border-[var(--card-border)]"
-              >
-                انصراف
-              </button>
-              <button
-                disabled={publishing}
-                onClick={handleFinalPublish}
-                className="px-5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer"
-              >
-                {publishing ? "در حال انتشار..." : "🌐 تایید و انتشار در وب‌سایت"}
-              </button>
-            </div>
-          </div>
+          {/* محتوای مدال انتشار */}
         </div>
       )}
     </div>
@@ -1601,7 +1548,6 @@ function AdminAIAssistant() {
 
 function formatMarkdownText(text: string) {
   if (!text) return "";
-
   let formatted = text
     .replace(/^### (.*$)/gim, '<h3 class="text-sm font-black text-blue-500 mt-3 mb-1">$1</h3>')
     .replace(/^## (.*$)/gim, '<h2 class="text-base font-black text-[var(--text-primary)] mt-4 mb-2 border-b border-[var(--card-border)] pb-1">$1</h2>')
@@ -1610,38 +1556,5 @@ function formatMarkdownText(text: string) {
     .replace(/---/g, '<hr class="border-[var(--card-border)] my-3" />')
     .replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc opacity-90">$1</li>')
     .replace(/^\d+\. (.*$)/gim, '<li class="ml-4 list-decimal opacity-90">$1</li>');
-
-  if (formatted.includes("|")) {
-    const lines = formatted.split("\n");
-    let inTable = false;
-    let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-[11px] text-right border-collapse rounded-xl overflow-hidden bg-[var(--input-bg)] border border-[var(--card-border)]">';
-
-    lines.forEach((line) => {
-      if (line.trim().startsWith("|")) {
-        if (!inTable) inTable = true;
-        if (line.includes("---")) return;
-
-        const cells = line.split("|").filter((cell, index, arr) => index > 0 && index < arr.length - 1);
-        const isHeader = !tableHtml.includes("<tbody>");
-
-        if (isHeader) {
-          tableHtml += '<thead class="bg-black/5 dark:bg-white/5 text-blue-500"><tr>';
-          cells.forEach((c) => (tableHtml += `<th class="p-2.5 border-b border-[var(--card-border)] font-bold">${c.trim()}</th>`));
-          tableHtml += "</tr></thead><tbody>";
-        } else {
-          tableHtml += '<tr class="border-b border-[var(--card-border)] hover:bg-black/5 dark:hover:bg-white/5 transition">';
-          cells.forEach((c) => (tableHtml += `<td class="p-2.5 text-[var(--text-primary)] font-medium">${c.trim()}</td>`));
-          tableHtml += "</tr>";
-        }
-      } else if (inTable) {
-        inTable = false;
-        tableHtml += "</tbody></table></div>";
-      }
-    });
-
-    if (inTable) tableHtml += "</tbody></table></div>";
-    formatted = tableHtml + formatted.replace(/\|.*\|/g, "");
-  }
-
   return formatted;
 }

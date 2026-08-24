@@ -2,29 +2,35 @@
 
 import React, { useState, useEffect } from "react";
 import { menuService, MenuItem } from "@/services/menuService";
+import { categoryService, Category } from "@/services/categoryService";
 import { supabase } from "@/lib/supabase";
 
 export default function AdminMenu() {
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newUrl, setNewUrl] = useState("");
+  const [newCatName, setNewCatName] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const fetchMenus = async () => {
-    const data = await menuService.getAll();
-    setItems(data);
+  const loadAll = async () => {
+    const [menus, cats] = await Promise.all([
+      menuService.getAll(),
+      categoryService.getAll(),
+    ]);
+    setItems(menus || []);
+    setCategories(cats || []);
   };
 
   useEffect(() => {
-    fetchMenus();
+    loadAll();
 
-    // لیسنر وب‌سوکت برای منوها
     const channel = supabase
-      .channel("menu-realtime-channel")
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
-        fetchMenus();
-      })
+      .channel("menu-admin-realtime-master")
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => loadAll())
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => loadAll())
       .subscribe();
 
     return () => {
@@ -37,9 +43,10 @@ export default function AdminMenu() {
     if (!newTitle.trim() || !newUrl.trim()) return;
 
     const newItem: MenuItem = {
-      id: "temp_" + Date.now(),
+      id: "menu_" + Date.now(),
       title: newTitle.trim(),
       url: newUrl.trim(),
+      order: items.length + 1,
       isActive: true,
       is_active: true,
     };
@@ -64,29 +71,55 @@ export default function AdminMenu() {
 
   const handleSaveAll = async () => {
     setSaving(true);
-    const ok = await menuService.saveMenuItems(items);
+    const ok = await menuService.saveAll(items);
     setSaving(false);
 
     if (ok) {
-      setStatusMessage({ type: "success", text: "⚡ ساختار منو با موفقیت در دیتابیس ذخیره و در هدر سایت فعال شد." });
-      fetchMenus();
+      setStatusMessage({ type: "success", text: "⚡ ساختار منو در دیتابیس ذخیره و در هدر سایت فعال گردید." });
+      loadAll();
     } else {
       setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی منوها در دیتابیس." });
     }
     setTimeout(() => setStatusMessage(null), 3500);
   };
 
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+
+    const res = await categoryService.addCategory({
+      name: newCatName.trim(),
+      slug: newCatName.trim().toLowerCase().replace(/\s+/g, "-"),
+    });
+
+    if (res) {
+      setNewCatName("");
+      loadAll();
+      setStatusMessage({ type: "success", text: `دسته‌بندی «${res.name}» افزوده شد.` });
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    if (confirm(`آیا از حذف دسته‌بندی "${name}" اطمینان دارید؟`)) {
+      await categoryService.deleteCategory(id);
+      loadAll();
+    }
+  };
+
   return (
-    <div className="space-y-6 font-sans" dir="rtl">
+    <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--text-primary)]">🔗 مدیریت پیوندها و منوی ناوبری هدر</h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">افزودن، جابجایی و فعال‌سازی لینک‌های بالای سایت با وب‌سوکت بلادرنگ</p>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🔗</span> مدیریت پیوندها، منوی هدر و دسته‌بندی‌ها
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">افزودن و ترتیب پیوندهای ناوبری بالای سایت به همراه مدیریت دسته‌های محصولات</p>
         </div>
         <button
           onClick={handleSaveAll}
           disabled={saving}
-          className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50"
+          className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50"
         >
           {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار سراسری منو"}
         </button>
@@ -105,10 +138,9 @@ export default function AdminMenu() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* فرم افزودن آیتم جدید به منو */}
-        <form onSubmit={handleAddItem} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit">
+        <form onSubmit={handleAddItem} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit text-xs">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            + افزودن آیتم به منو
+            + افزودن آیتم جدید به منوی هدر
           </h3>
 
           <div className="space-y-1">
@@ -127,7 +159,7 @@ export default function AdminMenu() {
             <label className="block text-[11px] font-bold text-[var(--text-secondary)]">آدرس مقصد (URL) *</label>
             <input
               type="text"
-              placeholder="/products یا https://..."
+              placeholder="/products یا /#products"
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
@@ -139,19 +171,18 @@ export default function AdminMenu() {
             type="submit"
             className="w-full py-3 rounded-2xl bg-[var(--input-bg)] hover:bg-[var(--accent-blue)] hover:text-white border border-[var(--card-border)] font-bold text-xs transition cursor-pointer"
           >
-            + اضافه کردن به لیست
+            + اضافه کردن به لیست منو
           </button>
         </form>
 
-        {/* لیست و ترتیب آیتم‌های منو */}
-        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm">
+        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm text-xs">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             📋 چینش و ترتیب آیتم‌های منو ({items.length})
           </h3>
 
           <div className="space-y-2 max-h-[460px] overflow-y-auto">
             {items.length === 0 ? (
-              <p className="text-xs text-center py-8 text-[var(--text-muted)] font-bold">هیچ آیتمی در منو وجود ندارد.</p>
+              <p className="text-xs text-center py-8 text-[var(--text-secondary)] font-bold">هیچ آیتمی در منو وجود ندارد.</p>
             ) : (
               items.map((item, idx) => (
                 <div
@@ -164,7 +195,7 @@ export default function AdminMenu() {
                     </span>
                     <div>
                       <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{item.title}</h4>
-                      <span className="font-mono text-[10px] text-[var(--text-muted)]">{item.url}</span>
+                      <span className="font-mono text-[10px] text-[var(--text-secondary)]">{item.url}</span>
                     </div>
                   </div>
 
@@ -196,6 +227,61 @@ export default function AdminMenu() {
                 </div>
               ))
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4 border-t border-[var(--card-border)]">
+        <form onSubmit={handleAddCategory} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit text-xs">
+          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
+            + ثبت دسته‌بندی جدید فروشگاه
+          </h3>
+
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">نام دسته‌بندی *</label>
+            <input
+              type="text"
+              placeholder="مثلاً: تجهیزات نورپردازی"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs transition cursor-pointer shadow-md"
+          >
+            + ایجاد دسته‌بندی
+          </button>
+        </form>
+
+        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm text-xs">
+          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
+            📂 دسته‌بندی‌های فعال سایت ({categories.length})
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto">
+            {categories.map((c) => (
+              <div
+                key={c.id || c.name}
+                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2 shadow-sm"
+              >
+                <div>
+                  <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{c.name}</h4>
+                  <span className="text-[10px] text-[var(--text-secondary)] font-mono">/{c.slug}</span>
+                </div>
+                {c.id && (
+                  <button
+                    onClick={() => handleDeleteCategory(c.id!, c.name)}
+                    className="p-1.5 px-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition cursor-pointer font-bold text-xs"
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>

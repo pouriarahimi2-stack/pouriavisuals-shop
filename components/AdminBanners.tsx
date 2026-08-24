@@ -47,9 +47,8 @@ export default function AdminBanners() {
   useEffect(() => {
     fetchBanners();
 
-    // اتصال بلادرنگ وب‌سوکت بنرها
     const channel = supabase
-      .channel("banners-realtime-channel")
+      .channel("banners-admin-realtime-master")
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
         fetchBanners();
       })
@@ -110,7 +109,7 @@ export default function AdminBanners() {
         if (error) throw error;
       }
 
-      setStatusMessage({ type: "success", text: "⚡ بنر با موفقیت در دیتابیس ثبت و در صفحه اصلی منتشر شد." });
+      setStatusMessage({ type: "success", text: "⚡ بنر با موفقیت ذخیره و در صفحه اصلی منتشر شد." });
       fetchBanners();
       if (!selectedBanner) handleCreateNew();
     } catch (err: any) {
@@ -136,11 +135,13 @@ export default function AdminBanners() {
   };
 
   return (
-    <div className="space-y-6 font-sans" dir="rtl">
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--text-primary)]">🖼️ مدیریت بنرهای تبلیغاتی و اسلایدر صفحه اصلی</h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ایجاد و ویرایش بنرهای ویترین اصلی با همگام‌سازی بلادرنگ</p>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🖼️</span> مدیریت بنرهای تبلیغاتی و اسلایدر صفحه اصلی
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">طراحی، ویرایش و تنظیم اولویت بنرهای ویترین اصلی سایت به صورت بلادرنگ</p>
         </div>
         <button
           onClick={handleCreateNew}
@@ -163,14 +164,13 @@ export default function AdminBanners() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* لیست بنرها */}
         <div className="lg:col-span-1 bg-[var(--modal-bg)] p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-sm h-fit">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            📋 بنرهای فعال ({banners.length})
+            📋 بنرهای ثبت‌شده ({banners.length})
           </h3>
           <div className="space-y-2 max-h-[500px] overflow-y-auto">
             {banners.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-muted)] font-medium text-center py-6">هنوز بنری ثبت نشده است.</p>
+              <p className="text-[11px] text-[var(--text-secondary)] font-medium text-center py-6">هنوز بنری ثبت نشده است.</p>
             ) : (
               banners.map((b) => (
                 <div
@@ -184,7 +184,7 @@ export default function AdminBanners() {
                 >
                   <div className="overflow-hidden">
                     <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{b.title}</h4>
-                    <span className="text-[10px] text-[var(--text-muted)] font-mono truncate block">{b.link_url}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] font-mono truncate block">{b.link_url}</span>
                   </div>
                   <span className={`w-2 h-2 rounded-full ${b.is_active !== false ? "bg-emerald-500" : "bg-slate-400"}`} />
                 </div>
@@ -193,9 +193,8 @@ export default function AdminBanners() {
           </div>
         </div>
 
-        {/* فرم ثبت و ویرایش بنر */}
         <div className="lg:col-span-3">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-sm">
+          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-sm text-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">عنوان اصلی بنر *</label>
@@ -203,7 +202,7 @@ export default function AdminBanners() {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: مانیتورهای تخصصی تدوین و کالرگریدینگ ۴K"
+                  placeholder="مثال: مانیتورهای تخصصی تدوین و رنگ ۵K"
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                   required
                 />
@@ -215,7 +214,7 @@ export default function AdminBanners() {
                   type="text"
                   value={badgeText}
                   onChange={(e) => setBadgeText(e.target.value)}
-                  placeholder="مثال: تجهیزات استودیویی ۲۰۲۶"
+                  placeholder="مثال: تخفیف ویژه نوروز"
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
@@ -226,13 +225,13 @@ export default function AdminBanners() {
                   type="text"
                   value={subtitle}
                   onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder="مثال: دقت رنگ ۱۰۰٪ DCI-P3 به همراه کالیبراسیون کارخانه‌ای سخت‌افزاری"
+                  placeholder="مثال: پوشش رنگ ۱۰۰٪ DCI-P3 و کالیبراسیون سخت‌افزاری کارخانه‌ای"
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">آدرس اینترنتی تصویر بنر (URL) *</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">آدرس تصویر بنر (URL) *</label>
                 <input
                   type="text"
                   value={imageUrl}
@@ -244,7 +243,7 @@ export default function AdminBanners() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">لینک مقصد بنر هنگام کلیک</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">لینک مقصد هنگام کلیک</label>
                 <input
                   type="text"
                   value={linkUrl}
@@ -260,7 +259,7 @@ export default function AdminBanners() {
                   type="text"
                   value={buttonText}
                   onChange={(e) => setButtonText(e.target.value)}
-                  placeholder="مشاهده کاتالوگ مانیتورها"
+                  placeholder="مشاهده و خرید"
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
@@ -268,28 +267,28 @@ export default function AdminBanners() {
               <div className="flex items-center gap-2 pt-6">
                 <input
                   type="checkbox"
-                  id="isBanAct"
+                  id="isBanActAdmin"
                   checked={isActive}
                   onChange={(e) => setIsActive(e.target.checked)}
                   className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
                 />
-                <label htmlFor="isBanAct" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
-                  بنر فعال و در صفحه اصلی نمایش داده شود
+                <label htmlFor="isBanActAdmin" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
+                  بنر فعال و در اسلایدر صفحه اصلی نمایش داده شود
                 </label>
               </div>
             </div>
 
-            {/* پیش‌نمایش بنر */}
             {imageUrl && (
               <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
-                <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش پس‌زمینه بنر:</span>
+                <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش بصری لایو:</span>
                 <div
-                  className="w-full h-36 rounded-2xl bg-cover bg-center border border-[var(--card-border)] p-4 flex items-center shadow-inner"
+                  className="w-full h-40 rounded-2xl bg-cover bg-center border border-[var(--card-border)] p-6 flex items-center shadow-inner"
                   style={{
-                    backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0.3)), url(${imageUrl})`,
+                    backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.3)), url(${imageUrl})`,
                   }}
                 >
-                  <div className="text-white space-y-1">
+                  <div className="text-white space-y-1.5">
+                    {badgeText && <span className="px-2 py-0.5 rounded bg-white/20 text-[9px] font-black">{badgeText}</span>}
                     <h4 className="font-black text-sm">{title || "عنوان پیش‌نمایش بنر"}</h4>
                     <p className="text-[10px] text-slate-300">{subtitle || "زیرعنوان تستی بنر"}</p>
                   </div>
@@ -301,7 +300,7 @@ export default function AdminBanners() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
+                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
               >
                 {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار بنر در سایت"}
               </button>

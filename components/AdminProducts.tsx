@@ -21,9 +21,12 @@ export default function AdminProducts() {
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
   const [specs, setSpecs] = useState<Array<{ key: string; value: string }>>([
     { key: "رزولوشن", value: "" },
-    { key: "پنل", value: "" },
+    { key: "نوع پنل", value: "" },
   ]);
   const [isAvailable, setIsAvailable] = useState(true);
+
+  const [showNewCatInput, setShowNewCatInput] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -33,17 +36,22 @@ export default function AdminProducts() {
       productService.getAll(),
       categoryService.getAll(),
     ]);
-    setProducts(prods);
-    setCategories(cats);
+    setProducts(prods || []);
+    setCategories(cats || []);
+    if (cats && cats.length > 0 && !category) {
+      setCategory(cats[0].name);
+    }
   };
 
   useEffect(() => {
     loadData();
 
-    // همگام‌سازی بلادرنگ محصولات با وب‌سوکت
     const channel = supabase
-      .channel("admin-products-realtime")
+      .channel("admin-products-realtime-channel")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        loadData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => {
         loadData();
       })
       .subscribe();
@@ -64,7 +72,7 @@ export default function AdminProducts() {
     setDescription(p.description || "");
     setWarranty(p.warranty || "۱۸ ماه گارانتی معتبر شرکتی");
     setImageUrls(p.images && p.images.length > 0 ? p.images : [p.image || ""]);
-    
+
     if (p.specs && typeof p.specs === "object") {
       const parsed = Object.entries(p.specs).map(([key, value]) => ({ key, value: String(value) }));
       setSpecs(parsed.length > 0 ? parsed : [{ key: "", value: "" }]);
@@ -90,6 +98,24 @@ export default function AdminProducts() {
       { key: "نوع پنل", value: "" },
     ]);
     setIsAvailable(true);
+  };
+
+  const handleAddNewCategory = async () => {
+    if (!newCatName.trim()) return;
+    const clean = newCatName.trim();
+    const added = await categoryService.addCategory({
+      name: clean,
+      slug: clean.toLowerCase().replace(/\s+/g, "-"),
+    });
+
+    if (added) {
+      setCategories([...categories, added]);
+      setCategory(added.name);
+      setNewCatName("");
+      setShowNewCatInput(false);
+      setStatusMessage({ type: "success", text: `دسته‌بندی «${clean}» با موفقیت افزوده شد.` });
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
   };
 
   const addImageField = () => setImageUrls([...imageUrls, ""]);
@@ -137,6 +163,7 @@ export default function AdminProducts() {
       category,
       price: Number(price),
       discountPrice: discountPrice ? Number(discountPrice) : undefined,
+      discount_price: discountPrice ? Number(discountPrice) : undefined,
       stock: stock !== "" ? Number(stock) : 10,
       description,
       warranty,
@@ -151,32 +178,34 @@ export default function AdminProducts() {
     setSaving(false);
 
     if (result) {
-      setStatusMessage({ type: "success", text: "⚡ محصول با موفقیت در دیتابیس ثبت و در سایت منتشر شد." });
+      setStatusMessage({ type: "success", text: "⚡ محصول با موفقیت در دیتابیس ذخیره و در ویترین منتشر گردید." });
       loadData();
       if (!selectedProduct && result) setSelectedProduct(result);
     } else {
-      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی محصول." });
+      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی محصول در پایگاه داده." });
     }
     setTimeout(() => setStatusMessage(null), 3500);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این محصول اطمینان دارید؟")) return;
+    if (!confirm("آیا از حذف این کالا از دیتابیس اطمینان دارید؟")) return;
     const ok = await productService.deleteProduct(id);
     if (ok) {
       handleCreateNew();
       loadData();
-      setStatusMessage({ type: "success", text: "محصول با موفقیت حذف گردید." });
+      setStatusMessage({ type: "success", text: "محصول با موفقیت حذف شد." });
       setTimeout(() => setStatusMessage(null), 3000);
     }
   };
 
   return (
-    <div className="space-y-6 font-sans" dir="rtl">
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--text-primary)]">🛍️ کاتالوگ محصولات و مشخصات فنی</h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">مدیریت قیمت‌ها، تصاویر چندگانه و مشخصات به صورت ابری و وب‌سوکت</p>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🛍️</span> کاتالوگ محصولات، مشخصات فنی و گالری تصاویر
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">مدیریت قیمت‌ها، تصاویر چندگانه، مشخصات و دسته‌بندی‌ها به صورت Realtime</p>
         </div>
         <button
           onClick={handleCreateNew}
@@ -199,14 +228,13 @@ export default function AdminProducts() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* لیست محصولات */}
-        <div className="lg:col-span-1 bg-[var(--modal-bg)] p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-sm h-fit">
+        <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-sm h-fit">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             📦 لیست محصولات ({products.length})
           </h3>
-          <div className="space-y-2 max-h-[540px] overflow-y-auto">
+          <div className="space-y-2 max-h-[600px] overflow-y-auto">
             {products.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-muted)] font-medium text-center py-6">هیچ محصولی ثبت نشده است.</p>
+              <p className="text-[11px] text-[var(--text-secondary)] font-medium text-center py-6">هیچ محصولی ثبت نشده است.</p>
             ) : (
               products.map((p) => (
                 <div
@@ -221,11 +249,11 @@ export default function AdminProducts() {
                   <img
                     src={p.images?.[0] || p.image || "/placeholder.png"}
                     alt=""
-                    className="w-10 h-10 object-contain rounded-xl bg-white/5 p-1 border border-[var(--card-border)] shrink-0"
+                    className="w-11 h-11 object-contain rounded-xl bg-white/5 p-1 border border-[var(--card-border)] shrink-0"
                   />
                   <div className="overflow-hidden flex-1">
                     <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
-                    <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="font-mono font-bold text-[11px] text-emerald-600 dark:text-emerald-400">
                       {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت
                     </span>
                   </div>
@@ -235,9 +263,8 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* فرم ویرایشگر کالا */}
         <div className="lg:col-span-3">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-sm">
+          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-sm text-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">عنوان کالا (لاتین یا اصلی) *</label>
@@ -246,7 +273,7 @@ export default function AdminProducts() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="مثال: Apple Studio Display 27-inch 5K"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                   required
                 />
               </div>
@@ -257,37 +284,67 @@ export default function AdminProducts() {
                   type="text"
                   value={titleFa}
                   onChange={(e) => setTitleFa(e.target.value)}
-                  placeholder="مثال: مانیتور ۲۷ اینچ اپل استودیو دیسپلی ۵K"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
+                  placeholder="مثال: مانیتور ۲۷ اینچ اپل استودیو ۵K"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">دسته‌بندی</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id || c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                  <option value="مانیتور تدوین">مانیتور تدوین</option>
-                  <option value="کالیبراتور رنگ">کالیبراتور رنگ</option>
-                  <option value="کارت کپچر">کارت کپچر</option>
-                  <option value="نورپردازی استودیو">نورپردازی استودیو</option>
-                </select>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-bold text-[var(--text-secondary)]">دسته‌بندی محصول *</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCatInput(!showNewCatInput)}
+                    className="text-[10px] font-bold text-[var(--accent-blue)] hover:underline cursor-pointer"
+                  >
+                    {showNewCatInput ? "بستن فرم دسته" : "+ ساخت دسته جدید"}
+                  </button>
+                </div>
+
+                {showNewCatInput ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="نام دسته جدید..."
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddNewCategory}
+                      className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs cursor-pointer shadow-sm"
+                    >
+                      افزودن
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] cursor-pointer"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id || c.name} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                    <option value="کالای دیجیتال">کالای دیجیتال (پیش‌فرض)</option>
+                    <option value="مانیتور تدوین">مانیتور تدوین</option>
+                    <option value="کالیبراتور رنگ">کالیبراتور رنگ</option>
+                    <option value="کارت کپچر">کارت کپچر</option>
+                    <option value="نورپردازی استودیو">نورپردازی استودیو</option>
+                  </select>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">گارانتی و ضمانت</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">گارانتی و ضمانت کالا</label>
                 <input
                   type="text"
                   value={warranty}
                   onChange={(e) => setWarranty(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
@@ -298,19 +355,19 @@ export default function AdminProducts() {
                   value={price}
                   onChange={(e) => setPrice(Number(e.target.value))}
                   placeholder="مثال: 95000000"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-black text-[var(--text-primary)] outline-none"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-black text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">قیمت با تخفیف (اختیاری)</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">قیمت با تخفیف (تومان)</label>
                 <input
                   type="number"
                   value={discountPrice}
                   onChange={(e) => setDiscountPrice(e.target.value ? Number(e.target.value) : "")}
                   placeholder="مثال: 89000000"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-black text-emerald-600 outline-none"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-black text-emerald-600 outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
@@ -320,30 +377,29 @@ export default function AdminProducts() {
                   type="number"
                   value={stock}
                   onChange={(e) => setStock(e.target.value ? Number(e.target.value) : "")}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div className="flex items-center gap-2 pt-6">
                 <input
                   type="checkbox"
-                  id="prodAvail"
+                  id="prodAvailAdmin"
                   checked={isAvailable}
                   onChange={(e) => setIsAvailable(e.target.checked)}
                   className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
                 />
-                <label htmlFor="prodAvail" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
-                  کالا موجود و آماده سفارش‌گذاری است
+                <label htmlFor="prodAvailAdmin" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
+                  کالا موجود و در ویترین فعال باشد
                 </label>
               </div>
             </div>
 
-            {/* تصاویر چندگانه کالا */}
             <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-[var(--text-secondary)]">گالری تصاویر کالا (URLها)</label>
+                <label className="text-xs font-bold text-[var(--text-secondary)]">گالری تصاویر کالا (URL عکس‌ها)</label>
                 <button type="button" onClick={addImageField} className="text-[11px] font-bold text-[var(--accent-blue)] hover:underline cursor-pointer">
-                  + افزودن عکس دیگر
+                  + افزودن فیلد عکس دیگر
                 </button>
               </div>
               <div className="space-y-2">
@@ -351,13 +407,13 @@ export default function AdminProducts() {
                   <div key={idx} className="flex gap-2">
                     <input
                       type="text"
-                      placeholder={`آدرس اینترنتی تصویر ${idx + 1}...`}
+                      placeholder={`آدرس اینترنتی عکس شماره ${idx + 1}...`}
                       value={url}
                       onChange={(e) => updateImageUrl(idx, e.target.value)}
-                      className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono"
+                      className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)]"
                     />
                     {imageUrls.length > 1 && (
-                      <button type="button" onClick={() => removeImageField(idx)} className="px-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs font-bold cursor-pointer">
+                      <button type="button" onClick={() => removeImageField(idx)} className="px-3 rounded-2xl bg-rose-500/10 text-rose-500 text-xs font-bold cursor-pointer">
                         ✕
                       </button>
                     )}
@@ -366,12 +422,11 @@ export default function AdminProducts() {
               </div>
             </div>
 
-            {/* مشخصات فنی */}
             <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-[var(--text-secondary)]">مشخصات فنی و جدول ویژگی‌ها</label>
                 <button type="button" onClick={addSpecField} className="text-[11px] font-bold text-[var(--accent-blue)] hover:underline cursor-pointer">
-                  + ویژگی جدید
+                  + سطر مشخصه جدید
                 </button>
               </div>
               <div className="space-y-2">
@@ -379,19 +434,19 @@ export default function AdminProducts() {
                   <div key={idx} className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="عنوان (مثال: درگاه‌ها)"
+                      placeholder="عنوان مشخصه (مثال: درگاه‌ها)"
                       value={item.key}
                       onChange={(e) => updateSpecField(idx, "key", e.target.value)}
-                      className="w-1/3 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+                      className="w-1/3 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)]"
                     />
                     <input
                       type="text"
-                      placeholder="مقدار (مثال: ۳x Thunderbolt 3)"
+                      placeholder="مقدار مشخصه (مثال: ۳x Thunderbolt 3)"
                       value={item.value}
                       onChange={(e) => updateSpecField(idx, "value", e.target.value)}
-                      className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
+                      className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)]"
                     />
-                    <button type="button" onClick={() => removeSpecField(idx)} className="px-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs font-bold cursor-pointer">
+                    <button type="button" onClick={() => removeSpecField(idx)} className="px-3 rounded-2xl bg-rose-500/10 text-rose-500 text-xs font-bold cursor-pointer">
                       ✕
                     </button>
                   </div>
@@ -399,15 +454,14 @@ export default function AdminProducts() {
               </div>
             </div>
 
-            {/* توضیحات */}
             <div className="space-y-1.5 border-t border-[var(--card-border)] pt-4">
-              <label className="block text-xs font-bold text-[var(--text-secondary)]">توضیحات و نقد و بررسی محصول</label>
+              <label className="block text-xs font-bold text-[var(--text-secondary)]">توضیحات جامع، نقد و بررسی محصول</label>
               <textarea
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="توضیحات کامل درباره کارایی و ویژگی‌های متمایز این کالا..."
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed outline-none"
+                placeholder="توضیحات تکمیلی و مزایای کالا..."
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
 
@@ -415,7 +469,7 @@ export default function AdminProducts() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
+                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
               >
                 {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار کالا در فروشگاه"}
               </button>
@@ -423,7 +477,7 @@ export default function AdminProducts() {
                 <button
                   type="button"
                   onClick={() => handleDelete(selectedProduct.id)}
-                  className="px-5 py-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 font-bold text-xs hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                  className="px-5 py-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500 hover:text-white transition cursor-pointer"
                 >
                   حذف کالا ✕
                 </button>

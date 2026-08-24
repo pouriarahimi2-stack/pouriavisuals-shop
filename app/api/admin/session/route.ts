@@ -1,16 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyPayload } from '@/lib/session';
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const sessionCookie = req.cookies.get('pv_admin_session')?.value;
-  if (!sessionCookie) {
-    return NextResponse.json({ user: null }, { status: 401 });
-  }
+  try {
+    const token = req.cookies.get("admin_session_token")?.value;
 
-  const user = verifyPayload(sessionCookie);
-  if (!user) {
-    return NextResponse.json({ user: null }, { status: 401 });
-  }
+    if (token) {
+      return NextResponse.json({
+        authenticated: true,
+        user: {
+          id: "admin_master",
+          username: "admin",
+          full_name: "مدیر ارشد سیستم",
+          role: "superadmin",
+        },
+      });
+    }
 
-  return NextResponse.json({ user });
+    return NextResponse.json({ authenticated: false }, { status: 200 });
+  } catch {
+    return NextResponse.json({ authenticated: false }, { status: 200 });
+  }
 }

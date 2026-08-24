@@ -10,7 +10,7 @@ export default function AdminSiteInfo() {
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
-  const [footerLogoUrl, setFooterLogoUrl] = useState(''); // لوگوی اختصاصی فوتر
+  const [footerLogoUrl, setFooterLogoUrl] = useState('');
   const [instagram, setInstagram] = useState('');
   const [telegram, setTelegram] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -22,15 +22,6 @@ export default function AdminSiteInfo() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const footerFileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const initialData = siteInfoService.getSiteInfoSync();
-    populateForm(initialData);
-
-    siteInfoService.getSiteInfo().then((data) => {
-      if (data) populateForm(data);
-    });
-  }, []);
-
   const populateForm = (data: SiteInfo) => {
     setSiteName(data.site_name || data.siteName || '');
     setTagline(data.tagline || '');
@@ -38,13 +29,22 @@ export default function AdminSiteInfo() {
     setEmail(data.email || '');
     setAddress(data.address || '');
     setLogoUrl(data.logo_url || data.logoUrl || '');
-    setFooterLogoUrl((data as any).footer_logo_url || (data as any).footerLogoUrl || '');
+    setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || '');
     setInstagram(data.instagram || '');
     setTelegram(data.telegram || '');
     setWhatsapp(data.whatsapp || '');
     setAnnouncement(data.header_announcement || data.headerAnnouncement || '');
     setDescription(data.description || data.footer_text || data.footerText || '');
   };
+
+  useEffect(() => {
+    const initialData = siteInfoService.getSiteInfoSync();
+    if (initialData) populateForm(initialData);
+
+    siteInfoService.getSiteInfo().then((data) => {
+      if (data) populateForm(data);
+    });
+  }, []);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, isFooter: boolean = false) => {
     const file = e.target.files?.[0];
@@ -70,7 +70,6 @@ export default function AdminSiteInfo() {
     setSaving(true);
 
     const payload: SiteInfo = {
-      id: 'default_info',
       site_name: siteName,
       siteName: siteName,
       tagline: tagline,
@@ -87,13 +86,17 @@ export default function AdminSiteInfo() {
       header_announcement: announcement,
       description: description,
       footer_text: description,
-    } as any;
+    };
 
-    await siteInfoService.updateSiteInfo(payload);
-
+    const res = await siteInfoService.updateSiteInfo(payload);
     setSaving(false);
-    setStatusMessage({ type: 'success', text: '⚡ تغییرات در دیتابیس ذخیره و از طریق وب‌سوکت در لحظه اعمال شد.' });
-    setTimeout(() => setStatusMessage(null), 3000);
+
+    if (res) {
+      setStatusMessage({ type: 'success', text: '⚡ تغییرات و لوگوی فوتر با موفقیت در دیتابیس ذخیره و منتشر شد.' });
+    } else {
+      setStatusMessage({ type: 'error', text: 'خطا در ذخیره‌سازی اطلاعات در دیتابیس.' });
+    }
+    setTimeout(() => setStatusMessage(null), 3500);
   };
 
   return (
@@ -102,7 +105,7 @@ export default function AdminSiteInfo() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">⚙️ تنظیمات عمومی، هویت برند و سئو سایت</h2>
-            <p className="text-xs text-gray-500 mt-1">مدیریت لوگوهای هدر و فوتر، اطلاعات تماس و شبکه‌های اجتماعی به صورت زنده[cite: 9]</p>
+            <p className="text-xs text-gray-500 mt-1">مدیریت لوگوهای هدر و فوتر، اطلاعات تماس و شبکه‌های اجتماعی</p>
           </div>
           <button
             type="button"
@@ -110,7 +113,7 @@ export default function AdminSiteInfo() {
             disabled={saving}
             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-sm font-medium transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
           >
-            {saving ? 'در حال اعمال...' : '💾 ذخیره و انتشار تغییرات'}
+            {saving ? 'در حال ذخیره‌سازی...' : '💾 ذخیره و انتشار تغییرات'}
           </button>
         </div>
 
@@ -127,7 +130,7 @@ export default function AdminSiteInfo() {
         )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-8">
-          {/* لوگوی هدر */}
+          {/* لوگوی اصلی هدر */}
           <div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               🖼️ لوگو اصلی هدر سایت
@@ -142,12 +145,12 @@ export default function AdminSiteInfo() {
                   <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold cursor-pointer">بارگذاری لوگوی جدید 📤</button>
                   {logoUrl && <button type="button" onClick={() => setLogoUrl('')} className="px-4 py-2 bg-rose-100 text-rose-600 rounded-xl text-xs font-semibold cursor-pointer">حذف ✕</button>}
                 </div>
-                <input type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="آدرس URL اینترنتی..." className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs text-gray-700 dark:text-gray-300" />
+                <input type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="آدرس URL اینترنتی لوگو..." className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs text-gray-700 dark:text-gray-300" />
               </div>
             </div>
           </div>
 
-          {/* لوگو / آیکون اختصاصی فوتر */}
+          {/* آیکون اختصاصی فوتر */}
           <div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               ⚓ آیکون اختصاصی فوتر (پاورقی)
@@ -167,29 +170,33 @@ export default function AdminSiteInfo() {
             </div>
           </div>
 
-          {/* مشخصات اصلی، تماس، شبکه‌های اجتماعی و فوتر[cite: 9] */}
+          {/* مشخصات اصلی */}
           <div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">🏢 مشخصات اصلی، تماس و توضیحات</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">نام رسمی فروشگاه *[cite: 9]</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">نام رسمی فروشگاه *</label>
                 <input type="text" value={siteName} onChange={(e) => setSiteName(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">شعار تبلیغاتی[cite: 9]</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">شعار تبلیغاتی</label>
                 <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">تلفن تماس[cite: 9]</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">تلفن تماس</label>
                 <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">ایمیل رسمی[cite: 9]</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">ایمیل رسمی</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">آدرس فروشگاه[cite: 9]</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">آدرس فروشگاه</label>
                 <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">توضیحات معرفی و فوتر</label>
+                <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" />
               </div>
             </div>
           </div>

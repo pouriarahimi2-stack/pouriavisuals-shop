@@ -2,123 +2,141 @@ import { supabase } from "@/lib/supabase";
 
 export interface SiteInfo {
   id?: string;
-  siteName: string;
-  tagline: string;
-  description: string;
-  phone: string;
-  email: string;
-  address: string;
-  instagram: string;
-  telegram: string;
-  whatsapp: string;
-  workingHours: string;
-  shippingText: string;
-  guaranteeText: string;
-  supportText: string;
-  allowGoogleIndex: boolean;
-  metaTitle: string;
-  metaDescription: string;
-  metaKeywords: string;
+  site_name?: string;
+  siteName?: string;
+  name?: string;
+  tagline?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  logo_url?: string;
+  logoUrl?: string;
+  footer_logo_url?: string;
+  footerLogoUrl?: string;
+  instagram?: string;
+  telegram?: string;
+  whatsapp?: string;
+  header_announcement?: string;
+  headerAnnouncement?: string;
+  description?: string;
+  footer_text?: string;
+  footerText?: string;
+  allowGoogleIndex?: boolean;
 }
 
-export const defaultSiteInfo: SiteInfo = {
-  siteName: "AXonCore | تجهیزات تخصصی دیجیتال",
-  tagline: "مرجع تخصصی فروش جدیدترین گجت‌ها و اکسسوری‌های اورجینال",
-  description: "فروشگاه آنلاین آکسون، ارائه‌دهنده باکیفیت‌ترین محصولات دیجیتال، مک‌بوک، آیفون و گجت‌های هوشمند همراه با گارانتی اصالت کالا.",
-  phone: "۰۲۱-۸۸۸۸۸۸۸۸",
-  email: "support@axoncore.ir",
-  address: "تهران، خیابان ولیعصر، تقاطع میرداماد، مجتمع تجاری پایتخت، طبقه دوم",
-  instagram: "axoncore",
-  telegram: "axoncore_support",
-  whatsapp: "09120000000",
-  workingHours: "شنبه تا چهارشنبه ۹ الی ۲۱ | پنج‌شنبه‌ها ۹ الی ۱۸",
-  shippingText: "ارسال سریع با پست پیشتاز و تیپاکس به سراسر کشور",
-  guaranteeText: "۷ روز ضمانت بازگشت وجه و تضمین ۱۰۰٪ اصالت کالا",
-  supportText: "پشتیبانی ۲۴ ساعته در ۷ روز هفته",
-  allowGoogleIndex: true,
-  metaTitle: "فروشگاه تخصصی محصولات دیجیتال و هوشمند | AXonCore",
-  metaDescription: "خرید آنلاین انواع لپ‌تاپ، لوازم جانبی هوشمند، قطعات و گجت‌های کاربردی با بهترین قیمت و ضمانت بازگشت وجه.",
-  metaKeywords: "خرید آنلاین, محصولات دیجیتال, فروشگاه اینترنتی, گجت هوشمند",
-};
-
-const STORAGE_KEY = "site_info_cache";
+let cachedSiteInfo: SiteInfo | null = null;
 
 export const siteInfoService = {
-  // ۱. متد همگام (Sync) برای رندر بدون معطلی در کلاینت و لایوت
-  getSiteInfoSync(): SiteInfo {
+  getSiteInfoSync(): SiteInfo | null {
+    if (cachedSiteInfo) return cachedSiteInfo;
     if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(STORAGE_KEY);
-        if (cached) {
-          return { ...defaultSiteInfo, ...JSON.parse(cached) };
-        }
-      } catch {}
-    }
-    return defaultSiteInfo;
-  },
-
-  // ۲. متد ناهمگام (Async) برای واکشی و به‌روزرسانی زنده
-  async getSiteInfo(): Promise<SiteInfo> {
-    if (typeof window !== "undefined") {
-      const syncData = this.getSiteInfoSync();
-      
-      // واکشی در پس‌زمینه از سرور یا سوپابیس
-      try {
-        const res = await fetch("/api/site-info", { cache: "no-store" });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.data) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(json.data));
-            return { ...defaultSiteInfo, ...json.data };
-          }
-        }
-      } catch {}
-
-      if (supabase) {
+      const local = localStorage.getItem("axon_site_info");
+      if (local) {
         try {
-          const { data, error } = await supabase.from("site_info").select("*").limit(1).single();
-          if (!error && data) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            return { ...defaultSiteInfo, ...data };
-          }
+          cachedSiteInfo = JSON.parse(local);
+          return cachedSiteInfo;
         } catch {}
       }
-
-      return syncData;
     }
-    return defaultSiteInfo;
+    return null;
   },
 
-  // ۳. ذخیره‌سازی اطلاعات
-  async updateSiteInfo(info: Partial<SiteInfo>): Promise<{ success: boolean; message?: string }> {
+  async getSiteInfo(): Promise<SiteInfo | null> {
     try {
-      const current = this.getSiteInfoSync();
-      const updated = { ...current, ...info };
+      const { data, error } = await supabase
+        .from("site_info")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
 
+      if (error) {
+        console.error("Error fetching site_info from Supabase:", error);
+        return this.getSiteInfoSync();
+      }
+
+      if (data) {
+        const mapped: SiteInfo = {
+          ...data,
+          siteName: data.site_name,
+          logoUrl: data.logo_url,
+          footerLogoUrl: data.footer_logo_url,
+          footerText: data.footer_text || data.description,
+          headerAnnouncement: data.header_announcement,
+        };
+        cachedSiteInfo = mapped;
+        if (typeof window !== "undefined") {
+          localStorage.setItem("axon_site_info", JSON.stringify(mapped));
+        }
+        return mapped;
+      }
+      return this.getSiteInfoSync();
+    } catch (e) {
+      console.error("getSiteInfo error:", e);
+      return this.getSiteInfoSync();
+    }
+  },
+
+  async getAll(): Promise<SiteInfo | null> {
+    return this.getSiteInfo();
+  },
+
+  async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
+    try {
+      const dbPayload = {
+        site_name: payload.site_name || payload.siteName || "",
+        tagline: payload.tagline || "",
+        phone: payload.phone || "",
+        email: payload.email || "",
+        address: payload.address || "",
+        logo_url: payload.logo_url || payload.logoUrl || "",
+        footer_logo_url: payload.footer_logo_url || payload.footerLogoUrl || "",
+        instagram: payload.instagram || "",
+        telegram: payload.telegram || "",
+        whatsapp: payload.whatsapp || "",
+        header_announcement: payload.header_announcement || payload.headerAnnouncement || "",
+        footer_text: payload.footer_text || payload.footerText || payload.description || "",
+        description: payload.description || payload.footer_text || payload.footerText || "",
+      };
+
+      // بررسی وجود سطر قبلی
+      const { data: existing } = await supabase.from("site_info").select("id").limit(1).maybeSingle();
+
+      let resultData;
+      if (existing?.id) {
+        const { data, error } = await supabase
+          .from("site_info")
+          .update(dbPayload)
+          .eq("id", existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        resultData = data;
+      } else {
+        const { data, error } = await supabase
+          .from("site_info")
+          .insert([dbPayload])
+          .select()
+          .single();
+        if (error) throw error;
+        resultData = data;
+      }
+
+      const updatedMapped: SiteInfo = {
+        ...resultData,
+        siteName: resultData.site_name,
+        logoUrl: resultData.logo_url,
+        footerLogoUrl: resultData.footer_logo_url,
+      };
+
+      cachedSiteInfo = updatedMapped;
       if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem("axon_site_info", JSON.stringify(updatedMapped));
+        window.dispatchEvent(new CustomEvent("site_info_updated", { detail: updatedMapped }));
       }
-
-      try {
-        await fetch("/api/site-info", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updated),
-        });
-      } catch {}
-
-      if (supabase) {
-        try {
-          await supabase.from("site_info").upsert({ id: "main_config", ...updated });
-        } catch {}
-      }
-
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, message: err?.message || "خطا در ثبت اطلاعات سایت." };
+      return updatedMapped;
+    } catch (err) {
+      console.error("Error updating site_info:", err);
+      return null;
     }
   },
 };
-
-export const getSiteInfoSync = siteInfoService.getSiteInfoSync.bind(siteInfoService);
-export const getSiteInfo = siteInfoService.getSiteInfo.bind(siteInfoService);

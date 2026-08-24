@@ -18,6 +18,7 @@ import PageBuilder from "@/components/admin/PageBuilder";
 import { productService, Product } from "@/services/productService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -67,6 +68,15 @@ export default function AdminPage() {
   const [newAdminRole, setNewAdminRole] = useState<AdminRole>("product_manager");
   const [adminCreateMsg, setAdminCreateMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+
+  const fetchSiteInfoLive = async () => {
+    try {
+      const info = await siteInfoService.getSiteInfo();
+      if (info) setSiteInfo(info);
+    } catch (e) {
+      console.error("Admin SiteInfo load error:", e);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -125,11 +135,19 @@ export default function AdminPage() {
       }
     } catch {}
 
-    try {
-      siteInfoService.getSiteInfo().then((info) => {
-        if (info) setSiteInfo(info);
-      });
-    } catch {}
+    fetchSiteInfoLive();
+
+    // همگام‌سازی بلادرنگ تنظیمات و ایندکس گوگل با وب‌سوکت
+    const channel = supabase
+      .channel("admin-siteinfo-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
+        fetchSiteInfoLive();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [router]);
 
   const toggleDarkMode = () => {
@@ -142,6 +160,17 @@ export default function AdminPage() {
       setIsDarkMode(true);
       localStorage.setItem("theme", "dark");
     }
+  };
+
+  const handleToggleGoogleIndex = async () => {
+    const currentState = siteInfo?.allowGoogleIndex !== false;
+    const nextState = !currentState;
+    
+    // به‌روزرسانی سریع در استیت محلی
+    setSiteInfo((prev) => prev ? { ...prev, allowGoogleIndex: nextState } : null);
+
+    // ارسال مستقیم به دیتابیس Supabase
+    await siteInfoService.updateSiteInfo({ allowGoogleIndex: nextState });
   };
 
   const loadAllAdmins = async () => {
@@ -297,7 +326,7 @@ export default function AdminPage() {
     >
       <AdminGlobalSearch />
 
-      {/* هدر بالایی پنل ادمین */}
+      {/* هدر بالایی پنل ادمین با سوییچ ایندکس گوگل و مدیریت نشست */}
       <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
@@ -306,12 +335,20 @@ export default function AdminPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل پیشرفته فروشگاه</h1>
-              <span
-                title={isGoogleIndexAllowed ? "ایندکس گوگل فعال است" : "ایندکس گوگل غیرفعال است"}
-                className={`w-2.5 h-2.5 rounded-full ${
-                  isGoogleIndexAllowed ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-rose-500"
-                }`}
-              />
+              <button
+                onClick={handleToggleGoogleIndex}
+                title={isGoogleIndexAllowed ? "ایندکس گوگل فعال است (برای تغییر کلیک کنید)" : "ایندکس گوگل غیرفعال است (برای تغییر کلیک کنید)"}
+                className="flex items-center gap-1.5 cursor-pointer group"
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                    isGoogleIndexAllowed ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
+                  }`}
+                />
+                <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">
+                  {isGoogleIndexAllowed ? "آنلاین" : "مخفی از گوگل"}
+                </span>
+              </button>
               {getRoleBadge(userRole)}
             </div>
             <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
@@ -690,35 +727,40 @@ export default function AdminPage() {
   );
 }
 
-// 📝 کامپوننت ویراستار مقالات سئو
+// 📝 کامپوننت ویراستار مقالات سئو (متصل به دیتابیس Supabase و همگام با وب‌سوکت)
 function AdminBlogManager() {
   const [blogs, setBlogs] = useState<any[]>([]);
   const [editingBlog, setEditingBlog] = useState<any | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<string>("");
   const editorRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadBlogs();
-  }, []);
-
   const loadBlogs = async () => {
     try {
       const res = await fetch("/api/blogs");
       const json = await res.json();
-      if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-        setBlogs(json.data);
-        localStorage.setItem("site_blogs", JSON.stringify(json.data));
-        return;
+      if (json.posts || json.data) {
+        setBlogs(json.posts || json.data || []);
       }
-    } catch {}
-
-    try {
-      const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
-      setBlogs(Array.isArray(localBlogs) ? localBlogs : []);
-    } catch {
-      setBlogs([]);
+    } catch (e) {
+      console.error("Error fetching blogs in admin:", e);
     }
   };
+
+  useEffect(() => {
+    loadBlogs();
+
+    // وب‌سوکت بلادرنگ مقالات
+    const channel = supabase
+      .channel("admin-blogs-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
+        loadBlogs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleCreateNewArticle = () => {
     const newArticle = {
@@ -731,45 +773,15 @@ function AdminBlogManager() {
     setEditingBlog(newArticle);
   };
 
-  useEffect(() => {
-    if (editingBlog && editorRef.current) {
-      const timer = setTimeout(() => {
-        const currentHtml = editorRef.current?.innerHTML || "";
-        const updatedBlog = { ...editingBlog, content: currentHtml };
-
-        try {
-          const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
-          const idx = localBlogs.findIndex((b: any) => b.id === editingBlog.id);
-          let updatedList;
-          if (idx >= 0) {
-            updatedList = localBlogs.map((b: any) => (b.id === editingBlog.id ? updatedBlog : b));
-          } else {
-            updatedList = [updatedBlog, ...localBlogs];
-          }
-          localStorage.setItem("site_blogs", JSON.stringify(updatedList));
-          setBlogs(updatedList);
-          setAutoSaveStatus("⚡ پیش‌نویس خودکار ذخیره شد");
-          setTimeout(() => setAutoSaveStatus(""), 2000);
-        } catch {}
-      }, 2000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [editingBlog]);
-
-  const toggleVisibility = (id: string) => {
-    const updated = blogs.map((b) =>
-      b.id === id ? { ...b, isVisible: b.isVisible === false ? true : false } : b
-    );
-    localStorage.setItem("site_blogs", JSON.stringify(updated));
-    setBlogs(updated);
+  const toggleVisibility = async (id: string, currentStatus: boolean) => {
+    await supabase.from("posts").update({ is_published: !currentStatus }).eq("id", id);
+    loadBlogs();
   };
 
-  const deleteBlog = (id: string) => {
+  const deleteBlog = async (id: string) => {
     if (confirm("آیا از حذف این مقاله اطمینان دارید؟")) {
-      const updated = blogs.filter((b) => b.id !== id);
-      localStorage.setItem("site_blogs", JSON.stringify(updated));
-      setBlogs(updated);
+      await supabase.from("posts").delete().eq("id", id);
+      loadBlogs();
     }
   };
 
@@ -820,24 +832,12 @@ function AdminBlogManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(finalBlog),
       });
-    } catch {}
-
-    try {
-      const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
-      const idx = localBlogs.findIndex((b: any) => b.id === finalBlog.id);
-      let updated;
-      if (idx >= 0) {
-        updated = localBlogs.map((b: any) => (b.id === finalBlog.id ? finalBlog : b));
-      } else {
-        updated = [finalBlog, ...localBlogs];
-      }
-
-      localStorage.setItem("site_blogs", JSON.stringify(updated));
-      setBlogs(updated);
-    } catch {}
-
-    setEditingBlog(null);
-    alert("🎉 مقاله با موفقیت ذخیره و منتشر شد!");
+      loadBlogs();
+      setEditingBlog(null);
+      alert("🎉 مقاله با موفقیت در دیتابیس ذخیره و منتشر شد!");
+    } catch {
+      alert("خطا در ذخیره‌سازی مقاله.");
+    }
   };
 
   return (
@@ -845,7 +845,7 @@ function AdminBlogManager() {
       <div className="flex flex-wrap justify-between items-center gap-3 border-b border-[var(--card-border)] pb-4">
         <div>
           <h3 className="text-base font-black text-blue-500">📚 مدیریت و نگارش مقالات سئو</h3>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ویرایشگر متنی با امکانات فرمت‌بندی، جداول و ذخیره خودکار</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ویرایشگر متنی با امکانات فرمت‌بندی، جداول و ذخیره ابری بلادرنگ</p>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -879,10 +879,10 @@ function AdminBlogManager() {
                   <span>📅 {blog.createdAt || "امروز"}</span>
                   <span
                     className={`px-2 py-0.5 rounded font-bold ${
-                      blog.isVisible !== false ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"
+                      blog.isPublished !== false && blog.isVisible !== false ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"
                     }`}
                   >
-                    {blog.isVisible !== false ? "نمایش در سایت" : "مخفی شده"}
+                    {blog.isPublished !== false && blog.isVisible !== false ? "نمایش در سایت" : "مخفی شده"}
                   </span>
                 </div>
                 <h4 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-1">{blog.title || "مقاله بدون عنوان"}</h4>
@@ -897,14 +897,14 @@ function AdminBlogManager() {
                 </button>
 
                 <button
-                  onClick={() => toggleVisibility(blog.id)}
+                  onClick={() => toggleVisibility(blog.id, blog.isPublished !== false && blog.isVisible !== false)}
                   className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer text-[11px] ${
-                    blog.isVisible !== false
+                    blog.isPublished !== false && blog.isVisible !== false
                       ? "bg-blue-500/15 text-blue-500 border border-blue-500/30 hover:bg-blue-600 hover:text-white"
                       : "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
                   }`}
                 >
-                  {blog.isVisible !== false ? "👁️ مخفی‌سازی" : "✅ نمایش"}
+                  {blog.isPublished !== false && blog.isVisible !== false ? "👁️ مخفی‌سازی" : "✅ نمایش"}
                 </button>
 
                 <button
@@ -1021,7 +1021,7 @@ function AdminBlogManager() {
   );
 }
 
-// 🤖 دستیار هوشمند سئو و بازارسنجی
+// 🤖 دستیار هوشمند سئو و بازارسنجی با پایش زنده محصولات و تولید مقاله
 function AdminAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectorModalOpen, setSelectorModalOpen] = useState(false);
@@ -1051,17 +1051,17 @@ function AdminAIAssistant() {
 
   useEffect(() => {
     async function initAssistant() {
-      if (typeof window !== "undefined") {
-        try {
-          const prods = (await productService.getAll()) || [];
-          const validProds = Array.isArray(prods) ? prods : [];
-          setProductsList(validProds);
+      try {
+        const prods = (await productService.getAll()) || [];
+        const validProds = Array.isArray(prods) ? prods : [];
+        setProductsList(validProds);
 
-          const cats = Array.from(
-            new Set(validProds.map((p: any) => p.category_id || p.category || p.category_name || "عمومی"))
-          ).filter(Boolean) as string[];
-          setCategories(cats);
-        } catch {}
+        const cats = Array.from(
+          new Set(validProds.map((p: any) => p.category_id || p.category || p.category_name || "عمومی"))
+        ).filter(Boolean) as string[];
+        setCategories(cats);
+      } catch (e) {
+        console.error("AI assistant products load error:", e);
       }
     }
     if (isOpen || selectorModalOpen) {
@@ -1131,8 +1131,8 @@ function AdminAIAssistant() {
       });
 
       const data = await res.json();
-      if (data && data.response) {
-        setMessages((prev) => [...prev, { role: "model", text: data.response }]);
+      if (data && (data.response || data.reply)) {
+        setMessages((prev) => [...prev, { role: "model", text: data.response || data.reply }]);
       }
     } catch {
       setMessages((prev) => [
@@ -1227,17 +1227,7 @@ function AdminAIAssistant() {
 
       const data = await res.json();
       if (data && data.success) {
-        const existingBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
-        const newPostItem = data.post || {
-          id: Date.now().toString(),
-          ...articleToPublish,
-          createdAt: new Date().toLocaleDateString("fa-IR"),
-          isVisible: true,
-        };
-        const updatedBlogs = [newPostItem, ...existingBlogs];
-        localStorage.setItem("site_blogs", JSON.stringify(updatedBlogs));
-
-        alert("🎉 مقاله با موفقیت در بخش مقالات سایت منتشر شد!");
+        alert("🎉 مقاله با موفقیت در بخش مقالات سایت و دیتابیس منتشر شد!");
         setPublishModalOpen(false);
       } else {
         alert("خطا در انتشار مقاله.");

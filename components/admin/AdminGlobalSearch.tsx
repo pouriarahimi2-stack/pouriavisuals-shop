@@ -1,23 +1,29 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { productService, Product } from "@/services/productService";
-import { orderService, Order } from "@/services/orderService";
-import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
-export default function AdminGlobalSearch() {
+interface SearchResult {
+  id: string;
+  type: "product" | "order" | "blog";
+  title: string;
+  subtitle: string;
+  extra?: string;
+}
+
+export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab: string) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [products, setProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [blogs, setBlogs] = useState<any[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setIsOpen((prev) => !prev);
-      } else if (e.key === "Escape") {
+      }
+      if (e.key === "Escape") {
         setIsOpen(false);
       }
     };
@@ -27,176 +33,138 @@ export default function AdminGlobalSearch() {
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      async function loadSearchData() {
-        try {
-          const [prods, ords] = await Promise.all([
-            productService.getAll(),
-            orderService.getAll(),
-          ]);
-          setProducts(prods || []);
-          setOrders(ords || []);
-
-          const localBlogs = JSON.parse(localStorage.getItem("site_blogs") || "[]");
-          setBlogs(localBlogs);
-        } catch (e) {
-          console.error("Global search data load error:", e);
-        }
-      }
-      loadSearchData();
+    if (!query.trim()) {
+      setResults([]);
+      return;
     }
-  }, [isOpen]);
 
-  if (!isOpen) return null;
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      const q = query.trim().toLowerCase();
 
-  const cleanQuery = query.trim().toLowerCase();
+      try {
+        const [prodsRes, ordersRes, postsRes] = await Promise.all([
+          supabase.from("products").select("id, title, name, price, category").limit(5),
+          supabase.from("orders").select("id, first_name, last_name, phone, total_amount").limit(5),
+          supabase.from("posts").select("id, title, category").limit(5),
+        ]);
 
-  const matchedProducts = cleanQuery
-    ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(cleanQuery) ||
-          (p.category || "").toLowerCase().includes(cleanQuery)
-      )
-    : [];
+        const combined: SearchResult[] = [];
 
-  const matchedOrders = cleanQuery
-    ? orders.filter(
-        (o) =>
-          o.id.toLowerCase().includes(cleanQuery) ||
-          o.customerName.toLowerCase().includes(cleanQuery) ||
-          o.phone.includes(cleanQuery) ||
-          (o.trackingCode && o.trackingCode.includes(cleanQuery))
-      )
-    : [];
+        // فیلتر محصولات
+        (prodsRes.data || [])
+          .filter((p: any) => (p.title || p.name || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q))
+          .forEach((p: any) => {
+            combined.push({
+              id: p.id,
+              type: "product",
+              title: p.title || p.name,
+              subtitle: `کالا | دسته: ${p.category || "عمومی"}`,
+              extra: `${Number(p.price || 0).toLocaleString("fa-IR")} تومان`,
+            });
+          });
 
-  const matchedBlogs = cleanQuery
-    ? blogs.filter(
-        (b) =>
-          (b.title || "").toLowerCase().includes(cleanQuery) ||
-          (b.content || "").toLowerCase().includes(cleanQuery)
-      )
-    : [];
+        // فیلتر سفارش‌ها
+        (ordersRes.data || [])
+          .filter((o: any) => (o.phone || "").includes(q) || `${o.first_name || ""} ${o.last_name || ""}`.toLowerCase().includes(q))
+          .forEach((o: any) => {
+            combined.push({
+              id: o.id,
+              type: "order",
+              title: `سفارش: ${o.first_name || ""} ${o.last_name || ""}`.trim() || o.phone,
+              subtitle: `فاکتور مشتری | تلفن: ${o.phone}`,
+              extra: `${Number(o.total_amount || 0).toLocaleString("fa-IR")} تومان`,
+            });
+          });
 
-  const totalResults = matchedProducts.length + matchedOrders.length + matchedBlogs.length;
+        // فیلتر مقالات
+        (postsRes.data || [])
+          .filter((post: any) => (post.title || "").toLowerCase().includes(q) || (post.category || "").toLowerCase().includes(q))
+          .forEach((post: any) => {
+            combined.push({
+              id: post.id,
+              type: "blog",
+              title: post.title,
+              subtitle: `مقاله سئو | موضوع: ${post.category || "مجله"}`,
+            });
+          });
+
+        setResults(combined);
+      } catch (err) {
+        console.error("Global search error:", err);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const handleNavigate = (type: SearchResult["type"]) => {
+    setIsOpen(false);
+    if (!onSelectTab) return;
+    if (type === "product") onSelectTab("products");
+    if (type === "order") onSelectTab("orders");
+    if (type === "blog") onSelectTab("blogs");
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans select-none" dir="rtl">
-      <div className="w-full max-w-2xl rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-        
-        {/* اینپوت جستجو */}
-        <div className="p-4 border-b border-[var(--card-border)] flex items-center gap-3">
-          <span className="text-lg">🔍</span>
-          <input
-            type="text"
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="جستجو در نام کالاها، شماره سفارش‌ها، مشتریان و مقالات وبلاگ..."
-            className="flex-1 bg-transparent text-xs font-bold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
-          />
-          <span className="px-2 py-1 rounded-lg bg-[var(--input-bg)] text-[10px] font-mono font-bold text-[var(--text-secondary)] border border-[var(--card-border)]">
-            ESC
-          </span>
-        </div>
-
-        {/* لیست نتایج */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
-          {!cleanQuery ? (
-            <div className="py-12 text-center text-[var(--text-secondary)] space-y-1 font-medium">
-              <p className="font-bold">جستجوی بلادرنگ در سراسر فروشگاه</p>
-              <p className="text-[11px]">عبارت مورد نظر خود را تایپ نمایید.</p>
+    <>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/75 backdrop-blur-md animate-fadeIn" dir="rtl">
+          <div className="w-full max-w-xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden font-sans text-[var(--text-primary)]">
+            <div className="p-4 border-b border-[var(--card-border)] flex items-center gap-3 bg-[var(--input-bg)]">
+              <span className="text-base">🔍</span>
+              <input
+                type="text"
+                autoFocus
+                placeholder="جستجو میان محصولات، فاکتورهای سفارش، شماره تماس و مقالات..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
+              />
+              <span className="text-[10px] font-mono bg-black/10 dark:bg-white/10 px-2 py-1 rounded-lg text-[var(--text-muted)] font-bold">
+                ESC
+              </span>
             </div>
-          ) : totalResults === 0 ? (
-            <div className="py-12 text-center text-[var(--text-secondary)] font-bold">
-              موردی مطابق با جستجوی شما یافت نشد.
+
+            <div className="p-3 max-h-80 overflow-y-auto space-y-1.5 text-xs">
+              {searching ? (
+                <div className="text-center py-6 text-[var(--text-muted)] font-bold animate-pulse">
+                  در حال جستجوی بلادرنگ در دیتابیس...
+                </div>
+              ) : results.length === 0 ? (
+                <div className="text-center py-6 text-[var(--text-muted)] font-medium">
+                  {query ? "هیچ نتیجه‌ای یافت نشد." : "عبارت مورد نظر را تایپ کنید (مثلاً نام کالا یا شماره موبایل)"}
+                </div>
+              ) : (
+                results.map((item) => (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    onClick={() => handleNavigate(item.type)}
+                    className="p-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-transparent transition cursor-pointer flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="p-2 rounded-xl bg-black/5 dark:bg-white/5 text-sm">
+                        {item.type === "product" ? "📦" : item.type === "order" ? "📄" : "📚"}
+                      </span>
+                      <div>
+                        <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{item.title}</h4>
+                        <span className="text-[10px] text-[var(--text-secondary)]">{item.subtitle}</span>
+                      </div>
+                    </div>
+                    {item.extra && (
+                      <span className="font-mono font-bold text-[11px] text-emerald-600 dark:text-emerald-400">
+                        {item.extra}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
-          ) : (
-            <>
-              {/* بخش محصولات */}
-              {matchedProducts.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black text-[var(--accent-blue)] block">
-                    📦 محصولات ({matchedProducts.length})
-                  </span>
-                  <div className="space-y-1.5">
-                    {matchedProducts.slice(0, 5).map((p) => (
-                      <div
-                        key={p.id}
-                        className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 hover:border-[var(--accent-blue)] transition"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <img
-                            src={p.images?.[0] || p.image || ""}
-                            alt=""
-                            className="w-8 h-8 rounded-lg object-contain bg-[var(--modal-bg)] p-0.5"
-                          />
-                          <span className="font-bold text-[var(--text-primary)]">{p.name}</span>
-                        </div>
-                        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                          {(p.price || 0).toLocaleString("fa-IR")} تومان
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* بخش سفارش‌ها */}
-              {matchedOrders.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 block">
-                    📑 سفارش‌ها ({matchedOrders.length})
-                  </span>
-                  <div className="space-y-1.5">
-                    {matchedOrders.slice(0, 5).map((o) => (
-                      <div
-                        key={o.id}
-                        className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 hover:border-purple-500 transition"
-                      >
-                        <div>
-                          <span className="font-mono font-black text-[var(--accent-blue)] block">{o.id}</span>
-                          <span className="text-[11px] text-[var(--text-secondary)] font-medium">خریدار: {o.customerName} ({o.phone})</span>
-                        </div>
-                        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                          {(o.totalAmount || 0).toLocaleString("fa-IR")} ت
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* بخش مقالات */}
-              {matchedBlogs.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black text-amber-500 block">
-                    📚 مقالات وبلاگ ({matchedBlogs.length})
-                  </span>
-                  <div className="space-y-1.5">
-                    {matchedBlogs.slice(0, 4).map((b) => (
-                      <Link
-                        key={b.id}
-                        href={`/blog/${b.id}`}
-                        onClick={() => setIsOpen(false)}
-                        className="block p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-amber-500 transition"
-                      >
-                        <h5 className="font-bold text-[var(--text-primary)]">{b.title || "مقاله بدون عنوان"}</h5>
-                        <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-mono">📅 {b.createdAt || "امروز"}</p>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          </div>
         </div>
-
-        {/* فوتر مودال */}
-        <div className="p-3 border-t border-[var(--card-border)] bg-[var(--input-bg)] flex justify-between items-center text-[10px] text-[var(--text-secondary)] font-bold">
-          <span>تعداد نتایج: {totalResults}</span>
-          <span>میانبر دسترسی سریع: Ctrl + K</span>
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

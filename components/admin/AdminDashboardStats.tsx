@@ -1,145 +1,114 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { productService } from "@/services/productService";
-import { orderService } from "@/services/orderService";
-
-interface DashboardStatsData {
-  totalProducts: number;
-  lowStockProducts: number;
-  totalOrders: number;
-  pendingOrders: number;
-  totalRevenue: number;
-  totalBlogs: number;
-}
+import { supabase } from "@/lib/supabase";
 
 export default function AdminDashboardStats() {
-  const [stats, setStats] = useState<DashboardStatsData>({
+  const [stats, setStats] = useState({
     totalProducts: 0,
-    lowStockProducts: 0,
-    totalOrders: 0,
-    pendingOrders: 0,
-    totalRevenue: 0,
-    totalBlogs: 0,
+    activeOrders: 0,
+    lowStockCount: 0,
+    totalSales: 0,
+    unreadMessages: 0,
+    totalPosts: 0,
   });
 
-  const [loading, setLoading] = useState(true);
-
-  const calculateStats = async () => {
+  const loadStats = async () => {
     try {
-      const [products, orders] = await Promise.all([
-        productService.getAll(),
-        orderService.getAll(),
+      const [prodsRes, ordersRes, msgsRes, postsRes] = await Promise.all([
+        supabase.from("products").select("id, price, discount_price, stock"),
+        supabase.from("orders").select("id, total_amount, status"),
+        supabase.from("contact_messages").select("id, is_read"),
+        supabase.from("posts").select("id"),
       ]);
 
-      const lowStock = products.filter((p) => (p.stock ?? 0) <= 3).length;
-      const pending = orders.filter((o) => o.status === "pending" || o.status === "processing").length;
-      const revenue = orders
-        .filter((o) => o.status !== "cancelled")
-        .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+      const prods = prodsRes.data || [];
+      const orders = ordersRes.data || [];
+      const msgs = msgsRes.data || [];
+      const posts = postsRes.data || [];
 
-      const localBlogs = typeof window !== "undefined"
-        ? JSON.parse(localStorage.getItem("site_blogs") || "[]")
-        : [];
+      const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+      const lowStock = prods.filter((p) => (p.stock || 0) < 3).length;
+      const unreadMsgs = msgs.filter((m) => !m.is_read).length;
 
       setStats({
-        totalProducts: products.length,
-        lowStockProducts: lowStock,
-        totalOrders: orders.length,
-        pendingOrders: pending,
-        totalRevenue: revenue,
-        totalBlogs: localBlogs.length,
+        totalProducts: prods.length,
+        activeOrders: orders.length,
+        lowStockCount: lowStock,
+        totalSales: totalRevenue,
+        unreadMessages: unreadMsgs,
+        totalPosts: posts.length,
       });
     } catch (e) {
-      console.error("Dashboard stats calculation error:", e);
-    } finally {
-      setLoading(false);
+      console.error("Error loading realtime dashboard stats:", e);
     }
   };
 
   useEffect(() => {
-    calculateStats();
+    loadStats();
 
-    const handleSync = () => calculateStats();
-
-    window.addEventListener("products_updated", handleSync);
-    window.addEventListener("orders_updated", handleSync);
-    window.addEventListener("coupons_updated", handleSync);
+    // اتصال وب‌سوکت زنده برای به‌روزرسانی کارت‌ها بدون رفرش
+    const channel = supabase
+      .channel("dashboard-stats-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadStats())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => loadStats())
+      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => loadStats())
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadStats())
+      .subscribe();
 
     return () => {
-      window.removeEventListener("products_updated", handleSync);
-      window.removeEventListener("orders_updated", handleSync);
-      window.removeEventListener("coupons_updated", handleSync);
+      supabase.removeChannel(channel);
     };
   }, []);
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
-      {/* کارت ۱: محصولات فعال */}
-      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col justify-between space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-[var(--text-secondary)] font-bold">کاتالوگ کالاها</span>
-          <span className="w-8 h-8 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] flex items-center justify-center text-sm">
-            📦
-          </span>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 font-sans select-none text-xs">
+      {/* ۱. کارت کاتالوگ محصولات */}
+      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group">
+        <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
+          <span>کاتالوگ کالاها</span>
+          <span className="p-2 rounded-xl bg-blue-500/10 text-blue-500 text-sm">📦</span>
         </div>
-        <div>
-          <h3 className="font-mono font-black text-xl text-[var(--accent-blue)]">
-            {loading ? "..." : `${stats.totalProducts} قلم`}
-          </h3>
-          <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">محصولات ثبت‌شده در ویترین</p>
+        <div className="text-2xl font-black font-mono text-blue-500">
+          {stats.totalProducts} <span className="text-xs font-bold text-[var(--text-secondary)]">قلم</span>
         </div>
+        <span className="text-[10px] text-[var(--text-muted)] font-medium block">کالاهای ثبت‌شده در ویترین اصلی</span>
       </div>
 
-      {/* کارت ۲: سفارش‌ها و فاکتورها */}
-      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col justify-between space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-[var(--text-secondary)] font-bold">فاکتورها و سفارش‌ها</span>
-          <span className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center text-sm">
-            📑
-          </span>
+      {/* ۲. کارت سفارشات و فاکتورها */}
+      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group">
+        <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
+          <span>فاکتورها و سفارش‌ها</span>
+          <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500 text-sm">📄</span>
         </div>
-        <div>
-          <h3 className="font-mono font-black text-xl text-purple-600 dark:text-purple-400">
-            {loading ? "..." : `${stats.totalOrders} عدد`}
-          </h3>
-          <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">
-            {stats.pendingOrders} فاکتور نیازمند ارسال
-          </p>
+        <div className="text-2xl font-black font-mono text-indigo-500">
+          {stats.activeOrders} <span className="text-xs font-bold text-[var(--text-secondary)]">عدد</span>
         </div>
+        <span className="text-[10px] text-[var(--text-muted)] font-medium block">کل سفارشات ثبت‌شده مشتریان</span>
       </div>
 
-      {/* کارت ۳: هشدار انبارداری */}
-      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col justify-between space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-[var(--text-secondary)] font-bold">موجودی بحرانی انبار</span>
-          <span className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-sm">
-            ⚠️
-          </span>
+      {/* ۳. کارت موجودی بحرانی انبار */}
+      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group">
+        <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
+          <span>موجودی بحرانی انبار</span>
+          <span className="p-2 rounded-xl bg-amber-500/10 text-amber-500 text-sm">⚠️</span>
         </div>
-        <div>
-          <h3 className="font-mono font-black text-xl text-amber-500">
-            {loading ? "..." : `${stats.lowStockProducts} کالا`}
-          </h3>
-          <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">تیراژ کمتر از ۳ عدد</p>
+        <div className="text-2xl font-black font-mono text-amber-500">
+          {stats.lowStockCount} <span className="text-xs font-bold text-[var(--text-secondary)]">کالا</span>
         </div>
+        <span className="text-[10px] text-[var(--text-muted)] font-medium block">تیراژ کمتر از ۳ عدد موجود در انبار</span>
       </div>
 
-      {/* کارت ۴: گردش مالی فروشگاه */}
-      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col justify-between space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-[var(--text-secondary)] font-bold">مجموع تراکنش‌های موفق</span>
-          <span className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm">
-            💰
-          </span>
+      {/* ۴. کارت مجموع فروش و تراکنش‌ها */}
+      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group">
+        <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
+          <span>مجموع تراکنش‌های موفق</span>
+          <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 text-sm">💳</span>
         </div>
-        <div>
-          <h3 className="font-mono font-black text-lg text-emerald-600 dark:text-emerald-400 truncate">
-            {loading ? "..." : `${stats.totalRevenue.toLocaleString("fa-IR")} ت`}
-          </h3>
-          <p className="text-[10px] text-[var(--text-secondary)] font-medium mt-0.5">فروش خالص تسویه‌شده</p>
+        <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400 truncate">
+          {stats.totalSales.toLocaleString("fa-IR")} <span className="text-xs font-bold">ت</span>
         </div>
+        <span className="text-[10px] text-[var(--text-muted)] font-medium block">فروش خالص تسویه‌شده</span>
       </div>
     </div>
   );

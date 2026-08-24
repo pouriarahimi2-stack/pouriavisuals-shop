@@ -6,15 +6,16 @@ const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
   "";
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase environment variables are missing!");
-}
-
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: typeof window !== "undefined",
     autoRefreshToken: true,
     detectSessionInUrl: true,
+  },
+  realtime: {
+    params: {
+      apikey: supabaseAnonKey,
+    },
   },
   global: {
     headers: {

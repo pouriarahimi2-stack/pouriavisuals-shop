@@ -28,7 +28,7 @@ export default function Footer() {
     window.addEventListener('site_info_updated', handleUpdate);
 
     const footerChannel = supabase
-      .channel('footer-realtime')
+      .channel('footer-realtime-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'site_info' }, () => {
         fetchFooterData();
       })
@@ -47,7 +47,6 @@ export default function Footer() {
   const address = info?.address || 'تهران، خیابان ولیعصر';
   const description = info?.footer_text || info?.footerText || info?.description || tagline;
 
-  // استفاده از لوگوی اختصاصی فوتر یا در صورت عدم وجود، استفاده از لوگوی اصلی هدر
   const footerLogo = (info as any)?.footer_logo_url || (info as any)?.footerLogoUrl || info?.logo_url || info?.logoUrl;
 
   return (
@@ -55,7 +54,6 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           
-          {/* ستون ۱: هویت و معرفی با لوگوی اختصاصی بزرگ فوتر */}
           <div className="space-y-4 md:col-span-1">
             <div className="flex items-center gap-3.5">
               {footerLogo ? (
@@ -76,7 +74,6 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* ستون ۲: دسترسی سریع */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">دسترسی سریع</h5>
             <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
@@ -87,7 +84,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون ۳: اطلاعات ارتباطی */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">اطلاعات ارتباطی</h5>
             <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
@@ -112,7 +108,6 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* ستون ۴: ضمانت */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">ضمانت و پشتیبانی</h5>
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 text-xs shadow-inner">

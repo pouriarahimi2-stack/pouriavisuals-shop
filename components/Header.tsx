@@ -382,14 +382,16 @@ export default function Header() {
     <header className="sticky top-3 z-40 max-w-7xl mx-auto px-4 select-none font-sans text-[var(--text-primary)]" dir="rtl">
       <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-6 py-3.5 flex items-center justify-between gap-4 rounded-3xl shadow-xl border border-[var(--card-border)] relative">
         
-        {/* راست: لوگو بزرگ و عنوان */}
+        {/* راست: لوگوی بزرگ‌تر که کاملاً کادر را پر می‌کند */}
         <div className="flex items-center gap-4 shrink-0">
-          <Link href="/" className="flex items-center gap-3 group">
-            {currentLogoUrl ? (
-              <img src={currentLogoUrl} alt={currentStoreName} className="w-14 h-14 object-contain rounded-2xl shadow-md border border-[var(--card-border)] bg-white/5 p-1 group-hover:scale-105 transition" />
-            ) : (
-              <span className="w-14 h-14 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center text-xl font-black shadow-md group-hover:scale-105 transition">⚡</span>
-            )}
+          <Link href="/" className="flex items-center gap-3.5 group">
+            <div className="w-16 h-16 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition">
+              {currentLogoUrl ? (
+                <img src={currentLogoUrl} alt={currentStoreName} className="w-full h-full object-contain" />
+              ) : (
+                <span className="text-2xl font-black text-[var(--accent-blue)]">⚡</span>
+              )}
+            </div>
             <div className="flex flex-col text-right">
               <div className="flex items-center gap-2">
                 <span className="text-base font-black text-[var(--text-primary)] leading-tight tracking-tight">
@@ -468,7 +470,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* وسط: منوی ناوبری مدرن بدون شکستگی کلمات */}
+        {/* وسط: منوی ناوبری مدرن */}
         <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {menuItems.length > 0 ? (
             menuItems.map((item) => (
@@ -491,7 +493,7 @@ export default function Header() {
           )}
         </nav>
 
-        {/* چپ: باکس سرچ، تغییر تم و سبد خرید */}
+        {/* چپ: ابزارها */}
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="relative hidden md:block" ref={searchContainerRef}>
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-44 lg:w-52">

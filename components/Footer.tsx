@@ -54,26 +54,27 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           
+          {/* ستون ۱: آیکون فوتر بزرگ و تمام‌کادر بدون متن تکراری عنوان */}
           <div className="space-y-4 md:col-span-1">
-            <div className="flex items-center gap-3.5">
+            <div className="w-full max-w-[200px] h-28 rounded-3xl border border-[var(--card-border)] bg-white/5 p-2 shadow-inner flex items-center justify-center overflow-hidden">
               {footerLogo ? (
                 <img
                   src={footerLogo}
                   alt={siteName}
-                  className="w-16 h-16 object-contain rounded-2xl shadow-md bg-white/5 p-1 border border-[var(--card-border)]"
+                  className="w-full h-full object-contain p-1"
                 />
               ) : (
-                <div className="w-16 h-16 rounded-2xl bg-[var(--accent-blue)] flex items-center justify-center text-white font-black text-xl shadow-md">
-                  ⚡
+                <div className="w-full h-full rounded-2xl bg-[var(--accent-blue)] flex items-center justify-center text-white font-black text-2xl shadow-md">
+                  ⚓
                 </div>
               )}
-              <h4 className="font-black text-lg text-[var(--text-primary)] tracking-tight">{siteName}</h4>
             </div>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
               {description}
             </p>
           </div>
 
+          {/* ستون ۲: دسترسی سریع */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">دسترسی سریع</h5>
             <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
@@ -84,6 +85,7 @@ export default function Footer() {
             </ul>
           </div>
 
+          {/* ستون ۳: اطلاعات ارتباطی */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">اطلاعات ارتباطی</h5>
             <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
@@ -108,6 +110,7 @@ export default function Footer() {
             </div>
           </div>
 
+          {/* ستون ۴: ضمانت */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">ضمانت و پشتیبانی</h5>
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 text-xs shadow-inner">

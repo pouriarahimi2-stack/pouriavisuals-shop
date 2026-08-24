@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { MenuItem } from "@/components/AdminMenu";
+import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
   const { totalItems, setIsCartOpen } = useCart();
@@ -13,48 +14,35 @@ export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const info = await siteInfoService.getAll();
-        setSiteInfo(info);
+  const fetchNavbarData = async () => {
+    try {
+      const info = await siteInfoService.getSiteInfo();
+      if (info) setSiteInfo(info);
 
-        const localMenu = localStorage.getItem("site_menu_items");
-        if (localMenu) {
-          setMenuItems(JSON.parse(localMenu));
-        } else {
-          setMenuItems([
-            { id: "1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
-            { id: "2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
-            { id: "3", title: "پیگیری مرسوله پستی", url: "/track-order", order: 3, isActive: true },
-            { id: "4", title: "مجله و مقالات سئو", url: "/blog", order: 4, isActive: true },
-            { id: "5", title: "تماس با پشتیبانی", url: "/contact", order: 5, isActive: true },
-          ]);
-        }
-      } catch (e) {
-        console.error("Navbar load data error:", e);
+      const menus = await menuService.getAll();
+      if (menus) {
+        setMenuItems(menus.filter((m: any) => m.isActive !== false && m.is_active !== false));
       }
+    } catch (e) {
+      console.error("Navbar realtime load error:", e);
     }
-    loadData();
+  };
 
-    const handleMenuSync = (e: any) => {
-      if (e.detail) setMenuItems(e.detail);
-    };
+  useEffect(() => {
+    fetchNavbarData();
 
-    const handleSiteSync = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-    };
-
-    window.addEventListener("menu_updated", handleMenuSync);
-    window.addEventListener("site_info_updated", handleSiteSync);
+    const navbarChannel = supabase
+      .channel("navbar-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchNavbarData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchNavbarData())
+      .subscribe();
 
     const savedTheme = localStorage.getItem("theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     setIsDarkMode(savedTheme === "dark" || (!savedTheme && prefersDark));
 
     return () => {
-      window.removeEventListener("menu_updated", handleMenuSync);
-      window.removeEventListener("site_info_updated", handleSiteSync);
+      supabase.removeChannel(navbarChannel);
     };
   }, []);
 
@@ -70,50 +58,57 @@ export default function Navbar() {
     }
   };
 
-  const activeLinks = menuItems.filter((m) => m.isActive !== false);
+  const activeLinks = menuItems.length > 0 ? menuItems : [
+    { id: "1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
+    { id: "2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
+    { id: "3", title: "پیگیری مرسوله", url: "/track-order", order: 3, isActive: true },
+    { id: "4", title: "مجله و مقالات", url: "/blog", order: 4, isActive: true },
+    { id: "5", title: "تماس با ما", url: "/contact", order: 5, isActive: true },
+  ];
+
   const logoSrc = siteInfo?.logo_url || (siteInfo as any)?.logoUrl;
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "پوریا ویژوالز";
-  const tagline = siteInfo?.tagline || "مرجع تخصصی مانیتور و تجهیزات بصری";
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
+  const tagline = siteInfo?.tagline || "تجهیزات تخصصی دیجیتال";
 
   return (
-    <nav className="sticky top-0 z-40 bg-[var(--modal-bg)]/90 backdrop-blur-2xl border-b border-[var(--card-border)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300 shadow-sm" dir="rtl">
+    <nav className="sticky top-0 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border-b border-[var(--card-border)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300 shadow-md" dir="rtl">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
         
-        {/* لوگو بزرگ‌تر و نام فروشگاه */}
+        {/* راست: لوگوی بزرگ و واضح + نام فروشگاه */}
         <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-3 group">
+          <Link href="/" className="flex items-center gap-3.5 group">
             {logoSrc ? (
-              <img src={logoSrc} alt="Logo" className="w-14 h-14 object-contain rounded-2xl shadow-md group-hover:scale-105 transition duration-300" />
+              <img src={logoSrc} alt="Logo" className="w-16 h-16 object-contain rounded-2xl shadow-lg bg-white/5 p-1 border border-[var(--card-border)] group-hover:scale-105 transition duration-300" />
             ) : (
-              <div className="w-14 h-14 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black text-xl shadow-lg group-hover:scale-105 transition duration-300">
+              <div className="w-16 h-16 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black text-2xl shadow-lg group-hover:scale-105 transition duration-300">
                 ⚡
               </div>
             )}
             <div>
-              <h1 className="font-black text-base md:text-lg leading-tight tracking-tight">
+              <h1 className="font-black text-base md:text-lg leading-tight tracking-tight text-[var(--text-primary)]">
                 {storeName}
               </h1>
-              <span className="text-[11px] text-[var(--text-secondary)] font-semibold block mt-0.5">
+              <span className="text-[11px] text-[var(--accent-blue)] font-bold block mt-0.5">
                 {tagline}
               </span>
             </div>
           </Link>
         </div>
 
-        {/* منوی پیوندهای دسکتاپ (کاملاً مرتب و استایل‌بندی شده) */}
-        <div className="hidden md:flex items-center gap-2 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
-          {activeLinks.map((item) => (
+        {/* وسط: منوی دسکتاپ مدرن و مرتب */}
+        <div className="hidden lg:flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
+          {activeLinks.map((item: any) => (
             <Link
               key={item.id}
-              href={item.url}
-              className="px-4 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition-all duration-300"
+              href={item.url || item.href}
+              className="px-4 py-2 rounded-xl text-xs font-extrabold text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition-all duration-300"
             >
               {item.title}
             </Link>
           ))}
         </div>
 
-        {/* دکمه‌های تم، سبد خرید و منوی موبایل */}
+        {/* چپ: دکمه تم و سبد خرید */}
         <div className="flex items-center gap-3">
           <button
             onClick={toggleTheme}
@@ -125,7 +120,7 @@ export default function Navbar() {
 
           <button
             onClick={() => setIsCartOpen(true)}
-            className="relative px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg flex items-center gap-2.5 cursor-pointer active:scale-95"
+            className="relative px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-95 transition shadow-lg flex items-center gap-2.5 cursor-pointer active:scale-95"
           >
             <span className="text-base">🛒</span>
             <span className="hidden sm:inline">سبد خرید</span>
@@ -136,25 +131,24 @@ export default function Navbar() {
             )}
           </button>
 
-          {/* دکمه منوی موبایل */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-sm cursor-pointer"
+            className="lg:hidden p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-sm cursor-pointer"
           >
             {isMobileMenuOpen ? "✕" : "☰"}
           </button>
         </div>
       </div>
 
-      {/* منوی کشویی موبایل */}
+      {/* منوی موبایل */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-[var(--card-border)] p-4 bg-[var(--modal-bg)] space-y-2 animate-fadeIn">
-          {activeLinks.map((item) => (
+        <div className="lg:hidden border-t border-[var(--card-border)] p-4 bg-[var(--modal-bg)] space-y-2 animate-fadeIn">
+          {activeLinks.map((item: any) => (
             <Link
               key={item.id}
-              href={item.url}
+              href={item.url || item.href}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="block p-3.5 rounded-2xl bg-[var(--input-bg)] font-black text-xs text-[var(--text-primary)] hover:border-[var(--accent-blue)] border border-transparent transition"
+              className="block p-3 rounded-2xl bg-[var(--input-bg)] font-black text-xs text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition"
             >
               {item.title}
             </Link>

@@ -612,8 +612,8 @@ function ProductDetailsModal({
   onAddToCart,
 }: {
   product: Product;
-  onAddToCart: (item: any) => void;
   onClose: () => void;
+  onAddToCart: (item: any) => void;
 }) {
   const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
   const [activeImage, setActiveImage] = useState(images[0]);

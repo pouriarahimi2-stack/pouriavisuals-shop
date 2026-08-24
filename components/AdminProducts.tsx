@@ -2,501 +2,436 @@
 
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
+import { categoryService, Category } from "@/services/categoryService";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [selectedCat, setSelectedCat] = useState("all");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // استیت‌های فرم ایجاد/ویرایش کالا
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState<number>(0);
-  const [originalPrice, setOriginalPrice] = useState<number>(0);
-  const [category, setCategory] = useState("مانیتور");
-  const [stock, setStock] = useState<number>(10);
+  const [title, setTitle] = useState("");
+  const [titleFa, setTitleFa] = useState("");
+  const [category, setCategory] = useState("کالای دیجیتال");
+  const [price, setPrice] = useState<number | "">("");
+  const [discountPrice, setDiscountPrice] = useState<number | "">("");
+  const [stock, setStock] = useState<number | "">(10);
   const [description, setDescription] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
-  const [newGalleryInput, setNewGalleryInput] = useState("");
-  const [isSpecialOffer, setIsSpecialOffer] = useState(false);
+  const [warranty, setWarranty] = useState("۱۸ ماه گارانتی معتبر شرکتی");
+  const [imageUrls, setImageUrls] = useState<string[]>([""]);
+  const [specs, setSpecs] = useState<Array<{ key: string; value: string }>>([
+    { key: "رزولوشن", value: "" },
+    { key: "پنل", value: "" },
+  ]);
   const [isAvailable, setIsAvailable] = useState(true);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const data = await productService.getAll();
-      setProducts(data || []);
-    } catch (err) {
-      console.error("Error loading products:", err);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
+  const loadData = async () => {
+    const [prods, cats] = await Promise.all([
+      productService.getAll(),
+      categoryService.getAll(),
+    ]);
+    setProducts(prods);
+    setCategories(cats);
   };
 
   useEffect(() => {
-    loadProducts();
+    loadData();
 
-    const handleUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) {
-        setProducts(e.detail);
-      } else {
-        loadProducts();
-      }
+    // همگام‌سازی بلادرنگ محصولات با وب‌سوکت
+    const channel = supabase
+      .channel("admin-products-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        loadData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
-    window.addEventListener("products_updated", handleUpdate);
-    return () => window.removeEventListener("products_updated", handleUpdate);
   }, []);
 
-  const handleOpenCreateModal = () => {
-    setEditingProduct(null);
-    setName("");
-    setPrice(0);
-    setOriginalPrice(0);
-    setCategory("مانیتور");
+  const handleSelectProduct = (p: Product) => {
+    setSelectedProduct(p);
+    setTitle(p.title || p.name || "");
+    setTitleFa(p.title_fa || "");
+    setCategory(p.category || "کالای دیجیتال");
+    setPrice(p.price || "");
+    setDiscountPrice(p.discountPrice || p.discount_price || "");
+    setStock(p.stock !== undefined ? p.stock : 10);
+    setDescription(p.description || "");
+    setWarranty(p.warranty || "۱۸ ماه گارانتی معتبر شرکتی");
+    setImageUrls(p.images && p.images.length > 0 ? p.images : [p.image || ""]);
+    
+    if (p.specs && typeof p.specs === "object") {
+      const parsed = Object.entries(p.specs).map(([key, value]) => ({ key, value: String(value) }));
+      setSpecs(parsed.length > 0 ? parsed : [{ key: "", value: "" }]);
+    } else {
+      setSpecs([{ key: "", value: "" }]);
+    }
+    setIsAvailable(p.isAvailable !== false && p.is_available !== false);
+  };
+
+  const handleCreateNew = () => {
+    setSelectedProduct(null);
+    setTitle("");
+    setTitleFa("");
+    setCategory(categories[0]?.name || "کالای دیجیتال");
+    setPrice("");
+    setDiscountPrice("");
     setStock(10);
     setDescription("");
-    setImageUrl("");
-    setGalleryUrls([]);
-    setIsSpecialOffer(false);
+    setWarranty("۱۸ ماه گارانتی معتبر شرکتی");
+    setImageUrls([""]);
+    setSpecs([
+      { key: "رزولوشن", value: "" },
+      { key: "نوع پنل", value: "" },
+    ]);
     setIsAvailable(true);
-    setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (p: Product) => {
-    setEditingProduct(p);
-    setName(p.name || p.title || "");
-    setPrice(p.price || 0);
-    setOriginalPrice(p.originalPrice || p.discountPrice || p.price || 0);
-    setCategory(p.category || "عمومی");
-    setStock(p.stock ?? 10);
-    setDescription(p.description || "");
-    setImageUrl(p.images?.[0] || p.image || p.image_url || "");
-    setGalleryUrls(p.images && p.images.length > 0 ? p.images : (p.image ? [p.image] : []));
-    setIsSpecialOffer(Boolean((p as any).isSpecialOffer || p.isFeatured));
-    setIsAvailable(p.is_available !== undefined ? p.is_available : (p.isAvailable ?? true));
-    setIsModalOpen(true);
+  const addImageField = () => setImageUrls([...imageUrls, ""]);
+  const updateImageUrl = (index: number, val: string) => {
+    const updated = [...imageUrls];
+    updated[index] = val;
+    setImageUrls(updated);
+  };
+  const removeImageField = (index: number) => {
+    setImageUrls(imageUrls.filter((_, i) => i !== index));
   };
 
-  const handleAddGalleryImage = () => {
-    if (!newGalleryInput.trim()) return;
-    setGalleryUrls([...galleryUrls, newGalleryInput.trim()]);
-    setNewGalleryInput("");
+  const addSpecField = () => setSpecs([...specs, { key: "", value: "" }]);
+  const updateSpecField = (index: number, field: "key" | "value", val: string) => {
+    const updated = [...specs];
+    updated[index][field] = val;
+    setSpecs(updated);
+  };
+  const removeSpecField = (index: number) => {
+    setSpecs(specs.filter((_, i) => i !== index));
   };
 
-  const handleRemoveGalleryImage = (idx: number) => {
-    setGalleryUrls(galleryUrls.filter((_, i) => i !== idx));
-  };
-
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || price <= 0) return;
+    if (!title.trim() || price === "") {
+      setStatusMessage({ type: "error", text: "نام محصول و قیمت الزامی هستند." });
+      return;
+    }
 
     setSaving(true);
-    try {
-      const finalImages = galleryUrls.length > 0 ? galleryUrls : imageUrl ? [imageUrl.trim()] : [];
-      const primaryImage = imageUrl.trim() || finalImages[0] || "";
-
-      const productPayload: Partial<Product> = {
-        name: name.trim(),
-        title: name.trim(),
-        price: Number(price),
-        originalPrice: originalPrice > price ? Number(originalPrice) : undefined,
-        category: category.trim(),
-        stock: Number(stock),
-        description: description.trim(),
-        image: primaryImage,
-        image_url: primaryImage,
-        images: finalImages,
-        isFeatured: isSpecialOffer,
-        isAvailable: isAvailable && stock > 0,
-        is_available: isAvailable && stock > 0,
-      };
-
-      if (editingProduct) {
-        const updated = await productService.update(editingProduct.id, productPayload);
-        if (updated) {
-          showToast(`محصول «${name}» با موفقیت ویرایش شد.`);
-          setIsModalOpen(false);
-          await loadProducts();
-        } else {
-          showToast("خطا در ویرایش محصول.");
-        }
-      } else {
-        const created = await productService.create(productPayload);
-        if (created) {
-          showToast(`محصول جدید «${name}» در فروشگاه و دیتابیس ثبت گردید.`);
-          setIsModalOpen(false);
-          await loadProducts();
-        } else {
-          showToast("خطا در ثبت محصول جدید.");
-        }
+    const specsObject = specs.reduce((acc, curr) => {
+      if (curr.key.trim() && curr.value.trim()) {
+        acc[curr.key.trim()] = curr.value.trim();
       }
-    } catch (err) {
-      console.error("Product submit error:", err);
-      showToast("خطای سیستمی در برقراری ارتباط با دیتابیس.");
-    } finally {
-      setSaving(false);
+      return acc;
+    }, {} as Record<string, string>);
+
+    const validImages = imageUrls.map((i) => i.trim()).filter(Boolean);
+
+    const payload: Partial<Product> = {
+      id: selectedProduct?.id,
+      title: title.trim(),
+      name: title.trim(),
+      title_fa: titleFa.trim() || undefined,
+      category,
+      price: Number(price),
+      discountPrice: discountPrice ? Number(discountPrice) : undefined,
+      stock: stock !== "" ? Number(stock) : 10,
+      description,
+      warranty,
+      images: validImages,
+      image: validImages[0] || "",
+      specs: specsObject,
+      isAvailable,
+      is_available: isAvailable,
+    };
+
+    const result = await productService.saveProduct(payload);
+    setSaving(false);
+
+    if (result) {
+      setStatusMessage({ type: "success", text: "⚡ محصول با موفقیت در دیتابیس ثبت و در سایت منتشر شد." });
+      loadData();
+      if (!selectedProduct && result) setSelectedProduct(result);
+    } else {
+      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی محصول." });
     }
+    setTimeout(() => setStatusMessage(null), 3500);
   };
 
-  const handleDelete = async (id: string | number, prodName: string) => {
-    if (confirm(`آیا از حذف محصول «${prodName}» از فروشگاه اطمینان دارید؟`)) {
-      const success = await productService.delete(id);
-      if (success) {
-        showToast("محصول حذف گردید.");
-        await loadProducts();
-      } else {
-        showToast("خطا در حذف محصول.");
-      }
+  const handleDelete = async (id: string) => {
+    if (!confirm("آیا از حذف این محصول اطمینان دارید؟")) return;
+    const ok = await productService.deleteProduct(id);
+    if (ok) {
+      handleCreateNew();
+      loadData();
+      setStatusMessage({ type: "success", text: "محصول با موفقیت حذف گردید." });
+      setTimeout(() => setStatusMessage(null), 3000);
     }
   };
-
-  const categories = Array.from(new Set(products.map((p) => p.category || "عمومی"))).filter(Boolean);
-
-  const filteredProducts = products.filter((p) => {
-    const prodName = p.name || p.title || "";
-    const matchCat = selectedCat === "all" || (p.category || "عمومی") === selectedCat;
-    const matchSearch =
-      prodName.toLowerCase().includes(search.toLowerCase()) ||
-      (p.description || "").toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
-  });
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
-      {toast && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black flex items-center gap-2 shadow-lg animate-fadeIn">
-          <span>✓</span>
-          <span>{toast}</span>
-        </div>
-      )}
-
-      {/* هدر بخش محصولات */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6 font-sans" dir="rtl">
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="font-black text-base flex items-center gap-2 text-[var(--accent-blue)]">
-            <span>📦</span> مدیریت کاتالوگ و محصولات فروشگاه
-          </h3>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تعریف کالای جدید، قیمت‌گذاری، گالری چندتصویره، موجودی انبار و برچسب‌های فروش ویژه
-          </p>
+          <h2 className="text-lg font-black text-[var(--text-primary)]">🛍️ کاتالوگ محصولات و مشخصات فنی</h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">مدیریت قیمت‌ها، تصاویر چندگانه و مشخصات به صورت ابری و وب‌سوکت</p>
         </div>
-
         <button
-          onClick={handleOpenCreateModal}
-          className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center gap-1.5"
+          onClick={handleCreateNew}
+          className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition shadow-md cursor-pointer"
         >
-          <span>➕</span>
-          <span>افزودن محصول جدید</span>
+          + افزودن محصول جدید
         </button>
       </div>
 
-      {/* فیلتر و جستجو */}
-      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none text-xs">
-          <button
-            onClick={() => setSelectedCat("all")}
-            className={`px-4 py-2 rounded-xl font-black transition cursor-pointer ${
-              selectedCat === "all"
-                ? "bg-[var(--accent-blue)] text-white shadow-md"
-                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-            }`}
-          >
-            همه دسته‌ها ({products.length})
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCat(cat)}
-              className={`px-4 py-2 rounded-xl font-black transition cursor-pointer ${
-                selectedCat === cat
-                  ? "bg-[var(--accent-blue)] text-white shadow-md"
-                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+      {statusMessage && (
+        <div
+          className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${
+            statusMessage.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
+          }`}
+        >
+          {statusMessage.text}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* لیست محصولات */}
+        <div className="lg:col-span-1 bg-[var(--modal-bg)] p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-sm h-fit">
+          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
+            📦 لیست محصولات ({products.length})
+          </h3>
+          <div className="space-y-2 max-h-[540px] overflow-y-auto">
+            {products.length === 0 ? (
+              <p className="text-[11px] text-[var(--text-muted)] font-medium text-center py-6">هیچ محصولی ثبت نشده است.</p>
+            ) : (
+              products.map((p) => (
+                <div
+                  key={p.id}
+                  onClick={() => handleSelectProduct(p)}
+                  className={`p-3 rounded-2xl border transition cursor-pointer flex items-center gap-3 ${
+                    selectedProduct?.id === p.id
+                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
+                      : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                  }`}
+                >
+                  <img
+                    src={p.images?.[0] || p.image || "/placeholder.png"}
+                    alt=""
+                    className="w-10 h-10 object-contain rounded-xl bg-white/5 p-1 border border-[var(--card-border)] shrink-0"
+                  />
+                  <div className="overflow-hidden flex-1">
+                    <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
+                    <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        <div className="w-full sm:w-64">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 جستجو در نام و مشخصات کالا..."
-            className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-          />
-        </div>
-      </div>
-
-      {/* جدول نمایش لیست محصولات */}
-      <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
-        {loading ? (
-          <div className="py-16 text-center text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری کاتالوگ محصولات...</div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="py-16 text-center text-xs font-bold text-[var(--text-secondary)]">محصولی با این مشخصات یافت نشد.</div>
-        ) : (
-          <table className="w-full text-right text-xs">
-            <thead>
-              <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
-                <th className="pb-3 px-2">تصویر و نام کالا</th>
-                <th className="pb-3 px-2">دسته‌بندی</th>
-                <th className="pb-3 px-2">قیمت نهایی</th>
-                <th className="pb-3 px-2">موجودی</th>
-                <th className="pb-3 px-2">برچسب‌ها</th>
-                <th className="pb-3 px-2 text-center">عملیات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--card-border)]">
-              {filteredProducts.map((p) => {
-                const prodName = p.name || p.title || "کالای بدون نام";
-                const prodImg = p.images?.[0] || p.image || p.image_url || "";
-                const isSpecial = Boolean((p as any).isSpecialOffer || p.isFeatured);
-                return (
-                  <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={prodImg}
-                          alt={prodName}
-                          className="w-11 h-11 rounded-xl object-contain bg-[var(--input-bg)] p-1 border border-[var(--card-border)]"
-                        />
-                        <span className="font-extrabold text-xs text-[var(--text-primary)]">{prodName}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2 font-bold text-[var(--text-secondary)]">{p.category || "عمومی"}</td>
-                    <td className="py-3 px-2 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                      {(p.price || 0).toLocaleString("fa-IR")} تومان
-                    </td>
-                    <td className="py-3 px-2 font-mono font-bold">
-                      <span className={(p.stock ?? 0) <= 3 ? "text-rose-500 font-black" : ""}>
-                        {p.stock ?? 0} عدد
-                      </span>
-                    </td>
-                    <td className="py-3 px-2">
-                      {isSpecial && (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px] border border-rose-500/30">
-                          🔥 ویژه
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-2 text-center flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleOpenEditModal(p)}
-                        className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                      >
-                        ✏️ ویرایش
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p.id, prodName)}
-                        className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                      >
-                        🗑️ حذف
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* مدال ساخت / ویرایش کالا */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <form
-            onSubmit={handleFormSubmit}
-            className="max-w-2xl w-full max-h-[92vh] overflow-y-auto rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs"
-          >
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h4 className="font-black text-sm text-[var(--accent-blue)]">
-                {editingProduct ? `✏️ ویرایش محصول «${name}»` : "➕ ثبت محصول جدید"}
-              </h4>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="sm:col-span-2">
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کامل کالا *</label>
+        {/* فرم ویرایشگر کالا */}
+        <div className="lg:col-span-3">
+          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">عنوان کالا (لاتین یا اصلی) *</label>
                 <input
                   type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="مثال: Apple Studio Display 27-inch 5K"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
                   required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="مثال: مانیتور ۲۷ اینچ 4K مخصوص تدوین"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">قیمت نهایی فروش (تومان) *</label>
-                <input
-                  type="number"
-                  required
-                  min={1000}
-                  value={price}
-                  onChange={(e) => setPrice(Number(e.target.value))}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">قیمت قبلی (جهت نمایش خط‌خورده)</label>
-                <input
-                  type="number"
-                  value={originalPrice}
-                  onChange={(e) => setOriginalPrice(Number(e.target.value))}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">دسته‌بندی کالا *</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">عنوان فارسی کالا</label>
                 <input
                   type="text"
-                  required
+                  value={titleFa}
+                  onChange={(e) => setTitleFa(e.target.value)}
+                  placeholder="مثال: مانیتور ۲۷ اینچ اپل استودیو دیسپلی ۵K"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">دسته‌بندی</label>
+                <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  placeholder="مانیتور، سخت‌افزار، تجهیزات تصویر"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id || c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                  <option value="مانیتور تدوین">مانیتور تدوین</option>
+                  <option value="کالیبراتور رنگ">کالیبراتور رنگ</option>
+                  <option value="کارت کپچر">کارت کپچر</option>
+                  <option value="نورپردازی استودیو">نورپردازی استودیو</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">گارانتی و ضمانت</label>
+                <input
+                  type="text"
+                  value={warranty}
+                  onChange={(e) => setWarranty(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none"
                 />
               </div>
 
               <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">موجودی انبار *</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">قیمت اصلی (تومان) *</label>
                 <input
                   type="number"
+                  value={price}
+                  onChange={(e) => setPrice(Number(e.target.value))}
+                  placeholder="مثال: 95000000"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-black text-[var(--text-primary)] outline-none"
                   required
-                  min={0}
-                  value={stock}
-                  onChange={(e) => setStock(Number(e.target.value))}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
                 />
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">آدرس اینترنتی تصویر اصلی (Image URL) *</label>
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">قیمت با تخفیف (اختیاری)</label>
                 <input
-                  type="text"
-                  required
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://... یا /products/item.png"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                  type="number"
+                  value={discountPrice}
+                  onChange={(e) => setDiscountPrice(e.target.value ? Number(e.target.value) : "")}
+                  placeholder="مثال: 89000000"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-black text-emerald-600 outline-none"
                 />
               </div>
 
-              {/* گالری چند تصویره */}
-              <div className="sm:col-span-2 space-y-2">
-                <label className="block font-bold text-[var(--text-secondary)]">تصاویر آلبوم و گالری کالا:</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newGalleryInput}
-                    onChange={(e) => setNewGalleryInput(e.target.value)}
-                    placeholder="URL تصویر گالری..."
-                    className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-xs text-[var(--text-primary)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddGalleryImage}
-                    className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
-                  >
-                    + افزودن به گالری
-                  </button>
-                </div>
-
-                {galleryUrls.length > 0 && (
-                  <div className="flex gap-2 flex-wrap pt-1">
-                    {galleryUrls.map((url, i) => (
-                      <div key={i} className="relative group w-14 h-14 rounded-xl border border-[var(--card-border)] overflow-hidden bg-black/5 p-1">
-                        <img src={url} alt="" className="w-full h-full object-contain" />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveGalleryImage(i)}
-                          className="absolute inset-0 bg-rose-600/80 text-white font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer text-xs"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیحات و نقد و بررسی تخصصی</label>
-                <textarea
-                  rows={4}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="مشخصات پنل، نرخ تازه‌سازی، پورت‌ها و ویژگی‌های کلیدی..."
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium leading-relaxed text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">موجودی در انبار</label>
+                <input
+                  type="number"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value ? Number(e.target.value) : "")}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none"
                 />
               </div>
 
-              <div className="flex items-center gap-4 sm:col-span-2 pt-2">
-                <label className="flex items-center gap-2 cursor-pointer font-bold">
-                  <input
-                    type="checkbox"
-                    checked={isSpecialOffer}
-                    onChange={(e) => setIsSpecialOffer(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent-blue)] cursor-pointer"
-                  />
-                  <span>نمایش در بخش پیشنهاد شگفت‌انگیز 🔥</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer font-bold">
-                  <input
-                    type="checkbox"
-                    checked={isAvailable}
-                    onChange={(e) => setIsAvailable(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent-blue)] cursor-pointer"
-                  />
-                  <span>قابل خرید و فعال در ویترین</span>
+              <div className="flex items-center gap-2 pt-6">
+                <input
+                  type="checkbox"
+                  id="prodAvail"
+                  checked={isAvailable}
+                  onChange={(e) => setIsAvailable(e.target.checked)}
+                  className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
+                />
+                <label htmlFor="prodAvail" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
+                  کالا موجود و آماده سفارش‌گذاری است
                 </label>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
-              >
-                انصراف
-              </button>
+            {/* تصاویر چندگانه کالا */}
+            <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[var(--text-secondary)]">گالری تصاویر کالا (URLها)</label>
+                <button type="button" onClick={addImageField} className="text-[11px] font-bold text-[var(--accent-blue)] hover:underline cursor-pointer">
+                  + افزودن عکس دیگر
+                </button>
+              </div>
+              <div className="space-y-2">
+                {imageUrls.map((url, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={`آدرس اینترنتی تصویر ${idx + 1}...`}
+                      value={url}
+                      onChange={(e) => updateImageUrl(idx, e.target.value)}
+                      className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono"
+                    />
+                    {imageUrls.length > 1 && (
+                      <button type="button" onClick={() => removeImageField(idx)} className="px-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs font-bold cursor-pointer">
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* مشخصات فنی */}
+            <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[var(--text-secondary)]">مشخصات فنی و جدول ویژگی‌ها</label>
+                <button type="button" onClick={addSpecField} className="text-[11px] font-bold text-[var(--accent-blue)] hover:underline cursor-pointer">
+                  + ویژگی جدید
+                </button>
+              </div>
+              <div className="space-y-2">
+                {specs.map((item, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="عنوان (مثال: درگاه‌ها)"
+                      value={item.key}
+                      onChange={(e) => updateSpecField(idx, "key", e.target.value)}
+                      className="w-1/3 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+                    />
+                    <input
+                      type="text"
+                      placeholder="مقدار (مثال: ۳x Thunderbolt 3)"
+                      value={item.value}
+                      onChange={(e) => updateSpecField(idx, "value", e.target.value)}
+                      className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
+                    />
+                    <button type="button" onClick={() => removeSpecField(idx)} className="px-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs font-bold cursor-pointer">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* توضیحات */}
+            <div className="space-y-1.5 border-t border-[var(--card-border)] pt-4">
+              <label className="block text-xs font-bold text-[var(--text-secondary)]">توضیحات و نقد و بررسی محصول</label>
+              <textarea
+                rows={4}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="توضیحات کامل درباره کارایی و ویژگی‌های متمایز این کالا..."
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed outline-none"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-[var(--card-border)]">
               <button
                 type="submit"
                 disabled={saving}
-                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md cursor-pointer disabled:opacity-50"
+                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
               >
-                {saving ? "در حال ذخیره‌سازی..." : "ذخیره در دیتابیس 💾"}
+                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار کالا در فروشگاه"}
               </button>
+              {selectedProduct?.id && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(selectedProduct.id)}
+                  className="px-5 py-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 font-bold text-xs hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                >
+                  حذف کالا ✕
+                </button>
+              )}
             </div>
           </form>
         </div>
-      )}
+      </div>
     </div>
   );
 }

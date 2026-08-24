@@ -1,70 +1,72 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   try {
-    if (supabase) {
-      const { data, error } = await supabase
-        .from("blogs")
-        .select("*")
-        .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-      if (!error && data) {
-        return NextResponse.json({ success: true, data });
-      }
-    }
+    if (error) throw error;
 
-    return NextResponse.json({ success: true, data: [] });
-  } catch (err) {
-    console.error("API Blogs GET Error:", err);
-    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+    const mappedPosts = (data || []).map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      slug: p.slug,
+      content: p.content,
+      category: p.category,
+      imageUrl: p.image_url,
+      metaDescription: p.meta_description,
+      metaKeywords: p.meta_keywords,
+      isPublished: p.is_published,
+      published: p.is_published,
+      viewsCount: p.views_count,
+      createdAt: p.created_at,
+    }));
+
+    return NextResponse.json({ success: true, posts: mappedPosts, data: mappedPosts });
+  } catch (error: any) {
+    console.error("API Blogs GET error:", error);
+    return NextResponse.json({ success: false, posts: [], data: [], error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, content, metaDescription, keywords, category } = body;
-
-    if (!title || !content) {
-      return NextResponse.json({ success: false, message: "عنوان و متن مقاله الزامی است." }, { status: 400 });
-    }
-
-    const newPost = {
-      id: `blog_${Date.now()}`,
-      title,
-      content,
-      meta_description: metaDescription || "",
-      keywords: keywords || "",
-      category: category || "مقاله تخصصی",
-      is_visible: true,
-      created_at: new Date().toISOString(),
+    const payload = {
+      title: body.title,
+      slug: body.slug || body.title.toLowerCase().replace(/\s+/g, "-"),
+      content: body.content,
+      category: body.category || "عمومی",
+      image_url: body.imageUrl || body.image_url || null,
+      meta_description: body.metaDescription || body.meta_description || null,
+      meta_keywords: body.metaKeywords || body.meta_keywords || null,
+      is_published: body.isPublished !== false,
+      updated_at: new Date().toISOString(),
     };
 
-    if (supabase) {
-      const { error } = await supabase.from("blogs").insert([newPost]);
-      if (error) {
-        console.error("Supabase blog insert error:", error);
-      }
+    if (body.id) {
+      const { data, error } = await supabase
+        .from("posts")
+        .update(payload)
+        .eq("id", body.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return NextResponse.json({ success: true, post: data });
+    } else {
+      const { data, error } = await supabase
+        .from("posts")
+        .insert([payload])
+        .select()
+        .single();
+      if (error) throw error;
+      return NextResponse.json({ success: true, post: data });
     }
-
-    return NextResponse.json({
-      success: true,
-      post: {
-        id: newPost.id,
-        title: newPost.title,
-        content: newPost.content,
-        metaDescription: newPost.meta_description,
-        keywords: newPost.keywords,
-        category: newPost.category,
-        isVisible: newPost.is_visible,
-        createdAt: new Date().toLocaleDateString("fa-IR"),
-      },
-    });
-  } catch (err) {
-    console.error("API Blogs POST Error:", err);
-    return NextResponse.json({ success: false, message: "خطا در ثبت مقاله." }, { status: 500 });
+  } catch (error: any) {
+    console.error("API Blogs POST error:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

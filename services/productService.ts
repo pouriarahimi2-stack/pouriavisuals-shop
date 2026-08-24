@@ -1,252 +1,146 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabase";
 
 export interface Product {
-  id: string | number;
-  name: string;
+  id: string;
   title?: string;
-  slug?: string;
+  name?: string;
+  title_fa?: string;
   price: number;
-  originalPrice?: number;
   discountPrice?: number;
-  image: string;
+  discount_price?: number;
+  originalPrice?: number;
+  stock?: number;
+  category?: string;
+  description?: string;
+  image?: string;
   image_url?: string;
   images?: string[];
-  category: string;
-  description: string;
-  fullDescription?: string;
-  features?: string[];
-  specs?: Record<string, string>;
-  stock: number;
-  rating?: number;
-  reviewsCount?: number;
+  specs?: Record<string, any>;
+  warranty?: string;
   isAvailable?: boolean;
   is_available?: boolean;
-  isNew?: boolean;
-  isFeatured?: boolean;
-  salesCount?: number;
   created_at?: string;
-  updated_at?: string;
-}
-
-// لایه تبدیل امن داده‌های دریافتی از دیتابیس به تایپ استاندارد
-export function normalizeProduct(raw: any): Product {
-  if (!raw) return {} as Product;
-
-  const id = raw.id;
-  const name = raw.name || raw.title || 'بدون نام';
-  const price = Number(raw.price) || 0;
-  const stock = typeof raw.stock === 'number' ? raw.stock : Number(raw.stock) || 0;
-  const image = raw.image || raw.image_url || '/placeholder.png';
-  const isAvailable = raw.is_available !== undefined ? Boolean(raw.is_available) : (raw.isAvailable !== undefined ? Boolean(raw.isAvailable) : stock > 0);
-
-  return {
-    ...raw,
-    id,
-    name,
-    title: name,
-    price,
-    stock,
-    image,
-    image_url: image,
-    isAvailable,
-    is_available: isAvailable,
-    category: raw.category || 'عمومی',
-    description: raw.description || '',
-    features: Array.isArray(raw.features) ? raw.features : [],
-    specs: typeof raw.specs === 'object' && raw.specs !== null ? raw.specs : {},
-    images: Array.isArray(raw.images) && raw.images.length > 0 ? raw.images : [image],
-  };
 }
 
 export const productService = {
-  // دریافت لیست تمام محصولات
   async getAll(): Promise<Product[]> {
     try {
       const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error('Error fetching products:', error.message);
-        return [];
-      }
-
-      return (data || []).map(normalizeProduct);
-    } catch (err) {
-      console.error('getAll Products Exception:', err);
+      if (error) throw error;
+      return (data || []).map((p: any) => ({
+        id: p.id,
+        title: p.title || p.name,
+        name: p.name || p.title,
+        title_fa: p.title_fa,
+        price: Number(p.price || 0),
+        discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
+        discount_price: p.discount_price ? Number(p.discount_price) : undefined,
+        originalPrice: Number(p.price || 0),
+        stock: p.stock ?? 10,
+        category: p.category || "کالای دیجیتال",
+        description: p.description || "",
+        image: p.image_url || p.image || (Array.isArray(p.images) ? p.images[0] : ""),
+        image_url: p.image_url || p.image,
+        images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image_url || p.image || ""],
+        specs: typeof p.specs === "object" ? p.specs : {},
+        warranty: p.warranty,
+        isAvailable: p.is_available !== false,
+        is_available: p.is_available !== false,
+      }));
+    } catch (e) {
+      console.error("productService.getAll error:", e);
       return [];
     }
   },
 
-  // دریافت یک محصول با آیدی یا اسلاگ
-  async getById(id: string | number): Promise<Product | null> {
+  async getById(id: string): Promise<Product | null> {
     try {
       const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', id)
-        .single();
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
 
-      if (error || !data) {
-        return null;
-      }
+      if (error || !data) return null;
 
-      return normalizeProduct(data);
-    } catch (err) {
-      console.error(`getById Product Exception for ID ${id}:`, err);
+      return {
+        id: data.id,
+        title: data.title || data.name,
+        name: data.name || data.title,
+        title_fa: data.title_fa,
+        price: Number(data.price || 0),
+        discountPrice: data.discount_price ? Number(data.discount_price) : undefined,
+        discount_price: data.discount_price ? Number(data.discount_price) : undefined,
+        stock: data.stock ?? 10,
+        category: data.category || "کالای دیجیتال",
+        description: data.description || "",
+        image: data.image_url || data.image,
+        images: Array.isArray(data.images) ? data.images : [data.image_url || data.image || ""],
+        specs: data.specs || {},
+        warranty: data.warranty,
+        isAvailable: data.is_available !== false,
+      };
+    } catch (e) {
+      console.error("productService.getById error:", e);
       return null;
     }
   },
 
-  // دریافت محصولات بر اساس دسته‌بندی
-  async getByCategory(category: string): Promise<Product[]> {
+  async saveProduct(p: Partial<Product>): Promise<Product | null> {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category', category)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching products by category:', error.message);
-        return [];
-      }
-
-      return (data || []).map(normalizeProduct);
-    } catch (err) {
-      console.error('getByCategory Exception:', err);
-      return [];
-    }
-  },
-
-  // ثبت محصول جدید
-  async create(product: Partial<Product>): Promise<Product | null> {
-    try {
-      const name = product.name || product.title || '';
       const payload: any = {
-        name,
-        title: name,
-        price: Number(product.price) || 0,
-        original_price: product.originalPrice ? Number(product.originalPrice) : null,
-        discount_price: product.discountPrice ? Number(product.discountPrice) : null,
-        image: product.image || product.image_url || '',
-        image_url: product.image || product.image_url || '',
-        images: product.images || [],
-        category: product.category || 'عمومی',
-        description: product.description || '',
-        full_description: product.fullDescription || '',
-        features: product.features || [],
-        specs: product.specs || {},
-        stock: Number(product.stock) || 0,
-        is_available: product.isAvailable !== undefined ? product.isAvailable : (product.is_available !== undefined ? product.is_available : true),
-        is_new: Boolean(product.isNew),
-        is_featured: Boolean(product.isFeatured),
+        title: p.title || p.name,
+        name: p.name || p.title,
+        title_fa: p.title_fa || null,
+        price: Number(p.price || 0),
+        discount_price: p.discountPrice || p.discount_price ? Number(p.discountPrice || p.discount_price) : null,
+        stock: p.stock !== undefined ? Number(p.stock) : 10,
+        category: p.category || "کالای دیجیتال",
+        description: p.description || "",
+        image: p.image || p.image_url || (p.images ? p.images[0] : ""),
+        image_url: p.image_url || p.image || (p.images ? p.images[0] : ""),
+        images: p.images || [],
+        specs: p.specs || {},
+        warranty: p.warranty || "۱۸ ماه گارانتی معتبر شرکتی",
+        is_available: p.isAvailable !== false && p.is_available !== false,
         updated_at: new Date().toISOString(),
       };
 
-      const { data, error } = await supabase
-        .from('products')
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating product:', error.message);
-        return null;
+      if (p.id) {
+        const { data, error } = await supabase
+          .from("products")
+          .update(payload)
+          .eq("id", p.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data as Product;
+      } else {
+        const { data, error } = await supabase
+          .from("products")
+          .insert([payload])
+          .select()
+          .single();
+        if (error) throw error;
+        return data as Product;
       }
-
-      return normalizeProduct(data);
     } catch (err) {
-      console.error('create Product Exception:', err);
+      console.error("productService.saveProduct error:", err);
       return null;
     }
   },
 
-  // ویرایش محصول
-  async update(id: string | number, product: Partial<Product>): Promise<Product | null> {
+  async deleteProduct(id: string): Promise<boolean> {
     try {
-      const name = product.name || product.title;
-      const payload: any = {
-        ...(name && { name, title: name }),
-        ...(product.price !== undefined && { price: Number(product.price) }),
-        ...(product.originalPrice !== undefined && { original_price: Number(product.originalPrice) }),
-        ...(product.discountPrice !== undefined && { discount_price: Number(product.discountPrice) }),
-        ...(product.image !== undefined && { image: product.image, image_url: product.image }),
-        ...(product.image_url !== undefined && { image: product.image_url, image_url: product.image_url }),
-        ...(product.images !== undefined && { images: product.images }),
-        ...(product.category !== undefined && { category: product.category }),
-        ...(product.description !== undefined && { description: product.description }),
-        ...(product.fullDescription !== undefined && { full_description: product.fullDescription }),
-        ...(product.features !== undefined && { features: product.features }),
-        ...(product.specs !== undefined && { specs: product.specs }),
-        ...(product.stock !== undefined && { stock: Number(product.stock) }),
-        ...(product.isAvailable !== undefined && { is_available: Boolean(product.isAvailable) }),
-        ...(product.is_available !== undefined && { is_available: Boolean(product.is_available) }),
-        ...(product.isNew !== undefined && { is_new: Boolean(product.isNew) }),
-        ...(product.isFeatured !== undefined && { is_featured: Boolean(product.isFeatured) }),
-        updated_at: new Date().toISOString(),
-      };
-
-      const { data, error } = await supabase
-        .from('products')
-        .update(payload)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating product:', error.message);
-        return null;
-      }
-
-      return normalizeProduct(data);
-    } catch (err) {
-      console.error(`update Product Exception for ID ${id}:`, err);
-      return null;
-    }
-  },
-
-  // حذف محصول
-  async delete(id: string | number): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error deleting product:', error.message);
-        return false;
-      }
-
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (error) throw error;
       return true;
     } catch (err) {
-      console.error(`delete Product Exception for ID ${id}:`, err);
-      return false;
-    }
-  },
-
-  // ویرایش سریع موجودی انبار
-  async updateStock(id: string | number, newStock: number): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .update({
-          stock: newStock,
-          is_available: newStock > 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error updating stock:', error.message);
-        return false;
-      }
-
-      return true;
-    } catch (err) {
-      console.error('updateStock Exception:', err);
+      console.error("productService.deleteProduct error:", err);
       return false;
     }
   },

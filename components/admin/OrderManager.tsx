@@ -1,323 +1,202 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { orderService, Order } from "@/services/orderService";
-import { smsService } from "@/services/smsService";
+import { supabase } from "@/lib/supabase";
+
+export interface Order {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  phone: string;
+  address: string;
+  postal_code: string;
+  total_amount: number;
+  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+  tracking_code?: string;
+  items?: any[];
+  created_at: string;
+}
 
 export default function OrderManager() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [trackingInput, setTrackingInput] = useState("");
-  const [newStatus, setNewStatus] = useState<Order["status"]>("pending");
-  const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [statusInput, setStatusInput] = useState<Order["status"]>("paid");
+  const [saving, setSaving] = useState(false);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const loadOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async () => {
     try {
-      const data = await orderService.getAll();
-      setOrders(data || []);
-    } catch (err) {
-      console.error("Error loading orders:", err);
-      setOrders([]);
-    } finally {
-      setLoading(false);
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setOrders((data as Order[]) || []);
+    } catch (e) {
+      console.error("Error loading orders:", e);
     }
   };
 
   useEffect(() => {
-    loadOrders();
+    fetchOrders();
 
-    const handleOrdersUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setOrders(e.detail);
-      else loadOrders();
+    // همگام‌سازی بلادرنگ سفارشات با وب‌سوکت
+    const channel = supabase
+      .channel("orders-realtime-channel")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        fetchOrders();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
-    window.addEventListener("orders_updated", handleOrdersUpdate);
-    return () => window.removeEventListener("orders_updated", handleOrdersUpdate);
   }, []);
 
-  const openOrderModal = (ord: Order) => {
-    setSelectedOrder(ord);
-    setNewStatus(ord.status);
-    setTrackingInput(ord.trackingCode || ord.tracking_code || "");
+  const handleSelectOrder = (o: Order) => {
+    setSelectedOrder(o);
+    setTrackingInput(o.tracking_code || "");
+    setStatusInput(o.status || "paid");
   };
 
-  const handleSaveOrderStatus = async (e: React.FormEvent) => {
+  const handleUpdateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrder) return;
 
-    setSubmitting(true);
+    setSaving(true);
     try {
-      const isShipped = newStatus === "shipped";
-      const tracking = trackingInput.trim() || undefined;
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          status: statusInput,
+          tracking_code: trackingInput.trim() || null,
+        })
+        .eq("id", selectedOrder.id);
 
-      const success = await orderService.updateStatus(selectedOrder.id, newStatus, tracking);
+      if (error) throw error;
 
-      if (success) {
-        // در صورت ثبت کد رهگیری جدید و تغییر وضعیت به ارسال، پیامک رهگیری ارسال می‌شود
-        const phone = selectedOrder.customer?.phone || (selectedOrder as any).phone;
-        const currentTracking = selectedOrder.trackingCode || selectedOrder.tracking_code;
-
-        if (isShipped && tracking && tracking !== currentTracking && phone && smsService && typeof smsService.sendTrackingCode === "function") {
-          try {
-            await smsService.sendTrackingCode(phone, selectedOrder.id, tracking);
-          } catch (smsErr) {
-            console.error("SMS Error:", smsErr);
-          }
-        }
-
-        showToast(`وضعیت سفارش ${selectedOrder.id} با موفقیت به‌روزرسانی شد.`);
-        setSelectedOrder(null);
-        await loadOrders();
-      } else {
-        showToast("خطا در به‌روزرسانی وضعیت سفارش.");
-      }
+      setOrders(
+        orders.map((o) =>
+          o.id === selectedOrder.id ? { ...o, status: statusInput, tracking_code: trackingInput.trim() } : o
+        )
+      );
+      setSelectedOrder({ ...selectedOrder, status: statusInput, tracking_code: trackingInput.trim() });
+      alert("وضعیت سفارش و کد رهگیری پستی به صورت زنده ذخیره شد.");
     } catch (err) {
-      console.error("Order update error:", err);
-      showToast("خطای سیستمی در ارتباط با دیتابیس.");
+      console.error("Error updating order:", err);
     } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const filteredOrders = orders.filter((ord) => {
-    const matchStatus = statusFilter === "all" || ord.status === statusFilter;
-    const orderIdStr = String(ord.id || "");
-    const custName = ord.customer?.fullName || ord.customer?.name || (ord as any).customerName || "";
-    const custPhone = ord.customer?.phone || (ord as any).phone || "";
-    const trackingStr = ord.trackingCode || ord.tracking_code || "";
-
-    const matchSearch =
-      orderIdStr.toLowerCase().includes(search.toLowerCase()) ||
-      custName.toLowerCase().includes(search.toLowerCase()) ||
-      custPhone.includes(search) ||
-      trackingStr.includes(search);
-
-    return matchStatus && matchSearch;
-  });
-
-  const getStatusBadge = (status: Order["status"]) => {
-    switch (status) {
-      case "pending":
-        return <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold text-[10px]">در انتظار پرداخت</span>;
-      case "processing":
-        return <span className="px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">در حال آماده‌سازی</span>;
-      case "shipped":
-        return <span className="px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">ارسال شده به پست</span>;
-      case "delivered":
-        return <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">تحویل داده شد</span>;
-      case "cancelled":
-        return <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px]">لغو شده</span>;
+      setSaving(false);
     }
   };
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
-      {toast && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black flex items-center gap-2 shadow-lg animate-fadeIn">
-          <span>✓</span>
-          <span>{toast}</span>
-        </div>
-      )}
-
-      {/* هدر بخش سفارش‌ها */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6 font-sans" dir="rtl">
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex items-center justify-between">
         <div>
-          <h3 className="font-black text-base flex items-center gap-2 text-[var(--accent-blue)]">
-            <span>📑</span> سامانه مدیریت سفارشات و مرسولات پستی
-          </h3>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تغییر وضعیت فاکتورها، صدور کد رهگیری پستی پیشتاز و ارسال آنی پیامک به مشتری
-          </p>
+          <h2 className="text-lg font-black text-[var(--text-primary)]">📦 مدیریت سفارشات و مرسولات پستی</h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">بررسی وضعیت پرداخت، درج کد رهگیری پیشتاز و اطلاع‌رسانی لایو</p>
         </div>
-
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer"
-          >
-            <option value="all">همه وضعیت‌ها ({orders.length})</option>
-            <option value="pending">در انتظار پرداخت</option>
-            <option value="processing">در حال پردازش</option>
-            <option value="shipped">تحویل به پست</option>
-            <option value="delivered">تحویل نهایی</option>
-            <option value="cancelled">لغو شده</option>
-          </select>
-
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 جستجو در شناسه، مشتری، شماره یا کد پست..."
-            className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] w-60"
-          />
-        </div>
+        <span className="px-4 py-2 rounded-2xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-black">
+          {orders.length} سفارش ثبت‌شده
+        </span>
       </div>
 
-      {/* جدول سفارش‌ها */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
-        {loading ? (
-          <div className="py-16 text-center text-xs font-bold text-[var(--text-secondary)]">در حال دریافت فاکتورها از دیتابیس...</div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="py-16 text-center text-xs font-bold text-[var(--text-secondary)]">هیچ سفارشی یافت نشد.</div>
-        ) : (
-          <table className="w-full text-right text-xs">
-            <thead>
-              <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
-                <th className="pb-3 px-2">شماره فاکتور</th>
-                <th className="pb-3 px-2">نام خریدار</th>
-                <th className="pb-3 px-2">شماره تماس</th>
-                <th className="pb-3 px-2">مبلغ کل</th>
-                <th className="pb-3 px-2">کد رهگیری پست</th>
-                <th className="pb-3 px-2">وضعیت فاکتور</th>
-                <th className="pb-3 px-2 text-center">مدیریت</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--card-border)]">
-              {filteredOrders.map((ord) => {
-                const cName = ord.customer?.fullName || ord.customer?.name || (ord as any).customerName || "خریدار";
-                const cPhone = ord.customer?.phone || (ord as any).phone || "---";
-                const total = ord.finalAmount || ord.final_amount || ord.totalAmount || (ord as any).total_amount || 0;
-                const trackCode = ord.trackingCode || ord.tracking_code;
-                const orderNum = ord.orderNumber || ord.order_number || ord.id;
-
-                return (
-                  <tr key={ord.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                    <td className="py-3 px-2 font-mono font-black text-[var(--accent-blue)]">{orderNum}</td>
-                    <td className="py-3 px-2 font-bold">{cName}</td>
-                    <td className="py-3 px-2 font-mono text-[var(--text-secondary)]">{cPhone}</td>
-                    <td className="py-3 px-2 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                      {Number(total).toLocaleString("fa-IR")} تومان
-                    </td>
-                    <td className="py-3 px-2 font-mono text-[11px]">
-                      {trackCode ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold">
-                          {trackCode}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--text-secondary)] opacity-50">ثبت نشده</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-2">{getStatusBadge(ord.status)}</td>
-                    <td className="py-3 px-2 text-center">
-                      <button
-                        onClick={() => openOrderModal(ord)}
-                        className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] hover:opacity-90 transition cursor-pointer shadow-md"
-                      >
-                        ✏️ مدیریت و بارنامه
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* مودال مدیریت و تغییر وضعیت سفارش */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <form onSubmit={handleSaveOrderStatus} className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-5 shadow-2xl text-[var(--text-primary)] text-xs">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <div>
-                <h4 className="font-black text-sm text-[var(--accent-blue)]">مدیریت سفارش {selectedOrder.orderNumber || selectedOrder.order_number || selectedOrder.id}</h4>
-                <p className="text-[11px] text-[var(--text-secondary)] font-bold mt-0.5">
-                  خریدار: {selectedOrder.customer?.fullName || selectedOrder.customer?.name || (selectedOrder as any).customerName}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedOrder(null)}
-                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* لیست سفارشات */}
+        <div className="bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-2 h-[540px] overflow-y-auto">
+          {orders.length === 0 ? (
+            <p className="text-xs text-center py-8 text-[var(--text-muted)] font-bold">هنوز سفارشی ثبت نشده است.</p>
+          ) : (
+            orders.map((o) => (
+              <div
+                key={o.id}
+                onClick={() => handleSelectOrder(o)}
+                className={`p-3.5 rounded-2xl border transition cursor-pointer space-y-1.5 ${
+                  selectedOrder?.id === o.id
+                    ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
+                    : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                }`}
               >
-                ✕
-              </button>
-            </div>
+                <div className="flex items-center justify-between text-xs font-black">
+                  <span className="text-[var(--text-primary)]">
+                    {o.first_name || ""} {o.last_name || "مشتری"}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-blue-500/10 text-blue-500">
+                    {o.status === "shipped" ? "ارسال شده 🚚" : o.status === "paid" ? "پرداخت شده ✓" : o.status}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
+                  <span className="font-mono">{o.phone}</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {Number(o.total_amount || 0).toLocaleString("fa-IR")} تومان
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
 
-            {/* مشخصات نشانی و اقلام */}
-            <div className="p-4 rounded-2xl bg-[var(--input-bg)] space-y-2 text-[11px] leading-relaxed">
-              <p>
-                <strong className="text-[var(--text-secondary)]">شماره تماس:</strong>{" "}
-                <span className="font-mono">{selectedOrder.customer?.phone || (selectedOrder as any).phone}</span>
-              </p>
-              <p>
-                <strong className="text-[var(--text-secondary)]">کد پستی:</strong>{" "}
-                <span className="font-mono">{selectedOrder.customer?.postalCode || (selectedOrder as any).postalCode || "ثبت نشده"}</span>
-              </p>
-              <p>
-                <strong className="text-[var(--text-secondary)]">نشانی پستی:</strong>{" "}
-                {selectedOrder.customer?.address || (selectedOrder as any).address || "ثبت نشده"}
-              </p>
-              {selectedOrder.notes && (
-                <p>
-                  <strong className="text-[var(--text-secondary)]">یادداشت سفارش:</strong> {selectedOrder.notes}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">وضعیت جدید سفارش *</label>
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value as any)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)] cursor-pointer"
+        {/* جزئیات و ثبت کد رهگیری پستی */}
+        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] h-[540px] overflow-y-auto">
+          {selectedOrder ? (
+            <form onSubmit={handleUpdateOrder} className="space-y-6">
+              <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
+                <div>
+                  <h3 className="text-base font-black text-[var(--text-primary)]">
+                    سفارش: {selectedOrder.first_name} {selectedOrder.last_name}
+                  </h3>
+                  <span className="text-[10px] font-mono text-[var(--text-muted)]">ID: {selectedOrder.id}</span>
+                </div>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition cursor-pointer shadow-md"
                 >
-                  <option value="pending">در انتظار پرداخت</option>
-                  <option value="processing">در حال پردازش و انبارداری</option>
-                  <option value="shipped">تحویل به پست پیشتاز (ارسال شد)</option>
-                  <option value="delivered">تحویل داده شد به خریدار</option>
-                  <option value="cancelled">لغو سفارش</option>
-                </select>
+                  {saving ? "در حال ثبت..." : "💾 ذخیره وضعیت"}
+                </button>
               </div>
 
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                  کد رهگیری مرسوله پستی (۲۴ رقمی پیشتاز):
-                </label>
-                <input
-                  type="text"
-                  placeholder="مثال: 123456789012345678901234"
-                  value={trackingInput}
-                  onChange={(e) => setTrackingInput(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-                />
-                <p className="text-[10px] text-[var(--text-secondary)] mt-1">
-                  * با تغییر وضعیت به «ارسال شد»، پیامک حاوی این کد رهگیری به شماره موبایل مشتری ارسال خواهد شد.
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
+                <div><span className="text-[var(--text-muted)] font-bold">شماره تماس:</span> <span className="font-mono font-bold mr-1">{selectedOrder.phone}</span></div>
+                <div><span className="text-[var(--text-muted)] font-bold">کد پستی ۱۰ رقمی:</span> <span className="font-mono font-bold mr-1">{selectedOrder.postal_code}</span></div>
+                <div className="sm:col-span-2"><span className="text-[var(--text-muted)] font-bold">نشانی تحویل:</span> <span className="mr-1 leading-relaxed font-medium">{selectedOrder.address}</span></div>
               </div>
-            </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
-              <button
-                type="button"
-                onClick={() => setSelectedOrder(null)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
-              >
-                انصراف
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md cursor-pointer disabled:opacity-50"
-              >
-                {submitting ? "در حال ثبت..." : "ذخیره و ارسال پیامک 💾"}
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-[var(--text-secondary)]">وضعیت پردازش سفارش</label>
+                  <select
+                    value={statusInput}
+                    onChange={(e) => setStatusInput(e.target.value as any)}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
+                  >
+                    <option value="paid">پرداخت شده و در حال آماده‌سازی</option>
+                    <option value="shipped">تحویل به پست (ارسال شد)</option>
+                    <option value="delivered">تحویل داده شده به مشتری</option>
+                    <option value="cancelled">لغو شده</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-[var(--text-secondary)]">کد رهگیری پست پیشتاز (۲۴ رقمی)</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: 184590219400018370000114"
+                    value={trackingInput}
+                    onChange={(e) => setTrackingInput(e.target.value)}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none"
+                  />
+                </div>
+              </div>
+            </form>
+          ) : (
+            <div className="h-full flex items-center justify-center text-xs text-[var(--text-muted)] font-bold">
+              یک سفارش را از لیست سمت راست برای مشاهده و مدیریت انتخاب کنید.
             </div>
-          </form>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

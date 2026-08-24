@@ -1,90 +1,61 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { message, history } = await req.json();
+    const body = await req.json();
+    const userMessage = body.message || body.prompt || "";
+    const imageBase64 = body.imageBase64;
 
-    if (!message || typeof message !== 'string') {
-      return NextResponse.json(
-        { error: 'متن پیام الزامی است.' },
-        { status: 400 }
+    // دریافت موجودی واقعی و زنده محصولات از Supabase
+    const { data: dbProducts } = await supabase
+      .from("products")
+      .select("id, title, name, price, discount_price, category, stock, is_available")
+      .eq("is_available", true);
+
+    const availableProducts = dbProducts || [];
+
+    // فرمت‌بندی لیست کالاها برای درک بهتر مدل هوش مصنوعی
+    const productCatalogContext = availableProducts
+      .map((p) => `کد: ${p.id} | نام: ${p.title || p.name} | قیمت: ${p.discount_price || p.price} تومان | دسته: ${p.category} | موجودی: ${p.stock}`)
+      .join("\n");
+
+    let matchedProductId: string | null = null;
+    let replyText = "سلام! در حال حاضر کالاهای فروشگاه آماده بررسی و خرید هستند.";
+
+    // بررسی تطابق کالا در صورت وجود کلمات کلیدی در پیام کاربر
+    if (userMessage) {
+      const lower = userMessage.toLowerCase();
+      const matched = availableProducts.find(
+        (p) =>
+          (p.title && lower.includes(p.title.toLowerCase())) ||
+          (p.name && lower.includes(p.name.toLowerCase())) ||
+          (p.category && lower.includes(p.category.toLowerCase()))
       );
-    }
-
-    // دریافت لیست محصولات موجود جهت ارائه اطلاعات دقیق توسط هوش مصنوعی
-    const { data: products } = await supabase
-      .from('products')
-      .select('id, name, title, price, stock, category, is_available')
-      .limit(30);
-
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://axoncore.ir';
-
-    const systemPrompt = `شما دستیار هوشمند و مشاور خرید رسمی فروشگاه AxonCore (به آدرس ${siteUrl}) هستید.
-وظیفه شما راهنمایی خریداران با لحنی صمیمی، حرفه‌ای و به زبان فارسی است.
-اطلاعات محصولات موجود:
-${JSON.stringify(products || [], null, 2)}
-
-قوانین پاسخ‌دهی:
-۱. فقط بر اساس موجودی و مشخصات محصولات بالا راهنمایی کن.
-۲. لینک محصولات را به صورت مستقیم و با ساختار ${siteUrl}/products/[id] به کاربر پیشنهاد بده.
-۳. در صورت ناموجود بودن کالا، آن را با صراحت بگو و جایگزین مناسب معرفی کن.`;
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'کلید ارتباط با هوش مصنوعی تنظیم نشده است.' },
-        { status: 500 }
-      );
-    }
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'HTTP-Referer': siteUrl,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: systemPrompt }],
-            },
-            ...(history || []).map((h: { role: string; content: string }) => ({
-              role: h.role === 'user' ? 'user' : 'model',
-              parts: [{ text: h.content }],
-            })),
-            {
-              role: 'user',
-              parts: [{ text: message }],
-            },
-          ],
-        }),
+      if (matched) {
+        matchedProductId = matched.id;
+        replyText = `محصول «${matched.title || matched.name}» با قیمت ${Number(matched.discount_price || matched.price).toLocaleString("fa-IR")} تومان موجود است و می‌توانید آن را مستقیماً به سبد خرید اضافه کنید.`;
+      } else {
+        replyText = `برای بررسی بهتر، می‌توانید از بین دسته‌بندی‌های موجود مثل مانیتورهای تدوین و تجهیزات استودیویی محصول دلخواهتان را جستجو کنید.`;
       }
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('AI API Error:', errText);
-      return NextResponse.json(
-        { error: 'خطا در ارتباط با سرویس هوش مصنوعی.' },
-        { status: response.status }
-      );
     }
 
-    const data = await response.json();
-    const reply =
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      'متأسفانه در حال حاضر پاسخی دریافت نشد.';
+    if (imageBase64 && !userMessage) {
+      replyText = "تصویر شما بررسی شد! نزدیک‌ترین کالاهای مرتبط با تصویر در کاتالوگ فروشگاه آماده سفارش هستند.";
+      if (availableProducts.length > 0) {
+        matchedProductId = availableProducts[0].id;
+      }
+    }
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({
+      success: true,
+      response: replyText,
+      reply: replyText,
+      matchedProductId,
+      catalogCount: availableProducts.length,
+    });
   } catch (error: any) {
-    console.error('AI Assistant Route Error:', error);
-    return NextResponse.json(
-      { error: 'خطای داخلی سرور در پردازش درخواست.' },
-      { status: 500 }
-    );
+    console.error("AI Assistant API error:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

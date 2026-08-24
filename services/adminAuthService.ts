@@ -1,99 +1,115 @@
-import { AdminRole, AdminUser } from "@/lib/adminContracts";
 import { supabase } from "@/lib/supabase";
 
-const LOCAL_ADMINS_KEY = "admin_users_data";
-const CURRENT_SESSION_KEY = "current_admin_session";
+export type AdminRole = "superadmin" | "super_admin" | "product_manager" | "inventory_manager" | "content_editor";
 
-const DEFAULT_SUPER_ADMIN: AdminUser = {
-  id: "admin-root",
-  username: "admin",
-  name: "مدیر ارشد",
-  role: "super_admin",
-  created_at: new Date().toISOString(),
-};
+export interface AdminUser {
+  id: string;
+  username: string;
+  full_name?: string;
+  role: AdminRole;
+}
+
+const STORAGE_KEY = "admin_current_user";
 
 export const adminAuthService = {
-  // بررسی سشن فعال
-  getCurrentSession(): AdminUser | null {
-    if (typeof window === "undefined") return null;
+  // همیشه یک Promise معتبر برمی‌گرداند تا .then و await بدون خطا کار کنند
+  async getCurrentSession(): Promise<AdminUser | null> {
     try {
-      const stored = localStorage.getItem(CURRENT_SESSION_KEY);
-      if (!stored) return DEFAULT_SUPER_ADMIN;
-      return JSON.parse(stored);
-    } catch {
-      return DEFAULT_SUPER_ADMIN;
+      if (typeof window !== "undefined") {
+        try {
+          const res = await fetch("/api/admin/session", { method: "GET" });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.authenticated && data.user) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
+              return data.user;
+            }
+          }
+        } catch {}
+
+        const local = localStorage.getItem(STORAGE_KEY);
+        if (local) {
+          try {
+            return JSON.parse(local);
+          } catch {
+            return null;
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      console.error("getCurrentSession error:", e);
+      return null;
     }
   },
 
-  // ذخیره ورود
-  setSession(user: AdminUser) {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(CURRENT_SESSION_KEY, JSON.stringify(user));
-    }
+  async isAuthenticated(): Promise<boolean> {
+    const session = await this.getCurrentSession();
+    return !!session;
   },
 
-  // خروج از حساب
-  logout() {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(CURRENT_SESSION_KEY);
-    }
-  },
-
-  // دریافت لیست همه ادمین‌ها
-  async getAllAdmins(): Promise<AdminUser[]> {
+  async logout(): Promise<void> {
     try {
-      const { data, error } = await supabase.from("admin_users").select("*");
-      if (!error && data && data.length > 0) {
-        return data.map((u: any) => ({
-          id: u.id,
-          username: u.username,
-          name: u.name || u.username,
-          role: (u.role as AdminRole) || "support",
-          created_at: u.created_at,
-        }));
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(STORAGE_KEY);
+        await fetch("/api/admin/logout", { method: "POST" });
       }
     } catch (e) {
-      console.warn("Supabase admin fetch fallback to localStorage");
+      console.error("logout error:", e);
     }
+  },
 
-    if (typeof window !== "undefined") {
-      const local = localStorage.getItem(LOCAL_ADMINS_KEY);
-      if (local) {
-        try {
-          return JSON.parse(local);
-        } catch {}
+  async getAllAdmins(): Promise<AdminUser[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from("admin_users").select("id, username, full_name, role");
+        if (!error && data && data.length > 0) return data;
       }
-    }
-    return [DEFAULT_SUPER_ADMIN];
-  },
-
-  // بررسی سطح دسترسی نقش به تب مشخص
-  hasPermission(role: AdminRole, tab: string): boolean {
-    if (role === "super_admin") return true;
-
-    switch (tab) {
-      case "products":
-        return ["super_admin", "product_manager"].includes(role);
-      case "inventory":
-        return ["super_admin", "product_manager", "inventory_manager"].includes(role);
-      case "orders":
-        return ["super_admin", "support"].includes(role);
-      case "articles":
-        return ["super_admin", "content_editor"].includes(role);
-      case "banners":
-      case "pages":
-      case "menus":
-      case "site-settings":
-        return ["super_admin", "content_editor"].includes(role);
-      case "contacts":
-      case "customers":
-        return ["super_admin", "support"].includes(role);
-      case "accounts":
-        return role === "super_admin";
-      default:
-        return true;
+      return [
+        { id: "1", username: "admin", full_name: "مدیر ارشد", role: "superadmin" }
+      ];
+    } catch {
+      return [];
     }
   },
+
+  async updateCredentials(id: string, username: string, password?: string, full_name?: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      if (supabase) {
+        const payload: any = { username, full_name };
+        if (password) payload.password = password;
+        await supabase.from("admin_users").update(payload).eq("id", id);
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err?.message || "خطا در تغییر مشخصات." };
+    }
+  },
+
+  async createAdmin(userData: { username: string; password: string; full_name: string; role: AdminRole }): Promise<{ success: boolean; message?: string }> {
+    try {
+      if (supabase) {
+        const { error } = await supabase.from("admin_users").insert([{
+          id: `adm_${Date.now()}`,
+          ...userData,
+          created_at: new Date().toISOString()
+        }]);
+        if (error) return { success: false, message: error.message };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err?.message || "خطا در ایجاد ادمین." };
+    }
+  },
+
+  async deleteAdmin(id: string): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("admin_users").delete().eq("id", id);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
 };
-
-export default adminAuthService;

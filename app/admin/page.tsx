@@ -101,13 +101,14 @@ export default function AdminPage() {
               router.replace("/admin/login");
             }
           } else {
-            // در حالت دیباگ اگر کاربر سشن نداشت به صفحه لاگین هدایت می‌شود
             setIsAuthenticated(false);
             router.replace("/admin/login");
           }
         }
-      } catch {
-        setIsAuthenticated(true);
+      } catch (err) {
+        console.error("Auth check error:", err);
+        setIsAuthenticated(false);
+        router.replace("/admin/login");
       }
     }
 

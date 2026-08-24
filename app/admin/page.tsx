@@ -21,6 +21,7 @@ import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthServ
 
 export default function AdminPage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
@@ -68,50 +69,66 @@ export default function AdminPage() {
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
   useEffect(() => {
-    adminAuthService.getCurrentSession().then((user) => {
-      if (user) {
-        setIsAuthenticated(true);
-        setCurrentUser(user);
-        setNewUsername(user.username || "");
-        setNewFullName(user.full_name || "");
+    setMounted(true);
 
-        if (user.role === "content_editor") {
-          setActiveTab("blogs");
-        } else if (user.role === "product_manager") {
-          setActiveTab("products");
+    async function checkAuth() {
+      try {
+        let user: AdminUser | null = null;
+        if (adminAuthService && typeof adminAuthService.getCurrentSession === "function") {
+          user = await adminAuthService.getCurrentSession();
         }
-      } else {
-        const localUser = localStorage.getItem("admin_current_user");
-        if (localUser) {
-          try {
-            const parsed = JSON.parse(localUser);
-            setIsAuthenticated(true);
-            setCurrentUser(parsed);
-          } catch {
+
+        if (user) {
+          setIsAuthenticated(true);
+          setCurrentUser(user);
+          setNewUsername(user.username || "");
+          setNewFullName(user.full_name || "");
+
+          if (user.role === "content_editor") {
+            setActiveTab("blogs");
+          } else if (user.role === "product_manager") {
+            setActiveTab("products");
+          }
+        } else {
+          const localUser = localStorage.getItem("admin_current_user");
+          if (localUser) {
+            try {
+              const parsed = JSON.parse(localUser);
+              setIsAuthenticated(true);
+              setCurrentUser(parsed);
+            } catch {
+              setIsAuthenticated(false);
+              router.replace("/admin/login");
+            }
+          } else {
+            // در حالت دیباگ اگر کاربر سشن نداشت به صفحه لاگین هدایت می‌شود
             setIsAuthenticated(false);
             router.replace("/admin/login");
           }
-        } else {
-          setIsAuthenticated(false);
-          router.replace("/admin/login");
         }
+      } catch {
+        setIsAuthenticated(true);
       }
-    }).catch(() => {
-      setIsAuthenticated(true);
-    });
-
-    const savedTheme = localStorage.getItem("theme");
-    const isDark = savedTheme !== "light";
-    setIsDarkMode(isDark);
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
     }
 
-    siteInfoService.getSiteInfo().then((info) => {
-      if (info) setSiteInfo(info);
-    });
+    checkAuth();
+
+    try {
+      const savedTheme = localStorage.getItem("theme");
+      const isDark = savedTheme !== "light";
+      setIsDarkMode(isDark);
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    } catch {}
+
+    try {
+      siteInfoService.getSiteInfo().then((info) => {
+        if (info) setSiteInfo(info);
+      });
+    } catch {}
   }, [router]);
 
   const toggleDarkMode = () => {
@@ -136,7 +153,10 @@ export default function AdminPage() {
   };
 
   const handleLogout = async () => {
-    await adminAuthService.logout();
+    try {
+      await adminAuthService.logout();
+    } catch {}
+    router.replace("/admin/login");
   };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -217,6 +237,16 @@ export default function AdminPage() {
     }
   };
 
+  if (!mounted || isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-200 text-xs font-bold font-sans">
+        در حال بررسی سطح دسترسی امنیتی...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return null;
+
   const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false;
   const userRole = (currentUser?.role || "superadmin") as AdminRole;
 
@@ -245,16 +275,6 @@ export default function AdminPage() {
     { id: "menu", label: "منوها و دسته‌ها", icon: "🔗", show: isSuper },
     { id: "siteInfo", label: "اطلاعات سایت", icon: "⚙️", show: isSuper },
   ].filter((t) => t.show);
-
-  if (isAuthenticated === null) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-200 text-xs font-bold animate-pulse font-sans">
-        در حال بررسی سطح دسترسی امنیتی...
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) return null;
 
   return (
     <div
@@ -1043,7 +1063,9 @@ function AdminAIAssistant() {
         } catch {}
       }
     }
-    initAssistant();
+    if (isOpen || selectorModalOpen) {
+      initAssistant();
+    }
   }, [isOpen, selectorModalOpen]);
 
   const categoryProducts = selectedCategory === "all"

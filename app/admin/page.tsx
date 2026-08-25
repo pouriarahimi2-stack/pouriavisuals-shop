@@ -19,7 +19,7 @@ import PageBuilder from "@/components/admin/PageBuilder";
 import AdminBlogManager from "@/components/AdminBlogManager";
 import AdminNewsManager from "@/components/admin/AdminNewsManager";
 import { productService, Product } from "@/services/productService";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
 import { supabase } from "@/lib/supabase";
 
@@ -47,7 +47,13 @@ export default function AdminPage() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
 
-  // مدال‌ها
+  // مدال‌های ادمین
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
+  const [maintHours, setMaintHours] = useState<number>(1);
+  const [maintMinutes, setMaintMinutes] = useState<number>(0);
+  const [isSavingMaint, setIsSavingMaint] = useState(false);
+
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
 
@@ -73,7 +79,10 @@ export default function AdminPage() {
   const fetchSiteInfoLive = async () => {
     try {
       const info = await siteInfoService.getSiteInfo();
-      if (info) setSiteInfo(info);
+      if (info) {
+        setSiteInfo(info);
+        setSelectedMaintMode(info.maintenance_mode || "none");
+      }
     } catch (e) {
       console.error("Admin SiteInfo load error:", e);
     }
@@ -136,7 +145,7 @@ export default function AdminPage() {
     fetchSiteInfoLive();
 
     const channel = supabase
-      .channel("admin-siteinfo-realtime-master-v10")
+      .channel("admin-siteinfo-realtime-master-v13")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchSiteInfoLive())
       .subscribe();
 
@@ -157,11 +166,28 @@ export default function AdminPage() {
     }
   };
 
-  const handleToggleGoogleIndex = async () => {
-    const currentState = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
-    const nextState = !currentState;
-    setSiteInfo((prev) => (prev ? { ...prev, allowGoogleIndex: nextState, allow_google_index: nextState } : null));
-    await siteInfoService.updateSiteInfo({ allowGoogleIndex: nextState, allow_google_index: nextState });
+  // مدیریت اعمال حالت تعمیرات و همگام‌سازی فوری با دیتابیس
+  const handleSaveMaintenanceMode = async () => {
+    setIsSavingMaint(true);
+    let untilISO: string | null = null;
+    const totalMinutes = Number(maintHours) * 60 + Number(maintMinutes);
+
+    if (selectedMaintMode === "timed") {
+      untilISO = new Date(Date.now() + totalMinutes * 60 * 1000).toISOString();
+    }
+
+    const payload: Partial<SiteInfo> = {
+      maintenance_mode: selectedMaintMode,
+      maintenance_until: untilISO || undefined,
+      maintenance_duration_minutes: selectedMaintMode === "timed" ? totalMinutes : undefined,
+      allow_google_index: selectedMaintMode === "none",
+      allowGoogleIndex: selectedMaintMode === "none",
+    };
+
+    await siteInfoService.updateSiteInfo(payload);
+    await fetchSiteInfoLive();
+    setIsSavingMaint(false);
+    setShowMaintenanceModal(false);
   };
 
   const loadAllAdmins = async () => {
@@ -268,9 +294,9 @@ export default function AdminPage() {
 
   if (!isAuthenticated) return null;
 
-  const isGoogleIndexAllowed = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
+  const currentMode = siteInfo?.maintenance_mode || (siteInfo?.allow_google_index === false ? "indefinite" : "none");
+  const isSuper = currentUser?.role === "superadmin" || (currentUser?.role as any) === "super_admin";
   const userRole = (currentUser?.role || "superadmin") as AdminRole;
-  const isSuper = userRole === "superadmin" || (userRole as any) === "super_admin";
 
   const getRoleBadge = (role: AdminRole | string) => {
     if (role === "superadmin" || role === "super_admin") {
@@ -326,18 +352,28 @@ export default function AdminPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل مهندسی‌شده فروشگاه</h1>
+              
+              {/* دکمه بازکردن مدال مدیریت وضعیت بحران و تعمیرات سایت */}
               <button
-                onClick={handleToggleGoogleIndex}
-                title={isGoogleIndexAllowed ? "ایندکس گوگل فعال است (کلیک برای تغییر)" : "ایندکس گوگل غیرفعال است (کلیک برای تغییر)"}
-                className="flex items-center gap-1.5 cursor-pointer group"
+                onClick={() => setShowMaintenanceModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-blue-500 transition cursor-pointer"
+                title="کلیک جهت تنظیم حالت آنلاین یا تعمیرات زمان‌دار"
               >
                 <span
-                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                    isGoogleIndexAllowed ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    currentMode === "none"
+                      ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"
+                      : currentMode === "timed"
+                      ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-ping"
+                      : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
                   }`}
                 />
-                <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition font-bold">
-                  {isGoogleIndexAllowed ? "آنلاین (ایندکس گوگل فعال)" : "مخفی از گوگل (No-Index)"}
+                <span className="text-[10px] text-[var(--text-secondary)] font-bold">
+                  {currentMode === "none"
+                    ? "سایت آنلاین (ایندکس فعال) ✓"
+                    : currentMode === "timed"
+                    ? "تعمیرات زمان‌دار (تایمر فعال) ⏱️"
+                    : "حالت تعمیر نامحدود (سایت مخفی) 🔒"}
                 </span>
               </button>
               {getRoleBadge(userRole)}
@@ -454,6 +490,130 @@ export default function AdminPage() {
 
       {/* دستیار هوشمند و بازارسنجی ادمین */}
       {isSuper && <AdminAIAssistant />}
+
+      {/* مدال کنترل حالت آنلاین / تعمیرات زمان‌دار / تعمیرات نامحدود */}
+      {showMaintenanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans">
+          <div className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-6 shadow-2xl text-[var(--text-primary)]">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 text-lg">
+                  🛠️
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-[var(--text-primary)]">تنظیمات وضعیت سایت و ایندکس گوگل</h3>
+                  <p className="text-[11px] text-[var(--text-secondary)] font-medium">کنترل زنده نمایش سایت برای کاربران و موتورهای جستجو</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMaintenanceModal(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold hover:border-blue-500 transition cursor-pointer text-[var(--text-primary)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* گزینه ۱: سایت آنلاین */}
+              <div
+                onClick={() => setSelectedMaintMode("none")}
+                className={`p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 ${
+                  selectedMaintMode === "none"
+                    ? "bg-emerald-500/10 border-emerald-500 text-[var(--text-primary)] ring-2 ring-emerald-500/20"
+                    : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500"
+                }`}
+              >
+                <input type="radio" checked={selectedMaintMode === "none"} onChange={() => {}} className="mt-1 cursor-pointer" />
+                <div className="space-y-1">
+                  <strong className="block font-black text-[var(--text-primary)]">۱. سایت آنلاین و فعال (حالت عادی)</strong>
+                  <p className="text-[11px] leading-relaxed">سایت برای تمام کاربران و موتورهای جستجوی گوگل فعال و در دسترس است.</p>
+                </div>
+              </div>
+
+              {/* گزینه ۲: تعمیرات زمان‌دار با تایمر */}
+              <div
+                onClick={() => setSelectedMaintMode("timed")}
+                className={`p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 ${
+                  selectedMaintMode === "timed"
+                    ? "bg-amber-500/10 border-amber-500 text-[var(--text-primary)] ring-2 ring-amber-500/20"
+                    : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500"
+                }`}
+              >
+                <input type="radio" checked={selectedMaintMode === "timed"} onChange={() => {}} className="mt-1 cursor-pointer" />
+                <div className="space-y-2 flex-1">
+                  <strong className="block font-black text-[var(--text-primary)]">۲. حالت تعمیرات زمان‌دار (با شمارنده معکوس)</strong>
+                  <p className="text-[11px] leading-relaxed">
+                    سایت بسته شده و شمارنده معکوس لایو به کاربر نشان داده می‌شود. با اتمام تایمر، سایت به صورت خودکار باز می‌شود.
+                  </p>
+
+                  {selectedMaintMode === "timed" && (
+                    <div className="pt-2 border-t border-[var(--card-border)] flex items-center gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1">مدت زمان (ساعت):</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={72}
+                          value={maintHours}
+                          onChange={(e) => setMaintHours(Number(e.target.value))}
+                          className="w-20 p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1">دقیقه اضافی:</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={maintMinutes}
+                          onChange={(e) => setMaintMinutes(Number(e.target.value))}
+                          className="w-20 p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* گزینه ۳: تعمیرات نامحدود */}
+              <div
+                onClick={() => setSelectedMaintMode("indefinite")}
+                className={`p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 ${
+                  selectedMaintMode === "indefinite"
+                    ? "bg-rose-500/10 border-rose-500 text-[var(--text-primary)] ring-2 ring-rose-500/20"
+                    : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500"
+                }`}
+              >
+                <input type="radio" checked={selectedMaintMode === "indefinite"} onChange={() => {}} className="mt-1 cursor-pointer" />
+                <div className="space-y-1">
+                  <strong className="block font-black text-[var(--text-primary)]">۳. حالت تعمیرات نامحدود (قفل کامل سایت)</strong>
+                  <p className="text-[11px] leading-relaxed">
+                    سایت هم برای کاربر و هم برای گوگل مخفی می‌شود تا زمانی که ادمین دوباره آن را به حالت آنلاین تغییر دهد.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-4 border-t border-[var(--card-border)]">
+              <button
+                type="button"
+                onClick={() => setShowMaintenanceModal(false)}
+                className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] hover:opacity-80 font-bold cursor-pointer text-[var(--text-secondary)] transition text-xs border border-[var(--card-border)]"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                disabled={isSavingMaint}
+                onClick={handleSaveMaintenanceMode}
+                className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black transition cursor-pointer shadow-lg disabled:opacity-50 text-xs"
+              >
+                {isSavingMaint ? "در حال اعمال فوری..." : "ذخیره و اعمال زنده در سراسر سایت ⚡"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* مدال تغییر رمز عبور */}
       {showPasswordModal && (
@@ -718,7 +878,7 @@ export default function AdminPage() {
   );
 }
 
-// کامپوننت دستیار هوش مصنوعی و بازارسنجی با مدال کامل انتشار در وبلاگ
+// کامپوننت هوش مصنوعی ادمین با مدال انتخاب محصولات و انتشار مقاله
 function AdminAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectorModalOpen, setSelectorModalOpen] = useState(false);

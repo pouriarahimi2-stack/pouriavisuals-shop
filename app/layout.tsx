@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const info = await getSiteInfoServer();
   const siteName = info.site_name || info.storeName || 'Axon | فروشگاه تخصصی تجهیزات دیجیتال';
   const tagline = info.tagline || 'مرجع تخصصی فروش و مشاوره تجهیزات استودیویی و مانیتورینگ';
-  const isGoogleAllowed = info.allow_google_index !== false && info.allowGoogleIndex !== false;
+  const isGoogleAllowed = info.allow_google_index !== false && info.allowGoogleIndex !== false && info.maintenance_mode === 'none';
 
   return {
     title: {

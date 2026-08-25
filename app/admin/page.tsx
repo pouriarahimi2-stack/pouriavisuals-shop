@@ -25,7 +25,6 @@ import { supabase } from "@/lib/supabase";
 
 export default function AdminPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
@@ -45,9 +44,9 @@ export default function AdminPage() {
   >("products");
 
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
-  // مدال‌های ادمین
+  // مدال کنترل وضعیت آنلاین / تعمیرات زمان‌دار / تعمیرات نامحدود
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
@@ -78,19 +77,20 @@ export default function AdminPage() {
 
   const fetchSiteInfoLive = async () => {
     try {
-      const info = await siteInfoService.getSiteInfo();
-      if (info) {
-        setSiteInfo(info);
-        setSelectedMaintMode(info.maintenance_mode || "none");
+      const res = await fetch("/api/site-info", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setSiteInfo(json.data);
+          setSelectedMaintMode(json.data.maintenance_mode || "none");
+        }
       }
     } catch (e) {
-      console.error("Admin SiteInfo load error:", e);
+      console.error("Admin SiteInfo fetch error:", e);
     }
   };
 
   useEffect(() => {
-    setMounted(true);
-
     async function checkAuth() {
       try {
         let user: AdminUser | null = null;
@@ -133,19 +133,10 @@ export default function AdminPage() {
     }
 
     checkAuth();
-
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      const isDark = savedTheme !== "light";
-      setIsDarkMode(isDark);
-      if (isDark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-    } catch {}
-
     fetchSiteInfoLive();
 
     const channel = supabase
-      .channel("admin-siteinfo-realtime-master-v13")
+      .channel("admin-siteinfo-realtime-master-v20")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchSiteInfoLive())
       .subscribe();
 
@@ -166,7 +157,7 @@ export default function AdminPage() {
     }
   };
 
-  // مدیریت اعمال حالت تعمیرات و همگام‌سازی فوری با دیتابیس
+  // اعمال قطعی و فوری حالت تعمیرات به دیتابیس سرور
   const handleSaveMaintenanceMode = async () => {
     setIsSavingMaint(true);
     let untilISO: string | null = null;
@@ -176,18 +167,26 @@ export default function AdminPage() {
       untilISO = new Date(Date.now() + totalMinutes * 60 * 1000).toISOString();
     }
 
-    const payload: Partial<SiteInfo> = {
+    const payload = {
       maintenance_mode: selectedMaintMode,
-      maintenance_until: untilISO || undefined,
-      maintenance_duration_minutes: selectedMaintMode === "timed" ? totalMinutes : undefined,
+      maintenance_until: untilISO,
+      maintenance_duration_minutes: selectedMaintMode === "timed" ? totalMinutes : null,
       allow_google_index: selectedMaintMode === "none",
       allowGoogleIndex: selectedMaintMode === "none",
     };
 
-    await siteInfoService.updateSiteInfo(payload);
-    await fetchSiteInfoLive();
-    setIsSavingMaint(false);
-    setShowMaintenanceModal(false);
+    try {
+      await fetch("/api/site-info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      await fetchSiteInfoLive();
+    } finally {
+      setIsSavingMaint(false);
+      setShowMaintenanceModal(false);
+    }
   };
 
   const loadAllAdmins = async () => {
@@ -284,17 +283,17 @@ export default function AdminPage() {
     }
   };
 
-  if (!mounted || isAuthenticated === null) {
+  if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-200 text-xs font-bold font-sans">
-        در حال بررسی سطح دسترسی امنیتی مدیریت...
+        در حال اعتبارسنجی سطح دسترسی...
       </div>
     );
   }
 
   if (!isAuthenticated) return null;
 
-  const currentMode = siteInfo?.maintenance_mode || (siteInfo?.allow_google_index === false ? "indefinite" : "none");
+  const currentMode: MaintenanceMode = siteInfo?.maintenance_mode || (siteInfo?.allow_google_index === false ? "indefinite" : "none");
   const isSuper = currentUser?.role === "superadmin" || (currentUser?.role as any) === "super_admin";
   const userRole = (currentUser?.role || "superadmin") as AdminRole;
 
@@ -353,10 +352,10 @@ export default function AdminPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل مهندسی‌شده فروشگاه</h1>
               
-              {/* دکمه بازکردن مدال مدیریت وضعیت بحران و تعمیرات سایت */}
+              {/* کلید کنترل زنده حالت تعمیرات و آنلاین بودن */}
               <button
                 onClick={() => setShowMaintenanceModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-blue-500 transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-blue-500 transition cursor-pointer shadow-sm"
                 title="کلیک جهت تنظیم حالت آنلاین یا تعمیرات زمان‌دار"
               >
                 <span
@@ -368,12 +367,12 @@ export default function AdminPage() {
                       : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
                   }`}
                 />
-                <span className="text-[10px] text-[var(--text-secondary)] font-bold">
+                <span className="text-[11px] text-[var(--text-primary)] font-bold">
                   {currentMode === "none"
                     ? "سایت آنلاین (ایندکس فعال) ✓"
                     : currentMode === "timed"
                     ? "تعمیرات زمان‌دار (تایمر فعال) ⏱️"
-                    : "حالت تعمیر نامحدود (سایت مخفی) 🔒"}
+                    : "حالت تعمیر نامحدود (سایت قفل) 🔒"}
                 </span>
               </button>
               {getRoleBadge(userRole)}
@@ -410,15 +409,7 @@ export default function AdminPage() {
           </button>
 
           <button
-            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
-            className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-blue-500 border border-[var(--card-border)] text-[var(--text-primary)] transition cursor-pointer text-xs flex items-center justify-center shadow-sm font-bold"
-            title="جستجوی سریع (Ctrl+K)"
-          >
-            🔍
-          </button>
-
-          <button
-            onClick={toggleDarkMode}
+            onClick={() => toggleDarkMode}
             className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-blue-500 border border-[var(--card-border)] text-[var(--text-primary)] transition cursor-pointer text-xs shadow-sm font-bold flex items-center justify-center"
             title="تم شب / روز"
           >
@@ -488,10 +479,10 @@ export default function AdminPage() {
         {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
       </div>
 
-      {/* دستیار هوشمند و بازارسنجی ادمین */}
+      {/* دستیار هوشمند ادمین */}
       {isSuper && <AdminAIAssistant />}
 
-      {/* مدال کنترل حالت آنلاین / تعمیرات زمان‌دار / تعمیرات نامحدود */}
+      {/* مدال کنترل وضعیت آنلاین / تعمیرات زمان‌دار / تعمیرات نامحدود */}
       {showMaintenanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-6 shadow-2xl text-[var(--text-primary)]">
@@ -530,7 +521,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* گزینه ۲: تعمیرات زمان‌دار با تایمر */}
+              {/* گزینه ۲: تعمیرات زمان‌دار */}
               <div
                 onClick={() => setSelectedMaintMode("timed")}
                 className={`p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 ${
@@ -878,7 +869,6 @@ export default function AdminPage() {
   );
 }
 
-// کامپوننت هوش مصنوعی ادمین با مدال انتخاب محصولات و انتشار مقاله
 function AdminAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectorModalOpen, setSelectorModalOpen] = useState(false);

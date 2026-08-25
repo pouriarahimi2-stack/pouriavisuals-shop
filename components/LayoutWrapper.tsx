@@ -1,7 +1,7 @@
 // components/LayoutWrapper.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -15,17 +15,19 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const router = useRouter();
   const isAdmin = pathname?.startsWith("/admin");
 
-  const [mounted, setMounted] = useState(false);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+  const [isClient, setIsClient] = useState(false);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
   const [maintenanceUntil, setMaintenanceUntil] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
 
-  const applyStatus = (info: SiteInfo | null) => {
+  const prevModeRef = useRef<MaintenanceMode>("none");
+
+  const checkStatus = (info: SiteInfo | null) => {
     if (!info) return;
     setSiteInfo(info);
 
-    const mode = info.maintenance_mode || (info.allow_google_index === false || info.allowGoogleIndex === false ? "indefinite" : "none");
+    const mode: MaintenanceMode = info.maintenance_mode || (info.allow_google_index === false || info.allowGoogleIndex === false ? "indefinite" : "none");
     const until = info.maintenance_until || null;
 
     if (mode === "timed" && until) {
@@ -41,44 +43,95 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     setMaintenanceUntil(until);
   };
 
-  const fetchSiteStatus = async () => {
+  const fetchLiveStatus = async () => {
     try {
-      const info = await siteInfoService.getSiteInfo();
-      if (info) applyStatus(info);
+      const res = await fetch("/api/site-info", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          checkStatus(json.data);
+        }
+      }
     } catch (e) {
-      console.error("LayoutWrapper sync error:", e);
+      console.warn("Live status check fallback:", e);
     }
   };
 
-  // ۱. سیستم هوشمند حافظه موقعیت کاربر (State & Path Memory)
+  // ۱. مانت شدن امن کلاینت
   useEffect(() => {
-    if (typeof window !== "undefined" && !isAdmin && mounted) {
-      if (maintenanceMode !== "none") {
-        const currentPath = window.location.pathname + window.location.search;
-        sessionStorage.setItem("axon_user_last_position", currentPath);
-      } else {
-        const savedPath = sessionStorage.getItem("axon_user_last_position");
-        if (savedPath && savedPath !== window.location.pathname) {
-          sessionStorage.removeItem("axon_user_last_position");
-          router.replace(savedPath);
+    setIsClient(true);
+    fetchLiveStatus();
+    const cleanup = initRealtimeSync();
+
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) checkStatus(e.detail);
+      else fetchLiveStatus();
+    };
+
+    window.addEventListener("site_info_updated", handleSiteUpdate);
+
+    // وب‌سوکت بلادرنگ سوپابیس
+    const channel = supabase
+      .channel("maintenance_realtime_channel_master")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
+        if (payload?.new) {
+          checkStatus(payload.new);
+        } else {
+          fetchLiveStatus();
         }
+      })
+      .subscribe();
+
+    // سیستم پایش کمکی هر ۳ ثانیه برای اطمینان ۱۰۰٪
+    const interval = setInterval(fetchLiveStatus, 3000);
+
+    return () => {
+      if (typeof cleanup === "function") cleanup();
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // ۲. سیستم حفظ موقعیت کاربر (State & Path Memory)
+  useEffect(() => {
+    if (!isClient || isAdmin) return;
+
+    if (maintenanceMode !== "none") {
+      // کاربر در حال حاضر در سایت بوده و سایت به حالت تعمیر رفته؛ مسیر فعلی را ذخیره می‌کنیم
+      const currentPath = window.location.pathname + window.location.search;
+      if (!currentPath.startsWith("/admin")) {
+        localStorage.setItem("axon_last_user_path", currentPath);
+      }
+    } else if (prevModeRef.current !== "none" && maintenanceMode === "none") {
+      // سایت از حالت تعمیرات خارج شده؛ کاربر را دقیقاً به همان صفحه و موقعیت قبلی بازمی‌گردانیم
+      const savedPath = localStorage.getItem("axon_last_user_path");
+      if (savedPath && savedPath !== window.location.pathname) {
+        localStorage.removeItem("axon_last_user_path");
+        router.replace(savedPath);
       }
     }
-  }, [maintenanceMode, isAdmin, mounted, router]);
 
-  // ۲. محاسبه زنده شمارنده معکوس برای حالت تعمیرات زمان‌دار
+    prevModeRef.current = maintenanceMode;
+  }, [maintenanceMode, isClient, isAdmin, router]);
+
+  // ۳. محاسبه زنده ثانیه‌شمار برای حالت زمان‌دار
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
       return;
     }
 
-    const calculateTimer = () => {
+    const updateCountdown = () => {
       const diff = new Date(maintenanceUntil).getTime() - Date.now();
       if (diff <= 0) {
         setMaintenanceMode("none");
         setTimeLeft(null);
-        siteInfoService.updateSiteInfo({ maintenance_mode: "none", allow_google_index: true, allowGoogleIndex: true });
+        fetch("/api/site-info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ maintenance_mode: "none", allow_google_index: true }),
+        }).catch(() => {});
         return;
       }
 
@@ -88,41 +141,12 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       setTimeLeft({ hours, minutes, seconds });
     };
 
-    calculateTimer();
-    const interval = setInterval(calculateTimer, 1000);
-    return () => clearInterval(interval);
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
   }, [maintenanceMode, maintenanceUntil]);
 
-  useEffect(() => {
-    setMounted(true);
-    fetchSiteStatus();
-    const cleanup = initRealtimeSync();
-
-    const handleUpdate = (e: any) => {
-      if (e.detail) applyStatus(e.detail);
-      else fetchSiteStatus();
-    };
-
-    window.addEventListener("site_info_updated", handleUpdate);
-
-    const channel = supabase
-      .channel("realtime-maintenance-guard-v16")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
-        if (payload?.new) {
-          applyStatus(payload.new);
-        } else {
-          fetchSiteStatus();
-        }
-      })
-      .subscribe();
-
-    return () => {
-      if (typeof cleanup === "function") cleanup();
-      window.removeEventListener("site_info_updated", handleUpdate);
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
+  // ادمین‌ها همیشه به پنل دسترسی دارند
   if (isAdmin) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -131,8 +155,8 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // صفحه لایو و چشم‌نواز حالت تعمیرات
-  if (maintenanceMode !== "none") {
+  // صفحه شیک حالت تعمیرات پس از لود کلاینت
+  if (isClient && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
     const email = siteInfo?.email || "support@axoncore.ir";
@@ -169,16 +193,17 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             
             <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed font-medium">
               {isTimed
-                ? "به منظور افزایش سرعت، اضافه شدن گجت‌های جدید و ارتقای امنیت پردازش داده‌ها، سایت موقتاً در دست ارتقا است و طبق زمان‌سنج زیر مجدداً در دسترس قرار خواهد گرفت."
-                : "به منظور ارتقای جامع زیرساخت، دسترسی موقتاً محدود شده است. به محض اتمام عملیات، سایت بدون نیاز به رفرش فعال خواهد شد."}
+                ? "به منظور افزایش سرعت پردازش، پیاده‌سازی محصولات جدید و ارتقای امنیت، سایت موقتاً در دست ارتقا است و طبق زمان‌سنج زیر به طور خودکار بازگشایی خواهد شد."
+                : "به منظور ارتقای جامع زیرساخت، دسترسی به سایت موقتاً محدود شده است. به محض اتمام کار، صفحه به صورت خودکار و بدون نیاز به رفرش در دسترس قرار خواهد گرفت."}
             </p>
 
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 text-[11px] text-blue-300 font-bold max-w-md mx-auto flex items-center justify-center gap-2">
               <span>🔒</span>
-              <span>موقعیت و سبد خرید شما ذخیره شده و پس از بازگشایی به همان صفحه هدایت می‌شوید.</span>
+              <span>موقعیت و سبد خرید شما ذخیره شده و پس از بازگشایی دقیقاً به همین صفحه برمی‌گردید.</span>
             </div>
           </div>
 
+          {/* تایمر معکوس برای حالت زمان‌دار */}
           {isTimed && timeLeft && (
             <div className="p-6 rounded-3xl bg-slate-950/80 border border-slate-800/90 space-y-3">
               <span className="text-[11px] font-black text-slate-400 block">زمان بازگشایی خودکار وب‌سایت:</span>

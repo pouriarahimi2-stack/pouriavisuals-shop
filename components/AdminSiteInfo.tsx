@@ -1,7 +1,8 @@
+// components/AdminSiteInfo.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { siteInfoService, SiteInfo } from '@/services/siteInfoService';
+import { siteInfoService, SiteInfo, MaintenanceMode } from '@/services/siteInfoService';
 import { supabase } from '@/lib/supabase';
 
 export default function AdminSiteInfo() {
@@ -13,7 +14,12 @@ export default function AdminSiteInfo() {
   const [workingHours, setWorkingHours] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [footerLogoUrl, setFooterLogoUrl] = useState('');
-  const [allowGoogleIndex, setAllowGoogleIndex] = useState(true);
+  
+  // تنظیمات حالت تعمیرات و ایندکس
+  const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>('none');
+  const [maintHours, setMaintHours] = useState<number>(1);
+  const [maintMinutes, setMaintMinutes] = useState<number>(0);
+
   const [instagram, setInstagram] = useState('');
   const [telegram, setTelegram] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -38,7 +44,10 @@ export default function AdminSiteInfo() {
     setWorkingHours(data.working_hours || 'شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰');
     setLogoUrl(data.logo_url || data.logoUrl || '');
     setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || '');
-    setAllowGoogleIndex(data.allow_google_index !== false && data.allowGoogleIndex !== false);
+    
+    const mode = data.maintenance_mode || (data.allow_google_index === false ? 'indefinite' : 'none');
+    setMaintenanceMode(mode);
+
     setInstagram(data.instagram || '');
     setTelegram(data.telegram || '');
     setWhatsapp(data.whatsapp || '');
@@ -58,7 +67,7 @@ export default function AdminSiteInfo() {
     });
 
     const channel = supabase
-      .channel("site-info-admin-realtime-master-v4")
+      .channel("site-info-admin-realtime-master-v55")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
         siteInfoService.getSiteInfo().then((data) => {
           if (data) populateForm(data);
@@ -95,8 +104,15 @@ export default function AdminSiteInfo() {
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSaving(true);
+    setStatusMessage(null);
 
-    const payload: SiteInfo = {
+    let untilISO: string | null = null;
+    const totalMins = Number(maintHours) * 60 + Number(maintMinutes);
+    if (maintenanceMode === 'timed') {
+      untilISO = new Date(Date.now() + totalMins * 60 * 1000).toISOString();
+    }
+
+    const payload: Partial<SiteInfo> = {
       site_name: siteName.trim(),
       siteName: siteName.trim(),
       storeName: siteName.trim(),
@@ -109,8 +125,11 @@ export default function AdminSiteInfo() {
       logoUrl: logoUrl.trim(),
       footer_logo_url: footerLogoUrl.trim(),
       footerLogoUrl: footerLogoUrl.trim(),
-      allow_google_index: allowGoogleIndex,
-      allowGoogleIndex: allowGoogleIndex,
+      allow_google_index: maintenanceMode === 'none',
+      allowGoogleIndex: maintenanceMode === 'none',
+      maintenance_mode: maintenanceMode,
+      maintenance_until: untilISO || undefined,
+      maintenance_duration_minutes: maintenanceMode === 'timed' ? totalMins : undefined,
       instagram: instagram.trim(),
       telegram: telegram.trim(),
       whatsapp: whatsapp.trim(),
@@ -122,18 +141,27 @@ export default function AdminSiteInfo() {
       custom_css: customCss,
     };
 
-    const res = await siteInfoService.updateSiteInfo(payload);
-    setSaving(false);
-
-    if (res) {
-      setStatusMessage({
-        type: 'success',
-        text: '⚡ مشخصات برند، لوگوها و وضعیت ایندکس گوگل با موفقیت در دیتابیس ذخیره و بلادرنگ در سراسر سایت اعمال گردید.',
+    try {
+      const res = await fetch('/api/site-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-    } else {
-      setStatusMessage({ type: 'error', text: 'خطا در ذخیره‌سازی اطلاعات در دیتابیس.' });
+
+      if (res.ok) {
+        setStatusMessage({
+          type: 'success',
+          text: '⚡ وضعیت سایت، تنظیمات برند و حالت تعمیرات با موفقیت در دیتابیس ذخیره و بلادرنگ اعمال شد.',
+        });
+      } else {
+        throw new Error('خطا در پاسخ سرور');
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'خطا در ذخیره‌سازی اطلاعات.' });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setStatusMessage(null), 4000);
     }
-    setTimeout(() => setStatusMessage(null), 3500);
   };
 
   return (
@@ -144,7 +172,7 @@ export default function AdminSiteInfo() {
             <span>⚙️</span> تنظیمات کلان سایت، سئو، هویت برند و درگاه‌ها
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پیکربندی هویت تجاری، لوگوهای هدر و فوتر، نوار اعلانات زنده، شبکه‌های اجتماعی و کلید وضعیت ایندکس گوگل
+            پیکربندی هویت تجاری، لوگوهای هدر و فوتر، وضعیت تعمیرات زمان‌دار یا نامحدود و ایندکس گوگل
           </p>
         </div>
         <button
@@ -169,56 +197,106 @@ export default function AdminSiteInfo() {
         </div>
       )}
 
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-3.5">
+      {/* بخش کنترل ۳ حالته وضعیت سایت و ایندکس گوگل */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+        <div className="flex items-center gap-3">
           <span
-            className={`w-4 h-4 rounded-full transition-all duration-500 ${
-              allowGoogleIndex
+            className={`w-3.5 h-3.5 rounded-full transition-all duration-500 ${
+              maintenanceMode === 'none'
                 ? "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.9)] animate-pulse"
+                : maintenanceMode === 'timed'
+                ? "bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.9)] animate-ping"
                 : "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.9)]"
             }`}
           />
           <div>
             <h4 className="text-sm font-black text-[var(--text-primary)]">
-              وضعیت ایندکس، دسترسی ربات‌های گوگل و موتورهای جستجو (Google Indexing)
+              مدیریت وضعیت آنلاین بودن، حالت تعمیرات و دسترسی ربات‌های گوگل
             </h4>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-              {allowGoogleIndex
-                ? "سایت به صورت زنده برای موتورهای جستجو ایندکس و در نتایج گوگل قرار دارد (نشانگر سبز)."
-                : "سایت در حالت تعمیرات قرار دارد و با ارسال هدرهای No-Index و تنظیم فایل robots.ts از دید گوگل مخفی است (نشانگر قرمز)."}
+              یکی از ۳ حالت زیر را انتخاب نمایید و دکمه ذخیره بالا را بزنید تا در لحظه روی کل سایت اعمال شود:
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setAllowGoogleIndex(!allowGoogleIndex)}
-          className={`px-6 py-3 rounded-2xl font-black text-xs transition cursor-pointer border ${
-            allowGoogleIndex
-              ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
-              : "bg-rose-500/15 text-rose-600 border-rose-500/30 hover:bg-rose-500 hover:text-white"
-          }`}
-        >
-          {allowGoogleIndex ? "ایندکس گوگل: فعال (Online) ✓" : "مخفی از گوگل (No-Index) ✕"}
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          {/* حالت ۱: آنلاین */}
+          <div
+            onClick={() => setMaintenanceMode('none')}
+            className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 ${
+              maintenanceMode === 'none'
+                ? 'bg-emerald-500/10 border-emerald-500 text-[var(--text-primary)] ring-2 ring-emerald-500/20'
+                : 'bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-black text-xs">
+              <input type="radio" checked={maintenanceMode === 'none'} onChange={() => {}} />
+              <span>۱. سایت آنلاین و فعال (Online)</span>
+            </div>
+            <p className="text-[11px] leading-relaxed">سایت برای تمام کاربران و گوگل فعال است.</p>
+          </div>
+
+          {/* حالت ۲: تعمیرات زمان‌دار */}
+          <div
+            onClick={() => setMaintenanceMode('timed')}
+            className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 ${
+              maintenanceMode === 'timed'
+                ? 'bg-amber-500/10 border-amber-500 text-[var(--text-primary)] ring-2 ring-amber-500/20'
+                : 'bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-black text-xs">
+              <input type="radio" checked={maintenanceMode === 'timed'} onChange={() => {}} />
+              <span>۲. تعمیرات زمان‌دار (با تایمر)</span>
+            </div>
+            <p className="text-[11px] leading-relaxed">سایت قفل شده و شمارنده معکوس نشان داده می‌شود.</p>
+
+            {maintenanceMode === 'timed' && (
+              <div className="pt-2 border-t border-[var(--card-border)] flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={48}
+                  value={maintHours}
+                  onChange={(e) => setMaintHours(Number(e.target.value))}
+                  className="w-16 p-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center text-xs"
+                />
+                <span className="text-[10px]">ساعت</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={maintMinutes}
+                  onChange={(e) => setMaintMinutes(Number(e.target.value))}
+                  className="w-16 p-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center text-xs"
+                />
+                <span className="text-[10px]">دقیقه</span>
+              </div>
+            )}
+          </div>
+
+          {/* حالت ۳: تعمیرات نامحدود */}
+          <div
+            onClick={() => setMaintenanceMode('indefinite')}
+            className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 ${
+              maintenanceMode === 'indefinite'
+                ? 'bg-rose-500/10 border-rose-500 text-[var(--text-primary)] ring-2 ring-rose-500/20'
+                : 'bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-black text-xs">
+              <input type="radio" checked={maintenanceMode === 'indefinite'} onChange={() => {}} />
+              <span>۳. تعمیرات نامحدود (قفل کامل)</span>
+            </div>
+            <p className="text-[11px] leading-relaxed">سایت تا زمان فعال‌سازی مجدد توسط ادمین مخفی می‌ماند.</p>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-8 shadow-xl text-xs">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <input
-            type="file"
-            ref={headerLogoFileRef}
-            onChange={(e) => handleFileUpload(e, false)}
-            accept="image/*"
-            className="hidden"
-          />
-          <input
-            type="file"
-            ref={footerLogoFileRef}
-            onChange={(e) => handleFileUpload(e, true)}
-            accept="image/*"
-            className="hidden"
-          />
+          <input type="file" ref={headerLogoFileRef} onChange={(e) => handleFileUpload(e, false)} accept="image/*" className="hidden" />
+          <input type="file" ref={footerLogoFileRef} onChange={(e) => handleFileUpload(e, true)} accept="image/*" className="hidden" />
 
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-[var(--text-primary)]">🖼️ لوگوی اصلی هدر بالای سایت</h3>
@@ -228,66 +306,34 @@ export default function AdminSiteInfo() {
               </div>
               <div className="space-y-2 flex-1">
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => headerLogoFileRef.current?.click()}
-                    className="px-3.5 py-2 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer"
-                  >
+                  <button type="button" onClick={() => headerLogoFileRef.current?.click()} className="px-3.5 py-2 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">
                     📁 آپلود از دستگاه
                   </button>
                   {logoUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setLogoUrl('')}
-                      className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer"
-                    >
-                      حذف ✕
-                    </button>
+                    <button type="button" onClick={() => setLogoUrl('')} className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
                   )}
                 </div>
-                <input
-                  type="text"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="یا درج لینک تصویر لوگو (https://...)..."
-                  className="w-full p-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none"
-                />
+                <input type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="یا درج لینک تصویر لوگو..." className="w-full p-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />
               </div>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-[var(--text-primary)]">⚓ آیکون / لوگوی اختصاصی فوتر (پاورقی)</h3>
+            <h3 className="text-xs font-bold text-[var(--text-primary)]">⚓ آیکون / لوگوی اختصاصی فوتر</h3>
             <div className="flex items-center gap-4 p-4 bg-[var(--input-bg)] rounded-2xl border border-[var(--card-border)]">
               <div className="w-20 h-20 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                 {footerLogoUrl ? <img src={footerLogoUrl} alt="Footer Logo" className="w-full h-full object-contain p-1" /> : <span className="text-2xl">⚓</span>}
               </div>
               <div className="space-y-2 flex-1">
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => footerLogoFileRef.current?.click()}
-                    className="px-3.5 py-2 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer"
-                  >
+                  <button type="button" onClick={() => footerLogoFileRef.current?.click()} className="px-3.5 py-2 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">
                     📁 آپلود از دستگاه
                   </button>
                   {footerLogoUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setFooterLogoUrl('')}
-                      className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer"
-                    >
-                      حذف ✕
-                    </button>
+                    <button type="button" onClick={() => setFooterLogoUrl('')} className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
                   )}
                 </div>
-                <input
-                  type="text"
-                  value={footerLogoUrl}
-                  onChange={(e) => setFooterLogoUrl(e.target.value)}
-                  placeholder="یا درج لینک تصویر فوتر..."
-                  className="w-full p-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none"
-                />
+                <input type="text" value={footerLogoUrl} onChange={(e) => setFooterLogoUrl(e.target.value)} placeholder="یا درج لینک تصویر فوتر..." className="w-full p-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />
               </div>
             </div>
           </div>
@@ -295,155 +341,46 @@ export default function AdminSiteInfo() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-[var(--card-border)] pt-6">
           <div className="md:col-span-2">
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">
-              متن نوار اعلانات بالای سایت (Header Live Announcement Bar)
-            </label>
-            <input
-              type="text"
-              value={announcement}
-              onChange={(e) => setAnnouncement(e.target.value)}
-              placeholder="مثال: جشنواره فروش ویژه نوروز | ارسال رایگان خریدهای بالای ۲ میلیون تومان..."
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">متن نوار اعلانات بالای سایت</label>
+            <input type="text" value={announcement} onChange={(e) => setAnnouncement(e.target.value)} placeholder="متن اعلان..." className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]" />
           </div>
-
           <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">
-              سقف حداقل خرید برای ارسال رایگان (تومان)
-            </label>
-            <input
-              type="number"
-              value={freeShippingThreshold}
-              onChange={(e) => setFreeShippingThreshold(Number(e.target.value))}
-              placeholder="2000000"
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">سقف ارسال رایگان (تومان)</label>
+            <input type="number" value={freeShippingThreshold} onChange={(e) => setFreeShippingThreshold(Number(e.target.value))} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono font-bold text-[var(--text-primary)] outline-none" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[var(--card-border)] pt-6">
           <div>
             <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی برند / فروشگاه *</label>
-            <input
-              type="text"
-              required
-              value={siteName}
-              onChange={(e) => setSiteName(e.target.value)}
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-bold text-[var(--text-primary)] outline-none"
-            />
+            <input type="text" required value={siteName} onChange={(e) => setSiteName(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-bold text-[var(--text-primary)] outline-none" />
           </div>
-
           <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شعار تبلیغاتی و تجاری (Tagline)</label>
-            <input
-              type="text"
-              value={tagline}
-              onChange={(e) => setTagline(e.target.value)}
-              placeholder="مرجع تخصصی تجهیزات دیجیتال..."
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-bold text-[var(--text-primary)] outline-none"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شعار تبلیغاتی (Tagline)</label>
+            <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-bold text-[var(--text-primary)] outline-none" />
           </div>
-
           <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شماره تماس رسمی و پشتیبانی</label>
-            <input
-              type="text"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="۰۲۱-۸۸۸۸۸۸۸۸"
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono font-bold text-[var(--text-primary)] outline-none"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شماره تماس رسمی</label>
+            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono font-bold text-[var(--text-primary)] outline-none" />
           </div>
-
           <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">ایمیل رسمی شرکت</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="support@yoursite.ir"
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)] outline-none"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">ایمیل رسمی</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)] outline-none" />
           </div>
-
           <div className="md:col-span-2">
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">ساعات کاری و پاسخ‌گویی پشتیبانی</label>
-            <input
-              type="text"
-              value={workingHours}
-              onChange={(e) => setWorkingHours(e.target.value)}
-              placeholder="شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰ | پنجشنبه‌ها ۹:۰۰ الی ۱۴:۰۰"
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs text-[var(--text-primary)] outline-none"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">ساعات کاری</label>
+            <input type="text" value={workingHours} onChange={(e) => setWorkingHours(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs text-[var(--text-primary)] outline-none" />
           </div>
-
           <div className="md:col-span-2">
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نشانی پستی دفتر مرکزی و انبار</label>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs text-[var(--text-primary)] outline-none"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-[var(--card-border)] pt-6">
-          <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">لینک صفحه اینستاگرام</label>
-            <input
-              type="text"
-              value={instagram}
-              onChange={(e) => setInstagram(e.target.value)}
-              placeholder="https://instagram.com/..."
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)] outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">لینک کانال تلگرام</label>
-            <input
-              type="text"
-              value={telegram}
-              onChange={(e) => setTelegram(e.target.value)}
-              placeholder="https://t.me/..."
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)] outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">لینک واتساپ پشتیبانی</label>
-            <input
-              type="text"
-              value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
-              placeholder="https://wa.me/..."
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)] outline-none"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نشانی پستی دفتر و انبار</label>
+            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs text-[var(--text-primary)] outline-none" />
           </div>
         </div>
 
         <div className="space-y-4 border-t border-[var(--card-border)] pt-6">
           <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">متن کامل معرفی برند در پاورقی سایت (Footer)</label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="توضیحات کوتاه درباره تاریخچه، اصالت محصولات و خدمات..."
-              className="w-full p-4 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs leading-relaxed text-[var(--text-primary)] outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">کدهای سفارشی استایل (Custom CSS):</label>
-            <textarea
-              rows={3}
-              value={customCss}
-              onChange={(e) => setCustomCss(e.target.value)}
-              placeholder="/* کدهای CSS اختصاصی خود را وارد کنید */"
-              className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs font-mono text-[var(--text-primary)] outline-none"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">متن کامل معرفی در پاورقی (Footer)</label>
+            <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-4 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-xs leading-relaxed text-[var(--text-primary)] outline-none" />
           </div>
         </div>
       </form>

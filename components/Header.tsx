@@ -117,7 +117,7 @@ export default function Header() {
     window.addEventListener("site_info_updated", handleSiteInfoUpdate);
 
     const channel = supabase
-      .channel("header-realtime-master-v35")
+      .channel("header-realtime-master-v60")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchHeaderData())
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchHeaderData())
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => fetchHeaderData())
@@ -348,10 +348,10 @@ export default function Header() {
                 )}
               </div>
               <div className="flex flex-col text-right">
-                <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]">
+                <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
                   {currentStoreName}
                 </span>
-                <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)] mt-0.5">
+                <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)] mt-0.5" suppressHydrationWarning>
                   {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال"}
                 </span>
               </div>
@@ -462,11 +462,12 @@ export default function Header() {
               onClick={toggleDarkMode}
               className="w-11 h-11 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
               title="تغییر تم"
+              suppressHydrationWarning
             >
-              {isDarkMode ? "🌙" : "☀️"}
+              {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
             </button>
 
-            {/* دکمه سبد خرید بی‌نقص */}
+            {/* دکمه سبد خرید متقارن و استاندارد */}
             <button
               onClick={toggleCart}
               className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-lg shadow-blue-500/25 cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"

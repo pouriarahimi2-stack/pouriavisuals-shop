@@ -148,7 +148,7 @@ export default function Header() {
 
     // همگام‌سازی بلادرنگ با وب‌سوکت Supabase برای هدر، منوها و کاتالوگ
     const channel = supabase
-      .channel("header-realtime-master-channel-v7")
+      .channel("header-realtime-master-channel-v10")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchAllHeaderData())
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchAllHeaderData())
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => fetchAllHeaderData())
@@ -392,11 +392,11 @@ export default function Header() {
         </div>
       )}
 
-      {/* ۲. بدنه کپسولی و شناور هدر در وسط صفحه با حاشیه از کناره‌ها */}
+      {/* ۲. بدنه کپسولی و شناور هدر */}
       <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 sm:py-3 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
         <div className="flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* راست: لوگوی بزرگ و برجسته، عنوان برند، چراغ نئونی ایندکس گوگل و دکمه دسته‌بندی‌ها */}
+          {/* راست: لوگو، عنوان برند، چراغ نئونی و دکمه دسته‌بندی‌ها */}
           <div className="flex items-center gap-3.5 shrink-0">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -406,13 +406,12 @@ export default function Header() {
               ☰
             </button>
 
-            <Link href="/" className="flex items-center gap-3.5 group">
-              {/* کادر لوگوی بزرگ، واضح و استاندارد اپلی */}
-              <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1.5 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
                 {currentLogoUrl ? (
                   <img src={currentLogoUrl} alt={currentStoreName} className="w-full h-full object-contain" />
                 ) : (
-                  <span className="text-3xl sm:text-4xl font-black text-[var(--accent-blue)]">⚡</span>
+                  <span className="text-2xl sm:text-3xl font-black text-[var(--accent-blue)]">⚡</span>
                 )}
               </div>
               <div className="flex flex-col text-right">
@@ -493,26 +492,27 @@ export default function Header() {
                 <Link
                   key={item.id}
                   href={item.url || "#"}
-                  className="px-4 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
+                  className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
                 >
                   {item.title}
                 </Link>
               ))
             ) : (
               <>
-                <Link href="/" className="px-4 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">صفحه نخست</Link>
-                <Link href="/products" className="px-4 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">کاتالوگ محصولات</Link>
-                <Link href="/track-order" className="px-4 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">پیگیری مرسوله پستی</Link>
-                <Link href="/blog" className="px-4 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">مجله تخصصی سئو</Link>
-                <Link href="/contact" className="px-4 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">تماس با ما</Link>
+                <Link href="/" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">صفحه نخست</Link>
+                <Link href="/products" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">کاتالوگ محصولات</Link>
+                <Link href="/news" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">📡 رادار اخبار تکنولوژی</Link>
+                <Link href="/track-order" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">پیگیری مرسوله پستی</Link>
+                <Link href="/blog" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">مجله تخصصی</Link>
+                <Link href="/contact" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">تماس با ما</Link>
               </>
             )}
           </nav>
 
-          {/* چپ: باکس جستجوی زنده، دکمه تغییر تم و سبد خرید */}
+          {/* چپ: باکس جستجوی زنده، دکمه تغییر تم و سبد خرید بازطراحی‌شده */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="relative hidden lg:block" ref={searchContainerRef}>
-              <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-44 xl:w-56 shadow-sm">
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 xl:w-52 shadow-sm h-11">
                 <span className="text-xs opacity-70">🔍</span>
                 <input
                   type="text"
@@ -550,18 +550,28 @@ export default function Header() {
               )}
             </div>
 
-            <button onClick={toggleDarkMode} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm" title="تغییر تم شب و روز">
+            <button
+              onClick={toggleDarkMode}
+              className="w-11 h-11 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
+              title="تغییر تم شب و روز"
+            >
               {isDarkMode ? "🌙" : "☀️"}
             </button>
 
-            <button onClick={toggleCart} className="relative px-4 sm:px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 active:scale-95 transition shadow-lg shadow-blue-500/20 cursor-pointer flex items-center gap-2">
-              <span>🛒</span>
-              <span className="hidden sm:inline">سبد خرید</span>
-              {totalCartCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-white text-[var(--accent-blue)] flex items-center justify-center font-mono font-black text-[10px] shadow">
-                  {totalCartCount}
-                </span>
-              )}
+            {/* دکمه بازطراحی‌شده و کاملاً متقارن سبد خرید */}
+            <button
+              onClick={toggleCart}
+              className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)] text-white text-xs font-black active:scale-95 transition-all shadow-lg shadow-blue-500/25 cursor-pointer flex items-center gap-2.5 shrink-0 whitespace-nowrap"
+            >
+              <div className="relative flex items-center justify-center">
+                <span className="text-base leading-none">🛒</span>
+                {totalCartCount > 0 && (
+                  <span className="absolute -top-2.5 -right-2.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[10px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse">
+                    {totalCartCount}
+                  </span>
+                )}
+              </div>
+              <span className="hidden sm:inline font-black text-xs">سبد خرید</span>
             </button>
           </div>
         </div>
@@ -573,6 +583,7 @@ export default function Header() {
           <div className="flex flex-col space-y-2 text-xs font-bold">
             <Link href="/" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">🏠 صفحه نخست</Link>
             <Link href="/products" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📦 کاتالوگ تجهیزات</Link>
+            <Link href="/news" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2 text-[var(--accent-blue)]">📡 رادار اخبار تکنولوژی روز دنیا</Link>
             <Link href="/track-order" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">🚚 استعلام مرسوله پستی</Link>
             <Link href="/blog" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📚 مجله تخصصی سئو</Link>
             <Link href="/contact" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📞 تماس با ما</Link>
@@ -580,7 +591,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* ۳. کشوی سبد خرید داخلی به همراه فرایند ثبت فاکتور و اعتبارسنجی پستی */}
+      {/* ۳. کشوی سبد خرید داخلی */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn font-sans">
           <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-6 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">

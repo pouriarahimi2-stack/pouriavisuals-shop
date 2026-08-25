@@ -19,16 +19,16 @@ function isValidIranianPostalCode(postalCode: string): { valid: boolean; message
     .replace(/\D/g, "");
 
   if (cleanCode.length !== 10) {
-    return { valid: false, message: "کد پستی باید دقیقاً ۱۰ رقم عددی بدون خط تیره باشد." };
+    return { valid: false, message: "کد پستی باید دقیقاً ۱۰ رقم عددی باشد." };
   }
 
   const firstDigit = cleanCode.charAt(0);
   if (firstDigit === "0" || firstDigit === "2") {
-    return { valid: false, message: "کد پستی با ارقام ۰ یا ۲ در محدوده مناطق پستی ایران تعریف نشده است." };
+    return { valid: false, message: "کد پستی با ارقام ۰ یا ۲ نامعتبر است." };
   }
 
   if (/^(\d)\1{9}$/.test(cleanCode)) {
-    return { valid: false, message: "کد پستی نمی‌تواند از ۱۰ رقم کاملاً تکراری تشکیل شده باشد." };
+    return { valid: false, message: "کد پستی نمی‌تواند از ۱۰ رقم کاملاً یکسان باشد." };
   }
 
   return { valid: true };
@@ -48,7 +48,6 @@ export default function Header() {
   const removeCoupon = cartContext?.removeCoupon || (() => {});
   const submitOrder = cartContext?.submitOrder;
 
-  const [mounted, setMounted] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
@@ -99,7 +98,7 @@ export default function Header() {
 
   const finalTotal = Math.max(0, rawTotal - discountAmount);
 
-  async function fetchAllHeaderData() {
+  async function fetchHeaderData() {
     try {
       const [info, menus, cats, prods] = await Promise.all([
         siteInfoService.getSiteInfo(),
@@ -117,28 +116,21 @@ export default function Header() {
   }
 
   useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem("theme");
-    const isDark = savedTheme !== "light";
-    setIsDarkMode(isDark);
-    if (isDark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-
-    fetchAllHeaderData();
+    fetchHeaderData();
 
     const handleSiteInfoUpdate = (e: any) => {
       if (e.detail) setSiteInfo(e.detail);
-      else fetchAllHeaderData();
+      else fetchHeaderData();
     };
 
     window.addEventListener("site_info_updated", handleSiteInfoUpdate);
 
     const channel = supabase
-      .channel("header-realtime-master-v15")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchAllHeaderData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchAllHeaderData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => fetchAllHeaderData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => fetchAllHeaderData())
+      .channel("header-realtime-master-v30")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchHeaderData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchHeaderData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => fetchHeaderData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => fetchHeaderData())
       .subscribe();
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -322,9 +314,14 @@ export default function Header() {
   const currentLogoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
   const headerAnnouncement = siteInfo?.header_announcement;
 
-  if (!mounted) {
-    return <header className="h-20" />;
-  }
+  const activeLinks = menuItems.length > 0 ? menuItems : [
+    { id: "m1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
+    { id: "m2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
+    { id: "m3", title: "📡 رادار اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
+    { id: "m4", title: "پیگیری سفارش پستی", url: "/track-order", order: 4, isActive: true },
+    { id: "m5", title: "مجله و مقالات سئو", url: "/blog", order: 5, isActive: true },
+    { id: "m6", title: "تماس با ما", url: "/contact", order: 6, isActive: true },
+  ];
 
   return (
     <header className="sticky top-2 sm:top-3.5 z-40 max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
@@ -344,15 +341,15 @@ export default function Header() {
         </div>
       )}
 
-      {/* بدنه اصلی هدر با دکمه‌های متقارن و بدون ارور */}
-      <div className="bg-[var(--modal-bg)]/90 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
+      {/* بدنه شیشه‌ای هدر با چینش کامل دسکتاپ و موبایل */}
+      <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
         <div className="flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* راست: لوگو، عنوان و دسته‌ها */}
+          {/* راست: لوگو و دسته‌ها */}
           <div className="flex items-center gap-3.5 shrink-0">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="xl:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
+              className="lg:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
             >
               ☰
             </button>
@@ -375,7 +372,7 @@ export default function Header() {
               </div>
             </Link>
 
-            <div className="relative hidden md:block" ref={categoryDropdownRef}>
+            <div className="relative hidden sm:block" ref={categoryDropdownRef}>
               <button
                 onClick={() => setIsCategoryOpen(!isCategoryOpen)}
                 className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-black transition-all duration-200 border cursor-pointer ${
@@ -422,38 +419,27 @@ export default function Header() {
             </div>
           </div>
 
-          {/* وسط: منوی پیوندها */}
-          <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
-            {menuItems.length > 0 ? (
-              menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  href={item.url || "#"}
-                  className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
-                >
-                  {item.title}
-                </Link>
-              ))
-            ) : (
-              <>
-                <Link href="/" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">صفحه نخست</Link>
-                <Link href="/products" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">کاتالوگ محصولات</Link>
-                <Link href="/news" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--accent-blue)] hover:text-white hover:bg-[var(--accent-blue)] transition">📡 رادار اخبار تکنولوژی</Link>
-                <Link href="/track-order" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">پیگیری مرسوله پستی</Link>
-                <Link href="/blog" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">مجله تخصصی</Link>
-                <Link href="/contact" className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition">تماس با ما</Link>
-              </>
-            )}
+          {/* وسط: منوی اصلی ناوبری سایت */}
+          <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
+            {activeLinks.map((item) => (
+              <Link
+                key={item.id}
+                href={item.url || "#"}
+                className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
+              >
+                {item.title}
+              </Link>
+            ))}
           </nav>
 
-          {/* چپ: جستجو، تم و دکمه سبد خرید بازطراحی‌شده */}
+          {/* چپ: سرچ، تم و دکمه سبد خرید با استایل اپلی */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            <div className="relative hidden lg:block" ref={searchContainerRef}>
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 xl:w-52 shadow-sm h-11">
+            <div className="relative hidden md:block" ref={searchContainerRef}>
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-48 shadow-sm h-11">
                 <span className="text-xs opacity-70">🔍</span>
                 <input
                   type="text"
-                  placeholder="جستجوی مدل، برند..."
+                  placeholder="جستجو..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setIsSearchFocused(true)}
@@ -490,12 +476,12 @@ export default function Header() {
             <button
               onClick={toggleDarkMode}
               className="w-11 h-11 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
-              title="تغییر تم شب و روز"
+              title="تغییر تم"
             >
               {isDarkMode ? "🌙" : "☀️"}
             </button>
 
-            {/* دکمه سبد خرید با استایل اپلی */}
+            {/* دکمه سبد خرید متقارن و استاندارد */}
             <button
               onClick={toggleCart}
               className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-lg shadow-blue-500/25 cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"
@@ -517,12 +503,12 @@ export default function Header() {
       </div>
 
       {mobileMenuOpen && (
-        <div className="xl:hidden mt-2 p-5 bg-[var(--modal-bg)] rounded-3xl border border-[var(--card-border)] shadow-2xl space-y-3 animate-fadeIn">
+        <div className="lg:hidden mt-2 p-5 bg-[var(--modal-bg)] rounded-3xl border border-[var(--card-border)] shadow-2xl space-y-3 animate-fadeIn">
           <div className="flex flex-col space-y-2 text-xs font-bold">
             <Link href="/" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">🏠 صفحه نخست</Link>
             <Link href="/products" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📦 کاتالوگ تجهیزات</Link>
-            <Link href="/news" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2 text-[var(--accent-blue)]">📡 رادار اخبار تکنولوژی روز دنیا</Link>
-            <Link href="/track-order" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">🚚 استعلام مرسوله پستی</Link>
+            <Link href="/news" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2 text-[var(--accent-blue)]">📡 رادار اخبار تکنولوژی</Link>
+            <Link href="/track-order" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">🚚 پیگیری مرسوله</Link>
             <Link href="/blog" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📚 مجله تخصصی سئو</Link>
             <Link href="/contact" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📞 تماس با ما</Link>
           </div>
@@ -658,7 +644,7 @@ export default function Header() {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5 font-bold">شماره موبایل (۱۱ رقم) *</label>
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5 font-bold">شماره موبایل *</label>
                         <input
                           type="text"
                           placeholder="09123456789"
@@ -672,7 +658,7 @@ export default function Header() {
                         <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5 font-bold">کد پستی ۱۰ رقمی *</label>
                         <input
                           type="text"
-                          placeholder="کد ۱۰ رقمی پستی"
+                          placeholder="کد ۱۰ رقمی"
                           required
                           value={postalCode}
                           onChange={(e) => setPostalCode(e.target.value)}

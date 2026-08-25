@@ -1,4 +1,3 @@
-
 // components/AdminBlogManager.tsx
 "use client";
 
@@ -32,6 +31,11 @@ export default function AdminBlogManager() {
   const [metaDescription, setMetaDescription] = useState("");
   const [isPublished, setIsPublished] = useState(true);
 
+  // آمار سند
+  const [wordCount, setWordCount] = useState(0);
+  const [charCount, setCharCount] = useState(0);
+  const [readTime, setReadTime] = useState(1);
+
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -54,7 +58,7 @@ export default function AdminBlogManager() {
     fetchPosts();
 
     const channel = supabase
-      .channel("posts-realtime-master-v5")
+      .channel("posts-realtime-master-v6")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
         fetchPosts();
       })
@@ -64,6 +68,16 @@ export default function AdminBlogManager() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const updateStats = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.innerText || "";
+    const words = text.trim().split(/\s+/).filter(Boolean).length;
+    const chars = text.length;
+    setWordCount(words);
+    setCharCount(chars);
+    setReadTime(Math.max(1, Math.ceil(words / 200)));
+  };
 
   const handleSelectPost = (p: BlogPost) => {
     setSelectedPost(p);
@@ -76,6 +90,7 @@ export default function AdminBlogManager() {
 
     if (editorRef.current) {
       editorRef.current.innerHTML = p.content || "";
+      setTimeout(updateStats, 100);
     }
   };
 
@@ -89,13 +104,15 @@ export default function AdminBlogManager() {
     setIsPublished(true);
 
     if (editorRef.current) {
-      editorRef.current.innerHTML = "<h2>مقدمه و بررسی تخصصی</h2><p>متن خود را با ابزارهای نوار بالا ویرایش کنید...</p>";
+      editorRef.current.innerHTML = "<h2>مقدمه و بررسی تخصصی</h2><p>متن خود را با ابزارهای نوار ابزار بالا بنویسید...</p>";
+      setTimeout(updateStats, 100);
     }
   };
 
-  // دستورات نوار ابزار Word-Like
+  // توابع فرمت‌بندی متن (Microsoft Word Style)
   const exec = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
+    updateStats();
   };
 
   const insertHeading = (tag: string) => {
@@ -103,8 +120,8 @@ export default function AdminBlogManager() {
   };
 
   const insertTable = () => {
-    const rows = prompt("تعداد سطرها:", "3") || "3";
-    const cols = prompt("تعداد ستون‌ها:", "3") || "3";
+    const rows = prompt("تعداد سطرهای جدول:", "3") || "3";
+    const cols = prompt("تعداد ستون‌های جدول:", "3") || "3";
     let tableHtml = `<table border="1" style="width:100%; border-collapse:collapse; margin:16px 0; border:1px solid var(--card-border);"><thead><tr style="background:var(--input-bg);">`;
     for (let c = 0; c < Number(cols); c++) {
       tableHtml += `<th style="padding:10px; border:1px solid var(--card-border); font-weight:bold;">سرستون ${c + 1}</th>`;
@@ -113,7 +130,7 @@ export default function AdminBlogManager() {
     for (let r = 0; r < Number(rows) - 1; r++) {
       tableHtml += `<tr>`;
       for (let c = 0; c < Number(cols); c++) {
-        tableHtml += `<td style="padding:10px; border:1px solid var(--card-border);">متن سطر ${r + 1}</td>`;
+        tableHtml += `<td style="padding:10px; border:1px solid var(--card-border);">محتوا سطر ${r + 1}</td>`;
       }
       tableHtml += `</tr>`;
     }
@@ -121,9 +138,19 @@ export default function AdminBlogManager() {
     exec("insertHTML", tableHtml);
   };
 
-  const insertQuote = () => {
-    const quoteHtml = `<blockquote style="border-right:4px solid var(--accent-blue); padding:12px 18px; margin:14px 0; background:rgba(0,113,227,0.08); border-radius:12px; font-style:italic;">نقل قول یا نکته مهم را اینجا بنویسید...</blockquote><p><br></p>`;
-    exec("insertHTML", quoteHtml);
+  const insertCallout = (type: "info" | "warning" | "success") => {
+    const bg = type === "info" ? "rgba(0,113,227,0.08)" : type === "warning" ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)";
+    const border = type === "info" ? "#0071e3" : type === "warning" ? "#f59e0b" : "#10b981";
+    const title = type === "info" ? "💡 نکته مهم" : type === "warning" ? "⚠️ هشدار و توجه" : "✅ تاییدیه کارشناسی";
+
+    const calloutHtml = `
+      <div style="border-right:4px solid ${border}; background:${bg}; padding:14px 18px; border-radius:16px; margin:16px 0;">
+        <strong style="color:${border}; display:block; margin-bottom:4px;">${title}:</strong>
+        <span>متن راهنما یا نکته ویژه سئو را اینجا بنویسید...</span>
+      </div>
+      <p><br></p>
+    `;
+    exec("insertHTML", calloutHtml);
   };
 
   const insertLink = () => {
@@ -141,7 +168,7 @@ export default function AdminBlogManager() {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === "string") {
-          const imgHtml = `<img src="${reader.result}" alt="Blog Image" style="max-width:100%; height:auto; border-radius:16px; margin:16px 0; border:1px solid var(--card-border);" /><p><br></p>`;
+          const imgHtml = `<img src="${reader.result}" alt="Blog Image" style="max-width:100%; height:auto; border-radius:20px; margin:16px auto; display:block; border:1px solid var(--card-border);" /><p><br></p>`;
           exec("insertHTML", imgHtml);
         }
       };
@@ -186,7 +213,7 @@ export default function AdminBlogManager() {
       const data = await res.json();
 
       if (data.success) {
-        setStatusMessage({ type: "success", text: "⚡ مقاله سئو با موفقیت ذخیره و در مجله سایت منتشر شد." });
+        setStatusMessage({ type: "success", text: "⚡ مقاله سئو با موفقیت در دیتابیس ذخیره و در مجله سایت منتشر شد." });
         fetchPosts();
         if (!selectedPost && data.post) {
           setSelectedPost(data.post);
@@ -203,7 +230,7 @@ export default function AdminBlogManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف کامل این مقاله اطمینان دارید؟")) return;
+    if (!confirm("آیا از حذف این مقاله اطمینان دارید؟")) return;
     try {
       const { error } = await supabase.from("posts").delete().eq("id", id);
       if (error) throw error;
@@ -220,13 +247,13 @@ export default function AdminBlogManager() {
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <input type="file" ref={imageUploadInputRef} onChange={handleImageUploadToEditor} accept="image/*" className="hidden" />
 
-      {/* سربرگ مدیریت مقالات */}
+      {/* هدر بخش ویراستار */}
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📚</span> ویراستار پیشرفته اسناد، مقالات و پایگاه دانش سئو (WYSIWYG Pro)
+            <span>📚</span> ویراستار پیشرفته اسناد، مقالات و سئو (Word-Grade Editor)
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">نگارش محتوای غنی با نوار ابزار کامل مایکروسافت ورد، جداول پیشرفته، فونت‌ها و پیش‌نمایش در گوگل</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">نگارش محتوای غنی با ابزارهای کامل فرمت‌بندی، جداول، باکس‌های راهنما و پیش‌نمایش SERP گوگل</p>
         </div>
         <button
           onClick={handleCreateNew}
@@ -244,12 +271,12 @@ export default function AdminBlogManager() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* لیست مقالات سایدبار */}
+        {/* لیست مقالات در سایدبار */}
         <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
           <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
             📑 مقالات منتشر شده ({posts.length})
           </h3>
-          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
             {posts.length === 0 ? (
               <p className="text-xs text-center py-10 text-[var(--text-secondary)]">هنوز مقاله‌ای ثبت نشده است.</p>
             ) : (
@@ -274,9 +301,11 @@ export default function AdminBlogManager() {
           </div>
         </div>
 
-        {/* ویرایشگر کامل متن و سئو */}
+        {/* بوم نگارش و فرم کامل مقاله */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
+            
+            {/* اطلاعات سئو و تیتر */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block font-bold text-[var(--text-secondary)] mb-1.5">عنوان اصلی مقاله (H1) *</label>
@@ -330,32 +359,52 @@ export default function AdminBlogManager() {
                 type="text"
                 value={metaDescription}
                 onChange={(e) => setMetaDescription(e.target.value)}
-                placeholder="خلاصه مقاله جهت نمایش در نتایج موتورهای جستجو..."
+                placeholder="خلاصه ترغیب‌کننده مقاله جهت نمایش در نتایج گوگل (حداکثر ۱۶۰ کاراکتر)..."
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
 
-            {/* نوار ابزار کامل مشابه مایکروسافت ورد */}
+            {/* نوار ابزار فوق پیشرفته Microsoft Word */}
             <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
-              <label className="font-bold text-[var(--text-secondary)] block">نوار ابزار حرفه‌ای ویرایش متن:</label>
-              <div className="flex flex-wrap items-center gap-1.5 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
+              <div className="flex justify-between items-center">
+                <label className="font-bold text-[var(--text-secondary)]">نوار ابزار ویرایشگر سند (Word Toolbar):</label>
+                <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--text-secondary)]">
+                  <span>کلمات: <strong>{wordCount}</strong></span>
+                  <span>کاراکترها: <strong>{charCount}</strong></span>
+                  <span>زمان مطالعه: <strong>~{readTime} دقیقه</strong></span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 p-3 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
+                {/* سرفصل‌ها */}
                 <select onChange={(e) => insertHeading(e.target.value)} className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none">
-                  <option value="p">پاراگراف (متن عادی)</option>
-                  <option value="h1">تیتر ۱ (H1)</option>
-                  <option value="h2">تیتر ۲ (H2)</option>
-                  <option value="h3">تیتر ۳ (H3)</option>
-                  <option value="h4">تیتر ۴ (H4)</option>
+                  <option value="p">پاراگراف عادی</option>
+                  <option value="h1">تیتر اصلی ۱ (H1)</option>
+                  <option value="h2">تیتر بخش ۲ (H2)</option>
+                  <option value="h3">تیتر زیربخش ۳ (H3)</option>
+                  <option value="h4">تیتر فرعی ۴ (H4)</option>
                 </select>
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
-                <button type="button" onClick={() => exec("bold")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-xs hover:border-[var(--accent-blue)]" title="Bold"><b>B</b></button>
-                <button type="button" onClick={() => exec("italic")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] italic text-xs hover:border-[var(--accent-blue)]" title="Italic"><i>I</i></button>
-                <button type="button" onClick={() => exec("underline")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] underline text-xs hover:border-[var(--accent-blue)]" title="Underline"><u>U</u></button>
-                <button type="button" onClick={() => exec("strikeThrough")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] line-through text-xs hover:border-[var(--accent-blue)]" title="Strike">S</button>
+                {/* فرمت‌بندی قلم */}
+                <button type="button" onClick={() => exec("bold")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-xs hover:border-[var(--accent-blue)]" title="Bold (Ctrl+B)"><b>B</b></button>
+                <button type="button" onClick={() => exec("italic")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] italic text-xs hover:border-[var(--accent-blue)]" title="Italic (Ctrl+I)"><i>I</i></button>
+                <button type="button" onClick={() => exec("underline")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] underline text-xs hover:border-[var(--accent-blue)]" title="Underline (Ctrl+U)"><u>U</u></button>
+                <button type="button" onClick={() => exec("strikeThrough")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] line-through text-xs hover:border-[var(--accent-blue)]" title="Strikethrough">S</button>
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
+                {/* انتخاب رنگ متن و هایلایت */}
+                <div className="flex items-center gap-1 bg-[var(--modal-bg)] p-1 rounded-xl border border-[var(--card-border)]">
+                  <span className="text-[10px] font-bold px-1">🎨 رنگ:</span>
+                  <input type="color" onChange={(e) => exec("foreColor", e.target.value)} title="رنگ فونت" className="w-6 h-6 rounded cursor-pointer bg-transparent border-none" />
+                  <input type="color" defaultValue="#ffff00" onChange={(e) => exec("hiliteColor", e.target.value)} title="هایلایت متن" className="w-6 h-6 rounded cursor-pointer bg-transparent border-none" />
+                </div>
+
+                <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
+
+                {/* ترازبندی */}
                 <button type="button" onClick={() => exec("justifyRight")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="راست‌چین">👉</button>
                 <button type="button" onClick={() => exec("justifyCenter")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="وسط‌چین">↔️</button>
                 <button type="button" onClick={() => exec("justifyLeft")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="چپ‌چین">👈</button>
@@ -363,29 +412,38 @@ export default function AdminBlogManager() {
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
+                {/* لیست‌ها */}
                 <button type="button" onClick={() => exec("insertUnorderedList")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="لیست نقطه‌ای">• لیست</button>
                 <button type="button" onClick={() => exec("insertOrderedList")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="لیست شماره‌دار">۱. لیست</button>
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
+                {/* المان‌های پیشرفته */}
                 <button type="button" onClick={insertTable} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)]">📊 ساخت جدول</button>
-                <button type="button" onClick={insertQuote} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)]">💬 نقل قول</button>
-                <button type="button" onClick={insertLink} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)]">🔗 درج لینک</button>
-                <button type="button" onClick={() => imageUploadInputRef.current?.click()} className="p-2 px-3 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 shadow-sm flex items-center gap-1">
+                <button type="button" onClick={() => insertCallout("info")} className="p-2 px-2.5 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-500/20 text-xs font-bold">💡 باکس نکته</button>
+                <button type="button" onClick={() => insertCallout("warning")} className="p-2 px-2.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs font-bold">⚠️ هشدار</button>
+                <button type="button" onClick={insertLink} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)]">🔗 لینک</button>
+                
+                <button
+                  type="button"
+                  onClick={() => imageUploadInputRef.current?.click()}
+                  className="p-2 px-3.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 shadow-md flex items-center gap-1 cursor-pointer"
+                >
                   <span>📁</span>
-                  <span>آپلود عکس در متن</span>
+                  <span>آپلود عکس از سیستم</span>
                 </button>
               </div>
             </div>
 
-            {/* بدنه ویرایشگر سند */}
+            {/* بوم نگارش زنده سند */}
             <div className="space-y-1.5">
-              <label className="font-bold text-[var(--text-secondary)] block">محیط نگارش مقاله (WYSIWYG Canvas):</label>
+              <label className="font-bold text-[var(--text-secondary)] block">محیط نگارش مقاله (WYSIWYG Live Canvas):</label>
               <div
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
-                className="w-full min-h-[380px] max-h-[550px] overflow-y-auto p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-loose text-xs focus:border-[var(--accent-blue)] font-sans shadow-inner text-[var(--text-primary)]"
+                onInput={updateStats}
+                className="w-full min-h-[420px] max-h-[600px] overflow-y-auto p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-loose text-xs focus:border-[var(--accent-blue)] font-sans shadow-inner text-[var(--text-primary)]"
                 style={{ textAlign: "justify" }}
               />
             </div>

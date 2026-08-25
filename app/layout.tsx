@@ -1,3 +1,4 @@
+// app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
@@ -51,8 +52,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" className="dark">
-      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between">
+    <html lang="fa" dir="rtl" className="dark" suppressHydrationWarning>
+      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between" suppressHydrationWarning>
         <ClientLayoutEnhancer />
         <CartProvider>
           <LayoutWrapper>{children}</LayoutWrapper>

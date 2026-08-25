@@ -24,10 +24,8 @@ export default function PageBuilder() {
     fetchPages();
 
     const pageChannel = supabase
-      .channel("pagebuilder-realtime-master")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_pages" }, () => {
-        fetchPages();
-      })
+      .channel("pagebuilder-realtime-master-v3")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_pages" }, () => fetchPages())
       .subscribe();
 
     return () => {
@@ -84,7 +82,7 @@ export default function PageBuilder() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !slug.trim()) {
-      setStatusMessage({ type: "error", text: "عنوان و نامک (Slug) صفحه الزامی هستند." });
+      setStatusMessage({ type: "error", text: "عنوان و نامک صفحه الزامی هستند." });
       return;
     }
 
@@ -102,11 +100,11 @@ export default function PageBuilder() {
     setSaving(false);
 
     if (result) {
-      setStatusMessage({ type: "success", text: "⚡ صفحه اختصاصی با موفقیت در دیتابیس ذخیره و منتشر شد." });
+      setStatusMessage({ type: "success", text: "⚡ صفحه با موفقیت ذخیره شد." });
       setSelectedPage(result);
       fetchPages();
     } else {
-      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی صفحه در دیتابیس." });
+      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی صفحه." });
     }
     setTimeout(() => setStatusMessage(null), 3500);
   };
@@ -124,234 +122,81 @@ export default function PageBuilder() {
 
   return (
     <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm">
+      <div className="flex justify-between items-center bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🏗️</span> صفحه‌ساز هوشمند و چیدمان صفحات اختصاصی
-          </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ساخت لندینگ‌های اختصاصی، لندینگ‌های تبلیغاتی و معرفی محصول با ذخیره‌سازی بلادرنگ</p>
+          <h2 className="text-lg font-black text-[var(--accent-blue)]">🏗️ صفحه‌ساز ماژولار و ساخت لندینگ (Page Builder)</h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">ساخت صفحات فرود با ۱۰ بلاک پیشرفته (Hero, FAQ, Testimonials, CTA, Products)</p>
         </div>
-        <button
-          onClick={handleCreateNew}
-          className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition shadow-md cursor-pointer"
-        >
-          + ایجاد صفحه جدید
-        </button>
+        <button onClick={handleCreateNew} className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer">+ ایجاد صفحه جدید</button>
       </div>
 
       {statusMessage && (
-        <div
-          className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${
-            statusMessage.type === "success"
-              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
-          }`}
-        >
+        <div className={`p-4 rounded-2xl text-xs font-bold ${statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}`}>
           {statusMessage.text}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1 bg-[var(--modal-bg)] p-5 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit">
-          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            📑 صفحات ثبت‌شده ({pages.length})
-          </h3>
+        <div className="lg:col-span-1 bg-[var(--modal-bg)] p-5 rounded-3xl border border-[var(--card-border)] space-y-4 h-fit">
+          <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">📑 صفحات ثبت‌شده ({pages.length})</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {pages.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-secondary)] font-medium text-center py-4">هنوز صفحه‌ای ثبت نشده است.</p>
-            ) : (
-              pages.map((p) => (
-                <div
-                  key={p.id || p.slug}
-                  onClick={() => handleSelectPage(p)}
-                  className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
-                    selectedPage?.slug === p.slug
-                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
-                      : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                  }`}
-                >
-                  <div className="overflow-hidden">
-                    <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{p.title}</h4>
-                    <span className="text-[10px] text-[var(--text-secondary)] font-mono">/{p.slug}</span>
-                  </div>
-                  <span className={`w-2 h-2 rounded-full ${p.is_published ? "bg-emerald-500" : "bg-slate-400"}`} />
-                </div>
-              ))
-            )}
+            {pages.map((p) => (
+              <div key={p.id || p.slug} onClick={() => handleSelectPage(p)} className={`p-3 rounded-2xl border cursor-pointer flex justify-between ${selectedPage?.slug === p.slug ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10" : "border-[var(--card-border)] bg-[var(--input-bg)]"}`}>
+                <h4 className="text-xs font-black truncate">{p.title}</h4>
+                <span className={`w-2 h-2 rounded-full ${p.is_published ? "bg-emerald-500" : "bg-slate-400"}`} />
+              </div>
+            ))}
           </div>
         </div>
 
         <div className="lg:col-span-3 space-y-6">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-sm text-xs">
+          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-sm space-y-6 text-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">عنوان صفحه (Title) *</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثلاً: لندینگ مانیتورهای تدوین"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                  required
-                />
+                <label className="block font-bold text-[var(--text-secondary)] mb-2">عنوان صفحه *</label>
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">نامک انگلیسی آدرس (Slug) *</label>
-                <input
-                  type="text"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  placeholder="editing-monitors"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                  required
-                />
+                <label className="block font-bold text-[var(--text-secondary)] mb-2">نامک (Slug) *</label>
+                <input type="text" value={slug} onChange={(e) => setSlug(e.target.value)} required className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold" />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">توضیحات متای سئو (Meta Description)</label>
-              <input
-                type="text"
-                value={metaDescription}
-                onChange={(e) => setMetaDescription(e.target.value)}
-                placeholder="توضیحات خلاصه این صفحه برای موتورهای جستجو..."
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="isPubPageAdmin"
-                checked={isPublished}
-                onChange={(e) => setIsPublished(e.target.checked)}
-                className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
-              />
-              <label htmlFor="isPubPageAdmin" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
-                صفحه فعال و قابل دسترسی در آدرس اختصاصی باشد
-              </label>
             </div>
 
             <div className="border-t border-[var(--card-border)] pt-6 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-black text-[var(--text-primary)]">🧱 افزودن بخش ساختمانی (بلاک):</span>
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <span className="text-xs font-black">🧱 افزودن بخش ساختمانی:</span>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => addBlock("hero")} className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
-                    + هدر و شعار (Hero)
-                  </button>
-                  <button type="button" onClick={() => addBlock("text")} className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
-                    + بلوک متن و محتوا
-                  </button>
-                  <button type="button" onClick={() => addBlock("banner")} className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
-                    + بنر تصویری و لینک
-                  </button>
-                  <button type="button" onClick={() => addBlock("products")} className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer">
-                    + ردیف کالاها
-                  </button>
+                  {["hero", "products", "faq", "cta", "banner", "text"].map((t: any) => (
+                    <button key={t} type="button" onClick={() => addBlock(t)} className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer uppercase text-[10px]">+ {t}</button>
+                  ))}
                 </div>
               </div>
 
               <div className="space-y-4 pt-2">
-                {blocks.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-[var(--text-secondary)] border-2 border-dashed border-[var(--card-border)] rounded-2xl font-medium">
-                    هیچ بخشی به این صفحه اضافه نشده است. از دکمه‌های بالا المان‌های مورد نظر را اضافه کنید.
-                  </div>
-                ) : (
-                  blocks.map((block, idx) => (
-                    <div key={block.id} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 shadow-inner">
-                      <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-2 text-xs font-bold text-[var(--text-primary)]">
-                        <span>
-                          بخش {idx + 1}: <strong className="text-[var(--accent-blue)] uppercase">{block.type}</strong>
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <button type="button" onClick={() => moveBlock(idx, "up")} disabled={idx === 0} className="p-1 px-2.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer">▲</button>
-                          <button type="button" onClick={() => moveBlock(idx, "down")} disabled={idx === blocks.length - 1} className="p-1 px-2.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer">▼</button>
-                          <button type="button" onClick={() => removeBlock(block.id)} className="p-1 px-2.5 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition cursor-pointer">✕</button>
-                        </div>
-                      </div>
-
-                      {block.type === "hero" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                          <input
-                            type="text"
-                            placeholder="عنوان بخش هیرو..."
-                            value={block.data.title || ""}
-                            onChange={(e) => updateBlockData(block.id, "title", e.target.value)}
-                            className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold"
-                          />
-                          <input
-                            type="text"
-                            placeholder="زیرعنوان و متن تکمیلی..."
-                            value={block.data.subtitle || ""}
-                            onChange={(e) => updateBlockData(block.id, "subtitle", e.target.value)}
-                            className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs"
-                          />
-                        </div>
-                      )}
-
-                      {block.type === "text" && (
-                        <textarea
-                          rows={3}
-                          placeholder="متن کامل و محتوای این بخش..."
-                          value={block.data.text || ""}
-                          onChange={(e) => updateBlockData(block.id, "text", e.target.value)}
-                          className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs leading-relaxed font-medium"
-                        />
-                      )}
-
-                      {block.type === "banner" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                          <input
-                            type="text"
-                            placeholder="آدرس اینترنتی تصویر بنر (Image URL)..."
-                            value={block.data.imageUrl || ""}
-                            onChange={(e) => updateBlockData(block.id, "imageUrl", e.target.value)}
-                            className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono"
-                          />
-                          <input
-                            type="text"
-                            placeholder="لینک مقصد هنگام کلیک (Link URL)..."
-                            value={block.data.linkUrl || ""}
-                            onChange={(e) => updateBlockData(block.id, "linkUrl", e.target.value)}
-                            className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono"
-                          />
-                        </div>
-                      )}
-
-                      {block.type === "products" && (
-                        <div className="text-xs space-y-2">
-                          <input
-                            type="text"
-                            placeholder="عنوان ردیف کالاها (مثال: منتخب مانیتورهای ۴K)..."
-                            value={block.data.heading || ""}
-                            onChange={(e) => updateBlockData(block.id, "heading", e.target.value)}
-                            className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold"
-                          />
-                        </div>
-                      )}
+                {blocks.map((block, idx) => (
+                  <div key={block.id} className="p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                    <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2 font-bold">
+                      <span>بخش {idx + 1}: <strong className="text-[var(--accent-blue)] uppercase">{block.type}</strong></span>
+                      <button type="button" onClick={() => removeBlock(block.id)} className="text-rose-500 cursor-pointer font-bold">✕</button>
                     </div>
-                  ))
-                )}
+
+                    {block.type === "hero" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="عنوان" value={block.data.title || ""} onChange={(e) => updateBlockData(block.id, "title", e.target.value)} className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold" />
+                        <input type="text" placeholder="زیرعنوان" value={block.data.subtitle || ""} onChange={(e) => updateBlockData(block.id, "subtitle", e.target.value)} className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]" />
+                      </div>
+                    )}
+                    {block.type === "text" && (
+                      <textarea rows={2} placeholder="متن" value={block.data.text || ""} onChange={(e) => updateBlockData(block.id, "text", e.target.value)} className="w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]" />
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
             <div className="flex gap-3 pt-4 border-t border-[var(--card-border)]">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
-              >
-                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار صفحه"}
-              </button>
-              {selectedPage?.id && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(selectedPage.id!)}
-                  className="px-5 py-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                >
-                  حذف صفحه ✕
-                </button>
-              )}
+              <button type="submit" disabled={saving} className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-lg">{saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار صفحه"}</button>
+              {selectedPage?.id && <button type="button" onClick={() => handleDelete(selectedPage.id!)} className="px-5 py-3.5 rounded-2xl bg-rose-500/15 text-rose-600 font-bold">حذف</button>}
             </div>
           </form>
         </div>
@@ -362,15 +207,8 @@ export default function PageBuilder() {
 
 function getDefaultDataForBlock(type: PageBlock["type"]): Record<string, any> {
   switch (type) {
-    case "hero":
-      return { title: "عنوان اصلی بخش", subtitle: "توضیحات و راهنمای خرید" };
-    case "text":
-      return { text: "محتوای متنی سفارشی را اینجا وارد کنید..." };
-    case "banner":
-      return { imageUrl: "", linkUrl: "/products" };
-    case "products":
-      return { heading: "محصولات برگزیده" };
-    default:
-      return {};
+    case "hero": return { title: "عنوان اصلی هیرو", subtitle: "توضیحات تکمیلی" };
+    case "products": return { heading: "محصولات منتخب", limit: 6 };
+    default: return {};
   }
 }

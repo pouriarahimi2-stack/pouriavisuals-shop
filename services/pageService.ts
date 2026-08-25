@@ -2,7 +2,17 @@ import { supabase } from "@/lib/supabase";
 
 export interface PageBlock {
   id: string;
-  type: "hero" | "text" | "banner" | "products" | "features" | "blogs";
+  type:
+    | "hero"
+    | "text"
+    | "banner"
+    | "products"
+    | "features"
+    | "blogs"
+    | "video"
+    | "faq"
+    | "cta"
+    | "testimonials";
   data: Record<string, any>;
 }
 
@@ -10,9 +20,13 @@ export interface CustomPage {
   id?: string;
   slug: string;
   title: string;
-  content: PageBlock[];
   meta_description?: string;
+  content: PageBlock[];
   is_published?: boolean;
+  theme?: {
+    primaryColor?: string;
+    backgroundColor?: string;
+  };
   created_at?: string;
   updated_at?: string;
 }
@@ -33,9 +47,10 @@ export const pageService = {
             id: d.id,
             slug: d.slug,
             title: d.title,
-            content: Array.isArray(d.sections) ? d.sections : (Array.isArray(d.content) ? d.content : []),
             meta_description: d.meta_description || "",
+            content: Array.isArray(d.sections) ? d.sections : (Array.isArray(d.content) ? d.content : []),
             is_published: d.is_published !== false,
+            theme: d.theme || {},
             created_at: d.created_at,
             updated_at: d.updated_at,
           }));
@@ -73,9 +88,10 @@ export const pageService = {
             id: data.id,
             slug: data.slug,
             title: data.title,
-            content: Array.isArray(data.sections) ? data.sections : (Array.isArray(data.content) ? data.content : []),
             meta_description: data.meta_description || "",
+            content: Array.isArray(data.sections) ? data.sections : (Array.isArray(data.content) ? data.content : []),
             is_published: data.is_published !== false,
+            theme: data.theme || {},
             created_at: data.created_at,
             updated_at: data.updated_at,
           };
@@ -96,9 +112,10 @@ export const pageService = {
       const payload: any = {
         slug: cleanSlug,
         title: pageData.title.trim(),
+        meta_description: pageData.meta_description || null,
         sections: pageData.content || [],
         content: pageData.content || [],
-        meta_description: pageData.meta_description || null,
+        theme: pageData.theme || {},
         is_published: pageData.is_published !== false,
         updated_at: new Date().toISOString(),
       };
@@ -119,9 +136,10 @@ export const pageService = {
             id: data.id,
             slug: data.slug,
             title: data.title,
-            content: Array.isArray(data.sections) ? data.sections : data.content || [],
             meta_description: data.meta_description,
+            content: Array.isArray(data.sections) ? data.sections : (data.content || []),
             is_published: data.is_published,
+            theme: data.theme,
             created_at: data.created_at,
             updated_at: data.updated_at,
           };

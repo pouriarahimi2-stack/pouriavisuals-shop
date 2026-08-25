@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { productService, Product, ProductVariant, MarketBenchmark } from "@/services/productService";
 import { categoryService, Category } from "@/services/categoryService";
 import { supabase } from "@/lib/supabase";
@@ -29,15 +29,19 @@ export default function AdminProducts() {
   const [isFeatured, setIsFeatured] = useState(false);
 
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [specs, setSpecs] = useState<Array<{ key: string; value: string }>>([
     { key: "ابعاد نمایشگر", value: "۲۷ اینچ 5K Retina" },
     { key: "شدت روشنایی", value: "۶۰۰ نیت (Nit)" },
+    { key: "پوشش رنگ", value: "۱۰۰٪ sRGB و DCI-P3" },
+    { key: "درگاه‌های اتصال", value: "یک تاندربولت ۳ و ۳ عدد USB-C" },
   ]);
 
   const [marketBenchmarks, setMarketBenchmarks] = useState<MarketBenchmark[]>([
-    { storeName: "متوسط قیمت بازار", price: 0, warranty: "گارانتی متفرقه", isOurStore: false, deliveryTime: "۳ روزه" },
-    { storeName: "انبار مرکزی ما", price: 0, warranty: "گارانتی طلایی ۱۸ ماهه", isOurStore: true, deliveryTime: "ارسال فوری" },
+    { storeName: "متوسط قیمت بازار (ترب/ایمالز)", price: 0, warranty: "گارانتی متفرقه", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
+    { storeName: "نمایندگی رسمی و انبار ما", price: 0, warranty: "گارانتی طلایی ۱۸ ماهه", isOurStore: true, deliveryTime: "ارسال فوری پیشتاز" },
   ]);
 
   const [metaTitle, setMetaTitle] = useState("");
@@ -62,7 +66,7 @@ export default function AdminProducts() {
     loadData();
 
     const channel = supabase
-      .channel("admin-products-realtime-master-v2")
+      .channel("admin-products-realtime-master-v3")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => loadData())
       .subscribe();
@@ -103,6 +107,11 @@ export default function AdminProducts() {
 
     if (p.market_comparison && p.market_comparison.length > 0) {
       setMarketBenchmarks(p.market_comparison);
+    } else {
+      setMarketBenchmarks([
+        { storeName: "متوسط قیمت بازار (ترب/ایمالز)", price: Number(p.price || 0) + 1500000, warranty: "گارانتی شرکتی معمولی", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
+        { storeName: "فروشگاه ما (قیمت تضمینی)", price: Number(p.discountPrice || p.price || 0), warranty: p.warranty || "گارانتی تعویض طلایی", isOurStore: true, deliveryTime: "تحویل اکسپرس ۱ روزه" },
+      ]);
     }
 
     setMetaTitle(p.meta_title || p.title);
@@ -119,25 +128,33 @@ export default function AdminProducts() {
     setBadge("");
     setShortDesc("");
     setDescription("");
-    setHighlights(["کیفیت ساخت فوق‌العاده", "پشتیبانی کامل از استاندارد DCI-P3"]);
+    setHighlights(["کیفیت ساخت فوق‌العاده و پنل رتینا", "کالیبراسیون سخت‌افزاری کارخانه", "پشتیبانی کامل از استاندارد DCI-P3"]);
 
     setPrice("");
     setDiscountPrice("");
     setStock(10);
-    setWarranty("۱۸ ماه گارانتی معتبر شرکتی");
+    setWarranty("۱۸ ماه گارانتی معتبر شرکتی + ۷ روز ضمانت بازگشت");
     setIsAvailable(true);
     setIsFeatured(false);
 
     setImageUrls([""]);
-    setVariants([]);
+    setVariants([
+      { id: "v1", name: "خاکستری فضایی (Space Gray)", colorHex: "#4b5563", priceDelta: 0, stock: 5 },
+      { id: "v2", name: "نقره‌ای مات (Silver)", colorHex: "#e5e7eb", priceDelta: 0, stock: 5 },
+    ]);
+
     setSpecs([
-      { key: "رزولوشن تصویر", value: "5K Retina" },
-      { key: "نوع پنل", value: "IPS" },
+      { key: "رزولوشن تصویر", value: "5120x2880 (5K)" },
+      { key: "نوع پنل", value: "IPS با زاویه دید ۱۷۸ درجه" },
+      { key: "پورت‌های ارتباطی", value: "Thunderbolt 3 + 3x USB-C" },
+      { key: "اسپیکر و وب‌کم", value: "دوربین ۱۲ مگاپیکسل + ۶ اسپیکر استودیو" },
     ]);
+
     setMarketBenchmarks([
-      { storeName: "متوسط قیمت بازار", price: 0, warranty: "گارانتی متفرقه", isOurStore: false, deliveryTime: "۳ روزه" },
-      { storeName: "انبار مرکزی ما", price: 0, warranty: "گارانتی طلایی", isOurStore: true, deliveryTime: "ارسال فوری" },
+      { storeName: "متوسط قیمت بازار (ترب/ایمالز)", price: 0, warranty: "گارانتی متفرقه", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
+      { storeName: "فروشگاه ما (تضمین کمترین قیمت)", price: 0, warranty: "گارانتی طلایی ۱۸ ماهه", isOurStore: true, deliveryTime: "ارسال فوری پیشتاز" },
     ]);
+
     setMetaTitle("");
     setMetaDescription("");
     setActiveFormTab("general");
@@ -156,9 +173,34 @@ export default function AdminProducts() {
       setCategory(added.name);
       setNewCatName("");
       setShowNewCatInput(false);
-      setStatusMessage({ type: "success", text: `دسته‌بندی «${clean}» افزوده شد.` });
+      setStatusMessage({ type: "success", text: `دسته‌بندی «${clean}» با موفقیت افزوده شد.` });
       setTimeout(() => setStatusMessage(null), 3000);
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`حجم فایل "${file.name}" نباید بیشتر از ۵ مگابایت باشد.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          setImageUrls((prev) => {
+            const filtered = prev.filter((u) => u.trim().length > 0);
+            return [...filtered, reader.result as string];
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const addImageField = () => setImageUrls([...imageUrls, ""]);
@@ -172,7 +214,7 @@ export default function AdminProducts() {
   };
 
   const addVariant = () => {
-    setVariants([...variants, { id: `var_${Date.now()}`, name: "مدل جدید", colorHex: "#000000", priceDelta: 0, stock: 5 }]);
+    setVariants([...variants, { id: `var_${Date.now()}`, name: "رنگ جدید", colorHex: "#000000", priceDelta: 0, stock: 5 }]);
   };
   const updateVariant = (idx: number, field: keyof ProductVariant, val: any) => {
     const updated = [...variants];
@@ -204,7 +246,7 @@ export default function AdminProducts() {
   };
 
   const addBenchmark = () => {
-    setMarketBenchmarks([...marketBenchmarks, { storeName: "رقیب", price: Number(price || 0), warranty: "شرکتی", isOurStore: false, deliveryTime: "۲ روزه" }]);
+    setMarketBenchmarks([...marketBenchmarks, { storeName: "فروشگاه رقیب", price: Number(price || 0), warranty: "شرکتی", isOurStore: false, deliveryTime: "۲ روزه" }]);
   };
   const updateBenchmark = (idx: number, field: keyof MarketBenchmark, val: any) => {
     const arr = [...marketBenchmarks];
@@ -227,6 +269,7 @@ export default function AdminProducts() {
     }
 
     setSaving(true);
+
     const specsMap: Record<string, string> = {};
     specs.forEach((s) => {
       if (s.key.trim() && s.value.trim()) {
@@ -269,7 +312,7 @@ export default function AdminProducts() {
     setSaving(false);
 
     if (result) {
-      setStatusMessage({ type: "success", text: "⚡ اطلاعات جامع محصول با موفقیت ذخیره شد." });
+      setStatusMessage({ type: "success", text: "⚡ اطلاعات کالا با موفقیت ذخیره شد." });
       loadData();
       if (!selectedProduct) setSelectedProduct(result);
     } else {
@@ -279,7 +322,7 @@ export default function AdminProducts() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف کامل این کالا اطمینان دارید؟")) return;
+    if (!confirm("آیا از حذف کامل این کالا از دیتابیس اطمینان دارید؟")) return;
     const ok = await productService.deleteProduct(id);
     if (ok) {
       handleCreateNew();
@@ -296,7 +339,7 @@ export default function AdminProducts() {
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>💎</span> مرکز جامع مدیریت محصولات و مشخصات تجاری کالا
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی قیمت، گالری، تنوع، مشخصات فنی و مقایسه بازار</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی قیمت، آپلود عکس از سیستم/موبایل، تنوع رنگ، ویژگی‌های فنی، سئو و بنچ‌مارک بازار</p>
         </div>
         <button
           onClick={handleCreateNew}
@@ -338,7 +381,7 @@ export default function AdminProducts() {
               {[
                 { id: "general", label: "اطلاعات پایه", icon: "📝" },
                 { id: "pricing", label: "قیمت و انبار", icon: "💰" },
-                { id: "gallery", label: "تصاویر", icon: "🖼️" },
+                { id: "gallery", label: "تصاویر و آپلود", icon: "🖼️" },
                 { id: "variants", label: "تنوع رنگ", icon: "🎨" },
                 { id: "specs", label: "مشخصات فنی", icon: "⚙️" },
                 { id: "comparison", label: "مقایسه بازار", icon: "📊" },
@@ -406,7 +449,11 @@ export default function AdminProducts() {
 
             {activeFormTab === "gallery" && (
               <div className="space-y-3">
-                <button type="button" onClick={addImageField} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold">+ افزودن لینک عکس</button>
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" multiple className="hidden" />
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">📁 آپلود عکس از سیستم/موبایل</button>
+                  <button type="button" onClick={addImageField} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">+ لینک عکس</button>
+                </div>
                 {imageUrls.map((url, idx) => (
                   <div key={idx} className="flex gap-2">
                     <input type="text" value={url} onChange={(e) => updateImageUrl(idx, e.target.value)} placeholder="https://..." className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs" />
@@ -418,7 +465,7 @@ export default function AdminProducts() {
 
             {activeFormTab === "variants" && (
               <div className="space-y-3">
-                <button type="button" onClick={addVariant} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold">+ افزودن رنگ</button>
+                <button type="button" onClick={addVariant} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">+ افزودن رنگ</button>
                 {variants.map((v, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
                     <input type="text" value={v.name} onChange={(e) => updateVariant(idx, "name", e.target.value)} placeholder="نام رنگ" className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs" />
@@ -431,7 +478,7 @@ export default function AdminProducts() {
 
             {activeFormTab === "specs" && (
               <div className="space-y-3">
-                <button type="button" onClick={addSpecField} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold">+ افزودن ویژگی</button>
+                <button type="button" onClick={addSpecField} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">+ افزودن ویژگی</button>
                 {specs.map((s, idx) => (
                   <div key={idx} className="flex gap-2">
                     <input type="text" value={s.key} onChange={(e) => updateSpecField(idx, "key", e.target.value)} placeholder="عنوان" className="w-1/3 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs" />
@@ -444,7 +491,7 @@ export default function AdminProducts() {
 
             {activeFormTab === "comparison" && (
               <div className="space-y-3">
-                <button type="button" onClick={addBenchmark} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold">+ افزودن رقیب</button>
+                <button type="button" onClick={addBenchmark} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">+ افزودن رقیب</button>
                 {marketBenchmarks.map((bm, idx) => (
                   <div key={idx} className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] grid grid-cols-2 gap-2">
                     <input type="text" value={bm.storeName} onChange={(e) => updateBenchmark(idx, "storeName", e.target.value)} placeholder="نام فروشگاه" className="p-2 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs" />

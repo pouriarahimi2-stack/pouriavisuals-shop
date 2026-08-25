@@ -1,4 +1,3 @@
-
 // app/admin/page.tsx
 "use client";
 
@@ -18,6 +17,7 @@ import AdminCustomers from "@/components/admin/AdminCustomers";
 import ContactMessagesManager from "@/components/admin/ContactMessagesManager";
 import PageBuilder from "@/components/admin/PageBuilder";
 import AdminBlogManager from "@/components/AdminBlogManager";
+import AdminNewsManager from "@/components/admin/AdminNewsManager";
 import { productService, Product } from "@/services/productService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<
     | "products"
     | "inventory"
+    | "news_radar"
     | "page_builder"
     | "blogs"
     | "coupons"
@@ -135,7 +136,7 @@ export default function AdminPage() {
     fetchSiteInfoLive();
 
     const channel = supabase
-      .channel("admin-siteinfo-realtime-master-v5")
+      .channel("admin-siteinfo-realtime-master-v10")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchSiteInfoLive())
       .subscribe();
 
@@ -159,7 +160,7 @@ export default function AdminPage() {
   const handleToggleGoogleIndex = async () => {
     const currentState = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
     const nextState = !currentState;
-    setSiteInfo((prev) => prev ? { ...prev, allowGoogleIndex: nextState, allow_google_index: nextState } : null);
+    setSiteInfo((prev) => (prev ? { ...prev, allowGoogleIndex: nextState, allow_google_index: nextState } : null));
     await siteInfoService.updateSiteInfo({ allowGoogleIndex: nextState, allow_google_index: nextState });
   };
 
@@ -284,6 +285,7 @@ export default function AdminPage() {
   const navTabs = [
     { id: "products", label: "محصولات و کاتالوگ", icon: "📦", show: true },
     { id: "inventory", label: "انبارداری سریع", icon: "📥", show: true },
+    { id: "news_radar", label: "رادار اخبار جهانی و گجت‌ها", icon: "📡", show: true },
     { id: "page_builder", label: "صفحه‌ساز اختصاصی", icon: "🏗️", show: isSuper },
     { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: isSuper },
     { id: "messages", label: "صندوق پیام‌ها و مشاوره", icon: "📩", show: isSuper },
@@ -438,6 +440,7 @@ export default function AdminPage() {
       <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-md">
         {activeTab === "products" && <AdminProducts />}
         {activeTab === "inventory" && <AdminInventoryManager />}
+        {activeTab === "news_radar" && <AdminNewsManager />}
         {activeTab === "page_builder" && isSuper && <PageBuilder />}
         {activeTab === "blogs" && <AdminBlogManager />}
         {activeTab === "orders" && isSuper && <AdminOrders />}
@@ -449,6 +452,7 @@ export default function AdminPage() {
         {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
       </div>
 
+      {/* دستیار هوشمند و بازارسنجی ادمین */}
       {isSuper && <AdminAIAssistant />}
 
       {/* مدال تغییر رمز عبور */}

@@ -1,3 +1,4 @@
+// app/sitemap.ts
 import { MetadataRoute } from 'next';
 import { supabase } from '@/lib/supabase';
 
@@ -12,15 +13,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // دریافت تمام مقالات وبلاگ فعال
   const { data: blogs } = await supabase
-    .from('blogs')
+    .from('posts')
     .select('id, updated_at')
     .order('updated_at', { ascending: false });
+
+  // دریافت تمام اخبار رادار تکنولوژی
+  const { data: newsItems } = await supabase
+    .from('tech_news')
+    .select('slug, published_at')
+    .eq('is_published', true)
+    .order('published_at', { ascending: false });
 
   const productUrls: MetadataRoute.Sitemap = (products || []).map((product) => ({
     url: `${baseUrl}/products/${product.id}`,
     lastModified: product.updated_at ? new Date(product.updated_at) : new Date(),
     changeFrequency: 'daily',
-    priority: 0.8,
+    priority: 0.9,
   }));
 
   const blogUrls: MetadataRoute.Sitemap = (blogs || []).map((blog) => ({
@@ -28,6 +36,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: blog.updated_at ? new Date(blog.updated_at) : new Date(),
     changeFrequency: 'weekly',
     priority: 0.7,
+  }));
+
+  const newsUrls: MetadataRoute.Sitemap = (newsItems || []).map((news) => ({
+    url: `${baseUrl}/news/${news.slug}`,
+    lastModified: news.published_at ? new Date(news.published_at) : new Date(),
+    changeFrequency: 'hourly',
+    priority: 0.85,
   }));
 
   const staticUrls: MetadataRoute.Sitemap = [
@@ -42,6 +57,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/news`,
+      lastModified: new Date(),
+      changeFrequency: 'hourly',
+      priority: 0.95,
     },
     {
       url: `${baseUrl}/blog`,
@@ -69,5 +90,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  return [...staticUrls, ...productUrls, ...blogUrls];
+  return [...staticUrls, ...productUrls, ...newsUrls, ...blogUrls];
 }

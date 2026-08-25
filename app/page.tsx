@@ -1,4 +1,3 @@
-
 // app/page.tsx
 "use client";
 
@@ -11,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AIAssistantChat from "@/components/AIAssistantChat";
+import TechRadarFeed from "@/components/TechRadarFeed";
 
 export default function HomePage() {
   const router = useRouter();
@@ -50,7 +50,7 @@ export default function HomePage() {
     window.addEventListener("category_selected", handleCategoryChange);
 
     const channel = supabase
-      .channel("public-db-home-realtime-master-v5")
+      .channel("public-db-home-realtime-master-v9")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => loadData())
@@ -84,7 +84,6 @@ export default function HomePage() {
   const isGoogleAllowed = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
   const activeBanner = banners[currentSlideIndex] || banners[0];
 
-  // رفع کامل خطای Hydration Mismatch React #418 با بررسی مونت بودن اولیه
   if (!mounted) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center font-sans">
@@ -95,20 +94,19 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 space-y-12 mt-6">
+      <div className="max-w-7xl mx-auto px-4 space-y-14 mt-6">
         
         {/* ۱. اسلایدر هوشمند بنرها با نشانگر زنده ایندکس گوگل */}
         {banners.length > 0 ? (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
-              className="min-h-[380px] sm:min-h-[460px] p-8 sm:p-16 flex items-center bg-cover bg-center transition-all duration-700 relative"
+              className="min-h-[380px] sm:min-h-[480px] p-8 sm:p-16 flex items-center bg-cover bg-center transition-all duration-700 relative"
               style={{
                 backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.3)), url(${activeBanner.image || (activeBanner as any).image_url || ""})`,
               }}
             >
               <div className="max-w-2xl space-y-4 z-10 text-white animate-fadeIn">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* نشانگر متحرک نئونی وضعیت ایندکس گوگل */}
                   <span
                     title={isGoogleAllowed ? "سایت در وضعیت ایندکس آنلاین گوگل قرار دارد" : "سایت در حالت No-Index و مخفی از گوگل است"}
                     className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black backdrop-blur-md border ${
@@ -149,7 +147,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* دکمه‌های ناوبری اسلایدر */}
               {banners.length > 1 && (
                 <div className="absolute bottom-6 left-8 flex items-center gap-2 z-20">
                   {banners.map((_, idx) => (
@@ -170,7 +167,7 @@ export default function HomePage() {
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] p-8 md:p-14 min-h-[280px] flex items-center bg-gradient-to-l from-neutral-900 to-neutral-800 text-white shadow-2xl">
             <div className="max-w-xl space-y-3 z-10">
               <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-bold">
-                مرکز تجهیزات تخصصی دیجیتال و استودیو
+                مرکز تجهیزات تخصصی دیجیتال، تصویر و استودیو
               </span>
               <h1 className="text-2xl md:text-4xl font-black">{siteInfo?.site_name || "آکسون | Axon"}</h1>
               <p className="text-xs md:text-sm text-slate-300 font-medium">{siteInfo?.tagline || "تضمین بهترین قیمت و اصالت کالا در ایران"}</p>
@@ -178,7 +175,10 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ۲. فیلتر دسته‌بندی‌ها و کاتالوگ محصولات */}
+        {/* ۲. بخش رادار زنده اخبار و ترندهای تکنولوژی روز دنیا */}
+        <TechRadarFeed />
+
+        {/* ۳. فیلتر دسته‌بندی‌ها و کاتالوگ محصولات */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
             <div>
@@ -248,7 +248,7 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* ۳. بخش مجله تخصصی، راهنمای خرید و مقالات سئو */}
+        {/* ۴. بخش مجله تخصصی، راهنمای خرید و مقالات سئو */}
         <section className="p-8 rounded-[2.5rem] space-y-6 my-12 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
@@ -269,7 +269,7 @@ export default function HomePage() {
         </section>
       </div>
 
-      {/* مدال بررسی جامع و سریع کالا */}
+      {/* مدال بررسی جامع و سریع کالا با کلیه تب‌های مشخصات، گارانتی و مقایسه */}
       {selectedProductForModal && (
         <ProductDetailsModal
           product={selectedProductForModal}
@@ -284,7 +284,7 @@ export default function HomePage() {
   );
 }
 
-// کارت محصول صفحه اصلی با قابلیت خرید سریع و بررسی
+// کارت محصول صفحه اصلی با دکمه‌های خرید سریع و بررسی
 function HomeProductCard({
   product,
   onAddToCart,
@@ -397,7 +397,7 @@ function HomeProductCard({
   );
 }
 
-// مدال بررسی جامع کالا
+// مدال بررسی جامع و مشخصات فنی کامل کالا
 function ProductDetailsModal({
   product,
   onClose,
@@ -416,7 +416,6 @@ function ProductDetailsModal({
   const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
   const productName = product.title || product.name || "";
   const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
-  const oldPrice = Number(product.originalPrice ?? product.price ?? 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
@@ -563,7 +562,7 @@ function ProductDetailsModal({
               )}
             </div>
 
-            {/* بخش قیمت و دکمه افزودن */}
+            {/* بخش قیمت و دکمه افزودن با تعداد دلخواه */}
             <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
@@ -607,6 +606,7 @@ function ProductDetailsModal({
   );
 }
 
+// بخش رندر مقالات در صفحه اصلی
 function HomeBlogSection() {
   const [posts, setPosts] = useState<any[]>([]);
 

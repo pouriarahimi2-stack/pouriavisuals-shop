@@ -1,6 +1,7 @@
+// components/ProductCard.tsx
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
@@ -8,6 +9,11 @@ import { useCart } from "@/context/CartContext";
 export default function ProductCard({ product }: { product: any }) {
   const { addToCart } = useCart();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const title = product.title || product.title_fa || product.name || "محصول بدون عنوان";
   const price = Number(product.price) || 0;
@@ -91,10 +97,12 @@ export default function ProductCard({ product }: { product: any }) {
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
             {discountPrice && discountPrice < price && (
-              <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono">{price.toLocaleString("fa-IR")}</span>
+              <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>
+                {mounted ? price.toLocaleString("fa-IR") : price}
+              </span>
             )}
-            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
-              {currentPrice.toLocaleString("fa-IR")} <span className="text-xs font-bold">تومان</span>
+            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
+              {mounted ? currentPrice.toLocaleString("fa-IR") : currentPrice} <span className="text-xs font-bold font-sans">تومان</span>
             </span>
           </div>
           <Link href={`/products/${product.id}`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline transition">بررسی ←</Link>

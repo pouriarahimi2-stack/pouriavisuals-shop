@@ -1,144 +1,157 @@
-// components/LayoutWrapper.tsx
+// components/Navbar.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import CartDrawer from "@/components/CartDrawer";
-import { initRealtimeSync } from "@/lib/realtimeSync";
+import Link from "next/link";
+import { useCart } from "@/context/CartContext";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { menuService, MenuItem } from "@/services/menuService";
 import { supabase } from "@/lib/supabase";
 
-export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isAdmin = pathname?.startsWith("/admin");
+export default function Navbar() {
+  const { totalItems, setIsCartOpen } = useCart();
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-  const [isMaintenance, setIsMaintenance] = useState<boolean>(false);
-
-  const fetchSiteStatus = async () => {
+  const fetchNavbarData = async () => {
     try {
       const info = await siteInfoService.getSiteInfo();
-      if (info) {
-        setSiteInfo(info);
-        const isClosed = info.allow_google_index === false || info.allowGoogleIndex === false;
-        setIsMaintenance(isClosed);
+      if (info) setSiteInfo(info);
+
+      const menus = await menuService.getAll();
+      if (menus) {
+        setMenuItems(menus.filter((m: any) => m.isActive !== false && m.is_active !== false));
       }
     } catch (e) {
-      console.error("LayoutWrapper status sync error:", e);
+      console.error("Navbar realtime load error:", e);
     }
   };
 
   useEffect(() => {
-    fetchSiteStatus();
-    const cleanup = initRealtimeSync();
+    fetchNavbarData();
 
-    const handleUpdate = (e: any) => {
-      if (e.detail) {
-        setSiteInfo(e.detail);
-        const isClosed = e.detail.allow_google_index === false || e.detail.allowGoogleIndex === false;
-        setIsMaintenance(isClosed);
-      } else {
-        fetchSiteStatus();
-      }
-    };
-
-    window.addEventListener("site_info_updated", handleUpdate);
-
-    // کانال وب‌سوکت لایو برای سوییچ فوری به حالت تعمیرات
-    const channel = supabase
-      .channel("layout-maintenance-realtime-master")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchSiteStatus())
+    const navbarChannel = supabase
+      .channel("navbar-realtime-sync-v10")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchNavbarData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchNavbarData())
       .subscribe();
 
+    const savedTheme = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setIsDarkMode(savedTheme === "dark" || (!savedTheme && prefersDark));
+
     return () => {
-      if (typeof cleanup === "function") cleanup();
-      window.removeEventListener("site_info_updated", handleUpdate);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(navbarChannel);
     };
   }, []);
 
-  // ادمین‌ها در هر حالتی به پنل مدیریت دسترسی دارند
-  if (isAdmin) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-        {children}
-      </div>
-    );
-  }
+  const toggleTheme = () => {
+    if (isDarkMode) {
+      document.documentElement.classList.remove("dark");
+      setIsDarkMode(false);
+      localStorage.setItem("theme", "light");
+    } else {
+      document.documentElement.classList.add("dark");
+      setIsDarkMode(true);
+      localStorage.setItem("theme", "dark");
+    }
+  };
 
-  // صفحه لوکس و فوق مدرن حالت ارتقا و نگهداری زنده
-  if (isMaintenance) {
-    const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
-    const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
-    const email = siteInfo?.email || "support@axoncore.ir";
+  const activeLinks = menuItems.length > 0 ? menuItems : [
+    { id: "1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
+    { id: "2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
+    { id: "3", title: "رادار اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
+    { id: "4", title: "پیگیری مرسوله", url: "/track-order", order: 4, isActive: true },
+    { id: "5", title: "مجله و مقالات", url: "/blog", order: 5, isActive: true },
+    { id: "6", title: "تماس با ما", url: "/contact", order: 6, isActive: true },
+  ];
 
-    return (
-      <div
-        dir="rtl"
-        className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-[#07090e] text-slate-100 font-sans select-none relative overflow-hidden"
-      >
-        {/* گرادیانت‌ها و نورهای پس‌زمینه نئونی */}
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
-
-        <div className="max-w-2xl w-full rounded-[2.8rem] bg-slate-900/80 border border-slate-800/80 p-8 sm:p-14 text-center space-y-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-3xl relative z-10 animate-fadeIn">
-          
-          {/* نشانگر زنده پایش زیرساخت */}
-          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-black shadow-lg">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-            </span>
-            <span>در حال ارتقا و بهینه‌سازی زیرساخت سرورها</span>
-          </div>
-
-          <div className="space-y-4">
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-3xl shadow-xl shadow-blue-500/10 animate-bounce">
-              ⚡
-            </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-snug">
-              فروشگاه {storeName} موقتاً در حال به‌روزرسانی است
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed font-medium">
-              به منظور ارتقای امنیت پردازش داده‌ها، پیاده‌سازی گجت‌های جدید و کالیبراسیون هوشمند سرورها، وب‌سایت برای مدتی کوتاه در دست ارتقا می‌باشد.
-              <br />
-              <strong className="text-blue-400 font-bold mt-2 inline-block">
-                نیازی به رفرش صفحه نیست؛ به محض اتمام، صفحه خودکار فعال خواهد شد.
-              </strong>
-            </p>
-          </div>
-
-          {/* اطلاعات ارتباطی پشتیبانی */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 rounded-3xl bg-slate-950/70 border border-slate-800 text-xs text-right">
-            <div className="space-y-1">
-              <span className="text-slate-400 font-bold block">📞 تلفن پشتیبانی و پیگیری:</span>
-              <span className="font-mono font-black text-blue-400 text-sm" dir="ltr">{phone}</span>
-            </div>
-            <div className="space-y-1">
-              <span className="text-slate-400 font-bold block">✉️ ایمیل پاسخگویی ۲۴ ساعته:</span>
-              <span className="font-mono text-slate-200 text-xs truncate block" dir="ltr">{email}</span>
-            </div>
-          </div>
-
-          {/* پاورقی وضعیت */}
-          <div className="pt-2 flex items-center justify-center gap-2 text-[11px] text-slate-500 font-mono">
-            <span>سیستم پایش بلادرنگ Supabase WebSocket</span>
-            <span>•</span>
-            <span className="text-emerald-500 font-bold">Live Synced ✓</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const logoSrc = siteInfo?.logo_url || (siteInfo as any)?.logoUrl;
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
+  const tagline = siteInfo?.tagline || "تجهیزات تخصصی دیجیتال";
 
   return (
-    <>
-      <Header />
-      <main className="flex-1 w-full">{children}</main>
-      <Footer />
-      <CartDrawer />
-    </>
+    <nav className="sticky top-0 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border-b border-[var(--card-border)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300 shadow-md" dir="rtl">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="flex items-center gap-3.5 group">
+            {logoSrc ? (
+              <img src={logoSrc} alt="Logo" className="w-14 h-14 object-contain rounded-2xl shadow-lg bg-white/5 p-1 border border-[var(--card-border)] group-hover:scale-105 transition duration-300" />
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black text-2xl shadow-lg group-hover:scale-105 transition duration-300">
+                ⚡
+              </div>
+            )}
+            <div>
+              <h1 className="font-black text-base md:text-lg leading-tight tracking-tight text-[var(--text-primary)]">
+                {storeName}
+              </h1>
+              <span className="text-[11px] text-[var(--accent-blue)] font-bold block mt-0.5">
+                {tagline}
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        <div className="hidden lg:flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
+          {activeLinks.map((item: any) => (
+            <Link
+              key={item.id}
+              href={item.url || item.href}
+              className="px-4 py-2 rounded-xl text-xs font-extrabold text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition-all duration-300"
+            >
+              {item.title}
+            </Link>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleTheme}
+            className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-sm hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm"
+            title="تغییر تم"
+          >
+            {isDarkMode ? "🌙" : "☀️"}
+          </button>
+
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="relative px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-95 transition shadow-lg flex items-center gap-2.5 cursor-pointer active:scale-95"
+          >
+            <span className="text-base">🛒</span>
+            <span className="hidden sm:inline">سبد خرید</span>
+            {totalItems > 0 && (
+              <span className="w-5 h-5 rounded-full bg-white text-[var(--accent-blue)] flex items-center justify-center font-mono font-black text-[10px] shadow">
+                {totalItems}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-sm cursor-pointer"
+          >
+            {isMobileMenuOpen ? "✕" : "☰"}
+          </button>
+        </div>
+      </div>
+
+      {isMobileMenuOpen && (
+        <div className="lg:hidden border-t border-[var(--card-border)] p-4 bg-[var(--modal-bg)] space-y-2 animate-fadeIn">
+          {activeLinks.map((item: any) => (
+            <Link
+              key={item.id}
+              href={item.url || item.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block p-3 rounded-2xl bg-[var(--input-bg)] font-black text-xs text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition"
+            >
+              {item.title}
+            </Link>
+          ))}
+        </div>
+      )}
+    </nav>
   );
 }

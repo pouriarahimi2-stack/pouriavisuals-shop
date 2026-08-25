@@ -1,7 +1,8 @@
+// app/actions/siteInfo.ts
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { SiteInfo } from "@/services/siteInfoService";
+import { SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { revalidatePath } from "next/cache";
 
 export async function getSiteInfoServer(): Promise<SiteInfo> {
@@ -20,6 +21,7 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
         tagline: "مرجع تخصصی تجهیزات دیجیتال و استودیو",
         allow_google_index: true,
         allowGoogleIndex: true,
+        maintenance_mode: "none",
       };
     }
 
@@ -47,17 +49,25 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
       header_announcement: data.header_announcement || "",
       allow_google_index: isAllowed,
       allowGoogleIndex: isAllowed,
+      maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
+      maintenance_until: data.maintenance_until || undefined,
+      maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
     };
   } catch (err) {
     console.error("Error in getSiteInfoServer:", err);
-    return { site_name: "آکسون | Axon", allow_google_index: true, allowGoogleIndex: true };
+    return { site_name: "آکسون | Axon", allow_google_index: true, allowGoogleIndex: true, maintenance_mode: "none" };
   }
 }
 
-export async function updateSiteInfoServer(info: SiteInfo) {
+export async function updateSiteInfoServer(info: Partial<SiteInfo>) {
   try {
     const sName = info.site_name || info.siteName || info.storeName || "آکسون | Axon";
-    const isAllowed = info.allow_google_index !== false && info.allowGoogleIndex !== false;
+    const isAllowed =
+      info.allow_google_index !== undefined
+        ? info.allow_google_index
+        : info.allowGoogleIndex !== undefined
+        ? info.allowGoogleIndex
+        : info.maintenance_mode === "none";
 
     const payload = {
       site_name: sName,
@@ -77,6 +87,9 @@ export async function updateSiteInfoServer(info: SiteInfo) {
       whatsapp: info.whatsapp || "",
       header_announcement: info.header_announcement || "",
       allow_google_index: isAllowed,
+      maintenance_mode: info.maintenance_mode || (isAllowed ? "none" : "indefinite"),
+      maintenance_until: info.maintenance_until || null,
+      maintenance_duration_minutes: info.maintenance_duration_minutes || null,
       updated_at: new Date().toISOString(),
     };
 

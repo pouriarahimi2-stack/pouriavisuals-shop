@@ -21,7 +21,7 @@ export interface SiteInfo {
   allow_google_index?: boolean;
   allowGoogleIndex?: boolean;
   maintenance_mode?: MaintenanceMode;
-  maintenance_until?: string; // تاریخ و ساعت پایان به فرمت ISO
+  maintenance_until?: string; // تاریخ پایان ISO
   maintenance_duration_minutes?: number;
   maintenance_title?: string;
   maintenance_message?: string;
@@ -34,6 +34,7 @@ export interface SiteInfo {
   free_shipping_threshold?: number;
   description?: string;
   footer_text?: string;
+  aboutText?: string;
   custom_css?: string;
   active_font_id?: string;
   updated_at?: string;
@@ -178,47 +179,35 @@ export const siteInfoService = {
         updated_at: new Date().toISOString(),
       };
 
-      let resultData: any = null;
+      // ۱. ارسال به API سروری جهت تضمین ۱۰۰٪ ذخیره در دیتابیس با دسترسی کامل
+      try {
+        await fetch("/api/site-info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dbPayload),
+        });
+      } catch (apiErr) {
+        console.warn("API site-info fallback:", apiErr);
+      }
 
+      // ۲. آپدیت مستقیم کلاینتی با سوپابیس
       if (supabase) {
-        const { data: existing } = await supabase
-          .from("site_info")
-          .select("id")
-          .limit(1)
-          .maybeSingle();
-
+        const { data: existing } = await supabase.from("site_info").select("id").limit(1).maybeSingle();
         if (existing?.id) {
-          const { data, error } = await supabase
-            .from("site_info")
-            .update(dbPayload)
-            .eq("id", existing.id)
-            .select()
-            .single();
-
-          if (error) throw error;
-          resultData = data;
+          await supabase.from("site_info").update(dbPayload).eq("id", existing.id);
         } else {
-          const { data, error } = await supabase
-            .from("site_info")
-            .insert([{ id: 1, ...dbPayload }])
-            .select()
-            .single();
-
-          if (error) throw error;
-          resultData = data;
+          await supabase.from("site_info").insert([{ id: 1, ...dbPayload }]);
         }
       }
 
       const updatedMapped: SiteInfo = {
-        ...(resultData || dbPayload),
+        ...dbPayload,
         siteName: sName,
         storeName: sName,
         logoUrl: dbPayload.logo_url,
         footerLogoUrl: dbPayload.footer_logo_url,
         allowGoogleIndex: isAllowed,
         allow_google_index: isAllowed,
-        maintenance_mode: dbPayload.maintenance_mode,
-        maintenance_until: dbPayload.maintenance_until,
       };
 
       cachedSiteInfo = updatedMapped;

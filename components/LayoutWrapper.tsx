@@ -16,7 +16,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const isAdmin = pathname?.startsWith("/admin");
 
   const [mounted, setMounted] = useState(false);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
   const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
   const [maintenanceUntil, setMaintenanceUntil] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
@@ -50,58 +50,23 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     }
   };
 
+  // ۱. سیستم هوشمند حافظه موقعیت کاربر (State & Path Memory)
   useEffect(() => {
-    setMounted(true);
-    fetchSiteStatus();
-    const cleanup = initRealtimeSync();
-
-    const handleUpdate = (e: any) => {
-      if (e.detail) applyStatus(e.detail);
-      else fetchSiteStatus();
-    };
-
-    window.addEventListener("site_info_updated", handleUpdate);
-
-    // اشتراک بلادرنگ برای تغییر آنی وضعیت بدون رفرش
-    const channel = supabase
-      .channel("realtime-maintenance-guard-v14")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
-        if (payload?.new) {
-          applyStatus(payload.new);
-        } else {
-          fetchSiteStatus();
+    if (typeof window !== "undefined" && !isAdmin && mounted) {
+      if (maintenanceMode !== "none") {
+        const currentPath = window.location.pathname + window.location.search;
+        sessionStorage.setItem("axon_user_last_position", currentPath);
+      } else {
+        const savedPath = sessionStorage.getItem("axon_user_last_position");
+        if (savedPath && savedPath !== window.location.pathname) {
+          sessionStorage.removeItem("axon_user_last_position");
+          router.replace(savedPath);
         }
-      })
-      .subscribe();
-
-    return () => {
-      if (typeof cleanup === "function") cleanup();
-      window.removeEventListener("site_info_updated", handleUpdate);
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // ۱. سیستم هوشمند حافظه موقعیت کاربر (User Path & Activity Memory)
-  useEffect(() => {
-    if (!mounted || typeof window === "undefined" || isAdmin) return;
-
-    if (maintenanceMode !== "none") {
-      // ذخیره موقعیت کاربر قبل از رفتن به صفحه تعمیرات
-      const currentFullUrl = window.location.pathname + window.location.search;
-      if (!currentFullUrl.startsWith("/admin")) {
-        sessionStorage.setItem("axon_user_last_position", currentFullUrl);
-      }
-    } else {
-      // بازگرداندن کاربر به همان صفحه به محض خروج از حالت تعمیر
-      const savedPosition = sessionStorage.getItem("axon_user_last_position");
-      if (savedPosition && savedPosition !== window.location.pathname) {
-        sessionStorage.removeItem("axon_user_last_position");
-        router.replace(savedPosition);
       }
     }
-  }, [maintenanceMode, mounted, isAdmin, router]);
+  }, [maintenanceMode, isAdmin, mounted, router]);
 
-  // ۲. ثانیه‌شمار زنده برای حالت تعمیرات زمان‌دار
+  // ۲. محاسبه زنده شمارنده معکوس برای حالت تعمیرات زمان‌دار
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
@@ -128,7 +93,36 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     return () => clearInterval(interval);
   }, [maintenanceMode, maintenanceUntil]);
 
-  // ادمین‌ها همیشه به پنل مدیریت دسترسی دارند
+  useEffect(() => {
+    setMounted(true);
+    fetchSiteStatus();
+    const cleanup = initRealtimeSync();
+
+    const handleUpdate = (e: any) => {
+      if (e.detail) applyStatus(e.detail);
+      else fetchSiteStatus();
+    };
+
+    window.addEventListener("site_info_updated", handleUpdate);
+
+    const channel = supabase
+      .channel("realtime-maintenance-guard-v16")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
+        if (payload?.new) {
+          applyStatus(payload.new);
+        } else {
+          fetchSiteStatus();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      if (typeof cleanup === "function") cleanup();
+      window.removeEventListener("site_info_updated", handleUpdate);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   if (isAdmin) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -137,12 +131,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // جلوگیری از ارور Hydration قبل از مانت شدن اولیه
-  if (!mounted) {
-    return <div className="min-h-screen bg-[#07090e]" />;
-  }
-
-  // صفحه فوق‌العاده مدرن و شیشه‌ای حالت ارتقا و نگهداری (Maintenance Screen)
+  // صفحه لایو و چشم‌نواز حالت تعمیرات
   if (maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
@@ -154,13 +143,11 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         dir="rtl"
         className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-[#07090e] text-slate-100 font-sans select-none relative overflow-hidden"
       >
-        {/* افکت‌های نوری نئونی پس‌زمینه */}
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />
 
         <div className="max-w-2xl w-full rounded-[3rem] bg-slate-900/90 border border-slate-800 p-8 sm:p-14 text-center space-y-8 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.95)] backdrop-blur-3xl relative z-10 animate-fadeIn">
           
-          {/* نشانگر زنده وضعیت */}
           <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black shadow-lg">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -186,14 +173,12 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                 : "به منظور ارتقای جامع زیرساخت، دسترسی موقتاً محدود شده است. به محض اتمام عملیات، سایت بدون نیاز به رفرش فعال خواهد شد."}
             </p>
 
-            {/* کارت هوشمند یادآوری موقعیت کاربر */}
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 text-[11px] text-blue-300 font-bold max-w-md mx-auto flex items-center justify-center gap-2">
               <span>🔒</span>
               <span>موقعیت و سبد خرید شما ذخیره شده و پس از بازگشایی به همان صفحه هدایت می‌شوید.</span>
             </div>
           </div>
 
-          {/* ثانیه‌شمار زنده برای حالت زمان‌دار */}
           {isTimed && timeLeft && (
             <div className="p-6 rounded-3xl bg-slate-950/80 border border-slate-800/90 space-y-3">
               <span className="text-[11px] font-black text-slate-400 block">زمان بازگشایی خودکار وب‌سایت:</span>
@@ -216,7 +201,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             </div>
           )}
 
-          {/* راه‌های ارتباطی */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 rounded-3xl bg-slate-950/60 border border-slate-800 text-xs text-right">
             <div className="space-y-1">
               <span className="text-slate-400 font-bold block">📞 تلفن پشتیبانی:</span>

@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AIAssistantChat from "@/components/AIAssistantChat";
 import TechRadarFeed from "@/components/TechRadarFeed";
+import ProductCard from "@/components/ProductCard";
 
 export default function HomePage() {
   const router = useRouter();
@@ -50,7 +51,7 @@ export default function HomePage() {
     window.addEventListener("category_selected", handleCategoryChange);
 
     const channel = supabase
-      .channel("public-db-home-realtime-master-v9")
+      .channel("public-db-home-realtime-master-v11")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => loadData())
@@ -81,7 +82,6 @@ export default function HomePage() {
     return cat === target || cat.includes(target) || target.includes(cat);
   });
 
-  const isGoogleAllowed = siteInfo?.allowGoogleIndex !== false && siteInfo?.allow_google_index !== false;
   const activeBanner = banners[currentSlideIndex] || banners[0];
 
   if (!mounted) {
@@ -96,7 +96,7 @@ export default function HomePage() {
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 space-y-14 mt-6">
         
-        {/* ۱. اسلایدر هوشمند بنرها با نشانگر زنده ایندکس گوگل */}
+        {/* ۱. اسلایدر هوشمند بنرها با طراحی اپلی بدون برچسب‌های ادمین */}
         {banners.length > 0 ? (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
@@ -107,22 +107,6 @@ export default function HomePage() {
             >
               <div className="max-w-2xl space-y-4 z-10 text-white animate-fadeIn">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span
-                    title={isGoogleAllowed ? "سایت در وضعیت ایندکس آنلاین گوگل قرار دارد" : "سایت در حالت No-Index و مخفی از گوگل است"}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black backdrop-blur-md border ${
-                      isGoogleAllowed
-                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/30 shadow-[0_0_12px_rgba(16,185,129,0.5)]"
-                        : "bg-rose-500/20 text-rose-300 border-rose-400/30 shadow-[0_0_12px_rgba(244,63,94,0.5)]"
-                    }`}
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        isGoogleAllowed ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
-                      }`}
-                    />
-                    <span>{isGoogleAllowed ? "آنلاین در گوگل (ایندکس فعال)" : "مخفی از گوگل (حالت تعمیرات)"}</span>
-                  </span>
-
                   {activeBanner.badge && (
                     <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/20 text-white border border-white/30 text-xs font-black backdrop-blur-md shadow-sm">
                       {activeBanner.badge}
@@ -269,7 +253,7 @@ export default function HomePage() {
         </section>
       </div>
 
-      {/* مدال بررسی جامع و سریع کالا با کلیه تب‌های مشخصات، گارانتی و مقایسه */}
+      {/* مدال بررسی جامع کالا */}
       {selectedProductForModal && (
         <ProductDetailsModal
           product={selectedProductForModal}
@@ -278,7 +262,7 @@ export default function HomePage() {
         />
       )}
 
-      {/* دستیار هوشمند شناور همراه با چت و جستجوی تصویری */}
+      {/* دستیار هوشمند شناور */}
       <AIAssistantChat />
     </div>
   );

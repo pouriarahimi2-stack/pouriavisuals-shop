@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AdminProducts from "@/components/AdminProducts";
 import AdminCoupons from "@/components/AdminCoupons";
@@ -41,7 +41,7 @@ export default function AdminPage() {
   >("products");
 
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
@@ -124,20 +124,15 @@ export default function AdminPage() {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
       setIsDarkMode(isDark);
-      if (isDark) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
+      if (isDark) document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
     } catch {}
 
     fetchSiteInfoLive();
 
     const channel = supabase
-      .channel("admin-siteinfo-realtime-master")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
-        fetchSiteInfoLive();
-      })
+      .channel("admin-siteinfo-realtime-master-v4")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchSiteInfoLive())
       .subscribe();
 
     return () => {
@@ -277,7 +272,7 @@ export default function AdminPage() {
       return <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 font-black text-[10px]">👑 مدیر کل سیستم</span>;
     }
     if (role === "product_manager" || role === "inventory_manager") {
-      return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و محصولات</span>;
+      return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و کالا</span>;
     }
     return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات سئو</span>;
   };
@@ -335,7 +330,7 @@ export default function AdminPage() {
                   }`}
                 />
                 <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">
-                  {isGoogleIndexAllowed ? "آنلاین" : "مخفی از گوگل"}
+                  {isGoogleIndexAllowed ? "آنلاین (گوگل فعال)" : "مخفی از گوگل (No-Index)"}
                 </span>
               </button>
               {getRoleBadge(userRole)}
@@ -373,7 +368,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
-            className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-blue-500 border border-[var(--card-border)] text-[var(--text-primary)] transition cursor-pointer text-xs flex items-center justify-center shadow-sm"
+            className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-blue-500 border border-[var(--card-border)] text-[var(--text-primary)] transition cursor-pointer text-xs flex items-center justify-center shadow-sm font-bold"
             title="جستجوی سریع (Ctrl+K)"
           >
             🔍
@@ -704,322 +699,6 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AdminBlogManager() {
-  const [blogs, setBlogs] = useState<any[]>([]);
-  const [editingBlog, setEditingBlog] = useState<any | null>(null);
-  const editorRef = useRef<HTMLDivElement>(null);
-
-  const loadBlogs = async () => {
-    try {
-      const res = await fetch("/api/blogs");
-      const json = await res.json();
-      if (json.posts || json.data) {
-        setBlogs(json.posts || json.data || []);
-      }
-    } catch (e) {
-      console.error("Error fetching blogs in admin:", e);
-    }
-  };
-
-  useEffect(() => {
-    loadBlogs();
-
-    const channel = supabase
-      .channel("admin-blogs-sync-master")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
-        loadBlogs();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const handleCreateNewArticle = () => {
-    const newArticle = {
-      id: `blog-${Date.now()}`,
-      title: "",
-      category: "راهنمای خرید و بررسی",
-      metaDescription: "",
-      content: "<p>متن خود را اینجا بنویسید...</p>",
-      createdAt: new Date().toLocaleDateString("fa-IR"),
-      isPublished: true,
-      isVisible: true,
-    };
-    setEditingBlog(newArticle);
-  };
-
-  const toggleVisibility = async (id: string, currentStatus: boolean) => {
-    await supabase.from("posts").update({ is_published: !currentStatus }).eq("id", id);
-    loadBlogs();
-  };
-
-  const deleteBlog = async (id: string) => {
-    if (confirm("آیا از حذف این مقاله اطمینان دارید؟")) {
-      await supabase.from("posts").delete().eq("id", id);
-      loadBlogs();
-    }
-  };
-
-  const exec = (command: string, value: string | undefined = undefined) => {
-    document.execCommand(command, false, value);
-  };
-
-  const insertTable = () => {
-    const tableHtml = `
-      <table border="1" style="width:100%; border-collapse:collapse; margin:14px 0; border:1px solid var(--card-border);">
-        <thead>
-          <tr style="background:var(--input-bg);">
-            <th style="padding:10px; color:var(--text-primary);">عنوان ۱</th>
-            <th style="padding:10px; color:var(--text-primary);">عنوان ۲</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="padding:10px; color:var(--text-secondary);">محتوا ۱</td>
-            <td style="padding:10px; color:var(--text-secondary);">محتوا ۲</td>
-          </tr>
-        </tbody>
-      </table>
-    `;
-    exec("insertHTML", tableHtml);
-  };
-
-  const insertLink = () => {
-    const url = prompt("لینک مورد نظر را وارد کنید:");
-    if (url) exec("createLink", url);
-  };
-
-  const insertImage = () => {
-    const url = prompt("آدرس اینترنتی تصویر را وارد کنید:");
-    if (url) exec("insertImage", url);
-  };
-
-  const handleSaveBlogEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingBlog) return;
-
-    const currentHtml = editorRef.current?.innerHTML || editingBlog.content;
-    const finalBlog = { ...editingBlog, content: currentHtml };
-
-    try {
-      await fetch("/api/blogs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(finalBlog),
-      });
-      loadBlogs();
-      setEditingBlog(null);
-      alert("🎉 مقاله با موفقیت در دیتابیس ذخیره و منتشر شد!");
-    } catch {
-      alert("خطا در ذخیره‌سازی مقاله.");
-    }
-  };
-
-  return (
-    <div className="space-y-6 text-[var(--text-primary)] font-sans select-none" dir="rtl">
-      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-[var(--card-border)] pb-4">
-        <div>
-          <h3 className="text-base font-black text-blue-500 flex items-center gap-2">
-            <span>📚</span> مدیریت، نگارش و ویرایشگر پیشرفته مقالات سئو
-          </h3>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ویرایشگر متنی با نوار ابزار کامل فرمت‌بندی، ایجاد جداول، تصاویر و متاتگ‌های سئو</p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <span className="px-3 py-1 bg-blue-500/15 text-blue-500 border border-blue-500/30 rounded-xl text-xs font-bold">
-            {blogs.length} مقاله ثبت‌شده
-          </span>
-
-          <button
-            onClick={handleCreateNewArticle}
-            className="px-4 py-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs transition flex items-center gap-1.5 shadow-md cursor-pointer"
-          >
-            <span>➕</span>
-            <span>نگارش مقاله جدید</span>
-          </button>
-        </div>
-      </div>
-
-      {blogs.length === 0 ? (
-        <div className="text-center py-12 text-xs text-[var(--text-secondary)] space-y-2 font-bold">
-          <p>هنوز مقاله‌ای در سیستم ثبت نشده است.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {blogs.map((blog) => (
-            <div
-              key={blog.id}
-              className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-wrap justify-between items-center gap-4 hover:border-blue-500 transition"
-            >
-              <div className="space-y-1 max-w-xl">
-                <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-bold">
-                  <span>📅 {blog.createdAt || "امروز"}</span>
-                  <span className="px-2 py-0.5 rounded font-bold bg-blue-500/10 text-blue-500">
-                    {blog.category || "مقاله"}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded font-bold ${
-                      blog.isPublished !== false && blog.isVisible !== false ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"
-                    }`}
-                  >
-                    {blog.isPublished !== false && blog.isVisible !== false ? "منتشر شده" : "پیش‌نویس / مخفی"}
-                  </span>
-                </div>
-                <h4 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-1">{blog.title || "بدون عنوان"}</h4>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs">
-                <button
-                  onClick={() => setEditingBlog({ ...blog })}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30 hover:bg-amber-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                >
-                  ✏️ ویرایش کامل
-                </button>
-
-                <button
-                  onClick={() => toggleVisibility(blog.id, blog.isPublished !== false && blog.isVisible !== false)}
-                  className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer text-[11px] ${
-                    blog.isPublished !== false && blog.isVisible !== false
-                      ? "bg-blue-500/15 text-blue-500 border border-blue-500/30 hover:bg-blue-600 hover:text-white"
-                      : "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
-                  }`}
-                >
-                  {blog.isPublished !== false && blog.isVisible !== false ? "👁️ مخفی‌سازی" : "✅ انتشار"}
-                </button>
-
-                <button
-                  onClick={() => deleteBlog(blog.id)}
-                  className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"
-                >
-                  🗑️ حذف
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {editingBlog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <form onSubmit={handleSaveBlogEdit} className="max-w-5xl w-full max-h-[94vh] overflow-y-auto p-6 space-y-4 border border-[var(--card-border)] shadow-2xl bg-[var(--modal-bg)] text-[var(--text-primary)] rounded-3xl">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <div>
-                <h3 className="font-extrabold text-sm text-blue-500">✏️ ویرایشگر سند و نگارش مقاله سئو</h3>
-                <p className="text-[10px] text-[var(--text-secondary)]">قالب‌بندی حرفه‌ای، فونت‌ها و ساختار تیتربندی</p>
-              </div>
-              <button type="button" onClick={() => setEditingBlog(null)} className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer">
-                ✕ بستن
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان اصلی مقاله (Title) *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="عنوان جذاب سئو شده بنویسید..."
-                    value={editingBlog.title}
-                    onChange={(e) => setEditingBlog({ ...editingBlog, title: e.target.value })}
-                    className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">دسته‌بندی مقاله</label>
-                  <input
-                    type="text"
-                    value={editingBlog.category || ""}
-                    onChange={(e) => setEditingBlog({ ...editingBlog, category: e.target.value })}
-                    placeholder="مثال: راهنمای خرید، تست رنگ، مانیتورینگ"
-                    className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیحات متای سئو (Meta Description):</label>
-                <input
-                  type="text"
-                  value={editingBlog.metaDescription || ""}
-                  onChange={(e) => setEditingBlog({ ...editingBlog, metaDescription: e.target.value })}
-                  placeholder="خلاصه مقاله جهت نمایش در نتایج گوگل (۱۲۰ الی ۱۶۰ کاراکتر)..."
-                  className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-blue-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block font-bold text-[var(--text-secondary)]">نوار ابزار ویرایش سند:</label>
-                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs select-none items-center">
-                  <select onChange={(e) => exec("fontSize", e.target.value)} className="p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-primary)] outline-none cursor-pointer">
-                    <option value="3">سایز متن: معمولی</option>
-                    <option value="1">خیلی کوچک</option>
-                    <option value="2">کوچک</option>
-                    <option value="4">متوسط</option>
-                    <option value="5">بزرگ (H3)</option>
-                    <option value="6">خیلی بزرگ (H2)</option>
-                    <option value="7">تیتر اصلی (H1)</option>
-                  </select>
-
-                  <div className="w-[1px] h-6 bg-[var(--card-border)] my-auto" />
-
-                  <button type="button" onClick={() => exec("bold")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-black" title="Bold"><b>B</b></button>
-                  <button type="button" onClick={() => exec("italic")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg italic" title="Italic"><i>I</i></button>
-                  <button type="button" onClick={() => exec("underline")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg underline" title="Underline"><u>U</u></button>
-
-                  <div className="w-[1px] h-6 bg-[var(--card-border)] my-auto" />
-
-                  <button type="button" onClick={() => exec("justifyRight")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="راست‌چین">👉</button>
-                  <button type="button" onClick={() => exec("justifyCenter")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="وسط‌چین">↔️</button>
-                  <button type="button" onClick={() => exec("justifyLeft")} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg" title="چپ‌چین">👈</button>
-                  <button type="button" onClick={() => exec("justifyFull")} className="px-2.5 py-1 bg-blue-600 text-white rounded-lg font-bold" title="Justify">≡ جاستیفای</button>
-
-                  <div className="w-[1px] h-6 bg-[var(--card-border)] my-auto" />
-
-                  <button type="button" onClick={insertTable} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-bold">📊 جدول</button>
-                  <button type="button" onClick={insertLink} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-bold">🔗 لینک</button>
-                  <button type="button" onClick={insertImage} className="px-2.5 py-1 bg-black/5 dark:bg-white/10 hover:opacity-80 rounded-lg font-bold">🖼️ عکس</button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">بدنه اصلی مقاله:</label>
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  dangerouslySetInnerHTML={{ __html: editingBlog.content || "" }}
-                  className="w-full min-h-[350px] max-h-[500px] overflow-y-auto p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed text-xs focus:border-blue-500 font-sans shadow-inner text-[var(--text-primary)]"
-                  style={{ textAlign: "justify" }}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
-              <button
-                type="button"
-                onClick={() => setEditingBlog(null)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--card-border)] cursor-pointer"
-              >
-                انصراف
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer"
-              >
-                ذخیره و انتشار مقاله 💾
-              </button>
-            </div>
-          </form>
         </div>
       )}
     </div>
@@ -1539,7 +1218,6 @@ function AdminAIAssistant() {
 
       {publishModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          {/* محتوای مدال انتشار */}
         </div>
       )}
     </div>

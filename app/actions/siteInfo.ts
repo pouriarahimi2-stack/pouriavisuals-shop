@@ -1,71 +1,97 @@
 "use server";
 
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseServer";
 import { SiteInfo } from "@/services/siteInfoService";
 import { revalidatePath } from "next/cache";
 
 export async function getSiteInfoServer(): Promise<SiteInfo> {
   try {
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabaseAdmin
       .from("site_info")
       .select("*")
-      .eq("id", 1)
+      .limit(1)
       .maybeSingle();
 
     if (error || !data) {
       return {
-        storeName: "BitByPouria",
+        site_name: "آکسون | Axon",
+        siteName: "آکسون | Axon",
+        storeName: "آکسون | Axon",
+        tagline: "مرجع تخصصی تجهیزات دیجیتال و استودیو",
+        allow_google_index: true,
         allowGoogleIndex: true,
       };
     }
 
+    const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
+
     return {
-      storeName: data.store_name || "BitByPouria",
+      id: data.id,
+      site_name: data.site_name || data.store_name || "آکسون | Axon",
+      siteName: data.site_name || data.store_name || "آکسون | Axon",
+      storeName: data.site_name || data.store_name || "آکسون | Axon",
+      tagline: data.tagline || "",
+      logo_url: data.logo_url || "",
       logoUrl: data.logo_url || "",
-      activeFontId: data.active_font_id || "vazir",
-      customFonts: data.custom_fonts || [],
-      aboutText: data.about_text || "",
+      footer_logo_url: data.footer_logo_url || "",
+      footerLogoUrl: data.footer_logo_url || "",
+      active_font_id: data.active_font_id || "Vazirmatn",
+      aboutText: data.about_text || data.description || "",
       phone: data.phone || "",
       email: data.email || "",
       address: data.address || "",
+      working_hours: data.working_hours || "",
       instagram: data.instagram || "",
       telegram: data.telegram || "",
-      allowGoogleIndex: data.allow_google_index !== undefined ? data.allow_google_index : true,
+      whatsapp: data.whatsapp || "",
+      header_announcement: data.header_announcement || "",
+      allow_google_index: isAllowed,
+      allowGoogleIndex: isAllowed,
     };
   } catch (err) {
     console.error("Error in getSiteInfoServer:", err);
-    return { storeName: "BitByPouria", allowGoogleIndex: true };
+    return { site_name: "آکسون | Axon", allow_google_index: true, allowGoogleIndex: true };
   }
 }
 
 export async function updateSiteInfoServer(info: SiteInfo) {
   try {
+    const sName = info.site_name || info.siteName || info.storeName || "آکسون | Axon";
+    const isAllowed = info.allow_google_index !== false && info.allowGoogleIndex !== false;
+
     const payload = {
-      id: 1,
-      store_name: info.storeName,
-      logo_url: info.logoUrl || "",
-      active_font_id: info.activeFontId || "vazir",
-      custom_fonts: info.customFonts || [],
-      about_text: info.aboutText || "",
+      site_name: sName,
+      store_name: sName,
+      tagline: info.tagline || "",
+      logo_url: info.logo_url || info.logoUrl || "",
+      footer_logo_url: info.footer_logo_url || info.footerLogoUrl || "",
+      active_font_id: info.active_font_id || "Vazirmatn",
+      description: info.description || info.footer_text || "",
+      footer_text: info.footer_text || info.description || "",
       phone: info.phone || "",
       email: info.email || "",
       address: info.address || "",
+      working_hours: info.working_hours || "",
       instagram: info.instagram || "",
       telegram: info.telegram || "",
-      allow_google_index: info.allowGoogleIndex ?? true,
+      whatsapp: info.whatsapp || "",
+      header_announcement: info.header_announcement || "",
+      allow_google_index: isAllowed,
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabaseServer
-      .from("site_info")
-      .upsert(payload, { onConflict: "id" });
+    const { data: existing } = await supabaseAdmin.from("site_info").select("id").limit(1).maybeSingle();
 
-    if (error) throw error;
+    if (existing?.id) {
+      await supabaseAdmin.from("site_info").update(payload).eq("id", existing.id);
+    } else {
+      await supabaseAdmin.from("site_info").insert([{ id: 1, ...payload }]);
+    }
 
     revalidatePath("/", "layout");
     return { success: true };
   } catch (err: any) {
-    console.error("Error updating site info:", err);
+    console.error("Error updating site info server action:", err);
     return { success: false, error: err.message };
   }
 }

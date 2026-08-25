@@ -10,6 +10,7 @@ export default function TechRadarFeed() {
   const [news, setNews] = useState<TechNewsItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   const loadNews = async () => {
     try {
@@ -21,13 +22,14 @@ export default function TechRadarFeed() {
   };
 
   useEffect(() => {
+    setMounted(true);
     loadNews();
 
     const handleNewsUpdate = () => loadNews();
     window.addEventListener("news_updated", handleNewsUpdate);
 
     const channel = supabase
-      .channel("radar-news-realtime-feed")
+      .channel("radar-news-realtime-feed-v3")
       .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => loadNews())
       .subscribe();
 
@@ -51,7 +53,7 @@ export default function TechRadarFeed() {
 
   return (
     <section className="space-y-6 font-sans select-none" dir="rtl">
-      {/* سربرگ رادار با نشانگر زنده پایش وب */}
+      {/* سربرگ رادار */}
       <div className="p-6 md:p-8 rounded-[2.5rem] bg-gradient-to-r from-blue-900/30 via-indigo-900/20 to-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
@@ -80,7 +82,7 @@ export default function TechRadarFeed() {
         </Link>
       </div>
 
-      {/* فیلترهای موضوعی */}
+      {/* فیلترهای دسته‌بندی */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
         {Object.entries(categoryBadges).map(([key, item]) => (
           <button
@@ -98,7 +100,7 @@ export default function TechRadarFeed() {
         ))}
       </div>
 
-      {/* گرید کارت‌های خبری فوق‌سریع */}
+      {/* لیست کارت‌ها */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
           {[1, 2, 3].map((i) => (
@@ -145,8 +147,8 @@ export default function TechRadarFeed() {
               </div>
 
               <div className="p-5 pt-0 flex items-center justify-between border-t border-[var(--card-border)] mt-4">
-                <span className="text-[10px] font-mono text-[var(--text-secondary)] font-bold">
-                  ⏱️ {new Date(item.published_at).toLocaleDateString("fa-IR")}
+                <span className="text-[10px] font-mono text-[var(--text-secondary)] font-bold" suppressHydrationWarning>
+                  {mounted ? new Date(item.published_at).toLocaleDateString("fa-IR") : "امروز"}
                 </span>
                 <Link
                   href={`/news/${item.slug}`}

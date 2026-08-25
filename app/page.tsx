@@ -11,11 +11,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AIAssistantChat from "@/components/AIAssistantChat";
 import TechRadarFeed from "@/components/TechRadarFeed";
-import ProductCard from "@/components/ProductCard";
 
 export default function HomePage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
@@ -42,7 +40,6 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    setMounted(true);
     loadData();
 
     const handleCategoryChange = (e: any) => {
@@ -51,7 +48,7 @@ export default function HomePage() {
     window.addEventListener("category_selected", handleCategoryChange);
 
     const channel = supabase
-      .channel("public-db-home-realtime-master-v11")
+      .channel("public-db-home-realtime-master-v22")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => loadData())
@@ -84,30 +81,22 @@ export default function HomePage() {
 
   const activeBanner = banners[currentSlideIndex] || banners[0];
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center font-sans">
-        <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 space-y-14 mt-6">
         
-        {/* ۱. اسلایدر هوشمند بنرها با طراحی اپلی بدون برچسب‌های ادمین */}
+        {/* ۱. اسلایدر هوشمند بنرها با طراحی مدرن اپلی */}
         {banners.length > 0 ? (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
               className="min-h-[380px] sm:min-h-[480px] p-8 sm:p-16 flex items-center bg-cover bg-center transition-all duration-700 relative"
               style={{
-                backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.3)), url(${activeBanner.image || (activeBanner as any).image_url || ""})`,
+                backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.3)), url(${activeBanner?.image || (activeBanner as any)?.image_url || ""})`,
               }}
             >
               <div className="max-w-2xl space-y-4 z-10 text-white animate-fadeIn">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {activeBanner.badge && (
+                  {activeBanner?.badge && (
                     <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/20 text-white border border-white/30 text-xs font-black backdrop-blur-md shadow-sm">
                       {activeBanner.badge}
                     </span>
@@ -115,17 +104,17 @@ export default function HomePage() {
                 </div>
 
                 <h1 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight drop-shadow-md">
-                  {activeBanner.title}
+                  {activeBanner?.title}
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl font-medium drop-shadow-sm">
-                  {activeBanner.subtitle}
+                  {activeBanner?.subtitle}
                 </p>
                 <div className="pt-2 flex items-center gap-3">
                   <Link
-                    href={activeBanner.link || (activeBanner as any).link_url || "/products"}
+                    href={activeBanner?.link || (activeBanner as any)?.link_url || "/products"}
                     className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-white text-gray-900 font-black text-xs hover:bg-slate-100 transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
                   >
-                    <span>{activeBanner.button_text || "مشاهده و بررسی کالا"}</span>
+                    <span>{activeBanner?.button_text || "مشاهده و بررسی کالا"}</span>
                     <span>←</span>
                   </Link>
                 </div>
@@ -253,7 +242,7 @@ export default function HomePage() {
         </section>
       </div>
 
-      {/* مدال بررسی جامع کالا */}
+      {/* مدال بررسی جامع و سریع کالا با کلیه تب‌های مشخصات، گارانتی و مقایسه */}
       {selectedProductForModal && (
         <ProductDetailsModal
           product={selectedProductForModal}
@@ -557,9 +546,9 @@ function ProductDetailsModal({
 
               <div className="flex items-center gap-2 pt-1">
                 <div className="flex items-center gap-2 bg-[var(--modal-bg)] rounded-xl px-3 py-2 border border-[var(--card-border)] font-bold text-xs">
-                  <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="px-1 text-sm font-black">-</button>
+                  <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="px-1 text-sm font-black cursor-pointer">-</button>
                   <span className="font-mono text-sm">{quantity}</span>
-                  <button onClick={() => setQuantity((q) => q + 1)} className="px-1 text-sm font-black">+</button>
+                  <button onClick={() => setQuantity((q) => q + 1)} className="px-1 text-sm font-black cursor-pointer">+</button>
                 </div>
 
                 <button

@@ -11,7 +11,6 @@ import { categoryService, Category } from "@/services/categoryService";
 import { productService, Product } from "@/services/productService";
 import { supabase } from "@/lib/supabase";
 
-// الگوریتم استاندارد اعتبارسنجی کد پستی ۱۰ رقمی ایران
 function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
   const cleanCode = postalCode
@@ -32,15 +31,6 @@ function isValidIranianPostalCode(postalCode: string): { valid: boolean; message
     return { valid: false, message: "کد پستی نمی‌تواند از ۱۰ رقم کاملاً تکراری تشکیل شده باشد." };
   }
 
-  const sequentialPatterns = ["0123456789", "1234567890", "2345678901", "9876543210", "8765432109"];
-  if (sequentialPatterns.includes(cleanCode)) {
-    return { valid: false, message: "کد پستی وارد شده نمی‌تواند اعداد متوالی و پشت‌سرهم باشد." };
-  }
-
-  if (cleanCode.substring(5) === "00000") {
-    return { valid: false, message: "کد شناسایی ساختمان (۵ رقم دوم) نامعتبر است." };
-  }
-
   return { valid: true };
 }
 
@@ -58,24 +48,22 @@ export default function Header() {
   const removeCoupon = cartContext?.removeCoupon || (() => {});
   const submitOrder = cartContext?.submitOrder;
 
-  // استیت‌های اطلاعات پایه، منو و دسته‌ها
+  const [mounted, setMounted] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
 
-  // استیت‌های باکس جستجوی زنده محصولات
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
 
-  // فرم تسویه حساب داخلی و مشخصات خریدار در سبد
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -85,7 +73,6 @@ export default function Header() {
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // سیستم تایید شماره تلفن همراه با کد ۶ رقمی (OTP)
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [userOtpInput, setUserOtpInput] = useState("");
@@ -96,7 +83,6 @@ export default function Header() {
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // محاسبات مقادیر سبد خرید
   const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
   const rawTotal = cartItems.reduce(
     (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
@@ -126,11 +112,12 @@ export default function Header() {
       if (cats) setCategories(cats);
       if (prods) setAllProducts(prods);
     } catch (e) {
-      console.error("Header data fetch error:", e);
+      console.error("Header fetch error:", e);
     }
   }
 
   useEffect(() => {
+    setMounted(true);
     const savedTheme = localStorage.getItem("theme");
     const isDark = savedTheme !== "light";
     setIsDarkMode(isDark);
@@ -146,9 +133,8 @@ export default function Header() {
 
     window.addEventListener("site_info_updated", handleSiteInfoUpdate);
 
-    // همگام‌سازی بلادرنگ با وب‌سوکت Supabase
     const channel = supabase
-      .channel("header-realtime-master-channel-v11")
+      .channel("header-realtime-master-v15")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchAllHeaderData())
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchAllHeaderData())
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => fetchAllHeaderData())
@@ -172,7 +158,6 @@ export default function Header() {
     };
   }, []);
 
-  // جستجوی زنده در کاتالوگ محصولات
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -188,7 +173,6 @@ export default function Header() {
     setSearchResults(matches.slice(0, 6));
   }, [searchQuery, allProducts]);
 
-  // شمارنده معکوس ۲ دقیقه‌ای رمز یکبار مصرف
   useEffect(() => {
     let timer: any;
     if (showOtpModal && otpTimer > 0) {
@@ -240,32 +224,6 @@ export default function Header() {
     }, 1500);
   };
 
-  const toEnglishDigits = (str: string) => {
-    return str
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString());
-  };
-
-  const handleNameChange = (val: string, setter: (v: string) => void) => {
-    const cleanVal = val.replace(/[0-9!@#$%^&*()_+=\[\]{};':"\\|,.<>\/?~`-]/g, "");
-    setter(cleanVal);
-  };
-
-  const handlePhoneChange = (val: string) => {
-    const cleanDigits = toEnglishDigits(val).replace(/\D/g, "");
-    if (cleanDigits.length <= 11) {
-      setPhone(cleanDigits);
-    }
-  };
-
-  const handlePostalCodeChange = (val: string) => {
-    const cleanDigits = toEnglishDigits(val).replace(/\D/g, "");
-    if (cleanDigits.length <= 10) {
-      setPostalCode(cleanDigits);
-    }
-  };
-
-  // ارسال پیامک کد تایید OTP
   const handleInitiateOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
@@ -275,8 +233,7 @@ export default function Header() {
       return;
     }
 
-    const mobileRegex = /^09\d{9}$/;
-    if (!mobileRegex.test(phone)) {
+    if (!/^09\d{9}$/.test(phone.trim())) {
       setValidationError("شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.");
       return;
     }
@@ -284,11 +241,6 @@ export default function Header() {
     const postalCheck = isValidIranianPostalCode(postalCode);
     if (!postalCheck.valid) {
       setValidationError(postalCheck.message || "کد پستی ۱۰ رقمی نامعتبر است.");
-      return;
-    }
-
-    if (address.trim().length < 8) {
-      setValidationError("نشانی پستی باید دقیق و شامل نام خیابان، پلاک و واحد باشد.");
       return;
     }
 
@@ -315,7 +267,6 @@ export default function Header() {
     }
   };
 
-  // تایید کد OTP و ثبت قطعی فاکتور
   const handleVerifyOtpAndProceed = async () => {
     if (userOtpInput.trim().length !== 6) {
       alert("لطفاً کد تایید ۶ رقمی پیامک‌شده را به طور کامل وارد نمایید.");
@@ -371,10 +322,13 @@ export default function Header() {
   const currentLogoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
   const headerAnnouncement = siteInfo?.header_announcement;
 
+  if (!mounted) {
+    return <header className="h-20" />;
+  }
+
   return (
     <header className="sticky top-2 sm:top-3.5 z-40 max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
       
-      {/* نوار اعلانات زنده بالای هدر */}
       {headerAnnouncement && !announcementDismissed && (
         <div className="w-full mb-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white text-[11px] font-black py-2 px-4 rounded-2xl shadow-lg flex items-center justify-between animate-fadeIn">
           <div className="flex-1 flex items-center justify-center gap-2">
@@ -384,23 +338,21 @@ export default function Header() {
           <button
             onClick={() => setAnnouncementDismissed(true)}
             className="text-white/80 hover:text-white text-xs font-bold cursor-pointer p-1"
-            title="بستن اعلان"
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* بدنه کپسولی و شیشه‌ای هدر اپلی */}
+      {/* بدنه اصلی هدر با دکمه‌های متقارن و بدون ارور */}
       <div className="bg-[var(--modal-bg)]/90 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
         <div className="flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* راست: لوگو، عنوان برند و دکمه دسته‌بندی‌ها */}
+          {/* راست: لوگو، عنوان و دسته‌ها */}
           <div className="flex items-center gap-3.5 shrink-0">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="xl:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
-              title="منوی موبایل"
             >
               ☰
             </button>
@@ -423,7 +375,6 @@ export default function Header() {
               </div>
             </Link>
 
-            {/* دراپ‌داون انتخاب دسته‌بندی‌ها */}
             <div className="relative hidden md:block" ref={categoryDropdownRef}>
               <button
                 onClick={() => setIsCategoryOpen(!isCategoryOpen)}
@@ -452,29 +403,26 @@ export default function Header() {
                     {selectedCategory === "all" && <span>✓</span>}
                   </button>
 
-                  {categories.map((cat) => {
-                    const isActive = selectedCategory === cat.name;
-                    return (
-                      <button
-                        key={cat.id || cat.name}
-                        onClick={() => handleSelectCategory(cat.name)}
-                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                          isActive
-                            ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
-                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-                        }`}
-                      >
-                        <span>🏷️ {cat.name}</span>
-                        {isActive && <span>✓</span>}
-                      </button>
-                    );
-                  })}
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id || cat.name}
+                      onClick={() => handleSelectCategory(cat.name)}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        selectedCategory === cat.name
+                          ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
+                      }`}
+                    >
+                      <span>🏷️ {cat.name}</span>
+                      {selectedCategory === cat.name && <span>✓</span>}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           </div>
 
-          {/* وسط: منوی پیوندهای هدر دسکتاپ */}
+          {/* وسط: منوی پیوندها */}
           <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
             {menuItems.length > 0 ? (
               menuItems.map((item) => (
@@ -498,7 +446,7 @@ export default function Header() {
             )}
           </nav>
 
-          {/* چپ: باکس سرچ، تغییر تم و دکمه سبد خرید مهندسی‌شده */}
+          {/* چپ: جستجو، تم و دکمه سبد خرید بازطراحی‌شده */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <div className="relative hidden lg:block" ref={searchContainerRef}>
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 xl:w-52 shadow-sm h-11">
@@ -547,7 +495,7 @@ export default function Header() {
               {isDarkMode ? "🌙" : "☀️"}
             </button>
 
-            {/* دکمه سبد خرید استاندارد و بی‌نقص */}
+            {/* دکمه سبد خرید با استایل اپلی */}
             <button
               onClick={toggleCart}
               className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-lg shadow-blue-500/25 cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"
@@ -568,7 +516,6 @@ export default function Header() {
         </div>
       </div>
 
-      {/* منوی بازشونده موبایل */}
       {mobileMenuOpen && (
         <div className="xl:hidden mt-2 p-5 bg-[var(--modal-bg)] rounded-3xl border border-[var(--card-border)] shadow-2xl space-y-3 animate-fadeIn">
           <div className="flex flex-col space-y-2 text-xs font-bold">
@@ -582,7 +529,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* کشوی سبد خرید داخلی */}
+      {/* دراور سبد خرید */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn font-sans">
           <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-6 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
@@ -692,7 +639,7 @@ export default function Header() {
                           placeholder="مثلاً: پوریا"
                           required
                           value={firstName}
-                          onChange={(e) => handleNameChange(e.target.value, setFirstName)}
+                          onChange={(e) => setFirstName(e.target.value)}
                           className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)]"
                         />
                       </div>
@@ -703,7 +650,7 @@ export default function Header() {
                           placeholder="مثلاً: رحیمی"
                           required
                           value={lastName}
-                          onChange={(e) => handleNameChange(e.target.value, setLastName)}
+                          onChange={(e) => setLastName(e.target.value)}
                           className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)]"
                         />
                       </div>
@@ -717,7 +664,7 @@ export default function Header() {
                           placeholder="09123456789"
                           required
                           value={phone}
-                          onChange={(e) => handlePhoneChange(e.target.value)}
+                          onChange={(e) => setPhone(e.target.value)}
                           className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)] text-center"
                         />
                       </div>
@@ -728,7 +675,7 @@ export default function Header() {
                           placeholder="کد ۱۰ رقمی پستی"
                           required
                           value={postalCode}
-                          onChange={(e) => handlePostalCodeChange(e.target.value)}
+                          onChange={(e) => setPostalCode(e.target.value)}
                           className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono outline-none focus:border-[var(--accent-blue)] text-center font-bold"
                         />
                       </div>
@@ -770,7 +717,6 @@ export default function Header() {
         </div>
       )}
 
-      {/* مدال احراز هویت پیامکی ۶ رقمی (OTP) */}
       {showOtpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-sm w-full bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 text-[var(--text-primary)] space-y-5 shadow-2xl relative">

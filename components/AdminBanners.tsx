@@ -1,44 +1,32 @@
+
+// components/AdminBanners.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-
-export interface BannerItem {
-  id?: string;
-  title: string;
-  subtitle?: string;
-  badge_text?: string;
-  image_url: string;
-  link_url?: string;
-  button_text?: string;
-  order_index?: number;
-  is_active?: boolean;
-}
+import { bannerService, Banner } from "@/services/bannerService";
 
 export default function AdminBanners() {
-  const [banners, setBanners] = useState<BannerItem[]>([]);
-  const [selectedBanner, setSelectedBanner] = useState<BannerItem | null>(null);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [selectedBanner, setSelectedBanner] = useState<Banner | null>(null);
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [badgeText, setBadgeText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [linkUrl, setLinkUrl] = useState("/#products");
-  const [buttonText, setButtonText] = useState("مشاهده و بررسی");
+  const [linkUrl, setLinkUrl] = useState("/products");
+  const [buttonText, setButtonText] = useState("مشاهده و بررسی کالا");
   const [isActive, setIsActive] = useState(true);
 
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchBanners = async () => {
     try {
-      const { data, error } = await supabase
-        .from("banners")
-        .select("*")
-        .order("order_index", { ascending: true });
-
-      if (error) throw error;
-      setBanners((data as BannerItem[]) || []);
+      const data = await bannerService.getAll();
+      setBanners(data || []);
     } catch (e) {
       console.error("Error fetching banners:", e);
     }
@@ -48,7 +36,7 @@ export default function AdminBanners() {
     fetchBanners();
 
     const channel = supabase
-      .channel("banners-admin-realtime-master")
+      .channel("banners-admin-realtime-v5")
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
         fetchBanners();
       })
@@ -59,32 +47,53 @@ export default function AdminBanners() {
     };
   }, []);
 
-  const handleSelectBanner = (b: BannerItem) => {
+  const handleSelectBanner = (b: Banner) => {
     setSelectedBanner(b);
     setTitle(b.title);
     setSubtitle(b.subtitle || "");
-    setBadgeText(b.badge_text || "");
-    setImageUrl(b.image_url);
-    setLinkUrl(b.link_url || "/#products");
-    setButtonText(b.button_text || "مشاهده و بررسی");
+    setBadgeText(b.badge || b.badge_text || "");
+    setImageUrl(b.image || b.image_url || "");
+    setLinkUrl(b.link || b.link_url || "/products");
+    setButtonText(b.button_text || b.buttonText || "مشاهده و بررسی کالا");
     setIsActive(b.is_active !== false);
   };
 
   const handleCreateNew = () => {
+    if (banners.length >= 10) {
+      alert("حداکثر ۱۰ اسلاید فعال برای اسلایدر صفحه اصلی مجاز است.");
+      return;
+    }
     setSelectedBanner(null);
     setTitle("");
     setSubtitle("");
     setBadgeText("");
     setImageUrl("");
-    setLinkUrl("/#products");
-    setButtonText("مشاهده و بررسی");
+    setLinkUrl("/products");
+    setButtonText("مشاهده و بررسی کالا");
     setIsActive(true);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("حجم تصویر نباید بیشتر از ۵ مگابایت باشد.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          setImageUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !imageUrl.trim()) {
-      setStatusMessage({ type: "error", text: "عنوان بنر و آدرس تصویر الزامی هستند." });
+      setStatusMessage({ type: "error", text: "عنوان بنر و تصویر الزامی هستند." });
       return;
     }
 
@@ -92,16 +101,19 @@ export default function AdminBanners() {
     const payload = {
       title: title.trim(),
       subtitle: subtitle.trim() || null,
+      badge: badgeText.trim() || null,
       badge_text: badgeText.trim() || null,
+      image: imageUrl.trim(),
       image_url: imageUrl.trim(),
-      link_url: linkUrl.trim() || "/#products",
-      button_text: buttonText.trim() || "مشاهده و بررسی",
+      link: linkUrl.trim() || "/products",
+      link_url: linkUrl.trim() || "/products",
+      button_text: buttonText.trim() || "مشاهده و بررسی کالا",
       is_active: isActive,
       updated_at: new Date().toISOString(),
     };
 
     try {
-      if (selectedBanner?.id) {
+      if (selectedBanner?.id && !selectedBanner.id.startsWith("default-")) {
         const { error } = await supabase.from("banners").update(payload).eq("id", selectedBanner.id);
         if (error) throw error;
       } else {
@@ -109,7 +121,7 @@ export default function AdminBanners() {
         if (error) throw error;
       }
 
-      setStatusMessage({ type: "success", text: "⚡ بنر با موفقیت ذخیره و در صفحه اصلی منتشر شد." });
+      setStatusMessage({ type: "success", text: "⚡ بنر با موفقیت در دیتابیس ذخیره و در اسلایدر فعال شد." });
       fetchBanners();
       if (!selectedBanner) handleCreateNew();
     } catch (err: any) {
@@ -123,11 +135,13 @@ export default function AdminBanners() {
   const handleDelete = async (id: string) => {
     if (!confirm("آیا از حذف این بنر اطمینان دارید؟")) return;
     try {
-      const { error } = await supabase.from("banners").delete().eq("id", id);
-      if (error) throw error;
+      if (!id.startsWith("default-")) {
+        const { error } = await supabase.from("banners").delete().eq("id", id);
+        if (error) throw error;
+      }
       handleCreateNew();
       fetchBanners();
-      setStatusMessage({ type: "success", text: "بنر حذف گردید." });
+      setStatusMessage({ type: "success", text: "بنر با موفقیت حذف گردید." });
       setTimeout(() => setStatusMessage(null), 3000);
     } catch (err: any) {
       alert("خطا در حذف: " + err.message);
@@ -136,161 +150,167 @@ export default function AdminBanners() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🖼️</span> مدیریت بنرهای تبلیغاتی و اسلایدر صفحه اصلی
+            <span>🖼️</span> مدیریت اسلایدر صفحه اصلی (تا ۱۰ اسلاید متحرک)
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">طراحی، ویرایش و تنظیم اولویت بنرهای ویترین اصلی سایت به صورت بلادرنگ</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">طراحی، تغییر اسلایدها و بارگذاری تصویر از گوشی و سیستم با ترنزیشن نرم</p>
         </div>
         <button
           onClick={handleCreateNew}
-          className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition shadow-md cursor-pointer"
+          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer"
         >
-          + ایجاد بنر جدید
+          + ایجاد اسلاید جدید ({banners.length}/10)
         </button>
       </div>
 
       {statusMessage && (
-        <div
-          className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${
-            statusMessage.type === "success"
-              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
-          }`}
-        >
+        <div className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}`}>
           {statusMessage.text}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1 bg-[var(--modal-bg)] p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-sm h-fit">
-          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            📋 بنرهای ثبت‌شده ({banners.length})
+        {/* لیست اسلایدهای موجود */}
+        <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
+          <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
+            📋 اسلایدهای فعال ({banners.length})
           </h3>
           <div className="space-y-2 max-h-[500px] overflow-y-auto">
-            {banners.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-secondary)] font-medium text-center py-6">هنوز بنری ثبت نشده است.</p>
-            ) : (
-              banners.map((b) => (
-                <div
-                  key={b.id}
-                  onClick={() => handleSelectBanner(b)}
-                  className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
-                    selectedBanner?.id === b.id
-                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
-                      : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                  }`}
-                >
-                  <div className="overflow-hidden">
-                    <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{b.title}</h4>
-                    <span className="text-[10px] text-[var(--text-secondary)] font-mono truncate block">{b.link_url}</span>
-                  </div>
-                  <span className={`w-2 h-2 rounded-full ${b.is_active !== false ? "bg-emerald-500" : "bg-slate-400"}`} />
+            {banners.map((b) => (
+              <div
+                key={b.id}
+                onClick={() => handleSelectBanner(b)}
+                className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
+                  selectedBanner?.id === b.id
+                    ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10 shadow-sm"
+                    : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <h4 className="text-xs font-black truncate">{b.title}</h4>
+                  <span className="text-[10px] text-[var(--text-secondary)] font-mono truncate block">{b.link || b.link_url}</span>
                 </div>
-              ))
-            )}
+                <span className={`w-2.5 h-2.5 rounded-full ${b.is_active !== false ? "bg-emerald-500" : "bg-slate-400"}`} />
+              </div>
+            ))}
           </div>
         </div>
 
+        {/* فرم ویرایش بنر */}
         <div className="lg:col-span-3">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-sm text-xs">
+          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-xl text-xs">
+            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">عنوان اصلی بنر *</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">عنوان اصلی اسلاید *</label>
                 <input
                   type="text"
+                  required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: مانیتورهای تخصصی تدوین و رنگ ۵K"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                  required
+                  placeholder="مثال: مانیتورهای تدوین و تصحیح رنگ ۵K"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">نشان یا برچسب کوچک (Badge)</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">برچسب کوچک نئونی (Badge)</label>
                 <input
                   type="text"
                   value={badgeText}
                   onChange={(e) => setBadgeText(e.target.value)}
-                  placeholder="مثال: تخفیف ویژه نوروز"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+                  placeholder="مثال: پیشنهاد ویژه نوروز"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">توضیح تکمیلی یا زیرعنوان</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">زیرعنوان و توضیحات اسلاید</label>
                 <input
                   type="text"
                   value={subtitle}
                   onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder="مثال: پوشش رنگ ۱۰۰٪ DCI-P3 و کالیبراسیون سخت‌افزاری کارخانه‌ای"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] font-medium"
+                  placeholder="توضیحات کوتاه برای معرفی مزیت محصول در اسلایدر..."
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">آدرس تصویر بنر (URL) *</label>
+              {/* بارگذاری تصویر با پشتیبانی همزمان از فایل و لینک */}
+              <div className="md:col-span-2 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="font-bold text-[var(--text-secondary)]">تصویر عریض اسلایدر (URL یا فایل) *</label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-sm flex items-center gap-1.5"
+                  >
+                    <span>📁</span>
+                    <span>انتخاب عکس از گوشی / کامپیوتر</span>
+                  </button>
+                </div>
                 <input
                   type="text"
+                  required
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                  required
+                  placeholder="https://... یا بعد از انتخاب فایل به صورت خودکار پر می‌شود"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">لینک مقصد هنگام کلیک</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">لینک مقصد هنگام کلیک</label>
                 <input
                   type="text"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder="/products یا /#products"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+                  placeholder="/products یا لینک اختصاصی"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">متن روی دکمه بنر</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">متن دکمه روی بنر</label>
                 <input
                   type="text"
                   value={buttonText}
                   onChange={(e) => setButtonText(e.target.value)}
-                  placeholder="مشاهده و خرید"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+                  placeholder="مشاهده و بررسی کالا"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-6">
+              <div className="md:col-span-2 flex items-center gap-2 pt-2">
                 <input
                   type="checkbox"
-                  id="isBanActAdmin"
+                  id="bannerActiveCheckbox"
                   checked={isActive}
                   onChange={(e) => setIsActive(e.target.checked)}
-                  className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
+                  className="w-5 h-5 rounded-lg text-[var(--accent-blue)] cursor-pointer"
                 />
-                <label htmlFor="isBanActAdmin" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
-                  بنر فعال و در اسلایدر صفحه اصلی نمایش داده شود
+                <label htmlFor="bannerActiveCheckbox" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
+                  اسلاید فعال و در چرخه اسلایدر صفحه نخست نمایش داده شود
                 </label>
               </div>
             </div>
 
+            {/* پیش‌نمایش تصویر اسلاید */}
             {imageUrl && (
               <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
-                <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش بصری لایو:</span>
+                <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش لایو بنر:</span>
                 <div
-                  className="w-full h-40 rounded-2xl bg-cover bg-center border border-[var(--card-border)] p-6 flex items-center shadow-inner"
+                  className="w-full h-44 rounded-2xl bg-cover bg-center border border-[var(--card-border)] p-6 flex items-center shadow-inner relative overflow-hidden"
                   style={{
                     backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.3)), url(${imageUrl})`,
                   }}
                 >
-                  <div className="text-white space-y-1.5">
-                    {badgeText && <span className="px-2 py-0.5 rounded bg-white/20 text-[9px] font-black">{badgeText}</span>}
-                    <h4 className="font-black text-sm">{title || "عنوان پیش‌نمایش بنر"}</h4>
-                    <p className="text-[10px] text-slate-300">{subtitle || "زیرعنوان تستی بنر"}</p>
+                  <div className="text-white space-y-1.5 z-10">
+                    {badgeText && <span className="px-3 py-1 rounded-full bg-white/20 text-[10px] font-black">{badgeText}</span>}
+                    <h4 className="font-black text-base">{title || "عنوان پیش‌نمایش"}</h4>
+                    <p className="text-xs text-slate-300">{subtitle || "توضیحات پیش‌نمایش"}</p>
                   </div>
                 </div>
               </div>
@@ -300,17 +320,17 @@ export default function AdminBanners() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-50"
+                className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 shadow-lg disabled:opacity-50"
               >
-                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار بنر در سایت"}
+                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و فعال‌سازی در اسلایدر"}
               </button>
               {selectedBanner?.id && (
                 <button
                   type="button"
-                  onClick={() => handleDelete(selectedBanner.id!)}
-                  className="px-5 py-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                  onClick={() => handleDelete(selectedBanner.id)}
+                  className="px-6 py-4 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500 hover:text-white transition cursor-pointer"
                 >
-                  حذف بنر ✕
+                  حذف اسلاید ✕
                 </button>
               )}
             </div>

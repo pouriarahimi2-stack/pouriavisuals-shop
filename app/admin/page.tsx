@@ -1,3 +1,5 @@
+
+// app/admin/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -15,6 +17,7 @@ import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import ContactMessagesManager from "@/components/admin/ContactMessagesManager";
 import PageBuilder from "@/components/admin/PageBuilder";
+import AdminBlogManager from "@/components/AdminBlogManager";
 import { productService, Product } from "@/services/productService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
@@ -43,6 +46,7 @@ export default function AdminPage() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
 
+  // مدال‌ها
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
 
@@ -131,7 +135,7 @@ export default function AdminPage() {
     fetchSiteInfoLive();
 
     const channel = supabase
-      .channel("admin-siteinfo-realtime-master-v4")
+      .channel("admin-siteinfo-realtime-master-v5")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchSiteInfoLive())
       .subscribe();
 
@@ -311,6 +315,7 @@ export default function AdminPage() {
     >
       <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
 
+      {/* هدر پیشخوان ادمین */}
       <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
@@ -329,8 +334,8 @@ export default function AdminPage() {
                     isGoogleIndexAllowed ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
                   }`}
                 />
-                <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">
-                  {isGoogleIndexAllowed ? "آنلاین (گوگل فعال)" : "مخفی از گوگل (No-Index)"}
+                <span className="text-[10px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition font-bold">
+                  {isGoogleIndexAllowed ? "آنلاین (ایندکس گوگل فعال)" : "مخفی از گوگل (No-Index)"}
                 </span>
               </button>
               {getRoleBadge(userRole)}
@@ -406,6 +411,7 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* نوار تب‌های مدیریت */}
       <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl backdrop-blur-2xl">
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
           {navTabs.map((tab) => {
@@ -428,6 +434,7 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* محتوای تب فعال */}
       <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-md">
         {activeTab === "products" && <AdminProducts />}
         {activeTab === "inventory" && <AdminInventoryManager />}
@@ -444,8 +451,9 @@ export default function AdminPage() {
 
       {isSuper && <AdminAIAssistant />}
 
+      {/* مدال تغییر رمز عبور */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-5 shadow-2xl text-[var(--text-primary)]">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
               <div className="flex items-center gap-2.5">
@@ -562,8 +570,9 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* مدال مدیریت ادمین‌ها */}
       {showAdminManagerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-6 shadow-2xl text-[var(--text-primary)]">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
               <div className="flex items-center gap-3">
@@ -705,6 +714,7 @@ export default function AdminPage() {
   );
 }
 
+// کامپوننت دستیار هوش مصنوعی و بازارسنجی با مدال کامل انتشار در وبلاگ
 function AdminAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectorModalOpen, setSelectorModalOpen] = useState(false);
@@ -1039,6 +1049,7 @@ function AdminAIAssistant() {
         </div>
       )}
 
+      {/* مدال انتخاب محصولات */}
       {selectorModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 sm:p-6 flex flex-col justify-between text-[var(--text-primary)] shadow-2xl">
@@ -1216,8 +1227,74 @@ function AdminAIAssistant() {
         </div>
       )}
 
+      {/* مدال تایید و انتشار مستقیم مقاله در وبلاگ */}
       {publishModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 text-[var(--text-primary)] shadow-2xl text-xs">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <h3 className="text-sm font-black text-blue-500">📝 بررسی و انتشار مستقیم مقاله در وبلاگ</h3>
+              <button
+                onClick={() => setPublishModalOpen(false)}
+                className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان سئو شده (Title Tag):</label>
+                <input
+                  type="text"
+                  value={articleToPublish.title}
+                  onChange={(e) =>
+                    setArticleToPublish({ ...articleToPublish, title: e.target.value })
+                  }
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-blue-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیحات متا (Meta Description):</label>
+                <input
+                  type="text"
+                  value={articleToPublish.metaDescription}
+                  onChange={(e) =>
+                    setArticleToPublish({ ...articleToPublish, metaDescription: e.target.value })
+                  }
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none focus:border-blue-500 text-xs font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن کامل مقاله (قابل ویرایش):</label>
+                <textarea
+                  rows={10}
+                  value={articleToPublish.content}
+                  onChange={(e) =>
+                    setArticleToPublish({ ...articleToPublish, content: e.target.value })
+                  }
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-sans leading-relaxed text-xs focus:border-blue-500 font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2 border-t border-[var(--card-border)]">
+              <button
+                onClick={() => setPublishModalOpen(false)}
+                className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] text-xs font-bold hover:opacity-80 cursor-pointer text-[var(--text-secondary)] border border-[var(--card-border)]"
+              >
+                انصراف
+              </button>
+              <button
+                disabled={publishing}
+                onClick={handleFinalPublish}
+                className="px-6 py-2.5 rounded-2xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer"
+              >
+                {publishing ? "در حال انتشار..." : "🌐 تایید و انتشار در وب‌سایت"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -5,13 +5,12 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
-import { menuService, MenuItem } from "@/services/menuService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { categoryService, Category } from "@/services/categoryService";
 import { productService, Product } from "@/services/productService";
+import { menuService, MenuItem } from "@/services/menuService";
+import { categoryService, Category } from "@/services/categoryService";
 import { supabase } from "@/lib/supabase";
 
-// الگوریتم رسمی و استاندارد اعتبارسنجی کد پستی ۱۰ رقمی ایران
 function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
   const cleanCode = postalCode
@@ -20,27 +19,8 @@ function isValidIranianPostalCode(postalCode: string): { valid: boolean; message
     .replace(/\D/g, "");
 
   if (cleanCode.length !== 10) {
-    return { valid: false, message: "کد پستی باید دقیقاً ۱۰ رقم عددی بدون خط تیره باشد." };
+    return { valid: false, message: "کد پستی باید ۱۰ رقم عددی باشد." };
   }
-
-  const firstDigit = cleanCode.charAt(0);
-  if (firstDigit === "0" || firstDigit === "2") {
-    return { valid: false, message: "کد پستی با ارقام ۰ یا ۲ در محدوده مناطق پستی ایران تعریف نشده است." };
-  }
-
-  if (/^(\d)\1{9}$/.test(cleanCode)) {
-    return { valid: false, message: "کد پستی نمی‌تواند از ۱۰ رقم کاملاً تکراری تشکیل شده باشد." };
-  }
-
-  const sequentialPatterns = ["0123456789", "1234567890", "2345678901", "9876543210", "8765432109"];
-  if (sequentialPatterns.includes(cleanCode)) {
-    return { valid: false, message: "کد پستی وارد شده نمی‌تواند اعداد متوالی و پشت‌سرهم باشد." };
-  }
-
-  if (cleanCode.substring(5) === "00000") {
-    return { valid: false, message: "کد شناسایی ساختمان (۵ رقم دوم) نامعتبر است." };
-  }
-
   return { valid: true };
 }
 
@@ -58,25 +38,22 @@ export default function Header() {
   const removeCoupon = cartContext?.removeCoupon || (() => {});
   const submitOrder = cartContext?.submitOrder;
 
-  // استیت‌های اطلاعات پایه، منو و دسته‌ها
+  // استیت‌های ایمن برای هیدریشن
   const [mounted, setMounted] = useState(false);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [announcementDismissed, setAnnouncementDismissed] = useState(false);
 
-  // استیت‌های باکس جستجوی زنده محصولات
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
 
-  // فرم تسویه حساب داخلی و مشخصات خریدار در سبد
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -86,7 +63,6 @@ export default function Header() {
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // سیستم تایید شماره تلفن همراه با کد ۶ رقمی (OTP)
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [userOtpInput, setUserOtpInput] = useState("");
@@ -94,10 +70,9 @@ export default function Header() {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
-  // محاسبات مقادیر سبد خرید
   const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
   const rawTotal = cartItems.reduce(
     (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
@@ -114,47 +89,33 @@ export default function Header() {
 
   const finalTotal = Math.max(0, rawTotal - discountAmount);
 
-  async function fetchAllHeaderData() {
-    try {
-      const [info, menus, cats, prods] = await Promise.all([
-        siteInfoService.getSiteInfo(),
-        menuService.getAll(),
-        categoryService.getAll(),
-        productService.getAll(),
-      ]);
-      if (info) setSiteInfo(info);
-      if (menus) setMenuItems(menus.filter((m: any) => m.isActive !== false && m.is_active !== false));
-      if (cats) setCategories(cats);
-      if (prods) setAllProducts(prods);
-    } catch (e) {
-      console.error("Header data fetch error:", e);
-    }
-  }
-
   useEffect(() => {
     setMounted(true);
-    const savedTheme = localStorage.getItem("theme");
-    const isDark = savedTheme !== "light";
-    setIsDarkMode(isDark);
-    if (isDark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
 
-    fetchAllHeaderData();
+    // همگام‌سازی امن تم و اطلاعات پس از مانت کلاینت
+    try {
+      const savedTheme = localStorage.getItem("theme");
+      const isDark = savedTheme !== "light";
+      setIsDarkMode(isDark);
+      if (isDark) document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
+    } catch {}
 
-    const handleSiteInfoUpdate = (e: any) => {
+    siteInfoService.getSiteInfo().then((info) => { if (info) setSiteInfo(info); });
+    productService.getAll().then((prods) => { if (prods) setAllProducts(prods); });
+    menuService.getAll().then((menus) => { if (menus) setMenuItems(menus); });
+    categoryService.getAll().then((cats) => { if (cats) setCategories(cats); });
+
+    const handleUpdate = (e: any) => {
       if (e.detail) setSiteInfo(e.detail);
-      else fetchAllHeaderData();
     };
+    window.addEventListener("site_info_updated", handleUpdate);
 
-    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
-
-    // همگام‌سازی بلادرنگ با وب‌سوکت Supabase
     const channel = supabase
-      .channel("header-realtime-master-channel-final-v1")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchAllHeaderData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchAllHeaderData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => fetchAllHeaderData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => fetchAllHeaderData())
+      .channel("header-realtime-master-v101")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
+        if (payload?.new) setSiteInfo(payload.new);
+      })
       .subscribe();
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -168,13 +129,12 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
-      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
+      window.removeEventListener("site_info_updated", handleUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
       supabase.removeChannel(channel);
     };
   }, []);
 
-  // جستجوی زنده در کاتالوگ محصولات
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -183,21 +143,10 @@ export default function Header() {
     const q = searchQuery.toLowerCase();
     const matches = allProducts.filter((p) =>
       (p.title || p.name || "").toLowerCase().includes(q) ||
-      (p.title_fa || "").toLowerCase().includes(q) ||
-      (p.category || "").toLowerCase().includes(q) ||
-      (p.brand || "").toLowerCase().includes(q)
+      (p.category || "").toLowerCase().includes(q)
     );
-    setSearchResults(matches.slice(0, 6));
+    setSearchResults(matches.slice(0, 5));
   }, [searchQuery, allProducts]);
-
-  // شمارنده معکوس ۲ دقیقه‌ای رمز یکبار مصرف
-  useEffect(() => {
-    let timer: any;
-    if (showOtpModal && otpTimer > 0) {
-      timer = setInterval(() => setOtpTimer((t) => t - 1), 1000);
-    }
-    return () => clearInterval(timer);
-  }, [showOtpModal, otpTimer]);
 
   const toggleDarkMode = () => {
     const nextMode = !isDarkMode;
@@ -242,43 +191,16 @@ export default function Header() {
     }, 1500);
   };
 
-  const toEnglishDigits = (str: string) => {
-    return str
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString());
-  };
-
-  const handleNameChange = (val: string, setter: (v: string) => void) => {
-    const cleanVal = val.replace(/[0-9!@#$%^&*()_+=\[\]{};':"\\|,.<>\/?~`-]/g, "");
-    setter(cleanVal);
-  };
-
-  const handlePhoneChange = (val: string) => {
-    const cleanDigits = toEnglishDigits(val).replace(/\D/g, "");
-    if (cleanDigits.length <= 11) {
-      setPhone(cleanDigits);
-    }
-  };
-
-  const handlePostalCodeChange = (val: string) => {
-    const cleanDigits = toEnglishDigits(val).replace(/\D/g, "");
-    if (cleanDigits.length <= 10) {
-      setPostalCode(cleanDigits);
-    }
-  };
-
-  // ارسال پیامک کد تایید OTP
   const handleInitiateOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
 
     if (!firstName.trim() || !lastName.trim() || !phone || !address.trim() || !postalCode) {
-      setValidationError("لطفاً تمامی مشخصات گیرنده و آدرس پستی را به طور کامل تکمیل نمایید.");
+      setValidationError("لطفاً تمامی مشخصات گیرنده و آدرس پستی را تکمیل نمایید.");
       return;
     }
 
-    const mobileRegex = /^09\d{9}$/;
-    if (!mobileRegex.test(phone)) {
+    if (!/^09\d{9}$/.test(phone.trim())) {
       setValidationError("شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.");
       return;
     }
@@ -286,11 +208,6 @@ export default function Header() {
     const postalCheck = isValidIranianPostalCode(postalCode);
     if (!postalCheck.valid) {
       setValidationError(postalCheck.message || "کد پستی ۱۰ رقمی نامعتبر است.");
-      return;
-    }
-
-    if (address.trim().length < 8) {
-      setValidationError("نشانی پستی باید دقیق و شامل نام خیابان، پلاک و واحد باشد.");
       return;
     }
 
@@ -317,7 +234,6 @@ export default function Header() {
     }
   };
 
-  // تایید کد OTP و ثبت قطعی فاکتور
   const handleVerifyOtpAndProceed = async () => {
     if (userOtpInput.trim().length !== 6) {
       alert("لطفاً کد تایید ۶ رقمی پیامک‌شده را به طور کامل وارد نمایید.");
@@ -369,83 +285,63 @@ export default function Header() {
     }
   };
 
-  const isGoogleIndexAllowed = siteInfo?.allow_google_index !== false && siteInfo?.allowGoogleIndex !== false && siteInfo?.maintenance_mode === "none";
-  const currentStoreName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "آکسون | Axon";
-  const currentLogoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-  const headerAnnouncement = siteInfo?.header_announcement;
-
-  const activeLinks = menuItems.length > 0 ? menuItems : [
-    { id: "m1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
-    { id: "m2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
-    { id: "m3", title: "📡 رادار اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
-    { id: "m4", title: "پیگیری سفارش پستی", url: "/track-order", order: 4, isActive: true },
-    { id: "m5", title: "مجله و مقالات سئو", url: "/blog", order: 5, isActive: true },
-    { id: "m6", title: "تماس با ما", url: "/contact", order: 6, isActive: true },
+  const navLinks = menuItems.length > 0 ? menuItems.map(m => ({ title: m.title, href: m.url })) : [
+    { title: "صفحه نخست", href: "/" },
+    { title: "کاتالوگ محصولات", href: "/#products" },
+    { title: "📡 رادار اخبار تکنولوژی", href: "/news" },
+    { title: "پیگیری سفارش", href: "/track-order" },
+    { title: "مجله تخصصی سئو", href: "/blog" },
+    { title: "تماس با ما", href: "/contact" },
   ];
+
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
+  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
+  const isGoogleAllowed = siteInfo?.allow_google_index !== false && siteInfo?.maintenance_mode === "none";
 
   return (
     <header className="sticky top-2 sm:top-3.5 z-40 max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
       
-      {/* ۱. نوار اعلانات زنده بالای هدر */}
-      {headerAnnouncement && !announcementDismissed && (
-        <div className="w-full mb-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white text-[11px] font-black py-2 px-4 rounded-2xl shadow-lg flex items-center justify-between animate-fadeIn">
-          <div className="flex-1 flex items-center justify-center gap-2">
-            <span>📢</span>
-            <span suppressHydrationWarning>{headerAnnouncement}</span>
-          </div>
-          <button
-            onClick={() => setAnnouncementDismissed(true)}
-            className="text-white/80 hover:text-white text-xs font-bold cursor-pointer p-1"
-            title="بستن اعلان"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* ۲. بدنه کپسولی و شیشه‌ای هدر اپلی */}
-      <div className="bg-[var(--modal-bg)]/90 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
+      {/* بدنه شیشه‌ای هدر */}
+      <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
         <div className="flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* راست: لوگو، عنوان برند و دکمه دسته‌بندی‌ها */}
+          {/* راست: لوگو، عنوان و دسته‌ها */}
           <div className="flex items-center gap-3.5 shrink-0">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="lg:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
-              title="منوی موبایل"
             >
               ☰
             </button>
 
             <Link href="/" className="flex items-center gap-3 group">
               <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
-                {currentLogoUrl ? (
-                  <img src={currentLogoUrl} alt={currentStoreName} className="w-full h-full object-contain" />
+                {logoUrl ? (
+                  <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
                 ) : (
-                  <span className="text-2xl sm:text-3xl font-black text-[var(--accent-blue)]">⚡</span>
+                  <span className="text-2xl font-black text-[var(--accent-blue)]">⚡</span>
                 )}
               </div>
               <div className="flex flex-col text-right">
                 <div className="flex items-center gap-2">
                   <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
-                    {currentStoreName}
+                    {storeName}
                   </span>
                   <span
-                    title={isGoogleIndexAllowed ? "سایت آنلاین است (ایندکس گوگل فعال)" : "سایت در حالت نگهداری یا No-Index است"}
                     className={`w-2.5 h-2.5 rounded-full transition-all duration-500 ${
-                      isGoogleIndexAllowed
+                      isGoogleAllowed
                         ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)] animate-pulse"
                         : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)]"
                     }`}
                   />
                 </div>
-                <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)] mt-0.5" suppressHydrationWarning>
+                <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
                   {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال"}
                 </span>
               </div>
             </Link>
 
-            {/* دراپ‌داون انتخاب دسته‌بندی‌ها */}
+            {/* دسته‌بندی‌ها */}
             <div className="relative hidden md:block" ref={categoryDropdownRef}>
               <button
                 onClick={() => setIsCategoryOpen(!isCategoryOpen)}
@@ -474,42 +370,39 @@ export default function Header() {
                     {selectedCategory === "all" && <span>✓</span>}
                   </button>
 
-                  {categories.map((cat) => {
-                    const isActive = selectedCategory === cat.name;
-                    return (
-                      <button
-                        key={cat.id || cat.name}
-                        onClick={() => handleSelectCategory(cat.name)}
-                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                          isActive
-                            ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
-                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-                        }`}
-                      >
-                        <span>🏷️ {cat.name}</span>
-                        {isActive && <span>✓</span>}
-                      </button>
-                    );
-                  })}
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id || cat.name}
+                      onClick={() => handleSelectCategory(cat.name)}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        selectedCategory === cat.name
+                          ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
+                      }`}
+                    >
+                      <span>🏷️ {cat.name}</span>
+                      {selectedCategory === cat.name && <span>✓</span>}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           </div>
 
-          {/* وسط: منوی پیوندهای هدر دسکتاپ */}
+          {/* وسط: منوی پیوندهای دسکتاپ */}
           <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
-            {activeLinks.map((item) => (
+            {navLinks.map((link, idx) => (
               <Link
-                key={item.id}
-                href={item.url || "#"}
+                key={idx}
+                href={link.href}
                 className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
               >
-                {item.title}
+                {link.title}
               </Link>
             ))}
           </nav>
 
-          {/* چپ: باکس جستجوی زنده، دکمه تغییر تم و سبد خرید */}
+          {/* چپ: جستجو، تم و دکمه سبد خرید */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <div className="relative hidden md:block" ref={searchContainerRef}>
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-48 shadow-sm h-11">
@@ -561,7 +454,7 @@ export default function Header() {
               {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
             </button>
 
-            {/* دکمه سبد خرید متقارن و استاندارد */}
+            {/* دکمه سبد خرید با استایل اپلی */}
             <button
               onClick={toggleCart}
               className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-lg shadow-blue-500/25 cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"
@@ -586,17 +479,21 @@ export default function Header() {
       {mobileMenuOpen && (
         <div className="lg:hidden mt-2 p-5 bg-[var(--modal-bg)] rounded-3xl border border-[var(--card-border)] shadow-2xl space-y-3 animate-fadeIn">
           <div className="flex flex-col space-y-2 text-xs font-bold">
-            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">🏠 صفحه نخست</Link>
-            <Link href="/products" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📦 کاتالوگ تجهیزات</Link>
-            <Link href="/news" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2 text-[var(--accent-blue)]">📡 رادار اخبار تکنولوژی</Link>
-            <Link href="/track-order" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">🚚 پیگیری مرسوله</Link>
-            <Link href="/blog" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📚 مجله تخصصی سئو</Link>
-            <Link href="/contact" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2">📞 تماس با ما</Link>
+            {navLinks.map((link, idx) => (
+              <Link
+                key={idx}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2"
+              >
+                {link.title}
+              </Link>
+            ))}
           </div>
         </div>
       )}
 
-      {/* ۳. دراور سبد خرید داخلی و فرم ثبت فاکتور */}
+      {/* دراور سبد خرید */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn font-sans">
           <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-6 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
@@ -706,7 +603,7 @@ export default function Header() {
                           placeholder="مثلاً: پوریا"
                           required
                           value={firstName}
-                          onChange={(e) => handleNameChange(e.target.value, setFirstName)}
+                          onChange={(e) => setFirstName(e.target.value)}
                           className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)]"
                         />
                       </div>
@@ -717,7 +614,7 @@ export default function Header() {
                           placeholder="مثلاً: رحیمی"
                           required
                           value={lastName}
-                          onChange={(e) => handleNameChange(e.target.value, setLastName)}
+                          onChange={(e) => setLastName(e.target.value)}
                           className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)]"
                         />
                       </div>
@@ -731,7 +628,7 @@ export default function Header() {
                           placeholder="09123456789"
                           required
                           value={phone}
-                          onChange={(e) => handlePhoneChange(e.target.value)}
+                          onChange={(e) => setPhone(e.target.value)}
                           className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)] text-center"
                         />
                       </div>
@@ -742,7 +639,7 @@ export default function Header() {
                           placeholder="کد ۱۰ رقمی"
                           required
                           value={postalCode}
-                          onChange={(e) => handlePostalCodeChange(e.target.value)}
+                          onChange={(e) => setPostalCode(e.target.value)}
                           className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono outline-none focus:border-[var(--accent-blue)] text-center font-bold"
                         />
                       </div>
@@ -784,7 +681,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* ۴. مدال احراز هویت پیامکی ۶ رقمی (OTP) */}
+      {/* مدال تایید پیامکی ۶ رقمی (OTP) */}
       {showOtpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-sm w-full bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 text-[var(--text-primary)] space-y-5 shadow-2xl relative">

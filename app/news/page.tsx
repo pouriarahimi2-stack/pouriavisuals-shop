@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { newsService, TechNewsItem } from "@/services/newsService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function NewsArchivePage() {
   const [news, setNews] = useState<TechNewsItem[]>([]);
@@ -26,7 +27,7 @@ export default function NewsArchivePage() {
     loadData();
 
     const channel = supabase
-      .channel("news-archive-realtime")
+      .channel("news-archive-realtime-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => loadData())
       .subscribe();
 
@@ -34,6 +35,11 @@ export default function NewsArchivePage() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const handleCategoryChange = (catId: string) => {
+    soundEngine.playClick();
+    setCategory(catId);
+  };
 
   const filtered = news.filter((item) => {
     const matchCat = category === "all" || item.category === category;
@@ -45,17 +51,19 @@ export default function NewsArchivePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
+      
+      {/* سربرگ بخش اخبار */}
       <div className="text-center space-y-3">
-        <span className="p-3 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-2xl inline-block">
+        <span className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-3xl inline-block shadow-sm">
           📡
         </span>
-        <h1 className="text-3xl md:text-5xl font-black">رادار جهانی اخبار تکنولوژی، گیم و گجت‌ها</h1>
+        <h1 className="text-3xl md:text-5xl font-black">رادار جهانی اخبار تکنولوژی، گیم و سخت‌افزار</h1>
         <p className="text-xs md:text-sm text-[var(--text-secondary)] font-medium max-w-2xl mx-auto leading-relaxed">
-          پوشش لحظه‌ای معتبرترین منابع فناوری دنیا، بررسی تخصصی سخت‌افزارها و آخرین نوآوری‌های هوش مصنوعی
+          پوشش لحظه‌ای معتبرترین مراجع فناوری دنیا، بررسی فنی قطعات و آخرین تحولات هوش مصنوعی به زبان فارسی
         </p>
       </div>
 
-      {/* نوار جستجو و فیلتر */}
+      {/* نوار جستجو و فیلتر دسته‌ها */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 scrollbar-none text-xs">
           {[
@@ -67,11 +75,11 @@ export default function NewsArchivePage() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setCategory(tab.id)}
+              onClick={() => handleCategoryChange(tab.id)}
               className={`px-4 py-2.5 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
                 category === tab.id
                   ? "bg-[var(--accent-blue)] text-white shadow-md"
-                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
+                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
             >
               {tab.label}

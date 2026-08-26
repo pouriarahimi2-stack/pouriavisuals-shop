@@ -1,3 +1,4 @@
+// services/menuService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface MenuItem {
@@ -22,7 +23,12 @@ export function normalizeMenuItem(raw: any, index: number = 0): MenuItem {
   const title = raw.title || raw.name || raw.label || "پیوند";
   const url = raw.url || raw.href || "#";
   const order = Number(raw.order ?? index + 1);
-  const isActive = raw.isActive !== undefined ? Boolean(raw.isActive) : (raw.is_active !== undefined ? Boolean(raw.is_active) : true);
+  const isActive =
+    raw.isActive !== undefined
+      ? Boolean(raw.isActive)
+      : raw.is_active !== undefined
+      ? Boolean(raw.is_active)
+      : true;
 
   return {
     ...raw,
@@ -40,7 +46,6 @@ export function normalizeMenuItem(raw: any, index: number = 0): MenuItem {
 }
 
 export const menuService = {
-  // دریافت لیست تمام آیتم‌های منو
   async getAll(): Promise<MenuItem[]> {
     try {
       if (supabase) {
@@ -68,9 +73,10 @@ export const menuService = {
       const defaults: MenuItem[] = [
         { id: "m_1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
         { id: "m_2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
-        { id: "m_3", title: "پیگیری مرسوله پستی", url: "/track-order", order: 3, isActive: true },
-        { id: "m_4", title: "مجله و مقالات سئو", url: "/blog", order: 4, isActive: true },
-        { id: "m_5", title: "تماس با پشتیبانی", url: "/contact", order: 5, isActive: true },
+        { id: "m_3", title: "📡 رادار اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
+        { id: "m_4", title: "پیگیری مرسوله پستی", url: "/track-order", order: 4, isActive: true },
+        { id: "m_5", title: "مجله و مقالات سئو", url: "/blog", order: 5, isActive: true },
+        { id: "m_6", title: "تماس با پشتیبانی", url: "/contact", order: 6, isActive: true },
       ];
 
       return defaults.map((d, idx) => normalizeMenuItem(d, idx));
@@ -84,7 +90,6 @@ export const menuService = {
     return this.getAll();
   },
 
-  // ذخیره کل آیتم‌ها
   async saveAll(items: MenuItem[]): Promise<boolean> {
     try {
       const normalized = items.map((d, idx) => normalizeMenuItem(d, idx));

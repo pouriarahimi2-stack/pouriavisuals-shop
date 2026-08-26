@@ -1,3 +1,4 @@
+// components/LayoutShell.tsx
 'use client';
 
 import React from 'react';
@@ -11,7 +12,6 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       <Header />
       <main className="flex-1 w-full">{children}</main>
       <Footer />
-      {/* دراور سبد خرید سراسری */}
       <CartDrawer />
     </div>
   );

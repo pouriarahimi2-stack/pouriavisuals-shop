@@ -1,10 +1,10 @@
-
 // components/AdminBanners.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { bannerService, Banner } from "@/services/bannerService";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminBanners() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -36,7 +36,7 @@ export default function AdminBanners() {
     fetchBanners();
 
     const channel = supabase
-      .channel("banners-admin-realtime-v5")
+      .channel("banners-admin-realtime-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
         fetchBanners();
       })
@@ -48,6 +48,7 @@ export default function AdminBanners() {
   }, []);
 
   const handleSelectBanner = (b: Banner) => {
+    soundEngine.playClick();
     setSelectedBanner(b);
     setTitle(b.title);
     setSubtitle(b.subtitle || "");
@@ -59,6 +60,7 @@ export default function AdminBanners() {
   };
 
   const handleCreateNew = () => {
+    soundEngine.playClick();
     if (banners.length >= 10) {
       alert("حداکثر ۱۰ اسلاید فعال برای اسلایدر صفحه اصلی مجاز است.");
       return;
@@ -121,6 +123,7 @@ export default function AdminBanners() {
         if (error) throw error;
       }
 
+      soundEngine.playSuccess();
       setStatusMessage({ type: "success", text: "⚡ بنر با موفقیت در دیتابیس ذخیره و در اسلایدر فعال شد." });
       fetchBanners();
       if (!selectedBanner) handleCreateNew();
@@ -135,6 +138,7 @@ export default function AdminBanners() {
   const handleDelete = async (id: string) => {
     if (!confirm("آیا از حذف این بنر اطمینان دارید؟")) return;
     try {
+      soundEngine.playClick();
       if (!id.startsWith("default-")) {
         const { error } = await supabase.from("banners").delete().eq("id", id);
         if (error) throw error;
@@ -155,7 +159,9 @@ export default function AdminBanners() {
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🖼️</span> مدیریت اسلایدر صفحه اصلی (تا ۱۰ اسلاید متحرک)
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">طراحی، تغییر اسلایدها و بارگذاری تصویر از گوشی و سیستم با ترنزیشن نرم</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            طراحی، تغییر اسلایدها و بارگذاری تصویر از گوشی و سیستم با انیمیشن روان
+          </p>
         </div>
         <button
           onClick={handleCreateNew}
@@ -172,12 +178,11 @@ export default function AdminBanners() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* لیست اسلایدهای موجود */}
         <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
           <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
             📋 اسلایدهای فعال ({banners.length})
           </h3>
-          <div className="space-y-2 max-h-[500px] overflow-y-auto">
+          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {banners.map((b) => (
               <div
                 key={b.id}
@@ -198,7 +203,6 @@ export default function AdminBanners() {
           </div>
         </div>
 
-        {/* فرم ویرایش بنر */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-xl text-xs">
             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
@@ -238,7 +242,6 @@ export default function AdminBanners() {
                 />
               </div>
 
-              {/* بارگذاری تصویر با پشتیبانی همزمان از فایل و لینک */}
               <div className="md:col-span-2 space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="font-bold text-[var(--text-secondary)]">تصویر عریض اسلایدر (URL یا فایل) *</label>
@@ -248,7 +251,7 @@ export default function AdminBanners() {
                     className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-sm flex items-center gap-1.5"
                   >
                     <span>📁</span>
-                    <span>انتخاب عکس از گوشی / کامپیوتر</span>
+                    <span>انتخاب عکس از دستگاه</span>
                   </button>
                 </div>
                 <input
@@ -256,7 +259,7 @@ export default function AdminBanners() {
                   required
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://... یا بعد از انتخاب فایل به صورت خودکار پر می‌شود"
+                  placeholder="https://..."
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none"
                 />
               </div>
@@ -267,7 +270,7 @@ export default function AdminBanners() {
                   type="text"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder="/products یا لینک اختصاصی"
+                  placeholder="/products"
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none"
                 />
               </div>
@@ -297,7 +300,7 @@ export default function AdminBanners() {
               </div>
             </div>
 
-            {/* پیش‌نمایش تصویر اسلاید */}
+            {/* پیش‌نمایش لایو بنر */}
             {imageUrl && (
               <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
                 <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش لایو بنر:</span>

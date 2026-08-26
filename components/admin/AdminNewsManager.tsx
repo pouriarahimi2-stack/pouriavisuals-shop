@@ -1,9 +1,9 @@
-// components/admin/AdminNewsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { newsService, TechNewsItem } from "@/services/newsService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminNewsManager() {
   const [news, setNews] = useState<TechNewsItem[]>([]);
@@ -32,7 +32,7 @@ export default function AdminNewsManager() {
     fetchNews();
 
     const channel = supabase
-      .channel("admin-news-realtime-master")
+      .channel("admin-news-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => fetchNews())
       .subscribe();
 
@@ -42,6 +42,7 @@ export default function AdminNewsManager() {
   }, []);
 
   const handleSelectNews = (n: TechNewsItem) => {
+    soundEngine.playClick();
     setSelectedNews(n);
     setTitle(n.title);
     setSlug(n.slug);
@@ -55,6 +56,7 @@ export default function AdminNewsManager() {
   };
 
   const handleCreateNew = () => {
+    soundEngine.playClick();
     setSelectedNews(null);
     setTitle("");
     setSlug("");
@@ -68,12 +70,14 @@ export default function AdminNewsManager() {
   };
 
   const handleSyncWorldNews = async () => {
+    soundEngine.playClick();
     setSyncing(true);
     setStatusMsg(null);
     try {
       const res = await fetch("/api/news/sync", { method: "POST" });
       const data = await res.json();
       if (data.success) {
+        soundEngine.playSuccess();
         setStatusMsg("⚡ همگام‌سازی اخبار جدید از وب با موفقیت انجام شد.");
         fetchNews();
       }
@@ -107,6 +111,7 @@ export default function AdminNewsManager() {
     setSaving(false);
 
     if (res) {
+      soundEngine.playSuccess();
       setStatusMsg("✅ خبر با موفقیت ذخیره و در رادار زنده منتشر شد.");
       fetchNews();
       if (!selectedNews) setSelectedNews(res);
@@ -116,6 +121,7 @@ export default function AdminNewsManager() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("آیا از حذف این خبر اطمینان دارید؟")) return;
+    soundEngine.playClick();
     await newsService.deleteNewsItem(id);
     handleCreateNew();
     fetchNews();
@@ -158,7 +164,6 @@ export default function AdminNewsManager() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* لیست اخبار */}
         <div className="bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-2 h-[640px] overflow-y-auto">
           <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
             📰 اخبار فعال در رادار ({news.length})
@@ -182,7 +187,6 @@ export default function AdminNewsManager() {
           ))}
         </div>
 
-        {/* فرم ویرایش خبر */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

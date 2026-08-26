@@ -1,15 +1,19 @@
+// components/AdminProducts.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { productService, Product, ProductVariant, MarketBenchmark } from "@/services/productService";
 import { categoryService, Category } from "@/services/categoryService";
 import { supabase } from "@/lib/supabase";
+import ProductExplodedView from "@/components/ProductExplodedView";
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [activeFormTab, setActiveFormTab] = useState<"general" | "pricing" | "gallery" | "variants" | "specs" | "comparison" | "seo">("general");
+  const [activeFormTab, setActiveFormTab] = useState<
+    "general" | "pricing" | "gallery" | "variants" | "specs" | "comparison" | "seo"
+  >("general");
 
   const [title, setTitle] = useState("");
   const [titleFa, setTitleFa] = useState("");
@@ -47,11 +51,11 @@ export default function AdminProducts() {
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
 
-  const [showNewCatInput, setShowNewCatInput] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
-
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // پیش‌نمایش نمای انفجاری در پنل ادمین
+  const [explodedPreviewOpen, setExplodedPreviewOpen] = useState(false);
 
   const loadData = async () => {
     const [prods, cats] = await Promise.all([
@@ -66,7 +70,7 @@ export default function AdminProducts() {
     loadData();
 
     const channel = supabase
-      .channel("admin-products-realtime-master-v3")
+      .channel("admin-products-master-realtime-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => loadData())
       .subscribe();
@@ -160,24 +164,6 @@ export default function AdminProducts() {
     setActiveFormTab("general");
   };
 
-  const handleAddNewCategory = async () => {
-    if (!newCatName.trim()) return;
-    const clean = newCatName.trim();
-    const added = await categoryService.addCategory({
-      name: clean,
-      slug: clean.toLowerCase().replace(/\s+/g, "-"),
-    });
-
-    if (added) {
-      setCategories([...categories, added]);
-      setCategory(added.name);
-      setNewCatName("");
-      setShowNewCatInput(false);
-      setStatusMessage({ type: "success", text: `دسته‌بندی «${clean}» با موفقیت افزوده شد.` });
-      setTimeout(() => setStatusMessage(null), 3000);
-    }
-  };
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -235,16 +221,6 @@ export default function AdminProducts() {
     setSpecs(specs.filter((_, i) => i !== idx));
   };
 
-  const addHighlight = () => setHighlights([...highlights, ""]);
-  const updateHighlight = (idx: number, val: string) => {
-    const arr = [...highlights];
-    arr[idx] = val;
-    setHighlights(arr);
-  };
-  const removeHighlight = (idx: number) => {
-    setHighlights(highlights.filter((_, i) => i !== idx));
-  };
-
   const addBenchmark = () => {
     setMarketBenchmarks([...marketBenchmarks, { storeName: "فروشگاه رقیب", price: Number(price || 0), warranty: "شرکتی", isOurStore: false, deliveryTime: "۲ روزه" }]);
   };
@@ -256,10 +232,6 @@ export default function AdminProducts() {
   const removeBenchmark = (idx: number) => {
     setMarketBenchmarks(marketBenchmarks.filter((_, i) => i !== idx));
   };
-
-  const calculatedDiscountPercent = price && discountPrice && Number(discountPrice) < Number(price)
-    ? Math.round(((Number(price) - Number(discountPrice)) / Number(price)) * 100)
-    : 0;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -312,7 +284,7 @@ export default function AdminProducts() {
     setSaving(false);
 
     if (result) {
-      setStatusMessage({ type: "success", text: "⚡ اطلاعات کالا با موفقیت ذخیره شد." });
+      setStatusMessage({ type: "success", text: "⚡ اطلاعات کالا با موفقیت ذخیره و در ویترین منتشر شد." });
       loadData();
       if (!selectedProduct) setSelectedProduct(result);
     } else {
@@ -339,14 +311,28 @@ export default function AdminProducts() {
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>💎</span> مرکز جامع مدیریت محصولات و مشخصات تجاری کالا
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی قیمت، آپلود عکس از سیستم/موبایل، تنوع رنگ، ویژگی‌های فنی، سئو و بنچ‌مارک بازار</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            پیکربندی قیمت، آپلود عکس از سیستم/موبایل، تنوع رنگ، ویژگی‌های فنی، سئو و کالبدشکافی ۳D
+          </p>
         </div>
-        <button
-          onClick={handleCreateNew}
-          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer"
-        >
-          + افزودن محصول جدید
-        </button>
+        <div className="flex gap-2">
+          {selectedProduct && (
+            <button
+              type="button"
+              onClick={() => setExplodedPreviewOpen(true)}
+              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs hover:opacity-95 transition shadow-lg cursor-pointer flex items-center gap-1.5"
+            >
+              <span>🧬</span>
+              <span>تست نمای انفجاری ۳D</span>
+            </button>
+          )}
+          <button
+            onClick={handleCreateNew}
+            className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer"
+          >
+            + افزودن محصول جدید
+          </button>
+        </div>
       </div>
 
       {statusMessage && (
@@ -356,25 +342,35 @@ export default function AdminProducts() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* لیست محصولات */}
         <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
-          <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">📦 کاتالوگ کالاها ({products.length})</h3>
+          <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
+            📦 کاتالوگ کالاها ({products.length})
+          </h3>
           <div className="space-y-2 max-h-[680px] overflow-y-auto">
             {products.map((p) => (
               <div
                 key={p.id}
                 onClick={() => handleSelectProduct(p)}
-                className={`p-3 rounded-2xl border transition cursor-pointer flex items-center gap-3 ${selectedProduct?.id === p.id ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10" : "border-[var(--card-border)] bg-[var(--input-bg)]"}`}
+                className={`p-3 rounded-2xl border transition cursor-pointer flex items-center gap-3 ${
+                  selectedProduct?.id === p.id
+                    ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
+                    : "border-[var(--card-border)] bg-[var(--input-bg)]"
+                }`}
               >
                 <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-11 h-11 object-contain rounded-xl bg-white/5 p-1 border border-[var(--card-border)]" />
                 <div className="overflow-hidden flex-1">
                   <h4 className="text-xs font-black truncate">{p.title || p.name}</h4>
-                  <span className="font-mono text-[10px] text-emerald-600">{Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت</span>
+                  <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                    {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
+        {/* فرم ۷ تب تنظیمات کالا */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
             <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] scrollbar-none">
@@ -391,7 +387,11 @@ export default function AdminProducts() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveFormTab(tab.id as any)}
-                  className={`px-4 py-2.5 rounded-2xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${activeFormTab === tab.id ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]"}`}
+                  className={`px-4 py-2.5 rounded-2xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    activeFormTab === tab.id
+                      ? "bg-[var(--accent-blue)] text-white shadow-md"
+                      : "bg-[var(--input-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]"
+                  }`}
                 >
                   <span>{tab.icon}</span><span>{tab.label}</span>
                 </button>
@@ -513,12 +513,25 @@ export default function AdminProducts() {
                 {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار محصول"}
               </button>
               {selectedProduct?.id && (
-                <button type="button" onClick={() => handleDelete(selectedProduct.id)} className="px-5 py-3.5 rounded-2xl bg-rose-500/15 text-rose-600 font-bold">حذف</button>
+                <button type="button" onClick={() => handleDelete(selectedProduct.id)} className="px-5 py-3.5 rounded-2xl bg-rose-500/15 text-rose-600 font-bold">
+                  حذف
+                </button>
               )}
             </div>
           </form>
         </div>
       </div>
+
+      {/* مدال تست کالبدشکافی در پنل مدیریت */}
+      {selectedProduct && (
+        <ProductExplodedView
+          productId={selectedProduct.id}
+          productTitle={selectedProduct.title}
+          category={selectedProduct.category}
+          isOpen={explodedPreviewOpen}
+          onClose={() => setExplodedPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 }

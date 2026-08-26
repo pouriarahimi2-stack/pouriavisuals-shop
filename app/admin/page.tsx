@@ -1,4 +1,3 @@
-// app/admin/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -18,10 +17,11 @@ import ContactMessagesManager from "@/components/admin/ContactMessagesManager";
 import PageBuilder from "@/components/admin/PageBuilder";
 import AdminBlogManager from "@/components/AdminBlogManager";
 import AdminNewsManager from "@/components/admin/AdminNewsManager";
-import { productService, Product } from "@/services/productService";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
+import { productService, Product } from "@/services/productService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -53,6 +53,7 @@ export default function AdminPage() {
   const [maintMinutes, setMaintMinutes] = useState<number>(0);
   const [isSavingMaint, setIsSavingMaint] = useState(false);
 
+  // مدال‌های تغییر کلمه عبور و مدیریت حساب‌های ادمین
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
 
@@ -136,7 +137,7 @@ export default function AdminPage() {
     fetchSiteInfoLive();
 
     const channel = supabase
-      .channel("admin-siteinfo-realtime-master-v20")
+      .channel("admin-siteinfo-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchSiteInfoLive())
       .subscribe();
 
@@ -146,6 +147,7 @@ export default function AdminPage() {
   }, [router]);
 
   const toggleDarkMode = () => {
+    soundEngine.playClick();
     if (isDarkMode) {
       document.documentElement.classList.remove("dark");
       setIsDarkMode(false);
@@ -157,8 +159,8 @@ export default function AdminPage() {
     }
   };
 
-  // اعمال قطعی و فوری حالت تعمیرات به دیتابیس سرور
   const handleSaveMaintenanceMode = async () => {
+    soundEngine.playClick();
     setIsSavingMaint(true);
     let untilISO: string | null = null;
     const totalMinutes = Number(maintHours) * 60 + Number(maintMinutes);
@@ -199,6 +201,7 @@ export default function AdminPage() {
   };
 
   const handleLogout = async () => {
+    soundEngine.playClick();
     try {
       await adminAuthService.logout();
     } catch {}
@@ -225,6 +228,7 @@ export default function AdminPage() {
       );
 
       if (res && res.success) {
+        soundEngine.playSuccess();
         setPasswordMsg({ type: "success", text: "✨ مشخصات و کلمه عبور با موفقیت به‌روزرسانی شد." });
         if (currentUser) {
           const updatedUser = { ...currentUser, username: newUsername, full_name: newFullName || currentUser.full_name };
@@ -261,6 +265,7 @@ export default function AdminPage() {
       });
 
       if (res && res.success) {
+        soundEngine.playSuccess();
         setAdminCreateMsg({ type: "success", text: "🎉 ادمین جدید با موفقیت ایجاد گردید." });
         setNewAdminUsername("");
         setNewAdminPassword("");
@@ -278,6 +283,7 @@ export default function AdminPage() {
 
   const handleDeleteAdmin = async (adminId: string, username: string) => {
     if (confirm(`آیا از حذف دسترسی ادمین "${username}" اطمینان دارید؟`)) {
+      soundEngine.playClick();
       await adminAuthService.deleteAdmin(adminId);
       loadAllAdmins();
     }
@@ -352,9 +358,12 @@ export default function AdminPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل مهندسی‌شده فروشگاه</h1>
               
-              {/* کلید کنترل زنده حالت تعمیرات و آنلاین بودن */}
+              {/* کلید کنترل زنده حالت تعمیرات */}
               <button
-                onClick={() => setShowMaintenanceModal(true)}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setShowMaintenanceModal(true);
+                }}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-blue-500 transition cursor-pointer shadow-sm"
                 title="کلیک جهت تنظیم حالت آنلاین یا تعمیرات زمان‌دار"
               >
@@ -387,6 +396,7 @@ export default function AdminPage() {
           {isSuper && (
             <button
               onClick={() => {
+                soundEngine.playClick();
                 setShowAdminManagerModal(true);
                 loadAllAdmins();
               }}
@@ -399,6 +409,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => {
+              soundEngine.playClick();
               setPasswordMsg(null);
               setShowPasswordModal(true);
             }}
@@ -409,7 +420,7 @@ export default function AdminPage() {
           </button>
 
           <button
-            onClick={() => toggleDarkMode}
+            onClick={toggleDarkMode}
             className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-blue-500 border border-[var(--card-border)] text-[var(--text-primary)] transition cursor-pointer text-xs shadow-sm font-bold flex items-center justify-center"
             title="تم شب / روز"
           >
@@ -448,7 +459,10 @@ export default function AdminPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab(tab.id as any);
+                }}
                 className={`px-3.5 py-2.5 rounded-2xl text-xs font-black transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 ${
                   isActive
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]"
@@ -479,10 +493,10 @@ export default function AdminPage() {
         {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
       </div>
 
-      {/* دستیار هوشمند ادمین */}
+      {/* دستیار هوشمند و تحلیلگر کاتالوگ ادمین */}
       {isSuper && <AdminAIAssistant />}
 
-      {/* مدال کنترل وضعیت آنلاین / تعمیرات زمان‌دار / تعمیرات نامحدود */}
+      {/* مدال کنترل وضعیت آنلاین / تعمیرات زمان‌دار */}
       {showMaintenanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-6 shadow-2xl text-[var(--text-primary)]">
@@ -505,7 +519,6 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* گزینه ۱: سایت آنلاین */}
               <div
                 onClick={() => setSelectedMaintMode("none")}
                 className={`p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 ${
@@ -521,7 +534,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* گزینه ۲: تعمیرات زمان‌دار */}
               <div
                 onClick={() => setSelectedMaintMode("timed")}
                 className={`p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 ${
@@ -566,7 +578,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* گزینه ۳: تعمیرات نامحدود */}
               <div
                 onClick={() => setSelectedMaintMode("indefinite")}
                 className={`p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 ${
@@ -1074,6 +1085,7 @@ function AdminAIAssistant() {
 
       const data = await res.json();
       if (data && data.success) {
+        soundEngine.playSuccess();
         alert("🎉 مقاله با موفقیت در بخش مقالات سایت و دیتابیس منتشر گردید!");
         setPublishModalOpen(false);
       } else {
@@ -1090,7 +1102,10 @@ function AdminAIAssistant() {
     <div className="fixed bottom-6 right-6 z-50 font-sans" dir="rtl">
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            soundEngine.playClick();
+            setIsOpen(true);
+          }}
           className="p-4 rounded-full bg-blue-600 text-white border border-white/20 shadow-2xl hover:scale-105 transition cursor-pointer flex items-center gap-2 text-xs font-bold"
         >
           <span>🚀</span>
@@ -1126,7 +1141,10 @@ function AdminAIAssistant() {
               </span>
             </div>
             <button
-              onClick={() => setSelectorModalOpen(true)}
+              onClick={() => {
+                soundEngine.playClick();
+                setSelectorModalOpen(true);
+              }}
               className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-md cursor-pointer flex items-center gap-1"
             >
               <span>🖼️</span>
@@ -1457,7 +1475,7 @@ function AdminAIAssistant() {
 
 function formatMarkdownText(text: string) {
   if (!text) return "";
-  let formatted = text
+  return text
     .replace(/^### (.*$)/gim, '<h3 class="text-sm font-black text-blue-500 mt-3 mb-1">$1</h3>')
     .replace(/^## (.*$)/gim, '<h2 class="text-base font-black text-[var(--text-primary)] mt-4 mb-2 border-b border-[var(--card-border)] pb-1">$1</h2>')
     .replace(/^# (.*$)/gim, '<h1 class="text-lg font-black text-[var(--text-primary)] mt-4 mb-2">$1</h1>')
@@ -1465,5 +1483,4 @@ function formatMarkdownText(text: string) {
     .replace(/---/g, '<hr class="border-[var(--card-border)] my-3" />')
     .replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc opacity-90">$1</li>')
     .replace(/^\d+\. (.*$)/gim, '<li class="ml-4 list-decimal opacity-90">$1</li>');
-  return formatted;
 }

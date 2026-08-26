@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export interface ContactMessage {
   id: string;
@@ -27,11 +28,15 @@ export default function ContactMessagesManager() {
 
   const fetchMessages = async () => {
     try {
-      const { data, error } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("contact_messages")
+        .select("*")
+        .order("created_at", { ascending: false });
+
       if (error) throw error;
       setMessages((data as ContactMessage[]) || []);
     } catch (e) {
-      console.error(e);
+      console.error("Error loading contact messages:", e);
     } finally {
       setLoading(false);
     }
@@ -40,14 +45,17 @@ export default function ContactMessagesManager() {
   useEffect(() => {
     fetchMessages();
     const channel = supabase
-      .channel("contact-messages-realtime-master")
+      .channel("contact-messages-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => fetchMessages())
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const markAsRead = async (msg: ContactMessage) => {
+    soundEngine.playClick();
     setSelectedMessage(msg);
     setReplyText(msg.admin_reply || "");
     if (!msg.is_read) {
@@ -67,8 +75,10 @@ export default function ContactMessagesManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: selectedMessage.id, admin_reply: replyText.trim(), status: "answered" }),
       });
+
       if (res.ok) {
-        alert("✅ پاسخ ثبت شد.");
+        soundEngine.playSuccess();
+        alert("✅ پاسخ با موفقیت ثبت و پیامک اطلاع‌رسانی برای خریدار ارسال گردید.");
         setSelectedMessage({ ...selectedMessage, admin_reply: replyText.trim(), status: "answered" });
         fetchMessages();
       }
@@ -87,31 +97,109 @@ export default function ContactMessagesManager() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex justify-between items-center">
-        <h2 className="text-lg font-black text-[var(--accent-blue)]">📩 صندوق پیام‌ها و تیکتینگ کاربران</h2>
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>📩</span> صندوق پیام‌ها و تیکتینگ مشاوره کاربران
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            پاسخگویی سریع به همراه ارسال خودکار پیامک SMS حاوی پاسخ به شماره همراه خریدار
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFilterStatus("all")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              filterStatus === "all" ? "bg-[var(--accent-blue)] text-white" : "bg-[var(--input-bg)] border border-[var(--card-border)]"
+            }`}
+          >
+            همه ({messages.length})
+          </button>
+          <button
+            onClick={() => setFilterStatus("pending")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              filterStatus === "pending" ? "bg-amber-500 text-white" : "bg-[var(--input-bg)] border border-[var(--card-border)]"
+            }`}
+          >
+            در انتظار پاسخ ({messages.filter((m) => !m.admin_reply).length})
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-2 h-[600px] overflow-y-auto">
-          {loading ? <p className="text-xs text-center">بارگذاری...</p> : filtered.map((msg) => (
-            <div key={msg.id} onClick={() => markAsRead(msg)} className={`p-3 rounded-2xl border cursor-pointer ${selectedMessage?.id === msg.id ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10" : "border-[var(--card-border)] bg-[var(--input-bg)]"}`}>
-              <h4 className="font-black text-xs">{msg.full_name || msg.name}</h4>
-              <p className="text-[10px] text-[var(--text-secondary)]">{msg.subject || "پیام"}</p>
-            </div>
-          ))}
+          {loading ? (
+            <p className="text-xs text-center py-10 font-bold text-[var(--text-secondary)]">در حال دریافت تیکت‌ها...</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-xs text-center py-10 font-bold text-[var(--text-secondary)]">پیامی در این وضعیت وجود ندارد.</p>
+          ) : (
+            filtered.map((msg) => (
+              <div
+                key={msg.id}
+                onClick={() => markAsRead(msg)}
+                className={`p-3.5 rounded-2xl border transition cursor-pointer space-y-1 ${
+                  selectedMessage?.id === msg.id
+                    ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
+                    : "border-[var(--card-border)] bg-[var(--input-bg)]"
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <h4 className="font-black text-xs text-[var(--text-primary)]">{msg.full_name || msg.name}</h4>
+                  <span className={`w-2.5 h-2.5 rounded-full ${msg.admin_reply ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
+                </div>
+                <p className="text-[11px] text-[var(--text-secondary)] font-medium truncate">{msg.subject || "درخواست مشاوره"}</p>
+                <span className="font-mono text-[10px] text-slate-400 block">{msg.phone}</span>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] h-[600px] flex flex-col justify-between">
           {selectedMessage ? (
-            <div className="space-y-4">
-              <h3 className="font-black text-sm">{selectedMessage.subject}</h3>
-              <p className="text-xs bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">{selectedMessage.message}</p>
-              <form onSubmit={handleSendReply} className="space-y-2 pt-4 border-t border-[var(--card-border)]">
-                <textarea rows={3} value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="پاسخ مدیریت..." className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs" />
-                <button type="submit" disabled={sendingReply} className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs cursor-pointer">ارسال پاسخ</button>
+            <div className="space-y-4 flex-1 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+                  <div>
+                    <h3 className="font-black text-sm text-[var(--text-primary)]">{selectedMessage.subject || "درخواست مشاوره تخصصی"}</h3>
+                    <span className="text-[10px] font-mono text-[var(--accent-blue)] font-bold">فرستنده: {selectedMessage.full_name} ({selectedMessage.phone})</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-[var(--text-secondary)]">
+                    {selectedMessage.created_at ? new Date(selectedMessage.created_at).toLocaleString("fa-IR") : "هم‌اکنون"}
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed font-medium">
+                  {selectedMessage.message}
+                </div>
+              </div>
+
+              <form onSubmit={handleSendReply} className="space-y-3 pt-4 border-t border-[var(--card-border)]">
+                <label className="block text-xs font-bold text-[var(--text-secondary)]">
+                  متن پاسخ مدیریت (به همراه ارسال پیامک خودکار به {selectedMessage.phone}):
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="پاسخ کارشناسی خود را بنویسید..."
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium outline-none focus:border-[var(--accent-blue)] leading-relaxed"
+                />
+                <button
+                  type="submit"
+                  disabled={sendingReply}
+                  className="px-6 py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  {sendingReply ? "در حال ثبت و ارسال پیامک..." : "ارسال پاسخ و پیامک به خریدار 🚀"}
+                </button>
               </form>
             </div>
-          ) : <div className="h-full flex items-center justify-center text-xs">یک پیام را انتخاب کنید.</div>}
+          ) : (
+            <div className="h-full flex items-center justify-center text-xs font-bold text-[var(--text-secondary)]">
+              یک پیام را از لیست سمت راست برای مشاهده و پاسخ انتخاب نمایید.
+            </div>
+          )}
         </div>
       </div>
     </div>

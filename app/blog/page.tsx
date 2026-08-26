@@ -1,11 +1,14 @@
+// app/blog/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { soundEngine } from "@/lib/soundEngine";
 
 interface BlogPost {
   id: string;
   title: string;
+  slug?: string;
   metaDescription?: string;
   content: string;
   createdAt: string;
@@ -53,6 +56,11 @@ export default function BlogArchivePage() {
     loadBlogs();
   }, []);
 
+  const handleCatChange = (cat: string) => {
+    soundEngine.playClick();
+    setSelectedCat(cat);
+  };
+
   const categories = Array.from(
     new Set(posts.map((p) => p.category || "مقاله تخصصی"))
   ).filter(Boolean);
@@ -69,23 +77,20 @@ export default function BlogArchivePage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
-      
-      {/* هدر بخش وبلاگ */}
       <div className="text-center space-y-3">
         <span className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] inline-block text-2xl">
           📚
         </span>
-        <h1 className="text-2xl md:text-4xl font-black">مجله تخصصی، راهنمای خرید و مقالات سئو</h1>
+        <h1 className="text-2xl md:text-4xl font-black">مجله تخصصی، راهنمای خرید و مقالات تحلیلی</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium max-w-xl mx-auto leading-relaxed">
-          تحلیل‌های جامع بازار، مقایسه سخت‌افزارها، مانیتورهای حرفه‌ای و نکات تخصصی حوزه تصویر و گرافیک.
+          تحلیل‌های جامع بازار، مقایسه سخت‌افزارها، مانیتورهای تدوین و کالیبراسیون تخصصی تصویر.
         </p>
       </div>
 
-      {/* نوار جستجو و فیلتر دسته‌بندی */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
-            onClick={() => setSelectedCat("all")}
+            onClick={() => handleCatChange("all")}
             className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
               selectedCat === "all"
                 ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -97,7 +102,7 @@ export default function BlogArchivePage() {
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => setSelectedCat(cat)}
+              onClick={() => handleCatChange(cat)}
               className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
                 selectedCat === cat
                   ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -114,13 +119,12 @@ export default function BlogArchivePage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 جستجو در مقالات و عناوین..."
+            placeholder="🔍 جستجو در مقالات..."
             className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
           />
         </div>
       </div>
 
-      {/* لیست کارت‌های وبلاگ */}
       {loading ? (
         <div className="py-24 text-center">
           <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin mx-auto mb-3" />
@@ -143,7 +147,7 @@ export default function BlogArchivePage() {
                     {post.category || "مقاله تخصصی"}
                   </span>
                   <span className="text-[var(--text-secondary)] font-mono">
-                    📅 {post.createdAt || "امروز"}
+                    📅 {post.createdAt ? new Date(post.createdAt).toLocaleDateString("fa-IR") : "امروز"}
                   </span>
                 </div>
 
@@ -166,7 +170,7 @@ export default function BlogArchivePage() {
                   <span>←</span>
                 </Link>
                 <span className="text-[10px] text-[var(--text-secondary)] font-bold">
-                  📖 ۳ دقیقه زمان مطالعه
+                  📖 ۳ دقیقه مطالعه
                 </span>
               </div>
             </article>

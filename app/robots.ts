@@ -1,3 +1,4 @@
+// app/robots.ts
 import { MetadataRoute } from 'next';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
@@ -9,15 +10,15 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   try {
     const { data } = await supabaseAdmin
       .from('site_info')
-      .select('allow_google_index')
+      .select('allow_google_index, maintenance_mode')
       .limit(1)
       .maybeSingle();
 
-    if (data && data.allow_google_index === false) {
+    if (data && (data.allow_google_index === false || data.maintenance_mode !== 'none')) {
       allowIndex = false;
     }
   } catch (err) {
-    console.warn("Robots file database check fallback:", err);
+    console.warn("Robots database check fallback:", err);
   }
 
   if (!allowIndex) {

@@ -1,3 +1,4 @@
+// app/api/payment/verify/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
@@ -13,10 +14,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // استعلام سفارش مستقیماً از دیتابیس با دسترسی امن سروری
     const { data: order, error: fetchError } = await supabaseAdmin
       .from('orders')
-      .select('id, total_amount, payment_status')
+      .select('id, total_amount, final_amount, payment_status')
       .eq('id', orderId)
       .single();
 
@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // در صورتی که سفارش قبلاً تایید شده باشد (Idempotency)
     if (order.payment_status === 'PAID' || order.payment_status === 'paid') {
       return NextResponse.json({
         success: true,
@@ -42,7 +41,6 @@ export async function POST(req: NextRequest) {
     let isVerified = false;
     let refId = `SIM-${Date.now()}`;
 
-    // درگاه واقعی در محیط پروداکشن
     if (!isSandbox && merchantId) {
       const zarinpalUrl = 'https://api.zarinpal.com/pg/v4/payment/verify.json';
       const verifyRes = await fetch(zarinpalUrl, {
@@ -50,7 +48,7 @@ export async function POST(req: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           merchant_id: merchantId,
-          amount: order.total_amount, // استفاده از مبلغ دیتابیس به جای مقدار هاردکد
+          amount: order.final_amount || order.total_amount,
           authority: authority,
         }),
       });
@@ -61,7 +59,6 @@ export async function POST(req: NextRequest) {
         refId = String(verifyData.data.ref_id);
       }
     } else {
-      // شبیه‌ساز محلی (فقط در صورت تایید دستی محیط تست)
       isVerified = true;
     }
 
@@ -72,13 +69,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // به‌روزرسانی نهایی وضعیت سفارش در دیتابیس
     const { error: updateError } = await supabaseAdmin
       .from('orders')
       .update({
-        payment_status: 'PAID',
+        payment_status: 'paid',
         status: 'processing',
-        transaction_ref: refId,
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId);

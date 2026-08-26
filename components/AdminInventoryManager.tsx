@@ -1,8 +1,10 @@
+// components/AdminInventoryManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminInventoryManager() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -18,7 +20,7 @@ export default function AdminInventoryManager() {
     fetchProducts();
 
     const channel = supabase
-      .channel("inventory-realtime-channel-master")
+      .channel("inventory-realtime-channel-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
         fetchProducts();
       })
@@ -30,6 +32,7 @@ export default function AdminInventoryManager() {
   }, []);
 
   const handleStockChange = async (id: string, newStock: number) => {
+    soundEngine.playClick();
     const stockVal = Math.max(0, newStock);
     setUpdatingId(id);
     await supabase.from("products").update({ stock: stockVal, is_available: stockVal > 0 }).eq("id", id);
@@ -38,6 +41,7 @@ export default function AdminInventoryManager() {
   };
 
   const toggleAvailability = async (id: string, current: boolean) => {
+    soundEngine.playClick();
     setUpdatingId(id);
     await supabase.from("products").update({ is_available: !current }).eq("id", id);
     setProducts(products.map((p) => (p.id === id ? { ...p, is_available: !current, isAvailable: !current } : p)));
@@ -57,22 +61,24 @@ export default function AdminInventoryManager() {
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>📥</span> مدیریت سریع موجودی انبار و وضعیت عرضه
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">افزایش/کاهش سریع تعداد موجودی، رصد کالاهای در معرض اتمام و تغییر زنده وضعیت عرضه</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            افزایش/کاهش سریع تعداد موجودی، رصد کالاهای در معرض اتمام و تغییر زنده وضعیت عرضه
+          </p>
         </div>
 
-        <div className="w-full sm:w-64">
+        <div className="w-full sm:w-72">
           <input
             type="text"
             placeholder="🔍 جستجو در نام کالا یا دسته..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+            className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
           />
         </div>
       </div>
 
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm overflow-x-auto">
-        <table className="w-full text-right text-xs">
+        <table className="w-full text-right text-xs border-collapse">
           <thead>
             <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
               <th className="p-3">تصویر</th>
@@ -83,7 +89,7 @@ export default function AdminInventoryManager() {
               <th className="p-3 text-center">وضعیت عرضه</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--card-border)]">
+          <tbody className="divide-y divide-[var(--card-border)] font-medium">
             {filtered.map((p) => {
               const currentStock = p.stock ?? 0;
               const isCritical = currentStock < 3;

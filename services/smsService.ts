@@ -1,3 +1,4 @@
+// services/smsService.ts
 export interface SendSmsResponse {
   success: boolean;
   message?: string;
@@ -7,11 +8,13 @@ export interface SendSmsResponse {
 }
 
 export const smsService = {
-  // ۱. ارسال کد تایید ۶ رقمی ورود/ثبت سفارش (OTP)
   async sendOtp(phone: string): Promise<SendSmsResponse> {
     try {
-      const cleanPhone = phone.trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
-      
+      const cleanPhone = phone
+        .trim()
+        .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+        .replace(/\D/g, "");
+
       const res = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -29,10 +32,13 @@ export const smsService = {
     }
   },
 
-  // ۲. بررسی و اعتبارسنجی کد پیامکی وارد شده توسط کاربر
   async verifyOtp(phone: string, code: string): Promise<SendSmsResponse> {
     try {
-      const cleanPhone = phone.trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
+      const cleanPhone = phone
+        .trim()
+        .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+        .replace(/\D/g, "");
+
       const cleanCode = code.trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString());
 
       const res = await fetch("/api/send-otp", {
@@ -52,10 +58,13 @@ export const smsService = {
     }
   },
 
-  // ۳. ارسال پیامک بارکد رهگیری پستی به خریدار
   async sendTrackingCode(phone: string, nameOrOrderId: string | number, trackingCode: string): Promise<boolean> {
     try {
-      const cleanPhone = String(phone).trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
+      const cleanPhone = String(phone)
+        .trim()
+        .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+        .replace(/\D/g, "");
+
       const cleanTracking = String(trackingCode).trim();
 
       const res = await fetch("/api/send-otp", {
@@ -76,13 +85,15 @@ export const smsService = {
     }
   },
 
-  // سازگاری با توابع قدیمی‌تر
+  async sendOrderStatusChange(phone: string, orderId: string, statusName: string): Promise<boolean> {
+    return this.sendTrackingCode(phone, `سفارش ${orderId}`, `تغییر وضعیت به: ${statusName}`);
+  },
+
   async sendSMS(phone: string, message: string): Promise<boolean> {
     return this.sendTrackingCode(phone, "کاربر گرامی", message);
-  }
+  },
 };
 
-// اکسپورت مستقیم برای روت‌هایی که به صورت Named تابع را ایمپورت می‌کنند
 export const sendSMS = smsService.sendSMS.bind(smsService);
 export const sendOtp = smsService.sendOtp.bind(smsService);
 export const verifyOtp = smsService.verifyOtp.bind(smsService);

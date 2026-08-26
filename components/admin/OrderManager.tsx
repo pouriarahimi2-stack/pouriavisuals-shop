@@ -1,7 +1,9 @@
+// components/admin/OrderManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export interface Order {
   id: string;
@@ -41,9 +43,8 @@ export default function OrderManager() {
   useEffect(() => {
     fetchOrders();
 
-    // همگام‌سازی بلادرنگ سفارشات با وب‌سوکت
     const channel = supabase
-      .channel("orders-realtime-channel")
+      .channel("orders-realtime-channel-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
         fetchOrders();
       })
@@ -55,6 +56,7 @@ export default function OrderManager() {
   }, []);
 
   const handleSelectOrder = (o: Order) => {
+    soundEngine.playClick();
     setSelectedOrder(o);
     setTrackingInput(o.tracking_code || "");
     setStatusInput(o.status || "paid");
@@ -64,6 +66,7 @@ export default function OrderManager() {
     e.preventDefault();
     if (!selectedOrder) return;
 
+    soundEngine.playClick();
     setSaving(true);
     try {
       const { error } = await supabase
@@ -76,6 +79,7 @@ export default function OrderManager() {
 
       if (error) throw error;
 
+      soundEngine.playSuccess();
       setOrders(
         orders.map((o) =>
           o.id === selectedOrder.id ? { ...o, status: statusInput, tracking_code: trackingInput.trim() } : o
@@ -103,7 +107,6 @@ export default function OrderManager() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* لیست سفارشات */}
         <div className="bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-2 h-[540px] overflow-y-auto">
           {orders.length === 0 ? (
             <p className="text-xs text-center py-8 text-[var(--text-muted)] font-bold">هنوز سفارشی ثبت نشده است.</p>
@@ -137,7 +140,6 @@ export default function OrderManager() {
           )}
         </div>
 
-        {/* جزئیات و ثبت کد رهگیری پستی */}
         <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] h-[540px] overflow-y-auto">
           {selectedOrder ? (
             <form onSubmit={handleUpdateOrder} className="space-y-6">

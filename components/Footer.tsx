@@ -1,9 +1,10 @@
+// components/Footer.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { siteInfoService, SiteInfo } from '@/services/siteInfoService';
-import { supabase } from '@/lib/supabase';
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { supabase } from "@/lib/supabase";
 
 export default function Footer() {
   const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
@@ -24,25 +25,25 @@ export default function Footer() {
       if (e.detail) setInfo(e.detail);
     };
 
-    window.addEventListener('site_info_updated', handleUpdate);
+    window.addEventListener("site_info_updated", handleUpdate);
 
     const channel = supabase
-      .channel('footer-realtime-master-v4')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_info' }, () => fetchFooterData())
+      .channel("footer-realtime-master-v2026")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchFooterData())
       .subscribe();
 
     return () => {
-      window.removeEventListener('site_info_updated', handleUpdate);
+      window.removeEventListener("site_info_updated", handleUpdate);
       supabase.removeChannel(channel);
     };
   }, []);
 
-  const siteName = info?.site_name || info?.siteName || info?.storeName || 'آکسون | Axon';
-  const tagline = info?.tagline || 'مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو';
-  const phone = info?.phone || '۰۲۱-۸۸۸۸۸۸۸۸';
-  const email = info?.email || 'info@axoncore.ir';
-  const address = info?.address || 'تهران، خیابان ولیعصر، تقاطع میرداماد';
-  const workingHours = info?.working_hours || 'شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰';
+  const siteName = info?.site_name || info?.siteName || info?.storeName || "آکسون | Axon";
+  const tagline = info?.tagline || "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو";
+  const phone = info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+  const email = info?.email || "info@axoncore.ir";
+  const address = info?.address || "تهران، خیابان ولیعصر، تقاطع میرداماد";
+  const workingHours = info?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰";
   const description = info?.footer_text || info?.description || tagline;
   const footerLogo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
 
@@ -70,6 +71,7 @@ export default function Footer() {
             <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
               <li><Link href="/products" className="hover:text-[var(--accent-blue)] transition font-bold">کاتالوگ تجهیزات و مانیتورها</Link></li>
               <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition font-bold">استعلام و پیگیری مرسوله پستی</Link></li>
+              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition font-bold">رادار جهانی اخبار تکنولوژی</Link></li>
               <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition font-bold">مجله تخصصی و مقالات سئو</Link></li>
               <li><Link href="/contact" className="hover:text-[var(--accent-blue)] transition font-bold">تماس با پشتیبانی و نشانی</Link></li>
             </ul>

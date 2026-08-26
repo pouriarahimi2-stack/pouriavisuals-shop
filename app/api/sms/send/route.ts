@@ -1,8 +1,9 @@
+// app/api/sms/send/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { sendSMS } from '@/services/smsService';
 
 const smsRateLimiter = new Map<string, { count: number; resetTime: number }>();
-const SMS_LIMIT_WINDOW = 60 * 1000; // ۱ دقیقه
+const SMS_LIMIT_WINDOW = 60 * 1000;
 const MAX_SMS_PER_WINDOW = 3;
 
 function isIpRateLimited(ip: string): boolean {

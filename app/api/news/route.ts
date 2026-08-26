@@ -22,7 +22,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      // در صورت نبودن جدول، پاسخ استاندارد برمی‌گرداند
       return NextResponse.json({ success: true, data: [] });
     }
 

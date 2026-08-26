@@ -1,61 +1,61 @@
 // components/AdminSiteInfo.tsx
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { siteInfoService, SiteInfo, MaintenanceMode } from '@/services/siteInfoService';
-import { supabase } from '@/lib/supabase';
+import React, { useState, useEffect, useRef } from "react";
+import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminSiteInfo() {
-  const [siteName, setSiteName] = useState('');
-  const [tagline, setTagline] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
-  const [workingHours, setWorkingHours] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
-  const [footerLogoUrl, setFooterLogoUrl] = useState('');
+  const [siteName, setSiteName] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [workingHours, setWorkingHours] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [footerLogoUrl, setFooterLogoUrl] = useState("");
   
-  // تنظیمات حالت تعمیرات و ایندکس
-  const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>('none');
+  const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
   const [maintMinutes, setMaintMinutes] = useState<number>(0);
 
-  const [instagram, setInstagram] = useState('');
-  const [telegram, setTelegram] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [youtube, setYoutube] = useState('');
-  const [announcement, setAnnouncement] = useState('');
+  const [instagram, setInstagram] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [announcement, setAnnouncement] = useState("");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(2000000);
-  const [description, setDescription] = useState('');
-  const [customCss, setCustomCss] = useState('');
+  const [description, setDescription] = useState("");
+  const [customCss, setCustomCss] = useState("");
 
   const [saving, setSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const headerLogoFileRef = useRef<HTMLInputElement>(null);
   const footerLogoFileRef = useRef<HTMLInputElement>(null);
 
   const populateForm = (data: SiteInfo) => {
-    setSiteName(data.site_name || data.siteName || data.storeName || '');
-    setTagline(data.tagline || '');
-    setPhone(data.phone || '');
-    setEmail(data.email || '');
-    setAddress(data.address || '');
-    setWorkingHours(data.working_hours || 'شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰');
-    setLogoUrl(data.logo_url || data.logoUrl || '');
-    setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || '');
+    setSiteName(data.site_name || data.siteName || data.storeName || "");
+    setTagline(data.tagline || "");
+    setPhone(data.phone || "");
+    setEmail(data.email || "");
+    setAddress(data.address || "");
+    setWorkingHours(data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
+    setLogoUrl(data.logo_url || data.logoUrl || "");
+    setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
     
-    const mode = data.maintenance_mode || (data.allow_google_index === false ? 'indefinite' : 'none');
+    const mode = data.maintenance_mode || (data.allow_google_index === false ? "indefinite" : "none");
     setMaintenanceMode(mode);
 
-    setInstagram(data.instagram || '');
-    setTelegram(data.telegram || '');
-    setWhatsapp(data.whatsapp || '');
-    setYoutube(data.youtube || '');
-    setAnnouncement(data.header_announcement || '');
+    setInstagram(data.instagram || "");
+    setTelegram(data.telegram || "");
+    setWhatsapp(data.whatsapp || "");
+    setYoutube(data.youtube || "");
+    setAnnouncement(data.header_announcement || "");
     setFreeShippingThreshold(Number(data.free_shipping_threshold || 2000000));
-    setDescription(data.description || data.footer_text || '');
-    setCustomCss(data.custom_css || '');
+    setDescription(data.description || data.footer_text || "");
+    setCustomCss(data.custom_css || "");
   };
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function AdminSiteInfo() {
     });
 
     const channel = supabase
-      .channel("site-info-admin-realtime-master-v55")
+      .channel("site-info-admin-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
         siteInfoService.getSiteInfo().then((data) => {
           if (data) populateForm(data);
@@ -84,12 +84,12 @@ export default function AdminSiteInfo() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 4 * 1024 * 1024) {
-        setStatusMessage({ type: 'error', text: 'حجم تصویر نباید بیشتر از ۴ مگابایت باشد.' });
+        setStatusMessage({ type: "error", text: "حجم تصویر نباید بیشتر از ۴ مگابایت باشد." });
         return;
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
+        if (typeof reader.result === "string") {
           if (isFooter) {
             setFooterLogoUrl(reader.result);
           } else {
@@ -103,12 +103,13 @@ export default function AdminSiteInfo() {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    soundEngine.playClick();
     setSaving(true);
     setStatusMessage(null);
 
     let untilISO: string | null = null;
     const totalMins = Number(maintHours) * 60 + Number(maintMinutes);
-    if (maintenanceMode === 'timed') {
+    if (maintenanceMode === "timed") {
       untilISO = new Date(Date.now() + totalMins * 60 * 1000).toISOString();
     }
 
@@ -125,11 +126,11 @@ export default function AdminSiteInfo() {
       logoUrl: logoUrl.trim(),
       footer_logo_url: footerLogoUrl.trim(),
       footerLogoUrl: footerLogoUrl.trim(),
-      allow_google_index: maintenanceMode === 'none',
-      allowGoogleIndex: maintenanceMode === 'none',
+      allow_google_index: maintenanceMode === "none",
+      allowGoogleIndex: maintenanceMode === "none",
       maintenance_mode: maintenanceMode,
       maintenance_until: untilISO || undefined,
-      maintenance_duration_minutes: maintenanceMode === 'timed' ? totalMins : undefined,
+      maintenance_duration_minutes: maintenanceMode === "timed" ? totalMins : undefined,
       instagram: instagram.trim(),
       telegram: telegram.trim(),
       whatsapp: whatsapp.trim(),
@@ -142,22 +143,23 @@ export default function AdminSiteInfo() {
     };
 
     try {
-      const res = await fetch('/api/site-info', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/site-info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (res.ok) {
+        soundEngine.playSuccess();
         setStatusMessage({
-          type: 'success',
-          text: '⚡ وضعیت سایت، تنظیمات برند و حالت تعمیرات با موفقیت در دیتابیس ذخیره و بلادرنگ اعمال شد.',
+          type: "success",
+          text: "⚡ وضعیت سایت، تنظیمات برند و حالت تعمیرات با موفقیت در دیتابیس ذخیره و بلادرنگ اعمال شد.",
         });
       } else {
-        throw new Error('خطا در پاسخ سرور');
+        throw new Error("خطا در پاسخ سرور");
       }
     } catch {
-      setStatusMessage({ type: 'error', text: 'خطا در ذخیره‌سازی اطلاعات.' });
+      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی اطلاعات." });
     } finally {
       setSaving(false);
       setTimeout(() => setStatusMessage(null), 4000);
@@ -181,16 +183,16 @@ export default function AdminSiteInfo() {
           disabled={saving}
           className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
         >
-          <span>{saving ? 'در حال ذخیره‌سازی...' : '💾 ذخیره و انتشار سراسری'}</span>
+          <span>{saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار سراسری"}</span>
         </button>
       </div>
 
       {statusMessage && (
         <div
           className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-              : 'bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400'
+            statusMessage.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
           }`}
         >
           {statusMessage.text}
@@ -202,9 +204,9 @@ export default function AdminSiteInfo() {
         <div className="flex items-center gap-3">
           <span
             className={`w-3.5 h-3.5 rounded-full transition-all duration-500 ${
-              maintenanceMode === 'none'
+              maintenanceMode === "none"
                 ? "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.9)] animate-pulse"
-                : maintenanceMode === 'timed'
+                : maintenanceMode === "timed"
                 ? "bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.9)] animate-ping"
                 : "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.9)]"
             }`}
@@ -214,44 +216,42 @@ export default function AdminSiteInfo() {
               مدیریت وضعیت آنلاین بودن، حالت تعمیرات و دسترسی ربات‌های گوگل
             </h4>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-              یکی از ۳ حالت زیر را انتخاب نمایید و دکمه ذخیره بالا را بزنید تا در لحظه روی کل سایت اعمال شود:
+              یکی از ۳ حالت زیر را انتخاب نمایید و دکمه ذخیره را بزنید تا در لحظه روی کل سایت اعمال شود:
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-          {/* حالت ۱: آنلاین */}
           <div
-            onClick={() => setMaintenanceMode('none')}
+            onClick={() => setMaintenanceMode("none")}
             className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 ${
-              maintenanceMode === 'none'
-                ? 'bg-emerald-500/10 border-emerald-500 text-[var(--text-primary)] ring-2 ring-emerald-500/20'
-                : 'bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500'
+              maintenanceMode === "none"
+                ? "bg-emerald-500/10 border-emerald-500 text-[var(--text-primary)] ring-2 ring-emerald-500/20"
+                : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500"
             }`}
           >
             <div className="flex items-center gap-2 font-black text-xs">
-              <input type="radio" checked={maintenanceMode === 'none'} onChange={() => {}} />
+              <input type="radio" checked={maintenanceMode === "none"} onChange={() => {}} />
               <span>۱. سایت آنلاین و فعال (Online)</span>
             </div>
             <p className="text-[11px] leading-relaxed">سایت برای تمام کاربران و گوگل فعال است.</p>
           </div>
 
-          {/* حالت ۲: تعمیرات زمان‌دار */}
           <div
-            onClick={() => setMaintenanceMode('timed')}
+            onClick={() => setMaintenanceMode("timed")}
             className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 ${
-              maintenanceMode === 'timed'
-                ? 'bg-amber-500/10 border-amber-500 text-[var(--text-primary)] ring-2 ring-amber-500/20'
-                : 'bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500'
+              maintenanceMode === "timed"
+                ? "bg-amber-500/10 border-amber-500 text-[var(--text-primary)] ring-2 ring-amber-500/20"
+                : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500"
             }`}
           >
             <div className="flex items-center gap-2 font-black text-xs">
-              <input type="radio" checked={maintenanceMode === 'timed'} onChange={() => {}} />
+              <input type="radio" checked={maintenanceMode === "timed"} onChange={() => {}} />
               <span>۲. تعمیرات زمان‌دار (با تایمر)</span>
             </div>
             <p className="text-[11px] leading-relaxed">سایت قفل شده و شمارنده معکوس نشان داده می‌شود.</p>
 
-            {maintenanceMode === 'timed' && (
+            {maintenanceMode === "timed" && (
               <div className="pt-2 border-t border-[var(--card-border)] flex items-center gap-2">
                 <input
                   type="number"
@@ -275,17 +275,16 @@ export default function AdminSiteInfo() {
             )}
           </div>
 
-          {/* حالت ۳: تعمیرات نامحدود */}
           <div
-            onClick={() => setMaintenanceMode('indefinite')}
+            onClick={() => setMaintenanceMode("indefinite")}
             className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 ${
-              maintenanceMode === 'indefinite'
-                ? 'bg-rose-500/10 border-rose-500 text-[var(--text-primary)] ring-2 ring-rose-500/20'
-                : 'bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500'
+              maintenanceMode === "indefinite"
+                ? "bg-rose-500/10 border-rose-500 text-[var(--text-primary)] ring-2 ring-rose-500/20"
+                : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:border-slate-500"
             }`}
           >
             <div className="flex items-center gap-2 font-black text-xs">
-              <input type="radio" checked={maintenanceMode === 'indefinite'} onChange={() => {}} />
+              <input type="radio" checked={maintenanceMode === "indefinite"} onChange={() => {}} />
               <span>۳. تعمیرات نامحدود (قفل کامل)</span>
             </div>
             <p className="text-[11px] leading-relaxed">سایت تا زمان فعال‌سازی مجدد توسط ادمین مخفی می‌ماند.</p>
@@ -310,7 +309,7 @@ export default function AdminSiteInfo() {
                     📁 آپلود از دستگاه
                   </button>
                   {logoUrl && (
-                    <button type="button" onClick={() => setLogoUrl('')} className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
+                    <button type="button" onClick={() => setLogoUrl("")} className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
                   )}
                 </div>
                 <input type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="یا درج لینک تصویر لوگو..." className="w-full p-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />
@@ -330,7 +329,7 @@ export default function AdminSiteInfo() {
                     📁 آپلود از دستگاه
                   </button>
                   {footerLogoUrl && (
-                    <button type="button" onClick={() => setFooterLogoUrl('')} className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
+                    <button type="button" onClick={() => setFooterLogoUrl("")} className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
                   )}
                 </div>
                 <input type="text" value={footerLogoUrl} onChange={(e) => setFooterLogoUrl(e.target.value)} placeholder="یا درج لینک تصویر فوتر..." className="w-full p-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />

@@ -1,3 +1,4 @@
+// app/api/payment/request/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     const { data: order, error } = await supabaseAdmin
       .from('orders')
-      .select('id, total_amount, phone')
+      .select('id, total_amount, final_amount, phone')
       .eq('id', orderId)
       .single();
 
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'سفارش یافت نشد.' }, { status: 404 });
     }
 
+    const payableAmount = order.final_amount || order.total_amount;
     const merchantId = process.env.ZARINPAL_MERCHANT_ID;
     const isSandbox = !merchantId || process.env.NODE_ENV !== 'production';
 
@@ -29,9 +31,9 @@ export async function POST(req: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           merchant_id: merchantId,
-          amount: order.total_amount,
+          amount: payableAmount,
           callback_url: callbackUrl || `${req.nextUrl.origin}/checkout/payment`,
-          description: `پرداخت سفارش ${order.id}`,
+          description: `پرداخت فاکتور ${order.id}`,
           metadata: { mobile: order.phone },
         }),
       });
@@ -46,7 +48,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // حالت لوکال / شبیه‌ساز امن
     const mockAuthority = `AUTH_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     return NextResponse.json({
       success: true,

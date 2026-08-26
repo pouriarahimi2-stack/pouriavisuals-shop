@@ -1,13 +1,15 @@
+// components/AdminStyleSettings.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminStyleSettings() {
-  const [storeName, setStoreName] = useState("STORE");
-  const [storeEmoji, setStoreEmoji] = useState("💎");
+  const [storeName, setStoreName] = useState("آکسون | Axon");
+  const [storeEmoji, setStoreEmoji] = useState("⚡");
   const [selectedFont, setSelectedFont] = useState("Vazirmatn");
   const [announcement, setAnnouncement] = useState(
-    "ارسال رایگان خریدهای بالای ۲ میلیون تومان | کد تخفیف: APPLE2026 🚀"
+    "ارسال رایگان خریدهای بالای ۲ میلیون تومان | کد تخفیف: OFF10 🚀"
   );
   const [accentColor, setAccentColor] = useState("#0071e3");
 
@@ -20,6 +22,7 @@ export default function AdminStyleSettings() {
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    soundEngine.playSuccess();
     localStorage.setItem("app_store_name", storeName);
     localStorage.setItem("app_font", selectedFont);
     document.body.style.fontFamily = selectedFont;
@@ -28,13 +31,12 @@ export default function AdminStyleSettings() {
 
   return (
     <div className="space-y-6 font-sans text-xs text-[var(--text-primary)] select-none">
-      <form onSubmit={handleSaveSettings} className="liquid-glass-card p-6 md:p-8 rounded-3xl space-y-6 border border-[var(--card-border)] shadow-xl">
+      <form onSubmit={handleSaveSettings} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl space-y-6 border border-[var(--card-border)] shadow-xl">
         <h3 className="text-base font-black flex items-center gap-2 border-b border-[var(--card-border)] pb-3 text-[var(--accent-blue)]">
           <span>🎨</span> تنظیمات برندینگ و فونت سایت
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* نام فروشگاه */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-[var(--text-secondary)]">نام برند / فروشگاه:</label>
             <input
@@ -45,7 +47,6 @@ export default function AdminStyleSettings() {
             />
           </div>
 
-          {/* ایموجی لوگو */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-[var(--text-secondary)]">ایموجی لوگو:</label>
             <input
@@ -56,7 +57,6 @@ export default function AdminStyleSettings() {
             />
           </div>
 
-          {/* انتخاب فونت اصلی سایت */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-[var(--text-secondary)]">فونت اصلی سایت:</label>
             <select
@@ -71,7 +71,6 @@ export default function AdminStyleSettings() {
             </select>
           </div>
 
-          {/* رنگ اصلی (Accent Color) */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-[var(--text-secondary)]">رنگ اصلی دکمه‌ها (Accent Color):</label>
             <div className="flex items-center gap-3">
@@ -86,7 +85,6 @@ export default function AdminStyleSettings() {
           </div>
         </div>
 
-        {/* متن نوار اعلانات */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-[var(--text-secondary)]">متن نوار اعلانات هدر:</label>
           <input

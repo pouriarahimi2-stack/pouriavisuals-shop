@@ -1,8 +1,10 @@
+// components/AdminCoupons.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { couponService, Coupon } from "@/services/couponService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminCoupons() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -40,7 +42,7 @@ export default function AdminCoupons() {
     loadCoupons();
 
     const channel = supabase
-      .channel("coupons-admin-realtime-master")
+      .channel("coupons-admin-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
         loadCoupons();
       })
@@ -55,6 +57,7 @@ export default function AdminCoupons() {
     e.preventDefault();
     if (!code.trim() || value <= 0) return;
 
+    soundEngine.playClick();
     setSubmitting(true);
     try {
       const created = await couponService.create({
@@ -74,6 +77,7 @@ export default function AdminCoupons() {
       });
 
       if (created) {
+        soundEngine.playSuccess();
         showToast(`🎉 کد تخفیف "${created.code}" با موفقیت در دیتابیس فعال گردید.`);
         setCode("");
         setValue(10);
@@ -94,6 +98,7 @@ export default function AdminCoupons() {
   };
 
   const handleToggleStatus = async (id: string | number, currentStatus?: boolean) => {
+    soundEngine.playClick();
     const nextStatus = currentStatus !== undefined ? !currentStatus : false;
     const success = await couponService.update(id, { is_active: nextStatus });
     if (success) {
@@ -104,6 +109,7 @@ export default function AdminCoupons() {
 
   const handleDelete = async (id: string | number, couponCode: string) => {
     if (confirm(`آیا از حذف کد تخفیف "${couponCode}" اطمینان دارید؟`)) {
+      soundEngine.playClick();
       const success = await couponService.delete(id);
       if (success) {
         showToast("کد تخفیف حذف گردید.");

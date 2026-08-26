@@ -5,19 +5,19 @@ import { supabase } from '@/lib/supabase';
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://axoncore.ir';
 
-  // دریافت تمام محصولات فعال
+  // دریافت تمام محصولات فعال از دیتابیس
   const { data: products } = await supabase
     .from('products')
     .select('id, updated_at')
     .order('updated_at', { ascending: false });
 
-  // دریافت تمام مقالات وبلاگ فعال
+  // دریافت تمام مقالات وبلاگ
   const { data: blogs } = await supabase
     .from('posts')
     .select('id, updated_at')
     .order('updated_at', { ascending: false });
 
-  // دریافت تمام اخبار رادار تکنولوژی
+  // دریافت تمام اخبار فعال رادار فناوری
   const { data: newsItems } = await supabase
     .from('tech_news')
     .select('slug, published_at')

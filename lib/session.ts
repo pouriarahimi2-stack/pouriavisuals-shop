@@ -1,3 +1,4 @@
+// lib/session.ts
 import { createHmac, timingSafeEqual } from 'crypto';
 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'pv_admin_super_secret_session_key_2026_apple_store_secure';

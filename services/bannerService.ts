@@ -23,7 +23,6 @@ export const bannerService = {
   async getAll(): Promise<Banner[]> {
     try {
       if (supabase) {
-        // کوئری اصلاح‌شده بدون وابستگی به order_index جهت رفع خطای 400
         const { data, error } = await supabase
           .from("banners")
           .select("*")
@@ -83,5 +82,5 @@ export const bannerService = {
   async getActive(): Promise<Banner[]> {
     const all = await this.getAll();
     return all.filter((b) => b.is_active !== false);
-  }
+  },
 };

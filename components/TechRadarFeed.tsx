@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { newsService, TechNewsItem } from "@/services/newsService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function TechRadarFeed() {
   const [news, setNews] = useState<TechNewsItem[]>([]);
@@ -29,7 +30,7 @@ export default function TechRadarFeed() {
     window.addEventListener("news_updated", handleNewsUpdate);
 
     const channel = supabase
-      .channel("radar-news-realtime-feed-v3")
+      .channel("radar-news-realtime-feed-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => loadNews())
       .subscribe();
 
@@ -38,6 +39,11 @@ export default function TechRadarFeed() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const handleCategoryChange = (catKey: string) => {
+    soundEngine.playClick();
+    setActiveCategory(catKey);
+  };
 
   const filteredNews = activeCategory === "all"
     ? news
@@ -87,7 +93,7 @@ export default function TechRadarFeed() {
         {Object.entries(categoryBadges).map(([key, item]) => (
           <button
             key={key}
-            onClick={() => setActiveCategory(key)}
+            onClick={() => handleCategoryChange(key)}
             className={`px-4 py-2.5 rounded-2xl font-black transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               activeCategory === key
                 ? "bg-[var(--accent-blue)] text-white shadow-md scale-105"

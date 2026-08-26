@@ -1,3 +1,4 @@
+// app/actions/orders.ts
 'use server';
 
 import { supabaseAdmin } from '@/lib/supabaseServer';
@@ -58,31 +59,34 @@ export async function createOrderServer(payload: CreateOrderInput) {
       };
     });
 
-    // بررسی کوپن تخفیف در سرور در صورت وجود
     let discountAmount = 0;
     if (couponCode) {
       const { data: coupon } = await supabaseAdmin
         .from('coupons')
         .select('*')
-        .eq('code', couponCode.trim())
+        .eq('code', couponCode.trim().toUpperCase())
         .eq('is_active', true)
         .maybeSingle();
 
       if (coupon) {
-        if (coupon.discount_percent) {
-          discountAmount = Math.round((calculatedTotal * coupon.discount_percent) / 100);
-        } else if (coupon.discount_amount) {
-          discountAmount = coupon.discount_amount;
+        if (coupon.discount_percent || coupon.value) {
+          const val = coupon.discount_percent || coupon.value;
+          discountAmount = Math.round((calculatedTotal * val) / 100);
+          if (coupon.max_discount && discountAmount > coupon.max_discount) {
+            discountAmount = coupon.max_discount;
+          }
         }
       }
     }
 
     const finalPayable = Math.max(0, calculatedTotal - discountAmount + shippingCost);
+    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
 
-    // ثبت نهایی سفارش در جدول orders
     const { data: newOrder, error: insertError } = await supabaseAdmin
       .from('orders')
       .insert({
+        id: orderId,
+        order_number: orderId,
         customer_name: customer.fullName,
         phone: customer.phone,
         province: customer.province || '',
@@ -91,11 +95,11 @@ export async function createOrderServer(payload: CreateOrderInput) {
         postal_code: customer.postalCode,
         notes: customer.notes || '',
         items: validatedItems,
-        subtotal: calculatedTotal,
+        total_amount: calculatedTotal,
         discount_amount: discountAmount,
-        shipping_cost: shippingCost,
-        total_amount: finalPayable,
-        payment_status: 'PENDING',
+        final_amount: finalPayable,
+        coupon_code: couponCode || null,
+        payment_status: 'pending',
         status: 'pending',
         created_at: new Date().toISOString(),
       })

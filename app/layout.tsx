@@ -8,9 +8,12 @@ import { getSiteInfoServer } from '@/app/actions/siteInfo';
 
 export async function generateMetadata(): Promise<Metadata> {
   const info = await getSiteInfoServer();
-  const siteName = info.site_name || info.storeName || 'Axon | فروشگاه تخصصی تجهیزات دیجیتال';
-  const tagline = info.tagline || 'مرجع تخصصی فروش و مشاوره تجهیزات استودیویی و مانیتورینگ';
-  const isGoogleAllowed = info.allow_google_index !== false && info.allowGoogleIndex !== false && info.maintenance_mode === 'none';
+  const siteName = info.site_name || info.storeName || 'آکسون | Axon';
+  const tagline = info.tagline || 'مرجع تخصصی تجهیزات تصویر، مانیتورینگ و استودیو';
+  const isGoogleAllowed =
+    info.allow_google_index !== false &&
+    info.allowGoogleIndex !== false &&
+    info.maintenance_mode === 'none';
 
   return {
     title: {
@@ -53,7 +56,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" className="dark" suppressHydrationWarning>
-      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between" suppressHydrationWarning>
+      <body
+        className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between"
+        suppressHydrationWarning
+      >
         <ClientLayoutEnhancer />
         <CartProvider>
           <LayoutWrapper>{children}</LayoutWrapper>

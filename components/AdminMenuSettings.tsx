@@ -1,7 +1,9 @@
+// components/AdminMenuSettings.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { menuService, MenuItem } from "@/services/menuService";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminMenuSettings() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -9,31 +11,47 @@ export default function AdminMenuSettings() {
   const [href, setHref] = useState("");
 
   useEffect(() => {
-    setMenuItems(menuService.getMenuItems());
+    menuService.getAll().then((data) => setMenuItems(data));
   }, []);
 
-  const handleAddMenu = (e: React.FormEvent) => {
+  const handleAddMenu = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!label || !href) return;
 
-    const updated = menuService.addMenuItem({ label, href });
+    soundEngine.playClick();
+    const newItem: MenuItem = {
+      id: `menu_${Date.now()}`,
+      title: label.trim(),
+      name: label.trim(),
+      label: label.trim(),
+      url: href.trim(),
+      href: href.trim(),
+      order: menuItems.length + 1,
+      isActive: true,
+      is_active: true,
+    };
+
+    const updated = [...menuItems, newItem];
     setMenuItems(updated);
+    await menuService.saveAll(updated);
     setLabel("");
     setHref("");
+    soundEngine.playSuccess();
   };
 
-  const handleDelete = (id: string) => {
-    const updated = menuService.deleteMenuItem(id);
+  const handleDelete = async (id: string | number) => {
+    soundEngine.playClick();
+    const updated = menuItems.filter((i) => String(i.id) !== String(id));
     setMenuItems(updated);
+    await menuService.saveAll(updated);
   };
 
   return (
-    <div className="liquid-glass-card p-6 md:p-8 rounded-3xl space-y-6 select-none border border-[var(--card-border)] shadow-xl text-[var(--text-primary)] font-sans">
+    <div className="p-6 md:p-8 rounded-3xl space-y-6 select-none border border-[var(--card-border)] shadow-xl text-[var(--text-primary)] font-sans bg-[var(--modal-bg)]">
       <h3 className="text-base font-black flex items-center gap-2 border-b border-[var(--card-border)] pb-3 text-[var(--accent-blue)]">
         <span>🔗</span> مدیریت منوهای هدر سایت
       </h3>
 
-      {/* فرم اضافه کردن منو */}
       <form onSubmit={handleAddMenu} className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <input
           type="text"
@@ -59,7 +77,6 @@ export default function AdminMenuSettings() {
         </button>
       </form>
 
-      {/* لیست منوها */}
       <div className="space-y-2.5">
         {menuItems.map((item) => (
           <div
@@ -67,8 +84,8 @@ export default function AdminMenuSettings() {
             className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <span className="text-[var(--text-primary)]">{item.label}</span>
-              <span className="text-[10px] font-mono text-[var(--text-muted)]">({item.href})</span>
+              <span className="text-[var(--text-primary)]">{item.title || item.label}</span>
+              <span className="text-[10px] font-mono text-[var(--text-secondary)]">({item.url || item.href})</span>
             </div>
             <button
               onClick={() => handleDelete(item.id)}

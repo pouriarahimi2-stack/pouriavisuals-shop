@@ -1,3 +1,4 @@
+// app/checkout/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -6,6 +7,7 @@ import { orderService, Order } from "@/services/orderService";
 import { couponService, Coupon } from "@/services/couponService";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -33,10 +35,10 @@ export default function CheckoutPage() {
 
   let discountAmount = 0;
   if (appliedCoupon) {
-    if (appliedCoupon.type === "percent") {
+    if (appliedCoupon.type === "percent" || appliedCoupon.discount_type === "percent") {
       discountAmount = Math.round((rawTotal * appliedCoupon.value) / 100);
-      if (appliedCoupon.max_discount_amount && discountAmount > appliedCoupon.max_discount_amount) {
-        discountAmount = appliedCoupon.max_discount_amount;
+      if (appliedCoupon.max_discount && discountAmount > appliedCoupon.max_discount) {
+        discountAmount = appliedCoupon.max_discount;
       }
     } else {
       discountAmount = appliedCoupon.value;
@@ -49,15 +51,17 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (!couponCode.trim()) return;
 
+    soundEngine.playClick();
     setCheckingCoupon(true);
     setCouponError("");
 
     try {
-      const valid = await couponService.validate(couponCode, rawTotal);
-      if (valid) {
-        setAppliedCoupon(valid);
+      const res = await couponService.validateCoupon(couponCode, rawTotal);
+      if (res.valid && res.coupon) {
+        soundEngine.playSuccess();
+        setAppliedCoupon(res.coupon);
       } else {
-        setCouponError("کد تخفیف نامعتبر، منقضی شده یا سقف استفاده آن پر شده است.");
+        setCouponError(res.message || "کد تخفیف نامعتبر یا منقضی شده است.");
       }
     } finally {
       setCheckingCoupon(false);
@@ -66,6 +70,7 @@ export default function CheckoutPage() {
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    soundEngine.playClick();
     setErrorMessage("");
 
     if (cartItems.length === 0) {
@@ -73,46 +78,58 @@ export default function CheckoutPage() {
       return;
     }
 
-    // اعتبارسنجی شماره موبایل ایران
-    const phoneRegex = /^09[0-9]{9}$/;
-    if (!phoneRegex.test(phone.trim())) {
+    const cleanPhone = phone
+      .trim()
+      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/\D/g, "");
+
+    if (!/^09\d{9}$/.test(cleanPhone)) {
       setErrorMessage("شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.");
       return;
     }
 
-    // اعتبارسنجی کد پستی ۱۰ رقمی ایران
-    const postalRegex = /^\d{10}$/;
-    if (postalCode.trim() && !postalRegex.test(postalCode.trim())) {
-      setErrorMessage("کد پستی وارد شده باید دقیقاً ۱۰ رقم عددی بدون خط تیره باشد.");
+    if (postalCode.trim() && !/^\d{10}$/.test(postalCode.trim())) {
+      setErrorMessage("کد پستی وارد شده باید ۱۰ رقم عددی باشد.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const newOrder: Order = {
-        id: `ORD-${Date.now().toString().slice(-6)}`,
-        customerName: customerName.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-        postalCode: postalCode.trim() || undefined,
+      const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+      const orderPayload = {
+        id: orderId,
+        order_number: orderId,
+        customer: {
+          fullName: customerName.trim(),
+          name: customerName.trim(),
+          phone: cleanPhone,
+          address: address.trim(),
+          postalCode: postalCode.trim() || undefined,
+          notes: notes.trim() || undefined,
+        },
         items: cartItems.map((item) => ({
-          id: String(item.id),
-          title: item.title,
+          productId: item.id,
+          product_id: item.id,
+          title: item.title || item.name || "کالا",
+          name: item.name || item.title || "کالا",
           price: item.price,
           quantity: item.quantity || 1,
+          image: item.image,
         })),
-        totalAmount: finalPayable,
-        status: "processing",
-        notes: notes.trim() || undefined,
-        createdAt: new Date().toISOString(),
+        totalAmount: rawTotal,
+        discountAmount: discountAmount > 0 ? discountAmount : undefined,
+        couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        finalAmount: finalPayable,
+        status: "pending" as const,
+        paymentStatus: "pending" as const,
       };
 
-      const created = await orderService.create(newOrder);
+      const created = await orderService.create(orderPayload);
       if (created) {
         clearCart();
-        router.push(`/track-order?orderId=${created.id}&success=true`);
+        router.push(`/checkout/payment?orderId=${created.orderNumber || created.id}`);
       } else {
-        setErrorMessage("خطا در ثبت نهایی فاکتور. لطفاً دوباره تلاش کنید.");
+        setErrorMessage("خطا در ثبت نهایی فاکتور. لطفاً مجدداً تلاش فرمایید.");
       }
     } catch {
       setErrorMessage("خطا در برقراری ارتباط با سرور.");
@@ -142,7 +159,7 @@ export default function CheckoutPage() {
       
       {/* هدر صفحه تسویه‌حساب */}
       <div className="text-center space-y-2">
-        <h1 className="text-2xl md:text-3xl font-black">تکمیل اطلاعات و ثبت نهایی سفارش</h1>
+        <h1 className="text-2xl md:text-3xl font-black">تکمیل اطلاعات و صدور فاکتور رسمی</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium">نشانی و مشخصات گیرنده مرسوله را با دقت وارد کنید</p>
       </div>
 
@@ -158,7 +175,7 @@ export default function CheckoutPage() {
         {/* فرم مشخصات خریدار و نشانی */}
         <form onSubmit={handleCheckoutSubmit} className="lg:col-span-2 p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
           <h3 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            📍 مشخصات گیرنده و آدرس ارسال
+            📍 مشخصات تحویل‌گیرنده و نشانی پستی
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -182,7 +199,7 @@ export default function CheckoutPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-right"
               />
             </div>
 
@@ -194,7 +211,7 @@ export default function CheckoutPage() {
                 value={postalCode}
                 onChange={(e) => setPostalCode(e.target.value)}
                 placeholder="مثال: 1234567890"
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-right"
               />
             </div>
 
@@ -216,7 +233,7 @@ export default function CheckoutPage() {
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="نکته خاص در زمان تحویل یا بسته‌بندی..."
+                placeholder="نکته خاص در زمان تحویل یا هماهنگی..."
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
               />
             </div>
@@ -227,14 +244,12 @@ export default function CheckoutPage() {
             disabled={submitting}
             className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-sm hover:opacity-90 transition shadow-2xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
           >
-            <span>{submitting ? "در حال ثبت سفارش..." : "تأیید و پرداخت نهایی فاکتور 💳"}</span>
+            <span>{submitting ? "در حال ثبت فاکتور..." : "تأیید اطلاعات و اتصال به درگاه پرداخت 💳"}</span>
           </button>
         </form>
 
-        {/* سایدبار: خلاصه اقلام و کوپن تخفیف */}
+        {/* سایدبار: خلاصه فاکتور و اعمال کوپن */}
         <div className="space-y-6">
-          
-          {/* فرم اعمال کوپن */}
           <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3 text-xs">
             <h4 className="font-black text-xs text-[var(--text-primary)]">🏷️ کد تخفیف دارید؟</h4>
             <div className="flex gap-2">
@@ -242,14 +257,14 @@ export default function CheckoutPage() {
                 type="text"
                 value={couponCode}
                 onChange={(e) => setCouponCode(e.target.value)}
-                placeholder="مثال: OFF50"
+                placeholder="مثال: OFF10"
                 className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono uppercase font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
               />
               <button
                 type="button"
                 onClick={handleApplyCoupon}
                 disabled={checkingCoupon}
-                className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer disabled:opacity-50"
+                className="px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer disabled:opacity-50"
               >
                 اعمال
               </button>
@@ -257,12 +272,11 @@ export default function CheckoutPage() {
             {couponError && <p className="text-[10px] text-rose-500 font-bold">{couponError}</p>}
             {appliedCoupon && (
               <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                ✓ کد تخفیف {appliedCoupon.code} اعمال شد.
+                ✓ کد تخفیف {appliedCoupon.code} با موفقیت اعمال شد.
               </p>
             )}
           </div>
 
-          {/* فاکتور خلاصه پرداخت */}
           <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
             <h4 className="font-black text-xs text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
               📋 خلاصه فاکتور خرید
@@ -296,12 +310,12 @@ export default function CheckoutPage() {
 
               <div className="flex justify-between text-[var(--text-secondary)] font-bold">
                 <span>هزینه بسته‌بندی و ارسال:</span>
-                <span className="text-emerald-600 dark:text-emerald-400">رایگان (پیشتاز)</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">رایگان (پیشتاز)</span>
               </div>
 
               <div className="flex justify-between items-center pt-2 border-t border-[var(--card-border)] text-sm font-black">
-                <span className="text-[var(--text-primary)]">مبلغ نهایی:</span>
-                <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                <span className="text-[var(--text-primary)]">مبلغ نهایی فاکتور:</span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 text-base">
                   {finalPayable.toLocaleString("fa-IR")} تومان
                 </span>
               </div>

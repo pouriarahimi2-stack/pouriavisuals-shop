@@ -1,8 +1,10 @@
+// components/ProductList.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
 import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function ProductList() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -45,7 +47,7 @@ export default function ProductList() {
   const categories = Array.from(new Set(products.map((p) => p.category || "عمومی"))).filter(Boolean);
 
   const filtered = products.filter((p) => {
-    const isAvail = p.is_active !== false && (p.stock ?? 1) > 0;
+    const isAvail = p.is_available !== false && (p.stock ?? 1) > 0;
     const matchCat = selectedCategory === "all" || (p.category || "عمومی") === selectedCategory;
     const matchSearch =
       p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,7 +72,10 @@ export default function ProductList() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
             <button
-              onClick={() => setSelectedCategory("all")}
+              onClick={() => {
+                soundEngine.playClick();
+                setSelectedCategory("all");
+              }}
               className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer ${
                 selectedCategory === "all"
                   ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -82,7 +87,10 @@ export default function ProductList() {
             {categories.map((cat) => (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setSelectedCategory(cat);
+                }}
                 className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer ${
                   selectedCategory === cat
                     ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -196,14 +204,15 @@ export default function ProductList() {
                   </div>
 
                   <button
-                    onClick={() =>
+                    onClick={() => {
+                      soundEngine.playAddToCart();
                       addToCart({
                         id: prod.id,
                         title: prod.title,
                         price: prod.discountPrice || prod.price,
                         image: displayImg,
-                      })
-                    }
+                      });
+                    }}
                     className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <span>🛒</span>

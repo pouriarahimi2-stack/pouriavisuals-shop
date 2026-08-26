@@ -1,3 +1,4 @@
+// services/adminAuthService.ts
 import { supabase } from "@/lib/supabase";
 
 export type AdminRole = "superadmin" | "super_admin" | "product_manager" | "inventory_manager" | "content_editor";
@@ -12,7 +13,6 @@ export interface AdminUser {
 const STORAGE_KEY = "admin_current_user";
 
 export const adminAuthService = {
-  // همیشه یک Promise معتبر برمی‌گرداند تا .then و await بدون خطا کار کنند
   async getCurrentSession(): Promise<AdminUser | null> {
     try {
       if (typeof window !== "undefined") {
@@ -66,7 +66,7 @@ export const adminAuthService = {
         if (!error && data && data.length > 0) return data;
       }
       return [
-        { id: "1", username: "admin", full_name: "مدیر ارشد", role: "superadmin" }
+        { id: "1", username: "admin", full_name: "مدیر ارشد سیستم", role: "superadmin" },
       ];
     } catch {
       return [];
@@ -92,7 +92,7 @@ export const adminAuthService = {
         const { error } = await supabase.from("admin_users").insert([{
           id: `adm_${Date.now()}`,
           ...userData,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         }]);
         if (error) return { success: false, message: error.message };
       }
@@ -111,5 +111,5 @@ export const adminAuthService = {
     } catch {
       return false;
     }
-  }
+  },
 };

@@ -1,7 +1,9 @@
+// components/AdminAccountsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminAccountsManager() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -44,6 +46,7 @@ export default function AdminAccountsManager() {
     e.preventDefault();
     if (!username.trim() || !password.trim()) return;
 
+    soundEngine.playClick();
     setSubmitting(true);
     try {
       const res = await adminAuthService.createAdmin({
@@ -54,6 +57,7 @@ export default function AdminAccountsManager() {
       });
 
       if (res.success) {
+        soundEngine.playSuccess();
         showToast(`کاربر مدیر «${username}» با نقش مشخص‌شده با موفقیت ایجاد گردید.`);
         setUsername("");
         setPassword("");
@@ -69,6 +73,7 @@ export default function AdminAccountsManager() {
   };
 
   const handleStartEdit = (adm: AdminUser) => {
+    soundEngine.playClick();
     setEditingAdmin(adm);
     setEditUsername(adm.username);
     setEditFullName(adm.full_name || "");
@@ -79,6 +84,7 @@ export default function AdminAccountsManager() {
     e.preventDefault();
     if (!editingAdmin) return;
 
+    soundEngine.playClick();
     setSubmitting(true);
     try {
       const res = await adminAuthService.updateCredentials(
@@ -89,6 +95,7 @@ export default function AdminAccountsManager() {
       );
 
       if (res.success) {
+        soundEngine.playSuccess();
         showToast("اطلاعات حساب مدیر با موفقیت به‌روزرسانی شد.");
         setEditingAdmin(null);
         await loadAdmins();
@@ -102,6 +109,7 @@ export default function AdminAccountsManager() {
 
   const handleDelete = async (id: string, admUser: string) => {
     if (confirm(`آیا از حذف دسترسی ادمین "${admUser}" اطمینان دارید؟`)) {
+      soundEngine.playClick();
       await adminAuthService.deleteAdmin(id);
       showToast("حساب کاربری مدیر حذف شد.");
       await loadAdmins();
@@ -111,8 +119,10 @@ export default function AdminAccountsManager() {
   const getRoleBadge = (r: AdminRole) => {
     switch (r) {
       case "super_admin":
+      case "superadmin":
         return <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px]">مدیر کل سیستم</span>;
       case "product_manager":
+      case "inventory_manager":
         return <span className="px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">مدیر انبار و محصولات</span>;
       case "content_editor":
         return <span className="px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">نویسنده و سئو</span>;
@@ -238,7 +248,7 @@ export default function AdminAccountsManager() {
                     >
                       ✏️ ویرایش / تغییر رمز
                     </button>
-                    {adm.role !== "super_admin" && (
+                    {adm.role !== "super_admin" && adm.role !== "superadmin" && (
                       <button
                         onClick={() => handleDelete(adm.id, adm.username)}
                         className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold transition cursor-pointer text-[11px]"

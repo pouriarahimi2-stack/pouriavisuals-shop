@@ -1,3 +1,4 @@
+// services/pageService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface PageBlock {
@@ -48,7 +49,7 @@ export const pageService = {
             slug: d.slug,
             title: d.title,
             meta_description: d.meta_description || "",
-            content: Array.isArray(d.sections) ? d.sections : (Array.isArray(d.content) ? d.content : []),
+            content: Array.isArray(d.sections) ? d.sections : Array.isArray(d.content) ? d.content : [],
             is_published: d.is_published !== false,
             theme: d.theme || {},
             created_at: d.created_at,
@@ -89,7 +90,7 @@ export const pageService = {
             slug: data.slug,
             title: data.title,
             meta_description: data.meta_description || "",
-            content: Array.isArray(data.sections) ? data.sections : (Array.isArray(data.content) ? data.content : []),
+            content: Array.isArray(data.sections) ? data.sections : Array.isArray(data.content) ? data.content : [],
             is_published: data.is_published !== false,
             theme: data.theme || {},
             created_at: data.created_at,
@@ -137,7 +138,7 @@ export const pageService = {
             slug: data.slug,
             title: data.title,
             meta_description: data.meta_description,
-            content: Array.isArray(data.sections) ? data.sections : (data.content || []),
+            content: Array.isArray(data.sections) ? data.sections : data.content || [],
             is_published: data.is_published,
             theme: data.theme,
             created_at: data.created_at,

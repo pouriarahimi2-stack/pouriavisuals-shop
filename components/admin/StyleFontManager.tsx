@@ -1,7 +1,9 @@
+// components/admin/StyleFontManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export interface SiteStyleConfig {
   id?: string;
@@ -13,7 +15,7 @@ export interface SiteStyleConfig {
 }
 
 export default function StyleFontManager() {
-  const [primaryColor, setPrimaryColor] = useState("#2563eb");
+  const [primaryColor, setPrimaryColor] = useState("#0071e3");
   const [secondaryColor, setSecondaryColor] = useState("#4f46e5");
   const [fontFamily, setFontFamily] = useState("Vazirmatn");
   const [borderRadius, setBorderRadius] = useState("1.5rem");
@@ -30,7 +32,7 @@ export default function StyleFontManager() {
         .maybeSingle();
 
       if (data) {
-        setPrimaryColor(data.primary_color || "#2563eb");
+        setPrimaryColor(data.primary_color || "#0071e3");
         setSecondaryColor(data.secondary_color || "#4f46e5");
         setFontFamily(data.font_family || "Vazirmatn");
         setBorderRadius(data.border_radius || "1.5rem");
@@ -44,9 +46,8 @@ export default function StyleFontManager() {
   useEffect(() => {
     fetchStyles();
 
-    // همگام‌سازی بلادرنگ استایل‌ها از طریق وب‌سوکت
     const styleChannel = supabase
-      .channel("style-realtime-channel")
+      .channel("style-realtime-channel-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_styles" }, () => {
         fetchStyles();
       })
@@ -59,6 +60,7 @@ export default function StyleFontManager() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    soundEngine.playClick();
     setSaving(true);
 
     const payload = {
@@ -78,9 +80,9 @@ export default function StyleFontManager() {
 
       if (error) throw error;
 
-      setStatusMessage({ type: "success", text: "⚡ استایل‌ها و فونت با موفقیت در دیتابیس ذخیره و زنده اعمال شدند." });
+      soundEngine.playSuccess();
+      setStatusMessage({ type: "success", text: "⚡ استایل‌ها و فونت با موفقیت در دیتابیس ذخیره و بلادرنگ در سایت اعمال شدند." });
       
-      // اعمال فوری در CSS متغیرهای مرورگر ادمین
       document.documentElement.style.setProperty("--accent-blue", primaryColor);
       document.documentElement.style.setProperty("--font-primary", fontFamily);
     } catch (err) {
@@ -93,35 +95,33 @@ export default function StyleFontManager() {
   };
 
   return (
-    <div className="space-y-6 font-sans" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--text-primary)]">🎨 مدیریت هویت بصری، فونت و استایل لایو</h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">شخصی‌سازی رنگ سازمانی، تایپوگرافی و قالب سایت با ذخیره ابری و وب‌سوکت</p>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🎨</span> مدیریت هویت بصری، فونت و استایل لایو (Live Theme Customizer)
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            شخصی‌سازی رنگ سازمانی، تایپوگرافی، انحنای کارت‌ها و تزریق کدهای اختصاصی CSS
+          </p>
         </div>
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50"
+          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
         >
           {saving ? "در حال اعمال..." : "💾 ذخیره و انتشار سراسری"}
         </button>
       </div>
 
       {statusMessage && (
-        <div
-          className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${
-            statusMessage.type === "success"
-              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
-          }`}
-        >
+        <div className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}`}>
           {statusMessage.text}
         </div>
       )}
 
-      <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-sm">
+      <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* رنگ اصلی */}
@@ -138,7 +138,7 @@ export default function StyleFontManager() {
                 type="text"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
-                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold uppercase"
+                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold uppercase outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
           </div>
@@ -157,34 +157,34 @@ export default function StyleFontManager() {
                 type="text"
                 value={secondaryColor}
                 onChange={(e) => setSecondaryColor(e.target.value)}
-                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold uppercase"
+                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold uppercase outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
           </div>
 
           {/* انتخاب فونت */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">تایپوگرافی و فونت اصلی</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">تایپوگرافی و قلم سازمانی (Font Family)</label>
             <select
               value={fontFamily}
               onChange={(e) => setFontFamily(e.target.value)}
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer focus:border-[var(--accent-blue)]"
             >
-              <option value="Vazirmatn">فونت وزیر متن (Vazirmatn)</option>
+              <option value="Vazirmatn">فونت وزیر متن (Vazirmatn - پیش‌فرض اپلی)</option>
               <option value="IranSans">فونت ایران سنس (IRANSans)</option>
               <option value="YekanBakh">فونت یکان باخ (YekanBakh)</option>
               <option value="Shabnam">فونت شبنم (Shabnam)</option>
-              <option value="Tahoma">فونت تاهوما (Tahoma)</option>
+              <option value="Tahoma">فونت استاندارد تاهوما (Tahoma)</option>
             </select>
           </div>
 
-          {/* میزان گردی گوشه‌ها */}
+          {/* انحنای کارت‌ها */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">میزان انحنای کارت‌ها (Border Radius)</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">میزان گردی گوشه‌ها (Border Radius)</label>
             <select
               value={borderRadius}
               onChange={(e) => setBorderRadius(e.target.value)}
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer focus:border-[var(--accent-blue)]"
             >
               <option value="0.75rem">کمی گرد (12px)</option>
               <option value="1rem">استاندارد مدرن (16px)</option>
@@ -195,33 +195,33 @@ export default function StyleFontManager() {
         </div>
 
         {/* کدهای سفارشی CSS */}
-        <div className="space-y-2 pt-2 border-t border-[var(--card-border)]">
-          <label className="block text-xs font-bold text-[var(--text-secondary)]">استایل‌های سفارشی پیشرفته (Custom CSS)</label>
+        <div className="space-y-2 pt-4 border-t border-[var(--card-border)]">
+          <label className="block text-xs font-bold text-[var(--text-secondary)]">استایل‌های پیشرفته اختصاصی (Custom CSS):</label>
           <textarea
             rows={4}
             value={customCss}
             onChange={(e) => setCustomCss(e.target.value)}
-            placeholder="/* کدهای CSS اختصاصی خود را اینجا وارد کنید */"
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none"
+            placeholder="/* کدهای سفارشی CSS خود را اینجا وارد کنید */"
+            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none leading-relaxed"
           />
         </div>
 
-        {/* پیش‌نمایش المان */}
+        {/* پیش‌نمایش لایو المان */}
         <div className="p-5 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] space-y-3">
-          <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش دکمه و برچسب با تنظیمات زنده:</span>
+          <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش زنده با رنگ و فونت انتخابی:</span>
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               style={{ backgroundColor: primaryColor, borderRadius }}
-              className="px-6 py-2.5 text-white font-extrabold text-xs shadow-md"
+              className="px-6 py-3 text-white font-black text-xs shadow-md"
             >
               دکمه نمونه اکشن
             </button>
             <span
               style={{ borderColor: primaryColor, color: primaryColor, borderRadius }}
-              className="px-4 py-1.5 border text-xs font-bold"
+              className="px-4 py-2 border text-xs font-bold"
             >
-              برچسب قیمت و تخفیف
+              برچسب قیمت و تخفیف ویژه
             </span>
           </div>
         </div>

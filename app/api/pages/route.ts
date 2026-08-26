@@ -1,3 +1,4 @@
+// app/api/pages/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 

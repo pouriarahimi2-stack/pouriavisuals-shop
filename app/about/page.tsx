@@ -1,3 +1,4 @@
+// app/about/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -15,21 +16,24 @@ export default function AboutPage() {
     load();
   }, []);
 
-  const storeName = siteInfo?.storeName || (siteInfo as any)?.site_name || "فروشگاه تخصصی";
-  const aboutText = siteInfo?.aboutText || siteInfo?.description || "فروشگاه تخصصی محصولات حوزه تکنولوژی";
+  const storeName = siteInfo?.storeName || (siteInfo as any)?.site_name || "آکسون | Axon";
+  const aboutText =
+    siteInfo?.aboutText ||
+    siteInfo?.description ||
+    `مجموعه ${storeName} مرجع تخصصی تامین، کالیبراسیون و مشاوره تجهیزات پیشرفته تصویر، مانیتورهای تدوین رنگ ۵K و ۴K، کارت‌های کپچر و ابزارهای حرفه‌ای استودیو در ایران است.\n\nتعهد ما ارائه کالاهای ۱۰۰٪ اورجینال با گارانتی اصالت طلایی، تضمین بهترین قیمت بازار و ارسال سریع پیشتاز به سراسر کشور با بسته‌بندی ضدضربه است.`;
 
   return (
     <div className="min-h-[70vh] max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="p-8 md:p-12 rounded-[2.5rem] liquid-glass-card border border-[var(--card-border)] space-y-6 shadow-2xl backdrop-blur-2xl">
+      <div className="p-8 md:p-12 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-6 shadow-2xl backdrop-blur-2xl">
         <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-4">
           <span className="p-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xl">🏢</span>
           <div>
             <h1 className="text-2xl font-black text-[var(--text-primary)]">درباره {storeName}</h1>
-            <p className="text-xs text-[var(--text-secondary)] mt-1 font-bold">آشنایی با تاریخچه، خدمات و تعهدات ما</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 font-bold">آشنایی با استانداردها، گارانتی و تعهدات ما</p>
           </div>
         </div>
 
-        <div className="space-y-4 text-sm leading-relaxed text-[var(--text-secondary)] font-medium whitespace-pre-line">
+        <div className="space-y-4 text-sm leading-loose text-[var(--text-secondary)] font-medium whitespace-pre-line text-justify">
           {aboutText}
         </div>
 

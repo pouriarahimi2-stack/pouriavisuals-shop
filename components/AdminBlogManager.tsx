@@ -1,8 +1,8 @@
-// components/AdminBlogManager.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export interface BlogPost {
   id?: string;
@@ -31,7 +31,7 @@ export default function AdminBlogManager() {
   const [metaDescription, setMetaDescription] = useState("");
   const [isPublished, setIsPublished] = useState(true);
 
-  // آمار سند
+  // آمار زنده سند
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [readTime, setReadTime] = useState(1);
@@ -58,7 +58,7 @@ export default function AdminBlogManager() {
     fetchPosts();
 
     const channel = supabase
-      .channel("posts-realtime-master-v6")
+      .channel("posts-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
         fetchPosts();
       })
@@ -80,6 +80,7 @@ export default function AdminBlogManager() {
   };
 
   const handleSelectPost = (p: BlogPost) => {
+    soundEngine.playClick();
     setSelectedPost(p);
     setTitle(p.title);
     setSlug(p.slug);
@@ -95,6 +96,7 @@ export default function AdminBlogManager() {
   };
 
   const handleCreateNew = () => {
+    soundEngine.playClick();
     setSelectedPost(null);
     setTitle("");
     setSlug("");
@@ -104,13 +106,13 @@ export default function AdminBlogManager() {
     setIsPublished(true);
 
     if (editorRef.current) {
-      editorRef.current.innerHTML = "<h2>مقدمه و بررسی تخصصی</h2><p>متن خود را با ابزارهای نوار ابزار بالا بنویسید...</p>";
+      editorRef.current.innerHTML = "<h2>مقدمه و بررسی تخصصی</h2><p>متن تحلیل خود را با ابزارهای نوار ابزار بالا آغاز کنید...</p>";
       setTimeout(updateStats, 100);
     }
   };
 
-  // توابع فرمت‌بندی متن (Microsoft Word Style)
   const exec = (command: string, value: string | undefined = undefined) => {
+    soundEngine.playClick();
     document.execCommand(command, false, value);
     updateStats();
   };
@@ -130,7 +132,7 @@ export default function AdminBlogManager() {
     for (let r = 0; r < Number(rows) - 1; r++) {
       tableHtml += `<tr>`;
       for (let c = 0; c < Number(cols); c++) {
-        tableHtml += `<td style="padding:10px; border:1px solid var(--card-border);">محتوا سطر ${r + 1}</td>`;
+        tableHtml += `<td style="padding:10px; border:1px solid var(--card-border);">داده ${r + 1}-${c + 1}</td>`;
       }
       tableHtml += `</tr>`;
     }
@@ -141,11 +143,11 @@ export default function AdminBlogManager() {
   const insertCallout = (type: "info" | "warning" | "success") => {
     const bg = type === "info" ? "rgba(0,113,227,0.08)" : type === "warning" ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)";
     const border = type === "info" ? "#0071e3" : type === "warning" ? "#f59e0b" : "#10b981";
-    const title = type === "info" ? "💡 نکته مهم" : type === "warning" ? "⚠️ هشدار و توجه" : "✅ تاییدیه کارشناسی";
+    const titleText = type === "info" ? "💡 نکته مهم سئو" : type === "warning" ? "⚠️ هشدار و توجه" : "✅ تاییدیه کارشناسی";
 
     const calloutHtml = `
       <div style="border-right:4px solid ${border}; background:${bg}; padding:14px 18px; border-radius:16px; margin:16px 0;">
-        <strong style="color:${border}; display:block; margin-bottom:4px;">${title}:</strong>
+        <strong style="color:${border}; display:block; margin-bottom:4px;">${titleText}:</strong>
         <span>متن راهنما یا نکته ویژه سئو را اینجا بنویسید...</span>
       </div>
       <p><br></p>
@@ -213,6 +215,7 @@ export default function AdminBlogManager() {
       const data = await res.json();
 
       if (data.success) {
+        soundEngine.playSuccess();
         setStatusMessage({ type: "success", text: "⚡ مقاله سئو با موفقیت در دیتابیس ذخیره و در مجله سایت منتشر شد." });
         fetchPosts();
         if (!selectedPost && data.post) {
@@ -232,6 +235,7 @@ export default function AdminBlogManager() {
   const handleDelete = async (id: string) => {
     if (!confirm("آیا از حذف این مقاله اطمینان دارید؟")) return;
     try {
+      soundEngine.playClick();
       const { error } = await supabase.from("posts").delete().eq("id", id);
       if (error) throw error;
       handleCreateNew();
@@ -304,8 +308,6 @@ export default function AdminBlogManager() {
         {/* بوم نگارش و فرم کامل مقاله */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
-            
-            {/* اطلاعات سئو و تیتر */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block font-bold text-[var(--text-secondary)] mb-1.5">عنوان اصلی مقاله (H1) *</label>
@@ -376,7 +378,6 @@ export default function AdminBlogManager() {
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5 p-3 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
-                {/* سرفصل‌ها */}
                 <select onChange={(e) => insertHeading(e.target.value)} className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none">
                   <option value="p">پاراگراف عادی</option>
                   <option value="h1">تیتر اصلی ۱ (H1)</option>
@@ -387,7 +388,6 @@ export default function AdminBlogManager() {
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
-                {/* فرمت‌بندی قلم */}
                 <button type="button" onClick={() => exec("bold")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-xs hover:border-[var(--accent-blue)]" title="Bold (Ctrl+B)"><b>B</b></button>
                 <button type="button" onClick={() => exec("italic")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] italic text-xs hover:border-[var(--accent-blue)]" title="Italic (Ctrl+I)"><i>I</i></button>
                 <button type="button" onClick={() => exec("underline")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] underline text-xs hover:border-[var(--accent-blue)]" title="Underline (Ctrl+U)"><u>U</u></button>
@@ -395,7 +395,6 @@ export default function AdminBlogManager() {
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
-                {/* انتخاب رنگ متن و هایلایت */}
                 <div className="flex items-center gap-1 bg-[var(--modal-bg)] p-1 rounded-xl border border-[var(--card-border)]">
                   <span className="text-[10px] font-bold px-1">🎨 رنگ:</span>
                   <input type="color" onChange={(e) => exec("foreColor", e.target.value)} title="رنگ فونت" className="w-6 h-6 rounded cursor-pointer bg-transparent border-none" />
@@ -404,7 +403,6 @@ export default function AdminBlogManager() {
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
-                {/* ترازبندی */}
                 <button type="button" onClick={() => exec("justifyRight")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="راست‌چین">👉</button>
                 <button type="button" onClick={() => exec("justifyCenter")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="وسط‌چین">↔️</button>
                 <button type="button" onClick={() => exec("justifyLeft")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="چپ‌چین">👈</button>
@@ -412,13 +410,11 @@ export default function AdminBlogManager() {
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
-                {/* لیست‌ها */}
                 <button type="button" onClick={() => exec("insertUnorderedList")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="لیست نقطه‌ای">• لیست</button>
                 <button type="button" onClick={() => exec("insertOrderedList")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="لیست شماره‌دار">۱. لیست</button>
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
-                {/* المان‌های پیشرفته */}
                 <button type="button" onClick={insertTable} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)]">📊 ساخت جدول</button>
                 <button type="button" onClick={() => insertCallout("info")} className="p-2 px-2.5 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-500/20 text-xs font-bold">💡 باکس نکته</button>
                 <button type="button" onClick={() => insertCallout("warning")} className="p-2 px-2.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs font-bold">⚠️ هشدار</button>

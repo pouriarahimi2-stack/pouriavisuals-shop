@@ -1,8 +1,10 @@
+// app/admin/login/page.tsx
 "use client";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -14,6 +16,7 @@ export default function AdminLoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    soundEngine.playClick();
     setErrorMessage(null);
 
     if (!username.trim() || !password.trim()) {
@@ -24,7 +27,6 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      // ارسال درخواست به روت سروری لاگین
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -37,18 +39,16 @@ export default function AdminLoginPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // ذخیره اطلاعات سشن در کلاینت
+        soundEngine.playSuccess();
         if (data.user) {
           localStorage.setItem("admin_current_user", JSON.stringify(data.user));
         }
-        // انتقال به پنل مدیریت
         router.push("/admin");
       } else {
         setErrorMessage(data.message || "نام کاربری یا کلمه عبور اشتباه است.");
       }
     } catch (err: any) {
       console.error("Login Error:", err);
-      // فال‌بک ورود با اطلاعات پیش‌فرض در صورت عدم دسترسی موقت به سرور
       if (username.trim() === "admin" && password.trim() === "admin123456") {
         const defaultUser = {
           id: "admin_master",
@@ -72,16 +72,14 @@ export default function AdminLoginPage() {
       dir="rtl"
     >
       <div className="max-w-md w-full rounded-[2.5rem] bg-[#111827]/90 border border-slate-700/60 p-8 sm:p-10 space-y-6 shadow-2xl backdrop-blur-2xl animate-fadeIn">
-        {/* آیکون و هدر */}
         <div className="text-center space-y-2">
           <div className="w-14 h-14 mx-auto rounded-3xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-2xl shadow-lg">
             ⚡
           </div>
           <h1 className="text-xl font-black tracking-tight text-white">ورود به پنل مدیریت فروشگاه</h1>
-          <p className="text-xs text-slate-400 font-medium">احراز هویت ادمین و دسترسی به امکانات مدیریتی</p>
+          <p className="text-xs text-slate-400 font-medium">احراز هویت ادمین و دسترسی به پیشخوان مدیریت</p>
         </div>
 
-        {/* باکس خطا */}
         {errorMessage && (
           <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold text-center animate-fadeIn flex items-center justify-center gap-2">
             <span>⚠️</span>
@@ -89,7 +87,6 @@ export default function AdminLoginPage() {
           </div>
         )}
 
-        {/* فرم ورود */}
         <form onSubmit={handleLogin} className="space-y-4 text-xs">
           <div>
             <label className="block mb-1.5 font-bold text-slate-300">نام کاربری ادمین</label>

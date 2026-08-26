@@ -28,7 +28,7 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
-        در حال دریافت خبر از رادار...
+        در حال دریافت تحلیل خبر از رادار...
       </div>
     );
   }
@@ -36,7 +36,7 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
   if (!item) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-24 text-center space-y-4 font-sans select-none" dir="rtl">
-        <h2 className="text-xl font-black text-[var(--text-primary)]">خبر مورد نظر یافت نشد.</h2>
+        <h2 className="text-xl font-black text-[var(--text-primary)]">خبر مورد نظر در رادار یافت نشد.</h2>
         <Link href="/news" className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs">
           ← بازگشت به رادار اخبار
         </Link>
@@ -46,6 +46,7 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
 
   return (
     <article className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+      
       {/* مسیر ناوبری */}
       <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-bold">
         <Link href="/">صفحه اصلی</Link>
@@ -79,14 +80,14 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
           </p>
         </header>
 
-        {/* محتوای خبر */}
+        {/* محتوای کامل خبر */}
         <div
           dangerouslySetInnerHTML={{ __html: item.content }}
           className="prose max-w-none text-xs md:text-sm leading-loose text-[var(--text-primary)] font-medium space-y-4"
           style={{ textAlign: "justify" }}
         />
 
-        {/* برچسب‌ها و دکمه اشتراک */}
+        {/* برچسب‌ها و دکمه هدایت به فروشگاه */}
         <footer className="pt-6 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap gap-2">
             {item.tags?.map((t) => (

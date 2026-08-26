@@ -1,6 +1,8 @@
+// components/CheckoutShipping.tsx
 "use client";
 
 import React from "react";
+import { soundEngine } from "@/lib/soundEngine";
 
 interface ShippingProps {
   formData: {
@@ -18,6 +20,11 @@ interface ShippingProps {
 
 export default function CheckoutShipping({ formData, onChange }: ShippingProps) {
   const isPostalValid = /^\d{10}$/.test(formData.postalCode.trim());
+
+  const handleMethodChange = (method: "express" | "regular") => {
+    soundEngine.playClick();
+    onChange("shippingMethod", method);
+  };
 
   return (
     <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
@@ -127,7 +134,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
-            onClick={() => onChange("shippingMethod", "regular")}
+            onClick={() => handleMethodChange("regular")}
             className={`p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
               formData.shippingMethod === "regular"
                 ? "bg-[var(--accent-blue)]/10 border-[var(--accent-blue)] text-[var(--text-primary)] shadow-md"
@@ -136,13 +143,13 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
           >
             <div className="space-y-1">
               <span className="font-extrabold text-xs block text-[var(--text-primary)]">📦 پست پیشتاز سراسری</span>
-              <span className="text-[10px] opacity-80">تحویل ۲ الی ۴ روز کاری</span>
+              <span className="text-[10px] opacity-80">تحویل ۲ الی ۴ روز کاری (رایگان)</span>
             </div>
-            <span className="font-mono font-bold text-xs">۴۵,۰۰۰ تومان</span>
+            <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">رایگان</span>
           </div>
 
           <div
-            onClick={() => onChange("shippingMethod", "express")}
+            onClick={() => handleMethodChange("express")}
             className={`p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
               formData.shippingMethod === "express"
                 ? "bg-[var(--accent-blue)]/10 border-[var(--accent-blue)] text-[var(--text-primary)] shadow-md"

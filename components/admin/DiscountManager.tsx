@@ -1,7 +1,9 @@
+// components/admin/DiscountManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export interface Coupon {
   id?: string;
@@ -40,9 +42,8 @@ export default function DiscountManager() {
   useEffect(() => {
     fetchCoupons();
 
-    // اتصال وب‌سوکت بلادرنگ کوپن‌ها
     const channel = supabase
-      .channel("coupons-realtime")
+      .channel("coupons-realtime-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
         fetchCoupons();
       })
@@ -60,6 +61,7 @@ export default function DiscountManager() {
       return;
     }
 
+    soundEngine.playClick();
     setSaving(true);
     const payload = {
       code: code.trim().toUpperCase(),
@@ -73,13 +75,14 @@ export default function DiscountManager() {
       const { error } = await supabase.from("coupons").insert([payload]);
       if (error) throw error;
 
+      soundEngine.playSuccess();
       setStatusMessage({ type: "success", text: "⚡ کد تخفیف با موفقیت در دیتابیس ثبت و فعال شد." });
       setCode("");
       setDiscountPercent("");
       setMaxDiscount("");
       fetchCoupons();
     } catch (err: any) {
-      setStatusMessage({ type: "error", text: err.message || "خطا در ثبت کد تخفیف (احتمالاً کد تکراری است)." });
+      setStatusMessage({ type: "error", text: err.message || "خطا در ثبت کد تخفیف." });
     } finally {
       setSaving(false);
       setTimeout(() => setStatusMessage(null), 3500);
@@ -87,12 +90,14 @@ export default function DiscountManager() {
   };
 
   const toggleStatus = async (id: string, current: boolean) => {
+    soundEngine.playClick();
     await supabase.from("coupons").update({ is_active: !current }).eq("id", id);
     setCoupons(coupons.map((c) => (c.id === id ? { ...c, is_active: !current } : c)));
   };
 
   const deleteCoupon = async (id: string) => {
     if (!confirm("آیا از حذف این کد تخفیف اطمینان دارید؟")) return;
+    soundEngine.playClick();
     await supabase.from("coupons").delete().eq("id", id);
     setCoupons(coupons.filter((c) => c.id !== id));
   };
@@ -119,7 +124,6 @@ export default function DiscountManager() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* فرم ثبت کوپن */}
         <form onSubmit={handleCreateCoupon} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             + ایجاد کوپن تخفیف جدید
@@ -172,7 +176,6 @@ export default function DiscountManager() {
           </button>
         </form>
 
-        {/* لیست کوپن‌ها */}
         <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             📋 لیست کدهای تخفیف فعال و آرشیو ({coupons.length})
@@ -180,7 +183,7 @@ export default function DiscountManager() {
 
           <div className="space-y-3 max-h-[450px] overflow-y-auto">
             {coupons.length === 0 ? (
-              <p className="text-xs text-center py-8 text-[var(--text-muted)] font-bold">هیچ کد تخفیفی ثبت نشده است.</p>
+              <p className="text-xs text-center py-8 text-[var(--text-secondary)] font-bold">هیچ کد تخفیفی ثبت نشده است.</p>
             ) : (
               coupons.map((c) => (
                 <div

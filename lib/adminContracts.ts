@@ -1,4 +1,6 @@
+// lib/adminContracts.ts
 export type AdminRole = 
+  | 'superadmin'
   | 'super_admin' 
   | 'product_manager' 
   | 'content_editor' 
@@ -8,7 +10,8 @@ export type AdminRole =
 export interface AdminUser {
   id: string;
   username: string;
-  name: string;
+  name?: string;
+  full_name?: string;
   role: AdminRole;
   created_at?: string;
 }
@@ -51,7 +54,7 @@ export interface StandardOrder {
   totalAmount: number;
   discountAmount?: number;
   couponCode?: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   trackingCode?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -76,7 +79,8 @@ export interface StandardMenuItem {
 }
 
 export interface StandardSiteInfo {
-  site_title: string;
+  site_name: string;
+  site_title?: string;
   site_description: string;
   support_phone: string;
   support_email: string;

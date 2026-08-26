@@ -1,3 +1,4 @@
+// app/api/admin/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
@@ -24,7 +25,6 @@ export async function POST(req: NextRequest) {
       role: "superadmin",
     };
 
-    // ۱. بررسی ادمین پیش‌فرض سیستمی
     const envAdminUser = process.env.ADMIN_USERNAME || "admin";
     const envAdminPass = process.env.ADMIN_PASSWORD || "admin123456";
 
@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
       isValid = true;
     }
 
-    // ۲. بررسی دیتابیس Supabase در صورت وجود
     if (!isValid && supabase) {
       try {
         const { data, error } = await supabase
@@ -64,8 +63,15 @@ export async function POST(req: NextRequest) {
         message: "ورود با موفقیت انجام شد.",
       });
 
-      // ثبت کوکی سشن لاگین
       response.cookies.set("admin_session_token", `SESSION-${Date.now()}`, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+      });
+
+      response.cookies.set("pv_admin_session", `AUTH-${Date.now()}`, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

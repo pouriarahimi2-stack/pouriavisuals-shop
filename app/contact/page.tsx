@@ -1,22 +1,23 @@
-'use client';
+// app/contact/page.tsx
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { siteInfoService, SiteInfo } from '@/services/siteInfoService';
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function ContactPage() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
-    // دریافت آنی اطلاعات
     const cached = siteInfoService.getSiteInfoSync();
     if (cached) setSiteInfo(cached);
 
@@ -27,19 +28,20 @@ export default function ContactPage() {
     const handleUpdate = (e: any) => {
       if (e.detail) setSiteInfo(e.detail);
     };
-    window.addEventListener('site_info_updated', handleUpdate);
-    return () => window.removeEventListener('site_info_updated', handleUpdate);
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    soundEngine.playClick();
     setLoading(true);
     setFeedback(null);
 
     try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: fullName,
           phone,
@@ -51,26 +53,27 @@ export default function ContactPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setFeedback({ type: 'success', text: data.message || 'پیام شما با موفقیت ثبت شد و به زودی پاسخ داده خواهد شد.' });
-        setFullName('');
-        setPhone('');
-        setSubject('');
-        setMessage('');
+        soundEngine.playSuccess();
+        setFeedback({ type: "success", text: data.message || "پیام شما با موفقیت ثبت شد و به زودی پاسخ داده خواهد شد." });
+        setFullName("");
+        setPhone("");
+        setSubject("");
+        setMessage("");
       } else {
-        setFeedback({ type: 'error', text: data.message || 'خطا در ثبت پیام. مجدداً تلاش کنید.' });
+        setFeedback({ type: "error", text: data.message || "خطا در ثبت پیام. مجدداً تلاش کنید." });
       }
     } catch {
-      setFeedback({ type: 'error', text: 'خطا در برقراری ارتباط با سرور.' });
+      setFeedback({ type: "error", text: "خطا در برقراری ارتباط با سرور." });
     } finally {
       setLoading(false);
     }
   };
 
-  const siteName = siteInfo?.site_name || siteInfo?.siteName || 'آکسون | Axon';
-  const phoneVal = siteInfo?.phone || '';
-  const emailVal = siteInfo?.email || '';
-  const addressVal = siteInfo?.address || '';
-  const workingHours = siteInfo?.extra_data?.working_hours || 'شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰';
+  const siteName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
+  const phoneVal = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+  const emailVal = siteInfo?.email || "info@axoncore.ir";
+  const addressVal = siteInfo?.address || "تهران، خیابان ولیعصر، تقاطع میرداماد";
+  const workingHours = siteInfo?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰";
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] py-12 px-4 select-none transition-colors duration-300" dir="rtl">
@@ -83,8 +86,7 @@ export default function ContactPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-          {/* فرم ارسال پیام */}
-          <div className="md:col-span-2 rounded-[2.5rem] liquid-glass-card p-6 sm:p-10 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl space-y-6">
+          <div className="md:col-span-2 rounded-[2.5rem] p-6 sm:p-10 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl space-y-6">
             <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-4">
               <span className="text-lg">✉️</span>
               <h2 className="text-sm sm:text-base font-extrabold">ارسال پیام یا درخواست مشاوره</h2>
@@ -93,16 +95,16 @@ export default function ContactPage() {
             {feedback && (
               <div
                 className={`p-4 rounded-2xl text-xs font-bold transition-all ${
-                  feedback.type === 'success'
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                  feedback.type === "success"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
                 }`}
               >
                 {feedback.text}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold mb-2 text-[var(--text-secondary)]">
@@ -114,7 +116,7 @@ export default function ContactPage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="مثال: پوریا رسولی"
-                    className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
+                    className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-bold focus:outline-none focus:border-[var(--accent-blue)]"
                   />
                 </div>
 
@@ -129,7 +131,7 @@ export default function ContactPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="09123456789"
-                    className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] text-right font-mono"
+                    className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] text-right font-mono font-bold"
                   />
                 </div>
               </div>
@@ -143,7 +145,7 @@ export default function ContactPage() {
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="مثال: استعلام گارانتی مانیتور، همکاری سازمانی و..."
-                  className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
+                  className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-bold focus:outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
@@ -157,22 +159,21 @@ export default function ContactPage() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="توضیحات خود را بنویسید..."
-                  className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
+                  className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] leading-relaxed"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 active:scale-95 transition shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 transition shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {loading ? 'در حال ارسال...' : 'ارسال پیام به واحد پشتیبانی 🚀'}
+                {loading ? "در حال ارسال..." : "ارسال پیام به واحد پشتیبانی 🚀"}
               </button>
             </form>
           </div>
 
-          {/* باکس مشخصات تماس (پویا از دیتابیس) */}
-          <div className="rounded-[2.5rem] liquid-glass-card p-6 sm:p-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl space-y-6">
+          <div className="rounded-[2.5rem] p-6 sm:p-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl space-y-6">
             <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-4">
               <span className="text-lg">🏢</span>
               <h3 className="text-xs sm:text-sm font-extrabold">اطلاعات رسمی {siteName}</h3>
@@ -180,41 +181,29 @@ export default function ContactPage() {
 
             <div className="space-y-5 text-xs">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] font-bold">
-                  <span>📞</span>
-                  <span>شماره تماس پشتیبانی:</span>
-                </div>
-                <p className="font-mono font-black text-[var(--accent-blue)] text-sm pr-6" dir="ltr">
-                  {phoneVal || 'در حال ثبت...'}
+                <span className="text-[var(--text-secondary)] font-bold block">📞 شماره تماس پشتیبانی:</span>
+                <p className="font-mono font-black text-[var(--accent-blue)] text-sm" dir="ltr">
+                  {phoneVal}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] font-bold">
-                  <span>✉️</span>
-                  <span>ایمیل ارتباطی:</span>
-                </div>
-                <p className="font-mono font-medium text-[var(--text-primary)] text-xs pr-6" dir="ltr">
-                  {emailVal || 'در حال ثبت...'}
+                <span className="text-[var(--text-secondary)] font-bold block">✉️ ایمیل ارتباطی:</span>
+                <p className="font-mono font-medium text-[var(--text-primary)] text-xs" dir="ltr">
+                  {emailVal}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] font-bold">
-                  <span>📍</span>
-                  <span>نشانی حضوری:</span>
-                </div>
-                <p className="text-[var(--text-primary)] leading-relaxed font-medium pr-6">
-                  {addressVal || 'در حال ثبت...'}
+                <span className="text-[var(--text-secondary)] font-bold block">📍 نشانی حضوری:</span>
+                <p className="text-[var(--text-primary)] leading-relaxed font-medium">
+                  {addressVal}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] font-bold">
-                  <span>⏰</span>
-                  <span>ساعات کاری:</span>
-                </div>
-                <p className="text-[var(--text-primary)] font-medium pr-6">
+                <span className="text-[var(--text-secondary)] font-bold block">⏰ ساعات کاری:</span>
+                <p className="text-[var(--text-primary)] font-medium">
                   {workingHours}
                 </p>
               </div>

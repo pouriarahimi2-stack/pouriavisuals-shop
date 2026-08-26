@@ -1,7 +1,9 @@
+// components/ProductReviews.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 interface Review {
   id: string;
@@ -42,7 +44,6 @@ export default function ProductReviews({ productId }: { productId: string }) {
         }
       }
 
-      // پشتیبان LocalStorage
       const local = localStorage.getItem(`reviews_${productId}`);
       if (local) {
         setReviews(JSON.parse(local));
@@ -62,6 +63,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
     e.preventDefault();
     if (!userName.trim() || !comment.trim()) return;
 
+    soundEngine.playClick();
     setSubmitting(true);
     const newRev: Review = {
       id: `rev_${Date.now()}`,
@@ -80,6 +82,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
       if (supabase) {
         await supabase.from("product_reviews").insert([newRev]);
       }
+      soundEngine.playSuccess();
       showToast("دیدگاه شما با موفقیت ثبت گردید.");
       setUserName("");
       setComment("");
@@ -126,7 +129,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
             <select
               value={rating}
               onChange={(e) => setRating(Number(e.target.value))}
-              className="w-full p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)]"
+              className="w-full p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] cursor-pointer"
             >
               <option value={5}>⭐⭐⭐⭐⭐ (عالی - ۵ از ۵)</option>
               <option value={4}>⭐⭐⭐⭐ (خوب - ۴ از ۵)</option>
@@ -158,7 +161,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
         </button>
       </form>
 
-      {/* لیست دیدگاه‌های ثبت‌شده */}
+      {/* لیست دیدگاه‌ها */}
       <div className="space-y-3">
         <h4 className="font-black text-xs text-[var(--text-secondary)]">نظرات ثبت‌شده کاربران ({reviews.length})</h4>
 

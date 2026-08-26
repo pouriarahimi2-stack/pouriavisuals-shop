@@ -4,7 +4,6 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export async function POST() {
   try {
-    // نمونه خبرهای پایش‌شده زنده از سرورهای جهانی تکنولوژی و ترجمه بلادرنگ
     const freshTrends = [
       {
         title: "معرفی نسل جدید هدست‌های واقعیت ترکیبی با نمایشگر میکرو اولد ۴K و ردیابی چشم بی‌درنگ",

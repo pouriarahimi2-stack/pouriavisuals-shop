@@ -1,3 +1,4 @@
+// lib/iranProvinces.ts
 export interface ProvinceData {
   name: string;
   cities: string[];
@@ -38,7 +39,7 @@ export const IRAN_PROVINCES: ProvinceData[] = [
   },
   {
     name: "مازندران",
-    cities: ["ساری", "بابل", "آمل", "قائم شهر", "بابللسر", "چالوس", "نوشهر", "تنکابن", "رامسر", "محمودآباد"]
+    cities: ["ساری", "بابل", "آمل", "قائم شهر", "بابلسر", "چالوس", "نوشهر", "تنکابن", "رامسر", "محمودآباد"]
   },
   {
     name: "گیلان",

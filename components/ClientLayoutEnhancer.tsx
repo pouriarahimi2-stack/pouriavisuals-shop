@@ -17,9 +17,7 @@ export default function ClientLayoutEnhancer() {
 
     async function init() {
       try {
-        const data = typeof siteInfoService.getAll === "function"
-          ? await siteInfoService.getAll()
-          : await siteInfoService.getSiteInfo();
+        const data = await siteInfoService.getSiteInfo();
         applyTitle(data);
       } catch (e) {
         console.warn("Title enhancer fallback:", e);

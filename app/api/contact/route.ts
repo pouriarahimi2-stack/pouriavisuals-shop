@@ -1,8 +1,8 @@
+// app/api/contact/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { smsService } from '@/services/smsService';
 
-// ۱. دریافت لیست پیام‌ها برای پنل مدیریت
 export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
@@ -17,7 +17,6 @@ export async function GET() {
   }
 }
 
-// ۲. ثبت پیام جدید توسط کاربر
 export async function POST(req: NextRequest) {
   try {
     const { full_name, phone, subject, message } = await req.json();
@@ -61,7 +60,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ۳. ثبت پاسخ توسط ادمین و ارسال پیامک خودکار
 export async function PATCH(req: NextRequest) {
   try {
     const { id, admin_reply, status } = await req.json();
@@ -84,7 +82,6 @@ export async function PATCH(req: NextRequest) {
 
     if (error || !data) throw error;
 
-    // ارسال پیامک پاسخ به شماره همراه کاربر
     if (data.phone) {
       const smsText = `کاربر گرامی ${data.full_name}، به پیام شما با موضوع «${data.subject || 'پشتیبانی'}» پاسخ داده شد:\n${admin_reply.substring(0, 120)}`;
       smsService.sendSMS(data.phone, smsText).catch(() => {});

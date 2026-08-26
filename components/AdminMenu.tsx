@@ -1,9 +1,11 @@
+// components/AdminMenu.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { menuService, MenuItem } from "@/services/menuService";
 import { categoryService, Category } from "@/services/categoryService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminMenu() {
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -28,7 +30,7 @@ export default function AdminMenu() {
     loadAll();
 
     const channel = supabase
-      .channel("menu-admin-realtime-master")
+      .channel("menu-admin-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => loadAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => loadAll())
       .subscribe();
@@ -42,6 +44,7 @@ export default function AdminMenu() {
     e.preventDefault();
     if (!newTitle.trim() || !newUrl.trim()) return;
 
+    soundEngine.playClick();
     const newItem: MenuItem = {
       id: "menu_" + Date.now(),
       title: newTitle.trim(),
@@ -57,10 +60,12 @@ export default function AdminMenu() {
   };
 
   const handleRemoveItem = (index: number) => {
+    soundEngine.playClick();
     setItems(items.filter((_, i) => i !== index));
   };
 
   const handleMove = (index: number, direction: "up" | "down") => {
+    soundEngine.playClick();
     const target = direction === "up" ? index - 1 : index + 1;
     if (target < 0 || target >= items.length) return;
     const list = [...items];
@@ -70,11 +75,13 @@ export default function AdminMenu() {
   };
 
   const handleSaveAll = async () => {
+    soundEngine.playClick();
     setSaving(true);
     const ok = await menuService.saveAll(items);
     setSaving(false);
 
     if (ok) {
+      soundEngine.playSuccess();
       setStatusMessage({ type: "success", text: "⚡ ساختار منو در دیتابیس ذخیره و در هدر سایت فعال گردید." });
       loadAll();
     } else {
@@ -87,12 +94,14 @@ export default function AdminMenu() {
     e.preventDefault();
     if (!newCatName.trim()) return;
 
+    soundEngine.playClick();
     const res = await categoryService.addCategory({
       name: newCatName.trim(),
       slug: newCatName.trim().toLowerCase().replace(/\s+/g, "-"),
     });
 
     if (res) {
+      soundEngine.playSuccess();
       setNewCatName("");
       loadAll();
       setStatusMessage({ type: "success", text: `دسته‌بندی «${res.name}» افزوده شد.` });
@@ -102,6 +111,7 @@ export default function AdminMenu() {
 
   const handleDeleteCategory = async (id: string, name: string) => {
     if (confirm(`آیا از حذف دسته‌بندی "${name}" اطمینان دارید؟`)) {
+      soundEngine.playClick();
       await categoryService.deleteCategory(id);
       loadAll();
     }
@@ -126,13 +136,7 @@ export default function AdminMenu() {
       </div>
 
       {statusMessage && (
-        <div
-          className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${
-            statusMessage.type === "success"
-              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
-          }`}
-        >
+        <div className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}`}>
           {statusMessage.text}
         </div>
       )}
@@ -231,6 +235,7 @@ export default function AdminMenu() {
         </div>
       </div>
 
+      {/* بخش دسته‌بندی‌ها */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4 border-t border-[var(--card-border)]">
         <form onSubmit={handleAddCategory} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit text-xs">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">

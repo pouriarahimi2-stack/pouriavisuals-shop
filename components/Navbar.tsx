@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { menuService, MenuItem } from "@/services/menuService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function Navbar() {
   const { totalItems, setIsCartOpen } = useCart();
@@ -33,7 +34,7 @@ export default function Navbar() {
     fetchNavbarData();
 
     const navbarChannel = supabase
-      .channel("navbar-realtime-sync-v10")
+      .channel("navbar-realtime-sync-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchNavbarData())
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchNavbarData())
       .subscribe();
@@ -48,6 +49,7 @@ export default function Navbar() {
   }, []);
 
   const toggleTheme = () => {
+    soundEngine.playClick();
     if (isDarkMode) {
       document.documentElement.classList.remove("dark");
       setIsDarkMode(false);
@@ -59,18 +61,21 @@ export default function Navbar() {
     }
   };
 
-  const activeLinks = menuItems.length > 0 ? menuItems : [
-    { id: "1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
-    { id: "2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
-    { id: "3", title: "رادار اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
-    { id: "4", title: "پیگیری مرسوله", url: "/track-order", order: 4, isActive: true },
-    { id: "5", title: "مجله و مقالات", url: "/blog", order: 5, isActive: true },
-    { id: "6", title: "تماس با ما", url: "/contact", order: 6, isActive: true },
-  ];
+  const activeLinks =
+    menuItems.length > 0
+      ? menuItems
+      : [
+          { id: "1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
+          { id: "2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
+          { id: "3", title: "📡 رادار اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
+          { id: "4", title: "پیگیری مرسوله", url: "/track-order", order: 4, isActive: true },
+          { id: "5", title: "مجله و مقالات", url: "/blog", order: 5, isActive: true },
+          { id: "6", title: "تماس با ما", url: "/contact", order: 6, isActive: true },
+        ];
 
   const logoSrc = siteInfo?.logo_url || (siteInfo as any)?.logoUrl;
   const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
-  const tagline = siteInfo?.tagline || "تجهیزات تخصصی دیجیتال";
+  const tagline = siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال";
 
   return (
     <nav className="sticky top-0 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border-b border-[var(--card-border)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300 shadow-md" dir="rtl">
@@ -117,7 +122,10 @@ export default function Navbar() {
           </button>
 
           <button
-            onClick={() => setIsCartOpen(true)}
+            onClick={() => {
+              soundEngine.playClick();
+              setIsCartOpen(true);
+            }}
             className="relative px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-95 transition shadow-lg flex items-center gap-2.5 cursor-pointer active:scale-95"
           >
             <span className="text-base">🛒</span>

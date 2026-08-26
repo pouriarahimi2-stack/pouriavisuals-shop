@@ -38,9 +38,6 @@ export async function POST(req: NextRequest) {
       maintenance_duration_minutes: body.maintenance_duration_minutes || null,
       maintenance_title: body.maintenance_title || null,
       maintenance_message: body.maintenance_message || null,
-      header_announcement: body.header_announcement || '',
-      description: body.description || body.footer_text || '',
-      footer_text: body.footer_text || body.description || '',
       updated_at: new Date().toISOString(),
     };
 
@@ -48,27 +45,15 @@ export async function POST(req: NextRequest) {
 
     let result = null;
     if (existing?.id) {
-      const { data, error } = await supabaseAdmin
-        .from('site_info')
-        .update(payload)
-        .eq('id', existing.id)
-        .select()
-        .single();
-      if (error) throw error;
+      const { data } = await supabaseAdmin.from('site_info').update(payload).eq('id', existing.id).select().maybeSingle();
       result = data;
     } else {
-      const { data, error } = await supabaseAdmin
-        .from('site_info')
-        .insert([{ ...payload }])
-        .select()
-        .single();
-      if (error) throw error;
+      const { data } = await supabaseAdmin.from('site_info').insert([payload]).select().maybeSingle();
       result = data;
     }
 
     return NextResponse.json({ success: true, data: result });
   } catch (err: any) {
-    console.error('API site-info error:', err);
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

@@ -23,7 +23,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   const prevModeRef = useRef<MaintenanceMode>("none");
 
-  const evaluateStatus = (info: SiteInfo | null) => {
+  const updateMaintenanceState = (info: SiteInfo | null) => {
     if (!info) return;
     setSiteInfo(info);
 
@@ -43,56 +43,41 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     setMaintenanceUntil(until);
   };
 
-  const fetchLiveStatus = async () => {
+  const loadInitialStatus = async () => {
     try {
-      const res = await fetch("/api/site-info", { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) {
-          evaluateStatus(json.data);
-        }
-      }
-    } catch (e) {
-      console.warn("Live status check error:", e);
-    }
+      const data = await siteInfoService.getSiteInfo();
+      if (data) updateMaintenanceState(data);
+    } catch {}
   };
 
   useEffect(() => {
     setMounted(true);
-    fetchLiveStatus();
+    loadInitialStatus();
     const cleanup = initRealtimeSync();
 
-    const handleSiteUpdate = (e: any) => {
-      if (e.detail) evaluateStatus(e.detail);
-      else fetchLiveStatus();
+    const handleUpdate = (e: any) => {
+      if (e.detail) updateMaintenanceState(e.detail);
     };
+    window.addEventListener("site_info_updated", handleUpdate);
 
-    window.addEventListener("site_info_updated", handleSiteUpdate);
-
-    // اشتراک بلادرنگ به تغییرات جدول تنظیمات در سوپابیس
+    // کانال زنده و سبک وب‌سوکت سوپابیس
     const channel = supabase
-      .channel("maintenance_realtime_v25")
+      .channel("maintenance_websocket_guard")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
         if (payload?.new) {
-          evaluateStatus(payload.new);
-        } else {
-          fetchLiveStatus();
+          updateMaintenanceState(payload.new);
         }
       })
       .subscribe();
 
-    // پایش مداوم هر ۲ ثانیه برای تضمین ۱۰۰٪
-    const interval = setInterval(fetchLiveStatus, 2000);
-
     return () => {
       if (typeof cleanup === "function") cleanup();
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
+      window.removeEventListener("site_info_updated", handleUpdate);
       supabase.removeChannel(channel);
-      clearInterval(interval);
     };
   }, []);
 
-  // سیستم ذخیره و بازیابی موقعیت کاربر (State & Path Memory)
+  // سیستم حفظ موقعیت کاربر
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -112,23 +97,19 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // ثانیه‌شمار زنده برای حالت زمان‌دار
+  // شمارنده معکوس برای حالت زمان‌دار
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
       return;
     }
 
-    const updateCountdown = () => {
+    const calcTime = () => {
       const diff = new Date(maintenanceUntil).getTime() - Date.now();
       if (diff <= 0) {
         setMaintenanceMode("none");
         setTimeLeft(null);
-        fetch("/api/site-info", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ maintenance_mode: "none", allow_google_index: true }),
-        }).catch(() => {});
+        siteInfoService.updateSiteInfo({ maintenance_mode: "none", allow_google_index: true });
         return;
       }
 
@@ -138,12 +119,12 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       setTimeLeft({ hours, minutes, seconds });
     };
 
-    updateCountdown();
-    const timer = setInterval(updateCountdown, 1000);
+    calcTime();
+    const timer = setInterval(calcTime, 1000);
     return () => clearInterval(timer);
   }, [maintenanceMode, maintenanceUntil]);
 
-  // دسترسی دائم ادمین به پنل مدیریت
+  // ادمین‌ها همیشه دسترسی مستقیم دارند
   if (isAdmin) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -152,7 +133,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // نمایش صفحه ارتقا و نگهداری بدون ارور هیدریشن
+  // صفحه شیک ارتقا و نگهداری بدون ارور
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
@@ -190,13 +171,13 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             
             <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed font-medium">
               {isTimed
-                ? "به منظور ارتقای امنیت و اضافه شدن گجت‌های جدید، وب‌سایت طبق زمان‌سنج زیر به طور خودکار بازگشایی خواهد شد."
+                ? "به منظور افزایش سرعت پردازش و اضافه شدن امکانات جدید، وب‌سایت طبق زمان‌سنج زیر به طور خودکار بازگشایی خواهد شد."
                 : "به منظور ارتقای جامع زیرساخت، دسترسی به سایت موقتاً محدود شده است. به محض اتمام کار، صفحه به صورت خودکار فعال خواهد شد."}
             </p>
 
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 text-[11px] text-blue-300 font-bold max-w-md mx-auto flex items-center justify-center gap-2">
               <span>🔒</span>
-              <span>موقعیت و سبد خرید شما در حافظه سیستم محفوظ است و پس از بازگشایی به همان صفحه هدایت می‌شوید.</span>
+              <span>موقعیت و سبد خرید شما در حافظه سیستم ذخیره شده و پس از بازگشایی به همان صفحه هدایت می‌شوید.</span>
             </div>
           </div>
 

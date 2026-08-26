@@ -1,3 +1,4 @@
+// components/ClientLayoutEnhancer.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -7,26 +8,30 @@ export default function ClientLayoutEnhancer() {
   useEffect(() => {
     const applyTitle = (info: any) => {
       if (!info) return;
-      const sName = info.storeName || info.site_name || "";
-      const sTitle = info.siteTitle || info.site_title || info.description || "";
-      if (sName) {
+      const sName = info.storeName || info.site_name || info.siteName || "";
+      const sTitle = info.siteTitle || info.site_title || info.tagline || info.description || "";
+      if (sName && typeof document !== "undefined") {
         document.title = sTitle ? `${sName} | ${sTitle}` : sName;
       }
     };
 
     async function init() {
-      const data = await siteInfoService.getAll();
-      applyTitle(data);
+      try {
+        const data = typeof siteInfoService.getAll === "function"
+          ? await siteInfoService.getAll()
+          : await siteInfoService.getSiteInfo();
+        applyTitle(data);
+      } catch (e) {
+        console.warn("Title enhancer fallback:", e);
+      }
     }
     init();
 
-    // دریافت رویداد درون صفحه
     const handleUpdate = (e: any) => {
       if (e.detail) applyTitle(e.detail);
     };
     window.addEventListener("site_info_updated", handleUpdate);
 
-    // دریافت پیام زنده از تب‌های دیگر (بدون رفرش)
     let channel: BroadcastChannel | null = null;
     if ("BroadcastChannel" in window) {
       channel = new BroadcastChannel("site_info_sync_channel");

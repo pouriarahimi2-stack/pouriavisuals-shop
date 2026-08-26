@@ -105,6 +105,11 @@ export const siteInfoService = {
     }
   },
 
+  // تابع الزامی getAll برای سازگاری کامل و رفع خطای کنسول
+  async getAll(): Promise<SiteInfo | null> {
+    return this.getSiteInfo();
+  },
+
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
       const isAllowed =

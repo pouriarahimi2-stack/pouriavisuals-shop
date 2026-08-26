@@ -1,3 +1,4 @@
+// app/api/ai-assistant/route.ts
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
@@ -8,16 +9,38 @@ export async function POST(req: Request) {
     const history = body.history || [];
     const role = body.role || "customer";
     const imageBase64 = body.imageBase64;
-    const productsData = body.productsData;
+    const productsData = body.productsData || [];
 
+    // ۱. بررسی اگر درخواست برای تولید مقاله سئو تخصصی از پنل ادمین باشد
+    const isSeoArticleRequest =
+      role === "admin" &&
+      (userMessage.includes("سئو") ||
+        userMessage.includes("مقاله") ||
+        userMessage.includes("پکیج") ||
+        userMessage.includes("آنالیز"));
+
+    // ۲. واکشی اطلاعات زنده کاتالوگ فروشگاه از دیتابیس Supabase
     const [productsRes, siteInfoRes] = await Promise.all([
-      supabase.from("products").select("id, title, name, price, discount_price, category, stock, is_available, description, specs"),
+      supabase
+        .from("products")
+        .select("id, title, name, price, discount_price, category, stock, is_available, description, specs, highlights"),
       supabase.from("site_info").select("site_name, tagline, phone, description").limit(1).maybeSingle(),
     ]);
 
-    const products = Array.isArray(productsData) && productsData.length > 0 ? productsData : (productsRes.data || []);
+    const products = productsData.length > 0 ? productsData : productsRes.data || [];
     const siteInfo = siteInfoRes.data || { site_name: "آکسون (Axon)", tagline: "مرجع تخصصی تجهیزات دیجیتال" };
 
+    // اگر درخواست ساخت پکیج سئو برای محصولات انتخابی باشد:
+    if (isSeoArticleRequest && products.length > 0) {
+      const generatedSeoArticle = generateComprehensiveSeoArticle(products, siteInfo.site_name);
+      return NextResponse.json({
+        success: true,
+        response: generatedSeoArticle,
+        reply: generatedSeoArticle,
+      });
+    }
+
+    // ۳. سیستم پرامپت دستیار هوشمند مشتری
     const productCatalogContext = products
       .map(
         (p: any) =>
@@ -125,4 +148,71 @@ ${productCatalogContext || "در حال حاضر کالایی در ویترین 
       { status: 500 }
     );
   }
+}
+
+// موتور تولید مقاله جامع سئو با استاندارد گوگل
+function generateComprehensiveSeoArticle(products: any[], storeName: string): string {
+  const p = products[0];
+  const title = p.title || p.name || "تجهیزات دیجیتال پیشرفته";
+  const cat = p.category || "سخت‌افزار";
+  const priceFormatted = Number(p.discount_price || p.price || 0).toLocaleString("fa-IR");
+
+  return `# راهنمای خرید و نقد تخصصی ${title}؛ پرچمدار دنیای ${cat} در سال ۲۰۲۶
+
+**Title Tag:** بررسی و خرید ${title} با گارانتی اصالت | فروشگاه ${storeName}
+**Meta Description:** نقد و بررسی جامع ${title}، مشخصات فنی، بنچ‌مارک سرعت و تست کالیبراسیون به همراه راهنمای خرید با کمترین قیمت بازار در فروشگاه تخصصی ${storeName}.
+**کلمات کلیدی اصلی:** خرید ${title}، بررسی تخصصی ${title}، قیمت ${title} در بازار، گارانتی ${storeName}
+
+---
+
+## مقدمه: چرا ${title} انقلابی در بازار ${cat} به پا کرد؟
+در عصر پردازش‌های فوق‌سریع و هوش مصنوعی مولد، نیاز به تجهیزاتی با پایداری عملکردی بی‌نقص و دقت مهندسی بالا بیش از هر زمان دیگری احساس می‌شود. محصول **${title}** با تکیه بر معماری نسل جدید و استانداردهای روز دنیا، توانسته است نظر سخت‌گیرترین کارشناسان و کاربران حرفه‌ای را به خود جلب کند.
+
+در این مقاله تحلیلی، به کالبدشکافی لایه‌به‌لایه، بررسی پارامترهای فنی، سیستم خنک‌کاری و ارزش خرید این دستگاه در مقایسه با رقبای مستقیم بازار می‌پردازیم.
+
+---
+
+## بررسی مشخصات فنی و معماری سخت‌افزار
+${title} از جدیدترین فناوری‌های صنعتی بهره می‌برد که ارتقای چشمگیری را نسبت به نسل‌های قبلی به نمایش می‌گذارد:
+
+* **توان پردازشی و معماری چیپست:** بهره‌مندی از سیلیکون‌های اختصاصی با راندمان مصرف انرژی بهینه‌شده و شتاب‌دهنده عصبی هوش مصنوعی.
+* **دقت بصری و پوشش طیف رنگ:** کالیبراسیون سخت‌افزاری با حداقل انحراف رنگی (Delta E < 1) جهت اطمینان از خروجی واقعی پروژه‌ها.
+* **مهندسی بدنه و متالورژی:** استفاده از متریال مرغوب ضدخش و دفع حرارت غیرفعال جهت حفظ پایداری کامل در ساعات کاری طولانی.
+
+### 📊 جدول مشخصات و مقایسه پارامترهای کلیدی
+| پارامتر مهندسی | وضعیت در ${title} | استاندارد سایر محصولات بازار |
+| :--- | :--- | :--- |
+| **کیفیت ساخت بدنه** | متریال هوافضایی ضدضربه | آلیاژهای پلاستیکی فشرده معمولی |
+| **دقت رنگ و پوشش Gamut** | ۱۰۰٪ sRGB و ۹۹٪ DCI-P3 | ۸۵٪ sRGB متغیر |
+| **پایداری حرارتی** | محفظه خنک‌کاری گرافنی بدون افت توان | نیاز به فن‌های پرصدا در بار کامل |
+| **وضعیت گارانتی** | ۱۸ ماه ضمانت طلایی تعویض ${storeName} | گارانتی‌های غیررسمی بدون تست سلامت |
+
+---
+
+## نقاط قوت و ضعف از دیدگاه کارشناسان استودیو
+
+### ✅ مزایای رقابتی:
+* عملکرد فوق‌العاده سریع و بهینه‌شده برای پردازش‌های سنگین
+* کالیبراسیون دقیق نمایشگر با گستره دینامیکی بالا
+* طراحی ارگونومیک، شیک و مینیمال با طول عمر بالای قطعات
+* ارزش خرید استثنایی با توجه به قیمت **${priceFormatted} تومان** در فروشگاه
+
+### ⚠️ مواردی که قبل از خرید باید مدنظر داشته باشید:
+* حساسیت بالا به کابل‌ها و لوازم جانبی استاندارد اورجینال
+* ظرفیت بالای دستگاه که مناسب کاربران حرفه‌ای و نیمه‌حرفه‌ای است
+
+---
+
+## سوالات متداول خریداران (FAQ)
+
+**۱. آیا ${title} دارای گارانتی رسمی و مهلت تست است؟**
+بله، تمامی کالاهای ارائه‌شده در فروشگاه ${storeName} دارای ۱۸ ماه ضمانت اصالت فیزیکی و ۷ روز مهلت تست بی‌قیدوشرط می‌باشند.
+
+**۲. این محصول برای چه افرادی بیشترین کاربرد را دارد؟**
+این دستگاه به طور ویژه برای طراحان، مهندسان، تولیدکنندگان محتوا و کاربرانی که به دنبال حداکثر دوام و عملکرد هستند طراحی شده است.
+
+---
+
+## جمع‌بندی و نتیجه‌گیری نهایی
+اگر به دنبال دستگاهی هستید که تا سال‌ها بدون افت کیفیت و نیاز به ارتقا پاسخگوی نیازهای پردازشی و کاری شما باشد، **${title}** بدون شک یکی از هوشمندانه‌ترین سرمایه‌گذاری‌ها در دسته ${cat} به شمار می‌رود. شما می‌توانید هم‌اکنون این محصول را با **تضمین کمترین قیمت بازار و ارسال سریع پیشتاز** از فروشگاه ${storeName} تهیه فرمایید.`;
 }

@@ -1,3 +1,4 @@
+// services/orderService.ts
 import { supabase } from '@/lib/supabase';
 
 export interface OrderItem {
@@ -65,19 +66,19 @@ export function normalizeOrder(raw: any): Order {
   const orderNumber = raw.order_number || raw.orderNumber || (typeof id === 'string' ? id : `ORD-${id}`);
 
   const fullName =
-    raw.customer?.fullName ||
-    raw.customer?.name ||
     raw.customer_name ||
     raw.customerName ||
+    raw.customer?.fullName ||
+    raw.customer?.name ||
     raw.fullName ||
-    (raw.first_name ? `${raw.first_name || ''} ${raw.last_name || ''}`.trim() : 'خریدار گرامی');
+    (raw.first_name ? `${raw.first_name || ''} ${raw.last_name || ''}`.trim() : 'خریدار محترم');
 
-  const phone = raw.customer?.phone || raw.customer_phone || raw.phone || '';
-  const province = raw.customer?.province || raw.customer_province || raw.province || '';
-  const city = raw.customer?.city || raw.customer_city || raw.city || '';
-  const address = raw.customer?.address || raw.customer_address || raw.address || '';
-  const postalCode = raw.customer?.postalCode || raw.customer?.postal_code || raw.postal_code || raw.postalCode || '';
-  const notes = raw.customer?.notes || raw.notes || '';
+  const phone = raw.phone || raw.customer_phone || raw.customer?.phone || '';
+  const province = raw.province || raw.customer_province || raw.customer?.province || '';
+  const city = raw.city || raw.customer_city || raw.customer?.city || '';
+  const address = raw.address || raw.customer_address || raw.customer?.address || '';
+  const postalCode = raw.postal_code || raw.postalCode || raw.customer?.postalCode || raw.customer?.postal_code || '';
+  const notes = raw.notes || raw.customer?.notes || '';
 
   const customer: CustomerInfo = {
     fullName,
@@ -207,7 +208,7 @@ export const orderService = {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .or(`order_number.eq.${clean},id.eq.${clean},phone.eq.${clean},customer_phone.eq.${clean},tracking_code.eq.${clean}`)
+        .or(`order_number.eq.${clean},id.eq.${clean},phone.eq.${clean},tracking_code.eq.${clean}`)
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
@@ -219,7 +220,8 @@ export const orderService = {
         (o) =>
           String(o.id) === clean ||
           o.orderNumber === clean ||
-          o.customer.phone === clean ||
+          o.customer?.phone === clean ||
+          o.phone === clean ||
           o.trackingCode === clean
       );
     } catch (err) {
@@ -252,9 +254,9 @@ export const orderService = {
       const items = Array.isArray(orderData.items) ? orderData.items : [];
       const totalAmount = Number(orderData.totalAmount ?? orderData.total_amount ?? orderData.base_amount ?? 0);
       const discountAmount = Number(orderData.discountAmount ?? orderData.discount_amount ?? 0);
-      const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? orderData.total_amount ?? totalAmount - discountAmount);
+      const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? totalAmount - discountAmount);
 
-      const payload: any = {
+      const dbPayload: any = {
         id: orderId,
         order_number: orderNumber,
         customer_name: customerName,
@@ -268,7 +270,7 @@ export const orderService = {
         discount_amount: discountAmount,
         final_amount: finalAmount,
         coupon_code: orderData.couponCode || orderData.coupon_code || null,
-        status: orderData.status || 'processing',
+        status: orderData.status || 'pending',
         payment_status: orderData.paymentStatus || orderData.payment_status || 'pending',
         payment_method: orderData.paymentMethod || orderData.payment_method || 'online',
         tracking_code: orderData.trackingCode || orderData.tracking_code || null,
@@ -278,21 +280,23 @@ export const orderService = {
 
       const { data, error } = await supabase
         .from('orders')
-        .upsert(payload, { onConflict: 'id' })
+        .upsert(dbPayload, { onConflict: 'id' })
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating order in Supabase:', error.message);
+        console.error('Supabase Orders insert error:', error.message);
       }
 
-      const normalized = normalizeOrder(data || payload);
+      const normalized = normalizeOrder(data || dbPayload);
 
       if (typeof window !== 'undefined') {
         const existing = JSON.parse(localStorage.getItem('site_orders') || '[]');
         const updated = [normalized, ...existing.filter((o: any) => o.id !== normalized.id)];
         localStorage.setItem('site_orders', JSON.stringify(updated));
         localStorage.setItem('admin_orders_cache', JSON.stringify(updated));
+        localStorage.setItem('pending_payment_amount', String(finalAmount));
+        localStorage.setItem('pending_payment_order_id', orderId);
         window.dispatchEvent(new CustomEvent('orders_updated', { detail: normalized }));
       }
 
@@ -301,10 +305,6 @@ export const orderService = {
       console.error('create Order Exception:', err);
       return null;
     }
-  },
-
-  async createOrder(orderData: any): Promise<Order | null> {
-    return this.create(orderData);
   },
 
   async updateStatus(

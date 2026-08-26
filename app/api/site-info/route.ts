@@ -7,6 +7,7 @@ export async function GET() {
     const { data } = await supabaseAdmin
       .from('site_info')
       .select('*')
+      .order('id', { ascending: true })
       .limit(1)
       .maybeSingle();
 
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
     const sName = body.site_name || body.siteName || body.storeName || 'آکسون | Axon';
 
     const payload: Record<string, any> = {
+      id: 1,
       site_name: sName,
       store_name: sName,
       tagline: body.tagline || '',
@@ -36,23 +38,26 @@ export async function POST(req: NextRequest) {
       maintenance_mode: body.maintenance_mode || (isAllowed ? 'none' : 'indefinite'),
       maintenance_until: body.maintenance_until || null,
       maintenance_duration_minutes: body.maintenance_duration_minutes || null,
-      maintenance_title: body.maintenance_title || null,
-      maintenance_message: body.maintenance_message || null,
+      header_announcement: body.header_announcement || '',
+      free_shipping_threshold: Number(body.free_shipping_threshold || 2000000),
+      description: body.description || body.footer_text || '',
+      footer_text: body.footer_text || body.description || '',
+      custom_css: body.custom_css || '',
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabaseAdmin.from('site_info').select('id').limit(1).maybeSingle();
+    const { data, error } = await supabaseAdmin
+      .from('site_info')
+      .upsert(payload, { onConflict: 'id' })
+      .select()
+      .single();
 
-    let result = null;
-    if (existing?.id) {
-      const { data } = await supabaseAdmin.from('site_info').update(payload).eq('id', existing.id).select().maybeSingle();
-      result = data;
-    } else {
-      const { data } = await supabaseAdmin.from('site_info').insert([payload]).select().maybeSingle();
-      result = data;
+    if (error) {
+      console.error('Error updating site_info in DB:', error.message);
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data: result });
+    return NextResponse.json({ success: true, data });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

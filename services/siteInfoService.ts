@@ -1,4 +1,3 @@
-// services/siteInfoService.ts
 import { supabase } from "@/lib/supabase";
 
 export type MaintenanceMode = "none" | "timed" | "indefinite";
@@ -105,7 +104,6 @@ export const siteInfoService = {
     }
   },
 
-  // تابع الزامی getAll برای سازگاری کامل و رفع خطای کنسول
   async getAll(): Promise<SiteInfo | null> {
     return this.getSiteInfo();
   },

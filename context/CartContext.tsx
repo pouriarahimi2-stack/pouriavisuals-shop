@@ -109,7 +109,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!existing) return;
 
     let newQty = deltaOrQty;
-    // اگر تغییر به صورت دلتا (+1 یا -1) ارسال شده باشد
     if (deltaOrQty === 1 || deltaOrQty === -1) {
       newQty = existing.quantity + deltaOrQty;
     }
@@ -151,7 +150,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const submitOrder = (orderData: any) => {
-    const orderId = `ORD-${Date.now()}`;
+    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
     const fullOrder = {
       id: orderId,
       ...orderData,
@@ -160,8 +159,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     try {
-      const existing = JSON.parse(localStorage.getItem("pv_orders_local") || "[]");
-      localStorage.setItem("pv_orders_local", JSON.stringify([fullOrder, ...existing]));
+      const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
+      localStorage.setItem("site_orders", JSON.stringify([fullOrder, ...existing]));
+      localStorage.setItem("admin_orders_cache", JSON.stringify([fullOrder, ...existing]));
     } catch (err) {
       console.error("Error saving local order:", err);
     }

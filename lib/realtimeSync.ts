@@ -1,74 +1,154 @@
-// lib/realtimeSync.ts
 import { supabase } from '@/lib/supabase';
 
 export function initRealtimeSync() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return () => {};
 
-  // ۱. کانال تغییرات محصولات
-  const productChannel = supabase
-    .channel('realtime_products_sync')
+  // کانال متمرکز و یکپارچه Realtime WebSocket برای همگام‌سازی بلادرنگ کل اجزای سایت
+  const masterChannel = supabase
+    .channel('axon_master_realtime_sync')
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'products' },
       (payload) => {
-        window.dispatchEvent(new CustomEvent('products_updated', { detail: payload.new || payload }));
+        window.dispatchEvent(
+          new CustomEvent('products_updated', {
+            detail: {
+              eventType: payload.eventType,
+              newRecord: payload.new,
+              oldRecord: payload.old,
+            },
+          })
+        );
       }
     )
-    .subscribe();
-
-  // ۲. کانال تغییرات بنرها
-  const bannerChannel = supabase
-    .channel('realtime_banners_sync')
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'banners' },
       (payload) => {
-        window.dispatchEvent(new CustomEvent('banners_updated', { detail: payload.new || payload }));
+        window.dispatchEvent(
+          new CustomEvent('banners_updated', {
+            detail: {
+              eventType: payload.eventType,
+              newRecord: payload.new,
+              oldRecord: payload.old,
+            },
+          })
+        );
       }
     )
-    .subscribe();
-
-  // ۳. کانال تنظیمات سایت و سئو
-  const siteInfoChannel = supabase
-    .channel('realtime_site_info_sync')
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'site_info' },
       (payload) => {
-        window.dispatchEvent(new CustomEvent('site_info_updated', { detail: payload.new }));
+        window.dispatchEvent(
+          new CustomEvent('site_info_updated', {
+            detail: payload.new || payload,
+          })
+        );
       }
     )
-    .subscribe();
-
-  // ۴. کانال رادار اخبار ترند تکنولوژی
-  const newsChannel = supabase
-    .channel('realtime_tech_news_sync')
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'tech_news' },
       (payload) => {
-        window.dispatchEvent(new CustomEvent('news_updated', { detail: payload.new || payload }));
+        window.dispatchEvent(
+          new CustomEvent('news_updated', {
+            detail: {
+              eventType: payload.eventType,
+              newRecord: payload.new,
+              oldRecord: payload.old,
+            },
+          })
+        );
       }
     )
-    .subscribe();
-
-  // ۵. کانال سفارشات
-  const ordersChannel = supabase
-    .channel('realtime_orders_sync')
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'orders' },
       (payload) => {
-        window.dispatchEvent(new CustomEvent('orders_updated', { detail: payload.new }));
+        window.dispatchEvent(
+          new CustomEvent('orders_updated', {
+            detail: {
+              eventType: payload.eventType,
+              newRecord: payload.new,
+              oldRecord: payload.old,
+            },
+          })
+        );
       }
     )
-    .subscribe();
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'coupons' },
+      (payload) => {
+        window.dispatchEvent(
+          new CustomEvent('coupons_updated', {
+            detail: {
+              eventType: payload.eventType,
+              newRecord: payload.new,
+              oldRecord: payload.old,
+            },
+          })
+        );
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'contact_messages' },
+      (payload) => {
+        window.dispatchEvent(
+          new CustomEvent('contact_messages_updated', {
+            detail: {
+              eventType: payload.eventType,
+              newRecord: payload.new,
+              oldRecord: payload.old,
+            },
+          })
+        );
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'menu_items' },
+      (payload) => {
+        window.dispatchEvent(
+          new CustomEvent('menu_updated', {
+            detail: payload.new || payload,
+          })
+        );
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'categories' },
+      (payload) => {
+        window.dispatchEvent(
+          new CustomEvent('categories_updated', {
+            detail: payload.new || payload,
+          })
+        );
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'posts' },
+      (payload) => {
+        window.dispatchEvent(
+          new CustomEvent('blogs_updated', {
+            detail: payload.new || payload,
+          })
+        );
+      }
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('⚡ [Realtime Engine] Connected to Supabase WebSocket channel.');
+        }
+      }
+    });
 
   return () => {
-    supabase.removeChannel(productChannel);
-    supabase.removeChannel(bannerChannel);
-    supabase.removeChannel(siteInfoChannel);
-    supabase.removeChannel(newsChannel);
-    supabase.removeChannel(ordersChannel);
+    supabase.removeChannel(masterChannel);
   };
 }

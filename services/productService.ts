@@ -30,6 +30,7 @@ export interface Product {
   stock: number;
   category: string;
   category_id?: string;
+  category_name?: string;
   description: string;
   short_description?: string;
   highlights?: string[];
@@ -59,22 +60,27 @@ export function normalizeProduct(raw: any): Product {
   const title = raw.title || raw.name || "محصول دیجیتال";
   const name = raw.name || title;
   const price = Number(raw.price || 0);
-  const discountPrice = raw.discountPrice !== undefined && raw.discountPrice !== null
-    ? Number(raw.discountPrice)
-    : (raw.discount_price !== undefined && raw.discount_price !== null ? Number(raw.discount_price) : undefined);
+  const discountPrice =
+    raw.discountPrice !== undefined && raw.discountPrice !== null
+      ? Number(raw.discountPrice)
+      : raw.discount_price !== undefined && raw.discount_price !== null
+      ? Number(raw.discount_price)
+      : undefined;
 
   let rawImages: string[] = [];
   if (Array.isArray(raw.images) && raw.images.length > 0) {
-    rawImages = raw.images;
+    rawImages = raw.images.filter((img: any) => typeof img === "string" && img.trim() !== "");
   } else if (raw.image_url) {
     rawImages = [raw.image_url];
   } else if (raw.image) {
     rawImages = [raw.image];
-  } else {
+  }
+
+  if (rawImages.length === 0) {
     rawImages = ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600&auto=format&fit=crop&q=60"];
   }
 
-  const primaryImage = rawImages[0] || "/placeholder.png";
+  const primaryImage = rawImages[0];
 
   let specsObj: Record<string, string> = {};
   if (raw.specs && typeof raw.specs === "object" && !Array.isArray(raw.specs)) {
@@ -88,9 +94,9 @@ export function normalizeProduct(raw: any): Product {
 
   let highlightsList: string[] = [];
   if (Array.isArray(raw.highlights)) {
-    highlightsList = raw.highlights;
+    highlightsList = raw.highlights.filter(Boolean);
   } else if (typeof raw.highlights === "string") {
-    highlightsList = raw.highlights.split("\n").filter(Boolean);
+    highlightsList = raw.highlights.split("\n").map((h: string) => h.trim()).filter(Boolean);
   }
 
   let comparisonList: MarketBenchmark[] = [];
@@ -98,7 +104,10 @@ export function normalizeProduct(raw: any): Product {
     comparisonList = raw.market_comparison;
   }
 
-  const isAvail = raw.is_available !== false && raw.isAvailable !== false && (raw.stock === undefined || Number(raw.stock) > 0);
+  const isAvail =
+    raw.is_available !== false &&
+    raw.isAvailable !== false &&
+    (raw.stock === undefined || Number(raw.stock) > 0);
 
   return {
     ...raw,
@@ -115,6 +124,7 @@ export function normalizeProduct(raw: any): Product {
     stock: raw.stock !== undefined ? Number(raw.stock) : 10,
     category: raw.category || raw.category_name || "کالای دیجیتال",
     category_id: raw.category_id,
+    category_name: raw.category || raw.category_name || "کالای دیجیتال",
     description: raw.description || "",
     short_description: raw.short_description || "",
     highlights: highlightsList,
@@ -212,7 +222,9 @@ export const productService = {
   async saveProduct(p: Partial<Product>): Promise<Product | null> {
     try {
       const normalized = normalizeProduct(p);
-      const cleanImages = (normalized.images || []).filter((url) => typeof url === "string" && url.trim().length > 0);
+      const cleanImages = (normalized.images || []).filter(
+        (url) => typeof url === "string" && url.trim().length > 0
+      );
 
       const dbPayload: any = {
         title: normalized.title,
@@ -220,9 +232,9 @@ export const productService = {
         title_fa: normalized.title_fa || null,
         sku: normalized.sku,
         brand: normalized.brand,
-        price: normalized.price,
-        discount_price: normalized.discountPrice !== undefined ? normalized.discountPrice : null,
-        stock: normalized.stock,
+        price: Number(normalized.price),
+        discount_price: normalized.discountPrice !== undefined ? Number(normalized.discountPrice) : null,
+        stock: Number(normalized.stock),
         category: normalized.category,
         description: normalized.description,
         short_description: normalized.short_description || null,
@@ -244,7 +256,7 @@ export const productService = {
 
       let savedData: any = null;
 
-      if (p.id && !p.id.startsWith("temp_")) {
+      if (p.id && !p.id.startsWith("temp_") && !p.id.startsWith("p_")) {
         const { data, error } = await supabase
           .from("products")
           .update(dbPayload)
@@ -269,7 +281,10 @@ export const productService = {
 
       if (typeof window !== "undefined") {
         const currentList = this.getAllSync();
-        const updatedList = [result, ...currentList.filter((item) => String(item.id) !== String(result.id))];
+        const updatedList = [
+          result,
+          ...currentList.filter((item) => String(item.id) !== String(result.id)),
+        ];
         localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updatedList));
         window.dispatchEvent(new CustomEvent("products_updated", { detail: updatedList }));
       }

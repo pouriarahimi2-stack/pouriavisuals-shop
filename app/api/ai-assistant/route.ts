@@ -6,48 +6,43 @@ export async function POST(req: Request) {
     const body = await req.json();
     const userMessage = body.message || body.prompt || "";
     const history = body.history || [];
-    const role = body.role || "customer"; // 'customer' | 'admin'
+    const role = body.role || "customer";
     const imageBase64 = body.imageBase64;
+    const productsData = body.productsData;
 
-    // ۱. واکشی اطلاعات زنده کاتالوگ فروشگاه از دیتابیس Supabase
     const [productsRes, siteInfoRes] = await Promise.all([
       supabase.from("products").select("id, title, name, price, discount_price, category, stock, is_available, description, specs"),
       supabase.from("site_info").select("site_name, tagline, phone, description").limit(1).maybeSingle(),
     ]);
 
-    const products = productsRes.data || [];
+    const products = Array.isArray(productsData) && productsData.length > 0 ? productsData : (productsRes.data || []);
     const siteInfo = siteInfoRes.data || { site_name: "آکسون (Axon)", tagline: "مرجع تخصصی تجهیزات دیجیتال" };
 
-    // آماده‌سازی کاتالوگ برای تزریق به هوش مصنوعی
     const productCatalogContext = products
       .map(
-        (p) =>
+        (p: any) =>
           `• [شناسه: ${p.id}] ${p.title || p.name} | دسته: ${p.category} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 0} عدد | توضیحات: ${p.description || "ندارد"}`
       )
       .join("\n");
 
-    // ۲. سیستم پرامپت جامع برای دستیار مشتری
     const systemPrompt = `تو «دستیار هوشمند و مشاور تخصصی فروشگاه ${siteInfo.site_name}» هستی.
 شعار فروشگاه: ${siteInfo.tagline}
 سیاست‌های اصلی:
-۱. تو مانند هوش مصنوعی Gemini، لحنی بسیار محترمانه، متخصصانه، صمیمی، دقیق و هوشمند داری.
-۲. به تمام سوالات تخصصی کاربران درباره تکنولوژی، مانیتورهای تدوین، کالرگریدینگ، دقت رنگ، انواع پنل‌ها (IPS, OLED, Mini-LED)، کارت‌های کپچر، سخت‌افزار، مقایسه رزولوشن‌ها و سوالات عمومی حوزه دیجیتال با بالاترین سطح علمی و روان‌ترین زبان فارسی پاسخ بده.
-۳. در حین پاسخ‌دهی و راهنمایی، همیشه پاسخ را به صورت طبیعی و غیرتحمیلی به سمت محصولات موجود در فروشگاه ما هدایت کن.
-۴. اگر کالا در کاتالوگ ما موجود است، آن را با ذکر مزایا و قیمت دقیق پیشنهاد بده و اگر ناموجود است یا در کاتالوگ نیست، کاربر را در آن زمینه راهنمایی کن و نزدیک‌ترین گزینه موجود در سایت را معرفی کن.
-۵. اگر کاربر عکسی فرستاده، تصویر را از نظر فنی و نوع تجهیزات تحلیل کن و راهنمایی لازم را ارائه بده.
+۱. با لحنی محترمانه، متخصصانه، صمیمی، دقیق و هوشمند پاسخ بده.
+۲. به تمام سوالات تخصصی کاربران درباره تکنولوژی، مانیتورهای تدوین، کالرگریدینگ، دقت رنگ، انواع پنل‌ها (IPS, OLED, Mini-LED)، سخت‌افزار و مقایسه رزولوشن‌ها با بالاترین سطح علمی پاسخ بده.
+۳. در حین پاسخ‌دهی، پاسخ را به سمت محصولات موجود در فروشگاه ما هدایت کن.
+۴. اگر کالا در کاتالوگ موجود است، با ذکر قیمت پیشنهاد بده.
 
 کاتالوگ محصولات فعال فروشگاه:
 ${productCatalogContext || "در حال حاضر کالایی در ویترین ثبت نشده است."}`;
 
-    // ۳. شبیه‌سازی هوشمند پاسخ‌دهی عمیق و زنده (Semantic & Knowledge Matching)
     let aiResponse = "";
     let matchedProductId: string | null = null;
 
     const lowerQuery = userMessage.toLowerCase();
 
-    // شناسایی خودکار محصول منطبق از پیام کاربر جهت ساخت دکمه خرید سریع
     const matchedProduct = products.find(
-      (p) =>
+      (p: any) =>
         (p.title && lowerQuery.includes(p.title.toLowerCase())) ||
         (p.name && lowerQuery.includes(p.name.toLowerCase())) ||
         (p.category && lowerQuery.includes(p.category.toLowerCase()))
@@ -57,7 +52,6 @@ ${productCatalogContext || "در حال حاضر کالایی در ویترین 
       matchedProductId = matchedProduct.id;
     }
 
-    // تحلیل متن و تولید پاسخ غنی (در صورت اتصال کلید API جمنای می‌توان مستقیماً به gemini-1.5-flash پاس داد)
     if (process.env.GEMINI_API_KEY) {
       try {
         const geminiReq = await fetch(
@@ -71,7 +65,7 @@ ${productCatalogContext || "در حال حاضر کالایی در ویترین 
                   role: "user",
                   parts: [
                     { text: systemPrompt },
-                    ...history.map((h: any) => ({ text: `${h.role === "user" ? "کاربر" : "دستیار"}: ${h.text}` })),
+                    ...history.map((h: any) => ({ text: `${h.role === "user" ? "کاربر" : "دستیار"}: ${h.text || (h.parts && h.parts[0]?.text) || ""}` })),
                     { text: `پیام کاربر: ${userMessage}` },
                     ...(imageBase64
                       ? [
@@ -96,16 +90,20 @@ ${productCatalogContext || "در حال حاضر کالایی در ویترین 
       }
     }
 
-    // پاسخ فال‌بک هوشمند و همه‌جانبه در صورت نبود کلید API
     if (!aiResponse) {
       if (lowerQuery.includes("سلام") || lowerQuery.includes("درود")) {
         aiResponse = `سلام و درود! خوش آمدید به فروشگاه **${siteInfo.site_name}** ⚡\nمن دستیار هوشمند و مشاور تخصصی شما هستم. چه در مورد انتخاب بهترین مانیتور برای تدوین و طراحی سوال داشته باشید، چه در مورد استانداردهای رنگ، کارت‌های کپچر یا مقایسه مدل‌ها، با کمال میل راهنماییتان می‌کنم. چطور می‌توانم کمکتان کنم؟`;
-      } else if (lowerQuery.includes("مانیتور") || lowerQuery.includes("تدوین") || lowerQuery.includes("رنگ") || lowerQuery.includes("ips") || lowerQuery.includes("oled") || lowerQuery.includes("4k")) {
+      } else if (
+        lowerQuery.includes("مانیتور") ||
+        lowerQuery.includes("تدوین") ||
+        lowerQuery.includes("رنگ") ||
+        lowerQuery.includes("ips") ||
+        lowerQuery.includes("oled") ||
+        lowerQuery.includes("4k")
+      ) {
         aiResponse = `برای کارهای حساس به رنگ و تدوین حرفه‌ای، مهم‌ترین فاکتورها **دقت پوشش رنگی (حداقل ۹۹٪ sRGB و DCI-P3)**، نوع پنل (ترجیحاً IPS یا OLED کالیبره‌شده) و تفکیک سایه‌روشن‌هاست.\n\nدر مجموعه ما مدل‌های برگزیده‌ای متناسب با همین استانداردها موجود است که می‌توانید مشخصات فنی و تست رنگ آن‌ها را در کاتالوگ بررسی فرمایید. آیا رزولوشن یا برند خاصی مد نظرتان است؟`;
-      } else if (lowerQuery.includes("کپچر") || lowerQuery.includes("استریم") || lowerQuery.includes("کالیبراتور")) {
-        aiResponse = `برای استریم و رکورد بدون تاخیر با رزولوشن 4K60 HDR، کارت‌های کپچر با پهنای باند بالا و پشتیبانی از استانداردهای UVC بهترین انتخاب هستند. همچنین برای ثابت نگه‌داشتن پروفایل رنگ مانیتور در طول زمان، استفاده از کالیبراتورهای سخت‌افزاری را اکیداً توصیه می‌کنیم.\n\nتجهیزات متناسب با این کاربرد در انبار فروشگاه موجود و آماده ارسال با پست پیشتاز بیمه‌شده هستند.`;
       } else if (matchedProduct) {
-        aiResponse = `محصول **«${matchedProduct.title || matchedProduct.name}»** یکی از بهترین گزینه‌ها در دسته ${matchedProduct.category} است.\n\n🔹 **قیمت با تخفیف ویژه:** ${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان\n🔹 **وضعیت موجودی:** آماده ارسال\n\nمی‌توانید برای مشاهده مشخصات کامل یا ثبت سفارش مستقیم، از دکمه زیر استفاده کنید.`;
+        aiResponse = `محصول **«${matchedProduct.title || matchedProduct.name}»** یکی از بهترین گزینه‌ها در دسته ${matchedProduct.category} است.\n\n🔹 **قیمت با تخفیف ویژه:** ${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان\n🔹 **وضعیت موجودی:** آماده ارسال با گارانتی معتبر\n\nمی‌توانید برای مشاهده مشخصات کامل یا ثبت سفارش مستقیم، از دکمه زیر استفاده کنید.`;
       } else {
         aiResponse = `پرسش بسیار خوبی است! من آماده‌ام تا در تمامی زمینه‌های فنی، مشخصات قطعات و انتخاب تجهیزات مورد نیازتان مشاوره‌تان بدهم. همچنین اگر تصویری از دستگاه یا نیاز خود دارید می‌توانید ارسال کنید تا دقیق‌تر بررسی کنیم.`;
       }

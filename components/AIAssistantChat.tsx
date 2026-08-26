@@ -58,7 +58,6 @@ export default function AIAssistantChat() {
     setLoading(true);
 
     try {
-      // ارسال تاریخچه کامل گفتگو جهت پیوستگی پاسخ‌ها
       const historyContext = updatedChat.map((m) => ({
         role: m.role,
         text: m.text,
@@ -116,7 +115,7 @@ export default function AIAssistantChat() {
           className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white shadow-2xl hover:scale-105 transition flex items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 active:scale-95"
         >
           <span className="text-sm">🤖</span>
-          <span>دستیار هوشمند و جستجوی عکس</span>
+          <span>دستیار هوشمند و مشاوره تخصصی</span>
         </button>
       )}
 
@@ -162,7 +161,6 @@ export default function AIAssistantChat() {
                     dangerouslySetInnerHTML={{ __html: formatText(m.text) }}
                   />
 
-                  {/* دکمه انتقال مستقیم به کارت محصول در صورت پیشنهاد کالا */}
                   {m.productId && (
                     <div className="pt-2 mt-2 border-t border-[var(--card-border)]">
                       <Link

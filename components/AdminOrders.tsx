@@ -35,7 +35,7 @@ export default function AdminOrders() {
     fetchOrders();
 
     const channel = supabase
-      .channel("orders-admin-realtime-master")
+      .channel("orders-admin-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
         fetchOrders();
       })
@@ -129,32 +129,6 @@ export default function AdminOrders() {
       setUpdatingId(null);
       setTrackingModal({ open: false, order: null, code: "" });
     }
-  };
-
-  const exportToCSV = () => {
-    if (orders.length === 0) {
-      alert("سفارشی برای خروجی یافت نشد.");
-      return;
-    }
-
-    const headers = ["شناسه سفارش,نام خریدار,شماره تماس,مبلغ کل (تومان),وضعیت,کد رهگیری پستی,تاریخ ثبت\n"];
-    const rows = orders.map((o: any) => {
-      const cName = o.customer?.fullName || o.customer?.name || o.customer_name || "";
-      const cPhone = o.customer?.phone || o.customer_phone || o.phone || "";
-      const total = o.finalAmount || o.final_amount || o.totalAmount || o.total_amount || 0;
-      const track = o.trackingCode || o.tracking_code || "";
-      return `"${o.id}","${cName}","${cPhone}","${total}","${o.status || ""}","${track}","${o.created_at || ""}"\n`;
-    });
-
-    const blob = new Blob(["\uFEFF" + headers.concat(rows).join("")], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Orders_Report_${Date.now()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   const printOrderInvoice = (order: Order) => {
@@ -277,22 +251,13 @@ export default function AdminOrders() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={exportToCSV}
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-md flex items-center justify-center gap-1.5"
-          >
-            <span>📊</span>
-            <span>خروجی اکسل (CSV)</span>
-          </button>
-          <button
-            onClick={fetchOrders}
-            className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-          >
-            <span>🔄</span>
-            <span>بروزرسانی</span>
-          </button>
-        </div>
+        <button
+          onClick={fetchOrders}
+          className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+        >
+          <span>🔄</span>
+          <span>بروزرسانی</span>
+        </button>
       </div>
 
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 rounded-2xl shadow-sm">
@@ -429,6 +394,7 @@ export default function AdminOrders() {
         </div>
       )}
 
+      {/* مدال جزئیات سفارش */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="max-w-2xl w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-6 shadow-2xl text-[var(--text-primary)] max-h-[90vh] overflow-y-auto">
@@ -508,6 +474,7 @@ export default function AdminOrders() {
         </div>
       )}
 
+      {/* مدال ثبت بارنامه و ارسال پیامک رهگیری */}
       {trackingModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-2xl text-[var(--text-primary)]">

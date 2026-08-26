@@ -19,8 +19,27 @@ function isValidIranianPostalCode(postalCode: string): { valid: boolean; message
     .replace(/\D/g, "");
 
   if (cleanCode.length !== 10) {
-    return { valid: false, message: "کد پستی باید ۱۰ رقم عددی باشد." };
+    return { valid: false, message: "کد پستی باید دقیقاً ۱۰ رقم عددی باشد." };
   }
+
+  const firstDigit = cleanCode.charAt(0);
+  if (firstDigit === "0" || firstDigit === "2") {
+    return { valid: false, message: "کد پستی وارد شده ساختار معتبر مناطق پستی ایران را ندارد." };
+  }
+
+  if (/^(\d)\1{9}$/.test(cleanCode)) {
+    return { valid: false, message: "کد پستی نمی‌تواند از ارقام یکسان تشکیل شده باشد." };
+  }
+
+  const sequentialPatterns = ["0123456789", "1234567890", "2345678901", "9876543210", "8765432109"];
+  if (sequentialPatterns.includes(cleanCode)) {
+    return { valid: false, message: "کد پستی نمی‌تواند متوالی باشد." };
+  }
+
+  if (cleanCode.substring(5) === "00000") {
+    return { valid: false, message: "بخش دوم کد پستی معتبر نیست." };
+  }
+
   return { valid: true };
 }
 
@@ -38,7 +57,6 @@ export default function Header() {
   const removeCoupon = cartContext?.removeCoupon || (() => {});
   const submitOrder = cartContext?.submitOrder;
 
-  // استیت‌های ایمن برای هیدریشن
   const [mounted, setMounted] = useState(false);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -54,6 +72,7 @@ export default function Header() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
 
+  // فرم مشخصات خریدار در دراور
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -63,6 +82,7 @@ export default function Header() {
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // استیت‌های احراز هویت پیامکی (OTP)
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [userOtpInput, setUserOtpInput] = useState("");
@@ -81,7 +101,7 @@ export default function Header() {
 
   let discountAmount = 0;
   if (appliedCoupon) {
-    discountAmount = (rawTotal * appliedCoupon.discountPercent) / 100;
+    discountAmount = Math.round((rawTotal * appliedCoupon.discountPercent) / 100);
     if (appliedCoupon.maxDiscount && discountAmount > appliedCoupon.maxDiscount) {
       discountAmount = appliedCoupon.maxDiscount;
     }
@@ -89,32 +109,65 @@ export default function Header() {
 
   const finalTotal = Math.max(0, rawTotal - discountAmount);
 
+  // تایمر شمارنده معکوس کد OTP
+  useEffect(() => {
+    let interval: any;
+    if (showOtpModal && otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [showOtpModal, otpTimer]);
+
   useEffect(() => {
     setMounted(true);
 
-    // همگام‌سازی امن تم و اطلاعات پس از مانت کلاینت
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
       setIsDarkMode(isDark);
-      if (isDark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
     } catch {}
 
-    siteInfoService.getSiteInfo().then((info) => { if (info) setSiteInfo(info); });
-    productService.getAll().then((prods) => { if (prods) setAllProducts(prods); });
-    menuService.getAll().then((menus) => { if (menus) setMenuItems(menus); });
-    categoryService.getAll().then((cats) => { if (cats) setCategories(cats); });
+    siteInfoService.getSiteInfo().then((info) => {
+      if (info) setSiteInfo(info);
+    });
+    productService.getAll().then((prods) => {
+      if (prods) setAllProducts(prods);
+    });
+    menuService.getAll().then((menus) => {
+      if (menus) setMenuItems(menus);
+    });
+    categoryService.getAll().then((cats) => {
+      if (cats) setCategories(cats);
+    });
 
-    const handleUpdate = (e: any) => {
+    const handleSiteInfoUpdate = (e: any) => {
       if (e.detail) setSiteInfo(e.detail);
     };
-    window.addEventListener("site_info_updated", handleUpdate);
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail) setAllProducts(e.detail);
+      else productService.getAll().then((prods) => prods && setAllProducts(prods));
+    };
+
+    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
+    window.addEventListener("products_updated", handleProductsUpdate);
 
     const channel = supabase
-      .channel("header-realtime-master-v101")
+      .channel("header-realtime-master-v2026-full")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
         if (payload?.new) setSiteInfo(payload.new);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
+        menuService.getAll().then((menus) => menus && setMenuItems(menus));
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => {
+        categoryService.getAll().then((cats) => cats && setCategories(cats));
       })
       .subscribe();
 
@@ -129,7 +182,8 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
-      window.removeEventListener("site_info_updated", handleUpdate);
+      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
+      window.removeEventListener("products_updated", handleProductsUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
       supabase.removeChannel(channel);
     };
@@ -195,12 +249,17 @@ export default function Header() {
     e.preventDefault();
     setValidationError(null);
 
-    if (!firstName.trim() || !lastName.trim() || !phone || !address.trim() || !postalCode) {
+    if (!firstName.trim() || !lastName.trim() || !phone.trim() || !address.trim() || !postalCode.trim()) {
       setValidationError("لطفاً تمامی مشخصات گیرنده و آدرس پستی را تکمیل نمایید.");
       return;
     }
 
-    if (!/^09\d{9}$/.test(phone.trim())) {
+    const cleanPhone = phone
+      .trim()
+      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/\D/g, "");
+
+    if (!/^09\d{9}$/.test(cleanPhone)) {
       setValidationError("شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.");
       return;
     }
@@ -216,7 +275,7 @@ export default function Header() {
       const res = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, action: "send" }),
+        body: JSON.stringify({ phone: cleanPhone, action: "send" }),
       });
       const data = await res.json();
       if (data.success) {
@@ -240,31 +299,45 @@ export default function Header() {
       return;
     }
 
+    const cleanPhone = phone
+      .trim()
+      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/\D/g, "");
+
     setIsVerifyingOtp(true);
     try {
       const res = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code: userOtpInput.trim(), action: "verify" }),
+        body: JSON.stringify({ phone: cleanPhone, code: userOtpInput.trim(), action: "verify" }),
       });
       const data = await res.json();
 
       if (data.success && data.verified) {
-        if (!submitOrder) {
-          router.push(`/checkout/payment?orderId=ORD-${Date.now().toString().slice(-6)}`);
-          return;
-        }
-
-        const newOrder = submitOrder({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          phone,
+        const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+        const orderData = {
+          id: orderId,
+          order_number: orderId,
+          customer_name: `${firstName.trim()} ${lastName.trim()}`,
+          phone: cleanPhone,
           address: address.trim(),
-          postalCode,
-          isPhoneVerified: true,
-          otpHash: data.token || `OTP-VERIFIED`,
-          otpSentAt: new Date().toISOString(),
-        });
+          postal_code: postalCode.trim(),
+          items: cartItems,
+          total_amount: rawTotal,
+          discount_amount: discountAmount,
+          final_amount: finalTotal,
+          coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          status: "pending",
+          payment_status: "pending",
+        };
+
+        if (typeof submitOrder === "function") {
+          submitOrder(orderData);
+        } else {
+          const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
+          localStorage.setItem("site_orders", JSON.stringify([orderData, ...existing]));
+          localStorage.setItem("admin_orders_cache", JSON.stringify([orderData, ...existing]));
+        }
 
         setFirstName("");
         setLastName("");
@@ -273,8 +346,9 @@ export default function Header() {
         setAddress("");
         setShowCheckoutForm(false);
         setShowOtpModal(false);
+        toggleCart();
 
-        router.push(`/checkout/payment?orderId=${newOrder.id}`);
+        router.push(`/checkout/payment?orderId=${orderId}`);
       } else {
         alert(data.message || "کد ۶ رقمی وارد شده اشتباه یا منقضی شده است.");
       }
@@ -285,23 +359,31 @@ export default function Header() {
     }
   };
 
-  const navLinks = menuItems.length > 0 ? menuItems.map(m => ({ title: m.title, href: m.url })) : [
-    { title: "صفحه نخست", href: "/" },
-    { title: "کاتالوگ محصولات", href: "/#products" },
-    { title: "📡 رادار اخبار تکنولوژی", href: "/news" },
-    { title: "پیگیری سفارش", href: "/track-order" },
-    { title: "مجله تخصصی سئو", href: "/blog" },
-    { title: "تماس با ما", href: "/contact" },
-  ];
+  const navLinks =
+    menuItems.length > 0
+      ? menuItems.map((m) => ({ title: m.title || m.label || "پیوند", href: m.url || m.href || "/" }))
+      : [
+          { title: "صفحه نخست", href: "/" },
+          { title: "کاتالوگ محصولات", href: "/#products" },
+          { title: "📡 رادار اخبار تکنولوژی", href: "/news" },
+          { title: "پیگیری سفارش", href: "/track-order" },
+          { title: "مجله تخصصی سئو", href: "/blog" },
+          { title: "تماس با ما", href: "/contact" },
+        ];
 
   const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-  const isGoogleAllowed = siteInfo?.allow_google_index !== false && siteInfo?.maintenance_mode === "none";
+  const isGoogleAllowed =
+    siteInfo?.allow_google_index !== false &&
+    siteInfo?.allowGoogleIndex !== false &&
+    siteInfo?.maintenance_mode === "none";
 
   return (
-    <header className="sticky top-2 sm:top-3.5 z-40 max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
-      
-      {/* بدنه شیشه‌ای هدر */}
+    <header
+      className="sticky top-2 sm:top-3.5 z-40 max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none"
+      dir="rtl"
+    >
+      {/* بدنه شیشه‌ای و ناوبری اصلی */}
       <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
         <div className="flex items-center justify-between gap-3 sm:gap-4">
           
@@ -310,6 +392,7 @@ export default function Header() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="lg:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
+              aria-label="Toggle Mobile Menu"
             >
               ☰
             </button>
@@ -333,6 +416,7 @@ export default function Header() {
                         ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)] animate-pulse"
                         : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)]"
                     }`}
+                    title={isGoogleAllowed ? "سیستم آنلاین و پایدار" : "حالت تعمیرات"}
                   />
                 </div>
                 <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
@@ -341,7 +425,7 @@ export default function Header() {
               </div>
             </Link>
 
-            {/* دسته‌بندی‌ها */}
+            {/* دراپ‌داون دسته‌بندی‌ها */}
             <div className="relative hidden md:block" ref={categoryDropdownRef}>
               <button
                 onClick={() => setIsCategoryOpen(!isCategoryOpen)}
@@ -389,7 +473,7 @@ export default function Header() {
             </div>
           </div>
 
-          {/* وسط: منوی پیوندهای دسکتاپ */}
+          {/* وسط: منوی پیوندها در دسکتاپ */}
           <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
             {navLinks.map((link, idx) => (
               <Link
@@ -402,7 +486,7 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* چپ: جستجو، تم و دکمه سبد خرید */}
+          {/* چپ: ابزارهای جستجو، تم و سبد خرید */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <div className="relative hidden md:block" ref={searchContainerRef}>
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-48 shadow-sm h-11">
@@ -454,7 +538,6 @@ export default function Header() {
               {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
             </button>
 
-            {/* دکمه سبد خرید با استایل اپلی */}
             <button
               onClick={toggleCart}
               className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-lg shadow-blue-500/25 cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"
@@ -493,7 +576,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* دراور سبد خرید */}
+      {/* دراور سبد خرید کامل داخلی */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn font-sans">
           <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-6 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
@@ -526,7 +609,7 @@ export default function Header() {
                       <div className="flex-1 space-y-1">
                         <h4 className="font-bold text-[var(--text-primary)] truncate">{item.title || item.name}</h4>
                         <span className="text-[var(--accent-blue)] font-black block font-mono" suppressHydrationWarning>
-                          {(item.discountPrice ?? item.price).toLocaleString("fa-IR")} تومان
+                          {((item.discountPrice ?? item.price) * (item.quantity || 1)).toLocaleString("fa-IR")} تومان
                         </span>
                       </div>
                       <div className="flex items-center gap-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl px-2 py-1 font-bold">
@@ -544,7 +627,14 @@ export default function Header() {
             {cartItems.length > 0 && (
               <div className="space-y-4 pt-4 border-t border-[var(--card-border)] text-xs">
                 {!appliedCoupon ? (
-                  <form onSubmit={(e) => { e.preventDefault(); if (couponCodeInput.trim()) applyCoupon(couponCodeInput.trim()); setCouponCodeInput(""); }} className="flex gap-2">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (couponCodeInput.trim()) applyCoupon(couponCodeInput.trim());
+                      setCouponCodeInput("");
+                    }}
+                    className="flex gap-2"
+                  >
                     <input
                       type="text"
                       placeholder="کد تخفیف..."
@@ -566,7 +656,9 @@ export default function Header() {
                 <div className="space-y-1.5 text-[var(--text-secondary)] font-medium">
                   <div className="flex justify-between">
                     <span>جمع کل اقلام:</span>
-                    <span className="text-[var(--text-primary)] font-bold font-mono" suppressHydrationWarning>{rawTotal.toLocaleString("fa-IR")} تومان</span>
+                    <span className="text-[var(--text-primary)] font-bold font-mono" suppressHydrationWarning>
+                      {rawTotal.toLocaleString("fa-IR")} تومان
+                    </span>
                   </div>
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
@@ -667,7 +759,10 @@ export default function Header() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setShowCheckoutForm(false); setValidationError(null); }}
+                        onClick={() => {
+                          setShowCheckoutForm(false);
+                          setValidationError(null);
+                        }}
                         className="py-3.5 px-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-bold text-xs cursor-pointer hover:border-[var(--accent-blue)] transition"
                       >
                         انصراف
@@ -714,7 +809,12 @@ export default function Header() {
 
             <div className="text-center text-[11px] text-[var(--text-secondary)] font-medium">
               {otpTimer > 0 ? (
-                <span>زمان باقی‌مانده: <strong className="font-mono text-[var(--text-primary)] font-bold">{Math.floor(otpTimer / 60)}:{("0" + (otpTimer % 60)).slice(-2)}</strong></span>
+                <span>
+                  زمان باقی‌مانده:{" "}
+                  <strong className="font-mono text-[var(--text-primary)] font-bold">
+                    {Math.floor(otpTimer / 60)}:{("0" + (otpTimer % 60)).slice(-2)}
+                  </strong>
+                </span>
               ) : (
                 <button
                   onClick={handleInitiateOtp}
@@ -731,7 +831,7 @@ export default function Header() {
                 disabled={isVerifyingOtp}
                 className="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs transition cursor-pointer shadow-lg disabled:opacity-50"
               >
-                {isVerifyingOtp ? "در حال تایید..." : "تایید و انتقال به درگاه بانکی 💳"}
+                {isVerifyingOtp ? "در حال تایید..." : "تایید و صدور فاکتور رسمی 💳"}
               </button>
               <button
                 onClick={() => setShowOtpModal(false)}

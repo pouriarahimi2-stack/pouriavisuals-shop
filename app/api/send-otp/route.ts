@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
-// حافظه موقت امن برای کدهای ارسالی (در محیط پروداکشن Redis یا دیتابیس Supabase استفاده می‌شود)
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
 
 export async function POST(req: NextRequest) {
@@ -21,7 +20,6 @@ export async function POST(req: NextRequest) {
       .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
       .replace(/\D/g, "");
 
-    // ۱. ارسال پیامک بارنامه و رهگیری پستی به مشتری
     if (action === "tracking") {
       if (!trackingCode) {
         return NextResponse.json(
@@ -43,8 +41,6 @@ export async function POST(req: NextRequest) {
         } catch (smsErr) {
           console.error("SMS Gateway Error:", smsErr);
         }
-      } else {
-        console.log(`[SMS Simulation] Tracking Code SMS sent to ${cleanPhone}: ${trackingCode}`);
       }
 
       return NextResponse.json({
@@ -53,7 +49,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۲. اعتبارسنجی کد پیامکی وارد شده توسط خریدار
     if (action === "verify") {
       if (!code) {
         return NextResponse.json(
@@ -68,7 +63,6 @@ export async function POST(req: NextRequest) {
 
       const stored = otpStore.get(cleanPhone);
 
-      // بررسی صحت کد و زمان انقضا (۲ دقیقه)
       if (stored && stored.code === cleanCode && stored.expiresAt > Date.now()) {
         otpStore.delete(cleanPhone);
         const token = crypto.randomBytes(16).toString("hex");
@@ -81,7 +75,6 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // شبیه‌سازی برای تست لوکال در صورت نبود لاگ
       if (cleanCode === "123456" || cleanCode === "111111") {
         return NextResponse.json({
           success: true,
@@ -97,9 +90,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۳. تولید و ارسال کد جدید OTP (اکشن پیش‌فرض send)
     const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 120 * 1000; // ۲ دقیقه اعتبار
+    const expiresAt = Date.now() + 120 * 1000;
 
     otpStore.set(cleanPhone, { code: generatedCode, expiresAt });
 
@@ -114,8 +106,6 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error("Kavenegar Error:", e);
       }
-    } else {
-      console.log(`[SMS Simulation] OTP for ${cleanPhone}: ${generatedCode}`);
     }
 
     return NextResponse.json({

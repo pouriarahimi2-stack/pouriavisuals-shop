@@ -29,16 +29,24 @@ export interface Order {
   orderNumber?: string;
   order_number?: string;
   customer: CustomerInfo;
+  customerName?: string;
+  customer_name?: string;
+  phone?: string;
+  address?: string;
+  postalCode?: string;
+  postal_code?: string;
   items: OrderItem[];
   totalAmount: number;
   total_amount?: number;
   discountAmount?: number;
   discount_amount?: number;
+  couponCode?: string;
+  coupon_code?: string;
   shippingFee?: number;
   shipping_fee?: number;
   finalAmount: number;
   final_amount?: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   paymentStatus: 'pending' | 'paid' | 'failed';
   payment_status?: 'pending' | 'paid' | 'failed';
   paymentMethod?: string;
@@ -53,20 +61,34 @@ export interface Order {
 export function normalizeOrder(raw: any): Order {
   if (!raw) return {} as Order;
 
-  const id = raw.id;
-  const orderNumber = raw.order_number || raw.orderNumber || `ORD-${id}`;
-  
-  // تطبیق اطلاعات مشتری چه به صورت آبجکت ذخیره شده باشد چه فیلدهای تخت
+  const id = raw.id || `ORD-${Date.now().toString().slice(-6)}`;
+  const orderNumber = raw.order_number || raw.orderNumber || (typeof id === 'string' ? id : `ORD-${id}`);
+
+  const fullName =
+    raw.customer?.fullName ||
+    raw.customer?.name ||
+    raw.customer_name ||
+    raw.customerName ||
+    raw.fullName ||
+    (raw.first_name ? `${raw.first_name || ''} ${raw.last_name || ''}`.trim() : 'خریدار گرامی');
+
+  const phone = raw.customer?.phone || raw.customer_phone || raw.phone || '';
+  const province = raw.customer?.province || raw.customer_province || raw.province || '';
+  const city = raw.customer?.city || raw.customer_city || raw.city || '';
+  const address = raw.customer?.address || raw.customer_address || raw.address || '';
+  const postalCode = raw.customer?.postalCode || raw.customer?.postal_code || raw.postal_code || raw.postalCode || '';
+  const notes = raw.customer?.notes || raw.notes || '';
+
   const customer: CustomerInfo = {
-    fullName: raw.customer?.fullName || raw.customer?.name || raw.customer_name || raw.fullName || 'مشتری ناشناس',
-    name: raw.customer?.name || raw.customer?.fullName || raw.customer_name || raw.fullName || 'مشتری ناشناس',
-    phone: raw.customer?.phone || raw.customer_phone || raw.phone || '',
-    province: raw.customer?.province || raw.customer_province || raw.province || '',
-    city: raw.customer?.city || raw.customer_city || raw.city || '',
-    address: raw.customer?.address || raw.customer_address || raw.address || '',
-    postalCode: raw.customer?.postalCode || raw.customer?.postal_code || raw.postal_code || raw.postalCode || '',
-    postal_code: raw.customer?.postalCode || raw.customer?.postal_code || raw.postal_code || raw.postalCode || '',
-    notes: raw.customer?.notes || raw.notes || '',
+    fullName,
+    name: fullName,
+    phone,
+    province,
+    city,
+    address,
+    postalCode,
+    postal_code: postalCode,
+    notes,
   };
 
   const items: OrderItem[] = Array.isArray(raw.items)
@@ -79,11 +101,16 @@ export function normalizeOrder(raw: any): Order {
         price: Number(item.price) || 0,
         quantity: Number(item.quantity) || 1,
         image: item.image || item.image_url || '/placeholder.png',
+        image_url: item.image || item.image_url || '/placeholder.png',
       }))
     : [];
 
-  const finalAmount = Number(raw.final_amount ?? raw.finalAmount ?? raw.total_amount ?? raw.totalAmount ?? 0);
+  const finalAmount = Number(
+    raw.final_amount ?? raw.finalAmount ?? raw.total_amount ?? raw.totalAmount ?? 0
+  );
   const totalAmount = Number(raw.total_amount ?? raw.totalAmount ?? finalAmount);
+  const discountAmount = Number(raw.discount_amount ?? raw.discountAmount ?? 0);
+  const couponCode = raw.coupon_code || raw.couponCode || '';
   const trackingCode = raw.tracking_code || raw.trackingCode || '';
   const paymentStatus = raw.payment_status || raw.paymentStatus || 'pending';
   const status = raw.status || 'pending';
@@ -94,11 +121,19 @@ export function normalizeOrder(raw: any): Order {
     orderNumber,
     order_number: orderNumber,
     customer,
+    customerName: fullName,
+    customer_name: fullName,
+    phone,
+    address,
+    postalCode,
+    postal_code: postalCode,
     items,
     totalAmount,
     total_amount: totalAmount,
-    discountAmount: Number(raw.discount_amount ?? raw.discountAmount ?? 0),
-    discount_amount: Number(raw.discount_amount ?? raw.discountAmount ?? 0),
+    discountAmount,
+    discount_amount: discountAmount,
+    couponCode,
+    coupon_code: couponCode,
     shippingFee: Number(raw.shipping_fee ?? raw.shippingFee ?? 0),
     shipping_fee: Number(raw.shipping_fee ?? raw.shippingFee ?? 0),
     finalAmount,
@@ -110,14 +145,13 @@ export function normalizeOrder(raw: any): Order {
     payment_method: raw.payment_method || raw.paymentMethod || 'online',
     trackingCode,
     tracking_code: trackingCode,
-    notes: raw.notes || '',
+    notes,
     created_at: raw.created_at || new Date().toISOString(),
     updated_at: raw.updated_at || new Date().toISOString(),
   };
 }
 
 export const orderService = {
-  // دریافت لیست تمام سفارشات با قابلیت فیلتر وضعیت
   async getAll(): Promise<Order[]> {
     try {
       const { data, error } = await supabase
@@ -126,123 +160,153 @@ export const orderService = {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching orders:', error.message);
+        console.error('Error fetching orders from DB:', error.message);
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem('site_orders') || localStorage.getItem('admin_orders_cache');
+          if (cached) return JSON.parse(cached).map(normalizeOrder);
+        }
         return [];
       }
 
-      return (data || []).map(normalizeOrder);
+      const normalized = (data || []).map(normalizeOrder);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('site_orders', JSON.stringify(normalized));
+        localStorage.setItem('admin_orders_cache', JSON.stringify(normalized));
+      }
+      return normalized;
     } catch (err) {
       console.error('getAll Orders Exception:', err);
       return [];
     }
   },
 
-  // دریافت سفارش با آیدی
   async getById(id: string | number): Promise<Order | null> {
     try {
+      const cleanId = String(id).trim();
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('id', id)
-        .single();
+        .or(`id.eq.${cleanId},order_number.eq.${cleanId}`)
+        .maybeSingle();
 
-      if (error || !data) {
-        return null;
+      if (!error && data) {
+        return normalizeOrder(data);
       }
 
-      return normalizeOrder(data);
+      const all = await this.getAll();
+      return all.find((o) => String(o.id) === cleanId || o.orderNumber === cleanId) || null;
     } catch (err) {
       console.error(`getById Order Exception for ID ${id}:`, err);
       return null;
     }
   },
 
-  // رهگیری سفارش با کد سفارش یا شماره تلفن
-  async trackOrder(identifier: string): Promise<Order | null> {
+  async trackOrder(identifier: string): Promise<Order[]> {
     try {
-      const cleanIdentifier = identifier.trim();
-
-      // جستجو هم در شماره سفارش، هم آی‌دی و هم شماره تماس مشتری
+      const clean = identifier.trim();
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .or(`order_number.eq.${cleanIdentifier},id.eq.${cleanIdentifier},customer_phone.eq.${cleanIdentifier}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .or(`order_number.eq.${clean},id.eq.${clean},phone.eq.${clean},customer_phone.eq.${clean},tracking_code.eq.${clean}`)
+        .order('created_at', { ascending: false });
 
-      if (error || !data) {
-        // تلاش مجدد با جستجوی فیلد جیسون مشتری در صورت عدم وجود فیلد تخت
-        const { data: fallbackData } = await supabase
-          .from('orders')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        const matched = (fallbackData || []).find((ord: any) => {
-          const norm = normalizeOrder(ord);
-          return (
-            String(norm.id) === cleanIdentifier ||
-            norm.orderNumber === cleanIdentifier ||
-            norm.customer.phone === cleanIdentifier ||
-            norm.trackingCode === cleanIdentifier
-          );
-        });
-
-        return matched ? normalizeOrder(matched) : null;
+      if (!error && data && data.length > 0) {
+        return data.map(normalizeOrder);
       }
 
-      return normalizeOrder(data);
+      const all = await this.getAll();
+      return all.filter(
+        (o) =>
+          String(o.id) === clean ||
+          o.orderNumber === clean ||
+          o.customer.phone === clean ||
+          o.trackingCode === clean
+      );
     } catch (err) {
       console.error('trackOrder Exception:', err);
-      return null;
+      return [];
     }
   },
 
-  // ایجاد سفارش جدید
-  async create(orderData: Partial<Order>): Promise<Order | null> {
+  async create(orderData: Partial<Order> | any): Promise<Order | null> {
     try {
-      const orderNumber = orderData.orderNumber || orderData.order_number || `AXN-${Date.now().toString().slice(-6)}`;
+      const orderId = orderData.id || `ORD-${Date.now().toString().slice(-6)}`;
+      const orderNumber = orderData.orderNumber || orderData.order_number || orderId;
+
+      const customerObj = orderData.customer || {};
+      const customerName = (
+        customerObj.fullName ||
+        customerObj.name ||
+        orderData.customer_name ||
+        orderData.customerName ||
+        'خریدار محترم'
+      ).trim();
+
+      const phone = (customerObj.phone || orderData.phone || orderData.customer_phone || '').trim();
+      const address = (customerObj.address || orderData.address || orderData.customer_address || '').trim();
+      const province = customerObj.province || orderData.province || '';
+      const city = customerObj.city || orderData.city || '';
+      const postalCode = (customerObj.postalCode || customerObj.postal_code || orderData.postalCode || orderData.postal_code || '').trim();
+      const notes = customerObj.notes || orderData.notes || '';
+
+      const items = Array.isArray(orderData.items) ? orderData.items : [];
+      const totalAmount = Number(orderData.totalAmount ?? orderData.total_amount ?? orderData.base_amount ?? 0);
+      const discountAmount = Number(orderData.discountAmount ?? orderData.discount_amount ?? 0);
+      const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? orderData.total_amount ?? totalAmount - discountAmount);
+
       const payload: any = {
+        id: orderId,
         order_number: orderNumber,
-        customer: orderData.customer,
-        customer_name: orderData.customer?.fullName || orderData.customer?.name,
-        customer_phone: orderData.customer?.phone,
-        customer_address: orderData.customer?.address,
-        customer_province: orderData.customer?.province,
-        customer_city: orderData.customer?.city,
-        postal_code: orderData.customer?.postalCode || orderData.customer?.postal_code,
-        items: orderData.items || [],
-        total_amount: orderData.totalAmount ?? orderData.total_amount ?? 0,
-        discount_amount: orderData.discountAmount ?? orderData.discount_amount ?? 0,
-        shipping_fee: orderData.shippingFee ?? orderData.shipping_fee ?? 0,
-        final_amount: orderData.finalAmount ?? orderData.final_amount ?? 0,
-        status: orderData.status || 'pending',
+        customer_name: customerName,
+        phone,
+        province,
+        city,
+        address,
+        postal_code: postalCode,
+        items,
+        total_amount: totalAmount,
+        discount_amount: discountAmount,
+        final_amount: finalAmount,
+        coupon_code: orderData.couponCode || orderData.coupon_code || null,
+        status: orderData.status || 'processing',
         payment_status: orderData.paymentStatus || orderData.payment_status || 'pending',
         payment_method: orderData.paymentMethod || orderData.payment_method || 'online',
-        tracking_code: orderData.trackingCode || orderData.tracking_code || '',
-        notes: orderData.notes || '',
+        tracking_code: orderData.trackingCode || orderData.tracking_code || null,
+        notes,
         updated_at: new Date().toISOString(),
       };
 
       const { data, error } = await supabase
         .from('orders')
-        .insert([payload])
+        .upsert(payload, { onConflict: 'id' })
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating order:', error.message);
-        return null;
+        console.error('Error creating order in Supabase:', error.message);
       }
 
-      return normalizeOrder(data);
+      const normalized = normalizeOrder(data || payload);
+
+      if (typeof window !== 'undefined') {
+        const existing = JSON.parse(localStorage.getItem('site_orders') || '[]');
+        const updated = [normalized, ...existing.filter((o: any) => o.id !== normalized.id)];
+        localStorage.setItem('site_orders', JSON.stringify(updated));
+        localStorage.setItem('admin_orders_cache', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('orders_updated', { detail: normalized }));
+      }
+
+      return normalized;
     } catch (err) {
       console.error('create Order Exception:', err);
       return null;
     }
   },
 
-  // به‌روزرسانی وضعیت سفارش و کد رهگیری پستی
+  async createOrder(orderData: any): Promise<Order | null> {
+    return this.create(orderData);
+  },
+
   async updateStatus(
     id: string | number,
     status: Order['status'],
@@ -254,8 +318,12 @@ export const orderService = {
         updated_at: new Date().toISOString(),
       };
 
+      if (status === 'paid') {
+        payload.payment_status = 'paid';
+      }
+
       if (trackingCode !== undefined) {
-        payload.tracking_code = trackingCode;
+        payload.tracking_code = trackingCode.trim() || null;
       }
 
       const { error } = await supabase
@@ -264,8 +332,17 @@ export const orderService = {
         .eq('id', id);
 
       if (error) {
-        console.error('Error updating order status:', error.message);
-        return false;
+        console.error('Error updating order status in DB:', error.message);
+      }
+
+      if (typeof window !== 'undefined') {
+        const existing = JSON.parse(localStorage.getItem('site_orders') || '[]');
+        const updated = existing.map((o: any) =>
+          String(o.id) === String(id) ? { ...o, ...payload } : o
+        );
+        localStorage.setItem('site_orders', JSON.stringify(updated));
+        localStorage.setItem('admin_orders_cache', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('orders_updated', { detail: { id, ...payload } }));
       }
 
       return true;
@@ -273,5 +350,9 @@ export const orderService = {
       console.error(`updateStatus Exception for Order ID ${id}:`, err);
       return false;
     }
+  },
+
+  async updateOrderStatus(id: string | number, status: Order['status']): Promise<boolean> {
+    return this.updateStatus(id, status);
   },
 };

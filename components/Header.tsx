@@ -58,7 +58,7 @@ export default function Header() {
   const removeCoupon = cartContext?.removeCoupon || (() => {});
   const submitOrder = cartContext?.submitOrder;
 
-  // استیت‌های پایه
+  // استیت‌های اطلاعات پایه، منو و دسته‌ها
   const [mounted, setMounted] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -69,14 +69,14 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
 
-  // استیت‌های جستجوی زنده
+  // استیت‌های باکس جستجوی زنده محصولات
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
 
-  // فرم تسویه‌حساب داخل دراور سبد خرید
+  // فرم تسویه حساب داخلی و مشخصات خریدار در سبد
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -86,7 +86,7 @@ export default function Header() {
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // سیستم احراز هویت پیامکی ۶ رقمی (OTP)
+  // سیستم تایید شماره تلفن همراه با کد ۶ رقمی (OTP)
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [userOtpInput, setUserOtpInput] = useState("");
@@ -97,7 +97,7 @@ export default function Header() {
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // محاسبات سبد خرید
+  // محاسبات مقادیر سبد خرید
   const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
   const rawTotal = cartItems.reduce(
     (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
@@ -148,9 +148,9 @@ export default function Header() {
 
     window.addEventListener("site_info_updated", handleSiteInfoUpdate);
 
-    // همگام‌سازی بلادرنگ وب‌سوکت با Supabase
+    // همگام‌سازی بلادرنگ با وب‌سوکت Supabase
     const channel = supabase
-      .channel("header-realtime-master-channel-v100")
+      .channel("header-realtime-master-channel-final-v1")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchAllHeaderData())
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchAllHeaderData())
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => fetchAllHeaderData())
@@ -174,7 +174,7 @@ export default function Header() {
     };
   }, []);
 
-  // جستجوی زنده
+  // جستجوی زنده در کاتالوگ محصولات
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -190,7 +190,7 @@ export default function Header() {
     setSearchResults(matches.slice(0, 6));
   }, [searchQuery, allProducts]);
 
-  // شمارنده معکوس ۲ دقیقه‌ای OTP
+  // شمارنده معکوس ۲ دقیقه‌ای رمز یکبار مصرف
   useEffect(() => {
     let timer: any;
     if (showOtpModal && otpTimer > 0) {
@@ -317,7 +317,7 @@ export default function Header() {
     }
   };
 
-  // تایید کد OTP و ثبت سفارش
+  // تایید کد OTP و ثبت قطعی فاکتور
   const handleVerifyOtpAndProceed = async () => {
     if (userOtpInput.trim().length !== 6) {
       alert("لطفاً کد تایید ۶ رقمی پیامک‌شده را به طور کامل وارد نمایید.");
@@ -369,6 +369,7 @@ export default function Header() {
     }
   };
 
+  const isGoogleIndexAllowed = siteInfo?.allow_google_index !== false && siteInfo?.allowGoogleIndex !== false && siteInfo?.maintenance_mode === "none";
   const currentStoreName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "آکسون | Axon";
   const currentLogoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
   const headerAnnouncement = siteInfo?.header_announcement;
@@ -385,7 +386,7 @@ export default function Header() {
   return (
     <header className="sticky top-2 sm:top-3.5 z-40 max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
       
-      {/* نوار اعلانات زنده بالای هدر */}
+      {/* ۱. نوار اعلانات زنده بالای هدر */}
       {headerAnnouncement && !announcementDismissed && (
         <div className="w-full mb-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white text-[11px] font-black py-2 px-4 rounded-2xl shadow-lg flex items-center justify-between animate-fadeIn">
           <div className="flex-1 flex items-center justify-center gap-2">
@@ -402,11 +403,11 @@ export default function Header() {
         </div>
       )}
 
-      {/* بدنه شیشه‌ای هدر */}
-      <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
+      {/* ۲. بدنه کپسولی و شیشه‌ای هدر اپلی */}
+      <div className="bg-[var(--modal-bg)]/90 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-2xl border border-[var(--card-border)] relative">
         <div className="flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* راست: لوگو، عنوان و دسته‌ها */}
+          {/* راست: لوگو، عنوان برند و دکمه دسته‌بندی‌ها */}
           <div className="flex items-center gap-3.5 shrink-0">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -425,9 +426,19 @@ export default function Header() {
                 )}
               </div>
               <div className="flex flex-col text-right">
-                <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
-                  {currentStoreName}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
+                    {currentStoreName}
+                  </span>
+                  <span
+                    title={isGoogleIndexAllowed ? "سایت آنلاین است (ایندکس گوگل فعال)" : "سایت در حالت نگهداری یا No-Index است"}
+                    className={`w-2.5 h-2.5 rounded-full transition-all duration-500 ${
+                      isGoogleIndexAllowed
+                        ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)] animate-pulse"
+                        : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)]"
+                    }`}
+                  />
+                </div>
                 <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)] mt-0.5" suppressHydrationWarning>
                   {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال"}
                 </span>
@@ -463,26 +474,29 @@ export default function Header() {
                     {selectedCategory === "all" && <span>✓</span>}
                   </button>
 
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.id || cat.name}
-                      onClick={() => handleSelectCategory(cat.name)}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                        selectedCategory === cat.name
-                          ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
-                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-                      }`}
-                    >
-                      <span>🏷️ {cat.name}</span>
-                      {selectedCategory === cat.name && <span>✓</span>}
-                    </button>
-                  ))}
+                  {categories.map((cat) => {
+                    const isActive = selectedCategory === cat.name;
+                    return (
+                      <button
+                        key={cat.id || cat.name}
+                        onClick={() => handleSelectCategory(cat.name)}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          isActive
+                            ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
+                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
+                        }`}
+                      >
+                        <span>🏷️ {cat.name}</span>
+                        {isActive && <span>✓</span>}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
 
-          {/* وسط: منوی اصلی ناوبری سایت */}
+          {/* وسط: منوی پیوندهای هدر دسکتاپ */}
           <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
             {activeLinks.map((item) => (
               <Link
@@ -495,7 +509,7 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* چپ: سرچ، تم و دکمه سبد خرید */}
+          {/* چپ: باکس جستجوی زنده، دکمه تغییر تم و سبد خرید */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <div className="relative hidden md:block" ref={searchContainerRef}>
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-48 shadow-sm h-11">
@@ -547,7 +561,7 @@ export default function Header() {
               {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
             </button>
 
-            {/* دکمه سبد خرید با استایل اپلی */}
+            {/* دکمه سبد خرید متقارن و استاندارد */}
             <button
               onClick={toggleCart}
               className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-lg shadow-blue-500/25 cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"
@@ -582,7 +596,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* دراور سبد خرید */}
+      {/* ۳. دراور سبد خرید داخلی و فرم ثبت فاکتور */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn font-sans">
           <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-6 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
@@ -770,7 +784,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* مدال تایید پیامکی ۶ رقمی (OTP) */}
+      {/* ۴. مدال احراز هویت پیامکی ۶ رقمی (OTP) */}
       {showOtpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-sm w-full bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 text-[var(--text-primary)] space-y-5 shadow-2xl relative">

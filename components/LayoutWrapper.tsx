@@ -43,16 +43,12 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     setMaintenanceUntil(until);
   };
 
-  const loadInitialStatus = async () => {
-    try {
-      const data = await siteInfoService.getSiteInfo();
-      if (data) updateMaintenanceState(data);
-    } catch {}
-  };
-
   useEffect(() => {
     setMounted(true);
-    loadInitialStatus();
+    siteInfoService.getSiteInfo().then((data) => {
+      if (data) updateMaintenanceState(data);
+    });
+
     const cleanup = initRealtimeSync();
 
     const handleUpdate = (e: any) => {
@@ -60,9 +56,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
     window.addEventListener("site_info_updated", handleUpdate);
 
-    // کانال زنده و سبک وب‌سوکت سوپابیس
+    // کانال وب‌سوکت خالص Realtime بدون ایجاد ترافیک و لگ
     const channel = supabase
-      .channel("maintenance_websocket_guard")
+      .channel("maintenance_websocket_pure")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
         if (payload?.new) {
           updateMaintenanceState(payload.new);
@@ -77,7 +73,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  // سیستم حفظ موقعیت کاربر
+  // سیستم حفظ و بازیابی موقعیت کاربر (State & Path Memory)
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -97,7 +93,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // شمارنده معکوس برای حالت زمان‌دار
+  // ثانیه‌شمار زنده برای حالت زمان‌دار
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
@@ -133,7 +129,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // صفحه شیک ارتقا و نگهداری بدون ارور
+  // صفحه فوق‌العاده مدرن اپلی در حالت تعمیرات
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";

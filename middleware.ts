@@ -1,11 +1,22 @@
-// middleware.ts
+// File Path: middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // بررسی مسیرهای پنل ادمین
+  // ۱. پاسخ مستقیم، فوری و قطعی به ربات اینماد در لایه اول سرور
+  if (pathname === '/27424534.txt' || pathname.includes('27424534.txt')) {
+    return new NextResponse('27424534', {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
+  }
+
+  // ۲. بررسی احراز هویت ادمین
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
     const sessionToken =
       request.cookies.get('pv_admin_session')?.value ||
@@ -22,5 +33,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/27424534.txt', '/admin/:path*'],
 };

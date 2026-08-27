@@ -3,11 +3,10 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import LayoutWrapper from '@/components/LayoutWrapper';
-import ClientLayoutEnhancer from '@/components/ClientLayoutEnhancer';
 
 export const metadata: Metadata = {
   title: '27424534',
-  description: 'مرجع تخصصی تجهیزات تصویر، مانیتورینگ و استودیو',
+  description: 'فروشگاه آکسون',
   other: {
     enamad: '27424534',
   },
@@ -28,7 +27,6 @@ export default function RootLayout({
         className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between"
         suppressHydrationWarning
       >
-        <ClientLayoutEnhancer />
         <CartProvider>
           <LayoutWrapper>{children}</LayoutWrapper>
         </CartProvider>

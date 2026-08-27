@@ -1,4 +1,4 @@
-// app/layout.tsx
+// File Path: app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
@@ -46,6 +46,10 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: {
       icon: info.logo_url || '/favicon.ico',
     },
+    // متاتگ رسمی احراز هویت اینماد (Enamad Verification Meta Tag)
+    other: {
+      enamad: '27424534',
+    },
   };
 }
 
@@ -56,6 +60,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" className="dark" suppressHydrationWarning>
+      <head>
+        {/* تگ پشتیبان مستقیم جهت اطمینان از خوانده شدن توسط ربات اینماد */}
+        <meta name="enamad" content="27424534" />
+      </head>
       <body
         className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between"
         suppressHydrationWarning

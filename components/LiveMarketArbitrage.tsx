@@ -1,4 +1,4 @@
-// components/LiveMarketArbitrage.tsx
+// File Path: components/LiveMarketArbitrage.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -21,26 +21,25 @@ export default function LiveMarketArbitrage({
     if (marketBenchmarks && marketBenchmarks.length > 0) {
       setCompetitors(marketBenchmarks);
     } else {
-      // داده‌های تخمینی بنچ‌مارک بازار به صورت خودکار
       setCompetitors([
         {
-          storeName: "متوسط قیمت در ترب و ایمالز",
-          price: Math.round(ourPrice * 1.09),
+          storeName: "میانگین بازار آنلاین و پلتفرم‌های واسط",
+          price: Math.round(ourPrice * 1.08),
           warranty: "گارانتی شرکتی متفرقه (معمولی)",
           isOurStore: false,
           deliveryTime: "۳ الی ۵ روز کاری",
         },
         {
-          storeName: "فروشگاه ما (نمایندگی مستقیم)",
+          storeName: "فروشگاه مستقیم ما (تضمین کمترین نرخ)",
           price: ourPrice,
-          warranty: "گارانتی طلایی ۱۸ ماهه + مهلت تست ۷ روزه",
+          warranty: "گارانتی طلایی ۱۸ ماهه + تست ۷ روزه",
           isOurStore: true,
           deliveryTime: "ارسال اکسپرس همان روز",
         },
         {
-          storeName: "بازار سنتی پایتخت (پاساژ علاءالدین/رضا)",
-          price: Math.round(ourPrice * 1.14),
-          warranty: "بدون گارانتی تعویض (مهلت تست ۲۴ ساعته)",
+          storeName: "بازار سنتی و فروشگاه‌های فیزیکی",
+          price: Math.round(ourPrice * 1.13),
+          warranty: "بدون گارانتی تعویض (تست ۲۴ ساعته)",
           isOurStore: false,
           deliveryTime: "خرید حضوری با هزینه پیک",
         },
@@ -65,7 +64,7 @@ export default function LiveMarketArbitrage({
               پایش و تضمین کمترین قیمت در بازار (Price Match Guarantee)
             </h3>
             <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
-              مقایسه شفاف نرخ فروش کالا با مراجع معتبر استعلام قیمت کالا در ایران
+              مقایسه شفاف نرخ فروش کالا برای: <strong className="text-[var(--text-primary)]">{productTitle}</strong>
             </p>
           </div>
         </div>

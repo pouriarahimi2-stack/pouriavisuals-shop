@@ -1,4 +1,4 @@
-// services/newsService.ts
+// File Path: services/newsService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface TechNewsItem {
@@ -18,7 +18,7 @@ export interface TechNewsItem {
   is_published?: boolean;
 }
 
-const LOCAL_NEWS_KEY = "axon_tech_radar_news";
+const LOCAL_NEWS_KEY = "axon_tech_radar_news_cache";
 
 export const newsService = {
   async getAll(): Promise<TechNewsItem[]> {
@@ -29,7 +29,7 @@ export const newsService = {
           .select("*")
           .order("published_at", { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           if (typeof window !== "undefined") {
             localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(data));
           }
@@ -42,10 +42,10 @@ export const newsService = {
         if (local) return JSON.parse(local);
       }
 
-      return this.getDefaults();
+      return [];
     } catch (e) {
       console.error("newsService.getAll Error:", e);
-      return this.getDefaults();
+      return [];
     }
   },
 
@@ -121,18 +121,7 @@ export const newsService = {
         return result as TechNewsItem;
       }
 
-      const localItem: TechNewsItem = {
-        ...payload,
-        id: item.id || `news_${Date.now()}`,
-      };
-
-      if (typeof window !== "undefined") {
-        const current = await this.getAll();
-        const updated = [localItem, ...current.filter((n) => n.id !== localItem.id)];
-        localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("news_updated", { detail: localItem }));
-      }
-      return localItem;
+      return null;
     } catch (e) {
       console.error("newsService.saveNewsItem Error:", e);
       return null;
@@ -155,58 +144,5 @@ export const newsService = {
       console.error("newsService.deleteNewsItem Error:", e);
       return false;
     }
-  },
-
-  getDefaults(): TechNewsItem[] {
-    return [
-      {
-        id: "news-1",
-        title: "رونمایی از تراشه‌های ۳ نانومتری نسل جدید و انقلاب پردازش هوش مصنوعی در گجت‌های ۲۰۲۶",
-        slug: "next-gen-3nm-ai-chips-revolution-gadgets-2026",
-        summary: "تراشه‌های پردازشی جدید با معماری عصبی بهبودیافته، اجرای مدل‌های مولد محلی را در ساعت‌های هوشمند و لپ‌تاپ‌های حرفه‌ای با یک‌سوم مصرف انرژی محقق ساختند.",
-        content: `<h3>تحول پردازش عصبی در لبه شبکه (Edge AI)</h3>
-        <p>کمپانی‌های پیشرو در صنعت نیمه‌هادی با رونمایی از سیلیکون‌های اختصاصی نوین، امکان رندر بلادرنگ ۸K و کالیبراسیون سخت‌افزاری نمایشگرها را به صورت مستقیم در مدار داخلی مانیتورها و تبلت‌ها فراهم کردند.</p>`,
-        category: "hardware",
-        source_name: "The Verge / TechCrunch",
-        source_url: "https://theverge.com",
-        image_url: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-        published_at: new Date().toISOString(),
-        trending_score: 99,
-        tags: ["هوش مصنوعی", "سخت‌افزار", "چیپست", "گجت"],
-        is_published: true,
-      },
-      {
-        id: "news-2",
-        title: "کنسول‌ها و مانیتورهای گیمینگ OLED 480Hz با حداقل زمان تاخیر ۰.۰۳ میلی‌ثانیه به بازار آمدند",
-        slug: "gaming-oled-480hz-ultra-low-latency-display-monitors",
-        summary: "پنل‌های فوق‌سریع QD-OLED با نرخ نوسازی ۴۸۰ هرتز و تفکیک رنگ ۱۰ بیتی استاندارد جدیدی را برای استودیوهای تولید بازی و گیمرهای فوق‌حرفه‌ای به ارمغان آوردند.",
-        content: `<h3>دقت بی‌رقیب در صحنه‌های پرتحرک</h3>
-        <p>تکنولوژی جدید ضد انعکاس نوری و هیت‌سینک گرافنی اختصاصی، طول عمر پنل‌های OLED را تا دو برابر افزایش داده و از هرگونه افت فریم جلوگیری می‌کند.</p>`,
-        category: "gaming",
-        source_name: "IGN / Tom's Hardware",
-        source_url: "https://ign.com",
-        image_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200",
-        published_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-        trending_score: 96,
-        tags: ["گیمینگ", "مانیتور", "OLED", "نمایشگر"],
-        is_published: true,
-      },
-      {
-        id: "news-3",
-        title: "استاندارد شارژ بی‌سیم Qi2 و مگنتیک هوشمند: هماهنگی کامل تمام گجت‌های اپل، سامسونگ و شیائومی",
-        slug: "qi2-wireless-charging-magnetic-cross-brand-ecosystem",
-        summary: "استاندارد بین‌المللی یکپارچه شارژ سریع بی‌سیم با توان ۲۵ وات به بازار جهانی لوازم جانبی راه یافت و نیاز به کابل‌های مختلف را حذف کرد.",
-        content: `<h3>اکوسیستم واحد مغناطیسی</h3>
-        <p>با پشتیبانی برندهای اصلی از استاندارد باز Qi2، پاوربانک‌ها، داک‌استیشن‌ها و پایه‌های رومیزی استودیویی به طور هوشمند جریان شارژ بهینه را بر اساس دمای باتری تنظیم می‌کنند.</p>`,
-        category: "gadgets",
-        source_name: "Wired / CNET",
-        source_url: "https://wired.com",
-        image_url: "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=1200",
-        published_at: new Date(Date.now() - 3600000 * 8).toISOString(),
-        trending_score: 93,
-        tags: ["گجت", "شارژر", "لوازم جانبی", "تکنولوژی"],
-        is_published: true,
-      },
-    ];
   },
 };

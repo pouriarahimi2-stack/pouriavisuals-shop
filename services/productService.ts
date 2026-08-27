@@ -1,4 +1,4 @@
-// services/productService.ts
+// File Path: services/productService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface ProductVariant {
@@ -52,13 +52,13 @@ export interface Product {
   updated_at?: string;
 }
 
-const LOCAL_PRODUCTS_CACHE = "PV_STORE_PRODUCTS_CACHE";
+const LOCAL_PRODUCTS_CACHE = "PV_STORE_PRODUCTS_CACHE_V2026";
 
 export function normalizeProduct(raw: any): Product {
   if (!raw) return {} as Product;
 
   const id = String(raw.id || `p_${Date.now()}`);
-  const title = raw.title || raw.name || "محصول دیجیتال";
+  const title = raw.title || raw.name || "محصول تخصصی";
   const name = raw.name || title;
   const price = Number(raw.price || 0);
   const discountPrice =
@@ -78,7 +78,7 @@ export function normalizeProduct(raw: any): Product {
   }
 
   if (rawImages.length === 0) {
-    rawImages = ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600&auto=format&fit=crop&q=60"];
+    rawImages = ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&auto=format&fit=crop&q=80"];
   }
 
   const primaryImage = rawImages[0];
@@ -117,15 +117,15 @@ export function normalizeProduct(raw: any): Product {
     name,
     title_fa: raw.title_fa || "",
     sku: raw.sku || `SKU-${id.slice(-6)}`,
-    brand: raw.brand || "Apple",
+    brand: raw.brand || "Axon Core",
     price,
     discountPrice,
     discount_price: discountPrice,
     originalPrice: price,
-    stock: raw.stock !== undefined ? Number(raw.stock) : 10,
-    category: raw.category || raw.category_name || "کالای دیجیتال",
+    stock: raw.stock !== undefined ? Number(raw.stock) : 0,
+    category: raw.category || raw.category_name || "تجهیزات تخصصی",
     category_id: raw.category_id,
-    category_name: raw.category || raw.category_name || "کالای دیجیتال",
+    category_name: raw.category || raw.category_name || "تجهیزات تخصصی",
     description: raw.description || "",
     short_description: raw.short_description || "",
     highlights: highlightsList,
@@ -134,7 +134,7 @@ export function normalizeProduct(raw: any): Product {
     images: rawImages,
     variants: variantsList,
     specs: specsObj,
-    warranty: raw.warranty || "۱۸ ماه گارانتی اصالت و سلامت فیزیکی",
+    warranty: raw.warranty || "۱۸ ماه گارانتی اصالت طلایی و سلامت فیزیکی",
     badge: raw.badge || (raw.is_featured ? "پیشنهاد ویژه" : ""),
     isAvailable: isAvail,
     is_available: isAvail,
@@ -159,9 +159,7 @@ export const productService = {
         }
       } catch {}
     }
-    const defaults = this.getDefaultProducts();
-    const match = defaults.find((p) => String(p.id) === String(id));
-    return match ? normalizeProduct(match) : null;
+    return null;
   },
 
   getAllSync(): Product[] {
@@ -173,7 +171,7 @@ export const productService = {
         }
       } catch {}
     }
-    return this.getDefaultProducts().map(normalizeProduct);
+    return [];
   },
 
   async getAll(): Promise<Product[]> {
@@ -184,7 +182,7 @@ export const productService = {
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           const mapped = data.map(normalizeProduct);
           if (typeof window !== "undefined") {
             localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(mapped));
@@ -192,7 +190,6 @@ export const productService = {
           return mapped;
         }
       }
-
       return this.getAllSync();
     } catch (e) {
       console.error("productService.getAll error:", e);
@@ -318,129 +315,4 @@ export const productService = {
       return false;
     }
   },
-
-  getDefaultProducts(): any[] {
-    return [
-      {
-        id: "prod-macbook-pro-m5-max",
-        title: 'MacBook Pro 16" (Apple M5 Max, 48GB, 1TB SSD)',
-        title_fa: "مک‌بوک پرو ۱۶ اینچ اپل با تراشه M5 Max نسل جدید ۲۰۲۶",
-        sku: "SKP-MBP16-M5MAX",
-        brand: "Apple",
-        price: 215000000,
-        discountPrice: 208500000,
-        discount_price: 208500000,
-        stock: 8,
-        category: "لپ‌تاپ و ورک‌استیشن",
-        category_name: "لپ‌تاپ و ورک‌استیشن",
-        description: "مک‌بوک پرو ۱۶ اینچ با تراشه انقلابی Apple M5 Max استاندارد جدیدی را برای استودیوهای تدوین فیلم و هوش مصنوعی تعریف کرده است.",
-        highlights: [
-          "تراشه پرچمدار M5 Max با پهنای باند حافظه ۴۰۰GB/s",
-          "نمایشگر ۱۶ اینچ Liquid Retina XDR با رفرش‌ریت ۱۲۰Hz ProMotion",
-          "۴۸ گیگابایت رم یکپارچه با تاخیر نزدیک به صفر و ۱ ترابایت SSD",
-          "شارژدهی بی‌رقیب تا ۲۲ ساعت و پورت تاندربولت ۵"
-        ],
-        image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200",
-        images: [
-          "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200",
-          "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=1200"
-        ],
-        variants: [
-          { id: "var-mbp-space-black", name: "مشکی فضایی مات (Space Black)", colorHex: "#1c1c1e", priceDelta: 0, stock: 5 },
-          { id: "var-mbp-silver", name: "نقره‌ای کلاسیک (Silver)", colorHex: "#e5e7eb", priceDelta: 0, stock: 3 }
-        ],
-        specs: {
-          "پردازنده مرکزی": "Apple M5 Max (16-Core CPU)",
-          "پردازنده گرافیکی": "40-Core GPU",
-          "حافظه رم": "۴۸ گیگابایت Unified Memory",
-          "حافظه ذخیره‌سازی": "۱ ترابایت SSD",
-          "نمایشگر": "۱۶.۲ اینچ Liquid Retina XDR (120Hz)"
-        },
-        warranty: "۱۸ ماه گارانتی معتبر شرکتی + ۷ روز ضمانت بازگشت وجه",
-        badge: "پرچمدار ۲۰۲۶ 🔥",
-        is_available: true,
-        is_featured: true,
-      },
-      {
-        id: "prod-ipad-pro-13-m5",
-        title: 'iPad Pro 13" (Apple M5, Tandem OLED, 256GB Wi-Fi)',
-        title_fa: "آیپد پرو ۱۳ اینچ اپل با تراشه M5 و نمایشگر تاندم اولد (Tandem OLED)",
-        sku: "SKP-IPAD13-M5",
-        brand: "Apple",
-        price: 98500000,
-        discountPrice: 94900000,
-        discount_price: 94900000,
-        stock: 12,
-        category: "تبلت و نمایشگر همراه",
-        category_name: "تبلت و نمایشگر همراه",
-        description: "آیپد پرو ۱۳ اینچ با ضخامت ۵.۱ میلی‌متر و نمایشگر Ultra Retina XDR Tandem OLED با روشنایی ۱۶۰۰ نیت.",
-        highlights: [
-          "نمایشگر خارق‌العاده Tandem OLED Ultra Retina XDR با رفرش‌ریت ۱۲۰Hz",
-          "طراحی فوق‌العاده باریک با ضخامت فقط ۵.۱ میلی‌متر",
-          "تراشه فوق‌سریع Apple M5 با موتور هوش مصنوعی نسل جدید",
-          "پشتیبانی از قلم Apple Pencil Pro"
-        ],
-        image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=1200",
-        images: [
-          "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=1200",
-          "https://images.unsplash.com/photo-1561154464-82e9adf32764?w=1200"
-        ],
-        variants: [
-          { id: "var-ipad-space-black", name: "مشکی فضایی (Space Black)", colorHex: "#1f2022", priceDelta: 0, stock: 7 },
-          { id: "var-ipad-silver", name: "نقره‌ای مات (Silver)", colorHex: "#e2e4e6", priceDelta: 0, stock: 5 }
-        ],
-        specs: {
-          "پردازنده": "Apple M5 (10-Core CPU)",
-          "نمایشگر": "۱۳ اینچ Ultra Retina XDR (Tandem OLED)",
-          "رزولوشن": "2752x2064 پیکسل",
-          "روشنایی": "۱۶۰۰ نیت اوج HDR",
-          "ضخامت": "۵.۱ میلی‌متر"
-        },
-        warranty: "۱۸ ماه گارانتی اصالت طلایی + ۷ روز مهلت تست",
-        badge: "پرفروش‌ترین تبلت استودیو ✨",
-        is_available: true,
-        is_featured: true,
-      },
-      {
-        id: "prod-apple-watch-ultra-3",
-        title: "Apple Watch Ultra 3 (Titanium Case, 49mm GPS + Cellular)",
-        title_fa: "اپل واچ اولترا ۳ تیتانیومی با اتصال ماهواره‌ای و نمایشگر Micro-OLED",
-        sku: "SKP-AW-ULTRA3",
-        brand: "Apple",
-        price: 58500000,
-        discountPrice: 55800000,
-        discount_price: 55800000,
-        stock: 15,
-        category: "ساعت هوشمند و گجت",
-        category_name: "ساعت هوشمند و گجت",
-        description: "مقاوم‌ترین ساعت ورزشی و ماجراجویی جهان با بدنه تیتانیوم گرید ۵، شیشه یاقوت کبود و نمایشگر ۳۰۰۰ نیتی.",
-        highlights: [
-          "کیس فوق‌مقاوم تیتانیوم هوانوردی گرید ۵ با استاندارد غواصی EN13319",
-          "نمایشگر همیشه روشن با روشنایی فوق‌العاده ۳۰۰۰ نیت و شیشه کریستال یاقوت",
-          "سیستم موقعیت‌یابی فرکانس دوگانه فوق‌دقیق L1 و L5",
-          "شارژدهی باتری تا ۷۲ ساعت در حالت Low Power Mode"
-        ],
-        image: "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=1200",
-        images: [
-          "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=1200",
-          "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1200"
-        ],
-        variants: [
-          { id: "var-aw-titanium-natural", name: "تیتانیوم طبیعی (Natural Titanium)", colorHex: "#8b8c8d", priceDelta: 0, stock: 9 },
-          { id: "var-aw-titanium-black", name: "تیتانیوم مشکی فضایی (Space Black)", colorHex: "#242526", priceDelta: 0, stock: 6 }
-        ],
-        specs: {
-          "جنس کیس": "تیتانیوم گرید ۵ با شیشه یاقوت کبود",
-          "سایز ساعت": "۴۹ میلی‌متر",
-          "روشنایی": "۳۰۰۰ نیت Always-On",
-          "مقاومت در آب": "۱۰۰ متر (استاندارد غواصی WR100)",
-          "پردازنده": "Apple S10 SiP 64-bit"
-        },
-        warranty: "۱۸ ماه گارانتی طلایی اصالت و تست سلامت فیزیکی",
-        badge: "مقاوم‌ترین ساعت هوشمند ⚡",
-        is_available: true,
-        is_featured: true,
-      }
-    ];
-  }
 };

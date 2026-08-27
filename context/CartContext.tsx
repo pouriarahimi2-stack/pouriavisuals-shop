@@ -1,6 +1,8 @@
+// File Path: context/CartContext.tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { couponService } from "@/services/couponService";
 
 export interface CartItem {
   id: string | number;
@@ -34,7 +36,7 @@ interface CartContextType {
   updateQuantity: (id: string | number, deltaOrQty: number) => void;
   clearCart: () => void;
   appliedCoupon: AppliedCoupon | null;
-  applyCoupon: (code: string) => { success: boolean; message: string };
+  applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
   removeCoupon: () => void;
   totalPrice: number;
   totalAmount: number;
@@ -131,23 +133,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const closeCart = () => setIsCartOpen(false);
   const toggleCart = () => setIsCartOpen((prev) => !prev);
 
-  const applyCoupon = (code: string) => {
+  const totalPrice = cartItems.reduce(
+    (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
+    0
+  );
+
+  const applyCoupon = async (code: string) => {
     const clean = code.trim().toUpperCase();
-    if (clean === "OFF10" || clean === "AXON") {
-      setAppliedCoupon({ code: clean, discountPercent: 10 });
-      return { success: true, message: "کد تخفیف ۱۰٪ با موفقیت اعمال شد." };
+    const res = await couponService.validateCoupon(clean, totalPrice);
+    if (res.valid && res.coupon) {
+      const discountPercent = res.coupon.type === "percent" || res.coupon.discount_type === "percent"
+        ? Number(res.coupon.value || res.coupon.discount_value || 0)
+        : Math.round((res.discount / (totalPrice || 1)) * 100);
+
+      setAppliedCoupon({
+        code: clean,
+        discountPercent,
+        maxDiscount: res.coupon.max_discount || res.coupon.max_discount_amount || undefined,
+      });
+      return { success: true, message: res.message };
     }
-    return { success: false, message: "کد تخفیف وارد شده معتبر نیست." };
+    return { success: false, message: res.message || "کد تخفیف وارد شده نامعتبر است." };
   };
 
   const removeCoupon = () => setAppliedCoupon(null);
 
   const totalItems = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
-
-  const totalPrice = cartItems.reduce(
-    (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
-    0
-  );
 
   const submitOrder = (orderData: any) => {
     const orderId = `ORD-${Date.now().toString().slice(-6)}`;

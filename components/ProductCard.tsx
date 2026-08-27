@@ -1,9 +1,11 @@
+// File Path: components/ProductCard.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function ProductCard({ product }: { product: any }) {
   const { addToCart } = useCart();
@@ -14,7 +16,7 @@ export default function ProductCard({ product }: { product: any }) {
     setMounted(true);
   }, []);
 
-  const title = product.title || product.title_fa || product.name || "محصول بدون عنوان";
+  const title = product.title || product.title_fa || product.name || "محصول تخصصی";
   const price = Number(product.price) || 0;
   const discountPrice =
     product.discountPrice !== undefined && product.discountPrice !== null
@@ -45,6 +47,7 @@ export default function ProductCard({ product }: { product: any }) {
   const handleQuickBuy = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    soundEngine.playAddToCart();
     addToCart({
       id: product.id,
       title,
@@ -60,6 +63,7 @@ export default function ProductCard({ product }: { product: any }) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    soundEngine.playAddToCart();
     addToCart({
       id: product.id,
       title,
@@ -105,14 +109,14 @@ export default function ProductCard({ product }: { product: any }) {
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "مرجع"}</span>
           <span className={`font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
-            {isAvailable ? "موجود ✓" : "ناموجود"}
+            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
           </span>
         </div>
         <Link href={`/products/${product.id}`} className="hover:text-[var(--accent-blue)] transition-colors">
           <h3 className="font-black text-sm text-[var(--text-primary)] line-clamp-2 leading-snug">{title}</h3>
         </Link>
         <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 font-medium">
-          {product.short_description || product.description || "تجهیزات تخصصی و مرجع"}
+          {product.short_description || product.description || "تجهیزات تخصصی با گارانتی اصالت"}
         </p>
       </div>
 

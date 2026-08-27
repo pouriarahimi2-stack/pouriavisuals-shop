@@ -1,3 +1,4 @@
+// File Path: services/couponService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface Coupon {
@@ -21,7 +22,7 @@ export interface Coupon {
   updated_at?: string;
 }
 
-const LOCAL_STORAGE_KEY = "axon_coupons_cache";
+const LOCAL_STORAGE_KEY = "axon_coupons_cache_v2026";
 
 export function normalizeCoupon(raw: any): Coupon {
   if (!raw) return {} as Coupon;
@@ -58,7 +59,6 @@ export function normalizeCoupon(raw: any): Coupon {
 }
 
 export const couponService = {
-  // دریافت همه کدهای تخفیف
   async getAll(): Promise<Coupon[]> {
     try {
       if (supabase) {
@@ -67,7 +67,7 @@ export const couponService = {
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           const mapped = data.map(normalizeCoupon);
           if (typeof window !== "undefined") {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
@@ -83,94 +83,79 @@ export const couponService = {
         }
       }
 
-      const defaults: Coupon[] = [
-        {
-          id: "cp_1",
-          code: "OFF10",
-          type: "percent",
-          discount_type: "percent",
-          value: 10,
-          discount_value: 10,
-          discountPercent: 10,
-          min_order_amount: 100000,
-          is_active: true,
-        },
-        {
-          id: "cp_2",
-          code: "AXON",
-          type: "percent",
-          discount_type: "percent",
-          value: 15,
-          discount_value: 15,
-          discountPercent: 15,
-          max_discount: 500000,
-          is_active: true,
-        },
-      ];
-
-      return defaults.map(normalizeCoupon);
+      return [];
     } catch (err) {
       console.error("couponService getAll error:", err);
       return [];
     }
   },
 
-  // بررسی و اعتبارسنجی یک کوپن
-  async validateCoupon(code: string, totalAmount: number): Promise<{ valid: boolean; discount: number; message: string; coupon?: Coupon }> {
+  async validateCoupon(
+    code: string,
+    totalAmount: number
+  ): Promise<{ valid: boolean; discount: number; message: string; coupon?: Coupon }> {
     try {
-      const all = await this.getAll();
       const cleanCode = code.trim().toUpperCase();
-      const matched = all.find((c) => c.code === cleanCode && c.is_active !== false);
 
-      if (!matched) {
-        return { valid: false, discount: 0, message: "کد تخفیف وارد شده معتبر نیست یا غیرفعال شده است." };
-      }
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .eq("code", cleanCode)
+          .eq("is_active", true)
+          .maybeSingle();
 
-      if (matched.expires_at && new Date(matched.expires_at) < new Date()) {
-        return { valid: false, discount: 0, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." };
-      }
+        if (!error && data) {
+          const matched = normalizeCoupon(data);
 
-      if (matched.min_order_amount && totalAmount < matched.min_order_amount) {
-        return {
-          valid: false,
-          discount: 0,
-          message: `حداقل مبلغ سفارش برای اعمال این کد ${matched.min_order_amount.toLocaleString("fa-IR")} تومان است.`,
-        };
-      }
+          if (matched.expires_at && new Date(matched.expires_at) < new Date()) {
+            return { valid: false, discount: 0, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." };
+          }
 
-      if (matched.usage_limit && (matched.used_count ?? 0) >= matched.usage_limit) {
-        return { valid: false, discount: 0, message: "ظرفیت استفاده از این کد تخفیف تکمیل شده است." };
-      }
+          if (matched.min_order_amount && totalAmount < matched.min_order_amount) {
+            return {
+              valid: false,
+              discount: 0,
+              message: `حداقل مبلغ سفارش برای اعمال این کد ${matched.min_order_amount.toLocaleString("fa-IR")} تومان است.`,
+            };
+          }
 
-      let calculatedDiscount = 0;
-      const type = matched.discount_type || matched.type;
-      const val = Number(matched.discount_value ?? matched.value ?? 0);
+          if (matched.usage_limit && (matched.used_count ?? 0) >= matched.usage_limit) {
+            return { valid: false, discount: 0, message: "ظرفیت استفاده از این کد تخفیف تکمیل شده است." };
+          }
 
-      if (type === "percent") {
-        calculatedDiscount = (totalAmount * val) / 100;
-        const maxLimit = matched.max_discount ?? matched.max_discount_amount ?? matched.maxDiscount;
-        if (maxLimit && calculatedDiscount > maxLimit) {
-          calculatedDiscount = maxLimit;
+          let calculatedDiscount = 0;
+          const type = matched.discount_type || matched.type;
+          const val = Number(matched.discount_value ?? matched.value ?? 0);
+
+          if (type === "percent") {
+            calculatedDiscount = (totalAmount * val) / 100;
+            const maxLimit = matched.max_discount ?? matched.max_discount_amount ?? matched.maxDiscount;
+            if (maxLimit && calculatedDiscount > maxLimit) {
+              calculatedDiscount = maxLimit;
+            }
+          } else {
+            calculatedDiscount = val;
+          }
+
+          calculatedDiscount = Math.min(calculatedDiscount, totalAmount);
+
+          return {
+            valid: true,
+            discount: calculatedDiscount,
+            message: "کد تخفیف با موفقیت اعمال گردید.",
+            coupon: matched,
+          };
         }
-      } else {
-        calculatedDiscount = val;
       }
 
-      calculatedDiscount = Math.min(calculatedDiscount, totalAmount);
-
-      return {
-        valid: true,
-        discount: calculatedDiscount,
-        message: "کد تخفیف با موفقیت اعمال گردید.",
-        coupon: matched,
-      };
+      return { valid: false, discount: 0, message: "کد تخفیف وارد شده معتبر نیست یا غیرفعال شده است." };
     } catch (err) {
       console.error("couponService validateCoupon error:", err);
       return { valid: false, discount: 0, message: "خطا در پردازش کد تخفیف." };
     }
   },
 
-  // ایجاد کد تخفیف جدید
   async create(couponData: Partial<Coupon>): Promise<Coupon | null> {
     try {
       const normalized = normalizeCoupon({
@@ -180,17 +165,16 @@ export const couponService = {
 
       if (supabase) {
         const payload = {
-          id: normalized.id,
           code: normalized.code,
           type: normalized.type,
           discount_type: normalized.discount_type,
           value: normalized.value,
           discount_value: normalized.discount_value,
-          min_order_amount: normalized.min_order_amount,
-          max_discount: normalized.max_discount,
-          usage_limit: normalized.usage_limit,
+          min_order_amount: normalized.min_order_amount || null,
+          max_discount: normalized.max_discount || null,
+          usage_limit: normalized.usage_limit || null,
           used_count: 0,
-          expires_at: normalized.expires_at,
+          expires_at: normalized.expires_at || null,
           is_active: normalized.is_active,
           updated_at: new Date().toISOString(),
         };
@@ -212,20 +196,13 @@ export const couponService = {
         }
       }
 
-      const current = await this.getAll();
-      const updatedList = [normalized, ...current];
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
-      }
-      return normalized;
+      return null;
     } catch (err) {
       console.error("couponService create error:", err);
       return null;
     }
   },
 
-  // ویرایش کد تخفیف
   async update(id: string | number, couponData: Partial<Coupon>): Promise<boolean> {
     try {
       if (supabase) {
@@ -252,7 +229,6 @@ export const couponService = {
     }
   },
 
-  // حذف کد تخفیف
   async delete(id: string | number): Promise<boolean> {
     try {
       if (supabase) {

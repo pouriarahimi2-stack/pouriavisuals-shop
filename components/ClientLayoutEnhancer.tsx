@@ -1,4 +1,4 @@
-// components/ClientLayoutEnhancer.tsx
+// File Path: components/ClientLayoutEnhancer.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -6,8 +6,12 @@ import { siteInfoService } from "@/services/siteInfoService";
 
 export default function ClientLayoutEnhancer() {
   useEffect(() => {
+    // در زمان تایید اینماد عنوان دست‌نخورده باقی می‌ماند
+    if (document.title === "27424534") return;
+
     const applyTitle = (info: any) => {
       if (!info) return;
+      if (document.title === "27424534") return;
       const sName = info.storeName || info.site_name || info.siteName || "";
       const sTitle = info.siteTitle || info.site_title || info.tagline || info.description || "";
       if (sName && typeof document !== "undefined") {
@@ -30,19 +34,8 @@ export default function ClientLayoutEnhancer() {
     };
     window.addEventListener("site_info_updated", handleUpdate);
 
-    let channel: BroadcastChannel | null = null;
-    if ("BroadcastChannel" in window) {
-      channel = new BroadcastChannel("site_info_sync_channel");
-      channel.onmessage = (event) => {
-        if (event.data?.type === "SYNC_SITE_INFO") {
-          applyTitle(event.data.data);
-        }
-      };
-    }
-
     return () => {
       window.removeEventListener("site_info_updated", handleUpdate);
-      if (channel) channel.close();
     };
   }, []);
 

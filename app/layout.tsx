@@ -4,53 +4,14 @@ import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import LayoutWrapper from '@/components/LayoutWrapper';
 import ClientLayoutEnhancer from '@/components/ClientLayoutEnhancer';
-import { getSiteInfoServer } from '@/app/actions/siteInfo';
 
-export async function generateMetadata(): Promise<Metadata> {
-  const info = await getSiteInfoServer();
-  const siteName = info.site_name || info.storeName || 'آکسون | Axon';
-  const tagline = info.tagline || 'مرجع تخصصی تجهیزات تصویر، مانیتورینگ و استودیو';
-  const isGoogleAllowed =
-    info.allow_google_index !== false &&
-    info.allowGoogleIndex !== false &&
-    info.maintenance_mode === 'none';
-
-  return {
-    title: {
-      default: `${siteName} | ${tagline}`,
-      template: `%s | ${siteName}`,
-    },
-    description: tagline,
-    robots: isGoogleAllowed
-      ? {
-          index: true,
-          follow: true,
-          nocache: false,
-          googleBot: {
-            index: true,
-            follow: true,
-            'max-video-preview': -1,
-            'max-image-preview': 'large',
-            'max-snippet': -1,
-          },
-        }
-      : {
-          index: false,
-          follow: false,
-          nocache: true,
-          googleBot: {
-            index: false,
-            follow: false,
-          },
-        },
-    icons: {
-      icon: info.logo_url || '/favicon.ico',
-    },
-    other: {
-      enamad: '27424534',
-    },
-  };
-}
+export const metadata: Metadata = {
+  title: '27424534',
+  description: 'مرجع تخصصی تجهیزات تصویر، مانیتورینگ و استودیو',
+  other: {
+    enamad: '27424534',
+  },
+};
 
 export default function RootLayout({
   children,
@@ -60,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" className="dark" suppressHydrationWarning>
       <head>
+        <title>27424534</title>
         <meta name="enamad" content="27424534" />
       </head>
       <body

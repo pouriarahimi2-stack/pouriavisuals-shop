@@ -1,4 +1,4 @@
-// services/categoryService.ts
+// File Path: services/categoryService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface Category {
@@ -11,25 +11,31 @@ export interface Category {
   display_order?: number;
 }
 
+const LOCAL_CATEGORIES_CACHE = "axon_categories_cache_v2026";
+
 export const categoryService = {
   async getAll(): Promise<Category[]> {
     try {
       if (supabase) {
-        const { data, error } = await supabase.from("categories").select("*");
+        const { data, error } = await supabase
+          .from("categories")
+          .select("*")
+          .order("order_index", { ascending: true });
 
         if (!error && data) {
-          return data.sort(
-            (a: any, b: any) =>
-              (a.order_index ?? a.display_order ?? 0) - (b.order_index ?? b.display_order ?? 0)
-          );
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(data));
+          }
+          return data;
         }
       }
-      return [
-        { name: "نمایشگرهای ۵K و ۴K", slug: "monitors", order_index: 1 },
-        { name: "کارت کپچر و استریم", slug: "capture-cards", order_index: 2 },
-        { name: "کالیبراتور رنگ سخت‌افزاری", slug: "calibrators", order_index: 3 },
-        { name: "لوازم جانبی استودیو", slug: "accessories", order_index: 4 },
-      ];
+
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(LOCAL_CATEGORIES_CACHE);
+        if (cached) return JSON.parse(cached);
+      }
+
+      return [];
     } catch (e) {
       console.error("categoryService.getAll error:", e);
       return [];
@@ -53,12 +59,17 @@ export const categoryService = {
           .single();
 
         if (error) throw error;
+
         if (typeof window !== "undefined") {
+          const all = await this.getAll();
+          const updated = [...all, data];
+          localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(updated));
           window.dispatchEvent(new CustomEvent("categories_updated", { detail: data }));
         }
+
         return data as Category;
       }
-      return { id: `cat_${Date.now()}`, ...payload };
+      return null;
     } catch (e) {
       console.error("categoryService.addCategory error:", e);
       return null;
@@ -71,7 +82,11 @@ export const categoryService = {
         const { error } = await supabase.from("categories").delete().eq("id", id);
         if (error) throw error;
       }
+
       if (typeof window !== "undefined") {
+        const all = await this.getAll();
+        const updated = all.filter((c) => c.id !== id);
+        localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(updated));
         window.dispatchEvent(new CustomEvent("categories_updated", { detail: id }));
       }
       return true;

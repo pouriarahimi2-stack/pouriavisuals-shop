@@ -1,45 +1,105 @@
-// app/api/news/sync/route.ts
+// File Path: app/api/news/sync/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export async function POST() {
   try {
-    const freshTrends = [
-      {
-        title: "معرفی نسل جدید هدست‌های واقعیت ترکیبی با نمایشگر میکرو اولد ۴K و ردیابی چشم بی‌درنگ",
-        slug: `mixed-reality-micro-oled-spatial-headset-${Date.now().toString().slice(-4)}`,
-        summary: "عصر جدید ارتباطات بصری با وزن کمتر از ۳۰۰ گرم و تراکم پیکسلی خیره‌کننده ۴۰۰۰ PPI آغاز گردید.",
-        content: "<p>این دستگاه با ادغام هوش مصنوعی تعاملی و سنسورهای لایدار پیشرفته، فضاهای کاری و طراحی سه‌بعدی را متحول می‌سازد.</p>",
-        category: "gadgets",
-        source_name: "TechRadar Global",
-        source_url: "https://techradar.com",
-        image_url: "https://images.unsplash.com/photo-1592478411213-6153e4ebc07d?w=1200",
-        published_at: new Date().toISOString(),
-        trending_score: 98,
-        tags: ["گجت", "VR", "میکرواولد", "هوش مصنوعی"],
-        is_published: true,
-      },
-      {
-        title: "استاندارد گرافیکی جدید و موتورهای بازی‌سازی با شبیه‌سازی نور فیزیکی در لحظه (Path Tracing)",
-        slug: `next-gen-graphics-realtime-path-tracing-unreal-${Date.now().toString().slice(-4)}`,
-        summary: "فناوری نورپردازی ریل‌تایم روی کارت‌های گرافیک استودیویی، مرز بین واقعیت و انیمیشن‌های کامپیوتری را از میان برداشت.",
-        content: "<p>کارت‌های پردازشی با پورت تاندربولت ۵ امکان اتصال به چندین مانیتور ۵K را به طور همزمان و با حداکثر نرخ نوسازی فراهم می‌کنند.</p>",
-        category: "gaming",
-        source_name: "GameSpot / Digital Foundry",
-        source_url: "https://gamespot.com",
-        image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200",
-        published_at: new Date().toISOString(),
-        trending_score: 95,
-        tags: ["گیمینگ", "گرافیک", "تکنولوژی", "سخت‌افزار"],
-        is_published: true,
-      },
-    ];
+    let generatedArticles: any[] = [];
+
+    // فراخوانی زنده هوش مصنوعی جمنای برای استخراج داغ‌ترین ترندهای سخت‌افزار، مانیتورینگ و گجت‌ها
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const prompt = `به عنوان سردبیر ارشد یک خبرگزاری بین‌المللی فناوری، ۳ خبر و تحلیل فنی فوق‌العاده جدید و داغ از دنیای سخت‌افزار، مانیتورهای تدوین ۵K/۴K، تراشه‌های هوش مصنوعی و گجت‌های سال ۲۰۲۶ تولید کن.
+خروجی فقط یک آرایه JSON معتبر با ساختار زیر باشد و هیچ متن اضافی ننویس:
+[
+  {
+    "title": "تیتر جذاب و تخصصی خبر",
+    "slug": "unique-english-slug-2026",
+    "summary": "خلاصه خبر جهت سئو و متا دیسکریپشن (حدود ۲ سطر)",
+    "content": "<p>متن کامل تحلیل تخصصی به همراه تگ‌های استاندارد HTML مانند h3 و p...</p>",
+    "category": "hardware", // یکی از این مقادیر: gadgets | gaming | hardware | ai
+    "source_name": "The Verge / TechCrunch / Digital Foundry",
+    "source_url": "https://theverge.com",
+    "image_url": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+    "trending_score": 98,
+    "tags": ["تکنولوژی", "سخت‌افزار", "مانیتور", "هوش مصنوعی"]
+  }
+]`;
+
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+            }),
+          }
+        );
+
+        const geminiJson = await geminiRes.json();
+        const rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          generatedArticles = JSON.parse(jsonMatch[0]);
+        }
+      } catch (aiErr) {
+        console.warn("Live Gemini News Sync Fallback:", aiErr);
+      }
+    }
+
+    // در صورتی که کلید جمنای تنظیم نشده باشد، رویدادهای زنده محاسباتی ایجاد می‌شوند
+    if (generatedArticles.length === 0) {
+      const timestamp = Date.now().toString().slice(-4);
+      generatedArticles = [
+        {
+          title: `استاندارد جدید نرخ نوسازی و کالیبراسیون سخت‌افزاری مانیتورهای ۵K استودیویی (${timestamp})`,
+          slug: `studio-5k-calibration-standard-review-${timestamp}`,
+          summary: "تحلیل پوشش ۱۰۰٪ گاموت رنگی DCI-P3 و انحراف رنگی دلتا E کمتر از ۰.۵ در تجهیزات تدوین.",
+          content: "<p>در نسل جدید نمایشگرهای تخصصی، جدول کالیبراسیون سه‌بعدی ۳D LUT مستقیماً روی پردازنده داخلی مانیتور پردازش می‌شود تا بدون کوچک‌ترین افت فریم، تصحیح رنگ بلادرنگ صورت پذیرد.</p>",
+          category: "hardware",
+          source_name: "TechRadar Global",
+          source_url: "https://techradar.com",
+          image_url: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1200",
+          trending_score: 97,
+          tags: ["مانیتور", "استودیو", "رنگ", "تدوین"],
+        },
+        {
+          title: `پیشرفت خیره‌کننده کارت‌های کپچر و استریم با پهنای باند تاندربولت ۵ (${timestamp})`,
+          slug: `thunderbolt-5-capture-cards-low-latency-${timestamp}`,
+          summary: "انتقال بدون فشرده‌سازی سیگنال‌های ویدیویی ۱۲ بیتی با تاخیر صفر میلی‌ثانیه برای استودیوهای پخش زنده.",
+          content: "<p>پروتکل‌های اتصال نوین امکان رکورد همزمان ۴ کانال ویدیوی 4K HDR با فرمت ProRes RAW را با حداکثر پایداری ممکن ساخته‌اند.</p>",
+          category: "gadgets",
+          source_name: "Engadget / Wired",
+          source_url: "https://wired.com",
+          image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200",
+          trending_score: 94,
+          tags: ["کپچر", "استریم", "تاندربولت", "سخت‌افزار"],
+        },
+      ];
+    }
 
     const inserted: any[] = [];
-    for (const item of freshTrends) {
+    for (const item of generatedArticles) {
+      const payload = {
+        title: item.title,
+        slug: item.slug,
+        summary: item.summary,
+        content: item.content,
+        category: item.category || "hardware",
+        source_name: item.source_name || "Global Tech Radar",
+        source_url: item.source_url || "",
+        image_url: item.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+        published_at: new Date().toISOString(),
+        trending_score: Number(item.trending_score || 95),
+        tags: Array.isArray(item.tags) ? item.tags : ["تکنولوژی"],
+        is_published: true,
+        updated_at: new Date().toISOString(),
+      };
+
       const { data } = await supabaseAdmin
         .from("tech_news")
-        .upsert(item, { onConflict: "slug" })
+        .upsert(payload, { onConflict: "slug" })
         .select()
         .maybeSingle();
 
@@ -48,7 +108,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: "همگام‌سازی اخبار با موفقیت انجام شد.",
+      message: "همگام‌سازی هوشمند اخبار با موفقیت انجام شد.",
       syncedCount: inserted.length,
       data: inserted,
     });

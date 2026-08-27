@@ -1,4 +1,4 @@
-// services/menuService.ts
+// File Path: services/menuService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface MenuItem {
@@ -14,7 +14,7 @@ export interface MenuItem {
   created_at?: string;
 }
 
-const LOCAL_STORAGE_KEY = "site_menu_items";
+const LOCAL_MENU_KEY = "axon_site_menu_items_cache";
 
 export function normalizeMenuItem(raw: any, index: number = 0): MenuItem {
   if (!raw) return {} as MenuItem;
@@ -57,37 +57,24 @@ export const menuService = {
         if (!error && data && data.length > 0) {
           const mapped = data.map((d: any, idx: number) => normalizeMenuItem(d, idx));
           if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+            localStorage.setItem(LOCAL_MENU_KEY, JSON.stringify(mapped));
           }
           return mapped;
         }
       }
 
       if (typeof window !== "undefined") {
-        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const local = localStorage.getItem(LOCAL_MENU_KEY);
         if (local) {
           return JSON.parse(local).map((d: any, idx: number) => normalizeMenuItem(d, idx));
         }
       }
 
-      const defaults: MenuItem[] = [
-        { id: "m_1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
-        { id: "m_2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
-        { id: "m_3", title: "📡 رادار اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
-        { id: "m_4", title: "پیگیری مرسوله پستی", url: "/track-order", order: 4, isActive: true },
-        { id: "m_5", title: "مجله و مقالات سئو", url: "/blog", order: 5, isActive: true },
-        { id: "m_6", title: "تماس با پشتیبانی", url: "/contact", order: 6, isActive: true },
-      ];
-
-      return defaults.map((d, idx) => normalizeMenuItem(d, idx));
+      return [];
     } catch (e) {
       console.error("Error loading menu:", e);
       return [];
     }
-  },
-
-  async getMenuItems(): Promise<MenuItem[]> {
-    return this.getAll();
   },
 
   async saveAll(items: MenuItem[]): Promise<boolean> {
@@ -95,19 +82,18 @@ export const menuService = {
       const normalized = items.map((d, idx) => normalizeMenuItem(d, idx));
 
       if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
+        localStorage.setItem(LOCAL_MENU_KEY, JSON.stringify(normalized));
       }
 
       if (supabase) {
         const payload = normalized.map((item) => ({
-          id: item.id,
           title: item.title,
           url: item.url,
           order: item.order,
           is_active: item.isActive,
         }));
 
-        await supabase.from("menu_items").delete().neq("id", "0");
+        await supabase.from("menu_items").delete().neq("id", "-1");
         await supabase.from("menu_items").insert(payload);
       }
 

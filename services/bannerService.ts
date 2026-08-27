@@ -1,4 +1,4 @@
-// services/bannerService.ts
+// File Path: services/bannerService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface Banner {
@@ -17,7 +17,7 @@ export interface Banner {
   created_at?: string;
 }
 
-const LOCAL_BANNERS_KEY = "axon_banners_cache";
+const LOCAL_BANNERS_KEY = "axon_banners_cache_v2026";
 
 export const bannerService = {
   async getAll(): Promise<Banner[]> {
@@ -31,7 +31,7 @@ export const bannerService = {
         if (!error && data && data.length > 0) {
           const mapped: Banner[] = data.map((b: any) => ({
             id: String(b.id),
-            title: b.title || "بنر ویژه",
+            title: b.title || "پیشنهاد ویژه",
             subtitle: b.subtitle || "",
             badge: b.badge || b.badge_text || "",
             badge_text: b.badge || b.badge_text || "",
@@ -57,26 +57,11 @@ export const bannerService = {
         if (local) return JSON.parse(local);
       }
 
-      return [
-        {
-          id: "default-banner-1",
-          title: "مرجع تخصصی تجهیزات مانیتورینگ و تدوین رنگ ۵K",
-          subtitle: "پوشش رنگ ۱۰۰٪ DCI-P3 به همراه کالیبراسیون سخت‌افزاری و ضمانت اصالت ۱۸ ماهه",
-          badge: "تجهیزات استودیویی ۲۰۲۶",
-          image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1600&auto=format&fit=crop&q=80",
-          link: "/products",
-          button_text: "مشاهده و بررسی کالاها",
-          is_active: true,
-        },
-      ];
+      return [];
     } catch (e) {
       console.error("bannerService.getAll error:", e);
       return [];
     }
-  },
-
-  async getBanners(): Promise<Banner[]> {
-    return this.getAll();
   },
 
   async getActive(): Promise<Banner[]> {

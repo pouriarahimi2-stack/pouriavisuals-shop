@@ -1309,131 +1309,6 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
 }
 </file>
 
-<file path="components/LiveMarketArbitrage.tsx">
-// components/LiveMarketArbitrage.tsx
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { MarketBenchmark } from "@/services/productService";
-
-interface LiveMarketArbitrageProps {
-  productTitle: string;
-  ourPrice: number;
-  marketBenchmarks?: MarketBenchmark[];
-}
-
-export default function LiveMarketArbitrage({
-  productTitle,
-  ourPrice,
-  marketBenchmarks = [],
-}: LiveMarketArbitrageProps) {
-  const [competitors, setCompetitors] = useState<MarketBenchmark[]>([]);
-
-  useEffect(() => {
-    if (marketBenchmarks && marketBenchmarks.length > 0) {
-      setCompetitors(marketBenchmarks);
-    } else {
-      // داده‌های تخمینی بنچ‌مارک بازار به صورت خودکار
-      setCompetitors([
-        {
-          storeName: "متوسط قیمت در ترب و ایمالز",
-          price: Math.round(ourPrice * 1.09),
-          warranty: "گارانتی شرکتی متفرقه (معمولی)",
-          isOurStore: false,
-          deliveryTime: "۳ الی ۵ روز کاری",
-        },
-        {
-          storeName: "فروشگاه ما (نمایندگی مستقیم)",
-          price: ourPrice,
-          warranty: "گارانتی طلایی ۱۸ ماهه + مهلت تست ۷ روزه",
-          isOurStore: true,
-          deliveryTime: "ارسال اکسپرس همان روز",
-        },
-        {
-          storeName: "بازار سنتی پایتخت (پاساژ علاءالدین/رضا)",
-          price: Math.round(ourPrice * 1.14),
-          warranty: "بدون گارانتی تعویض (مهلت تست ۲۴ ساعته)",
-          isOurStore: false,
-          deliveryTime: "خرید حضوری با هزینه پیک",
-        },
-      ]);
-    }
-  }, [ourPrice, marketBenchmarks]);
-
-  const maxPrice = Math.max(...competitors.map((c) => c.price), ourPrice);
-  const potentialSavings = maxPrice - ourPrice;
-
-  return (
-    <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
-      {/* سربرگ آربیتراژ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center text-xl shadow-lg">
-            ⚖️
-          </div>
-          <div>
-            <h3 className="font-black text-sm sm:text-base">
-              پایش و تضمین کمترین قیمت در بازار (Price Match Guarantee)
-            </h3>
-            <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
-              مقایسه شفاف نرخ فروش کالا با مراجع معتبر استعلام قیمت کالا در ایران
-            </p>
-          </div>
-        </div>
-
-        {potentialSavings > 0 && (
-          <div className="px-4 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
-            سود شما از خرید مستقیم: <strong className="font-mono font-black">{potentialSavings.toLocaleString("fa-IR")} تومان</strong>
-          </div>
-        )}
-      </div>
-
-      {/* جدول مقایسه فروشگاه‌ها */}
-      <div className="space-y-3">
-        {competitors.map((comp, idx) => (
-          <div
-            key={idx}
-            className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-              comp.isOurStore
-                ? "bg-emerald-500/10 border-emerald-500/40 shadow-lg ring-1 ring-emerald-500/30"
-                : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]"
-            }`}
-          >
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="font-black text-xs text-[var(--text-primary)]">{comp.storeName}</span>
-                {comp.isOurStore && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white font-black text-[9px] shadow-sm">
-                    تضمین بهترین قیمت ✓
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-[var(--text-secondary)] font-medium">
-                🛡️ {comp.warranty} • ⏱️ {comp.deliveryTime}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-[var(--card-border)] pt-2 sm:pt-0">
-              <span className="font-mono font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400">
-                {Number(comp.price).toLocaleString("fa-IR")} تومان
-              </span>
-              {comp.isOurStore ? (
-                <span className="text-[11px] font-black text-emerald-500">فاکتور ما</span>
-              ) : (
-                <span className="text-[10px] text-rose-500 font-bold font-mono">
-                  +{(comp.price - ourPrice).toLocaleString("fa-IR")} ت گران‌تر
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="components/ProductExplodedView.tsx">
 // components/ProductExplodedView.tsx
 "use client";
@@ -4032,6 +3907,130 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
 }
 </file>
 
+<file path="components/LiveMarketArbitrage.tsx">
+// File Path: components/LiveMarketArbitrage.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { MarketBenchmark } from "@/services/productService";
+
+interface LiveMarketArbitrageProps {
+  productTitle: string;
+  ourPrice: number;
+  marketBenchmarks?: MarketBenchmark[];
+}
+
+export default function LiveMarketArbitrage({
+  productTitle,
+  ourPrice,
+  marketBenchmarks = [],
+}: LiveMarketArbitrageProps) {
+  const [competitors, setCompetitors] = useState<MarketBenchmark[]>([]);
+
+  useEffect(() => {
+    if (marketBenchmarks && marketBenchmarks.length > 0) {
+      setCompetitors(marketBenchmarks);
+    } else {
+      setCompetitors([
+        {
+          storeName: "میانگین بازار آنلاین و پلتفرم‌های واسط",
+          price: Math.round(ourPrice * 1.08),
+          warranty: "گارانتی شرکتی متفرقه (معمولی)",
+          isOurStore: false,
+          deliveryTime: "۳ الی ۵ روز کاری",
+        },
+        {
+          storeName: "فروشگاه مستقیم ما (تضمین کمترین نرخ)",
+          price: ourPrice,
+          warranty: "گارانتی طلایی ۱۸ ماهه + تست ۷ روزه",
+          isOurStore: true,
+          deliveryTime: "ارسال اکسپرس همان روز",
+        },
+        {
+          storeName: "بازار سنتی و فروشگاه‌های فیزیکی",
+          price: Math.round(ourPrice * 1.13),
+          warranty: "بدون گارانتی تعویض (تست ۲۴ ساعته)",
+          isOurStore: false,
+          deliveryTime: "خرید حضوری با هزینه پیک",
+        },
+      ]);
+    }
+  }, [ourPrice, marketBenchmarks]);
+
+  const maxPrice = Math.max(...competitors.map((c) => c.price), ourPrice);
+  const potentialSavings = maxPrice - ourPrice;
+
+  return (
+    <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      
+      {/* سربرگ آربیتراژ */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center text-xl shadow-lg">
+            ⚖️
+          </div>
+          <div>
+            <h3 className="font-black text-sm sm:text-base">
+              پایش و تضمین کمترین قیمت در بازار (Price Match Guarantee)
+            </h3>
+            <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
+              مقایسه شفاف نرخ فروش کالا برای: <strong className="text-[var(--text-primary)]">{productTitle}</strong>
+            </p>
+          </div>
+        </div>
+
+        {potentialSavings > 0 && (
+          <div className="px-4 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+            سود شما از خرید مستقیم: <strong className="font-mono font-black">{potentialSavings.toLocaleString("fa-IR")} تومان</strong>
+          </div>
+        )}
+      </div>
+
+      {/* جدول مقایسه فروشگاه‌ها */}
+      <div className="space-y-3">
+        {competitors.map((comp, idx) => (
+          <div
+            key={idx}
+            className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+              comp.isOurStore
+                ? "bg-emerald-500/10 border-emerald-500/40 shadow-lg ring-1 ring-emerald-500/30"
+                : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]"
+            }`}
+          >
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-xs text-[var(--text-primary)]">{comp.storeName}</span>
+                {comp.isOurStore && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white font-black text-[9px] shadow-sm">
+                    تضمین بهترین قیمت ✓
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] font-medium">
+                🛡️ {comp.warranty} • ⏱️ {comp.deliveryTime}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-[var(--card-border)] pt-2 sm:pt-0">
+              <span className="font-mono font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400">
+                {Number(comp.price).toLocaleString("fa-IR")} تومان
+              </span>
+              {comp.isOurStore ? (
+                <span className="text-[11px] font-black text-emerald-500">فاکتور ما</span>
+              ) : (
+                <span className="text-[10px] text-rose-500 font-bold font-mono">
+                  +{(comp.price - ourPrice).toLocaleString("fa-IR")} ت گران‌تر
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="lib/adminContracts.ts">
 // lib/adminContracts.ts
 export type AdminRole = 
@@ -4308,221 +4307,6 @@ export function verifyPayload(token: string): any | null {
     return null;
   }
 }
-</file>
-
-<file path="services/newsService.ts">
-// services/newsService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface TechNewsItem {
-  id: string;
-  title: string;
-  slug: string;
-  summary: string;
-  content: string;
-  category: "gadgets" | "gaming" | "ai" | "apple" | "hardware" | "general";
-  source_name: string;
-  source_url?: string;
-  image_url: string;
-  published_at: string;
-  views_count?: number;
-  trending_score?: number;
-  tags?: string[];
-  is_published?: boolean;
-}
-
-const LOCAL_NEWS_KEY = "axon_tech_radar_news";
-
-export const newsService = {
-  async getAll(): Promise<TechNewsItem[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("tech_news")
-          .select("*")
-          .order("published_at", { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(data));
-          }
-          return data as TechNewsItem[];
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        const local = localStorage.getItem(LOCAL_NEWS_KEY);
-        if (local) return JSON.parse(local);
-      }
-
-      return this.getDefaults();
-    } catch (e) {
-      console.error("newsService.getAll Error:", e);
-      return this.getDefaults();
-    }
-  },
-
-  async getBySlug(slug: string): Promise<TechNewsItem | null> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("tech_news")
-          .select("*")
-          .eq("slug", slug.trim().toLowerCase())
-          .maybeSingle();
-
-        if (!error && data) {
-          return data as TechNewsItem;
-        }
-      }
-
-      const all = await this.getAll();
-      return all.find((n) => n.slug === slug.trim().toLowerCase()) || null;
-    } catch (e) {
-      console.error("newsService.getBySlug Error:", e);
-      return null;
-    }
-  },
-
-  async saveNewsItem(item: Partial<TechNewsItem>): Promise<TechNewsItem | null> {
-    try {
-      const cleanSlug = (item.slug || item.title || `news-${Date.now()}`)
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-
-      const payload = {
-        title: item.title?.trim() || "خبر تکنولوژی",
-        slug: cleanSlug,
-        summary: item.summary?.trim() || "",
-        content: item.content?.trim() || "",
-        category: item.category || "gadgets",
-        source_name: item.source_name || "Global Tech Wire",
-        source_url: item.source_url || "",
-        image_url: item.image_url || "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200",
-        published_at: item.published_at || new Date().toISOString(),
-        trending_score: item.trending_score || 95,
-        tags: item.tags || ["تکنولوژی", "گجت", "سخت‌افزار"],
-        is_published: item.is_published !== false,
-      };
-
-      if (supabase) {
-        let result: any;
-        if (item.id && !item.id.startsWith("temp_") && !item.id.startsWith("news-")) {
-          const { data, error } = await supabase
-            .from("tech_news")
-            .update(payload)
-            .eq("id", item.id)
-            .select()
-            .single();
-          if (error) throw error;
-          result = data;
-        } else {
-          const { data, error } = await supabase
-            .from("tech_news")
-            .insert([payload])
-            .select()
-            .single();
-          if (error) throw error;
-          result = data;
-        }
-
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("news_updated", { detail: result }));
-        }
-        return result as TechNewsItem;
-      }
-
-      const localItem: TechNewsItem = {
-        ...payload,
-        id: item.id || `news_${Date.now()}`,
-      };
-
-      if (typeof window !== "undefined") {
-        const current = await this.getAll();
-        const updated = [localItem, ...current.filter((n) => n.id !== localItem.id)];
-        localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("news_updated", { detail: localItem }));
-      }
-      return localItem;
-    } catch (e) {
-      console.error("newsService.saveNewsItem Error:", e);
-      return null;
-    }
-  },
-
-  async deleteNewsItem(id: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("tech_news").delete().eq("id", id);
-      }
-      if (typeof window !== "undefined") {
-        const current = await this.getAll();
-        const updated = current.filter((n) => n.id !== id);
-        localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("news_updated", { detail: id }));
-      }
-      return true;
-    } catch (e) {
-      console.error("newsService.deleteNewsItem Error:", e);
-      return false;
-    }
-  },
-
-  getDefaults(): TechNewsItem[] {
-    return [
-      {
-        id: "news-1",
-        title: "رونمایی از تراشه‌های ۳ نانومتری نسل جدید و انقلاب پردازش هوش مصنوعی در گجت‌های ۲۰۲۶",
-        slug: "next-gen-3nm-ai-chips-revolution-gadgets-2026",
-        summary: "تراشه‌های پردازشی جدید با معماری عصبی بهبودیافته، اجرای مدل‌های مولد محلی را در ساعت‌های هوشمند و لپ‌تاپ‌های حرفه‌ای با یک‌سوم مصرف انرژی محقق ساختند.",
-        content: `<h3>تحول پردازش عصبی در لبه شبکه (Edge AI)</h3>
-        <p>کمپانی‌های پیشرو در صنعت نیمه‌هادی با رونمایی از سیلیکون‌های اختصاصی نوین، امکان رندر بلادرنگ ۸K و کالیبراسیون سخت‌افزاری نمایشگرها را به صورت مستقیم در مدار داخلی مانیتورها و تبلت‌ها فراهم کردند.</p>`,
-        category: "hardware",
-        source_name: "The Verge / TechCrunch",
-        source_url: "https://theverge.com",
-        image_url: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-        published_at: new Date().toISOString(),
-        trending_score: 99,
-        tags: ["هوش مصنوعی", "سخت‌افزار", "چیپست", "گجت"],
-        is_published: true,
-      },
-      {
-        id: "news-2",
-        title: "کنسول‌ها و مانیتورهای گیمینگ OLED 480Hz با حداقل زمان تاخیر ۰.۰۳ میلی‌ثانیه به بازار آمدند",
-        slug: "gaming-oled-480hz-ultra-low-latency-display-monitors",
-        summary: "پنل‌های فوق‌سریع QD-OLED با نرخ نوسازی ۴۸۰ هرتز و تفکیک رنگ ۱۰ بیتی استاندارد جدیدی را برای استودیوهای تولید بازی و گیمرهای فوق‌حرفه‌ای به ارمغان آوردند.",
-        content: `<h3>دقت بی‌رقیب در صحنه‌های پرتحرک</h3>
-        <p>تکنولوژی جدید ضد انعکاس نوری و هیت‌سینک گرافنی اختصاصی، طول عمر پنل‌های OLED را تا دو برابر افزایش داده و از هرگونه افت فریم جلوگیری می‌کند.</p>`,
-        category: "gaming",
-        source_name: "IGN / Tom's Hardware",
-        source_url: "https://ign.com",
-        image_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200",
-        published_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-        trending_score: 96,
-        tags: ["گیمینگ", "مانیتور", "OLED", "نمایشگر"],
-        is_published: true,
-      },
-      {
-        id: "news-3",
-        title: "استاندارد شارژ بی‌سیم Qi2 و مگنتیک هوشمند: هماهنگی کامل تمام گجت‌های اپل، سامسونگ و شیائومی",
-        slug: "qi2-wireless-charging-magnetic-cross-brand-ecosystem",
-        summary: "استاندارد بین‌المللی یکپارچه شارژ سریع بی‌سیم با توان ۲۵ وات به بازار جهانی لوازم جانبی راه یافت و نیاز به کابل‌های مختلف را حذف کرد.",
-        content: `<h3>اکوسیستم واحد مغناطیسی</h3>
-        <p>با پشتیبانی برندهای اصلی از استاندارد باز Qi2، پاوربانک‌ها، داک‌استیشن‌ها و پایه‌های رومیزی استودیویی به طور هوشمند جریان شارژ بهینه را بر اساس دمای باتری تنظیم می‌کنند.</p>`,
-        category: "gadgets",
-        source_name: "Wired / CNET",
-        source_url: "https://wired.com",
-        image_url: "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=1200",
-        published_at: new Date(Date.now() - 3600000 * 8).toISOString(),
-        trending_score: 93,
-        tags: ["گجت", "شارژر", "لوازم جانبی", "تکنولوژی"],
-        is_published: true,
-      },
-    ];
-  },
-};
 </file>
 
 <file path="postcss.config.js">
@@ -6815,6 +6599,157 @@ export default function TechRadarFeed() {
     </section>
   );
 }
+</file>
+
+<file path="services/newsService.ts">
+// File Path: services/newsService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface TechNewsItem {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  content: string;
+  category: "gadgets" | "gaming" | "ai" | "apple" | "hardware" | "general";
+  source_name: string;
+  source_url?: string;
+  image_url: string;
+  published_at: string;
+  views_count?: number;
+  trending_score?: number;
+  tags?: string[];
+  is_published?: boolean;
+}
+
+const LOCAL_NEWS_KEY = "axon_tech_radar_news_cache";
+
+export const newsService = {
+  async getAll(): Promise<TechNewsItem[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("tech_news")
+          .select("*")
+          .order("published_at", { ascending: false });
+
+        if (!error && data) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(data));
+          }
+          return data as TechNewsItem[];
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem(LOCAL_NEWS_KEY);
+        if (local) return JSON.parse(local);
+      }
+
+      return [];
+    } catch (e) {
+      console.error("newsService.getAll Error:", e);
+      return [];
+    }
+  },
+
+  async getBySlug(slug: string): Promise<TechNewsItem | null> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("tech_news")
+          .select("*")
+          .eq("slug", slug.trim().toLowerCase())
+          .maybeSingle();
+
+        if (!error && data) {
+          return data as TechNewsItem;
+        }
+      }
+
+      const all = await this.getAll();
+      return all.find((n) => n.slug === slug.trim().toLowerCase()) || null;
+    } catch (e) {
+      console.error("newsService.getBySlug Error:", e);
+      return null;
+    }
+  },
+
+  async saveNewsItem(item: Partial<TechNewsItem>): Promise<TechNewsItem | null> {
+    try {
+      const cleanSlug = (item.slug || item.title || `news-${Date.now()}`)
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+      const payload = {
+        title: item.title?.trim() || "خبر تکنولوژی",
+        slug: cleanSlug,
+        summary: item.summary?.trim() || "",
+        content: item.content?.trim() || "",
+        category: item.category || "gadgets",
+        source_name: item.source_name || "Global Tech Wire",
+        source_url: item.source_url || "",
+        image_url: item.image_url || "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200",
+        published_at: item.published_at || new Date().toISOString(),
+        trending_score: item.trending_score || 95,
+        tags: item.tags || ["تکنولوژی", "گجت", "سخت‌افزار"],
+        is_published: item.is_published !== false,
+      };
+
+      if (supabase) {
+        let result: any;
+        if (item.id && !item.id.startsWith("temp_") && !item.id.startsWith("news-")) {
+          const { data, error } = await supabase
+            .from("tech_news")
+            .update(payload)
+            .eq("id", item.id)
+            .select()
+            .single();
+          if (error) throw error;
+          result = data;
+        } else {
+          const { data, error } = await supabase
+            .from("tech_news")
+            .insert([payload])
+            .select()
+            .single();
+          if (error) throw error;
+          result = data;
+        }
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("news_updated", { detail: result }));
+        }
+        return result as TechNewsItem;
+      }
+
+      return null;
+    } catch (e) {
+      console.error("newsService.saveNewsItem Error:", e);
+      return null;
+    }
+  },
+
+  async deleteNewsItem(id: string): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("tech_news").delete().eq("id", id);
+      }
+      if (typeof window !== "undefined") {
+        const current = await this.getAll();
+        const updated = current.filter((n) => n.id !== id);
+        localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("news_updated", { detail: id }));
+      }
+      return true;
+    } catch (e) {
+      console.error("newsService.deleteNewsItem Error:", e);
+      return false;
+    }
+  },
+};
 </file>
 
 <file path="tailwind.config.js">
@@ -13113,284 +13048,6 @@ export const categoryService = {
 };
 </file>
 
-<file path="services/couponService.ts">
-import { supabase } from "@/lib/supabase";
-
-export interface Coupon {
-  id: string | number;
-  code: string;
-  type?: "percent" | "fixed";
-  discount_type?: "percent" | "fixed";
-  value?: number;
-  discount_value?: number;
-  discountPercent?: number;
-  min_order_amount?: number;
-  minOrder?: number;
-  max_discount_amount?: number;
-  max_discount?: number;
-  maxDiscount?: number;
-  usage_limit?: number;
-  used_count?: number;
-  expires_at?: string;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
-
-const LOCAL_STORAGE_KEY = "axon_coupons_cache";
-
-export function normalizeCoupon(raw: any): Coupon {
-  if (!raw) return {} as Coupon;
-
-  const id = raw.id || `coupon_${Date.now()}`;
-  const code = (raw.code || "").trim().toUpperCase();
-  const type = raw.discount_type || raw.type || (raw.discountPercent ? "percent" : "fixed");
-  const value = Number(raw.discount_value ?? raw.value ?? raw.discountPercent ?? 0);
-  const min_order_amount = raw.min_order_amount !== undefined ? Number(raw.min_order_amount) : (raw.minOrder !== undefined ? Number(raw.minOrder) : undefined);
-  const max_discount = raw.max_discount !== undefined ? Number(raw.max_discount) : (raw.max_discount_amount !== undefined ? Number(raw.max_discount_amount) : (raw.maxDiscount !== undefined ? Number(raw.maxDiscount) : undefined));
-  const is_active = raw.is_active !== undefined ? Boolean(raw.is_active) : true;
-
-  return {
-    ...raw,
-    id,
-    code,
-    type,
-    discount_type: type,
-    value,
-    discount_value: value,
-    discountPercent: type === "percent" ? value : undefined,
-    min_order_amount,
-    minOrder: min_order_amount,
-    max_discount,
-    max_discount_amount: max_discount,
-    maxDiscount: max_discount,
-    usage_limit: raw.usage_limit !== undefined ? Number(raw.usage_limit) : undefined,
-    used_count: Number(raw.used_count ?? 0),
-    expires_at: raw.expires_at || undefined,
-    is_active,
-    created_at: raw.created_at || new Date().toISOString(),
-    updated_at: raw.updated_at || new Date().toISOString(),
-  };
-}
-
-export const couponService = {
-  // دریافت همه کدهای تخفیف
-  async getAll(): Promise<Coupon[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("coupons")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          const mapped = data.map(normalizeCoupon);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
-          }
-          return mapped;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (cached) {
-          return JSON.parse(cached).map(normalizeCoupon);
-        }
-      }
-
-      const defaults: Coupon[] = [
-        {
-          id: "cp_1",
-          code: "OFF10",
-          type: "percent",
-          discount_type: "percent",
-          value: 10,
-          discount_value: 10,
-          discountPercent: 10,
-          min_order_amount: 100000,
-          is_active: true,
-        },
-        {
-          id: "cp_2",
-          code: "AXON",
-          type: "percent",
-          discount_type: "percent",
-          value: 15,
-          discount_value: 15,
-          discountPercent: 15,
-          max_discount: 500000,
-          is_active: true,
-        },
-      ];
-
-      return defaults.map(normalizeCoupon);
-    } catch (err) {
-      console.error("couponService getAll error:", err);
-      return [];
-    }
-  },
-
-  // بررسی و اعتبارسنجی یک کوپن
-  async validateCoupon(code: string, totalAmount: number): Promise<{ valid: boolean; discount: number; message: string; coupon?: Coupon }> {
-    try {
-      const all = await this.getAll();
-      const cleanCode = code.trim().toUpperCase();
-      const matched = all.find((c) => c.code === cleanCode && c.is_active !== false);
-
-      if (!matched) {
-        return { valid: false, discount: 0, message: "کد تخفیف وارد شده معتبر نیست یا غیرفعال شده است." };
-      }
-
-      if (matched.expires_at && new Date(matched.expires_at) < new Date()) {
-        return { valid: false, discount: 0, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." };
-      }
-
-      if (matched.min_order_amount && totalAmount < matched.min_order_amount) {
-        return {
-          valid: false,
-          discount: 0,
-          message: `حداقل مبلغ سفارش برای اعمال این کد ${matched.min_order_amount.toLocaleString("fa-IR")} تومان است.`,
-        };
-      }
-
-      if (matched.usage_limit && (matched.used_count ?? 0) >= matched.usage_limit) {
-        return { valid: false, discount: 0, message: "ظرفیت استفاده از این کد تخفیف تکمیل شده است." };
-      }
-
-      let calculatedDiscount = 0;
-      const type = matched.discount_type || matched.type;
-      const val = Number(matched.discount_value ?? matched.value ?? 0);
-
-      if (type === "percent") {
-        calculatedDiscount = (totalAmount * val) / 100;
-        const maxLimit = matched.max_discount ?? matched.max_discount_amount ?? matched.maxDiscount;
-        if (maxLimit && calculatedDiscount > maxLimit) {
-          calculatedDiscount = maxLimit;
-        }
-      } else {
-        calculatedDiscount = val;
-      }
-
-      calculatedDiscount = Math.min(calculatedDiscount, totalAmount);
-
-      return {
-        valid: true,
-        discount: calculatedDiscount,
-        message: "کد تخفیف با موفقیت اعمال گردید.",
-        coupon: matched,
-      };
-    } catch (err) {
-      console.error("couponService validateCoupon error:", err);
-      return { valid: false, discount: 0, message: "خطا در پردازش کد تخفیف." };
-    }
-  },
-
-  // ایجاد کد تخفیف جدید
-  async create(couponData: Partial<Coupon>): Promise<Coupon | null> {
-    try {
-      const normalized = normalizeCoupon({
-        ...couponData,
-        id: `cp_${Date.now()}`,
-      });
-
-      if (supabase) {
-        const payload = {
-          id: normalized.id,
-          code: normalized.code,
-          type: normalized.type,
-          discount_type: normalized.discount_type,
-          value: normalized.value,
-          discount_value: normalized.discount_value,
-          min_order_amount: normalized.min_order_amount,
-          max_discount: normalized.max_discount,
-          usage_limit: normalized.usage_limit,
-          used_count: 0,
-          expires_at: normalized.expires_at,
-          is_active: normalized.is_active,
-          updated_at: new Date().toISOString(),
-        };
-
-        const { data, error } = await supabase
-          .from("coupons")
-          .insert([payload])
-          .select()
-          .single();
-
-        if (!error && data) {
-          const current = await this.getAll();
-          const updatedList = [normalizeCoupon(data), ...current.filter((c) => String(c.id) !== String(data.id))];
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-            window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
-          }
-          return normalizeCoupon(data);
-        }
-      }
-
-      const current = await this.getAll();
-      const updatedList = [normalized, ...current];
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
-      }
-      return normalized;
-    } catch (err) {
-      console.error("couponService create error:", err);
-      return null;
-    }
-  },
-
-  // ویرایش کد تخفیف
-  async update(id: string | number, couponData: Partial<Coupon>): Promise<boolean> {
-    try {
-      if (supabase) {
-        const payload: any = {
-          ...couponData,
-          updated_at: new Date().toISOString(),
-        };
-        await supabase.from("coupons").update(payload).eq("id", id);
-      }
-
-      const current = await this.getAll();
-      const updatedList = current.map((c) =>
-        String(c.id) === String(id) ? normalizeCoupon({ ...c, ...couponData }) : c
-      );
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
-      }
-      return true;
-    } catch (err) {
-      console.error("couponService update error:", err);
-      return false;
-    }
-  },
-
-  // حذف کد تخفیف
-  async delete(id: string | number): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("coupons").delete().eq("id", id);
-      }
-
-      const current = await this.getAll();
-      const updatedList = current.filter((c) => String(c.id) !== String(id));
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
-      }
-      return true;
-    } catch (err) {
-      console.error("couponService delete error:", err);
-      return false;
-    }
-  },
-};
-</file>
-
 <file path="services/smsService.ts">
 // services/smsService.ts
 export interface SendSmsResponse {
@@ -14506,372 +14163,6 @@ export default function Navbar() {
 }
 </file>
 
-<file path="components/ProductCard.tsx">
-"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
-
-export default function ProductCard({ product }: { product: any }) {
-  const { addToCart } = useCart();
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const title = product.title || product.title_fa || product.name || "محصول بدون عنوان";
-  const price = Number(product.price) || 0;
-  const discountPrice =
-    product.discountPrice !== undefined && product.discountPrice !== null
-      ? Number(product.discountPrice)
-      : product.discount_price !== undefined && product.discount_price !== null
-      ? Number(product.discount_price)
-      : undefined;
-
-  const currentPrice = discountPrice || price;
-
-  const images =
-    Array.isArray(product.images) && product.images.length > 0
-      ? product.images
-      : [product.image_url || product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600"];
-
-  const mainImage = images[0];
-  const category = product.category || product.category_name || "تجهیزات تخصصی";
-  const isAvailable =
-    product.is_available !== false &&
-    product.isAvailable !== false &&
-    (product.stock === undefined || Number(product.stock) > 0);
-
-  const discountPercent =
-    discountPrice && discountPrice < price
-      ? Math.round(((price - discountPrice) / price) * 100)
-      : 0;
-
-  const handleQuickBuy = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addToCart({
-      id: product.id,
-      title,
-      name: title,
-      price: currentPrice,
-      image: mainImage,
-      stock: product.stock ?? 10,
-      quantity: 1,
-    });
-    router.push("/checkout");
-  };
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addToCart({
-      id: product.id,
-      title,
-      name: title,
-      price: currentPrice,
-      image: mainImage,
-      stock: product.stock ?? 10,
-      quantity: 1,
-    });
-  };
-
-  return (
-    <div
-      className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
-      dir="rtl"
-    >
-      <div className="relative w-full h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
-        <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center relative">
-          <img
-            src={mainImage}
-            alt={title}
-            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-          />
-        </Link>
-        {discountPercent > 0 && (
-          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[11px] px-2.5 py-1 rounded-full font-black shadow-lg">
-            {discountPercent}٪- تخفیف
-          </span>
-        )}
-        <span className="absolute top-3 left-3 bg-black/50 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-bold">
-          {product.badge || category}
-        </span>
-        {!isAvailable && (
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center">
-            <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black">
-              ناموجود در انبار
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col flex-grow space-y-2 mb-4">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "مرجع"}</span>
-          <span className={`font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
-            {isAvailable ? "موجود ✓" : "ناموجود"}
-          </span>
-        </div>
-        <Link href={`/products/${product.id}`} className="hover:text-[var(--accent-blue)] transition-colors">
-          <h3 className="font-black text-sm text-[var(--text-primary)] line-clamp-2 leading-snug">{title}</h3>
-        </Link>
-        <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 font-medium">
-          {product.short_description || product.description || "تجهیزات تخصصی و مرجع"}
-        </p>
-      </div>
-
-      <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            {discountPrice && discountPrice < price && (
-              <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>
-                {mounted ? price.toLocaleString("fa-IR") : price}
-              </span>
-            )}
-            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
-              {mounted ? currentPrice.toLocaleString("fa-IR") : currentPrice}{" "}
-              <span className="text-xs font-bold font-sans">تومان</span>
-            </span>
-          </div>
-          <Link href={`/products/${product.id}`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline transition">
-            بررسی ←
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={handleAddToCart}
-            disabled={!isAvailable}
-            className="py-2.5 bg-[var(--input-bg)] text-[var(--text-primary)] text-xs font-black rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] cursor-pointer disabled:opacity-40 transition"
-          >
-            🛒 سبد خرید
-          </button>
-          <button
-            onClick={handleQuickBuy}
-            disabled={!isAvailable}
-            className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition"
-          >
-            ⚡ خرید سریع
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="context/CartContext.tsx">
-"use client";
-
-import React, { createContext, useContext, useState, useEffect } from "react";
-
-export interface CartItem {
-  id: string | number;
-  title: string;
-  name?: string;
-  price: number;
-  discountPrice?: number;
-  image: string;
-  quantity: number;
-  stock?: number;
-  category?: string;
-}
-
-export interface AppliedCoupon {
-  code: string;
-  discountPercent: number;
-  maxDiscount?: number;
-}
-
-interface CartContextType {
-  cartItems: CartItem[];
-  cart: CartItem[];
-  totalItems: number;
-  isCartOpen: boolean;
-  setIsCartOpen: (open: boolean) => void;
-  toggleCart: () => void;
-  openCart: () => void;
-  closeCart: () => void;
-  addToCart: (item: any) => void;
-  removeFromCart: (id: string | number) => void;
-  updateQuantity: (id: string | number, deltaOrQty: number) => void;
-  clearCart: () => void;
-  appliedCoupon: AppliedCoupon | null;
-  applyCoupon: (code: string) => { success: boolean; message: string };
-  removeCoupon: () => void;
-  totalPrice: number;
-  totalAmount: number;
-  submitOrder?: (orderData: any) => { id: string; [key: string]: any };
-}
-
-const CartContext = createContext<CartContextType | undefined>(undefined);
-
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
-
-  useEffect(() => {
-    try {
-      const local = localStorage.getItem("pv_cart_items");
-      if (local) setCartItems(JSON.parse(local));
-    } catch (err) {
-      console.error("Error loading cart from localStorage:", err);
-    }
-  }, []);
-
-  const saveCart = (items: CartItem[]) => {
-    setCartItems(items);
-    try {
-      localStorage.setItem("pv_cart_items", JSON.stringify(items));
-    } catch (err) {
-      console.error("Error saving cart to localStorage:", err);
-    }
-  };
-
-  const addToCart = (item: any) => {
-    const itemId = String(item.id);
-    const itemTitle = item.title || item.name || "محصول فروشگاه";
-    const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);
-    const itemImage = item.image || item.image_url || item.images?.[0] || "/placeholder.png";
-
-    const existing = cartItems.find((i) => String(i.id) === itemId);
-    let updated: CartItem[];
-
-    if (existing) {
-      updated = cartItems.map((i) =>
-        String(i.id) === itemId ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i
-      );
-    } else {
-      updated = [
-        ...cartItems,
-        {
-          id: itemId,
-          title: itemTitle,
-          name: itemTitle,
-          price: itemPrice,
-          discountPrice: item.discountPrice ? Number(item.discountPrice) : undefined,
-          image: itemImage,
-          quantity: item.quantity || 1,
-          stock: item.stock !== undefined ? Number(item.stock) : undefined,
-          category: item.category,
-        },
-      ];
-    }
-    saveCart(updated);
-    setIsCartOpen(true);
-  };
-
-  const removeFromCart = (id: string | number) => {
-    const updated = cartItems.filter((i) => String(i.id) !== String(id));
-    saveCart(updated);
-  };
-
-  const updateQuantity = (id: string | number, deltaOrQty: number) => {
-    const existing = cartItems.find((i) => String(i.id) === String(id));
-    if (!existing) return;
-
-    let newQty = deltaOrQty;
-    if (deltaOrQty === 1 || deltaOrQty === -1) {
-      newQty = existing.quantity + deltaOrQty;
-    }
-
-    if (newQty <= 0) {
-      removeFromCart(id);
-      return;
-    }
-
-    const updated = cartItems.map((i) => (String(i.id) === String(id) ? { ...i, quantity: newQty } : i));
-    saveCart(updated);
-  };
-
-  const clearCart = () => {
-    saveCart([]);
-    setAppliedCoupon(null);
-  };
-
-  const openCart = () => setIsCartOpen(true);
-  const closeCart = () => setIsCartOpen(false);
-  const toggleCart = () => setIsCartOpen((prev) => !prev);
-
-  const applyCoupon = (code: string) => {
-    const clean = code.trim().toUpperCase();
-    if (clean === "OFF10" || clean === "AXON") {
-      setAppliedCoupon({ code: clean, discountPercent: 10 });
-      return { success: true, message: "کد تخفیف ۱۰٪ با موفقیت اعمال شد." };
-    }
-    return { success: false, message: "کد تخفیف وارد شده معتبر نیست." };
-  };
-
-  const removeCoupon = () => setAppliedCoupon(null);
-
-  const totalItems = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
-
-  const totalPrice = cartItems.reduce(
-    (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
-    0
-  );
-
-  const submitOrder = (orderData: any) => {
-    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
-    const fullOrder = {
-      id: orderId,
-      ...orderData,
-      items: cartItems,
-      totalAmount: totalPrice,
-      createdAt: new Date().toISOString(),
-    };
-    try {
-      const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
-      localStorage.setItem("site_orders", JSON.stringify([fullOrder, ...existing]));
-      localStorage.setItem("admin_orders_cache", JSON.stringify([fullOrder, ...existing]));
-    } catch (err) {
-      console.error("Error saving local order:", err);
-    }
-    return fullOrder;
-  };
-
-  return (
-    <CartContext.Provider
-      value={{
-        cartItems,
-        cart: cartItems,
-        totalItems,
-        isCartOpen,
-        setIsCartOpen,
-        toggleCart,
-        openCart,
-        closeCart,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        appliedCoupon,
-        applyCoupon,
-        removeCoupon,
-        totalPrice,
-        totalAmount: totalPrice,
-        submitOrder,
-      }}
-    >
-      {children}
-    </CartContext.Provider>
-  );
-}
-
-export function useCart() {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error("useCart must be used within a CartProvider");
-  }
-  return context;
-}
-</file>
-
 <file path="services/adminAuthService.ts">
 // services/adminAuthService.ts
 import { supabase } from "@/lib/supabase";
@@ -14984,6 +14275,260 @@ export const adminAuthService = {
       }
       return true;
     } catch {
+      return false;
+    }
+  },
+};
+</file>
+
+<file path="services/couponService.ts">
+// File Path: services/couponService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface Coupon {
+  id: string | number;
+  code: string;
+  type?: "percent" | "fixed";
+  discount_type?: "percent" | "fixed";
+  value?: number;
+  discount_value?: number;
+  discountPercent?: number;
+  min_order_amount?: number;
+  minOrder?: number;
+  max_discount_amount?: number;
+  max_discount?: number;
+  maxDiscount?: number;
+  usage_limit?: number;
+  used_count?: number;
+  expires_at?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+const LOCAL_STORAGE_KEY = "axon_coupons_cache_v2026";
+
+export function normalizeCoupon(raw: any): Coupon {
+  if (!raw) return {} as Coupon;
+
+  const id = raw.id || `coupon_${Date.now()}`;
+  const code = (raw.code || "").trim().toUpperCase();
+  const type = raw.discount_type || raw.type || (raw.discountPercent ? "percent" : "fixed");
+  const value = Number(raw.discount_value ?? raw.value ?? raw.discountPercent ?? 0);
+  const min_order_amount = raw.min_order_amount !== undefined ? Number(raw.min_order_amount) : (raw.minOrder !== undefined ? Number(raw.minOrder) : undefined);
+  const max_discount = raw.max_discount !== undefined ? Number(raw.max_discount) : (raw.max_discount_amount !== undefined ? Number(raw.max_discount_amount) : (raw.maxDiscount !== undefined ? Number(raw.maxDiscount) : undefined));
+  const is_active = raw.is_active !== undefined ? Boolean(raw.is_active) : true;
+
+  return {
+    ...raw,
+    id,
+    code,
+    type,
+    discount_type: type,
+    value,
+    discount_value: value,
+    discountPercent: type === "percent" ? value : undefined,
+    min_order_amount,
+    minOrder: min_order_amount,
+    max_discount,
+    max_discount_amount: max_discount,
+    maxDiscount: max_discount,
+    usage_limit: raw.usage_limit !== undefined ? Number(raw.usage_limit) : undefined,
+    used_count: Number(raw.used_count ?? 0),
+    expires_at: raw.expires_at || undefined,
+    is_active,
+    created_at: raw.created_at || new Date().toISOString(),
+    updated_at: raw.updated_at || new Date().toISOString(),
+  };
+}
+
+export const couponService = {
+  async getAll(): Promise<Coupon[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          const mapped = data.map(normalizeCoupon);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+          }
+          return mapped;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (cached) {
+          return JSON.parse(cached).map(normalizeCoupon);
+        }
+      }
+
+      return [];
+    } catch (err) {
+      console.error("couponService getAll error:", err);
+      return [];
+    }
+  },
+
+  async validateCoupon(
+    code: string,
+    totalAmount: number
+  ): Promise<{ valid: boolean; discount: number; message: string; coupon?: Coupon }> {
+    try {
+      const cleanCode = code.trim().toUpperCase();
+
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .eq("code", cleanCode)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (!error && data) {
+          const matched = normalizeCoupon(data);
+
+          if (matched.expires_at && new Date(matched.expires_at) < new Date()) {
+            return { valid: false, discount: 0, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." };
+          }
+
+          if (matched.min_order_amount && totalAmount < matched.min_order_amount) {
+            return {
+              valid: false,
+              discount: 0,
+              message: `حداقل مبلغ سفارش برای اعمال این کد ${matched.min_order_amount.toLocaleString("fa-IR")} تومان است.`,
+            };
+          }
+
+          if (matched.usage_limit && (matched.used_count ?? 0) >= matched.usage_limit) {
+            return { valid: false, discount: 0, message: "ظرفیت استفاده از این کد تخفیف تکمیل شده است." };
+          }
+
+          let calculatedDiscount = 0;
+          const type = matched.discount_type || matched.type;
+          const val = Number(matched.discount_value ?? matched.value ?? 0);
+
+          if (type === "percent") {
+            calculatedDiscount = (totalAmount * val) / 100;
+            const maxLimit = matched.max_discount ?? matched.max_discount_amount ?? matched.maxDiscount;
+            if (maxLimit && calculatedDiscount > maxLimit) {
+              calculatedDiscount = maxLimit;
+            }
+          } else {
+            calculatedDiscount = val;
+          }
+
+          calculatedDiscount = Math.min(calculatedDiscount, totalAmount);
+
+          return {
+            valid: true,
+            discount: calculatedDiscount,
+            message: "کد تخفیف با موفقیت اعمال گردید.",
+            coupon: matched,
+          };
+        }
+      }
+
+      return { valid: false, discount: 0, message: "کد تخفیف وارد شده معتبر نیست یا غیرفعال شده است." };
+    } catch (err) {
+      console.error("couponService validateCoupon error:", err);
+      return { valid: false, discount: 0, message: "خطا در پردازش کد تخفیف." };
+    }
+  },
+
+  async create(couponData: Partial<Coupon>): Promise<Coupon | null> {
+    try {
+      const normalized = normalizeCoupon({
+        ...couponData,
+        id: `cp_${Date.now()}`,
+      });
+
+      if (supabase) {
+        const payload = {
+          code: normalized.code,
+          type: normalized.type,
+          discount_type: normalized.discount_type,
+          value: normalized.value,
+          discount_value: normalized.discount_value,
+          min_order_amount: normalized.min_order_amount || null,
+          max_discount: normalized.max_discount || null,
+          usage_limit: normalized.usage_limit || null,
+          used_count: 0,
+          expires_at: normalized.expires_at || null,
+          is_active: normalized.is_active,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabase
+          .from("coupons")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (!error && data) {
+          const current = await this.getAll();
+          const updatedList = [normalizeCoupon(data), ...current.filter((c) => String(c.id) !== String(data.id))];
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+            window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
+          }
+          return normalizeCoupon(data);
+        }
+      }
+
+      return null;
+    } catch (err) {
+      console.error("couponService create error:", err);
+      return null;
+    }
+  },
+
+  async update(id: string | number, couponData: Partial<Coupon>): Promise<boolean> {
+    try {
+      if (supabase) {
+        const payload: any = {
+          ...couponData,
+          updated_at: new Date().toISOString(),
+        };
+        await supabase.from("coupons").update(payload).eq("id", id);
+      }
+
+      const current = await this.getAll();
+      const updatedList = current.map((c) =>
+        String(c.id) === String(id) ? normalizeCoupon({ ...c, ...couponData }) : c
+      );
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
+      }
+      return true;
+    } catch (err) {
+      console.error("couponService update error:", err);
+      return false;
+    }
+  },
+
+  async delete(id: string | number): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("coupons").delete().eq("id", id);
+      }
+
+      const current = await this.getAll();
+      const updatedList = current.filter((c) => String(c.id) !== String(id));
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
+      }
+      return true;
+    } catch (err) {
+      console.error("couponService delete error:", err);
       return false;
     }
   },
@@ -15402,6 +14947,387 @@ export default function AdminBanners() {
       </div>
     </div>
   );
+}
+</file>
+
+<file path="components/ProductCard.tsx">
+// File Path: components/ProductCard.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
+
+export default function ProductCard({ product }: { product: any }) {
+  const { addToCart } = useCart();
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const title = product.title || product.title_fa || product.name || "محصول تخصصی";
+  const price = Number(product.price) || 0;
+  const discountPrice =
+    product.discountPrice !== undefined && product.discountPrice !== null
+      ? Number(product.discountPrice)
+      : product.discount_price !== undefined && product.discount_price !== null
+      ? Number(product.discount_price)
+      : undefined;
+
+  const currentPrice = discountPrice || price;
+
+  const images =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images
+      : [product.image_url || product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600"];
+
+  const mainImage = images[0];
+  const category = product.category || product.category_name || "تجهیزات تخصصی";
+  const isAvailable =
+    product.is_available !== false &&
+    product.isAvailable !== false &&
+    (product.stock === undefined || Number(product.stock) > 0);
+
+  const discountPercent =
+    discountPrice && discountPrice < price
+      ? Math.round(((price - discountPrice) / price) * 100)
+      : 0;
+
+  const handleQuickBuy = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    soundEngine.playAddToCart();
+    addToCart({
+      id: product.id,
+      title,
+      name: title,
+      price: currentPrice,
+      image: mainImage,
+      stock: product.stock ?? 10,
+      quantity: 1,
+    });
+    router.push("/checkout");
+  };
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    soundEngine.playAddToCart();
+    addToCart({
+      id: product.id,
+      title,
+      name: title,
+      price: currentPrice,
+      image: mainImage,
+      stock: product.stock ?? 10,
+      quantity: 1,
+    });
+  };
+
+  return (
+    <div
+      className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
+      dir="rtl"
+    >
+      <div className="relative w-full h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
+        <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center relative">
+          <img
+            src={mainImage}
+            alt={title}
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+          />
+        </Link>
+        {discountPercent > 0 && (
+          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[11px] px-2.5 py-1 rounded-full font-black shadow-lg">
+            {discountPercent}٪- تخفیف
+          </span>
+        )}
+        <span className="absolute top-3 left-3 bg-black/50 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-bold">
+          {product.badge || category}
+        </span>
+        {!isAvailable && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center">
+            <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black">
+              ناموجود در انبار
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col flex-grow space-y-2 mb-4">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "مرجع"}</span>
+          <span className={`font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
+            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
+          </span>
+        </div>
+        <Link href={`/products/${product.id}`} className="hover:text-[var(--accent-blue)] transition-colors">
+          <h3 className="font-black text-sm text-[var(--text-primary)] line-clamp-2 leading-snug">{title}</h3>
+        </Link>
+        <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 font-medium">
+          {product.short_description || product.description || "تجهیزات تخصصی با گارانتی اصالت"}
+        </p>
+      </div>
+
+      <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            {discountPrice && discountPrice < price && (
+              <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>
+                {mounted ? price.toLocaleString("fa-IR") : price}
+              </span>
+            )}
+            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
+              {mounted ? currentPrice.toLocaleString("fa-IR") : currentPrice}{" "}
+              <span className="text-xs font-bold font-sans">تومان</span>
+            </span>
+          </div>
+          <Link href={`/products/${product.id}`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline transition">
+            بررسی ←
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handleAddToCart}
+            disabled={!isAvailable}
+            className="py-2.5 bg-[var(--input-bg)] text-[var(--text-primary)] text-xs font-black rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] cursor-pointer disabled:opacity-40 transition"
+          >
+            🛒 سبد خرید
+          </button>
+          <button
+            onClick={handleQuickBuy}
+            disabled={!isAvailable}
+            className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition"
+          >
+            ⚡ خرید سریع
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="context/CartContext.tsx">
+// File Path: context/CartContext.tsx
+"use client";
+
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { couponService } from "@/services/couponService";
+
+export interface CartItem {
+  id: string | number;
+  title: string;
+  name?: string;
+  price: number;
+  discountPrice?: number;
+  image: string;
+  quantity: number;
+  stock?: number;
+  category?: string;
+}
+
+export interface AppliedCoupon {
+  code: string;
+  discountPercent: number;
+  maxDiscount?: number;
+}
+
+interface CartContextType {
+  cartItems: CartItem[];
+  cart: CartItem[];
+  totalItems: number;
+  isCartOpen: boolean;
+  setIsCartOpen: (open: boolean) => void;
+  toggleCart: () => void;
+  openCart: () => void;
+  closeCart: () => void;
+  addToCart: (item: any) => void;
+  removeFromCart: (id: string | number) => void;
+  updateQuantity: (id: string | number, deltaOrQty: number) => void;
+  clearCart: () => void;
+  appliedCoupon: AppliedCoupon | null;
+  applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
+  removeCoupon: () => void;
+  totalPrice: number;
+  totalAmount: number;
+  submitOrder?: (orderData: any) => { id: string; [key: string]: any };
+}
+
+const CartContext = createContext<CartContextType | undefined>(undefined);
+
+export function CartProvider({ children }: { children: React.ReactNode }) {
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+
+  useEffect(() => {
+    try {
+      const local = localStorage.getItem("pv_cart_items");
+      if (local) setCartItems(JSON.parse(local));
+    } catch (err) {
+      console.error("Error loading cart from localStorage:", err);
+    }
+  }, []);
+
+  const saveCart = (items: CartItem[]) => {
+    setCartItems(items);
+    try {
+      localStorage.setItem("pv_cart_items", JSON.stringify(items));
+    } catch (err) {
+      console.error("Error saving cart to localStorage:", err);
+    }
+  };
+
+  const addToCart = (item: any) => {
+    const itemId = String(item.id);
+    const itemTitle = item.title || item.name || "محصول فروشگاه";
+    const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);
+    const itemImage = item.image || item.image_url || item.images?.[0] || "/placeholder.png";
+
+    const existing = cartItems.find((i) => String(i.id) === itemId);
+    let updated: CartItem[];
+
+    if (existing) {
+      updated = cartItems.map((i) =>
+        String(i.id) === itemId ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i
+      );
+    } else {
+      updated = [
+        ...cartItems,
+        {
+          id: itemId,
+          title: itemTitle,
+          name: itemTitle,
+          price: itemPrice,
+          discountPrice: item.discountPrice ? Number(item.discountPrice) : undefined,
+          image: itemImage,
+          quantity: item.quantity || 1,
+          stock: item.stock !== undefined ? Number(item.stock) : undefined,
+          category: item.category,
+        },
+      ];
+    }
+    saveCart(updated);
+    setIsCartOpen(true);
+  };
+
+  const removeFromCart = (id: string | number) => {
+    const updated = cartItems.filter((i) => String(i.id) !== String(id));
+    saveCart(updated);
+  };
+
+  const updateQuantity = (id: string | number, deltaOrQty: number) => {
+    const existing = cartItems.find((i) => String(i.id) === String(id));
+    if (!existing) return;
+
+    let newQty = deltaOrQty;
+    if (deltaOrQty === 1 || deltaOrQty === -1) {
+      newQty = existing.quantity + deltaOrQty;
+    }
+
+    if (newQty <= 0) {
+      removeFromCart(id);
+      return;
+    }
+
+    const updated = cartItems.map((i) => (String(i.id) === String(id) ? { ...i, quantity: newQty } : i));
+    saveCart(updated);
+  };
+
+  const clearCart = () => {
+    saveCart([]);
+    setAppliedCoupon(null);
+  };
+
+  const openCart = () => setIsCartOpen(true);
+  const closeCart = () => setIsCartOpen(false);
+  const toggleCart = () => setIsCartOpen((prev) => !prev);
+
+  const totalPrice = cartItems.reduce(
+    (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
+    0
+  );
+
+  const applyCoupon = async (code: string) => {
+    const clean = code.trim().toUpperCase();
+    const res = await couponService.validateCoupon(clean, totalPrice);
+    if (res.valid && res.coupon) {
+      const discountPercent = res.coupon.type === "percent" || res.coupon.discount_type === "percent"
+        ? Number(res.coupon.value || res.coupon.discount_value || 0)
+        : Math.round((res.discount / (totalPrice || 1)) * 100);
+
+      setAppliedCoupon({
+        code: clean,
+        discountPercent,
+        maxDiscount: res.coupon.max_discount || res.coupon.max_discount_amount || undefined,
+      });
+      return { success: true, message: res.message };
+    }
+    return { success: false, message: res.message || "کد تخفیف وارد شده نامعتبر است." };
+  };
+
+  const removeCoupon = () => setAppliedCoupon(null);
+
+  const totalItems = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+
+  const submitOrder = (orderData: any) => {
+    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+    const fullOrder = {
+      id: orderId,
+      ...orderData,
+      items: cartItems,
+      totalAmount: totalPrice,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
+      localStorage.setItem("site_orders", JSON.stringify([fullOrder, ...existing]));
+      localStorage.setItem("admin_orders_cache", JSON.stringify([fullOrder, ...existing]));
+    } catch (err) {
+      console.error("Error saving local order:", err);
+    }
+    return fullOrder;
+  };
+
+  return (
+    <CartContext.Provider
+      value={{
+        cartItems,
+        cart: cartItems,
+        totalItems,
+        isCartOpen,
+        setIsCartOpen,
+        toggleCart,
+        openCart,
+        closeCart,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+        appliedCoupon,
+        applyCoupon,
+        removeCoupon,
+        totalPrice,
+        totalAmount: totalPrice,
+        submitOrder,
+      }}
+    >
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+export function useCart() {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error("useCart must be used within a CartProvider");
+  }
+  return context;
 }
 </file>
 
@@ -16629,227 +16555,6 @@ export const orderService = {
 };
 </file>
 
-<file path="app/api/ai-assistant/route.ts">
-// app/api/ai-assistant/route.ts
-import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const userMessage = body.message || body.prompt || "";
-    const history = body.history || [];
-    const role = body.role || "customer";
-    const imageBase64 = body.imageBase64;
-    const productsData = body.productsData || [];
-
-    // ۱. بررسی اگر درخواست برای تولید مقاله سئو تخصصی از پنل ادمین باشد
-    const isSeoArticleRequest =
-      role === "admin" &&
-      (userMessage.includes("سئو") ||
-        userMessage.includes("مقاله") ||
-        userMessage.includes("پکیج") ||
-        userMessage.includes("آنالیز"));
-
-    // ۲. واکشی اطلاعات زنده کاتالوگ فروشگاه از دیتابیس Supabase
-    const [productsRes, siteInfoRes] = await Promise.all([
-      supabase
-        .from("products")
-        .select("id, title, name, price, discount_price, category, stock, is_available, description, specs, highlights"),
-      supabase.from("site_info").select("site_name, tagline, phone, description").limit(1).maybeSingle(),
-    ]);
-
-    const products = productsData.length > 0 ? productsData : productsRes.data || [];
-    const siteInfo = siteInfoRes.data || { site_name: "آکسون (Axon)", tagline: "مرجع تخصصی تجهیزات دیجیتال" };
-
-    // اگر درخواست ساخت پکیج سئو برای محصولات انتخابی باشد:
-    if (isSeoArticleRequest && products.length > 0) {
-      const generatedSeoArticle = generateComprehensiveSeoArticle(products, siteInfo.site_name);
-      return NextResponse.json({
-        success: true,
-        response: generatedSeoArticle,
-        reply: generatedSeoArticle,
-      });
-    }
-
-    // ۳. سیستم پرامپت دستیار هوشمند مشتری
-    const productCatalogContext = products
-      .map(
-        (p: any) =>
-          `• [شناسه: ${p.id}] ${p.title || p.name} | دسته: ${p.category} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 0} عدد | توضیحات: ${p.description || "ندارد"}`
-      )
-      .join("\n");
-
-    const systemPrompt = `تو «دستیار هوشمند و مشاور تخصصی فروشگاه ${siteInfo.site_name}» هستی.
-شعار فروشگاه: ${siteInfo.tagline}
-سیاست‌های اصلی:
-۱. با لحنی محترمانه، متخصصانه، صمیمی، دقیق و هوشمند پاسخ بده.
-۲. به تمام سوالات تخصصی کاربران درباره تکنولوژی، مانیتورهای تدوین، کالرگریدینگ، دقت رنگ، انواع پنل‌ها (IPS, OLED, Mini-LED)، سخت‌افزار و مقایسه رزولوشن‌ها با بالاترین سطح علمی پاسخ بده.
-۳. در حین پاسخ‌دهی، پاسخ را به سمت محصولات موجود در فروشگاه ما هدایت کن.
-۴. اگر کالا در کاتالوگ موجود است، با ذکر قیمت پیشنهاد بده.
-
-کاتالوگ محصولات فعال فروشگاه:
-${productCatalogContext || "در حال حاضر کالایی در ویترین ثبت نشده است."}`;
-
-    let aiResponse = "";
-    let matchedProductId: string | null = null;
-
-    const lowerQuery = userMessage.toLowerCase();
-
-    const matchedProduct = products.find(
-      (p: any) =>
-        (p.title && lowerQuery.includes(p.title.toLowerCase())) ||
-        (p.name && lowerQuery.includes(p.name.toLowerCase())) ||
-        (p.category && lowerQuery.includes(p.category.toLowerCase()))
-    );
-
-    if (matchedProduct) {
-      matchedProductId = matchedProduct.id;
-    }
-
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        const geminiReq = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: "user",
-                  parts: [
-                    { text: systemPrompt },
-                    ...history.map((h: any) => ({ text: `${h.role === "user" ? "کاربر" : "دستیار"}: ${h.text || (h.parts && h.parts[0]?.text) || ""}` })),
-                    { text: `پیام کاربر: ${userMessage}` },
-                    ...(imageBase64
-                      ? [
-                          {
-                            inline_data: {
-                              mime_type: "image/jpeg",
-                              data: imageBase64.replace(/^data:image\/\w+;base64,/, ""),
-                            },
-                          },
-                        ]
-                      : []),
-                  ],
-                },
-              ],
-            }),
-          }
-        );
-        const geminiData = await geminiReq.json();
-        aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-      } catch (err) {
-        console.error("Gemini API Call Error:", err);
-      }
-    }
-
-    if (!aiResponse) {
-      if (lowerQuery.includes("سلام") || lowerQuery.includes("درود")) {
-        aiResponse = `سلام و درود! خوش آمدید به فروشگاه **${siteInfo.site_name}** ⚡\nمن دستیار هوشمند و مشاور تخصصی شما هستم. چه در مورد انتخاب بهترین مانیتور برای تدوین و طراحی سوال داشته باشید، چه در مورد استانداردهای رنگ، کارت‌های کپچر یا مقایسه مدل‌ها، با کمال میل راهنماییتان می‌کنم. چطور می‌توانم کمکتان کنم؟`;
-      } else if (
-        lowerQuery.includes("مانیتور") ||
-        lowerQuery.includes("تدوین") ||
-        lowerQuery.includes("رنگ") ||
-        lowerQuery.includes("ips") ||
-        lowerQuery.includes("oled") ||
-        lowerQuery.includes("4k")
-      ) {
-        aiResponse = `برای کارهای حساس به رنگ و تدوین حرفه‌ای، مهم‌ترین فاکتورها **دقت پوشش رنگی (حداقل ۹۹٪ sRGB و DCI-P3)**، نوع پنل (ترجیحاً IPS یا OLED کالیبره‌شده) و تفکیک سایه‌روشن‌هاست.\n\nدر مجموعه ما مدل‌های برگزیده‌ای متناسب با همین استانداردها موجود است که می‌توانید مشخصات فنی و تست رنگ آن‌ها را در کاتالوگ بررسی فرمایید. آیا رزولوشن یا برند خاصی مد نظرتان است؟`;
-      } else if (matchedProduct) {
-        aiResponse = `محصول **«${matchedProduct.title || matchedProduct.name}»** یکی از بهترین گزینه‌ها در دسته ${matchedProduct.category} است.\n\n🔹 **قیمت با تخفیف ویژه:** ${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان\n🔹 **وضعیت موجودی:** آماده ارسال با گارانتی معتبر\n\nمی‌توانید برای مشاهده مشخصات کامل یا ثبت سفارش مستقیم، از دکمه زیر استفاده کنید.`;
-      } else {
-        aiResponse = `پرسش بسیار خوبی است! من آماده‌ام تا در تمامی زمینه‌های فنی، مشخصات قطعات و انتخاب تجهیزات مورد نیازتان مشاوره‌تان بدهم. همچنین اگر تصویری از دستگاه یا نیاز خود دارید می‌توانید ارسال کنید تا دقیق‌تر بررسی کنیم.`;
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      response: aiResponse,
-      reply: aiResponse,
-      matchedProductId,
-    });
-  } catch (error: any) {
-    console.error("AI Assistant API Route Error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        response: "در حال حاضر ارتباط با دستیار برقرار نشد. لطفاً مجدداً پیام خود را ارسال فرمایید.",
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// موتور تولید مقاله جامع سئو با استاندارد گوگل
-function generateComprehensiveSeoArticle(products: any[], storeName: string): string {
-  const p = products[0];
-  const title = p.title || p.name || "تجهیزات دیجیتال پیشرفته";
-  const cat = p.category || "سخت‌افزار";
-  const priceFormatted = Number(p.discount_price || p.price || 0).toLocaleString("fa-IR");
-
-  return `# راهنمای خرید و نقد تخصصی ${title}؛ پرچمدار دنیای ${cat} در سال ۲۰۲۶
-
-**Title Tag:** بررسی و خرید ${title} با گارانتی اصالت | فروشگاه ${storeName}
-**Meta Description:** نقد و بررسی جامع ${title}، مشخصات فنی، بنچ‌مارک سرعت و تست کالیبراسیون به همراه راهنمای خرید با کمترین قیمت بازار در فروشگاه تخصصی ${storeName}.
-**کلمات کلیدی اصلی:** خرید ${title}، بررسی تخصصی ${title}، قیمت ${title} در بازار، گارانتی ${storeName}
-
----
-
-## مقدمه: چرا ${title} انقلابی در بازار ${cat} به پا کرد؟
-در عصر پردازش‌های فوق‌سریع و هوش مصنوعی مولد، نیاز به تجهیزاتی با پایداری عملکردی بی‌نقص و دقت مهندسی بالا بیش از هر زمان دیگری احساس می‌شود. محصول **${title}** با تکیه بر معماری نسل جدید و استانداردهای روز دنیا، توانسته است نظر سخت‌گیرترین کارشناسان و کاربران حرفه‌ای را به خود جلب کند.
-
-در این مقاله تحلیلی، به کالبدشکافی لایه‌به‌لایه، بررسی پارامترهای فنی، سیستم خنک‌کاری و ارزش خرید این دستگاه در مقایسه با رقبای مستقیم بازار می‌پردازیم.
-
----
-
-## بررسی مشخصات فنی و معماری سخت‌افزار
-${title} از جدیدترین فناوری‌های صنعتی بهره می‌برد که ارتقای چشمگیری را نسبت به نسل‌های قبلی به نمایش می‌گذارد:
-
-* **توان پردازشی و معماری چیپست:** بهره‌مندی از سیلیکون‌های اختصاصی با راندمان مصرف انرژی بهینه‌شده و شتاب‌دهنده عصبی هوش مصنوعی.
-* **دقت بصری و پوشش طیف رنگ:** کالیبراسیون سخت‌افزاری با حداقل انحراف رنگی (Delta E < 1) جهت اطمینان از خروجی واقعی پروژه‌ها.
-* **مهندسی بدنه و متالورژی:** استفاده از متریال مرغوب ضدخش و دفع حرارت غیرفعال جهت حفظ پایداری کامل در ساعات کاری طولانی.
-
-### 📊 جدول مشخصات و مقایسه پارامترهای کلیدی
-| پارامتر مهندسی | وضعیت در ${title} | استاندارد سایر محصولات بازار |
-| :--- | :--- | :--- |
-| **کیفیت ساخت بدنه** | متریال هوافضایی ضدضربه | آلیاژهای پلاستیکی فشرده معمولی |
-| **دقت رنگ و پوشش Gamut** | ۱۰۰٪ sRGB و ۹۹٪ DCI-P3 | ۸۵٪ sRGB متغیر |
-| **پایداری حرارتی** | محفظه خنک‌کاری گرافنی بدون افت توان | نیاز به فن‌های پرصدا در بار کامل |
-| **وضعیت گارانتی** | ۱۸ ماه ضمانت طلایی تعویض ${storeName} | گارانتی‌های غیررسمی بدون تست سلامت |
-
----
-
-## نقاط قوت و ضعف از دیدگاه کارشناسان استودیو
-
-### ✅ مزایای رقابتی:
-* عملکرد فوق‌العاده سریع و بهینه‌شده برای پردازش‌های سنگین
-* کالیبراسیون دقیق نمایشگر با گستره دینامیکی بالا
-* طراحی ارگونومیک، شیک و مینیمال با طول عمر بالای قطعات
-* ارزش خرید استثنایی با توجه به قیمت **${priceFormatted} تومان** در فروشگاه
-
-### ⚠️ مواردی که قبل از خرید باید مدنظر داشته باشید:
-* حساسیت بالا به کابل‌ها و لوازم جانبی استاندارد اورجینال
-* ظرفیت بالای دستگاه که مناسب کاربران حرفه‌ای و نیمه‌حرفه‌ای است
-
----
-
-## سوالات متداول خریداران (FAQ)
-
-**۱. آیا ${title} دارای گارانتی رسمی و مهلت تست است؟**
-بله، تمامی کالاهای ارائه‌شده در فروشگاه ${storeName} دارای ۱۸ ماه ضمانت اصالت فیزیکی و ۷ روز مهلت تست بی‌قیدوشرط می‌باشند.
-
-**۲. این محصول برای چه افرادی بیشترین کاربرد را دارد؟**
-این دستگاه به طور ویژه برای طراحان، مهندسان، تولیدکنندگان محتوا و کاربرانی که به دنبال حداکثر دوام و عملکرد هستند طراحی شده است.
-
----
-
-## جمع‌بندی و نتیجه‌گیری نهایی
-اگر به دنبال دستگاهی هستید که تا سال‌ها بدون افت کیفیت و نیاز به ارتقا پاسخگوی نیازهای پردازشی و کاری شما باشد، **${title}** بدون شک یکی از هوشمندانه‌ترین سرمایه‌گذاری‌ها در دسته ${cat} به شمار می‌رود. شما می‌توانید هم‌اکنون این محصول را با **تضمین کمترین قیمت بازار و ارسال سریع پیشتاز** از فروشگاه ${storeName} تهیه فرمایید.`;
-}
-</file>
-
 <file path="components/CartDrawer.tsx">
 // components/CartDrawer.tsx
 "use client";
@@ -17366,6 +17071,184 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
 });
 </file>
 
+<file path="app/api/ai-assistant/route.ts">
+// File Path: app/api/ai-assistant/route.ts
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const userMessage = body.message || body.prompt || "";
+    const history = body.history || [];
+    const role = body.role || "customer";
+    const imageBase64 = body.imageBase64;
+    const productsData = body.productsData || [];
+
+    const isSeoArticleRequest =
+      role === "admin" &&
+      (userMessage.includes("سئو") ||
+        userMessage.includes("مقاله") ||
+        userMessage.includes("پکیج") ||
+        userMessage.includes("آنالیز"));
+
+    const [productsRes, siteInfoRes] = await Promise.all([
+      supabase
+        .from("products")
+        .select("id, title, name, price, discount_price, category, stock, is_available, description, specs, highlights"),
+      supabase.from("site_info").select("site_name, tagline, phone, description").limit(1).maybeSingle(),
+    ]);
+
+    const products = productsData.length > 0 ? productsData : productsRes.data || [];
+    const siteInfo = siteInfoRes.data || { site_name: "آکسون (Axon)", tagline: "مرجع تخصصی تجهیزات دیجیتال" };
+
+    if (isSeoArticleRequest && products.length > 0) {
+      const generatedSeoArticle = generateComprehensiveSeoArticle(products, siteInfo.site_name);
+      return NextResponse.json({
+        success: true,
+        response: generatedSeoArticle,
+        reply: generatedSeoArticle,
+      });
+    }
+
+    const productCatalogContext = products
+      .map(
+        (p: any) =>
+          `• [شناسه: ${p.id}] ${p.title || p.name} | دسته: ${p.category} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 0} عدد | توضیحات: ${p.description || "ندارد"}`
+      )
+      .join("\n");
+
+    const systemPrompt = `تو «دستیار هوشمند و مشاور تخصصی فروشگاه ${siteInfo.site_name}» هستی.
+شعار فروشگاه: ${siteInfo.tagline}
+سیاست‌های اصلی:
+۱. با لحنی محترمانه، متخصصانه، صمیمی، دقیق و هوشمند پاسخ بده.
+۲. به تمام سوالات تخصصی کاربران درباره تکنولوژی، مانیتورهای تدوین، کالرگریدینگ، دقت رنگ، انواع پنل‌ها (IPS, OLED, Mini-LED)، سخت‌افزار و مقایسه رزولوشن‌ها با بالاترین سطح علمی پاسخ بده.
+۳. در حین پاسخ‌دهی، پاسخ را بر اساس موجودی واقعی انبار فروشگاه ما ارائه بده.
+۴. اگر کالا در کاتالوگ موجود است، با ذکر قیمت و ویژگی‌های فنی پیشنهاد بده.
+
+کاتالوگ محصولات فعال فروشگاه:
+${productCatalogContext || "در حال حاضر کالایی در ویترین ثبت نشده است."}`;
+
+    let aiResponse = "";
+    let matchedProductId: string | null = null;
+
+    const lowerQuery = userMessage.toLowerCase();
+
+    const matchedProduct = products.find(
+      (p: any) =>
+        (p.title && lowerQuery.includes(p.title.toLowerCase())) ||
+        (p.name && lowerQuery.includes(p.name.toLowerCase())) ||
+        (p.category && lowerQuery.includes(p.category.toLowerCase()))
+    );
+
+    if (matchedProduct) {
+      matchedProductId = matchedProduct.id;
+    }
+
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const geminiReq = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    { text: systemPrompt },
+                    ...history.map((h: any) => ({ text: `${h.role === "user" ? "کاربر" : "دستیار"}: ${h.text || (h.parts && h.parts[0]?.text) || ""}` })),
+                    { text: `پیام کاربر: ${userMessage}` },
+                    ...(imageBase64
+                      ? [
+                          {
+                            inline_data: {
+                              mime_type: "image/jpeg",
+                              data: imageBase64.replace(/^data:image\/\w+;base64,/, ""),
+                            },
+                          },
+                        ]
+                      : []),
+                  ],
+                },
+              ],
+            }),
+          }
+        );
+        const geminiData = await geminiReq.json();
+        aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+      } catch (err) {
+        console.error("Gemini API Call Error:", err);
+      }
+    }
+
+    if (!aiResponse) {
+      if (lowerQuery.includes("سلام") || lowerQuery.includes("درود")) {
+        aiResponse = `سلام و درود! خوش آمدید به فروشگاه **${siteInfo.site_name}** ⚡\nمن دستیار هوشمند و مشاور تخصصی شما هستم. چه در مورد انتخاب بهترین تجهیزات و مانیتورها سوال داشته باشید، چه در مورد استانداردهای رنگ، استعلام کالا یا مقایسه مدل‌ها، با کمال میل راهنماییتان می‌کنم. چطور می‌توانم کمکتان کنم؟`;
+      } else if (matchedProduct) {
+        aiResponse = `محصول **«${matchedProduct.title || matchedProduct.name}»** در دسته **${matchedProduct.category}** با مشخصات زیر در انبار موجود است:\n\n🔹 **قیمت با تخفیف ویژه:** ${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان\n🔹 **وضعیت موجودی:** ${matchedProduct.stock ?? 0} عدد موجود در انبار\n\nمی‌توانید برای مشاهده مشخصات کامل یا ثبت سفارش مستقیم از دکمه زیر استفاده کنید.`;
+      } else {
+        aiResponse = `درخواست شما بررسی شد. شما می‌توانید محصولات موجود در کاتالوگ فروشگاه را با تضمین اصالت و گارانتی ۱۸ ماهه مشاهده و سفارش دهید. در صورت نیاز به راهنمایی در مورد کالای خاص، نام آن را بفرمایید.`;
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      response: aiResponse,
+      reply: aiResponse,
+      matchedProductId,
+    });
+  } catch (error: any) {
+    console.error("AI Assistant API Route Error:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        response: "در حال حاضر ارتباط با دستیار هوشمند برقرار نشد. لطفاً مجدداً پیام خود را ارسال فرمایید.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+function generateComprehensiveSeoArticle(products: any[], storeName: string): string {
+  const p = products[0];
+  const title = p.title || p.name || "تجهیزات دیجیتال پیشرفته";
+  const cat = p.category || "سخت‌افزار";
+  const priceFormatted = Number(p.discount_price || p.price || 0).toLocaleString("fa-IR");
+
+  return `# راهنمای جامع خرید و نقد تخصصی ${title}؛ برگزیده دسته ${cat}
+
+**Title Tag:** بررسی و خرید ${title} با گارانتی اصالت | فروشگاه ${storeName}
+**Meta Description:** نقد و بررسی جامع ${title}، مشخصات فنی، بنچ‌مارک سرعت و تست کالیبراسیون به همراه راهنمای خرید با کمترین قیمت بازار در فروشگاه تخصصی ${storeName}.
+**کلمات کلیدی اصلی:** خرید ${title}، بررسی تخصصی ${title}، قیمت ${title} در بازار، گارانتی ${storeName}
+
+---
+
+## مقدمه: چرا ${title} انتخابی متمایز در بازار ${cat} است؟
+در دنیای پرشتاب فناوری، داشتن ابزارهایی با پایداری عملکردی بی‌نقص و استانداردهای کیفی بالا اهمیت دوچندانی پیدا کرده است. محصول **${title}** با تکیه بر استانداردهای مهندسی مدرن توانسته است نظر کاربران حرفه‌ای را به خود جلب کند.
+
+---
+
+## بررسی مشخصات فنی و کیفیت ساخت
+${title} دارای ویژگی‌های فنی برجسته‌ای است که ارزش خرید آن را دوچندان می‌کند:
+* **پایداری عملکردی:** مهندسی قطعات بهینه‌شده برای کارکرد مداوم بدون افت کارایی.
+* **کیفیت متریال:** استفاده از متریال با دوام جهت افزایش طول عمر فیزیکی دستگاه.
+* **ارزش خرید:** با توجه به قیمت **${priceFormatted} تومان**، از گزینه‌های بسیار مناسب بازار است.
+
+---
+
+## سوالات متداول خریداران (FAQ)
+**۱. آیا ${title} دارای گارانتی رسمی است؟**
+بله، تمامی کالاهای ارائه‌شده در فروشگاه ${storeName} دارای ضمانت اصالت فیزیکی و مهلت تست می‌باشند.
+
+---
+
+## جمع‌بندی نهایی
+شما می‌توانید هم‌اکنون این محصول را با **تضمین کمترین قیمت بازار و ارسال سریع پیشتاز** از فروشگاه ${storeName} تهیه فرمایید.`;
+}
+</file>
+
 <file path="components/Footer.tsx">
 // components/Footer.tsx
 "use client";
@@ -17493,7 +17376,7 @@ export default function Footer() {
 </file>
 
 <file path="services/productService.ts">
-// services/productService.ts
+// File Path: services/productService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface ProductVariant {
@@ -17547,13 +17430,13 @@ export interface Product {
   updated_at?: string;
 }
 
-const LOCAL_PRODUCTS_CACHE = "PV_STORE_PRODUCTS_CACHE";
+const LOCAL_PRODUCTS_CACHE = "PV_STORE_PRODUCTS_CACHE_V2026";
 
 export function normalizeProduct(raw: any): Product {
   if (!raw) return {} as Product;
 
   const id = String(raw.id || `p_${Date.now()}`);
-  const title = raw.title || raw.name || "محصول دیجیتال";
+  const title = raw.title || raw.name || "محصول تخصصی";
   const name = raw.name || title;
   const price = Number(raw.price || 0);
   const discountPrice =
@@ -17573,7 +17456,7 @@ export function normalizeProduct(raw: any): Product {
   }
 
   if (rawImages.length === 0) {
-    rawImages = ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600&auto=format&fit=crop&q=60"];
+    rawImages = ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&auto=format&fit=crop&q=80"];
   }
 
   const primaryImage = rawImages[0];
@@ -17612,15 +17495,15 @@ export function normalizeProduct(raw: any): Product {
     name,
     title_fa: raw.title_fa || "",
     sku: raw.sku || `SKU-${id.slice(-6)}`,
-    brand: raw.brand || "Apple",
+    brand: raw.brand || "Axon Core",
     price,
     discountPrice,
     discount_price: discountPrice,
     originalPrice: price,
-    stock: raw.stock !== undefined ? Number(raw.stock) : 10,
-    category: raw.category || raw.category_name || "کالای دیجیتال",
+    stock: raw.stock !== undefined ? Number(raw.stock) : 0,
+    category: raw.category || raw.category_name || "تجهیزات تخصصی",
     category_id: raw.category_id,
-    category_name: raw.category || raw.category_name || "کالای دیجیتال",
+    category_name: raw.category || raw.category_name || "تجهیزات تخصصی",
     description: raw.description || "",
     short_description: raw.short_description || "",
     highlights: highlightsList,
@@ -17629,7 +17512,7 @@ export function normalizeProduct(raw: any): Product {
     images: rawImages,
     variants: variantsList,
     specs: specsObj,
-    warranty: raw.warranty || "۱۸ ماه گارانتی اصالت و سلامت فیزیکی",
+    warranty: raw.warranty || "۱۸ ماه گارانتی اصالت طلایی و سلامت فیزیکی",
     badge: raw.badge || (raw.is_featured ? "پیشنهاد ویژه" : ""),
     isAvailable: isAvail,
     is_available: isAvail,
@@ -17654,9 +17537,7 @@ export const productService = {
         }
       } catch {}
     }
-    const defaults = this.getDefaultProducts();
-    const match = defaults.find((p) => String(p.id) === String(id));
-    return match ? normalizeProduct(match) : null;
+    return null;
   },
 
   getAllSync(): Product[] {
@@ -17668,7 +17549,7 @@ export const productService = {
         }
       } catch {}
     }
-    return this.getDefaultProducts().map(normalizeProduct);
+    return [];
   },
 
   async getAll(): Promise<Product[]> {
@@ -17679,7 +17560,7 @@ export const productService = {
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           const mapped = data.map(normalizeProduct);
           if (typeof window !== "undefined") {
             localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(mapped));
@@ -17687,7 +17568,6 @@ export const productService = {
           return mapped;
         }
       }
-
       return this.getAllSync();
     } catch (e) {
       console.error("productService.getAll error:", e);
@@ -17813,131 +17693,6 @@ export const productService = {
       return false;
     }
   },
-
-  getDefaultProducts(): any[] {
-    return [
-      {
-        id: "prod-macbook-pro-m5-max",
-        title: 'MacBook Pro 16" (Apple M5 Max, 48GB, 1TB SSD)',
-        title_fa: "مک‌بوک پرو ۱۶ اینچ اپل با تراشه M5 Max نسل جدید ۲۰۲۶",
-        sku: "SKP-MBP16-M5MAX",
-        brand: "Apple",
-        price: 215000000,
-        discountPrice: 208500000,
-        discount_price: 208500000,
-        stock: 8,
-        category: "لپ‌تاپ و ورک‌استیشن",
-        category_name: "لپ‌تاپ و ورک‌استیشن",
-        description: "مک‌بوک پرو ۱۶ اینچ با تراشه انقلابی Apple M5 Max استاندارد جدیدی را برای استودیوهای تدوین فیلم و هوش مصنوعی تعریف کرده است.",
-        highlights: [
-          "تراشه پرچمدار M5 Max با پهنای باند حافظه ۴۰۰GB/s",
-          "نمایشگر ۱۶ اینچ Liquid Retina XDR با رفرش‌ریت ۱۲۰Hz ProMotion",
-          "۴۸ گیگابایت رم یکپارچه با تاخیر نزدیک به صفر و ۱ ترابایت SSD",
-          "شارژدهی بی‌رقیب تا ۲۲ ساعت و پورت تاندربولت ۵"
-        ],
-        image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200",
-        images: [
-          "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200",
-          "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=1200"
-        ],
-        variants: [
-          { id: "var-mbp-space-black", name: "مشکی فضایی مات (Space Black)", colorHex: "#1c1c1e", priceDelta: 0, stock: 5 },
-          { id: "var-mbp-silver", name: "نقره‌ای کلاسیک (Silver)", colorHex: "#e5e7eb", priceDelta: 0, stock: 3 }
-        ],
-        specs: {
-          "پردازنده مرکزی": "Apple M5 Max (16-Core CPU)",
-          "پردازنده گرافیکی": "40-Core GPU",
-          "حافظه رم": "۴۸ گیگابایت Unified Memory",
-          "حافظه ذخیره‌سازی": "۱ ترابایت SSD",
-          "نمایشگر": "۱۶.۲ اینچ Liquid Retina XDR (120Hz)"
-        },
-        warranty: "۱۸ ماه گارانتی معتبر شرکتی + ۷ روز ضمانت بازگشت وجه",
-        badge: "پرچمدار ۲۰۲۶ 🔥",
-        is_available: true,
-        is_featured: true,
-      },
-      {
-        id: "prod-ipad-pro-13-m5",
-        title: 'iPad Pro 13" (Apple M5, Tandem OLED, 256GB Wi-Fi)',
-        title_fa: "آیپد پرو ۱۳ اینچ اپل با تراشه M5 و نمایشگر تاندم اولد (Tandem OLED)",
-        sku: "SKP-IPAD13-M5",
-        brand: "Apple",
-        price: 98500000,
-        discountPrice: 94900000,
-        discount_price: 94900000,
-        stock: 12,
-        category: "تبلت و نمایشگر همراه",
-        category_name: "تبلت و نمایشگر همراه",
-        description: "آیپد پرو ۱۳ اینچ با ضخامت ۵.۱ میلی‌متر و نمایشگر Ultra Retina XDR Tandem OLED با روشنایی ۱۶۰۰ نیت.",
-        highlights: [
-          "نمایشگر خارق‌العاده Tandem OLED Ultra Retina XDR با رفرش‌ریت ۱۲۰Hz",
-          "طراحی فوق‌العاده باریک با ضخامت فقط ۵.۱ میلی‌متر",
-          "تراشه فوق‌سریع Apple M5 با موتور هوش مصنوعی نسل جدید",
-          "پشتیبانی از قلم Apple Pencil Pro"
-        ],
-        image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=1200",
-        images: [
-          "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=1200",
-          "https://images.unsplash.com/photo-1561154464-82e9adf32764?w=1200"
-        ],
-        variants: [
-          { id: "var-ipad-space-black", name: "مشکی فضایی (Space Black)", colorHex: "#1f2022", priceDelta: 0, stock: 7 },
-          { id: "var-ipad-silver", name: "نقره‌ای مات (Silver)", colorHex: "#e2e4e6", priceDelta: 0, stock: 5 }
-        ],
-        specs: {
-          "پردازنده": "Apple M5 (10-Core CPU)",
-          "نمایشگر": "۱۳ اینچ Ultra Retina XDR (Tandem OLED)",
-          "رزولوشن": "2752x2064 پیکسل",
-          "روشنایی": "۱۶۰۰ نیت اوج HDR",
-          "ضخامت": "۵.۱ میلی‌متر"
-        },
-        warranty: "۱۸ ماه گارانتی اصالت طلایی + ۷ روز مهلت تست",
-        badge: "پرفروش‌ترین تبلت استودیو ✨",
-        is_available: true,
-        is_featured: true,
-      },
-      {
-        id: "prod-apple-watch-ultra-3",
-        title: "Apple Watch Ultra 3 (Titanium Case, 49mm GPS + Cellular)",
-        title_fa: "اپل واچ اولترا ۳ تیتانیومی با اتصال ماهواره‌ای و نمایشگر Micro-OLED",
-        sku: "SKP-AW-ULTRA3",
-        brand: "Apple",
-        price: 58500000,
-        discountPrice: 55800000,
-        discount_price: 55800000,
-        stock: 15,
-        category: "ساعت هوشمند و گجت",
-        category_name: "ساعت هوشمند و گجت",
-        description: "مقاوم‌ترین ساعت ورزشی و ماجراجویی جهان با بدنه تیتانیوم گرید ۵، شیشه یاقوت کبود و نمایشگر ۳۰۰۰ نیتی.",
-        highlights: [
-          "کیس فوق‌مقاوم تیتانیوم هوانوردی گرید ۵ با استاندارد غواصی EN13319",
-          "نمایشگر همیشه روشن با روشنایی فوق‌العاده ۳۰۰۰ نیت و شیشه کریستال یاقوت",
-          "سیستم موقعیت‌یابی فرکانس دوگانه فوق‌دقیق L1 و L5",
-          "شارژدهی باتری تا ۷۲ ساعت در حالت Low Power Mode"
-        ],
-        image: "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=1200",
-        images: [
-          "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=1200",
-          "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1200"
-        ],
-        variants: [
-          { id: "var-aw-titanium-natural", name: "تیتانیوم طبیعی (Natural Titanium)", colorHex: "#8b8c8d", priceDelta: 0, stock: 9 },
-          { id: "var-aw-titanium-black", name: "تیتانیوم مشکی فضایی (Space Black)", colorHex: "#242526", priceDelta: 0, stock: 6 }
-        ],
-        specs: {
-          "جنس کیس": "تیتانیوم گرید ۵ با شیشه یاقوت کبود",
-          "سایز ساعت": "۴۹ میلی‌متر",
-          "روشنایی": "۳۰۰۰ نیت Always-On",
-          "مقاومت در آب": "۱۰۰ متر (استاندارد غواصی WR100)",
-          "پردازنده": "Apple S10 SiP 64-bit"
-        },
-        warranty: "۱۸ ماه گارانتی طلایی اصالت و تست سلامت فیزیکی",
-        badge: "مقاوم‌ترین ساعت هوشمند ⚡",
-        is_available: true,
-        is_featured: true,
-      }
-    ];
-  }
 };
 </file>
 

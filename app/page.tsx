@@ -1,4 +1,4 @@
-// app/page.tsx
+// File Path: app/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AIAssistantChat from "@/components/AIAssistantChat";
 import TechRadarFeed from "@/components/TechRadarFeed";
+import ProductComparisonModal from "@/components/ProductComparisonModal";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function HomePage() {
   const router = useRouter();
@@ -20,6 +22,10 @@ export default function HomePage() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
+
+  // سیستم مقایسه تعاملی چند کالا
+  const [compareList, setCompareList] = useState<Product[]>([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
 
   const { addToCart } = useCart();
 
@@ -48,7 +54,7 @@ export default function HomePage() {
     window.addEventListener("category_selected", handleCategoryChange);
 
     const channel = supabase
-      .channel("public-db-home-realtime-master-v22")
+      .channel("home-master-realtime-channel-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => loadData())
@@ -68,6 +74,19 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [banners.length]);
 
+  const toggleCompare = (p: Product) => {
+    soundEngine.playClick();
+    if (compareList.some((item) => item.id === p.id)) {
+      setCompareList(compareList.filter((item) => item.id !== p.id));
+    } else {
+      if (compareList.length >= 4) {
+        alert("حداکثر ۴ محصول را می‌توانید به طور همزمان مقایسه نمایید.");
+        return;
+      }
+      setCompareList([...compareList, p]);
+    }
+  };
+
   const categoriesList = Array.from(
     new Set(products.map((p) => p.category || (p as any).category_name || "کالای دیجیتال"))
   ).filter(Boolean);
@@ -85,8 +104,8 @@ export default function HomePage() {
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 space-y-14 mt-6">
         
-        {/* ۱. اسلایدر هوشمند بنرها با طراحی مدرن اپلی */}
-        {banners.length > 0 ? (
+        {/* ۱. اسلایدر هوشمند بنرهای داینامیک برآمده از دیتابیس */}
+        {banners.length > 0 && (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
               className="min-h-[380px] sm:min-h-[480px] p-8 sm:p-16 flex items-center bg-cover bg-center transition-all duration-700 relative"
@@ -125,7 +144,10 @@ export default function HomePage() {
                   {banners.map((_, idx) => (
                     <button
                       key={idx}
-                      onClick={() => setCurrentSlideIndex(idx)}
+                      onClick={() => {
+                        soundEngine.playClick();
+                        setCurrentSlideIndex(idx);
+                      }}
                       className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
                         currentSlideIndex === idx ? "w-8 bg-[var(--accent-blue)]" : "w-2.5 bg-white/40 hover:bg-white/70"
                       }`}
@@ -136,19 +158,9 @@ export default function HomePage() {
               )}
             </div>
           </section>
-        ) : (
-          <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] p-8 md:p-14 min-h-[280px] flex items-center bg-gradient-to-l from-neutral-900 to-neutral-800 text-white shadow-2xl">
-            <div className="max-w-xl space-y-3 z-10">
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-bold">
-                مرکز تجهیزات تخصصی دیجیتال، تصویر و استودیو
-              </span>
-              <h1 className="text-2xl md:text-4xl font-black">{siteInfo?.site_name || "آکسون | Axon"}</h1>
-              <p className="text-xs md:text-sm text-slate-300 font-medium">{siteInfo?.tagline || "تضمین بهترین قیمت و اصالت کالا در ایران"}</p>
-            </div>
-          </section>
         )}
 
-        {/* ۲. بخش رادار زنده اخبار و ترندهای تکنولوژی روز دنیا */}
+        {/* ۲. رادار زنده اخبار و ترندهای تکنولوژی روز دنیا */}
         <TechRadarFeed />
 
         {/* ۳. فیلتر دسته‌بندی‌ها و کاتالوگ محصولات */}
@@ -165,7 +177,10 @@ export default function HomePage() {
 
             <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none text-xs">
               <button
-                onClick={() => setSelectedCategory("all")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setSelectedCategory("all");
+                }}
                 className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
                   selectedCategory === "all"
                     ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -177,7 +192,10 @@ export default function HomePage() {
               {categoriesList.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setSelectedCategory(cat);
+                  }}
                   className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
                     selectedCategory === cat
                       ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -201,9 +219,15 @@ export default function HomePage() {
                 <HomeProductCard
                   key={product.id}
                   product={product}
+                  isCompared={compareList.some((item) => item.id === product.id)}
+                  onToggleCompare={toggleCompare}
                   onAddToCart={addToCart}
-                  onOpenDetails={(p) => setSelectedProductForModal(p)}
+                  onOpenDetails={(p) => {
+                    soundEngine.playClick();
+                    setSelectedProductForModal(p);
+                  }}
                   onQuickBuy={(p) => {
+                    soundEngine.playAddToCart();
                     addToCart({
                       id: p.id,
                       title: p.title || p.name,
@@ -220,6 +244,34 @@ export default function HomePage() {
             </div>
           )}
         </section>
+
+        {/* نوار شناور مقایسه فعال */}
+        {compareList.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-[var(--card-border)] p-3 px-6 rounded-full shadow-2xl flex items-center gap-4 animate-fadeIn">
+            <span className="text-xs font-black text-[var(--text-primary)] flex items-center gap-2">
+              <span>⚖️</span>
+              <span>{compareList.length} کالا آماده مقایسه</span>
+            </span>
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setIsCompareOpen(true);
+              }}
+              className="px-4 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md cursor-pointer hover:opacity-90 transition"
+            >
+              مشاهده جدول مقایسه 🚀
+            </button>
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setCompareList([]);
+              }}
+              className="text-xs text-rose-500 font-bold hover:underline cursor-pointer"
+            >
+              لغو
+            </button>
+          </div>
+        )}
 
         {/* ۴. بخش مجله تخصصی، راهنمای خرید و مقالات سئو */}
         <section className="p-8 rounded-[2.5rem] space-y-6 my-12 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
@@ -242,7 +294,6 @@ export default function HomePage() {
         </section>
       </div>
 
-      {/* مدال بررسی جامع و سریع کالا با کلیه تب‌های مشخصات، گارانتی و مقایسه */}
       {selectedProductForModal && (
         <ProductDetailsModal
           product={selectedProductForModal}
@@ -251,20 +302,30 @@ export default function HomePage() {
         />
       )}
 
-      {/* دستیار هوشمند شناور */}
+      {/* مدال مقایسه ساید‌بای‌ساید */}
+      <ProductComparisonModal
+        products={compareList}
+        isOpen={isCompareOpen}
+        onClose={() => setIsCompareOpen(false)}
+        onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))}
+      />
+
       <AIAssistantChat />
     </div>
   );
 }
 
-// کارت محصول صفحه اصلی با دکمه‌های خرید سریع و بررسی
 function HomeProductCard({
   product,
+  isCompared,
+  onToggleCompare,
   onAddToCart,
   onOpenDetails,
   onQuickBuy,
 }: {
   product: Product;
+  isCompared: boolean;
+  onToggleCompare: (product: Product) => void;
   onAddToCart: (item: any) => void;
   onOpenDetails: (product: Product) => void;
   onQuickBuy: (product: Product) => void;
@@ -298,11 +359,20 @@ function HomeProductCard({
           </span>
         )}
 
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center backdrop-blur-[2px]">
-          <span className="px-4 py-2 rounded-xl bg-white text-gray-900 text-xs font-black border border-white/30 shadow-2xl">
-            🔍 بررسی جامع کالا
-          </span>
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCompare(product);
+          }}
+          className={`absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition cursor-pointer ${
+            isCompared
+              ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
+              : "bg-black/60 text-white border-white/20 hover:bg-black/80"
+          }`}
+          title="افزودن به مقایسه"
+        >
+          {isCompared ? "✓ در مقایسه" : "⚖️ مقایسه"}
+        </button>
       </div>
 
       <div className="space-y-2 cursor-pointer" onClick={() => onOpenDetails(product)}>
@@ -343,6 +413,7 @@ function HomeProductCard({
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--card-border)]">
         <button
           onClick={() => {
+            soundEngine.playAddToCart();
             onAddToCart({
               id: product.id,
               name: productName,
@@ -370,7 +441,6 @@ function HomeProductCard({
   );
 }
 
-// مدال بررسی جامع و مشخصات فنی کامل کالا
 function ProductDetailsModal({
   product,
   onClose,
@@ -394,7 +464,10 @@ function ProductDetailsModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
       <div className="w-full max-w-4xl max-h-[90vh] bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-8 text-[var(--text-primary)] overflow-y-auto shadow-2xl relative space-y-6">
         <button
-          onClick={onClose}
+          onClick={() => {
+            soundEngine.playClick();
+            onClose();
+          }}
           className="absolute top-6 left-6 w-9 h-9 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold transition cursor-pointer z-10"
         >
           ✕
@@ -415,7 +488,10 @@ function ProductDetailsModal({
                 {images.map((imgUrl, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setActiveImage(imgUrl)}
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setActiveImage(imgUrl);
+                    }}
                     className={`w-16 h-16 rounded-2xl overflow-hidden border-2 cursor-pointer transition shrink-0 bg-[var(--input-bg)] p-1 ${
                       activeImage === imgUrl
                         ? "border-[var(--accent-blue)] scale-105 shadow-md"
@@ -451,10 +527,12 @@ function ProductDetailsModal({
               )}
             </div>
 
-            {/* تب‌های تکمیلی مدال */}
             <div className="flex gap-2 border-b border-[var(--card-border)] pb-3 overflow-x-auto scrollbar-none text-xs">
               <button
-                onClick={() => setActiveTab("specs")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("specs");
+                }}
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   activeTab === "specs"
                     ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
@@ -464,7 +542,10 @@ function ProductDetailsModal({
                 ⚙️ مشخصات فنی
               </button>
               <button
-                onClick={() => setActiveTab("desc")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("desc");
+                }}
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   activeTab === "desc"
                     ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
@@ -474,7 +555,10 @@ function ProductDetailsModal({
                 📝 توضیحات
               </button>
               <button
-                onClick={() => setActiveTab("shipping")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("shipping");
+                }}
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   activeTab === "shipping"
                     ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
@@ -484,7 +568,10 @@ function ProductDetailsModal({
                 🚚 ارسال و گارانتی
               </button>
               <button
-                onClick={() => setActiveTab("comparison")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("comparison");
+                }}
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   activeTab === "comparison"
                     ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
@@ -535,7 +622,6 @@ function ProductDetailsModal({
               )}
             </div>
 
-            {/* بخش قیمت و دکمه افزودن با تعداد دلخواه */}
             <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
@@ -553,6 +639,7 @@ function ProductDetailsModal({
 
                 <button
                   onClick={() => {
+                    soundEngine.playAddToCart();
                     for (let i = 0; i < quantity; i++) {
                       onAddToCart({
                         id: product.id,
@@ -579,7 +666,6 @@ function ProductDetailsModal({
   );
 }
 
-// بخش رندر مقالات در صفحه اصلی
 function HomeBlogSection() {
   const [posts, setPosts] = useState<any[]>([]);
 

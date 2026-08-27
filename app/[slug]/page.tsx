@@ -1,4 +1,4 @@
-// app/[slug]/page.tsx
+// File Path: app/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -13,6 +13,11 @@ import Link from "next/link";
 export default function DynamicCustomPage() {
   const params = useParams();
   const slug = Array.isArray(params.slug) ? params.slug[0] : (params.slug as string);
+
+  // اگر آدرس فایل اینماد یا پسوند txt بود بلافاصله خروج کند
+  if (slug && (slug.endsWith(".txt") || slug.includes("27424534"))) {
+    return null;
+  }
 
   const [pageData, setPageData] = useState<CustomPage | null>(null);
   const [products, setProducts] = useState<Product[]>([]);

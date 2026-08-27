@@ -1,4 +1,4 @@
-// services/pageService.ts
+// File Path: services/pageService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface PageBlock {
@@ -32,7 +32,7 @@ export interface CustomPage {
   updated_at?: string;
 }
 
-const LOCAL_KEY = "PV_CUSTOM_PAGES_CACHE";
+const LOCAL_KEY = "PV_CUSTOM_PAGES_CACHE_V2026";
 
 export const pageService = {
   async getAll(): Promise<CustomPage[]> {
@@ -45,7 +45,7 @@ export const pageService = {
 
         if (!error && data && data.length > 0) {
           const mapped: CustomPage[] = data.map((d: any) => ({
-            id: d.id,
+            id: String(d.id),
             slug: d.slug,
             title: d.title,
             meta_description: d.meta_description || "",
@@ -77,16 +77,17 @@ export const pageService = {
 
   async getBySlug(slug: string): Promise<CustomPage | null> {
     try {
+      const cleanSlug = slug.trim().toLowerCase();
       if (supabase) {
         const { data, error } = await supabase
           .from("site_pages")
           .select("*")
-          .eq("slug", slug.trim().toLowerCase())
+          .eq("slug", cleanSlug)
           .maybeSingle();
 
         if (!error && data) {
           return {
-            id: data.id,
+            id: String(data.id),
             slug: data.slug,
             title: data.title,
             meta_description: data.meta_description || "",
@@ -100,7 +101,7 @@ export const pageService = {
       }
 
       const all = await this.getAll();
-      return all.find((p) => p.slug.toLowerCase() === slug.trim().toLowerCase()) || null;
+      return all.find((p) => p.slug.toLowerCase() === cleanSlug) || null;
     } catch (e) {
       console.error("pageService.getBySlug Error:", e);
       return null;
@@ -110,7 +111,10 @@ export const pageService = {
   async savePage(pageData: CustomPage): Promise<CustomPage | null> {
     try {
       const cleanSlug = pageData.slug.trim().toLowerCase().replace(/\s+/g, "-");
+      const pageId = pageData.id || `page_${cleanSlug}`;
+
       const payload: any = {
+        id: pageId,
         slug: cleanSlug,
         title: pageData.title.trim(),
         meta_description: pageData.meta_description || null,
@@ -121,10 +125,6 @@ export const pageService = {
         updated_at: new Date().toISOString(),
       };
 
-      if (pageData.id && !pageData.id.startsWith("temp_")) {
-        payload.id = pageData.id;
-      }
-
       if (supabase) {
         const { data, error } = await supabase
           .from("site_pages")
@@ -134,7 +134,7 @@ export const pageService = {
 
         if (!error && data) {
           const saved: CustomPage = {
-            id: data.id,
+            id: String(data.id),
             slug: data.slug,
             title: data.title,
             meta_description: data.meta_description,
@@ -158,7 +158,7 @@ export const pageService = {
 
       const localPage: CustomPage = {
         ...pageData,
-        id: pageData.id || `page_${Date.now()}`,
+        id: pageId,
         slug: cleanSlug,
         updated_at: new Date().toISOString(),
       };

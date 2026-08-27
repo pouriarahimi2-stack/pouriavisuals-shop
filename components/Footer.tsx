@@ -1,4 +1,4 @@
-// components/Footer.tsx
+// File Path: components/Footer.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -51,6 +51,8 @@ export default function Footer() {
     <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] transition-colors mt-auto shadow-2xl select-none" dir="rtl">
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+          
+          {/* ستون اول: لوگو و معرفی */}
           <div className="space-y-4 md:col-span-1">
             <div className="w-full max-w-[200px] h-24 rounded-3xl border border-[var(--card-border)] bg-white/5 p-2 shadow-inner flex items-center justify-center overflow-hidden">
               {footerLogo ? (
@@ -66,17 +68,19 @@ export default function Footer() {
             </p>
           </div>
 
+          {/* ستون دوم: دسترسی سریع */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">دسترسی سریع</h5>
             <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
               <li><Link href="/products" className="hover:text-[var(--accent-blue)] transition font-bold">کاتالوگ تجهیزات و مانیتورها</Link></li>
               <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition font-bold">استعلام و پیگیری مرسوله پستی</Link></li>
-              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition font-bold">رادار جهانی اخبار تکنولوژی</Link></li>
+              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition font-bold">جدیدترین اخبار حوزه تکنولوژی</Link></li>
               <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition font-bold">مجله تخصصی و مقالات سئو</Link></li>
               <li><Link href="/contact" className="hover:text-[var(--accent-blue)] transition font-bold">تماس با پشتیبانی و نشانی</Link></li>
             </ul>
           </div>
 
+          {/* ستون سوم: اطلاعات رسمی */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">اطلاعات رسمی</h5>
             <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
@@ -105,6 +109,7 @@ export default function Footer() {
             </div>
           </div>
 
+          {/* ستون چهارم: ضمانت و استانداردها */}
           <div className="space-y-3">
             <h5 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2">ضمانت و پشتیبانی</h5>
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 text-xs shadow-inner">

@@ -1,9 +1,11 @@
+// File Path: components/AdminOrders.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { orderService, Order } from "@/services/orderService";
 import { smsService } from "@/services/smsService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -47,6 +49,7 @@ export default function AdminOrders() {
   }, []);
 
   const handleStatusUpdate = async (orderId: string | number, newStatus: string) => {
+    soundEngine.playClick();
     const targetOrder = orders.find((o) => String(o.id) === String(orderId));
 
     if (newStatus === "shipped" && targetOrder) {
@@ -69,6 +72,7 @@ export default function AdminOrders() {
       if (selectedOrder && String(selectedOrder.id) === String(orderId)) {
         setSelectedOrder({ ...selectedOrder, status: newStatus as any });
       }
+      soundEngine.playSuccess();
     } catch (err) {
       console.error("Status update error:", err);
       alert("خطا در بروزرسانی وضعیت سفارش");
@@ -80,6 +84,7 @@ export default function AdminOrders() {
   const handleConfirmTrackingCode = async () => {
     if (!trackingModal.order || !trackingModal.code.trim()) return;
 
+    soundEngine.playClick();
     const orderId = trackingModal.order.id;
     const code = trackingModal.code.trim();
     setUpdatingId(orderId);
@@ -121,7 +126,8 @@ export default function AdminOrders() {
         }
       }
 
-      alert("✅ سفارش به وضعیت «ارسال شده» تغییر یافت و پیامک کد رهگیری پستی به مشتری ارسال شد.");
+      soundEngine.playSuccess();
+      alert("✅ سفارش به وضعیت «ارسال به پست» تغییر یافت و پیامک کد رهگیری پستی به مشتری ارسال شد.");
     } catch (err) {
       console.error(err);
       alert("خطا در ثبت کد رهگیری");
@@ -132,6 +138,7 @@ export default function AdminOrders() {
   };
 
   const printOrderInvoice = (order: Order) => {
+    soundEngine.playClick();
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
@@ -144,7 +151,7 @@ export default function AdminOrders() {
     printWindow.document.write(`
       <html dir="rtl" lang="fa">
         <head>
-          <title>فاکتور سفارش ${order.id}</title>
+          <title>فاکتور رسمی سفارش ${order.id}</title>
           <style>
             body { font-family: Tahoma, sans-serif; padding: 30px; direction: rtl; color: #0f172a; font-size: 13px; }
             .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 20px; }
@@ -160,7 +167,7 @@ export default function AdminOrders() {
         </head>
         <body>
           <div class="header">
-            <h1 class="title">فاکتور رسمی فروش کالا و خدمات</h1>
+            <h1 class="title">فاکتور رسمی فروش کالا و خدمات استودیویی</h1>
             <p>شماره سفارش: ${order.orderNumber || order.id} | تاریخ: ${order.created_at ? new Date(order.created_at).toLocaleDateString("fa-IR") : new Date().toLocaleDateString("fa-IR")}</p>
           </div>
           <div class="info-grid">
@@ -256,7 +263,7 @@ export default function AdminOrders() {
           className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
         >
           <span>🔄</span>
-          <span>بروزرسانی</span>
+          <span>بروزرسانی زنده</span>
         </button>
       </div>
 
@@ -273,7 +280,10 @@ export default function AdminOrders() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                soundEngine.playClick();
+                setActiveTab(tab.id);
+              }}
               className={`px-3.5 py-2 rounded-xl font-bold transition cursor-pointer whitespace-nowrap text-xs ${
                 activeTab === tab.id
                   ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -357,7 +367,10 @@ export default function AdminOrders() {
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => setSelectedOrder(order)}
+                            onClick={() => {
+                              soundEngine.playClick();
+                              setSelectedOrder(order);
+                            }}
                             className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer"
                           >
                             👁️ جزئیات
@@ -396,7 +409,7 @@ export default function AdminOrders() {
 
       {/* مدال جزئیات سفارش */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-2xl w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-6 shadow-2xl text-[var(--text-primary)] max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
               <div>
@@ -474,9 +487,9 @@ export default function AdminOrders() {
         </div>
       )}
 
-      {/* مدال ثبت بارنامه و ارسال پیامک رهگیری */}
+      {/* مدال ثبت بارنامه و ارسال پیامک */}
       {trackingModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-2xl text-[var(--text-primary)]">
             <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-3">
               <span className="text-2xl">📮</span>
@@ -487,11 +500,7 @@ export default function AdminOrders() {
             </div>
 
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
-              لطفاً کد ۲۴ رقمی بارنامه پیشتاز را وارد نمایید تا همزمان پیامک حاوی لینک پیگیری برای شماره{" "}
-              <strong className="text-[var(--text-primary)] font-mono">
-                {trackingModal.order?.customer?.phone || (trackingModal.order as any)?.customer_phone || (trackingModal.order as any)?.phone}
-              </strong>{" "}
-              ارسال شود.
+              لطفاً کد ۲۴ رقمی بارنامه پیشتاز را وارد نمایید تا پیامک حاوی لینک پیگیری ارسال شود:
             </p>
 
             <div>

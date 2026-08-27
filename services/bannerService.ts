@@ -39,8 +39,8 @@ export const bannerService = {
             image_url: b.image || b.image_url || "/placeholder.png",
             link: b.link || b.link_url || "/products",
             link_url: b.link || b.link_url || "/products",
-            button_text: b.button_text || b.buttonText || "مشاهده و خرید",
-            buttonText: b.button_text || b.buttonText || "مشاهده و خرید",
+            button_text: b.button_text || b.buttonText || "مشاهده و خرید کالا",
+            buttonText: b.button_text || b.buttonText || "مشاهده و خرید کالا",
             is_active: b.is_active !== false,
             created_at: b.created_at,
           }));

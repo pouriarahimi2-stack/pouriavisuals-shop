@@ -1,13 +1,14 @@
-// app/checkout/page.tsx
+// File Path: app/checkout/page.tsx
 "use client";
 
 import React, { useState } from "react";
 import { useCart } from "@/context/CartContext";
-import { orderService, Order } from "@/services/orderService";
+import { orderService } from "@/services/orderService";
 import { couponService, Coupon } from "@/services/couponService";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
+import { IRAN_PROVINCES } from "@/lib/iranProvinces";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function CheckoutPage() {
 
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
+  const [province, setProvince] = useState("تهران");
+  const [city, setCity] = useState("تهران");
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [notes, setNotes] = useState("");
@@ -36,16 +39,24 @@ export default function CheckoutPage() {
   let discountAmount = 0;
   if (appliedCoupon) {
     if (appliedCoupon.type === "percent" || appliedCoupon.discount_type === "percent") {
-      discountAmount = Math.round((rawTotal * appliedCoupon.value) / 100);
+      discountAmount = Math.round((rawTotal * (appliedCoupon.value || 0)) / 100);
       if (appliedCoupon.max_discount && discountAmount > appliedCoupon.max_discount) {
         discountAmount = appliedCoupon.max_discount;
       }
     } else {
-      discountAmount = appliedCoupon.value;
+      discountAmount = appliedCoupon.value || 0;
     }
   }
 
   const finalPayable = Math.max(0, rawTotal - discountAmount);
+
+  const handleProvinceChange = (provName: string) => {
+    setProvince(provName);
+    const p = IRAN_PROVINCES.find((x) => x.name === provName);
+    if (p && p.cities.length > 0) {
+      setCity(p.cities[0]);
+    }
+  };
 
   const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +107,8 @@ export default function CheckoutPage() {
     setSubmitting(true);
     try {
       const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+      const fullAddress = `استان ${province}، شهر ${city}، ${address.trim()}`;
+
       const orderPayload = {
         id: orderId,
         order_number: orderId,
@@ -103,7 +116,9 @@ export default function CheckoutPage() {
           fullName: customerName.trim(),
           name: customerName.trim(),
           phone: cleanPhone,
-          address: address.trim(),
+          province,
+          city,
+          address: fullAddress,
           postalCode: postalCode.trim() || undefined,
           notes: notes.trim() || undefined,
         },
@@ -138,6 +153,8 @@ export default function CheckoutPage() {
     }
   };
 
+  const citiesList = IRAN_PROVINCES.find((p) => p.name === province)?.cities || [];
+
   if (cartItems.length === 0) {
     return (
       <div className="max-w-xl mx-auto px-4 py-24 text-center space-y-4 font-sans select-none" dir="rtl">
@@ -157,7 +174,6 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
       
-      {/* هدر صفحه تسویه‌حساب */}
       <div className="text-center space-y-2">
         <h1 className="text-2xl md:text-3xl font-black">تکمیل اطلاعات و صدور فاکتور رسمی</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium">نشانی و مشخصات گیرنده مرسوله را با دقت وارد کنید</p>
@@ -172,7 +188,7 @@ export default function CheckoutPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* فرم مشخصات خریدار و نشانی */}
+        {/* فرم مشخصات خریدار */}
         <form onSubmit={handleCheckoutSubmit} className="lg:col-span-2 p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
           <h3 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             📍 مشخصات تحویل‌گیرنده و نشانی پستی
@@ -203,8 +219,38 @@ export default function CheckoutPage() {
               />
             </div>
 
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">استان تحویل *</label>
+              <select
+                value={province}
+                onChange={(e) => handleProvinceChange(e.target.value)}
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer"
+              >
+                {IRAN_PROVINCES.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شهرستان / شهر *</label>
+              <select
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer"
+              >
+                {citiesList.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="sm:col-span-2">
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کد پستی ۱۰ رقمی (اختیاری اما الزامی برای پست پیشتاز)</label>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کد پستی ۱۰ رقمی (اختیاری)</label>
               <input
                 type="text"
                 maxLength={10}
@@ -216,19 +262,19 @@ export default function CheckoutPage() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نشانی دقیق پستی تحویل *</label>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نشانی دقیق پستی (خیابان، کوچه، پلاک، واحد) *</label>
               <textarea
                 rows={3}
                 required
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="استان، شهر، خیابان اصلی، کوچه، پلاک، واحد..."
+                placeholder="خیابان اصلی، کوچه، پلاک، طبقه، واحد..."
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] leading-relaxed focus:border-[var(--accent-blue)]"
               />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">توضیحات یا یادداشت سفارش (اختیاری)</label>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">توضیحات و یادداشت سفارش (اختیاری)</label>
               <input
                 type="text"
                 value={notes}
@@ -248,7 +294,7 @@ export default function CheckoutPage() {
           </button>
         </form>
 
-        {/* سایدبار: خلاصه فاکتور و اعمال کوپن */}
+        {/* خلاصه فاکتور و کوپن */}
         <div className="space-y-6">
           <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3 text-xs">
             <h4 className="font-black text-xs text-[var(--text-primary)]">🏷️ کد تخفیف دارید؟</h4>
@@ -279,10 +325,10 @@ export default function CheckoutPage() {
 
           <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
             <h4 className="font-black text-xs text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-              📋 خلاصه فاکتور خرید
+              📋 خلاصه اقلام فاکتور
             </h4>
 
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-60 overflow-y-auto">
               {cartItems.map((it) => (
                 <div key={it.id} className="flex justify-between text-[11px]">
                   <span className="text-[var(--text-secondary)] font-medium">

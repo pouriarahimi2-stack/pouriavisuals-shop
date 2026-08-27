@@ -1,8 +1,11 @@
+// File Path: components/AdminBlogManager.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
+import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
+import { productService, Product } from "@/services/productService";
 
 export interface BlogPost {
   id?: string;
@@ -14,7 +17,6 @@ export interface BlogPost {
   image_url?: string;
   metaDescription?: string;
   meta_description?: string;
-  metaKeywords?: string;
   isPublished?: boolean;
   is_published?: boolean;
   createdAt?: string;
@@ -22,6 +24,7 @@ export interface BlogPost {
 
 export default function AdminBlogManager() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
 
   const [title, setTitle] = useState("");
@@ -31,24 +34,40 @@ export default function AdminBlogManager() {
   const [metaDescription, setMetaDescription] = useState("");
   const [isPublished, setIsPublished] = useState(true);
 
-  // آمار زنده سند
+  // سیستم تایپوگرافی زنده
+  const [availableFonts, setAvailableFonts] = useState<CustomFontItem[]>([]);
+  const [selectedFontFamily, setSelectedFontFamily] = useState("Vazirmatn");
+  const [selectedFontWeight, setSelectedFontWeight] = useState(400);
+
+  // آمار سند
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [readTime, setReadTime] = useState(1);
+
+  // مودال تولید مقاله هوش مصنوعی رنک یک گوگل
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiCustomTopic, setAiCustomTopic] = useState("");
+  const [aiSelectedProductId, setAiSelectedProductId] = useState<string>("all");
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const imageUploadInputRef = useRef<HTMLInputElement>(null);
+  const fontUploadInputRef = useRef<HTMLInputElement>(null);
 
   const fetchPosts = async () => {
     try {
-      const res = await fetch("/api/blogs");
+      const [res, prods] = await Promise.all([
+        fetch("/api/blogs"),
+        productService.getAll(),
+      ]);
       const data = await res.json();
       if (data.posts || data.data) {
         setPosts(data.posts || data.data || []);
       }
+      if (prods) setProducts(prods);
     } catch (e) {
       console.error("Error loading blog posts:", e);
     }
@@ -56,6 +75,12 @@ export default function AdminBlogManager() {
 
   useEffect(() => {
     fetchPosts();
+    setAvailableFonts(fontEngine.getAllFonts());
+
+    const handleFontsUpdated = (e: any) => {
+      if (e.detail) setAvailableFonts(e.detail);
+    };
+    window.addEventListener("fonts_updated", handleFontsUpdated);
 
     const channel = supabase
       .channel("posts-realtime-master-v2026")
@@ -65,6 +90,7 @@ export default function AdminBlogManager() {
       .subscribe();
 
     return () => {
+      window.removeEventListener("fonts_updated", handleFontsUpdated);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -106,7 +132,7 @@ export default function AdminBlogManager() {
     setIsPublished(true);
 
     if (editorRef.current) {
-      editorRef.current.innerHTML = "<h2>مقدمه و بررسی تخصصی</h2><p>متن تحلیل خود را با ابزارهای نوار ابزار بالا آغاز کنید...</p>";
+      editorRef.current.innerHTML = "<h2>مقدمه و بررسی تخصصی</h2><p>متن تحلیل خود را اینجا آغاز کنید یا از دکمه «تولید مقاله با هوش مصنوعی» استفاده کنید...</p>";
       setTimeout(updateStats, 100);
     }
   };
@@ -117,64 +143,111 @@ export default function AdminBlogManager() {
     updateStats();
   };
 
-  const insertHeading = (tag: string) => {
-    exec("formatBlock", `<${tag}>`);
-  };
-
-  const insertTable = () => {
-    const rows = prompt("تعداد سطرهای جدول:", "3") || "3";
-    const cols = prompt("تعداد ستون‌های جدول:", "3") || "3";
-    let tableHtml = `<table border="1" style="width:100%; border-collapse:collapse; margin:16px 0; border:1px solid var(--card-border);"><thead><tr style="background:var(--input-bg);">`;
-    for (let c = 0; c < Number(cols); c++) {
-      tableHtml += `<th style="padding:10px; border:1px solid var(--card-border); font-weight:bold;">سرستون ${c + 1}</th>`;
+  const handleFontChange = (fontFamily: string) => {
+    soundEngine.playClick();
+    setSelectedFontFamily(fontFamily);
+    if (editorRef.current) {
+      editorRef.current.style.fontFamily = `'${fontFamily}', sans-serif`;
     }
-    tableHtml += `</tr></thead><tbody>`;
-    for (let r = 0; r < Number(rows) - 1; r++) {
-      tableHtml += `<tr>`;
-      for (let c = 0; c < Number(cols); c++) {
-        tableHtml += `<td style="padding:10px; border:1px solid var(--card-border);">داده ${r + 1}-${c + 1}</td>`;
-      }
-      tableHtml += `</tr>`;
+  };
+
+  const handleWeightChange = (weight: number) => {
+    soundEngine.playClick();
+    setSelectedFontWeight(weight);
+    if (editorRef.current) {
+      editorRef.current.style.fontWeight = String(weight);
     }
-    tableHtml += `</tbody></table><p><br></p>`;
-    exec("insertHTML", tableHtml);
   };
 
-  const insertCallout = (type: "info" | "warning" | "success") => {
-    const bg = type === "info" ? "rgba(0,113,227,0.08)" : type === "warning" ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)";
-    const border = type === "info" ? "#0071e3" : type === "warning" ? "#f59e0b" : "#10b981";
-    const titleText = type === "info" ? "💡 نکته مهم سئو" : type === "warning" ? "⚠️ هشدار و توجه" : "✅ تاییدیه کارشناسی";
-
-    const calloutHtml = `
-      <div style="border-right:4px solid ${border}; background:${bg}; padding:14px 18px; border-radius:16px; margin:16px 0;">
-        <strong style="color:${border}; display:block; margin-bottom:4px;">${titleText}:</strong>
-        <span>متن راهنما یا نکته ویژه سئو را اینجا بنویسید...</span>
-      </div>
-      <p><br></p>
-    `;
-    exec("insertHTML", calloutHtml);
-  };
-
-  const insertLink = () => {
-    const url = prompt("آدرس اینترنتی پیوند (URL):", "https://");
-    if (url) exec("createLink", url);
-  };
-
-  const handleImageUploadToEditor = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFontFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("حجم تصویر نباید بیشتر از ۵ مگابایت باشد.");
-        return;
+    if (!file) return;
+
+    const fontName = prompt("نام این فونت را وارد کنید:", file.name.replace(/\.[^/.]+$/, "")) || "CustomFont";
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        const format = ext === "woff2" ? "woff2" : ext === "woff" ? "woff" : "truetype";
+
+        const newFont: CustomFontItem = {
+          id: `custom_${Date.now()}`,
+          name: `${fontName} (شخصی)`,
+          fontFamily: fontName,
+          fontUrlOrBase64: reader.result,
+          format,
+          weights: [100, 200, 300, 400, 500, 600, 700, 800, 900],
+          isCustom: true,
+        };
+
+        fontEngine.registerCustomFont(newFont);
+        setAvailableFonts(fontEngine.getAllFonts());
+        setSelectedFontFamily(fontName);
+        handleFontChange(fontName);
+        soundEngine.playSuccess();
+        alert(`فونت «${fontName}» با موفقیت بارگذاری و برای همیشه در سایت ذخیره شد.`);
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          const imgHtml = `<img src="${reader.result}" alt="Blog Image" style="max-width:100%; height:auto; border-radius:20px; margin:16px auto; display:block; border:1px solid var(--card-border);" /><p><br></p>`;
-          exec("insertHTML", imgHtml);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleGenerateAiRank1Article = async () => {
+    soundEngine.playClick();
+    setIsAiGenerating(true);
+
+    let targetProducts = products;
+    if (aiSelectedProductId !== "all") {
+      targetProducts = products.filter((p) => String(p.id) === String(aiSelectedProductId));
+    }
+
+    try {
+      const res = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: "admin",
+          prompt: aiCustomTopic.trim() || `تولید مقاله سئو رنک یک گوگل برای محصولات ${targetProducts.map((p) => p.title).join(", ")}`,
+          targetTopic: aiCustomTopic.trim(),
+          productsData: targetProducts,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.response) {
+        soundEngine.playSuccess();
+        const rawContent = data.response;
+
+        // استخراج تیتر H1
+        const titleMatch = rawContent.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || rawContent.match(/^#\s+(.+)$/m);
+        if (titleMatch) {
+          const cleanTitle = titleMatch[1].replace(/<[^>]*>/g, "").trim();
+          setTitle(cleanTitle);
+          setSlug(cleanTitle.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, "-"));
+        } else if (aiCustomTopic.trim()) {
+          setTitle(aiCustomTopic.trim());
+          setSlug(aiCustomTopic.trim().toLowerCase().replace(/\s+/g, "-"));
         }
-      };
-      reader.readAsDataURL(file);
+
+        // استخراج متا دیسکریپشن
+        const metaMatch = rawContent.match(/Meta Description:\s*([^\n]+)/i);
+        if (metaMatch) {
+          setMetaDescription(metaMatch[1].trim());
+        }
+
+        if (editorRef.current) {
+          editorRef.current.innerHTML = rawContent;
+          updateStats();
+        }
+
+        setIsAiModalOpen(false);
+        setStatusMessage({ type: "success", text: "⚡ مقاله رنک یک گوگل با لینک‌های داخلی و تصاویر در ویراستار بارگذاری شد." });
+      }
+    } catch {
+      alert("خطا در برقراری ارتباط با هوش مصنوعی.");
+    } finally {
+      setIsAiGenerating(false);
+      setTimeout(() => setStatusMessage(null), 4000);
     }
   };
 
@@ -183,7 +256,7 @@ export default function AdminBlogManager() {
     const contentHtml = editorRef.current?.innerHTML || "";
 
     if (!title.trim() || !contentHtml.trim()) {
-      setStatusMessage({ type: "error", text: "عنوان و متن مقاله الزامی هستند." });
+      setStatusMessage({ type: "error", text: "عنوان و محتوای مقاله الزامی هستند." });
       return;
     }
 
@@ -236,36 +309,49 @@ export default function AdminBlogManager() {
     if (!confirm("آیا از حذف این مقاله اطمینان دارید؟")) return;
     try {
       soundEngine.playClick();
-      const { error } = await supabase.from("posts").delete().eq("id", id);
-      if (error) throw error;
+      await supabase.from("posts").delete().eq("id", id);
       handleCreateNew();
       fetchPosts();
       setStatusMessage({ type: "success", text: "مقاله حذف گردید." });
-      setTimeout(() => setStatusMessage(null), 3000);
-    } catch (err: any) {
-      alert("خطا در حذف: " + err.message);
-    }
+    } catch {}
   };
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <input type="file" ref={imageUploadInputRef} onChange={handleImageUploadToEditor} accept="image/*" className="hidden" />
+      <input type="file" ref={imageUploadInputRef} accept="image/*" className="hidden" />
+      <input type="file" ref={fontUploadInputRef} onChange={handleFontFileUpload} accept=".woff2,.woff,.ttf,.otf" className="hidden" />
 
-      {/* هدر بخش ویراستار */}
+      {/* هدر بخش نگارش مقاله */}
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📚</span> ویراستار پیشرفته اسناد، مقالات و سئو (Word-Grade Editor)
+            <span>📚</span> ویراستار مقالات سئو با هوش مصنوعی و تایپوگرافی جهانی
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">نگارش محتوای غنی با ابزارهای کامل فرمت‌بندی، جداول، باکس‌های راهنما و پیش‌نمایش SERP گوگل</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            تولید خودکار مقالات رنک ۱ گوگل با لینک‌دهی داخلی، تصاویر، اسکیما و انتخاب زنده فونت و وزن
+          </p>
         </div>
-        <button
-          onClick={handleCreateNew}
-          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center gap-2"
-        >
-          <span>➕</span>
-          <span>نگارش مقاله جدید</span>
-        </button>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              setIsAiModalOpen(true);
+            }}
+            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs transition shadow-lg flex items-center gap-2 cursor-pointer"
+          >
+            <span>🤖</span>
+            <span>تولید مقاله با هوش مصنوعی (رنک ۱ گوگل)</span>
+          </button>
+
+          <button
+            onClick={handleCreateNew}
+            className="px-5 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer"
+          >
+            + نگارش دستی
+          </button>
+        </div>
       </div>
 
       {statusMessage && (
@@ -305,7 +391,7 @@ export default function AdminBlogManager() {
           </div>
         </div>
 
-        {/* بوم نگارش و فرم کامل مقاله */}
+        {/* بوم نگارش و فرم مقاله */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -316,7 +402,7 @@ export default function AdminBlogManager() {
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: مقایسه مانیتورهای ۴K و ۸K برای تدوین و کالرگریدینگ"
+                  placeholder="مثال: مقایسه جامع مانیتورهای ۵K و ۴K برای تدوین"
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
@@ -338,7 +424,7 @@ export default function AdminBlogManager() {
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="4k-vs-8k-video-editing-monitors"
+                  placeholder="5k-vs-4k-monitors-editing"
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
@@ -361,15 +447,15 @@ export default function AdminBlogManager() {
                 type="text"
                 value={metaDescription}
                 onChange={(e) => setMetaDescription(e.target.value)}
-                placeholder="خلاصه ترغیب‌کننده مقاله جهت نمایش در نتایج گوگل (حداکثر ۱۶۰ کاراکتر)..."
+                placeholder="خلاصه جذاب برای گوگل (حداکثر ۱۶۰ کاراکتر)..."
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
 
-            {/* نوار ابزار فوق پیشرفته Microsoft Word */}
-            <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
-              <div className="flex justify-between items-center">
-                <label className="font-bold text-[var(--text-secondary)]">نوار ابزار ویرایشگر سند (Word Toolbar):</label>
+            {/* نوار ابزار کامل Microsoft Word با تایپوگرافی زنده */}
+            <div className="space-y-3 border-t border-[var(--card-border)] pt-4">
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <span className="font-bold text-[var(--text-secondary)]">🎛️ نوار ابزار پیشرفته و تایپوگرافی لایو:</span>
                 <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--text-secondary)]">
                   <span>کلمات: <strong>{wordCount}</strong></span>
                   <span>کاراکترها: <strong>{charCount}</strong></span>
@@ -377,57 +463,61 @@ export default function AdminBlogManager() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 p-3 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
-                <select onChange={(e) => insertHeading(e.target.value)} className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none">
-                  <option value="p">پاراگراف عادی</option>
-                  <option value="h1">تیتر اصلی ۱ (H1)</option>
-                  <option value="h2">تیتر بخش ۲ (H2)</option>
-                  <option value="h3">تیتر زیربخش ۳ (H3)</option>
-                  <option value="h4">تیتر فرعی ۴ (H4)</option>
+              <div className="flex flex-wrap items-center gap-2 p-3.5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
+                {/* انتخابگر فونت جهانی */}
+                <select
+                  value={selectedFontFamily}
+                  onChange={(e) => handleFontChange(e.target.value)}
+                  className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none"
+                >
+                  {availableFonts.map((f) => (
+                    <option key={f.id} value={f.fontFamily}>
+                      {f.name}
+                    </option>
+                  ))}
                 </select>
+
+                {/* انتخابگر وزن فونت */}
+                <select
+                  value={selectedFontWeight}
+                  onChange={(e) => handleWeightChange(Number(e.target.value))}
+                  className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none font-mono"
+                >
+                  <option value={100}>100 - نازک (Thin)</option>
+                  <option value={300}>300 - روشن (Light)</option>
+                  <option value={400}>400 - عادی (Regular)</option>
+                  <option value={500}>500 - متوسط (Medium)</option>
+                  <option value={600}>600 - نیمه‌ضخیم (SemiBold)</option>
+                  <option value={700}>700 - ضخیم (Bold)</option>
+                  <option value={800}>800 - خیلی ضخیم (ExtraBold)</option>
+                  <option value={900}>900 - توپر (Black)</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => fontUploadInputRef.current?.click()}
+                  className="px-3 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition cursor-pointer flex items-center gap-1 shadow-sm"
+                  title="بارگذاری فونت دلخواه از کامپیوتر یا موبایل"
+                >
+                  <span>🔤</span>
+                  <span>+ آپلود فونت دلخواه</span>
+                </button>
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
-                <button type="button" onClick={() => exec("bold")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-xs hover:border-[var(--accent-blue)]" title="Bold (Ctrl+B)"><b>B</b></button>
-                <button type="button" onClick={() => exec("italic")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] italic text-xs hover:border-[var(--accent-blue)]" title="Italic (Ctrl+I)"><i>I</i></button>
-                <button type="button" onClick={() => exec("underline")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] underline text-xs hover:border-[var(--accent-blue)]" title="Underline (Ctrl+U)"><u>U</u></button>
-                <button type="button" onClick={() => exec("strikeThrough")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] line-through text-xs hover:border-[var(--accent-blue)]" title="Strikethrough">S</button>
+                <button type="button" onClick={() => exec("bold")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-xs" title="Bold"><b>B</b></button>
+                <button type="button" onClick={() => exec("italic")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] italic text-xs" title="Italic"><i>I</i></button>
+                <button type="button" onClick={() => exec("underline")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] underline text-xs" title="Underline"><u>U</u></button>
 
                 <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
 
                 <div className="flex items-center gap-1 bg-[var(--modal-bg)] p-1 rounded-xl border border-[var(--card-border)]">
-                  <span className="text-[10px] font-bold px-1">🎨 رنگ:</span>
-                  <input type="color" onChange={(e) => exec("foreColor", e.target.value)} title="رنگ فونت" className="w-6 h-6 rounded cursor-pointer bg-transparent border-none" />
-                  <input type="color" defaultValue="#ffff00" onChange={(e) => exec("hiliteColor", e.target.value)} title="هایلایت متن" className="w-6 h-6 rounded cursor-pointer bg-transparent border-none" />
+                  <span className="text-[10px] font-bold px-1">رنگ متن:</span>
+                  <input type="color" onChange={(e) => exec("foreColor", e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none" />
                 </div>
 
-                <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
-
                 <button type="button" onClick={() => exec("justifyRight")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="راست‌چین">👉</button>
-                <button type="button" onClick={() => exec("justifyCenter")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="وسط‌چین">↔️</button>
-                <button type="button" onClick={() => exec("justifyLeft")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="چپ‌چین">👈</button>
                 <button type="button" onClick={() => exec("justifyFull")} className="p-2 px-3 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs" title="Justify">≡ جاستیفای</button>
-
-                <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
-
-                <button type="button" onClick={() => exec("insertUnorderedList")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="لیست نقطه‌ای">• لیست</button>
-                <button type="button" onClick={() => exec("insertOrderedList")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="لیست شماره‌دار">۱. لیست</button>
-
-                <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
-
-                <button type="button" onClick={insertTable} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)]">📊 ساخت جدول</button>
-                <button type="button" onClick={() => insertCallout("info")} className="p-2 px-2.5 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-500/20 text-xs font-bold">💡 باکس نکته</button>
-                <button type="button" onClick={() => insertCallout("warning")} className="p-2 px-2.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs font-bold">⚠️ هشدار</button>
-                <button type="button" onClick={insertLink} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)]">🔗 لینک</button>
-                
-                <button
-                  type="button"
-                  onClick={() => imageUploadInputRef.current?.click()}
-                  className="p-2 px-3.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 shadow-md flex items-center gap-1 cursor-pointer"
-                >
-                  <span>📁</span>
-                  <span>آپلود عکس از سیستم</span>
-                </button>
               </div>
             </div>
 
@@ -439,19 +529,13 @@ export default function AdminBlogManager() {
                 contentEditable
                 suppressContentEditableWarning
                 onInput={updateStats}
-                className="w-full min-h-[420px] max-h-[600px] overflow-y-auto p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-loose text-xs focus:border-[var(--accent-blue)] font-sans shadow-inner text-[var(--text-primary)]"
-                style={{ textAlign: "justify" }}
+                className="w-full min-h-[420px] max-h-[600px] overflow-y-auto p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-loose text-xs focus:border-[var(--accent-blue)] shadow-inner text-[var(--text-primary)] transition-all"
+                style={{
+                  textAlign: "justify",
+                  fontFamily: `'${selectedFontFamily}', sans-serif`,
+                  fontWeight: selectedFontWeight,
+                }}
               />
-            </div>
-
-            {/* پیش‌نمایش در نتایج گوگل (Google SERP Snippet) */}
-            <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-              <span className="text-[11px] font-black text-[var(--accent-blue)] block">🌐 پیش‌نمایش در نتایج جستجوی گوگل (SERP):</span>
-              <div className="space-y-1 bg-[var(--modal-bg)] p-4 rounded-xl border border-[var(--card-border)]">
-                <span className="text-[10px] text-emerald-600 block font-mono">https://axoncore.ir/blog/{slug || "post-slug"}</span>
-                <h4 className="text-sm font-black text-blue-600 hover:underline cursor-pointer">{title || "عنوان مقاله"}</h4>
-                <p className="text-xs text-[var(--text-secondary)] line-clamp-2">{metaDescription || "توضیحات خلاصه متای سئو در این قسمت قرار می‌گیرد..."}</p>
-              </div>
             </div>
 
             <div className="flex items-center gap-2 pt-2">
@@ -488,6 +572,81 @@ export default function AdminBlogManager() {
           </form>
         </div>
       </div>
+
+      {/* مودال هوش مصنوعی تولید مقالات رنک ۱ گوگل */}
+      {isAiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="max-w-xl w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-5 text-xs shadow-2xl text-[var(--text-primary)]">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🚀</span>
+                <h3 className="font-black text-sm text-[var(--accent-blue)]">تولید مقاله سئو رنک یک گوگل با هوش مصنوعی</h3>
+              </div>
+              <button
+                onClick={() => setIsAiModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">
+                  انتخاب کالا برای تولید محتوا و لینک‌دهی خودکار:
+                </label>
+                <select
+                  value={aiSelectedProductId}
+                  onChange={(e) => setAiSelectedProductId(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer"
+                >
+                  <option value="all">🌟 تمامی محصولات فروشگاه (مقاله جامع مقایسه‌ای)</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      📦 {p.title || p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">
+                  موضوع یا کلمه کلیدی دلخواه شما (اختیاری یا رندوم):
+                </label>
+                <input
+                  type="text"
+                  value={aiCustomTopic}
+                  onChange={(e) => setAiCustomTopic(e.target.value)}
+                  placeholder="مثال: راهنمای خرید مانیتور تدوین رنگ 5K با پنل OLED در سال ۲۰۲۶"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 leading-relaxed font-medium">
+                ⚡ هوش مصنوعی مقاله را با بالاترین استانداردهای موتور جستجوی گوگل، تگ‌های معنایی، عکس‌های مرتبط، لینک‌های داخلی مستقیم به کاتالوگ فروشگاه و جدول مقایسه تولید خواهد کرد.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
+              <button
+                type="button"
+                onClick={() => setIsAiModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                disabled={isAiGenerating}
+                onClick={handleGenerateAiRank1Article}
+                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isAiGenerating ? "در حال تولید مهندسی‌شده مقاله..." : "شروع نگارش هوشمند 🚀"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

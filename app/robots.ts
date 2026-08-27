@@ -1,32 +1,34 @@
-// app/robots.ts
-import { MetadataRoute } from 'next';
-import { supabaseAdmin } from '@/lib/supabaseServer';
+// File Path: app/robots.ts
+import { MetadataRoute } from "next";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export const dynamic = "force-dynamic";
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://axoncore.ir';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
 
   let allowIndex = true;
 
   try {
     const { data } = await supabaseAdmin
-      .from('site_info')
-      .select('allow_google_index, maintenance_mode')
+      .from("site_info")
+      .select("allow_google_index, maintenance_mode")
       .limit(1)
       .maybeSingle();
 
-    if (data && (data.allow_google_index === false || data.maintenance_mode !== 'none')) {
+    if (data && (data.allow_google_index === false || data.maintenance_mode !== "none")) {
       allowIndex = false;
     }
   } catch (err) {
-    console.warn("Robots database check fallback:", err);
+    console.warn("Robots database query fallback:", err);
   }
 
   if (!allowIndex) {
     return {
       rules: [
         {
-          userAgent: '*',
-          disallow: '/',
+          userAgent: "*",
+          disallow: "/",
         },
       ],
       sitemap: `${baseUrl}/sitemap.xml`,
@@ -36,14 +38,15 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   return {
     rules: [
       {
-        userAgent: '*',
-        allow: '/',
+        userAgent: "*",
+        allow: "/",
         disallow: [
-          '/admin/',
-          '/admin',
-          '/api/admin/',
-          '/api/payment/',
-          '/checkout/payment',
+          "/admin/",
+          "/admin",
+          "/api/admin/",
+          "/api/payment/",
+          "/checkout/payment",
+          "/payment",
         ],
       },
     ],

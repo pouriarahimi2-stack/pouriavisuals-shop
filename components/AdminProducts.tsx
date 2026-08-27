@@ -1,10 +1,12 @@
-// components/AdminProducts.tsx
+// File Path: components/AdminProducts.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { productService, Product, ProductVariant, MarketBenchmark } from "@/services/productService";
 import { categoryService, Category } from "@/services/categoryService";
 import { supabase } from "@/lib/supabase";
+import { soundEngine } from "@/lib/soundEngine";
+import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
 import ProductExplodedView from "@/components/ProductExplodedView";
 
 export default function AdminProducts() {
@@ -45,16 +47,24 @@ export default function AdminProducts() {
 
   const [marketBenchmarks, setMarketBenchmarks] = useState<MarketBenchmark[]>([
     { storeName: "متوسط قیمت بازار (ترب/ایمالز)", price: 0, warranty: "گارانتی متفرقه", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
-    { storeName: "نمایندگی رسمی و انبار ما", price: 0, warranty: "گارانتی طلایی ۱۸ ماهه", isOurStore: true, deliveryTime: "ارسال فوری پیشتاز" },
+    { storeName: "فروشگاه مستقیم ما (تضمین کمترین نرخ)", price: 0, warranty: "گارانتی طلایی ۱۸ ماهه", isOurStore: true, deliveryTime: "ارسال فوری پیشتاز" },
   ]);
 
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
 
+  // تایپوگرافی زنده کالا
+  const [fontsList, setFontsList] = useState<CustomFontItem[]>([]);
+  const [productFont, setProductFont] = useState("Vazirmatn");
+  const [productFontWeight, setProductFontWeight] = useState(600);
+
+  // هوش مصنوعی تولید خودکار محتوای کالا
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // پیش‌نمایش نمای انفجاری در پنل ادمین
+  // پیش‌نمایش کالبدشکافی ۳ بعدی در پنل ادمین
   const [explodedPreviewOpen, setExplodedPreviewOpen] = useState(false);
 
   const loadData = async () => {
@@ -64,6 +74,7 @@ export default function AdminProducts() {
     ]);
     setProducts(prods || []);
     setCategories(cats || []);
+    setFontsList(fontEngine.getAllFonts());
   };
 
   useEffect(() => {
@@ -81,6 +92,7 @@ export default function AdminProducts() {
   }, []);
 
   const handleSelectProduct = (p: Product) => {
+    soundEngine.playClick();
     setSelectedProduct(p);
     setTitle(p.title || p.name || "");
     setTitleFa(p.title_fa || "");
@@ -113,8 +125,8 @@ export default function AdminProducts() {
       setMarketBenchmarks(p.market_comparison);
     } else {
       setMarketBenchmarks([
-        { storeName: "متوسط قیمت بازار (ترب/ایمالز)", price: Number(p.price || 0) + 1500000, warranty: "گارانتی شرکتی معمولی", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
-        { storeName: "فروشگاه ما (قیمت تضمینی)", price: Number(p.discountPrice || p.price || 0), warranty: p.warranty || "گارانتی تعویض طلایی", isOurStore: true, deliveryTime: "تحویل اکسپرس ۱ روزه" },
+        { storeName: "متوسط قیمت بازار (ترب/ایمالز)", price: Number(p.price || 0) + 1500000, warranty: "گارانتی معمولی", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
+        { storeName: "فروشگاه ما (قیمت تضمینی)", price: Number(p.discountPrice || p.price || 0), warranty: p.warranty || "گارانتی طلایی", isOurStore: true, deliveryTime: "ارسال فوری پیشتاز" },
       ]);
     }
 
@@ -123,6 +135,7 @@ export default function AdminProducts() {
   };
 
   const handleCreateNew = () => {
+    soundEngine.playClick();
     setSelectedProduct(null);
     setTitle("");
     setTitleFa("");
@@ -162,6 +175,68 @@ export default function AdminProducts() {
     setMetaTitle("");
     setMetaDescription("");
     setActiveFormTab("general");
+  };
+
+  // موتور هوش مصنوعی تولید خودکار مشخصات فنی و متن تبلیغاتی
+  const handleAiAutoFill = async () => {
+    if (!title.trim()) {
+      alert("لطفاً ابتدا عنوان کالا را وارد نمایید.");
+      return;
+    }
+
+    soundEngine.playClick();
+    setIsAiGenerating(true);
+
+    try {
+      const prompt = `به عنوان مهندس ارشد سخت‌افزار، مشخصات فنی دقیق، توضیحات تبلیغاتی، نکات برجسته و سئو برای کالای «${title.trim()}» در دسته «${category}» تولید کن.
+خروجی فقط یک JSON با ساختار زیر باشد:
+{
+  "titleFa": "عنوان فارسی جذاب",
+  "shortDesc": "خلاصه دو خطی جذاب",
+  "description": "توضیحات کامل و تخصصی فنی با تاکید بر مزایا و گارانتی",
+  "highlights": ["مزیت ۱", "مزیت ۲", "مزیت ۳", "مزیت ۴"],
+  "specs": {
+    "رزولوشن": "...",
+    "روشنایی": "...",
+    "پوشش رنگ": "...",
+    "درگاه‌ها": "..."
+  },
+  "metaTitle": "عنوان سئو مناسب گوگل",
+  "metaDescription": "توضیحات متا ۱۶۰ کاراکتری"
+}`;
+
+      const res = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, role: "admin" }),
+      });
+
+      const json = await res.json();
+      const rawText = json.response || json.reply || "";
+      const match = rawText.match(/\{[\s\S]*\}/);
+
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        if (parsed.titleFa) setTitleFa(parsed.titleFa);
+        if (parsed.shortDesc) setShortDesc(parsed.shortDesc);
+        if (parsed.description) setDescription(parsed.description);
+        if (Array.isArray(parsed.highlights)) setHighlights(parsed.highlights);
+        if (parsed.specs) {
+          const specArr = Object.entries(parsed.specs).map(([key, value]) => ({ key, value: String(value) }));
+          setSpecs(specArr);
+        }
+        if (parsed.metaTitle) setMetaTitle(parsed.metaTitle);
+        if (parsed.metaDescription) setMetaDescription(parsed.metaDescription);
+
+        soundEngine.playSuccess();
+        setStatusMessage({ type: "success", text: "✨ مشخصات فنی و محتوای سئو با هوش مصنوعی تکمیل شد." });
+      }
+    } catch {
+      alert("خطا در ارتباط با هوش مصنوعی.");
+    } finally {
+      setIsAiGenerating(false);
+      setTimeout(() => setStatusMessage(null), 3500);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,6 +315,7 @@ export default function AdminProducts() {
       return;
     }
 
+    soundEngine.playClick();
     setSaving(true);
 
     const specsMap: Record<string, string> = {};
@@ -284,7 +360,8 @@ export default function AdminProducts() {
     setSaving(false);
 
     if (result) {
-      setStatusMessage({ type: "success", text: "⚡ اطلاعات کالا با موفقیت ذخیره و در ویترین منتشر شد." });
+      soundEngine.playSuccess();
+      setStatusMessage({ type: "success", text: "⚡ کالا با موفقیت ذخیره و در ویترین فروشگاه منتشر شد." });
       loadData();
       if (!selectedProduct) setSelectedProduct(result);
     } else {
@@ -295,6 +372,7 @@ export default function AdminProducts() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("آیا از حذف کامل این کالا از دیتابیس اطمینان دارید؟")) return;
+    soundEngine.playClick();
     const ok = await productService.deleteProduct(id);
     if (ok) {
       handleCreateNew();
@@ -309,28 +387,39 @@ export default function AdminProducts() {
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>💎</span> مرکز جامع مدیریت محصولات و مشخصات تجاری کالا
+            <span>💎</span> مرکز جامع مدیریت کاتالوگ کالا و مشخصات مهندسی
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پیکربندی قیمت، آپلود عکس از سیستم/موبایل، تنوع رنگ، ویژگی‌های فنی، سئو و کالبدشکافی ۳D
+            تولید مشخصات هوشمند با AI، تنوع رنگ، ویژگی‌های متالورژی، قیمت‌گذاری و کالبدشکافی ۳D
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleAiAutoFill}
+            disabled={isAiGenerating || !title.trim()}
+            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <span>✨</span>
+            <span>{isAiGenerating ? "در حال پردازش AI..." : "تولید مشخصات با هوش مصنوعی"}</span>
+          </button>
+
           {selectedProduct && (
             <button
               type="button"
               onClick={() => setExplodedPreviewOpen(true)}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs hover:opacity-95 transition shadow-lg cursor-pointer flex items-center gap-1.5"
+              className="px-5 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black text-xs transition cursor-pointer flex items-center gap-1.5"
             >
               <span>🧬</span>
               <span>تست نمای انفجاری ۳D</span>
             </button>
           )}
+
           <button
             onClick={handleCreateNew}
             className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer"
           >
-            + افزودن محصول جدید
+            + محصول جدید
           </button>
         </div>
       </div>
@@ -370,23 +459,26 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* فرم ۷ تب تنظیمات کالا */}
+        {/* فرم ۷ تب تنظیمات پیشرفته کالا */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
             <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] scrollbar-none">
               {[
                 { id: "general", label: "اطلاعات پایه", icon: "📝" },
                 { id: "pricing", label: "قیمت و انبار", icon: "💰" },
-                { id: "gallery", label: "تصاویر و آپلود", icon: "🖼️" },
-                { id: "variants", label: "تنوع رنگ", icon: "🎨" },
+                { id: "gallery", label: "گالری تصاویر", icon: "🖼️" },
+                { id: "variants", label: "تنوع و رنگ‌ها", icon: "🎨" },
                 { id: "specs", label: "مشخصات فنی", icon: "⚙️" },
-                { id: "comparison", label: "مقایسه بازار", icon: "📊" },
-                { id: "seo", label: "سئو", icon: "🌐" },
+                { id: "comparison", label: "مقایسه قیمت بازار", icon: "📊" },
+                { id: "seo", label: "سئو و تگ‌ها", icon: "🌐" },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveFormTab(tab.id as any)}
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setActiveFormTab(tab.id as any);
+                  }}
                   className={`px-4 py-2.5 rounded-2xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                     activeFormTab === tab.id
                       ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -402,28 +494,29 @@ export default function AdminProducts() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان کالا *</label>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان اصلی کالا *</label>
                     <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]" />
                   </div>
                   <div>
-                    <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان فارسی</label>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان فارسی / زیرعنوان</label>
                     <input type="text" value={titleFa} onChange={(e) => setTitleFa(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]" />
                   </div>
                   <div>
-                    <label className="block font-bold text-[var(--text-secondary)] mb-1">برند</label>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">برند سازنده</label>
                     <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]" />
                   </div>
                   <div>
-                    <label className="block font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی</label>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی فروشگاه</label>
                     <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] cursor-pointer">
                       {categories.map((c) => <option key={c.id || c.name} value={c.name}>{c.name}</option>)}
                       <option value="کالای دیجیتال">کالای دیجیتال</option>
                     </select>
                   </div>
                 </div>
+
                 <div>
-                  <label className="block font-bold text-[var(--text-secondary)] mb-1">توضیحات کامل</label>
-                  <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium" />
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">توضیحات تخصصی و معرفی کالا</label>
+                  <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium leading-relaxed" />
                 </div>
               </div>
             )}
@@ -432,17 +525,22 @@ export default function AdminProducts() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block font-bold text-[var(--text-secondary)] mb-1">قیمت اصلی *</label>
-                    <input type="number" required value={price} onChange={(e) => setPrice(Number(e.target.value))} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold" />
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">قیمت پایه (تومان) *</label>
+                    <input type="number" required value={price} onChange={(e) => setPrice(Number(e.target.value))} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-[var(--text-primary)]" />
                   </div>
                   <div>
-                    <label className="block font-bold text-[var(--text-secondary)] mb-1">قیمت با تخفیف</label>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">قیمت با تخفیف ویژه (تومان)</label>
                     <input type="number" value={discountPrice} onChange={(e) => setDiscountPrice(e.target.value ? Number(e.target.value) : "")} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-emerald-600" />
                   </div>
                   <div>
-                    <label className="block font-bold text-[var(--text-secondary)] mb-1">موجودی انبار</label>
-                    <input type="number" value={stock} onChange={(e) => setStock(e.target.value ? Number(e.target.value) : "")} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold" />
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">تعداد موجود در انبار</label>
+                    <input type="number" value={stock} onChange={(e) => setStock(e.target.value ? Number(e.target.value) : "")} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-[var(--text-primary)]" />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">شرایط گارانتی و خدمات پس از فروش</label>
+                  <input type="text" value={warranty} onChange={(e) => setWarranty(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]" />
                 </div>
               </div>
             )}
@@ -451,13 +549,17 @@ export default function AdminProducts() {
               <div className="space-y-3">
                 <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" multiple className="hidden" />
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">📁 آپلود عکس از سیستم/موبایل</button>
-                  <button type="button" onClick={addImageField} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">+ لینک عکس</button>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer shadow-md">
+                    📁 آپلود عکس از دستگاه
+                  </button>
+                  <button type="button" onClick={addImageField} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">
+                    + لینک عکس
+                  </button>
                 </div>
                 {imageUrls.map((url, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <input type="text" value={url} onChange={(e) => updateImageUrl(idx, e.target.value)} placeholder="https://..." className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs" />
-                    <button type="button" onClick={() => removeImageField(idx)} className="px-3 rounded-xl bg-rose-500/15 text-rose-500 font-bold">✕</button>
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input type="text" value={url} onChange={(e) => updateImageUrl(idx, e.target.value)} placeholder="https://..." className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs text-[var(--text-primary)]" />
+                    <button type="button" onClick={() => removeImageField(idx)} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer">✕</button>
                   </div>
                 ))}
               </div>
@@ -465,12 +567,14 @@ export default function AdminProducts() {
 
             {activeFormTab === "variants" && (
               <div className="space-y-3">
-                <button type="button" onClick={addVariant} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">+ افزودن رنگ</button>
+                <button type="button" onClick={addVariant} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">
+                  + افزودن رنگ / مدل
+                </button>
                 {variants.map((v, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
-                    <input type="text" value={v.name} onChange={(e) => updateVariant(idx, "name", e.target.value)} placeholder="نام رنگ" className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs" />
-                    <input type="color" value={v.colorHex || "#000"} onChange={(e) => updateVariant(idx, "colorHex", e.target.value)} className="w-8 h-8 rounded-lg cursor-pointer" />
-                    <button type="button" onClick={() => removeVariant(idx)} className="p-2.5 rounded-xl bg-rose-500/15 text-rose-500 font-bold">🗑️</button>
+                    <input type="text" value={v.name} onChange={(e) => updateVariant(idx, "name", e.target.value)} placeholder="نام رنگ (مثلا: تیتانیوم)" className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs flex-1" />
+                    <input type="color" value={v.colorHex || "#000"} onChange={(e) => updateVariant(idx, "colorHex", e.target.value)} className="w-9 h-9 rounded-lg cursor-pointer bg-transparent" />
+                    <button type="button" onClick={() => removeVariant(idx)} className="p-2 px-3 rounded-xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer">🗑️</button>
                   </div>
                 ))}
               </div>
@@ -478,12 +582,14 @@ export default function AdminProducts() {
 
             {activeFormTab === "specs" && (
               <div className="space-y-3">
-                <button type="button" onClick={addSpecField} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">+ افزودن ویژگی</button>
+                <button type="button" onClick={addSpecField} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">
+                  + افزودن ویژگی فنی
+                </button>
                 {specs.map((s, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <input type="text" value={s.key} onChange={(e) => updateSpecField(idx, "key", e.target.value)} placeholder="عنوان" className="w-1/3 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs" />
-                    <input type="text" value={s.value} onChange={(e) => updateSpecField(idx, "value", e.target.value)} placeholder="مقدار" className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs" />
-                    <button type="button" onClick={() => removeSpecField(idx)} className="px-3 rounded-xl bg-rose-500/15 text-rose-500 font-bold">✕</button>
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input type="text" value={s.key} onChange={(e) => updateSpecField(idx, "key", e.target.value)} placeholder="عنوان پارامتر" className="w-1/3 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs" />
+                    <input type="text" value={s.value} onChange={(e) => updateSpecField(idx, "value", e.target.value)} placeholder="مقدار فنی" className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs" />
+                    <button type="button" onClick={() => removeSpecField(idx)} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer">✕</button>
                   </div>
                 ))}
               </div>
@@ -491,11 +597,13 @@ export default function AdminProducts() {
 
             {activeFormTab === "comparison" && (
               <div className="space-y-3">
-                <button type="button" onClick={addBenchmark} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">+ افزودن رقیب</button>
+                <button type="button" onClick={addBenchmark} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">
+                  + افزودن قیمت رقیب
+                </button>
                 {marketBenchmarks.map((bm, idx) => (
-                  <div key={idx} className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] grid grid-cols-2 gap-2">
-                    <input type="text" value={bm.storeName} onChange={(e) => updateBenchmark(idx, "storeName", e.target.value)} placeholder="نام فروشگاه" className="p-2 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs" />
-                    <input type="number" value={bm.price} onChange={(e) => updateBenchmark(idx, "price", Number(e.target.value))} placeholder="قیمت" className="p-2 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs" />
+                  <div key={idx} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] grid grid-cols-2 gap-2">
+                    <input type="text" value={bm.storeName} onChange={(e) => updateBenchmark(idx, "storeName", e.target.value)} placeholder="نام فروشگاه" className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs" />
+                    <input type="number" value={bm.price} onChange={(e) => updateBenchmark(idx, "price", Number(e.target.value))} placeholder="قیمت" className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs" />
                   </div>
                 ))}
               </div>
@@ -503,18 +611,24 @@ export default function AdminProducts() {
 
             {activeFormTab === "seo" && (
               <div className="space-y-3">
-                <label className="block font-bold text-[var(--text-secondary)]">متا تایتل</label>
-                <input type="text" value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]" />
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان سئو (Meta Title)</label>
+                  <input type="text" value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]" />
+                </div>
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">توضیحات متای گوگل (Meta Description)</label>
+                  <input type="text" value={metaDescription} onChange={(e) => setMetaDescription(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium" />
+                </div>
               </div>
             )}
 
             <div className="flex gap-3 pt-4 border-t border-[var(--card-border)]">
-              <button type="submit" disabled={saving} className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-lg">
-                {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار محصول"}
+              <button type="submit" disabled={saving} className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-lg hover:opacity-90 disabled:opacity-50">
+                {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار کالا"}
               </button>
               {selectedProduct?.id && (
-                <button type="button" onClick={() => handleDelete(selectedProduct.id)} className="px-5 py-3.5 rounded-2xl bg-rose-500/15 text-rose-600 font-bold">
-                  حذف
+                <button type="button" onClick={() => handleDelete(selectedProduct.id)} className="px-6 py-4 rounded-2xl bg-rose-500/15 text-rose-600 font-bold cursor-pointer">
+                  حذف کالا ✕
                 </button>
               )}
             </div>
@@ -522,7 +636,6 @@ export default function AdminProducts() {
         </div>
       </div>
 
-      {/* مدال تست کالبدشکافی در پنل مدیریت */}
       {selectedProduct && (
         <ProductExplodedView
           productId={selectedProduct.id}

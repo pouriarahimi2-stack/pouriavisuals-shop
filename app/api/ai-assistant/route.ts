@@ -10,66 +10,103 @@ export async function POST(req: Request) {
     const role = body.role || "customer";
     const imageBase64 = body.imageBase64;
     const productsData = body.productsData || [];
+    const targetTopic = body.targetTopic || "";
 
     const isSeoArticleRequest =
       role === "admin" &&
       (userMessage.includes("سئو") ||
         userMessage.includes("مقاله") ||
         userMessage.includes("پکیج") ||
-        userMessage.includes("آنالیز"));
+        userMessage.includes("آنالیز") ||
+        Boolean(targetTopic));
 
     const [productsRes, siteInfoRes] = await Promise.all([
       supabase
         .from("products")
-        .select("id, title, name, price, discount_price, category, stock, is_available, description, specs, highlights"),
+        .select("id, title, name, price, discount_price, category, stock, is_available, description, specs, highlights, images, image"),
       supabase.from("site_info").select("site_name, tagline, phone, description").limit(1).maybeSingle(),
     ]);
 
     const products = productsData.length > 0 ? productsData : productsRes.data || [];
     const siteInfo = siteInfoRes.data || { site_name: "آکسون (Axon)", tagline: "مرجع تخصصی تجهیزات دیجیتال" };
 
-    if (isSeoArticleRequest && products.length > 0) {
-      const generatedSeoArticle = generateComprehensiveSeoArticle(products, siteInfo.site_name);
+    // موتور هوشمند تولید مقاله جامع رنک یک گوگل
+    if (isSeoArticleRequest) {
+      let generatedArticle = "";
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          const productContext = products
+            .slice(0, 10)
+            .map(
+              (p: any) =>
+                `• عنوان: ${p.title || p.name} | آی‌دی محصول: ${p.id} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | دسته‌بندی: ${p.category} | لینک مستقیم: /products/${p.id} | مشخصات: ${JSON.stringify(p.specs || {})}`
+            )
+            .join("\n");
+
+          const prompt = `تو برترین استراتژیست محتوا و متخصص ارشد SEO فنی و معنایی برای گوگل (Google Search Rank-1) در ایران هستی.
+وظیفه تو نگارش یک مقاله کامل، فوق‌العاده جامع، موشکافانه و جذاب در مورد موضوع زیر است:
+«${targetTopic || userMessage}»
+
+الزامات حیاتی مقاله:
+۱. عنوان جذاب (Title Tag) با CTR حداکثری و برچسب‌های متا (Meta Description).
+۲. لینک‌دهی هوشمند داخلی به محصولات مرتبط فروشگاه «${siteInfo.site_name}» با استفاده از لینک‌های واقعی زیر:
+${productContext}
+۳. فرمت‌بندی کامل HTML با تگ‌های معنایی (h1, h2, h3, p, ul, li, strong).
+۴. طراحی جدول مقایسه فنی (HTML Table) با استایل تمیز و باکس‌های راهنمای ویژه (Callout Boxes).
+۵. بخش سوالات متداول (FAQ Schema).
+۶. درج تصاویر مرتبط با تگ <img> با آدرس‌های مستقیم استانداردی مثل https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1000 و متن جایگزین (alt) فوق‌العاده بهینه‌شده.
+
+مقاله را فوراً به صورت متن کامل تولید کن:`;
+
+          const geminiReq = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+              }),
+            }
+          );
+          const geminiData = await geminiReq.json();
+          generatedArticle = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        } catch (aiErr) {
+          console.warn("AI Article Gen Error:", aiErr);
+        }
+      }
+
+      if (!generatedArticle) {
+        generatedArticle = generateRankOneSeoArticle(products, siteInfo.site_name, targetTopic || userMessage);
+      }
+
       return NextResponse.json({
         success: true,
-        response: generatedSeoArticle,
-        reply: generatedSeoArticle,
+        response: generatedArticle,
+        reply: generatedArticle,
       });
     }
 
+    // حالت پشتیبانی چت کلاینت
     const productCatalogContext = products
       .map(
         (p: any) =>
-          `• [شناسه: ${p.id}] ${p.title || p.name} | دسته: ${p.category} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 0} عدد | توضیحات: ${p.description || "ندارد"}`
+          `• [شناسه: ${p.id}] ${p.title || p.name} | دسته: ${p.category} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 0} عدد`
       )
       .join("\n");
 
-    const systemPrompt = `تو «دستیار هوشمند و مشاور تخصصی فروشگاه ${siteInfo.site_name}» هستی.
-شعار فروشگاه: ${siteInfo.tagline}
-سیاست‌های اصلی:
-۱. با لحنی محترمانه، متخصصانه، صمیمی، دقیق و هوشمند پاسخ بده.
-۲. به تمام سوالات تخصصی کاربران درباره تکنولوژی، مانیتورهای تدوین، کالرگریدینگ، دقت رنگ، انواع پنل‌ها (IPS, OLED, Mini-LED)، سخت‌افزار و مقایسه رزولوشن‌ها با بالاترین سطح علمی پاسخ بده.
-۳. در حین پاسخ‌دهی، پاسخ را بر اساس موجودی واقعی انبار فروشگاه ما ارائه بده.
-۴. اگر کالا در کاتالوگ موجود است، با ذکر قیمت و ویژگی‌های فنی پیشنهاد بده.
-
-کاتالوگ محصولات فعال فروشگاه:
-${productCatalogContext || "در حال حاضر کالایی در ویترین ثبت نشده است."}`;
+    const systemPrompt = `تو مشاور تخصصی فروشگاه ${siteInfo.site_name} هستی. به تمام سوالات پیرامون مانیتور، تدوین، سخت‌افزار و قیمت‌ها به صورت حرفه‌ای پاسخ بده و کالاها را پیشنهاد بده.`;
 
     let aiResponse = "";
     let matchedProductId: string | null = null;
-
     const lowerQuery = userMessage.toLowerCase();
 
     const matchedProduct = products.find(
       (p: any) =>
         (p.title && lowerQuery.includes(p.title.toLowerCase())) ||
-        (p.name && lowerQuery.includes(p.name.toLowerCase())) ||
-        (p.category && lowerQuery.includes(p.category.toLowerCase()))
+        (p.name && lowerQuery.includes(p.name.toLowerCase()))
     );
 
-    if (matchedProduct) {
-      matchedProductId = matchedProduct.id;
-    }
+    if (matchedProduct) matchedProductId = matchedProduct.id;
 
     if (process.env.GEMINI_API_KEY) {
       try {
@@ -83,19 +120,9 @@ ${productCatalogContext || "در حال حاضر کالایی در ویترین 
                 {
                   role: "user",
                   parts: [
-                    { text: systemPrompt },
+                    { text: `${systemPrompt}\nکاتالوگ فروشگاه:\n${productCatalogContext}` },
                     ...history.map((h: any) => ({ text: `${h.role === "user" ? "کاربر" : "دستیار"}: ${h.text || (h.parts && h.parts[0]?.text) || ""}` })),
                     { text: `پیام کاربر: ${userMessage}` },
-                    ...(imageBase64
-                      ? [
-                          {
-                            inline_data: {
-                              mime_type: "image/jpeg",
-                              data: imageBase64.replace(/^data:image\/\w+;base64,/, ""),
-                            },
-                          },
-                        ]
-                      : []),
                   ],
                 },
               ],
@@ -104,18 +131,14 @@ ${productCatalogContext || "در حال حاضر کالایی در ویترین 
         );
         const geminiData = await geminiReq.json();
         aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-      } catch (err) {
-        console.error("Gemini API Call Error:", err);
-      }
+      } catch {}
     }
 
     if (!aiResponse) {
-      if (lowerQuery.includes("سلام") || lowerQuery.includes("درود")) {
-        aiResponse = `سلام و درود! خوش آمدید به فروشگاه **${siteInfo.site_name}** ⚡\nمن دستیار هوشمند و مشاور تخصصی شما هستم. چه در مورد انتخاب بهترین تجهیزات و مانیتورها سوال داشته باشید، چه در مورد استانداردهای رنگ، استعلام کالا یا مقایسه مدل‌ها، با کمال میل راهنماییتان می‌کنم. چطور می‌توانم کمکتان کنم؟`;
-      } else if (matchedProduct) {
-        aiResponse = `محصول **«${matchedProduct.title || matchedProduct.name}»** در دسته **${matchedProduct.category}** با مشخصات زیر در انبار موجود است:\n\n🔹 **قیمت با تخفیف ویژه:** ${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان\n🔹 **وضعیت موجودی:** ${matchedProduct.stock ?? 0} عدد موجود در انبار\n\nمی‌توانید برای مشاهده مشخصات کامل یا ثبت سفارش مستقیم از دکمه زیر استفاده کنید.`;
+      if (matchedProduct) {
+        aiResponse = `محصول **«${matchedProduct.title || matchedProduct.name}»** در دسته **${matchedProduct.category}** با مشخصات زیر موجود است:\n\n🔹 **قیمت:** ${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان\n🔹 **موجودی:** ${matchedProduct.stock ?? 0} عدد در انبار\n\nبرای مشاهده مشخصات کامل یا خرید روی دکمه زیر کلیک فرمایید.`;
       } else {
-        aiResponse = `درخواست شما بررسی شد. شما می‌توانید محصولات موجود در کاتالوگ فروشگاه را با تضمین اصالت و گارانتی ۱۸ ماهه مشاهده و سفارش دهید. در صورت نیاز به راهنمایی در مورد کالای خاص، نام آن را بفرمایید.`;
+        aiResponse = `درود! چطور می‌توانم در خصوص خرید، مشخصات مانیتورها و تجهیزات استودیویی به شما کمک کنم؟`;
       }
     }
 
@@ -126,50 +149,47 @@ ${productCatalogContext || "در حال حاضر کالایی در ویترین 
       matchedProductId,
     });
   } catch (error: any) {
-    console.error("AI Assistant API Route Error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        response: "در حال حاضر ارتباط با دستیار هوشمند برقرار نشد. لطفاً مجدداً پیام خود را ارسال فرمایید.",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
 
-function generateComprehensiveSeoArticle(products: any[], storeName: string): string {
-  const p = products[0];
-  const title = p.title || p.name || "تجهیزات دیجیتال پیشرفته";
-  const cat = p.category || "سخت‌افزار";
+function generateRankOneSeoArticle(products: any[], storeName: string, topic: string): string {
+  const p = products[0] || { id: "1", title: "مانیتور ۵K استودیویی آکسون", price: 65000000, category: "سخت‌افزار" };
   const priceFormatted = Number(p.discount_price || p.price || 0).toLocaleString("fa-IR");
 
-  return `# راهنمای جامع خرید و نقد تخصصی ${title}؛ برگزیده دسته ${cat}
+  return `<h1>راهنمای جامع خرید و بررسی تخصصی: ${topic || p.title} (استاندارد ۲۰۲۶)</h1>
 
-**Title Tag:** بررسی و خرید ${title} با گارانتی اصالت | فروشگاه ${storeName}
-**Meta Description:** نقد و بررسی جامع ${title}، مشخصات فنی، بنچ‌مارک سرعت و تست کالیبراسیون به همراه راهنمای خرید با کمترین قیمت بازار در فروشگاه تخصصی ${storeName}.
-**کلمات کلیدی اصلی:** خرید ${title}، بررسی تخصصی ${title}، قیمت ${title} در بازار، گارانتی ${storeName}
+<p><strong>Title Tag:</strong> بررسی و خرید ${topic || p.title} با گارانتی اصالت طلایی | فروشگاه ${storeName}</p>
+<p><strong>Meta Description:</strong> راهنمای جامع خرید ${topic || p.title}، تست کالیبراسیون سخت‌افزاری رنگ و بنچ‌مارک در فروشگاه تخصصی ${storeName}.</p>
 
----
+<img src="https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1000" alt="${topic || p.title}" style="width:100%; border-radius:24px; margin:20px 0;" />
 
-## مقدمه: چرا ${title} انتخابی متمایز در بازار ${cat} است؟
-در دنیای پرشتاب فناوری، داشتن ابزارهایی با پایداری عملکردی بی‌نقص و استانداردهای کیفی بالا اهمیت دوچندانی پیدا کرده است. محصول **${title}** با تکیه بر استانداردهای مهندسی مدرن توانسته است نظر کاربران حرفه‌ای را به خود جلب کند.
+<h2>مقدمه و تحلیل نیازهای فنی تدوین‌گران</h2>
+<p>در صنعت تولید محتوا و اصلاح رنگ ویدیو، دقت نمایشگر و سرعت ارتباطی از اهمیت حیاتی برخوردار است. محصول <a href="/products/${p.id}"><strong>${p.title}</strong></a> با پشتیبانی کامل از طیف‌های رنگی سینمایی توانسته تحولی در بازار ایجاد کند.</p>
 
----
+<div style="border-right: 4px solid #0071e3; background: rgba(0,113,227,0.08); padding: 16px; border-radius: 16px; margin: 20px 0;">
+  <strong style="color:#0071e3;">💡 توصیه کارشناسی:</strong>
+  <span>کالیبراسیون سخت‌افزاری با انحراف رنگی Delta E کمتر از ۰.۵ تضمین‌کننده خروجی بدون نقص در نرم‌افزارهای DaVinci Resolve است.</span>
+</div>
 
-## بررسی مشخصات فنی و کیفیت ساخت
-${title} دارای ویژگی‌های فنی برجسته‌ای است که ارزش خرید آن را دوچندان می‌کند:
-* **پایداری عملکردی:** مهندسی قطعات بهینه‌شده برای کارکرد مداوم بدون افت کارایی.
-* **کیفیت متریال:** استفاده از متریال با دوام جهت افزایش طول عمر فیزیکی دستگاه.
-* **ارزش خرید:** با توجه به قیمت **${priceFormatted} تومان**، از گزینه‌های بسیار مناسب بازار است.
+<h2>جدول مقایسه فنی و پارامترهای مهندسی</h2>
+<table border="1" style="width:100%; border-collapse:collapse; margin:20px 0;">
+  <thead>
+    <tr style="background:rgba(255,255,255,0.08);">
+      <th style="padding:10px;">شاخص</th>
+      <th style="padding:10px;">مشخصه فنی</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding:10px;">کالای مرتبط در انبار</td><td style="padding:10px;"><a href="/products/${p.id}">${p.title}</a></td></tr>
+    <tr><td style="padding:10px;">قیمت ویژه با تخفیف</td><td style="padding:10px;">${priceFormatted} تومان</td></tr>
+    <tr><td style="padding:10px;">گارانتی و خدمات</td><td style="padding:10px;">۱۸ ماه گارانتی تعویض طلایی</td></tr>
+  </tbody>
+</table>
 
----
+<h2>سوالات متداول (FAQ)</h2>
+<h3>آیا این کالا با مک‌بوک و ویندوز سازگار است؟</h3>
+<p>بله، با تمامی دیوایس‌های مجهز به درگاه Thunderbolt و Type-C سازگاری کامل دارد.</p>
 
-## سوالات متداول خریداران (FAQ)
-**۱. آیا ${title} دارای گارانتی رسمی است؟**
-بله، تمامی کالاهای ارائه‌شده در فروشگاه ${storeName} دارای ضمانت اصالت فیزیکی و مهلت تست می‌باشند.
-
----
-
-## جمع‌بندی نهایی
-شما می‌توانید هم‌اکنون این محصول را با **تضمین کمترین قیمت بازار و ارسال سریع پیشتاز** از فروشگاه ${storeName} تهیه فرمایید.`;
+<p>شما می‌توانید هم‌اکنون برای خرید مستقیم و بررسی جزئیات کالا به <a href="/products/${p.id}">صفحه خرید اختصاصی ${p.title}</a> مراجعه فرمایید.</p>`;
 }

@@ -1,4 +1,4 @@
-// app/blog/[id]/page.tsx
+// File Path: app/blog/[id]/page.tsx
 "use client";
 
 import React, { useState, useEffect, use } from "react";
@@ -26,7 +26,7 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // نوار پیشرفت مطالعه زنده بالای صفحه
+  // نوار پیشرفت مطالعه زنده در بالای صفحه
   useEffect(() => {
     const handleScroll = () => {
       const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -72,8 +72,8 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans">
-        <div className="w-10 h-10 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mb-4" />
+      <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans space-y-3">
+        <div className="w-10 h-10 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin" />
         <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری تحلیل و مقاله تخصصی...</p>
       </div>
     );
@@ -84,7 +84,6 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
       <div className="max-w-3xl mx-auto px-4 py-24 text-center space-y-4 font-sans select-none" dir="rtl">
         <div className="text-5xl">📄</div>
         <h2 className="text-xl font-black text-[var(--text-primary)]">مقاله مورد نظر یافت نشد!</h2>
-        <p className="text-xs text-[var(--text-secondary)]">ممکن است این مقاله حذف شده باشد یا آدرس اشتباه باشد.</p>
         <Link
           href="/blog"
           className="inline-block px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-lg"
@@ -100,7 +99,7 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
       
-      {/* نوار نئونی پیشرفت مطالعه در بالای صفحه */}
+      {/* نوار پیشرفت مطالعه */}
       <div
         className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 z-50 transition-all duration-150"
         style={{ width: `${scrollProgress}%` }}
@@ -115,10 +114,7 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
         <span className="text-[var(--text-primary)] truncate max-w-xs">{post.title}</span>
       </div>
 
-      {/* باکس کامل محتوای مقاله */}
-      <article className="p-8 md:p-12 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-8">
-        
-        {/* هدر مقاله */}
+      <article className="p-8 md:p-12 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-8 backdrop-blur-2xl">
         <header className="space-y-4 border-b border-[var(--card-border)] pb-6">
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
             <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black">
@@ -140,20 +136,18 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
           )}
 
           {post.metaDescription && (
-            <p className="text-xs md:text-sm text-[var(--text-secondary)] leading-relaxed font-medium bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
+            <div className="text-xs md:text-sm text-[var(--text-secondary)] leading-relaxed font-medium bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
               💡 {post.metaDescription}
-            </p>
+            </div>
           )}
         </header>
 
-        {/* بدنه رندر شده مقاله */}
+        {/* محتوای رندر شده مقاله */}
         <div
           dangerouslySetInnerHTML={{ __html: post.content }}
-          className="blog-content prose prose-sm max-w-none text-xs md:text-sm leading-loose text-[var(--text-primary)] font-medium space-y-4"
-          style={{ textAlign: "justify" }}
+          className="blog-content prose prose-sm max-w-none text-xs md:text-sm leading-loose text-[var(--text-primary)] font-medium space-y-4 text-justify"
         />
 
-        {/* فوتر مقاله و دکمه‌های ناوبری */}
         <footer className="pt-6 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4">
           <Link
             href="/blog"
@@ -173,12 +167,12 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
         </footer>
       </article>
 
-      {/* بخش پیشنهاد هوشمند محصولات مرتبط در انتهای مقاله */}
+      {/* بخش محصولات مرتبط */}
       {relatedProducts.length > 0 && (
         <section className="space-y-6">
           <div className="flex justify-between items-center px-1">
             <h3 className="text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
-              <span>💎</span> تجهیزات و مانیتورهای مرتبط با این مقاله
+              <span>💎</span> تجهیزات و مانیتورهای مرتبط با این موضوع
             </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -1,3 +1,4 @@
+// File Path: components/admin/AdminDashboardStats.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -90,13 +91,13 @@ export default function AdminDashboardStats() {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-sans select-none text-xs" dir="rtl">
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-[var(--accent-blue)] transition">
         <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
-          <span>کاتالوگ کالاها</span>
+          <span>کاتالوگ فعال کالاها</span>
           <span className="p-2 rounded-2xl bg-blue-500/10 text-blue-500 text-sm">📦</span>
         </div>
         <div className="text-2xl font-black font-mono text-blue-500">
           {loading ? "..." : stats.totalProducts} <span className="text-xs font-bold text-[var(--text-secondary)]">قلم کالا</span>
         </div>
-        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">ثبت‌شده در ویترین فعال</span>
+        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">ثبت‌شده در ویترین فروشگاه</span>
       </div>
 
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-[var(--accent-blue)] transition">
@@ -105,9 +106,9 @@ export default function AdminDashboardStats() {
           <span className="p-2 rounded-2xl bg-indigo-500/10 text-indigo-500 text-sm">📄</span>
         </div>
         <div className="text-2xl font-black font-mono text-indigo-500">
-          {loading ? "..." : stats.activeOrders} <span className="text-xs font-bold text-[var(--text-secondary)]">عدد</span>
+          {loading ? "..." : stats.activeOrders} <span className="text-xs font-bold text-[var(--text-secondary)]">فاکتور</span>
         </div>
-        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">کل فاکتورهای ثبت‌شده</span>
+        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">ثبت‌شده در چرخه پردازش</span>
       </div>
 
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-amber-500 transition">
@@ -118,18 +119,18 @@ export default function AdminDashboardStats() {
         <div className="text-2xl font-black font-mono text-amber-500">
           {loading ? "..." : stats.lowStockCount} <span className="text-xs font-bold text-[var(--text-secondary)]">کالا</span>
         </div>
-        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">موجودی کمتر از ۳ عدد در انبار</span>
+        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">کمتر از ۳ عدد موجود در انبار</span>
       </div>
 
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-emerald-500 transition">
         <div className="flex items-center justify-between text-[var(--text-secondary)] font-bold">
-          <span>مجموع فروش و تراکنش‌ها</span>
+          <span>مجموع تراکنش‌های موفق</span>
           <span className="p-2 rounded-2xl bg-emerald-500/10 text-emerald-500 text-sm">💳</span>
         </div>
         <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400 truncate">
           {loading ? "..." : stats.totalSales.toLocaleString("fa-IR")} <span className="text-xs font-bold">تومان</span>
         </div>
-        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">فروش ناخالص کل سفارشات</span>
+        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">کل حجم ناخالص فروش</span>
       </div>
     </div>
   );

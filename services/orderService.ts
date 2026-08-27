@@ -1,5 +1,5 @@
-// services/orderService.ts
-import { supabase } from '@/lib/supabase';
+// File Path: services/orderService.ts
+import { supabase } from "@/lib/supabase";
 
 export interface OrderItem {
   id?: string | number;
@@ -47,9 +47,9 @@ export interface Order {
   shipping_fee?: number;
   finalAmount: number;
   final_amount?: number;
-  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  paymentStatus: 'pending' | 'paid' | 'failed';
-  payment_status?: 'pending' | 'paid' | 'failed';
+  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+  paymentStatus: "pending" | "paid" | "failed";
+  payment_status?: "pending" | "paid" | "failed";
   paymentMethod?: string;
   payment_method?: string;
   trackingCode?: string;
@@ -63,7 +63,7 @@ export function normalizeOrder(raw: any): Order {
   if (!raw) return {} as Order;
 
   const id = raw.id || `ORD-${Date.now().toString().slice(-6)}`;
-  const orderNumber = raw.order_number || raw.orderNumber || (typeof id === 'string' ? id : `ORD-${id}`);
+  const orderNumber = raw.order_number || raw.orderNumber || (typeof id === "string" ? id : `ORD-${id}`);
 
   const fullName =
     raw.customer_name ||
@@ -71,14 +71,14 @@ export function normalizeOrder(raw: any): Order {
     raw.customer?.fullName ||
     raw.customer?.name ||
     raw.fullName ||
-    (raw.first_name ? `${raw.first_name || ''} ${raw.last_name || ''}`.trim() : 'خریدار محترم');
+    (raw.first_name ? `${raw.first_name || ""} ${raw.last_name || ""}`.trim() : "خریدار محترم");
 
-  const phone = raw.phone || raw.customer_phone || raw.customer?.phone || '';
-  const province = raw.province || raw.customer_province || raw.customer?.province || '';
-  const city = raw.city || raw.customer_city || raw.customer?.city || '';
-  const address = raw.address || raw.customer_address || raw.customer?.address || '';
-  const postalCode = raw.postal_code || raw.postalCode || raw.customer?.postalCode || raw.customer?.postal_code || '';
-  const notes = raw.notes || raw.customer?.notes || '';
+  const phone = raw.phone || raw.customer_phone || raw.customer?.phone || "";
+  const province = raw.province || raw.customer_province || raw.customer?.province || "";
+  const city = raw.city || raw.customer_city || raw.customer?.city || "";
+  const address = raw.address || raw.customer_address || raw.customer?.address || "";
+  const postalCode = raw.postal_code || raw.postalCode || raw.customer?.postalCode || raw.customer?.postal_code || "";
+  const notes = raw.notes || raw.customer?.notes || "";
 
   const customer: CustomerInfo = {
     fullName,
@@ -97,12 +97,12 @@ export function normalizeOrder(raw: any): Order {
         ...item,
         productId: item.productId || item.product_id || item.id,
         product_id: item.product_id || item.productId || item.id,
-        name: item.name || item.title || 'کالا',
-        title: item.title || item.name || 'کالا',
+        name: item.name || item.title || "کالا",
+        title: item.title || item.name || "کالا",
         price: Number(item.price) || 0,
         quantity: Number(item.quantity) || 1,
-        image: item.image || item.image_url || '/placeholder.png',
-        image_url: item.image || item.image_url || '/placeholder.png',
+        image: item.image || item.image_url || "/placeholder.png",
+        image_url: item.image || item.image_url || "/placeholder.png",
       }))
     : [];
 
@@ -111,10 +111,10 @@ export function normalizeOrder(raw: any): Order {
   );
   const totalAmount = Number(raw.total_amount ?? raw.totalAmount ?? finalAmount);
   const discountAmount = Number(raw.discount_amount ?? raw.discountAmount ?? 0);
-  const couponCode = raw.coupon_code || raw.couponCode || '';
-  const trackingCode = raw.tracking_code || raw.trackingCode || '';
-  const paymentStatus = raw.payment_status || raw.paymentStatus || 'pending';
-  const status = raw.status || 'pending';
+  const couponCode = raw.coupon_code || raw.couponCode || "";
+  const trackingCode = raw.tracking_code || raw.trackingCode || "";
+  const paymentStatus = raw.payment_status || raw.paymentStatus || "pending";
+  const status = raw.status || "pending";
 
   return {
     ...raw,
@@ -142,8 +142,8 @@ export function normalizeOrder(raw: any): Order {
     status,
     paymentStatus,
     payment_status: paymentStatus,
-    paymentMethod: raw.payment_method || raw.paymentMethod || 'online',
-    payment_method: raw.payment_method || raw.paymentMethod || 'online',
+    paymentMethod: raw.payment_method || raw.paymentMethod || "online",
+    payment_method: raw.payment_method || raw.paymentMethod || "online",
     trackingCode,
     tracking_code: trackingCode,
     notes,
@@ -155,28 +155,29 @@ export function normalizeOrder(raw: any): Order {
 export const orderService = {
   async getAll(): Promise<Order[]> {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error('Error fetching orders from DB:', error.message);
-        if (typeof window !== 'undefined') {
-          const cached = localStorage.getItem('site_orders') || localStorage.getItem('admin_orders_cache');
-          if (cached) return JSON.parse(cached).map(normalizeOrder);
+        if (!error && data) {
+          const normalized = data.map(normalizeOrder);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("site_orders", JSON.stringify(normalized));
+            localStorage.setItem("admin_orders_cache", JSON.stringify(normalized));
+          }
+          return normalized;
         }
-        return [];
       }
 
-      const normalized = (data || []).map(normalizeOrder);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('site_orders', JSON.stringify(normalized));
-        localStorage.setItem('admin_orders_cache', JSON.stringify(normalized));
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("site_orders") || localStorage.getItem("admin_orders_cache");
+        if (cached) return JSON.parse(cached).map(normalizeOrder);
       }
-      return normalized;
+      return [];
     } catch (err) {
-      console.error('getAll Orders Exception:', err);
+      console.error("getAll Orders Exception:", err);
       return [];
     }
   },
@@ -184,20 +185,22 @@ export const orderService = {
   async getById(id: string | number): Promise<Order | null> {
     try {
       const cleanId = String(id).trim();
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .or(`id.eq.${cleanId},order_number.eq.${cleanId}`)
-        .maybeSingle();
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .or(`id.eq.${cleanId},order_number.eq.${cleanId}`)
+          .maybeSingle();
 
-      if (!error && data) {
-        return normalizeOrder(data);
+        if (!error && data) {
+          return normalizeOrder(data);
+        }
       }
 
       const all = await this.getAll();
       return all.find((o) => String(o.id) === cleanId || o.orderNumber === cleanId) || null;
     } catch (err) {
-      console.error(`getById Order Exception for ID ${id}:`, err);
+      console.error(`getById Order Exception:`, err);
       return null;
     }
   },
@@ -205,14 +208,16 @@ export const orderService = {
   async trackOrder(identifier: string): Promise<Order[]> {
     try {
       const clean = identifier.trim();
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .or(`order_number.eq.${clean},id.eq.${clean},phone.eq.${clean},tracking_code.eq.${clean}`)
-        .order('created_at', { ascending: false });
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .or(`order_number.eq.${clean},id.eq.${clean},phone.eq.${clean},tracking_code.eq.${clean}`)
+          .order("created_at", { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return data.map(normalizeOrder);
+        if (!error && data && data.length > 0) {
+          return data.map(normalizeOrder);
+        }
       }
 
       const all = await this.getAll();
@@ -225,7 +230,7 @@ export const orderService = {
           o.trackingCode === clean
       );
     } catch (err) {
-      console.error('trackOrder Exception:', err);
+      console.error("trackOrder Exception:", err);
       return [];
     }
   },
@@ -241,18 +246,18 @@ export const orderService = {
         customerObj.name ||
         orderData.customer_name ||
         orderData.customerName ||
-        'خریدار محترم'
+        "خریدار محترم"
       ).trim();
 
-      const phone = (customerObj.phone || orderData.phone || orderData.customer_phone || '').trim();
-      const address = (customerObj.address || orderData.address || orderData.customer_address || '').trim();
-      const province = customerObj.province || orderData.province || '';
-      const city = customerObj.city || orderData.city || '';
-      const postalCode = (customerObj.postalCode || customerObj.postal_code || orderData.postalCode || orderData.postal_code || '').trim();
-      const notes = customerObj.notes || orderData.notes || '';
+      const phone = (customerObj.phone || orderData.phone || orderData.customer_phone || "").trim();
+      const address = (customerObj.address || orderData.address || orderData.customer_address || "").trim();
+      const province = customerObj.province || orderData.province || "";
+      const city = customerObj.city || orderData.city || "";
+      const postalCode = (customerObj.postalCode || customerObj.postal_code || orderData.postalCode || orderData.postal_code || "").trim();
+      const notes = customerObj.notes || orderData.notes || "";
 
       const items = Array.isArray(orderData.items) ? orderData.items : [];
-      const totalAmount = Number(orderData.totalAmount ?? orderData.total_amount ?? orderData.base_amount ?? 0);
+      const totalAmount = Number(orderData.totalAmount ?? orderData.total_amount ?? 0);
       const discountAmount = Number(orderData.discountAmount ?? orderData.discount_amount ?? 0);
       const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? totalAmount - discountAmount);
 
@@ -270,46 +275,40 @@ export const orderService = {
         discount_amount: discountAmount,
         final_amount: finalAmount,
         coupon_code: orderData.couponCode || orderData.coupon_code || null,
-        status: orderData.status || 'pending',
-        payment_status: orderData.paymentStatus || orderData.payment_status || 'pending',
-        payment_method: orderData.paymentMethod || orderData.payment_method || 'online',
+        status: orderData.status || "pending",
+        payment_status: orderData.paymentStatus || orderData.payment_status || "pending",
+        payment_method: orderData.paymentMethod || orderData.payment_method || "online",
         tracking_code: orderData.trackingCode || orderData.tracking_code || null,
         notes,
         updated_at: new Date().toISOString(),
       };
 
-      const { data, error } = await supabase
-        .from('orders')
-        .upsert(dbPayload, { onConflict: 'id' })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Supabase Orders insert error:', error.message);
+      if (supabase) {
+        await supabase.from("orders").upsert(dbPayload, { onConflict: "id" });
       }
 
-      const normalized = normalizeOrder(data || dbPayload);
+      const normalized = normalizeOrder(dbPayload);
 
-      if (typeof window !== 'undefined') {
-        const existing = JSON.parse(localStorage.getItem('site_orders') || '[]');
+      if (typeof window !== "undefined") {
+        const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
         const updated = [normalized, ...existing.filter((o: any) => o.id !== normalized.id)];
-        localStorage.setItem('site_orders', JSON.stringify(updated));
-        localStorage.setItem('admin_orders_cache', JSON.stringify(updated));
-        localStorage.setItem('pending_payment_amount', String(finalAmount));
-        localStorage.setItem('pending_payment_order_id', orderId);
-        window.dispatchEvent(new CustomEvent('orders_updated', { detail: normalized }));
+        localStorage.setItem("site_orders", JSON.stringify(updated));
+        localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
+        localStorage.setItem("pending_payment_amount", String(finalAmount));
+        localStorage.setItem("pending_payment_order_id", orderId);
+        window.dispatchEvent(new CustomEvent("orders_updated", { detail: normalized }));
       }
 
       return normalized;
     } catch (err) {
-      console.error('create Order Exception:', err);
+      console.error("create Order Exception:", err);
       return null;
     }
   },
 
   async updateStatus(
     id: string | number,
-    status: Order['status'],
+    status: Order["status"],
     trackingCode?: string
   ): Promise<boolean> {
     try {
@@ -318,41 +317,36 @@ export const orderService = {
         updated_at: new Date().toISOString(),
       };
 
-      if (status === 'paid') {
-        payload.payment_status = 'paid';
+      if (status === "paid") {
+        payload.payment_status = "paid";
       }
 
       if (trackingCode !== undefined) {
         payload.tracking_code = trackingCode.trim() || null;
       }
 
-      const { error } = await supabase
-        .from('orders')
-        .update(payload)
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error updating order status in DB:', error.message);
+      if (supabase) {
+        await supabase.from("orders").update(payload).eq("id", id);
       }
 
-      if (typeof window !== 'undefined') {
-        const existing = JSON.parse(localStorage.getItem('site_orders') || '[]');
+      if (typeof window !== "undefined") {
+        const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
         const updated = existing.map((o: any) =>
           String(o.id) === String(id) ? { ...o, ...payload } : o
         );
-        localStorage.setItem('site_orders', JSON.stringify(updated));
-        localStorage.setItem('admin_orders_cache', JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent('orders_updated', { detail: { id, ...payload } }));
+        localStorage.setItem("site_orders", JSON.stringify(updated));
+        localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("orders_updated", { detail: { id, ...payload } }));
       }
 
       return true;
     } catch (err) {
-      console.error(`updateStatus Exception for Order ID ${id}:`, err);
+      console.error(`updateStatus Exception:`, err);
       return false;
     }
   },
 
-  async updateOrderStatus(id: string | number, status: Order['status']): Promise<boolean> {
+  async updateOrderStatus(id: string | number, status: Order["status"]): Promise<boolean> {
     return this.updateStatus(id, status);
   },
 };

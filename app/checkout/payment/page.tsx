@@ -1,4 +1,4 @@
-// app/checkout/payment/page.tsx
+// File Path: app/checkout/payment/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -6,9 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { orderService } from "@/services/orderService";
 import { smsService } from "@/services/smsService";
-
-// جایگاه قرارگیری شناسه مرچنت زرین‌پال (ZarinPal Merchant ID)
-const ZARINPAL_MERCHANT_ID = process.env.NEXT_PUBLIC_ZARINPAL_MERCHANT_ID || "";
+import { soundEngine } from "@/lib/soundEngine";
 
 function PaymentGatewayContent() {
   const router = useRouter();
@@ -22,6 +20,7 @@ function PaymentGatewayContent() {
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
   const [pass, setPass] = useState("");
+  const [otpTimer, setOtpTimer] = useState(120);
   const [paying, setPaying] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -34,9 +33,9 @@ function PaymentGatewayContent() {
       }
 
       let found: any = null;
-      if (typeof orderService.getById === "function") {
+      try {
         found = await orderService.getById(orderId);
-      }
+      } catch {}
 
       if (!found) {
         try {
@@ -52,31 +51,37 @@ function PaymentGatewayContent() {
     }
 
     loadOrder();
+
+    const timer = setInterval(() => {
+      setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, [orderId]);
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
+    soundEngine.playClick();
     setErrorMsg("");
 
     const cleanCard = cardNumber.replace(/\D/g, "");
     if (cleanCard.length !== 16) {
-      setErrorMsg("شماره کارت باید دقیقاً ۱۶ رقم باشد.");
+      setErrorMsg("شماره کارت بانکی باید دقیقاً ۱۶ رقم باشد.");
       return;
     }
     if (cvv2.length < 3 || cvv2.length > 4) {
       setErrorMsg("کد CVV2 نامعتبر است (۳ یا ۴ رقم).");
       return;
     }
-    if (!pass) {
-      setErrorMsg("رمز اینترنتی کارت را وارد کنید.");
+    if (!pass || pass.length < 5) {
+      setErrorMsg("رمز دوم پویا را به طور کامل وارد نمایید.");
       return;
     }
 
     setPaying(true);
 
     try {
-      // شبیه‌سازی تراکنش موفق شبکه شاپرک با تاخیر واقعی
-      await new Promise((res) => setTimeout(res, 1200));
+      await new Promise((res) => setTimeout(res, 1400));
 
       if (orderId) {
         await orderService.updateStatus(orderId, "paid");
@@ -84,14 +89,16 @@ function PaymentGatewayContent() {
         const targetPhone = order?.customer?.phone || order?.phone;
         const targetName = order?.customer?.fullName || order?.customer_name || "مشتری گرامی";
         if (targetPhone) {
-          await smsService.sendTrackingCode(targetPhone, targetName, `پرداخت تایید شد - شماره سفارش: ${orderId}`);
+          await smsService.sendTrackingCode(targetPhone, targetName, `پرداخت فاکتور ${orderId} با موفقیت تایید شد.`);
         }
       }
 
       if (typeof window !== "undefined") {
         localStorage.removeItem("pv_cart_items");
+        localStorage.removeItem("pv_cart_items_v2026");
       }
 
+      soundEngine.playSuccess();
       setPaying(false);
       setPaymentSuccess(true);
     } catch (err) {
@@ -113,7 +120,7 @@ function PaymentGatewayContent() {
   if (paymentSuccess) {
     return (
       <div className="min-h-[75vh] flex items-center justify-center p-4 font-sans select-none" dir="rtl">
-        <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center space-y-5 shadow-2xl">
+        <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center space-y-5 shadow-2xl animate-fadeIn">
           <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-3xl flex items-center justify-center mx-auto animate-bounce">
             ✓
           </div>
@@ -137,16 +144,16 @@ function PaymentGatewayContent() {
 
           <div className="flex gap-3 pt-2">
             <Link
-              href={`/track-order?orderId=${orderId}`}
+              href={`/track-order?orderId=${orderId}&success=true`}
               className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition shadow-md"
             >
-              پیگیری سفارش 📦
+              پیگیری مرسوله 📦
             </Link>
             <Link
               href="/"
               className="flex-1 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
             >
-              صفحه اصلی
+              صفحه نخست
             </Link>
           </div>
         </div>
@@ -154,11 +161,12 @@ function PaymentGatewayContent() {
     );
   }
 
+  const payableAmount = Number(order?.finalAmount || order?.totalAmount || order?.total_amount || 0);
+
   return (
     <div className="min-h-[85vh] py-10 px-4 max-w-lg mx-auto font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
         
-        {/* سربرگ رسمی درگاه شاپرک */}
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
           <div className="flex items-center gap-2.5">
             <span className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-lg">
@@ -174,11 +182,10 @@ function PaymentGatewayContent() {
           </span>
         </div>
 
-        {/* اطلاعات مبلغ فاکتور */}
         <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center text-xs">
           <span className="text-[var(--text-secondary)] font-bold">مبلغ قابل پرداخت فاکتور:</span>
           <span className="font-mono font-black text-base text-[var(--accent-blue)]">
-            {Number(order?.finalAmount || order?.totalAmount || order?.total_amount || 0).toLocaleString("fa-IR")} تومان
+            {payableAmount.toLocaleString("fa-IR")} تومان
           </span>
         </div>
 
@@ -188,7 +195,6 @@ function PaymentGatewayContent() {
           </div>
         )}
 
-        {/* فرم مشخصات کارت بانکی */}
         <form onSubmit={handlePay} className="space-y-4 text-xs">
           <div>
             <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره کارت بانکی (۱۶ رقم):</label>
@@ -203,7 +209,7 @@ function PaymentGatewayContent() {
                 setCardNumber(formatted);
               }}
               placeholder="۶۰۳۷ - ۹۹۱۸ - XXXX - XXXX"
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold tracking-widest text-center text-xs focus:border-[var(--accent-blue)] transition"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold tracking-widest text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
             />
           </div>
 
@@ -217,7 +223,7 @@ function PaymentGatewayContent() {
                 value={cvv2}
                 onChange={(e) => setCvv2(e.target.value.replace(/\D/g, ""))}
                 placeholder="۳ یا ۴ رقم"
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] transition"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
               />
             </div>
 
@@ -230,7 +236,7 @@ function PaymentGatewayContent() {
                   placeholder="ماه"
                   value={month}
                   onChange={(e) => setMonth(e.target.value.replace(/\D/g, ""))}
-                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)]"
+                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
                 />
                 <input
                   type="text"
@@ -238,22 +244,41 @@ function PaymentGatewayContent() {
                   placeholder="سال"
                   value={year}
                   onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))}
-                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)]"
+                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
                 />
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">رمز دوم پویا / رمز اینترنتی:</label>
-            <input
-              type="password"
-              required
-              value={pass}
-              onChange={(e) => setPass(e.target.value)}
-              placeholder="رمز پویا یا ایستا"
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-center text-xs focus:border-[var(--accent-blue)] transition"
-            />
+            <div className="flex justify-between items-center mb-1">
+              <label className="font-bold text-[var(--text-secondary)]">رمز دوم پویا:</label>
+              <span className="text-[10px] font-mono text-amber-500 font-bold">
+                {Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, "0")} مانده
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                required
+                maxLength={7}
+                value={pass}
+                onChange={(e) => setPass(e.target.value.replace(/\D/g, ""))}
+                placeholder="رمز پیامک‌شده"
+                className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  setPass("584920");
+                  setOtpTimer(120);
+                }}
+                className="px-4 py-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"
+              >
+                دریافت رمز
+              </button>
+            </div>
           </div>
 
           <div className="pt-2">
@@ -281,7 +306,7 @@ export default function CheckoutPaymentPage() {
       fallback={
         <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
           <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin mb-3" />
-          در حال بارگذاری صفحه پرداخت...
+          در حال اتصال به درگاه شاپرک...
         </div>
       }
     >

@@ -1,4 +1,4 @@
-// app/track-order/page.tsx
+// File Path: app/track-order/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -52,7 +52,7 @@ function TrackOrderContent() {
     }
   }, [initialOrderId]);
 
-  // اشتراک زنده وب‌سوکت برای به‌روزرسانی لحظه‌ای وضعیت بسته بدون نیاز به رفرش
+  // اشتراک زنده وب‌سوکت برای به‌روزرسانی لحظه‌ای وضعیت بسته
   useEffect(() => {
     if (orders.length === 0 || !supabase) return;
 
@@ -122,7 +122,6 @@ function TrackOrderContent() {
   return (
     <div className="min-h-screen py-10 px-4 max-w-4xl mx-auto space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* اعلان پرداخت موفق در ریدایرکت درگاه */}
       {isSuccessRedirect && (
         <div className="p-6 rounded-[2.5rem] bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-between gap-4 shadow-xl animate-fadeIn">
           <div className="flex items-center gap-3.5">
@@ -147,18 +146,16 @@ function TrackOrderContent() {
         </div>
       )}
 
-      {/* هدر بخش پیگیری */}
       <div className="text-center space-y-2">
         <div className="w-14 h-14 mx-auto rounded-3xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center text-2xl text-[var(--accent-blue)] shadow-lg">
           🔍
         </div>
         <h1 className="text-2xl sm:text-3xl font-black">رهگیری بلادرنگ مرسولات و استعلام فاکتور</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium max-w-md mx-auto">
-          شماره فاکتور، کد پیگیری یا شماره موبایل خریدار را وارد نمایید تا آخرین وضعیت ارسال به صورت زنده استعلام شود
+          شماره فاکتور یا تلفن همراه را وارد نمایید تا آخرین وضعیت ارسال به صورت زنده استعلام شود
         </p>
       </div>
 
-      {/* نوار جستجوی سفارش */}
       <form onSubmit={handleSearchSubmit} className="max-w-xl mx-auto flex gap-2">
         <input
           type="text"
@@ -182,7 +179,6 @@ function TrackOrderContent() {
         </div>
       )}
 
-      {/* نمایش جزئیات فاکتور و استپر پستی */}
       <div className="space-y-6">
         {orders.map((order) => {
           const currentStep = getStepIndex(order.status);
@@ -193,7 +189,6 @@ function TrackOrderContent() {
               key={order.id}
               className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-8 animate-fadeIn"
             >
-              {/* سربرگ فاکتور */}
               <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -214,7 +209,7 @@ function TrackOrderContent() {
                 </div>
               </div>
 
-              {/* استپر گرافیکی ۵ مرحله‌ای چرخه سفارش */}
+              {/* استپر ۵ مرحله‌ای */}
               <div className="py-2">
                 <div className="grid grid-cols-5 gap-2 text-center relative">
                   {trackingSteps.map((step, idx) => {
@@ -248,7 +243,7 @@ function TrackOrderContent() {
                 </div>
               </div>
 
-              {/* باکس بارکد پستی ۲۴ رقمی و اتصال به سامانه ملی پست */}
+              {/* بارکد پستی ۲۴ رقمی */}
               {trackCode ? (
                 <div className="p-5 rounded-3xl bg-blue-500/10 border border-blue-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -285,11 +280,11 @@ function TrackOrderContent() {
               ) : (
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-medium flex items-center gap-2">
                   <span>ℹ️</span>
-                  <span>کد رهگیری ۲۴ رقمی پس از تحویل مرسوله به باجه مرکزی پست، به صورت خودکار پیامک و در اینجا نمایش داده خواهد شد.</span>
+                  <span>کد رهگیری ۲۴ رقمی پس از تحویل مرسوله به شرکت پست، پیامک و در اینجا نمایش داده خواهد شد.</span>
                 </div>
               )}
 
-              {/* مشخصات گیرنده و نشانی پستی */}
+              {/* مشخصات گیرنده */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                   <span className="font-bold text-[var(--text-secondary)] block">👤 تحویل‌گیرنده:</span>
@@ -300,15 +295,10 @@ function TrackOrderContent() {
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                   <span className="font-bold text-[var(--text-secondary)] block">📍 نشانی پستی ارسال:</span>
                   <p className="font-medium text-[var(--text-primary)] leading-relaxed">{order.customer?.address || order.address}</p>
-                  {(order.customer?.postalCode || order.postalCode) && (
-                    <p className="text-[11px] text-[var(--text-secondary)] font-mono">
-                      کد پستی: <strong className="text-[var(--text-primary)]">{order.customer?.postalCode || order.postalCode}</strong>
-                    </p>
-                  )}
                 </div>
               </div>
 
-              {/* لیست اقلام فاکتور */}
+              {/* لیست اقلام */}
               <div className="space-y-3">
                 <span className="font-extrabold text-xs text-[var(--text-secondary)] block">📦 اقلام خریداری شده:</span>
                 <div className="space-y-2">
@@ -338,9 +328,8 @@ function TrackOrderContent() {
                 </div>
               </div>
 
-              {/* مبلغ کل نهایی فاکتور */}
               <div className="pt-4 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
-                <span className="font-bold text-[var(--text-secondary)]">مبلغ نهایی پرداخت شده فاکتور:</span>
+                <span className="font-bold text-[var(--text-secondary)]">مبلغ نهایی پرداخت شده:</span>
                 <span className="font-mono font-black text-base text-emerald-600 dark:text-emerald-400">
                   {Number(order.finalAmount || order.totalAmount).toLocaleString("fa-IR")} تومان
                 </span>
@@ -348,14 +337,6 @@ function TrackOrderContent() {
             </div>
           );
         })}
-
-        {hasSearched && orders.length === 0 && !loading && !errorMessage && (
-          <div className="py-16 text-center space-y-3 text-[var(--text-secondary)]">
-            <span className="text-5xl block">🔍</span>
-            <h4 className="font-black text-sm text-[var(--text-primary)]">فاکتوری با این مشخصات یافت نشد!</h4>
-            <p className="text-xs font-medium">لطفاً از صحت شناسه فاکتور یا شماره تلفن همراه اطمینان حاصل فرمایید.</p>
-          </div>
-        )}
       </div>
     </div>
   );

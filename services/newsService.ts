@@ -1,5 +1,5 @@
-// File Path: services/newsService.ts
 import { supabase } from "@/lib/supabase";
+import { userBehavior } from "@/lib/userBehavior";
 
 export interface TechNewsItem {
   id: string;
@@ -18,7 +18,7 @@ export interface TechNewsItem {
   is_published?: boolean;
 }
 
-const LOCAL_NEWS_KEY = "axon_tech_radar_news_cache";
+const LOCAL_NEWS_KEY = "axon_tech_radar_news_cache_v2";
 
 export const newsService = {
   async getAll(): Promise<TechNewsItem[]> {
@@ -27,9 +27,10 @@ export const newsService = {
         const { data, error } = await supabase
           .from("tech_news")
           .select("*")
+          .eq("is_published", true)
           .order("published_at", { ascending: false });
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           if (typeof window !== "undefined") {
             localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(data));
           }
@@ -49,6 +50,20 @@ export const newsService = {
     }
   },
 
+  async getPersonalizedNews(): Promise<TechNewsItem[]> {
+    const all = await this.getAll();
+    const topCategory = userBehavior.getTopInterestCategory();
+
+    if (topCategory === "all") return all;
+
+    // مرتب‌سازی بر اساس علایق استخراج‌شده از کوکی کاربر
+    return [...all].sort((a, b) => {
+      const aMatch = a.category.toLowerCase() === topCategory.toLowerCase() ? 1 : 0;
+      const bMatch = b.category.toLowerCase() === topCategory.toLowerCase() ? 1 : 0;
+      return bMatch - aMatch;
+    });
+  },
+
   async getBySlug(slug: string): Promise<TechNewsItem | null> {
     try {
       if (supabase) {
@@ -59,12 +74,17 @@ export const newsService = {
           .maybeSingle();
 
         if (!error && data) {
+          userBehavior.trackNewsRead(data.slug, data.category);
           return data as TechNewsItem;
         }
       }
 
       const all = await this.getAll();
-      return all.find((n) => n.slug === slug.trim().toLowerCase()) || null;
+      const found = all.find((n) => n.slug === slug.trim().toLowerCase()) || null;
+      if (found) {
+        userBehavior.trackNewsRead(found.slug, found.category);
+      }
+      return found;
     } catch (e) {
       console.error("newsService.getBySlug Error:", e);
       return null;
@@ -85,9 +105,9 @@ export const newsService = {
         summary: item.summary?.trim() || "",
         content: item.content?.trim() || "",
         category: item.category || "gadgets",
-        source_name: item.source_name || "Global Tech Wire",
+        source_name: item.source_name || "Global Tech Radar",
         source_url: item.source_url || "",
-        image_url: item.image_url || "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200",
+        image_url: item.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
         published_at: item.published_at || new Date().toISOString(),
         trending_score: item.trending_score || 95,
         tags: item.tags || ["تکنولوژی", "گجت", "سخت‌افزار"],
@@ -120,7 +140,6 @@ export const newsService = {
         }
         return result as TechNewsItem;
       }
-
       return null;
     } catch (e) {
       console.error("newsService.saveNewsItem Error:", e);
@@ -134,9 +153,6 @@ export const newsService = {
         await supabase.from("tech_news").delete().eq("id", id);
       }
       if (typeof window !== "undefined") {
-        const current = await this.getAll();
-        const updated = current.filter((n) => n.id !== id);
-        localStorage.setItem(LOCAL_NEWS_KEY, JSON.stringify(updated));
         window.dispatchEvent(new CustomEvent("news_updated", { detail: id }));
       }
       return true;

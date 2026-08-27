@@ -1,7 +1,7 @@
 // File Path: components/ProductComparisonModal.tsx
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Product } from "@/services/productService";
 import { soundEngine } from "@/lib/soundEngine";
 import { useCart } from "@/context/CartContext";
@@ -20,10 +20,11 @@ export default function ProductComparisonModal({
   onRemoveProduct,
 }: ProductComparisonModalProps) {
   const { addToCart } = useCart();
+  const [highlightDifferences, setHighlightDifferences] = useState(false);
 
   if (!isOpen || products.length === 0) return null;
 
-  // استخراج تمام کلیدهای مشخصات فنی از تمام محصولات انتخاب‌شده
+  // استخراج تمام کلیدهای مشخصات فنی از تمام محصولات
   const allSpecKeys = Array.from(
     new Set(products.flatMap((p) => Object.keys(p.specs || {})))
   );
@@ -34,15 +35,16 @@ export default function ProductComparisonModal({
       dir="rtl"
     >
       <div className="w-full max-w-5xl max-h-[92vh] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden">
+        
         {/* سربرگ مقایسه */}
-        <header className="p-5 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--input-bg)]">
+        <header className="p-5 border-b border-[var(--card-border)] flex flex-wrap items-center justify-between gap-3 bg-[var(--input-bg)]">
           <div className="flex items-center gap-3">
             <span className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] flex items-center justify-center text-xl font-black shadow-sm">
               ⚖️
             </span>
             <div>
               <h3 className="font-black text-sm sm:text-base">
-                ماتریس مقایسه فنی و تخصصی کالاها (Side-by-Side Comparison)
+                ماتریس مقایسه فنی و تخصصی کالاها (Side-by-Side Matrix)
               </h3>
               <p className="text-[11px] text-[var(--text-secondary)] font-medium">
                 مقایسه رزولوشن، گاموت رنگی، چیپست و قیمت {products.length} محصول منتخب
@@ -50,23 +52,41 @@ export default function ProductComparisonModal({
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="w-9 h-9 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setHighlightDifferences(!highlightDifferences);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition cursor-pointer ${
+                highlightDifferences
+                  ? "bg-amber-500 text-white border-amber-500 shadow-md"
+                  : "bg-[var(--modal-bg)] border-[var(--card-border)] text-[var(--text-secondary)]"
+              }`}
+            >
+              {highlightDifferences ? "✓ هایلایت تفاوت‌ها" : "هایلایت تفاوت‌ها"}
+            </button>
+
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                onClose();
+              }}
+              className="w-9 h-9 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
-        {/* جدول مقایسه ساید‌بای‌ساید */}
+        {/* جدول مقایسه */}
         <div className="flex-1 overflow-x-auto overflow-y-auto p-5 sm:p-6 text-xs">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-[var(--card-border)]">
-                <th className="p-3 text-right font-black text-[var(--text-secondary)] w-40">مشخصات و کالا</th>
+                <th className="p-3 text-right font-black text-[var(--text-secondary)] w-40 sticky right-0 bg-[var(--modal-bg)] z-10">
+                  مشخصات و کالا
+                </th>
                 {products.map((p) => (
                   <th key={p.id} className="p-3 text-center min-w-[220px]">
                     <div className="space-y-2.5 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] relative">
@@ -100,6 +120,7 @@ export default function ProductComparisonModal({
                             title: p.title,
                             price: p.discountPrice || p.price,
                             image: p.images?.[0] || p.image,
+                            stock: p.stock ?? 10,
                           });
                         }}
                         className="w-full py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black text-[11px] shadow-md hover:opacity-90 transition cursor-pointer"
@@ -112,8 +133,8 @@ export default function ProductComparisonModal({
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--card-border)] font-medium">
-              <tr className="bg-black/5 dark:bg-white/5">
-                <td className="p-3.5 font-black text-[var(--accent-blue)]">دسته‌بندی و اصالت</td>
+              <tr>
+                <td className="p-3.5 font-black text-[var(--accent-blue)] sticky right-0 bg-[var(--modal-bg)]">دسته‌بندی</td>
                 {products.map((p) => (
                   <td key={p.id} className="p-3.5 text-center font-bold">
                     {p.category || "تجهیزات تخصصی"}
@@ -121,7 +142,7 @@ export default function ProductComparisonModal({
                 ))}
               </tr>
               <tr>
-                <td className="p-3.5 font-black text-[var(--text-secondary)]">وضعیت موجودی انبار</td>
+                <td className="p-3.5 font-black text-[var(--text-secondary)] sticky right-0 bg-[var(--modal-bg)]">وضعیت موجودی</td>
                 {products.map((p) => (
                   <td key={p.id} className="p-3.5 text-center font-bold">
                     {p.isAvailable !== false && (p.stock ?? 0) > 0 ? (
@@ -133,25 +154,36 @@ export default function ProductComparisonModal({
                 ))}
               </tr>
               <tr>
-                <td className="p-3.5 font-black text-[var(--text-secondary)]">گارانتی و خدمات</td>
+                <td className="p-3.5 font-black text-[var(--text-secondary)] sticky right-0 bg-[var(--modal-bg)]">گارانتی و خدمات</td>
                 {products.map((p) => (
                   <td key={p.id} className="p-3.5 text-center font-medium leading-relaxed">
-                    {p.warranty || "۱۸ ماه گارانتی معتبر اصالت"}
+                    {p.warranty || "۱۸ ماه گارانتی اصالت طلایی"}
                   </td>
                 ))}
               </tr>
 
-              {/* رندرر مشخصات فنی دقیق ساید‌بای‌ساید */}
-              {allSpecKeys.map((specKey) => (
-                <tr key={specKey} className="hover:bg-[var(--input-bg)] transition">
-                  <td className="p-3.5 font-bold text-[var(--text-secondary)]">{specKey}</td>
-                  {products.map((p) => (
-                    <td key={p.id} className="p-3.5 text-center font-mono font-bold text-[var(--text-primary)]">
-                      {p.specs?.[specKey] || "---"}
+              {allSpecKeys.map((specKey) => {
+                const values = products.map((p) => p.specs?.[specKey] || "---");
+                const hasDiff = new Set(values).size > 1;
+
+                return (
+                  <tr
+                    key={specKey}
+                    className={`transition ${
+                      highlightDifferences && hasDiff ? "bg-amber-500/10 dark:bg-amber-500/15" : "hover:bg-[var(--input-bg)]"
+                    }`}
+                  >
+                    <td className="p-3.5 font-bold text-[var(--text-secondary)] sticky right-0 bg-[var(--modal-bg)]">
+                      {specKey}
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {products.map((p) => (
+                      <td key={p.id} className="p-3.5 text-center font-mono font-bold text-[var(--text-primary)]">
+                        {p.specs?.[specKey] || "---"}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

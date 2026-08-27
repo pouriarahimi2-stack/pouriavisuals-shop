@@ -1,4 +1,3 @@
-// components/AdminSiteInfo.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -15,7 +14,7 @@ export default function AdminSiteInfo() {
   const [workingHours, setWorkingHours] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [footerLogoUrl, setFooterLogoUrl] = useState("");
-  
+
   const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
   const [maintMinutes, setMaintMinutes] = useState<number>(0);
@@ -44,7 +43,7 @@ export default function AdminSiteInfo() {
     setWorkingHours(data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
     setLogoUrl(data.logo_url || data.logoUrl || "");
     setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
-    
+
     const mode = data.maintenance_mode || (data.allow_google_index === false ? "indefinite" : "none");
     setMaintenanceMode(mode);
 
@@ -149,17 +148,20 @@ export default function AdminSiteInfo() {
         body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         soundEngine.playSuccess();
         setStatusMessage({
           type: "success",
           text: "⚡ وضعیت سایت، تنظیمات برند و حالت تعمیرات با موفقیت در دیتابیس ذخیره و بلادرنگ اعمال شد.",
         });
       } else {
-        throw new Error("خطا در پاسخ سرور");
+        throw new Error(json.message || "خطا در پاسخ سرور");
       }
-    } catch {
-      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی اطلاعات." });
+    } catch (err: any) {
+      console.error("Save site info error:", err);
+      setStatusMessage({ type: "error", text: err?.message || "خطا در ذخیره‌سازی اطلاعات در دیتابیس." });
     } finally {
       setSaving(false);
       setTimeout(() => setStatusMessage(null), 4000);

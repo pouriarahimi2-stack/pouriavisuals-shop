@@ -1,4 +1,4 @@
-// app/products/page.tsx
+// File Path: app/products/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -6,33 +6,57 @@ import ProductCard from "@/components/ProductCard";
 import { productService, Product } from "@/services/productService";
 import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
+import { userBehavior } from "@/lib/userBehavior";
+import { supabase } from "@/lib/supabase";
 
-export default function ProductsPage() {
+export default function ProductsCatalogPage() {
   const [products, setProducts] = useState<Product[]>(() => productService.getAllSync());
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(products.length === 0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
-  const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc">("newest");
+  const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc" | "recommended">("recommended");
+
+  const loadData = async () => {
+    try {
+      const [prodsData, catsData] = await Promise.all([
+        productService.getAll(),
+        categoryService.getAll(),
+      ]);
+
+      const topCat = userBehavior.getTopInterestCategory();
+      let list = prodsData || [];
+
+      if (topCat !== "all" && sortBy === "recommended") {
+        list = [...list].sort((a, b) => {
+          const aMatch = (a.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
+          const bMatch = (b.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
+          return bMatch - aMatch;
+        });
+      }
+
+      setProducts(list);
+      setCategories(catsData || []);
+    } catch (err) {
+      console.error("Error loading products page data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [prodsData, catsData] = await Promise.all([
-          productService.getAll(),
-          categoryService.getAll(),
-        ]);
-        setProducts(prodsData || []);
-        setCategories(catsData || []);
-      } catch (err) {
-        console.error("Error loading products page data:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadData();
-  }, []);
+
+    const channel = supabase
+      .channel("catalog-products-realtime-v2026")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sortBy]);
 
   const handleCategorySelect = (catName: string) => {
     soundEngine.playClick();
@@ -47,8 +71,7 @@ export default function ProductsPage() {
     const matchesCategory =
       selectedCategory === "all" ||
       p.category === selectedCategory ||
-      p.category_name === selectedCategory ||
-      p.category_id === selectedCategory;
+      p.category_name === selectedCategory;
 
     const matchesAvail =
       !onlyAvailable ||
@@ -63,18 +86,24 @@ export default function ProductsPage() {
 
     if (sortBy === "price_asc") return priceA - priceB;
     if (sortBy === "price_desc") return priceB - priceA;
-    return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+    if (sortBy === "newest") {
+      return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+    }
+    return 0;
   });
 
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+      
+      {/* سربرگ کاتالوگ */}
       <div className="text-center space-y-3">
-        <h1 className="text-2xl sm:text-4xl font-black tracking-tight">کاتالوگ تجهیزات دیجیتال، تصویر و استودیو</h1>
-        <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-xl mx-auto font-medium">
-          بررسی تخصصی و خرید انواع مانیتورهای تدوین، کالیبراتورهای رنگ، کارت‌های کپچر با ضمانت اصالت
+        <h1 className="text-2xl sm:text-4xl font-black tracking-tight">کاتالوگ تجهیزات دیجیتال، مانیتورهای ۵K و استودیو</h1>
+        <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-xl mx-auto font-medium leading-relaxed">
+          خرید مستقیم انواع مانیتورهای تدوین رنگ، کالیبراتورهای استودیویی و کارت‌های کپچر با ضمانت اصالت طلایی
         </p>
       </div>
 
+      {/* فیلترها و مرتب‌سازی */}
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 text-xs scrollbar-none">
@@ -99,7 +128,7 @@ export default function ProductsPage() {
             ))}
           </div>
 
-          <div className="w-full md:w-72">
+          <div className="w-full md:w-80">
             <input
               type="text"
               value={searchQuery}
@@ -117,7 +146,7 @@ export default function ProductsPage() {
               id="onlyAvailCheckbox"
               checked={onlyAvailable}
               onChange={(e) => setOnlyAvailable(e.target.checked)}
-              className="w-4 h-4 rounded-lg cursor-pointer"
+              className="w-4 h-4 rounded-lg cursor-pointer text-[var(--accent-blue)]"
             />
             <label htmlFor="onlyAvailCheckbox" className="font-bold cursor-pointer">
               فقط کالاهای موجود در انبار
@@ -128,9 +157,13 @@ export default function ProductsPage() {
             <span className="text-[var(--text-secondary)] font-bold">مرتب‌سازی:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+              onChange={(e) => {
+                soundEngine.playClick();
+                setSortBy(e.target.value as any);
+              }}
+              className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
             >
+              <option value="recommended">پیشنهاد هوشمند (علایق شما)</option>
               <option value="newest">جدیدترین محصولات</option>
               <option value="price_asc">ارزان‌ترین به گران‌ترین</option>
               <option value="price_desc">گران‌ترین به ارزان‌ترین</option>
@@ -139,13 +172,14 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {/* لیست کارت‌ها */}
       {loading && products.length === 0 ? (
         <div className="min-h-[40vh] flex items-center justify-center">
           <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-16 text-center rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-secondary)]">
-          کالایی مطابق با جستجوی شما یافت نشد.
+          کالایی مطابق با فیلترهای انتخابی شما یافت نشد.
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

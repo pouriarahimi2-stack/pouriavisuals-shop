@@ -1,3 +1,4 @@
+// File Path: components/admin/AdminNewsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -14,9 +15,9 @@ export default function AdminNewsManager() {
   const [summary, setSummary] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState<TechNewsItem["category"]>("gadgets");
-  const [sourceName, setSourceName] = useState("Global Tech Radar");
+  const [sourceName, setSourceName] = useState("Global Tech Wire");
   const [imageUrl, setImageUrl] = useState("");
-  const [tags, setTags] = useState("گجت, تکنولوژی, سخت افزار");
+  const [tags, setTags] = useState("تکنولوژی, سخت افزار, مانیتور");
   const [isPublished, setIsPublished] = useState(true);
 
   const [saving, setSaving] = useState(false);
@@ -63,9 +64,9 @@ export default function AdminNewsManager() {
     setSummary("");
     setContent("");
     setCategory("gadgets");
-    setSourceName("Global Tech Radar");
+    setSourceName("Global Tech Wire");
     setImageUrl("");
-    setTags("گجت, سخت افزار, گیمینگ");
+    setTags("گجت, سخت افزار, مانیتور");
     setIsPublished(true);
   };
 
@@ -78,7 +79,7 @@ export default function AdminNewsManager() {
       const data = await res.json();
       if (data.success) {
         soundEngine.playSuccess();
-        setStatusMsg("⚡ همگام‌سازی اخبار جدید از وب با موفقیت انجام شد.");
+        setStatusMsg("⚡ همگام‌سازی ترندهای جهانی و پاکسازی اخبار قدیمی‌تر از ۷ روز انجام شد.");
         fetchNews();
       }
     } catch {
@@ -93,6 +94,7 @@ export default function AdminNewsManager() {
     e.preventDefault();
     if (!title.trim()) return;
 
+    soundEngine.playClick();
     setSaving(true);
     const payload: Partial<TechNewsItem> = {
       id: selectedNews?.id,
@@ -112,7 +114,7 @@ export default function AdminNewsManager() {
 
     if (res) {
       soundEngine.playSuccess();
-      setStatusMsg("✅ خبر با موفقیت ذخیره و در رادار زنده منتشر شد.");
+      setStatusMsg("✅ خبر با موفقیت ذخیره و در بخش «جدیدترین اخبار حوزه تکنولوژی» منتشر شد.");
       fetchNews();
       if (!selectedNews) setSelectedNews(res);
     }
@@ -132,21 +134,21 @@ export default function AdminNewsManager() {
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📡</span> مرکز رادار هوشمند اخبار تکنولوژی، گیم و گجت‌ها
+            <span>📡</span> مرکز مدیریت جدیدترین اخبار حوزه تکنولوژی
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پایش و همگام‌سازی لحظه‌ای اخبار داغ دنیای وب، ترجمه هوشمند و انتشار در وب‌سایت
+            پایش خودکار هر ۶ ساعت، پاکسازی هفتگی خودکار و دسته‌بندی هوشمند بر اساس رفتار کاربر
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={handleSyncWorldNews}
             disabled={syncing}
             className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg disabled:opacity-50 flex items-center gap-1.5"
           >
             <span>🔄</span>
-            <span>{syncing ? "در حال دریافت ترندها..." : "پایش اتوماتیک ترندهای دنیا"}</span>
+            <span>{syncing ? "در حال دریافت ترندها..." : "پایش فوری اخبار جهان"}</span>
           </button>
           <button
             onClick={handleCreateNew}
@@ -165,12 +167,17 @@ export default function AdminNewsManager() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-2 h-[640px] overflow-y-auto">
-          <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
-            📰 اخبار فعال در رادار ({news.length})
-          </h3>
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+            <h3 className="text-xs font-black">
+              📰 اخبار فعال ({news.length})
+            </h3>
+            <span className="text-[10px] font-mono text-emerald-500 font-bold">
+              ۷ روز اعتبار خودکار
+            </span>
+          </div>
           {news.map((item) => (
             <div
-              key={item.id}
+              key={item.id || item.slug}
               onClick={() => handleSelectNews(item)}
               className={`p-3 rounded-2xl border transition cursor-pointer flex items-center gap-3 ${
                 selectedNews?.id === item.id
@@ -178,7 +185,7 @@ export default function AdminNewsManager() {
                   : "border-[var(--card-border)] bg-[var(--input-bg)]"
               }`}
             >
-              <img src={item.image_url} alt="" className="w-12 h-12 object-cover rounded-xl shrink-0" />
+              <img src={item.image_url} alt="" className="w-12 h-12 object-cover rounded-xl shrink-0 border border-[var(--card-border)]" />
               <div className="overflow-hidden flex-1 space-y-1">
                 <h4 className="font-bold text-xs truncate">{item.title}</h4>
                 <span className="text-[10px] text-[var(--accent-blue)] font-bold block">{item.category}</span>
@@ -208,16 +215,15 @@ export default function AdminNewsManager() {
                   onChange={(e) => setCategory(e.target.value as any)}
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] cursor-pointer"
                 >
+                  <option value="hardware">سخت‌افزار و مانیتور</option>
                   <option value="gadgets">گجت‌ها و دیوایس‌ها</option>
-                  <option value="gaming">گیمینگ و کنسول</option>
-                  <option value="hardware">سخت‌افزار و قطعات</option>
                   <option value="ai">هوش مصنوعی</option>
-                  <option value="apple">اکوسیستم اپل</option>
+                  <option value="gaming">گیمینگ و کنسول</option>
                 </select>
               </div>
 
               <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">نام منبع معتبر جهانی</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">نام منبع خبر</label>
                 <input
                   type="text"
                   value={sourceName}
@@ -248,7 +254,7 @@ export default function AdminNewsManager() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">متن کامل و تحلیل تخصصی خبر (HTML Support)</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">متن کامل خبر (پشتیبانی از HTML)</label>
                 <textarea
                   rows={6}
                   value={content}
@@ -274,7 +280,7 @@ export default function AdminNewsManager() {
                 disabled={saving}
                 className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-lg disabled:opacity-50"
               >
-                {saving ? "در حال ذخیره..." : "💾 انتشار و ذخیره خبر در رادار"}
+                {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار خبر"}
               </button>
               {selectedNews?.id && (
                 <button

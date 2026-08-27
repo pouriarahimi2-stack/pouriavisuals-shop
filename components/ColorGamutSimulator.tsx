@@ -1,4 +1,4 @@
-// components/ColorGamutSimulator.tsx
+// File Path: components/ColorGamutSimulator.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -111,7 +111,7 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
         })}
       </div>
 
-      {/* بوم پیش‌نمایش تصویر و فیلتر رنگی */}
+      {/* پیش‌نمایش تصویر و فیلتر رنگی */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
         <div className="lg:col-span-8 relative h-72 sm:h-96 rounded-3xl overflow-hidden bg-black border border-[var(--card-border)] shadow-inner flex items-center justify-center group">
           <img
@@ -123,12 +123,10 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
             }}
           />
 
-          {/* نشانگر گاموت روی تصویر */}
           <div className="absolute top-4 right-4 bg-black/75 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-white/15 text-white font-mono text-[11px] font-bold shadow-xl">
             Space: <span className="text-[var(--accent-blue)]">{gamuts[selectedGamut].name}</span> | Gamma: {gammaCorrection}
           </div>
 
-          {/* انتخابگر سناریوهای تصویر تست */}
           <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 flex items-center gap-1.5 bg-black/75 backdrop-blur-md p-1.5 rounded-2xl border border-white/15">
             {[
               { id: "gradient", label: "طیف گرادیانت" },
@@ -152,7 +150,7 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
           </div>
         </div>
 
-        {/* سایدبار تحلیل تکنیکال و اسلایدر گاما */}
+        {/* تحلیل تکنیکال و اسلایدر گاما */}
         <div className="lg:col-span-4 space-y-4 text-xs">
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
             <span className="font-black text-[var(--accent-blue)] block text-xs">

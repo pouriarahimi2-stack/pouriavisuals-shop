@@ -1,4 +1,4 @@
-// components/LayoutWrapper.tsx
+// File Path: components/LayoutWrapper.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
 import { initRealtimeSync } from "@/lib/realtimeSync";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { fontEngine } from "@/lib/fontEngine";
 import { supabase } from "@/lib/supabase";
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
@@ -27,7 +28,14 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     if (!info) return;
     setSiteInfo(info);
 
-    const mode: MaintenanceMode = info.maintenance_mode || (info.allow_google_index === false || info.allowGoogleIndex === false ? "indefinite" : "none");
+    // اعمال زنده فونت سایت
+    if (info.active_font_id) {
+      fontEngine.applyFontToTarget(info.active_font_id, "body");
+    }
+
+    const mode: MaintenanceMode =
+      info.maintenance_mode ||
+      (info.allow_google_index === false || info.allowGoogleIndex === false ? "indefinite" : "none");
     const until = info.maintenance_until || null;
 
     if (mode === "timed" && until) {
@@ -45,6 +53,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     setMounted(true);
+
     siteInfoService.getSiteInfo().then((data) => {
       if (data) updateMaintenanceState(data);
     });
@@ -56,9 +65,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
     window.addEventListener("site_info_updated", handleUpdate);
 
-    // کانال وب‌سوکت خالص Realtime بدون ایجاد ترافیک و لگ
+    // اشتراک بلادرنگ وب‌سوکت برای وضعیت سایت
     const channel = supabase
-      .channel("maintenance_websocket_pure")
+      .channel("layout_maintenance_realtime_v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
         if (payload?.new) {
           updateMaintenanceState(payload.new);
@@ -73,7 +82,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  // سیستم حفظ و بازیابی موقعیت کاربر (State & Path Memory)
+  // سیستم حفظ و بازیابی موقعیت کاربر (Path Memory)
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -93,7 +102,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // ثانیه‌شمار زنده برای حالت زمان‌دار
+  // شمارش معکوس زنده حالت تعمیرات زمان‌دار
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
@@ -120,7 +129,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     return () => clearInterval(timer);
   }, [maintenanceMode, maintenanceUntil]);
 
-  // ادمین‌ها همیشه دسترسی مستقیم دارند
+  // دسترسی بدون محدودیت برای پنل ادمین
   if (isAdmin) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -129,7 +138,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // صفحه فوق‌العاده مدرن اپلی در حالت تعمیرات
+  // صفحه تعمیرات فوق‌العاده مدرن
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
@@ -173,7 +182,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 text-[11px] text-blue-300 font-bold max-w-md mx-auto flex items-center justify-center gap-2">
               <span>🔒</span>
-              <span>موقعیت و سبد خرید شما در حافظه سیستم ذخیره شده و پس از بازگشایی به همان صفحه هدایت می‌شوید.</span>
+              <span>سبد خرید و موقعیت شما در حافظه سیستم ذخیره شده و پس از بازگشایی مجدداً فعال می‌شود.</span>
             </div>
           </div>
 

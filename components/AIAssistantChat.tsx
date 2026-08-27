@@ -1,7 +1,9 @@
+// File Path: components/AIAssistantChat.tsx
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { soundEngine } from "@/lib/soundEngine";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -47,6 +49,7 @@ export default function AIAssistantChat() {
     const textToSend = suggestedText || input.trim();
     if ((!textToSend && !selectedImage) || loading) return;
 
+    soundEngine.playClick();
     const userMsg = textToSend || "📷 [ارسال تصویر جهت بررسی و تحلیل]";
     const currentImg = selectedImage;
 
@@ -78,6 +81,7 @@ export default function AIAssistantChat() {
       const data = await res.json();
       const botReply = data.response || data.reply || "در زمینه سوال شما کاتالوگ فروشگاه گزینه‌های بسیار مناسبی دارد.";
 
+      soundEngine.playSuccess();
       setMessages((prev) => [
         ...prev,
         {
@@ -111,7 +115,10 @@ export default function AIAssistantChat() {
       {/* دکمه شناور باز کردن چت */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            soundEngine.playClick();
+            setIsOpen(true);
+          }}
           className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white shadow-2xl hover:scale-105 transition flex items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 active:scale-95"
         >
           <span className="text-sm">🤖</span>
@@ -119,7 +126,7 @@ export default function AIAssistantChat() {
         </button>
       )}
 
-      {/* پنجره تعاملی گفتگو */}
+      {/* پنجره گفتگو */}
       {isOpen && (
         <div className="w-[92vw] sm:w-[420px] h-[560px] max-h-[85vh] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-2xl animate-fadeIn">
           
@@ -138,7 +145,10 @@ export default function AIAssistantChat() {
               </div>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => {
+                soundEngine.playClick();
+                setIsOpen(false);
+              }}
               className="w-7 h-7 rounded-xl bg-[var(--input-bg)] hover:text-rose-500 border border-[var(--card-border)] flex items-center justify-center text-xs font-bold transition cursor-pointer"
             >
               ✕
@@ -186,7 +196,7 @@ export default function AIAssistantChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* پیشنهادات سریع برای شروع */}
+          {/* پیشنهادات سریع */}
           {messages.length === 1 && (
             <div className="px-3 py-1 flex flex-wrap gap-1.5">
               <button

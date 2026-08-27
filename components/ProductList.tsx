@@ -1,10 +1,12 @@
-// components/ProductList.tsx
+// File Path: components/ProductList.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
+import { userBehavior } from "@/lib/userBehavior";
+import { supabase } from "@/lib/supabase";
 
 export default function ProductList() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -14,10 +16,20 @@ export default function ProductList() {
   const { addToCart } = useCart();
 
   const loadProducts = async () => {
-    setLoading(true);
     try {
       const data = await productService.getAll();
-      setProducts(data);
+      const topCat = userBehavior.getTopInterestCategory();
+
+      let sorted = data || [];
+      if (topCat !== "all") {
+        sorted = [...sorted].sort((a, b) => {
+          const aMatch = (a.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
+          const bMatch = (b.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
+          return bMatch - aMatch;
+        });
+      }
+
+      setProducts(sorted);
     } finally {
       setLoading(false);
     }
@@ -38,9 +50,15 @@ export default function ProductList() {
     window.addEventListener("products_updated", handleUpdate);
     window.addEventListener("category_selected", handleCategorySelect);
 
+    const channel = supabase
+      .channel("product-list-realtime-master")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadProducts())
+      .subscribe();
+
     return () => {
       window.removeEventListener("products_updated", handleUpdate);
       window.removeEventListener("category_selected", handleCategorySelect);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -64,11 +82,11 @@ export default function ProductList() {
           <span className="text-xs font-black text-[var(--accent-blue)] block mb-1">PRO DISPLAY & GEARS</span>
           <h2 className="text-2xl md:text-3xl font-black">کاتالوگ تجهیزات تصویر و مانیتورها</h2>
           <p className="text-xs text-[var(--text-secondary)] font-medium mt-1">
-            تمامی کالاها با گارانتی اصالت، تست سلامت و ارسال پیشتاز عرضه می‌شوند
+            تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند
           </p>
         </div>
 
-        {/* فیلترها و جستجو */}
+        {/* فیلترها و جستجوی زنده */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
             <button
@@ -76,7 +94,7 @@ export default function ProductList() {
                 soundEngine.playClick();
                 setSelectedCategory("all");
               }}
-              className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer ${
+              className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
                 selectedCategory === "all"
                   ? "bg-[var(--accent-blue)] text-white shadow-md"
                   : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
@@ -91,7 +109,7 @@ export default function ProductList() {
                   soundEngine.playClick();
                   setSelectedCategory(cat);
                 }}
-                className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer ${
+                className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
                   selectedCategory === cat
                     ? "bg-[var(--accent-blue)] text-white shadow-md"
                     : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
@@ -121,22 +139,11 @@ export default function ProductList() {
               className="p-5 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 flex flex-col justify-between"
             >
               <div className="space-y-4">
-                <div className="w-full h-48 rounded-3xl bg-[var(--input-bg)] relative overflow-hidden flex items-center justify-center">
-                  <div className="absolute inset-0 bg-slate-200/50 dark:bg-slate-800/50" />
-                </div>
-                <div className="space-y-2">
-                  <div className="h-3 w-16 bg-slate-200/60 dark:bg-slate-800/60 rounded-full" />
-                  <div className="h-4 w-3/4 bg-slate-200/80 dark:bg-slate-800/80 rounded-full" />
-                  <div className="h-3 w-5/6 bg-slate-200/40 dark:bg-slate-800/40 rounded-full" />
-                </div>
+                <div className="w-full h-48 rounded-3xl bg-[var(--input-bg)]" />
+                <div className="h-4 w-3/4 bg-[var(--input-bg)] rounded-full" />
+                <div className="h-3 w-1/2 bg-[var(--input-bg)] rounded-full" />
               </div>
-              <div className="pt-4 border-t border-[var(--card-border)] space-y-3 mt-4">
-                <div className="flex justify-between items-center">
-                  <div className="h-3 w-12 bg-slate-200/40 dark:bg-slate-800/40 rounded-full" />
-                  <div className="h-5 w-24 bg-slate-200/80 dark:bg-slate-800/80 rounded-full" />
-                </div>
-                <div className="h-10 w-full bg-slate-200/60 dark:bg-slate-800/60 rounded-2xl" />
-              </div>
+              <div className="h-10 w-full bg-[var(--input-bg)] rounded-2xl" />
             </div>
           ))}
         </div>
@@ -151,10 +158,10 @@ export default function ProductList() {
             return (
               <div
                 key={prod.id}
+                onClick={() => userBehavior.trackProductView(prod.id, prod.category)}
                 className="p-5 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl hover:border-[var(--accent-blue)] hover:shadow-2xl transition duration-300 flex flex-col justify-between group"
               >
                 <div className="space-y-4">
-                  {/* تصویر محصول */}
                   <div className="w-full h-48 rounded-3xl bg-[var(--input-bg)] p-3 border border-[var(--card-border)] flex items-center justify-center relative overflow-hidden">
                     {displayImg ? (
                       <img
@@ -173,7 +180,6 @@ export default function ProductList() {
                     )}
                   </div>
 
-                  {/* مشخصات */}
                   <div className="space-y-1.5">
                     <span className="text-[10px] text-[var(--accent-blue)] font-extrabold block">
                       {prod.category || "تجهیزات"}
@@ -182,12 +188,11 @@ export default function ProductList() {
                       {prod.title}
                     </h3>
                     <p className="text-[11px] text-[var(--text-secondary)] font-medium line-clamp-2 leading-relaxed">
-                      {prod.description || "دارای گارانتی اصالت و ضمانت بازگشت وجه ۷ روزه"}
+                      {prod.description || "دارای گارانتی اصالت طلایی و ضمانت بازگشت وجه ۷ روزه"}
                     </p>
                   </div>
                 </div>
 
-                {/* قیمت و دکمه خرید */}
                 <div className="pt-4 border-t border-[var(--card-border)] space-y-3 mt-4">
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
@@ -211,6 +216,7 @@ export default function ProductList() {
                         title: prod.title,
                         price: prod.discountPrice || prod.price,
                         image: displayImg,
+                        stock: prod.stock ?? 10,
                       });
                     }}
                     className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center justify-center gap-1.5"

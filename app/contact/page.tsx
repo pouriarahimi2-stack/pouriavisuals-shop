@@ -1,4 +1,4 @@
-// app/contact/page.tsx
+// File Path: app/contact/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -38,15 +38,26 @@ export default function ContactPage() {
     setLoading(true);
     setFeedback(null);
 
+    const cleanPhone = phone
+      .trim()
+      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/\D/g, "");
+
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      setFeedback({ type: "error", text: "شماره تماس وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود." });
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          full_name: fullName,
-          phone,
-          subject,
-          message,
+          full_name: fullName.trim(),
+          phone: cleanPhone,
+          subject: subject.trim() || "درخواست مشاوره تخصصی",
+          message: message.trim(),
         }),
       });
 
@@ -54,7 +65,7 @@ export default function ContactPage() {
 
       if (res.ok && data.success) {
         soundEngine.playSuccess();
-        setFeedback({ type: "success", text: data.message || "پیام شما با موفقیت ثبت شد و به زودی پاسخ داده خواهد شد." });
+        setFeedback({ type: "success", text: data.message || "پیام و درخواست مشاوره شما با موفقیت ثبت شد و پاسخ به زودی پیامک خواهد شد." });
         setFullName("");
         setPhone("");
         setSubject("");
@@ -79,9 +90,9 @@ export default function ContactPage() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] py-12 px-4 select-none transition-colors duration-300" dir="rtl">
       <div className="max-w-5xl mx-auto space-y-10">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-black">تماس با پشتیبانی و مشاوره تخصصی</h1>
+          <h1 className="text-2xl sm:text-3xl font-black">تماس با واحد پشتیبانی و مشاوره استودیو</h1>
           <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium">
-            پاسخگوی سوالات شما در خصوص تجهیزات، مانیتورهای تدوین و هماهنگی سفارشات هستیم
+            پاسخگوی سوالات شما در خصوص کالیبراسیون، مانیتورهای ۵K و هماهنگی فاکتورها هستیم
           </p>
         </div>
 
@@ -89,7 +100,7 @@ export default function ContactPage() {
           <div className="md:col-span-2 rounded-[2.5rem] p-6 sm:p-10 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl space-y-6">
             <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-4">
               <span className="text-lg">✉️</span>
-              <h2 className="text-sm sm:text-base font-extrabold">ارسال پیام یا درخواست مشاوره</h2>
+              <h2 className="text-sm sm:text-base font-extrabold">ارسال تیکت مشاوره یا پشتیبانی</h2>
             </div>
 
             {feedback && (
@@ -108,21 +119,21 @@ export default function ContactPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold mb-2 text-[var(--text-secondary)]">
-                    نام و نام خانوادگی *
+                    نام و نام خانوادگی شما *
                   </label>
                   <input
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="مثال: پوریا رسولی"
+                    placeholder="مثال: پوریا احمدی"
                     className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-bold focus:outline-none focus:border-[var(--accent-blue)]"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold mb-2 text-[var(--text-secondary)]">
-                    شماره موبایل جهت پاسخگویی *
+                    شماره موبایل جهت دریافت پیامک پاسخ *
                   </label>
                   <input
                     type="tel"
@@ -138,20 +149,20 @@ export default function ContactPage() {
 
               <div>
                 <label className="block text-xs font-bold mb-2 text-[var(--text-secondary)]">
-                  موضوع پیام
+                  موضوع درخواست
                 </label>
                 <input
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  placeholder="مثال: استعلام گارانتی مانیتور، همکاری سازمانی و..."
+                  placeholder="مثال: استعلام گارانتی مانیتور، سازگاری کابل و..."
                   className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-bold focus:outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold mb-2 text-[var(--text-secondary)]">
-                  متن پیام یا پرسش شما *
+                  متن کامل پرسش یا شرح نیاز *
                 </label>
                 <textarea
                   required
@@ -168,7 +179,7 @@ export default function ContactPage() {
                 disabled={loading}
                 className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs cursor-pointer hover:opacity-90 transition shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {loading ? "در حال ارسال..." : "ارسال پیام به واحد پشتیبانی 🚀"}
+                {loading ? "در حال ارسال تیکت..." : "ارسال پیام به کارشناسان استودیو 🚀"}
               </button>
             </form>
           </div>
@@ -181,28 +192,28 @@ export default function ContactPage() {
 
             <div className="space-y-5 text-xs">
               <div className="space-y-1">
-                <span className="text-[var(--text-secondary)] font-bold block">📞 شماره تماس پشتیبانی:</span>
+                <span className="text-[var(--text-secondary)] font-bold block">📞 تلفن مستقیم پشتیبانی:</span>
                 <p className="font-mono font-black text-[var(--accent-blue)] text-sm" dir="ltr">
                   {phoneVal}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[var(--text-secondary)] font-bold block">✉️ ایمیل ارتباطی:</span>
+                <span className="text-[var(--text-secondary)] font-bold block">✉️ پست الکترونیک:</span>
                 <p className="font-mono font-medium text-[var(--text-primary)] text-xs" dir="ltr">
                   {emailVal}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[var(--text-secondary)] font-bold block">📍 نشانی حضوری:</span>
+                <span className="text-[var(--text-secondary)] font-bold block">📍 نشانی تحویل حضوری و انبار:</span>
                 <p className="text-[var(--text-primary)] leading-relaxed font-medium">
                   {addressVal}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[var(--text-secondary)] font-bold block">⏰ ساعات کاری:</span>
+                <span className="text-[var(--text-secondary)] font-bold block">⏰ ساعات پاسخگویی:</span>
                 <p className="text-[var(--text-primary)] font-medium">
                   {workingHours}
                 </p>
@@ -215,7 +226,7 @@ export default function ContactPage() {
                 className="w-full py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
               >
                 <span>🔍</span>
-                <span>رهگیری مرسولات پستی ←</span>
+                <span>استعلام لحظه‌ای بسته پستی ←</span>
               </Link>
             </div>
           </div>

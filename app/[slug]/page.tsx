@@ -14,7 +14,7 @@ export default function DynamicCustomPage() {
   const params = useParams();
   const slug = Array.isArray(params.slug) ? params.slug[0] : (params.slug as string);
 
-  // اگر آدرس فایل اینماد یا پسوند txt بود بلافاصله خروج کند
+  // اگر آدرس مربوط به تاییدیه اینماد بود نادیده بگیرد
   if (slug && (slug.endsWith(".txt") || slug.includes("27424534"))) {
     return null;
   }
@@ -120,7 +120,7 @@ function RenderModularBlock({
     case "cta":
       return (
         <section className="p-8 rounded-[2.5rem] bg-[var(--accent-blue)] text-white text-center space-y-4 shadow-xl">
-          <h3 className="text-xl font-black">{block.data.title || "مشاوره تخصصی"}</h3>
+          <h3 className="text-xl font-black">{block.data.title || "مشاوره تخصصی استودیو"}</h3>
           <Link
             href={block.data.link || "/contact"}
             className="inline-block px-8 py-3 rounded-2xl bg-white text-gray-900 font-black text-xs shadow-lg hover:scale-105 transition"
@@ -132,7 +132,7 @@ function RenderModularBlock({
 
     case "text":
       return (
-        <section className="p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] leading-loose text-xs font-medium text-[var(--text-primary)]" style={{ textAlign: "justify" }}>
+        <section className="p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] leading-loose text-xs font-medium text-[var(--text-primary)] text-justify">
           <p>{block.data.text}</p>
         </section>
       );

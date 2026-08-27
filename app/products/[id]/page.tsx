@@ -1,4 +1,4 @@
-// app/products/[id]/page.tsx
+// File Path: app/products/[id]/page.tsx
 "use client";
 
 import React, { useState, useEffect, use } from "react";
@@ -11,6 +11,7 @@ import ProductExplodedView from "@/components/ProductExplodedView";
 import ColorGamutSimulator from "@/components/ColorGamutSimulator";
 import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
 import { soundEngine } from "@/lib/soundEngine";
+import { userBehavior } from "@/lib/userBehavior";
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -34,6 +35,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         const data = await productService.getById(id);
         if (data) {
           setProduct(data);
+          userBehavior.trackProductView(data.id, data.category);
+
           const defaultImg = data.images && data.images.length > 0 ? data.images[0] : data.image || "";
           if (!activeImage) setActiveImage(defaultImg);
           if (data.variants && data.variants.length > 0 && !selectedVariant) {
@@ -81,22 +84,24 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const finalUnitPrice = Math.max(0, basePrice + variantDelta);
   const oldPrice = Number(product.originalPrice || product.price || 0) + variantDelta;
 
+  const currentStock = product.stock !== undefined ? Number(product.stock) : 10;
   const isAvailable =
     product.is_available !== false &&
     product.isAvailable !== false &&
-    (product.stock === undefined || Number(product.stock) > 0);
+    currentStock > 0;
 
   const specsEntries = product.specs ? Object.entries(product.specs) : [];
 
   const handleDirectBuy = () => {
     soundEngine.playAddToCart();
+    userBehavior.trackProductView(product.id, product.category);
     addToCart({
       id: product.id,
       title: `${product.title} ${selectedVariant ? `(${selectedVariant.name})` : ""}`,
       name: `${product.title} ${selectedVariant ? `(${selectedVariant.name})` : ""}`,
       price: finalUnitPrice,
       image: currentMainImg,
-      stock: selectedVariant?.stock || product.stock || 10,
+      stock: selectedVariant?.stock || currentStock,
       quantity,
     });
     router.push("/checkout");
@@ -104,6 +109,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const handleAddCart = () => {
     soundEngine.playAddToCart();
+    userBehavior.trackProductView(product.id, product.category);
     for (let i = 0; i < quantity; i++) {
       addToCart({
         id: product.id,
@@ -111,7 +117,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         name: `${product.title} ${selectedVariant ? `(${selectedVariant.name})` : ""}`,
         price: finalUnitPrice,
         image: currentMainImg,
-        stock: selectedVariant?.stock || product.stock || 10,
+        stock: selectedVariant?.stock || currentStock,
         quantity: 1,
       });
     }
@@ -123,9 +129,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
+    <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-[var(--text-primary)] space-y-10 pb-28 sm:pb-10" dir="rtl">
       
-      {/* مسیر ناوبری (Breadcrumbs) */}
+      {/* مسیر ناوبری */}
       <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-bold">
         <Link href="/" className="hover:text-[var(--accent-blue)] transition">صفحه نخست</Link>
         <span>/</span>
@@ -137,7 +143,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       {/* کارت اصلی معرفی و خرید کالا */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
         
-        {/* بخش گالری و لانچر نمای انفجاری */}
+        {/* بخش گالری و لانچر کالبدشکافی */}
         <div className="lg:col-span-5 space-y-4">
           <div className="w-full h-80 md:h-[430px] rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] overflow-hidden flex items-center justify-center p-6 relative group">
             <img
@@ -152,7 +158,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </span>
             )}
 
-            {/* دکمه شناور کالبدشکافی قطعات روی تصویر */}
             <button
               onClick={() => {
                 soundEngine.playExplodeShift();
@@ -195,7 +200,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 {product.category || "کالای دیجیتال"}
               </span>
               <span className={`text-xs font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
-                {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
+                {isAvailable ? `موجود در انبار (${currentStock} عدد) ✓` : "ناموجود"}
               </span>
             </div>
 
@@ -203,7 +208,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.title}
             </h1>
 
-            {/* بنر تعاملی معرفی کالبدشکافی و گاموت رنگی */}
+            {/* بنرهای تعاملی معرفی کالبدشکافی و گاموت رنگی */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div
                 onClick={() => {
@@ -276,7 +281,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
-          {/* باکس قیمت نهایی و دکمه‌های خرید */}
+          {/* باکس قیمت نهایی و دکمه‌های خرید دسکتاپ */}
           <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-5">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی فاکتور:</span>
@@ -307,7 +312,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 <button
                   onClick={() => {
                     soundEngine.playClick();
-                    setQuantity((q) => q + 1);
+                    setQuantity((q) => Math.min(currentStock, q + 1));
                   }}
                   className="px-2 text-sm font-black cursor-pointer hover:text-[var(--accent-blue)]"
                 >
@@ -318,7 +323,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <button
                 disabled={!isAvailable}
                 onClick={handleAddCart}
-                className="w-full sm:flex-1 py-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--accent-blue)] text-[var(--text-primary)] font-black text-xs cursor-pointer hover:bg-[var(--accent-blue)] hover:text-white transition disabled:opacity-40"
+                className="w-full sm:flex-1 py-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--accent-blue)] text-[var(--text-primary)] font-black text-xs cursor-pointer hover:bg-[var(--accent-blue)] hover:text-white transition disabled:opacity-40 shadow-sm"
               >
                 🛒 افزودن به سبد خرید
               </button>
@@ -328,14 +333,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 onClick={handleDirectBuy}
                 className="w-full sm:flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-xl shadow-blue-500/25 hover:opacity-90 transition disabled:opacity-40"
               >
-                ⚡ خرید آنی و تسویه
+                ⚡ خرید آنی و تسویه فاکتور
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* تب‌های پیشرفته مشخصات، شبیه‌ساز گاموت، مقایسه بازار و نظرات */}
+      {/* تب‌های پیشرفته مشخصات، شبیه‌ساز گاموت و نظرات */}
       <div className="space-y-6">
         <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] text-xs scrollbar-none">
           {[
@@ -406,7 +411,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {/* مدال نمای انفجاری سه‌بعدی هوشمند */}
+      {/* نوار چسبان خرید سریع در موبایل (Sticky Mobile Purchase Bar) */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border-t border-[var(--card-border)] p-3 px-4 flex items-center justify-between gap-3 shadow-[0_-10px_25px_rgba(0,0,0,0.2)]">
+        <div>
+          <span className="text-[10px] text-[var(--text-secondary)] block font-bold">مبلغ نهایی:</span>
+          <span className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
+            {finalUnitPrice.toLocaleString("fa-IR")} تومان
+          </span>
+        </div>
+        <button
+          disabled={!isAvailable}
+          onClick={handleDirectBuy}
+          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg active:scale-95 transition disabled:opacity-40 cursor-pointer"
+        >
+          ⚡ خرید سریع
+        </button>
+      </div>
+
       <ProductExplodedView
         productId={product.id}
         productTitle={product.title}

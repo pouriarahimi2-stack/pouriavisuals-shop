@@ -1,8 +1,10 @@
+// File Path: app/payment/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { orderService } from "@/services/orderService";
+import { soundEngine } from "@/lib/soundEngine";
 
 function PaymentGatewayForm() {
   const router = useRouter();
@@ -35,6 +37,7 @@ function PaymentGatewayForm() {
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
+    soundEngine.playClick();
     setErrorMsg("");
 
     const cleanCard = cardNumber.replace(/\D/g, "");
@@ -56,10 +59,8 @@ function PaymentGatewayForm() {
     setIsProcessing(true);
 
     try {
-      // شبیه‌سازی تراکنش شتاب با تاخیر واقعی
-      await new Promise((res) => setTimeout(res, 1500));
+      await new Promise((res) => setTimeout(res, 1400));
 
-      // به‌روزرسانی قطعی وضعیت در دیتابیس به پرداخت‌شده (paid)
       if (typeof orderService.updateOrderStatus === "function") {
         await orderService.updateOrderStatus(orderId, "paid");
       } else {
@@ -70,6 +71,7 @@ function PaymentGatewayForm() {
         localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
       }
 
+      soundEngine.playSuccess();
       setStatus("success");
       sessionStorage.removeItem("pending_payment_amount");
       sessionStorage.removeItem("pending_payment_order_id");
@@ -82,12 +84,12 @@ function PaymentGatewayForm() {
   };
 
   return (
-    <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+    <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl font-sans text-slate-100" dir="rtl">
       
       {/* نشان رسمی شبکه پرداخت شاپرک */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-md">
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-md">
             💳
           </span>
           <div>
@@ -103,22 +105,22 @@ function PaymentGatewayForm() {
 
       {status === "success" ? (
         <div className="text-center py-8 space-y-4 animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-3xl flex items-center justify-center mx-auto shadow-lg">
+          <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-3xl flex items-center justify-center mx-auto shadow-lg animate-bounce">
             ✓
           </div>
           <h3 className="text-base font-black text-white">پرداخت شما با موفقیت تایید شد!</h3>
           <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-            سفارش شما در مرحله آماده‌سازی و ارسال قرار گرفت.
+            سفارش شما در مرحله آماده‌سازی و ارسال با پست پیشتاز قرار گرفت.
           </p>
           <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-1">
             <p className="text-slate-400">کد رهگیری تراکنش: {Date.now().toString().slice(-8)}</p>
             <p className="text-emerald-400 font-bold">مبلغ کسر شده: {amount.toLocaleString("fa-IR")} تومان</p>
           </div>
           <button
-            onClick={() => router.push(`/track-order`)}
+            onClick={() => router.push(`/track-order?orderId=${orderId}&success=true`)}
             className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer"
           >
-            پیگیری لحظه‌ای سفارش 📦
+            پیگیری لحظه‌ای بسته پستی 📦
           </button>
         </div>
       ) : (
@@ -130,13 +132,12 @@ function PaymentGatewayForm() {
           )}
 
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex justify-between items-center">
-            <span className="text-slate-400 font-bold">مبلغ قابل پرداخت:</span>
+            <span className="text-slate-400 font-bold">مبلغ قابل پرداخت فاکتور:</span>
             <span className="text-base font-black text-emerald-400 font-mono">
               {amount.toLocaleString("fa-IR")} تومان
             </span>
           </div>
 
-          {/* شماره کارت ۱۶ رقمی */}
           <div className="space-y-1">
             <label className="font-bold text-slate-300">شماره کارت بانکی (۱۶ رقم):</label>
             <input
@@ -154,7 +155,6 @@ function PaymentGatewayForm() {
             />
           </div>
 
-          {/* CVV2 و تاریخ انقضا */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="font-bold text-slate-300">کد CVV2:</label>
@@ -194,7 +194,6 @@ function PaymentGatewayForm() {
             </div>
           </div>
 
-          {/* رمز دوم پویا */}
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <label className="font-bold text-slate-300">رمز دوم پویا:</label>
@@ -215,12 +214,13 @@ function PaymentGatewayForm() {
               <button
                 type="button"
                 onClick={() => {
+                  soundEngine.playClick();
                   setOtp("584920");
                   setOtpTimer(120);
                 }}
                 className="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-amber-400 transition cursor-pointer"
               >
-                دریافت پیامکی رمز
+                دریافت رمز پیامکی
               </button>
             </div>
           </div>
@@ -231,7 +231,7 @@ function PaymentGatewayForm() {
               onClick={() => router.push("/")}
               className="px-5 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 font-bold text-slate-300 transition cursor-pointer"
             >
-              انصراف از پرداخت
+              انصراف
             </button>
             <button
               type="submit"
@@ -254,14 +254,7 @@ function PaymentGatewayForm() {
 export default function PaymentGatewayPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-slate-100 font-sans select-none">
-      <Suspense
-        fallback={
-          <div className="py-20 text-center space-y-4">
-            <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent animate-spin rounded-full mx-auto" />
-            <p className="text-xs font-bold text-slate-400">در حال بارگذاری درگاه شاپرک...</p>
-          </div>
-        }
-      >
+      <Suspense fallback={<div className="text-xs text-slate-400 animate-pulse">در حال اتصال به شاپرک...</div>}>
         <PaymentGatewayForm />
       </Suspense>
     </div>

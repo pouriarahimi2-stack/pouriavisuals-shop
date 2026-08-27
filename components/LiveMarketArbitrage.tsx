@@ -32,7 +32,7 @@ export default function LiveMarketArbitrage({
         {
           storeName: "فروشگاه مستقیم ما (تضمین کمترین نرخ)",
           price: ourPrice,
-          warranty: "گارانتی طلایی ۱۸ ماهه + تست ۷ روزه",
+          warranty: "گارانتی طلایی ۱۸ ماهه + مهلت تست",
           isOurStore: true,
           deliveryTime: "ارسال اکسپرس همان روز",
         },
@@ -76,7 +76,7 @@ export default function LiveMarketArbitrage({
         )}
       </div>
 
-      {/* جدول مقایسه فروشگاه‌ها */}
+      {/* لیست فروشگاه‌ها */}
       <div className="space-y-3">
         {competitors.map((comp, idx) => (
           <div

@@ -1,4 +1,4 @@
-/* app/globals.css */
+/* File Path: app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,15 +10,15 @@
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #94a3b8;
-  --card-bg: rgba(255, 255, 255, 0.92);
+  --card-bg: rgba(255, 255, 255, 0.95);
   --card-border: rgba(15, 23, 42, 0.08);
   --glass-border: rgba(0, 0, 0, 0.08);
   --accent-blue: #0071e3;
   --accent-blue-hover: #0077ed;
-  --nav-bg: rgba(255, 255, 255, 0.85);
+  --nav-bg: rgba(255, 255, 255, 0.9);
   --modal-bg: #ffffff;
   --input-bg: #f8fafc;
-  --shadow-subtle: 0 10px 30px -10px rgba(0, 0, 0, 0.06);
+  --shadow-subtle: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
 }
 
 .dark {
@@ -28,12 +28,12 @@
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted: #64748b;
-  --card-bg: rgba(15, 23, 42, 0.75);
+  --card-bg: rgba(15, 23, 42, 0.85);
   --card-border: rgba(255, 255, 255, 0.1);
   --glass-border: rgba(255, 255, 255, 0.12);
   --accent-blue: #38bdf8;
   --accent-blue-hover: #0284c7;
-  --nav-bg: rgba(7, 9, 14, 0.85);
+  --nav-bg: rgba(7, 9, 14, 0.9);
   --modal-bg: #0d1117;
   --input-bg: rgba(255, 255, 255, 0.04);
   --shadow-subtle: 0 20px 40px -15px rgba(0, 0, 0, 0.7);

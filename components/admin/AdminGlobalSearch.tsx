@@ -1,4 +1,4 @@
-// components/admin/AdminGlobalSearch.tsx
+// File Path: components/admin/AdminGlobalSearch.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,7 +7,7 @@ import { soundEngine } from "@/lib/soundEngine";
 
 interface SearchResult {
   id: string;
-  type: "product" | "order" | "blog" | "message";
+  type: "product" | "order" | "blog" | "message" | "news";
   title: string;
   subtitle: string;
   extra?: string;
@@ -46,11 +46,12 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
       const q = query.trim().toLowerCase();
 
       try {
-        const [prodsRes, ordersRes, postsRes, msgsRes] = await Promise.all([
-          supabase.from("products").select("id, title, name, price, category").limit(8),
-          supabase.from("orders").select("id, customer_name, phone, total_amount, final_amount").limit(8),
-          supabase.from("posts").select("id, title, category").limit(8),
-          supabase.from("contact_messages").select("id, full_name, phone, subject").limit(8),
+        const [prodsRes, ordersRes, postsRes, msgsRes, newsRes] = await Promise.all([
+          supabase.from("products").select("id, title, name, price, category").limit(6),
+          supabase.from("orders").select("id, customer_name, phone, final_amount, total_amount").limit(6),
+          supabase.from("posts").select("id, title, category").limit(6),
+          supabase.from("contact_messages").select("id, full_name, phone, subject").limit(6),
+          supabase.from("tech_news").select("id, title, category").limit(6),
         ]);
 
         const combined: SearchResult[] = [];
@@ -66,7 +67,7 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
               id: p.id,
               type: "product",
               title: p.title || p.name,
-              subtitle: `کالا | دسته‌بندی: ${p.category || "عمومی"}`,
+              subtitle: `کالا | دسته: ${p.category || "تخصصی"}`,
               extra: `${Number(p.price || 0).toLocaleString("fa-IR")} ت`,
             });
           });
@@ -83,7 +84,7 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
               id: o.id,
               type: "order",
               title: `فاکتور ${o.id} - ${o.customer_name || "مشتری"}`,
-              subtitle: `شماره همراه: ${o.phone || "---"}`,
+              subtitle: `تلفن: ${o.phone || "---"}`,
               extra: `${Number(o.final_amount || o.total_amount || 0).toLocaleString("fa-IR")} ت`,
             });
           });
@@ -99,7 +100,18 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
               id: post.id,
               type: "blog",
               title: post.title,
-              subtitle: `مقاله سئو | دسته‌بندی: ${post.category || "مجله"}`,
+              subtitle: `مجله سئو | دسته: ${post.category || "مقاله"}`,
+            });
+          });
+
+        (newsRes.data || [])
+          .filter((n: any) => (n.title || "").toLowerCase().includes(q))
+          .forEach((n: any) => {
+            combined.push({
+              id: n.id,
+              type: "news",
+              title: n.title,
+              subtitle: `خبر تکنولوژی | ${n.category || "گجت"}`,
             });
           });
 
@@ -114,7 +126,7 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
             combined.push({
               id: msg.id,
               type: "message",
-              title: `تیکت از طرف ${msg.full_name}`,
+              title: `تیکت از ${msg.full_name}`,
               subtitle: `موضوع: ${msg.subject || "مشاوره"} - تلفن: ${msg.phone}`,
             });
           });
@@ -137,6 +149,7 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
     if (type === "product") onSelectTab("products");
     if (type === "order") onSelectTab("orders");
     if (type === "blog") onSelectTab("blogs");
+    if (type === "news") onSelectTab("news_radar");
     if (type === "message") onSelectTab("messages");
   };
 
@@ -153,7 +166,7 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
               <input
                 type="text"
                 autoFocus
-                placeholder="جستجو در کالاها، سفارشات، مشتریان، پیام‌ها و مقالات سئو..."
+                placeholder="جستجو در کالاها، سفارشات، مشتریان، اخبار تکنولوژی و مقالات سئو..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full bg-transparent border-none outline-none text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
@@ -181,7 +194,7 @@ export default function AdminGlobalSearch({ onSelectTab }: { onSelectTab?: (tab:
                   >
                     <div className="flex items-center gap-3">
                       <span className="w-9 h-9 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center text-sm shadow-inner">
-                        {item.type === "product" ? "📦" : item.type === "order" ? "📄" : item.type === "blog" ? "📚" : "✉️"}
+                        {item.type === "product" ? "📦" : item.type === "order" ? "📄" : item.type === "blog" ? "📚" : item.type === "news" ? "📡" : "✉️"}
                       </span>
                       <div>
                         <h4 className="font-black text-xs text-[var(--text-primary)]">{item.title}</h4>

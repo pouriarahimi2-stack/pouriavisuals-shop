@@ -1,4 +1,4 @@
-// components/AdminMenu.tsx
+// File Path: components/AdminMenu.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -104,7 +104,7 @@ export default function AdminMenu() {
       soundEngine.playSuccess();
       setNewCatName("");
       loadAll();
-      setStatusMessage({ type: "success", text: `دسته‌بندی «${res.name}» افزوده شد.` });
+      setStatusMessage({ type: "success", text: `دسته‌بندی «${res.name}» با موفقیت افزوده شد.` });
       setTimeout(() => setStatusMessage(null), 3000);
     }
   };

@@ -1,3 +1,4 @@
+// File Path: services/siteInfoService.ts
 import { supabase } from "@/lib/supabase";
 
 export type MaintenanceMode = "none" | "timed" | "indefinite";
@@ -62,13 +63,14 @@ export const siteInfoService = {
   async getSiteInfo(): Promise<SiteInfo | null> {
     try {
       if (supabase) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("site_info")
           .select("*")
+          .order("id", { ascending: true })
           .limit(1)
           .maybeSingle();
 
-        if (data) {
+        if (data && !error) {
           const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
           return {
             id: data.id,
@@ -90,10 +92,15 @@ export const siteInfoService = {
             maintenance_until: data.maintenance_until || undefined,
             maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
             header_announcement: data.header_announcement || "",
+            free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
             description: data.description || data.footer_text || "",
             footer_text: data.footer_text || data.description || "",
             custom_css: data.custom_css || "",
             active_font_id: data.active_font_id || "Vazirmatn",
+            instagram: data.instagram || "",
+            telegram: data.telegram || "",
+            whatsapp: data.whatsapp || "",
+            youtube: data.youtube || "",
             updated_at: data.updated_at,
           };
         }
@@ -132,8 +139,14 @@ export const siteInfoService = {
         maintenance_until: payload.maintenance_until || null,
         maintenance_duration_minutes: payload.maintenance_duration_minutes || null,
         header_announcement: payload.header_announcement || "",
+        free_shipping_threshold: Number(payload.free_shipping_threshold || 2000000),
         footer_text: payload.footer_text || payload.description || "",
         description: payload.description || payload.footer_text || "",
+        custom_css: payload.custom_css || "",
+        instagram: payload.instagram || "",
+        telegram: payload.telegram || "",
+        whatsapp: payload.whatsapp || "",
+        youtube: payload.youtube || "",
         updated_at: new Date().toISOString(),
       };
 

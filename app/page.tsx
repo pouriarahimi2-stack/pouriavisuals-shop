@@ -1,4 +1,3 @@
-// File Path: app/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -13,6 +12,7 @@ import AIAssistantChat from "@/components/AIAssistantChat";
 import TechRadarFeed from "@/components/TechRadarFeed";
 import ProductComparisonModal from "@/components/ProductComparisonModal";
 import { soundEngine } from "@/lib/soundEngine";
+import { userBehavior } from "@/lib/userBehavior";
 
 export default function HomePage() {
   const router = useRouter();
@@ -37,7 +37,18 @@ export default function HomePage() {
         siteInfoService.getSiteInfo(),
       ]);
 
-      setProducts(prods || []);
+      // مرتب‌سازی هوشمند کالاها بر اساس رفتار و کوکی‌های ثبت‌شده کاربر
+      const topCat = userBehavior.getTopInterestCategory();
+      let sortedProducts = prods || [];
+      if (topCat !== "all") {
+        sortedProducts = [...sortedProducts].sort((a, b) => {
+          const aMatch = (a.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
+          const bMatch = (b.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
+          return bMatch - aMatch;
+        });
+      }
+
+      setProducts(sortedProducts);
       setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
       if (info) setSiteInfo(info);
     } catch (e) {
@@ -102,9 +113,9 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 space-y-14 mt-6">
+      <div className="max-w-7xl mx-auto px-4 space-y-12 mt-4">
         
-        {/* ۱. اسلایدر هوشمند بنرهای داینامیک برآمده از دیتابیس */}
+        {/* ۱. اسلایدر هوشمند بنرهای داینامیک */}
         {banners.length > 0 && (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
@@ -160,10 +171,10 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ۲. رادار زنده اخبار و ترندهای تکنولوژی روز دنیا */}
+        {/* ۲. ویجت فشرده، نئونی و جذاب «جدیدترین اخبار حوزه تکنولوژی» */}
         <TechRadarFeed />
 
-        {/* ۳. فیلتر دسته‌بندی‌ها و کاتالوگ محصولات */}
+        {/* ۳. ویترین و کاتالوگ محصولات با اولویت فروش حداکثری */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
             <div>
@@ -224,10 +235,12 @@ export default function HomePage() {
                   onAddToCart={addToCart}
                   onOpenDetails={(p) => {
                     soundEngine.playClick();
+                    userBehavior.trackProductView(p.id, p.category);
                     setSelectedProductForModal(p);
                   }}
                   onQuickBuy={(p) => {
                     soundEngine.playAddToCart();
+                    userBehavior.trackProductView(p.id, p.category);
                     addToCart({
                       id: p.id,
                       title: p.title || p.name,
@@ -245,7 +258,7 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* نوار شناور مقایسه فعال */}
+        {/* نوار مقایسه شناور */}
         {compareList.length > 0 && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-[var(--card-border)] p-3 px-6 rounded-full shadow-2xl flex items-center gap-4 animate-fadeIn">
             <span className="text-xs font-black text-[var(--text-primary)] flex items-center gap-2">
@@ -273,7 +286,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ۴. بخش مجله تخصصی، راهنمای خرید و مقالات سئو */}
+        {/* ۴. مجله تخصصی، مقالات و راهنمای خرید */}
         <section className="p-8 rounded-[2.5rem] space-y-6 my-12 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
@@ -302,7 +315,6 @@ export default function HomePage() {
         />
       )}
 
-      {/* مدال مقایسه ساید‌بای‌ساید */}
       <ProductComparisonModal
         products={compareList}
         isOpen={isCompareOpen}

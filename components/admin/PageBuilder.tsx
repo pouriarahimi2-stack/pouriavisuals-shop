@@ -1,4 +1,4 @@
-// components/admin/PageBuilder.tsx
+// File Path: components/admin/PageBuilder.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -93,6 +93,7 @@ export default function PageBuilder() {
       return;
     }
 
+    soundEngine.playClick();
     setSaving(true);
     const payload: CustomPage = {
       id: selectedPage?.id,
@@ -108,7 +109,7 @@ export default function PageBuilder() {
 
     if (result) {
       soundEngine.playSuccess();
-      setStatusMessage({ type: "success", text: "⚡ صفحه با موفقیت ذخیره و منتشر شد." });
+      setStatusMessage({ type: "success", text: "⚡ صفحه فرود با موفقیت در دیتابیس ذخیره و منتشر شد." });
       setSelectedPage(result);
       fetchPages();
     } else {
@@ -137,7 +138,7 @@ export default function PageBuilder() {
             <span>🏗️</span> صفحه‌ساز ماژولار و لندینگ‌پیس (Page Builder Engine)
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ساخت صفحات فرود اختصاصی با ۱۰ بلاک پیشرفته (Hero, Products, FAQ, CTA, Testimonials, Video)
+            ساخت صفحات فرود اختصاصی با ۱۰ بلاک پیشرفته (Hero, Products, FAQ, CTA, Video, Features)
           </p>
         </div>
         <button
@@ -194,7 +195,7 @@ export default function PageBuilder() {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: جشنواره تجهیزات تصویر ۲۰۲۶"
+                  placeholder="مثال: جشنواره مانیتورهای ۵K"
                   required
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
@@ -205,7 +206,7 @@ export default function PageBuilder() {
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="studio-gear-event"
+                  placeholder="studio-monitors-sale"
                   required
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
@@ -372,6 +373,6 @@ function getDefaultDataForBlock(type: PageBlock["type"]): Record<string, any> {
     case "cta":
       return { title: "مشاوره رایگان خرید با کارشناسان", buttonText: "تماس با ما", link: "/contact" };
     default:
-      return { text: "محتوای پیش‌فرض متنی..." };
+      return { text: "محتوای متنی دلخواه..." };
   }
 }

@@ -1,4 +1,4 @@
-// app/actions/siteInfo.ts
+// File Path: app/actions/siteInfo.ts
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -10,6 +10,7 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
     const { data, error } = await supabaseAdmin
       .from("site_info")
       .select("*")
+      .order("id", { ascending: true })
       .limit(1)
       .maybeSingle();
 
@@ -46,7 +47,9 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
       instagram: data.instagram || "",
       telegram: data.telegram || "",
       whatsapp: data.whatsapp || "",
+      youtube: data.youtube || "",
       header_announcement: data.header_announcement || "",
+      free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
       allow_google_index: isAllowed,
       allowGoogleIndex: isAllowed,
       maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
@@ -69,7 +72,15 @@ export async function updateSiteInfoServer(info: Partial<SiteInfo>) {
         ? info.allowGoogleIndex
         : info.maintenance_mode === "none";
 
-    const payload = {
+    // بررسی رکورد موجود در دیتابیس
+    const { data: existingRecords } = await supabaseAdmin
+      .from("site_info")
+      .select("id")
+      .limit(1);
+
+    const existingId = existingRecords && existingRecords.length > 0 ? existingRecords[0].id : null;
+
+    const payload: Record<string, any> = {
       site_name: sName,
       store_name: sName,
       tagline: info.tagline || "",
@@ -85,20 +96,21 @@ export async function updateSiteInfoServer(info: Partial<SiteInfo>) {
       instagram: info.instagram || "",
       telegram: info.telegram || "",
       whatsapp: info.whatsapp || "",
+      youtube: info.youtube || "",
       header_announcement: info.header_announcement || "",
+      free_shipping_threshold: Number(info.free_shipping_threshold || 2000000),
       allow_google_index: isAllowed,
       maintenance_mode: info.maintenance_mode || (isAllowed ? "none" : "indefinite"),
       maintenance_until: info.maintenance_until || null,
       maintenance_duration_minutes: info.maintenance_duration_minutes || null,
+      custom_css: info.custom_css || "",
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabaseAdmin.from("site_info").select("id").limit(1).maybeSingle();
-
-    if (existing?.id) {
-      await supabaseAdmin.from("site_info").update(payload).eq("id", existing.id);
+    if (existingId !== null && existingId !== undefined) {
+      await supabaseAdmin.from("site_info").update(payload).eq("id", existingId);
     } else {
-      await supabaseAdmin.from("site_info").insert([{ id: 1, ...payload }]);
+      await supabaseAdmin.from("site_info").insert([payload]);
     }
 
     revalidatePath("/", "layout");

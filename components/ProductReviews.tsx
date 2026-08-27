@@ -1,4 +1,4 @@
-// components/ProductReviews.tsx
+// File Path: components/ProductReviews.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -57,6 +57,15 @@ export default function ProductReviews({ productId }: { productId: string }) {
 
   useEffect(() => {
     loadReviews();
+
+    const channel = supabase
+      .channel(`reviews-${productId}-realtime`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "product_reviews" }, () => loadReviews())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [productId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,7 +118,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
 
       {/* فرم ثبت دیدگاه */}
       <form onSubmit={handleSubmit} className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4 text-xs">
-        <h4 className="font-black text-sm text-[var(--accent-blue)]">✍️ ثبت نظر و امتیاز برای این محصول</h4>
+        <h4 className="font-black text-sm text-[var(--accent-blue)]">✍️ ثبت نظر و امتیاز برای این کالا</h4>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -120,7 +129,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               placeholder="مثال: علی محمدی"
-              className="w-full p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)]"
+              className="w-full p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
             />
           </div>
 
@@ -129,7 +138,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
             <select
               value={rating}
               onChange={(e) => setRating(Number(e.target.value))}
-              className="w-full p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] cursor-pointer"
+              className="w-full p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] cursor-pointer text-[var(--text-primary)]"
             >
               <option value={5}>⭐⭐⭐⭐⭐ (عالی - ۵ از ۵)</option>
               <option value={4}>⭐⭐⭐⭐ (خوب - ۴ از ۵)</option>
@@ -147,8 +156,8 @@ export default function ProductReviews({ productId }: { productId: string }) {
             required
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="تجربه خود را از کیفیت و کارایی این محصول بنویسید..."
-            className="w-full p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-medium leading-relaxed focus:border-[var(--accent-blue)]"
+            placeholder="تجربه خود را از کیفیت تصویر، وضوح و عملکرد این محصول بنویسید..."
+            className="w-full p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-medium leading-relaxed focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
           />
         </div>
 
@@ -163,7 +172,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
 
       {/* لیست دیدگاه‌ها */}
       <div className="space-y-3">
-        <h4 className="font-black text-xs text-[var(--text-secondary)]">نظرات ثبت‌شده کاربران ({reviews.length})</h4>
+        <h4 className="font-black text-xs text-[var(--text-secondary)]">نظرات ثبت‌شده خریداران ({reviews.length})</h4>
 
         {loading ? (
           <div className="py-8 text-center text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری نظرات...</div>

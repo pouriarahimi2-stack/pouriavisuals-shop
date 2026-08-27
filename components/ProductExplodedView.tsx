@@ -1,8 +1,9 @@
-// components/ProductExplodedView.tsx
+// File Path: components/ProductExplodedView.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { TeardownData, TeardownComponent } from "@/app/api/ai-teardown/route";
+import { soundEngine } from "@/lib/soundEngine";
 
 interface ProductExplodedViewProps {
   productId: string;
@@ -21,7 +22,7 @@ export default function ProductExplodedView({
 }: ProductExplodedViewProps) {
   const [data, setData] = useState<TeardownData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [explosionDistance, setExplosionDistance] = useState<number>(65); // درصد انفصال لایه‌ها (۰ تا ۱۰۰)
+  const [explosionDistance, setExplosionDistance] = useState<number>(65);
   const [rotationX, setRotationX] = useState<number>(18);
   const [rotationY, setRotationY] = useState<number>(-24);
   const [selectedComponent, setSelectedComponent] = useState<TeardownComponent | null>(null);
@@ -60,7 +61,6 @@ export default function ProductExplodedView({
     loadTeardown();
   }, [isOpen, productId, productTitle, category]);
 
-  // چرخش خودکار نرم سه‌بعدی
   useEffect(() => {
     if (!autoRotate) return;
     const interval = setInterval(() => {
@@ -69,7 +69,6 @@ export default function ProductExplodedView({
     return () => clearInterval(interval);
   }, [autoRotate]);
 
-  // کنترل چرخش سه‌بعدی با درگ ماوس و تاچ لمسی موبایل
   const handlePointerDown = (e: React.PointerEvent) => {
     isDraggingRef.current = true;
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -94,9 +93,6 @@ export default function ProductExplodedView({
   if (!isOpen) return null;
 
   const components = data?.components || [];
-  const filteredComponents = filterCategory === "all"
-    ? components
-    : components.filter((c) => c.category === filterCategory);
 
   return (
     <div
@@ -105,7 +101,7 @@ export default function ProductExplodedView({
     >
       <div className="relative w-full max-w-6xl h-[92vh] max-h-[850px] bg-slate-900/90 border border-slate-700/70 rounded-[2.5rem] shadow-2xl flex flex-col justify-between overflow-hidden backdrop-blur-3xl">
         
-        {/* سربرگ هوشمند نمای انفجاری */}
+        {/* سربرگ نمای انفجاری */}
         <header className="p-4 sm:p-6 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 bg-slate-950/60">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-blue-500/20 border border-blue-500/40 text-blue-400 flex items-center justify-center text-xl shadow-lg animate-pulse">
@@ -121,25 +117,31 @@ export default function ProductExplodedView({
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-medium">
-                کالبدشکافی معماری قطعات، مدارات نوری و مهندسی: <strong className="text-white">{productTitle}</strong>
+                کالبدشکافی معماری قطعات و مهندسی: <strong className="text-white">{productTitle}</strong>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setAutoRotate(!autoRotate)}
+              onClick={() => {
+                soundEngine.playClick();
+                setAutoRotate(!autoRotate);
+              }}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
                 autoRotate
                   ? "bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-500/30"
                   : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
               }`}
             >
-              {autoRotate ? "توقف چرخش خودکار ⏸️" : "چرخش ۳۶۰ درجه ▶️"}
+              {autoRotate ? "توقف چرخش ⏸️" : "چرخش ۳۶۰ درجه ▶️"}
             </button>
 
             <button
-              onClick={onClose}
+              onClick={() => {
+                soundEngine.playClick();
+                onClose();
+              }}
               className="w-10 h-10 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-sm font-bold text-slate-300 hover:text-white transition cursor-pointer"
             >
               ✕
@@ -151,7 +153,7 @@ export default function ProductExplodedView({
           <div className="flex-1 flex flex-col items-center justify-center space-y-4">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent animate-spin rounded-full shadow-lg" />
             <p className="text-xs font-bold text-slate-400">
-              در حال رندر لایه‌های سه‌بعدی و تجزیه ساختار مهندسی قطعات توسط هوش مصنوعی...
+              در حال رندر لایه‌های سه‌بعدی و تجزیه ساختار مهندسی قطعات...
             </p>
           </div>
         ) : (
@@ -166,12 +168,11 @@ export default function ProductExplodedView({
               onPointerLeave={handlePointerUp}
               className="lg:col-span-7 h-[360px] lg:h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden bg-radial from-blue-950/20 via-slate-950 to-slate-950 border-b lg:border-b-0 lg:border-l border-slate-800"
             >
-              {/* نشانگرهای راهنما */}
               <div className="absolute top-4 right-4 z-10 bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-mono text-slate-400 backdrop-blur-md">
                 🖱️ درگ کنید تا زاویه تغییر کند (X: {Math.round(rotationX)}°, Y: {Math.round(rotationY)}°)
               </div>
 
-              {/* کانتینر پرسپکتیو سه‌بعدی */}
+              {/* کانتینر سه‌بعدی */}
               <div
                 className="relative w-64 h-64 sm:w-80 sm:h-80 transition-transform duration-75 ease-out"
                 style={{
@@ -182,7 +183,6 @@ export default function ProductExplodedView({
               >
                 {components.map((comp) => {
                   const isSelected = selectedComponent?.id === comp.id;
-                  // محاسبه جابجایی هر لایه در محور Z بر اساس اسلایدر انفصال
                   const offsetFactor = (comp.depthIndex - 3.5) * (explosionDistance * 2.6);
                   const opacity = filterCategory === "all" || filterCategory === comp.category ? 1 : 0.2;
 
@@ -191,6 +191,7 @@ export default function ProductExplodedView({
                       key={comp.id}
                       onClick={(e) => {
                         e.stopPropagation();
+                        soundEngine.playClick();
                         setSelectedComponent(comp);
                       }}
                       className={`absolute inset-0 rounded-3xl border transition-all duration-500 cursor-pointer flex flex-col justify-between p-4 backdrop-blur-md ${
@@ -204,7 +205,6 @@ export default function ProductExplodedView({
                         opacity,
                       }}
                     >
-                      {/* هدر لایه */}
                       <div className="flex justify-between items-center text-[10px]">
                         <span className="px-2 py-0.5 rounded-md bg-black/60 border border-white/10 text-slate-300 font-mono font-bold">
                           لایه #{comp.depthIndex}
@@ -212,7 +212,6 @@ export default function ProductExplodedView({
                         <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping" />
                       </div>
 
-                      {/* گرافیک بصری ماکت قطعه */}
                       <div className="flex flex-col items-center justify-center space-y-1.5 my-auto">
                         <span className="text-3xl sm:text-4xl drop-shadow-md">
                           {comp.category === "optics"
@@ -235,7 +234,6 @@ export default function ProductExplodedView({
                         </span>
                       </div>
 
-                      {/* فوتر لایه */}
                       <div className="text-center">
                         <span className="text-[9px] text-slate-400 font-medium truncate block">
                           {comp.material}
@@ -246,12 +244,12 @@ export default function ProductExplodedView({
                 })}
               </div>
 
-              {/* کنترلر شناور فاصله انفصال لایه‌ها */}
+              {/* اسلایدر کنترل انفصال لایه‌ها */}
               <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-6 bg-slate-950/80 border border-slate-800 p-3.5 rounded-2xl backdrop-blur-xl space-y-2 z-10 sm:w-72 shadow-2xl">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-black text-white flex items-center gap-1.5">
                     <span>💥</span>
-                    <span>شدت انفصال لایه‌ها:</span>
+                    <span>فاصله انفصال لایه‌ها:</span>
                   </span>
                   <span className="font-mono font-black text-blue-400">{explosionDistance}٪</span>
                 </div>
@@ -260,22 +258,19 @@ export default function ProductExplodedView({
                   min="0"
                   max="100"
                   value={explosionDistance}
-                  onChange={(e) => setExplosionDistance(Number(e.target.value))}
+                  onChange={(e) => {
+                    setExplosionDistance(Number(e.target.value));
+                    soundEngine.playExplodeShift(Number(e.target.value) / 100);
+                  }}
                   className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />
-                <div className="flex justify-between text-[9px] text-slate-400 font-bold">
-                  <span>مونتاژ کامل (۰٪)</span>
-                  <span>انفجار حداکثری (۱۰۰٪)</span>
-                </div>
               </div>
             </div>
 
-            {/* سایدبار اطلاعات و آنالیز مهندسی لایه انتخاب‌شده */}
+            {/* سایدبار تحلیل مهندسی قطعه انتخاب‌شده */}
             <div className="lg:col-span-5 p-5 sm:p-7 space-y-5 overflow-y-auto bg-slate-950/50 flex flex-col justify-between text-xs">
               {selectedComponent ? (
                 <div className="space-y-4">
-                  
-                  {/* عنوان و نقش قطعه */}
                   <div className="space-y-1.5 border-b border-slate-800 pb-3.5">
                     <div className="flex items-center justify-between">
                       <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-black">
@@ -293,7 +288,6 @@ export default function ProductExplodedView({
                     </p>
                   </div>
 
-                  {/* عملکرد و وظیفه قطعه */}
                   <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1.5">
                     <span className="font-black text-blue-400 block text-[11px]">
                       🎯 نقش استراتژیک در دستگاه:
@@ -303,7 +297,6 @@ export default function ProductExplodedView({
                     </p>
                   </div>
 
-                  {/* نکته فوق‌العاده مهندسی */}
                   <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-1">
                     <span className="font-black text-emerald-400 block text-[11px] flex items-center gap-1">
                       <span>💡</span>
@@ -314,7 +307,6 @@ export default function ProductExplodedView({
                     </p>
                   </div>
 
-                  {/* جدول مشخصات فنی لایه */}
                   <div className="space-y-2">
                     <span className="font-black text-slate-300 block">
                       ⚙️ پارامترهای فنی و متالورژی:
@@ -342,7 +334,6 @@ export default function ProductExplodedView({
                 </div>
               )}
 
-              {/* خلاصه معماری و امتیاز تعمیرپذیری در فوتر سایدبار */}
               <div className="pt-4 border-t border-slate-800 space-y-3 mt-4">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-slate-400 font-bold">امتیاز تعمیرپذیری (iFixit Grade):</span>

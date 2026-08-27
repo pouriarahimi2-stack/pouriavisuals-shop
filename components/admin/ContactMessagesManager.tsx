@@ -1,8 +1,10 @@
+// File Path: components/admin/ContactMessagesManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
+import { smsService } from "@/services/smsService";
 
 export interface ContactMessage {
   id: string;
@@ -68,17 +70,23 @@ export default function ContactMessagesManager() {
     e.preventDefault();
     if (!selectedMessage || !replyText.trim()) return;
 
+    soundEngine.playClick();
     setSendingReply(true);
+
     try {
       const res = await fetch("/api/contact", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selectedMessage.id, admin_reply: replyText.trim(), status: "answered" }),
+        body: JSON.stringify({
+          id: selectedMessage.id,
+          admin_reply: replyText.trim(),
+          status: "answered",
+        }),
       });
 
       if (res.ok) {
         soundEngine.playSuccess();
-        alert("✅ پاسخ با موفقیت ثبت و پیامک اطلاع‌رسانی برای خریدار ارسال گردید.");
+        alert("✅ پاسخ با موفقیت در سیستم ثبت و پیامک اطلاع‌رسانی برای خریدار ارسال گردید.");
         setSelectedMessage({ ...selectedMessage, admin_reply: replyText.trim(), status: "answered" });
         fetchMessages();
       }
@@ -109,7 +117,10 @@ export default function ContactMessagesManager() {
 
         <div className="flex gap-2">
           <button
-            onClick={() => setFilterStatus("all")}
+            onClick={() => {
+              soundEngine.playClick();
+              setFilterStatus("all");
+            }}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
               filterStatus === "all" ? "bg-[var(--accent-blue)] text-white" : "bg-[var(--input-bg)] border border-[var(--card-border)]"
             }`}
@@ -117,7 +128,10 @@ export default function ContactMessagesManager() {
             همه ({messages.length})
           </button>
           <button
-            onClick={() => setFilterStatus("pending")}
+            onClick={() => {
+              soundEngine.playClick();
+              setFilterStatus("pending");
+            }}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
               filterStatus === "pending" ? "bg-amber-500 text-white" : "bg-[var(--input-bg)] border border-[var(--card-border)]"
             }`}
@@ -169,14 +183,14 @@ export default function ContactMessagesManager() {
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed font-medium">
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed font-medium whitespace-pre-line">
                   {selectedMessage.message}
                 </div>
               </div>
 
               <form onSubmit={handleSendReply} className="space-y-3 pt-4 border-t border-[var(--card-border)]">
                 <label className="block text-xs font-bold text-[var(--text-secondary)]">
-                  متن پاسخ مدیریت (به همراه ارسال پیامک خودکار به {selectedMessage.phone}):
+                  متن پاسخ مدیریت (به همراه ارسال پیامک خودکار به شماره {selectedMessage.phone}):
                 </label>
                 <textarea
                   rows={4}
@@ -184,14 +198,14 @@ export default function ContactMessagesManager() {
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   placeholder="پاسخ کارشناسی خود را بنویسید..."
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium outline-none focus:border-[var(--accent-blue)] leading-relaxed"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium outline-none focus:border-[var(--accent-blue)] leading-relaxed text-[var(--text-primary)]"
                 />
                 <button
                   type="submit"
                   disabled={sendingReply}
                   className="px-6 py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
                 >
-                  {sendingReply ? "در حال ثبت و ارسال پیامک..." : "ارسال پاسخ و پیامک به خریدار 🚀"}
+                  {sendingReply ? "در حال ارسال پیامک..." : "ارسال پاسخ و پیامک به خریدار 🚀"}
                 </button>
               </form>
             </div>

@@ -1,4 +1,4 @@
-// components/CartDrawer.tsx
+// File Path: components/CartDrawer.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -22,8 +22,8 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
   const setIsCartOpen = propOnClose || cartContext?.setIsCartOpen || (() => {});
   const removeFromCart = cartContext?.removeFromCart || (() => {});
   const updateQuantity = cartContext?.updateQuantity || (() => {});
-  const clearCart = cartContext?.clearCart || (() => {});
   const totalPrice = cartContext?.totalPrice || 0;
+  const amountUntilFreeShipping = cartContext?.amountUntilFreeShipping || 0;
 
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
@@ -93,7 +93,6 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
 
   const finalPayable = Math.max(0, totalPrice - discountAmount);
 
-  // ثبت آنی سفارش و انتقال مستقیم به درگاه پرداخت بدون فرم تکراری
   const handleFinalCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
@@ -164,7 +163,6 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
 
       if (newOrder) {
         if (typeof setIsCartOpen === "function") setIsCartOpen(false);
-        // انتقال مستقیم به صفحه شبیه‌ساز پرداخت
         router.push(`/checkout/payment?orderId=${newOrder.orderNumber || newOrder.id}`);
       } else {
         throw new Error("خطا در ایجاد فاکتور در سرور.");
@@ -201,6 +199,26 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
             <span className="text-lg">🛒</span>
           </div>
         </div>
+
+        {/* نوار پیشرفت ارسال رایگان پیشتاز */}
+        {totalPrice > 0 && (
+          <div className="p-3 bg-[var(--input-bg)] border-b border-[var(--card-border)] text-xs space-y-1.5">
+            <div className="flex justify-between text-[11px] font-bold">
+              <span>🚀 وضعیت ارسال رایگان پیشتاز:</span>
+              <span className={amountUntilFreeShipping === 0 ? "text-emerald-500 font-black" : "text-[var(--accent-blue)]"}>
+                {amountUntilFreeShipping === 0
+                  ? "✓ ارسال مرسوله شما رایگان شد!"
+                  : `فقط ${amountUntilFreeShipping.toLocaleString("fa-IR")} تومان تا ارسال رایگان`}
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-700/30 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-500"
+                style={{ width: `${Math.min(100, (totalPrice / 2000000) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* لیست محصولات و فرم دریافت اطلاعات */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
@@ -305,7 +323,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                 )}
               </div>
 
-              {/* فرم مشخصات دریافت‌کننده و نشانی پستی */}
+              {/* فرم مشخصات تحویل‌گیرنده */}
               <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
                 <div className="flex items-center gap-1.5 font-black text-xs text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
                   <span>📋</span>
@@ -424,7 +442,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">کد پستی ۱۰ رقمی (اختیاری اما توصیه می‌شود)</label>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">کد پستی ۱۰ رقمی (اختیاری)</label>
                   <input
                     type="text"
                     dir="ltr"
@@ -440,7 +458,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
           )}
         </div>
 
-        {/* فوتر سبد و دکمه اتصال مستقیم به درگاه پرداخت */}
+        {/* فوتر سبد و دکمه پرداخت */}
         {cartItems.length > 0 && (
           <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs">
             <div className="space-y-1.5 font-bold">
@@ -473,7 +491,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
               className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 active:scale-[0.99] transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <span>💳</span>
-              <span>{submitting ? "در حال ثبت سفارش و انتقال به درگاه..." : "تأیید نهایی و انتقال به درگاه پرداخت شاپرک"}</span>
+              <span>{submitting ? "در حال ثبت سفارش و اتصال..." : "تأیید نهایی و انتقال به درگاه پرداخت شاپرک"}</span>
             </button>
           </div>
         )}

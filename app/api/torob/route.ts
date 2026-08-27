@@ -1,6 +1,8 @@
-// app/api/torob/route.ts
+// File Path: app/api/torob/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
@@ -24,7 +26,7 @@ export async function GET() {
 
       return {
         page_unique_id: String(p.id),
-        title: p.title || p.name || "کالای دیجیتال",
+        title: p.title || p.name || "کالای دیجیتال استودیویی",
         subtitle: p.title_fa || p.short_description || "",
         price: discountPrice || price,
         old_price: discountPrice ? price : undefined,
@@ -40,7 +42,13 @@ export async function GET() {
         count: products.length,
         products: products,
       },
-      { status: 200 }
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "s-maxage=60, stale-while-revalidate=120",
+        },
+      }
     );
   } catch (err: any) {
     return NextResponse.json({ count: 0, products: [], error: err.message }, { status: 500 });

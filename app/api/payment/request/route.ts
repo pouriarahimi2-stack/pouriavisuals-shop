@@ -1,39 +1,42 @@
-// app/api/payment/request/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseServer';
+// File Path: app/api/payment/request/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
     const { orderId, callbackUrl } = await req.json();
 
     if (!orderId) {
-      return NextResponse.json({ success: false, message: 'شناسه سفارش الزامی است.' }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
     }
 
     const { data: order, error } = await supabaseAdmin
-      .from('orders')
-      .select('id, total_amount, final_amount, phone')
-      .eq('id', orderId)
+      .from("orders")
+      .select("id, total_amount, final_amount, phone")
+      .eq("id", orderId)
       .single();
 
     if (error || !order) {
-      return NextResponse.json({ success: false, message: 'سفارش یافت نشد.' }, { status: 404 });
+      return NextResponse.json({ success: false, message: "فاکتور سفارش یافت نشد." }, { status: 404 });
     }
 
     const payableAmount = order.final_amount || order.total_amount;
     const merchantId = process.env.ZARINPAL_MERCHANT_ID;
-    const isSandbox = !merchantId || process.env.NODE_ENV !== 'production';
+    const isSandbox = !merchantId || process.env.NODE_ENV !== "production";
 
+    // اتصال واقعی به درگاه زرین‌پال در محیط پروداکشن
     if (!isSandbox && merchantId) {
-      const zarinpalUrl = 'https://api.zarinpal.com/pg/v4/payment/request.json';
+      const zarinpalUrl = "https://api.zarinpal.com/pg/v4/payment/request.json";
       const gatewayRes = await fetch(zarinpalUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchant_id: merchantId,
           amount: payableAmount,
           callback_url: callbackUrl || `${req.nextUrl.origin}/checkout/payment`,
-          description: `پرداخت فاکتور ${order.id}`,
+          description: `پرداخت فاکتور سفارش ${order.id}`,
           metadata: { mobile: order.phone },
         }),
       });
@@ -48,6 +51,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // شبیه‌ساز امن پرداخت
     const mockAuthority = `AUTH_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     return NextResponse.json({
       success: true,

@@ -1,3 +1,4 @@
+// File Path: components/admin/AdminCustomers.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -106,7 +107,7 @@ export default function AdminCustomers() {
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>👥</span> باشگاه مشتریان و مدیریت ارتباط با مخاطبان (CRM)
+            <span>👥</span> باشگاه مخاطبان و مدیریت ارتباط با مشتریان (CRM)
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
             دسته‌بندی خودکار وفاداری، پایش حجم خرید و مشاهده پرونده هر خریدار

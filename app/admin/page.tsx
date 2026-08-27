@@ -1,7 +1,9 @@
+// File Path: app/admin/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import AdminProducts from "@/components/AdminProducts";
 import AdminCoupons from "@/components/AdminCoupons";
 import AdminBanners from "@/components/AdminBanners";
@@ -17,6 +19,7 @@ import ContactMessagesManager from "@/components/admin/ContactMessagesManager";
 import PageBuilder from "@/components/admin/PageBuilder";
 import AdminBlogManager from "@/components/AdminBlogManager";
 import AdminNewsManager from "@/components/admin/AdminNewsManager";
+import StyleFontManager from "@/components/admin/StyleFontManager";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
 import { productService, Product } from "@/services/productService";
@@ -38,6 +41,7 @@ export default function AdminPage() {
     | "customers"
     | "banners"
     | "menu"
+    | "typography"
     | "orders"
     | "siteInfo"
     | "messages"
@@ -46,21 +50,17 @@ export default function AdminPage() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
-  // مدال کنترل وضعیت آنلاین / تعمیرات زمان‌دار / تعمیرات نامحدود
+  // کنترل وضعیت آنلاین بودن / تعمیرات زمان‌دار / تعمیرات نامحدود
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
   const [maintMinutes, setMaintMinutes] = useState<number>(0);
   const [isSavingMaint, setIsSavingMaint] = useState(false);
 
-  // مدال‌های تغییر کلمه عبور و مدیریت حساب‌های ادمین
+  // مدال تغییر رمز عبور و مشخصات
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
-
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
-  const [showAdminPass, setShowAdminPass] = useState(false);
-
   const [newUsername, setNewUsername] = useState("");
   const [newFullName, setNewFullName] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -68,11 +68,14 @@ export default function AdminPage() {
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
+  // مدال مدیریت حساب‌های ادمین و سطوح دسترسی
+  const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
   const [newAdminUsername, setNewAdminUsername] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [newAdminFullName, setNewAdminFullName] = useState("");
   const [newAdminRole, setNewAdminRole] = useState<AdminRole>("product_manager");
+  const [showAdminPass, setShowAdminPass] = useState(false);
   const [adminCreateMsg, setAdminCreateMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
@@ -316,13 +319,14 @@ export default function AdminPage() {
   const navTabs = [
     { id: "products", label: "محصولات و کاتالوگ", icon: "📦", show: true },
     { id: "inventory", label: "انبارداری سریع", icon: "📥", show: true },
-    { id: "news_radar", label: "رادار اخبار جهانی و گجت‌ها", icon: "📡", show: true },
+    { id: "news_radar", label: "جدیدترین اخبار تکنولوژی", icon: "📡", show: true },
     { id: "page_builder", label: "صفحه‌ساز اختصاصی", icon: "🏗️", show: isSuper },
     { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: isSuper },
     { id: "messages", label: "صندوق پیام‌ها و مشاوره", icon: "📩", show: isSuper },
     { id: "coupons", label: "تخفیف‌ها و کوپن", icon: "🏷️", show: isSuper },
-    { id: "customers", label: "باشگاه مخاطبان", icon: "👥", show: isSuper },
+    { id: "customers", label: "باشگاه مخاطبان (CRM)", icon: "👥", show: isSuper },
     { id: "blogs", label: "مقالات تخصصی و سئو", icon: "📚", show: true },
+    { id: "typography", label: "تایپوگرافی و فونت‌ها", icon: "🎨", show: isSuper },
     { id: "banners", label: "بنرها و اسلایدرها", icon: "🖼️", show: isSuper },
     { id: "menu", label: "منوها و دسته‌بندی‌ها", icon: "🔗", show: isSuper },
     { id: "siteInfo", label: "اطلاعات سایت و ایندکس", icon: "⚙️", show: isSuper },
@@ -358,14 +362,13 @@ export default function AdminPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-[var(--text-primary)]">کنترل پنل مهندسی‌شده فروشگاه</h1>
               
-              {/* کلید کنترل زنده حالت تعمیرات */}
               <button
                 onClick={() => {
                   soundEngine.playClick();
                   setShowMaintenanceModal(true);
                 }}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-blue-500 transition cursor-pointer shadow-sm"
-                title="کلیک جهت تنظیم حالت آنلاین یا تعمیرات زمان‌دار"
+                title="کلیک جهت تنظیم وضعیت سایت"
               >
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
@@ -381,7 +384,7 @@ export default function AdminPage() {
                     ? "سایت آنلاین (ایندکس فعال) ✓"
                     : currentMode === "timed"
                     ? "تعمیرات زمان‌دار (تایمر فعال) ⏱️"
-                    : "حالت تعمیر نامحدود (سایت قفل) 🔒"}
+                    : "حالت تعمیر نامحدود (قفل کامل) 🔒"}
                 </span>
               </button>
               {getRoleBadge(userRole)}
@@ -484,6 +487,7 @@ export default function AdminPage() {
         {activeTab === "news_radar" && <AdminNewsManager />}
         {activeTab === "page_builder" && isSuper && <PageBuilder />}
         {activeTab === "blogs" && <AdminBlogManager />}
+        {activeTab === "typography" && isSuper && <StyleFontManager />}
         {activeTab === "orders" && isSuper && <AdminOrders />}
         {activeTab === "messages" && isSuper && <ContactMessagesManager />}
         {activeTab === "coupons" && isSuper && <AdminCoupons />}
@@ -496,7 +500,7 @@ export default function AdminPage() {
       {/* دستیار هوشمند و تحلیلگر کاتالوگ ادمین */}
       {isSuper && <AdminAIAssistant />}
 
-      {/* مدال کنترل وضعیت آنلاین / تعمیرات زمان‌دار */}
+      {/* مدال کنترل وضعیت آنلاین / تعمیرات */}
       {showMaintenanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-6 shadow-2xl text-[var(--text-primary)]">
@@ -530,7 +534,7 @@ export default function AdminPage() {
                 <input type="radio" checked={selectedMaintMode === "none"} onChange={() => {}} className="mt-1 cursor-pointer" />
                 <div className="space-y-1">
                   <strong className="block font-black text-[var(--text-primary)]">۱. سایت آنلاین و فعال (حالت عادی)</strong>
-                  <p className="text-[11px] leading-relaxed">سایت برای تمام کاربران و موتورهای جستجوی گوگل فعال و در دسترس است.</p>
+                  <p className="text-[11px] leading-relaxed">سایت برای تمام کاربران و موتورهای جستجوی گوگل فعال است.</p>
                 </div>
               </div>
 
@@ -544,9 +548,9 @@ export default function AdminPage() {
               >
                 <input type="radio" checked={selectedMaintMode === "timed"} onChange={() => {}} className="mt-1 cursor-pointer" />
                 <div className="space-y-2 flex-1">
-                  <strong className="block font-black text-[var(--text-primary)]">۲. حالت تعمیرات زمان‌دار (با شمارنده معکوس)</strong>
+                  <strong className="block font-black text-[var(--text-primary)]">۲. حالت تعمیرات زمان‌دار (با تایمر)</strong>
                   <p className="text-[11px] leading-relaxed">
-                    سایت بسته شده و شمارنده معکوس لایو به کاربر نشان داده می‌شود. با اتمام تایمر، سایت به صورت خودکار باز می‌شود.
+                    سایت بسته شده و شمارنده معکوس نشان داده می‌شود. پس از پایان زمان، سایت خودکار باز می‌شود.
                   </p>
 
                   {selectedMaintMode === "timed" && (
@@ -590,7 +594,7 @@ export default function AdminPage() {
                 <div className="space-y-1">
                   <strong className="block font-black text-[var(--text-primary)]">۳. حالت تعمیرات نامحدود (قفل کامل سایت)</strong>
                   <p className="text-[11px] leading-relaxed">
-                    سایت هم برای کاربر و هم برای گوگل مخفی می‌شود تا زمانی که ادمین دوباره آن را به حالت آنلاین تغییر دهد.
+                    سایت برای کاربر و گوگل بسته می‌ماند تا زمانی که ادمین وضعیت را به آنلاین تغییر دهد.
                   </p>
                 </div>
               </div>
@@ -610,7 +614,7 @@ export default function AdminPage() {
                 onClick={handleSaveMaintenanceMode}
                 className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black transition cursor-pointer shadow-lg disabled:opacity-50 text-xs"
               >
-                {isSavingMaint ? "در حال اعمال فوری..." : "ذخیره و اعمال زنده در سراسر سایت ⚡"}
+                {isSavingMaint ? "در حال اعمال..." : "ذخیره و اعمال سراسری ⚡"}
               </button>
             </div>
           </div>
@@ -747,7 +751,7 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <h3 className="font-black text-sm text-[var(--text-primary)]">سامانه مدیریت ادمین‌ها و سطوح دسترسی</h3>
-                  <p className="text-[11px] text-[var(--text-secondary)] font-medium">تفکیک وظایف نویسنده مقالات و مدیر انبار</p>
+                  <p className="text-[11px] text-[var(--text-secondary)] font-medium">تعریف نقش‌های دسترسی و ادمین‌های جدید</p>
                 </div>
               </div>
               <button
@@ -758,7 +762,7 @@ export default function AdminPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateAdmin} className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
+            <form onSubmit={handleCreateAdmin} className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4 text-xs">
               <span className="font-extrabold text-xs text-blue-500 block">➕ ساخت ادمین جدید:</span>
 
               {adminCreateMsg && (
@@ -845,13 +849,13 @@ export default function AdminPage() {
               </div>
             </form>
 
-            <div className="space-y-3">
+            <div className="space-y-3 text-xs">
               <span className="font-bold text-xs text-[var(--text-secondary)] block">لیست مدیران فعال:</span>
               <div className="space-y-2">
                 {adminList.map((adm) => (
                   <div
                     key={adm.id}
-                    className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 text-xs"
+                    className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -893,7 +897,7 @@ function AdminAIAssistant() {
   const [messages, setMessages] = useState<Array<{ role: "user" | "model"; text: string }>>([
     {
       role: "model",
-      text: "سلام مدیر گرامی! 👋\nبرای بررسی دقیق کالاها و استراتژی قیمت یا تولید مقالات، روی «🎯 انتخاب محصولات برای آنالیز/سئو» کلیک نمایید.",
+      text: "سلام مدیر گرامی! 👋\nبرای بررسی تخصصی کالاها، استراتژی قیمت یا تولید مقالات رنک ۱ گوگل، روی «🎯 انتخاب محصولات برای آنالیز/سئو» کلیک نمایید.",
     },
   ]);
   const [loading, setLoading] = useState(false);
@@ -932,12 +936,14 @@ function AdminAIAssistant() {
     : productsList.filter((p: any) => (p.category || p.category_name || p.category_id || "عمومی") === selectedCategory);
 
   const toggleProductSelection = (id: string) => {
+    soundEngine.playClick();
     setSelectedProductIds((prev) =>
       prev.includes(id) ? prev.filter((pId) => pId !== id) : [...prev, id]
     );
   };
 
   const handleSelectAllCategory = () => {
+    soundEngine.playClick();
     const currentCatIds = categoryProducts.map((p) => String(p.id));
     const allSelected = currentCatIds.every((id) => selectedProductIds.includes(id));
 
@@ -949,6 +955,7 @@ function AdminAIAssistant() {
   };
 
   const handleSelectAllSite = () => {
+    soundEngine.playClick();
     if (selectedProductIds.length === productsList.length) {
       setSelectedProductIds([]);
     } else {
@@ -960,6 +967,7 @@ function AdminAIAssistant() {
     const query = customPrompt || input;
     if (!query.trim() || loading || selectedProductIds.length === 0) return;
 
+    soundEngine.playClick();
     if (!customPrompt) setInput("");
 
     const updatedMessages = [...messages, { role: "user" as const, text: query }];
@@ -990,6 +998,7 @@ function AdminAIAssistant() {
 
       const data = await res.json();
       if (data && (data.response || data.reply)) {
+        soundEngine.playSuccess();
         setMessages((prev) => [...prev, { role: "model", text: data.response || data.reply }]);
       }
     } catch {
@@ -1009,7 +1018,7 @@ function AdminAIAssistant() {
 
     const promptText = `محصولات انتخابی زیر (${targetProducts.length} کالا):
     [ ${names} ]
-    را با کل وب ایران به صورت زنده آنالیز کن. کف و سقف قیمت بازار، حاشیه سود ما و بهترین قیمت پیشنهادی سودآور را در یک جدول دقیق ارائه بده.`;
+    را با بازار آنلاین ایران آنالیز کن. کف و سقف قیمت بازار، حاشیه سود و بهترین قیمت رقابتی سودآور را در یک جدول دقیق ارائه بده.`;
 
     handleSend(promptText);
   };
@@ -1021,12 +1030,13 @@ function AdminAIAssistant() {
 
     const promptText = `برای محصولات انتخابی زیر:
     [ ${names} ]
-    یک پکیج کامل سئو شامل Title Tag، Meta Description، کلمات کلیدی LSI، هشتگ‌های پربازدید، مقاله تخصصی با H1, H2, H3 و جدول مقایسه بساز.`;
+    یک پکیج کامل سئو رنک ۱ گوگل شامل Title Tag، Meta Description، کلمات کلیدی، لینک‌دهی داخلی به صفحات خرید و مقاله جامع با جدول مقایسه بساز.`;
 
     handleSend(promptText);
   };
 
   const downloadArticleTxt = (text: string, filename: string) => {
+    soundEngine.playClick();
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -1037,6 +1047,7 @@ function AdminAIAssistant() {
   };
 
   const openPublishModal = (text: string) => {
+    soundEngine.playClick();
     if (!text) return;
 
     let extractedTitle = "مقاله جدید سئو";
@@ -1068,13 +1079,14 @@ function AdminAIAssistant() {
     setArticleToPublish({
       title: extractedTitle,
       metaDescription: "توضیحات سئو شده مقاله تولید شده توسط هوش مصنوعی",
-      keywords: "سئو, خرید آنلاین, مقاله تخصصی",
+      keywords: "سئو, مانیتور, خرید آنلاین",
       content: text,
     });
     setPublishModalOpen(true);
   };
 
   const handleFinalPublish = async () => {
+    soundEngine.playClick();
     setPublishing(true);
     try {
       const res = await fetch("/api/blogs", {
@@ -1099,7 +1111,7 @@ function AdminAIAssistant() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans" dir="rtl">
+    <div className="fixed bottom-6 right-6 z-50 font-sans select-none" dir="rtl">
       {!isOpen && (
         <button
           onClick={() => {
@@ -1124,7 +1136,10 @@ function AdminAIAssistant() {
               </div>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => {
+                soundEngine.playClick();
+                setIsOpen(false);
+              }}
               className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 cursor-pointer"
             >
               ✕
@@ -1235,7 +1250,10 @@ function AdminAIAssistant() {
                 </p>
               </div>
               <button
-                onClick={() => setSelectorModalOpen(false)}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setSelectorModalOpen(false);
+                }}
                 className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-2 rounded-xl bg-[var(--input-bg)] cursor-pointer"
               >
                 ✕ بستن
@@ -1257,7 +1275,10 @@ function AdminAIAssistant() {
 
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
                 <button
-                  onClick={() => setSelectedCategory("all")}
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setSelectedCategory("all");
+                  }}
                   className={`px-4 py-2 rounded-2xl border transition cursor-pointer font-extrabold whitespace-nowrap ${
                     selectedCategory === "all"
                       ? "bg-blue-600 border-blue-600 text-white shadow-lg"
@@ -1269,7 +1290,10 @@ function AdminAIAssistant() {
                 {categories.map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setSelectedCategory(cat);
+                    }}
                     className={`px-4 py-2 rounded-2xl border transition cursor-pointer font-extrabold whitespace-nowrap ${
                       selectedCategory === cat
                         ? "bg-blue-600 border-blue-600 text-white shadow-lg"
@@ -1406,7 +1430,10 @@ function AdminAIAssistant() {
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
               <h3 className="text-sm font-black text-blue-500">📝 بررسی و انتشار مستقیم مقاله در وبلاگ</h3>
               <button
-                onClick={() => setPublishModalOpen(false)}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setPublishModalOpen(false);
+                }}
                 className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
               >
                 ✕
@@ -1453,7 +1480,10 @@ function AdminAIAssistant() {
 
             <div className="flex justify-end gap-3 pt-2 border-t border-[var(--card-border)]">
               <button
-                onClick={() => setPublishModalOpen(false)}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setPublishModalOpen(false);
+                }}
                 className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] text-xs font-bold hover:opacity-80 cursor-pointer text-[var(--text-secondary)] border border-[var(--card-border)]"
               >
                 انصراف
@@ -1461,7 +1491,7 @@ function AdminAIAssistant() {
               <button
                 disabled={publishing}
                 onClick={handleFinalPublish}
-                className="px-6 py-2.5 rounded-2xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer"
+                className="px-6 py-2.5 rounded-2xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md cursor-pointer disabled:opacity-50"
               >
                 {publishing ? "در حال انتشار..." : "🌐 تایید و انتشار در وب‌سایت"}
               </button>

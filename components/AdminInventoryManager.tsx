@@ -1,4 +1,4 @@
-// components/AdminInventoryManager.tsx
+// File Path: components/AdminInventoryManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -35,7 +35,9 @@ export default function AdminInventoryManager() {
     soundEngine.playClick();
     const stockVal = Math.max(0, newStock);
     setUpdatingId(id);
-    await supabase.from("products").update({ stock: stockVal, is_available: stockVal > 0 }).eq("id", id);
+    if (supabase) {
+      await supabase.from("products").update({ stock: stockVal, is_available: stockVal > 0 }).eq("id", id);
+    }
     setProducts(products.map((p) => (p.id === id ? { ...p, stock: stockVal, is_available: stockVal > 0 } : p)));
     setUpdatingId(null);
   };
@@ -43,7 +45,9 @@ export default function AdminInventoryManager() {
   const toggleAvailability = async (id: string, current: boolean) => {
     soundEngine.playClick();
     setUpdatingId(id);
-    await supabase.from("products").update({ is_available: !current }).eq("id", id);
+    if (supabase) {
+      await supabase.from("products").update({ is_available: !current }).eq("id", id);
+    }
     setProducts(products.map((p) => (p.id === id ? { ...p, is_available: !current, isAvailable: !current } : p)));
     setUpdatingId(null);
   };

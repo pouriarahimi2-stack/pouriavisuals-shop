@@ -1,4 +1,8 @@
-// services/smsService.ts
+// File Path: services/smsService.ts
+/**
+ * سرویس یکپارچه ارسال پیامک، کدهای اعتبارسنجی OTP و اطلاع‌رسانی بارنامه پستی
+ */
+
 export interface SendSmsResponse {
   success: boolean;
   message?: string;
@@ -8,11 +12,13 @@ export interface SendSmsResponse {
 }
 
 export const smsService = {
+  // ارسال کد تایید ۶ رقمی ورود/ثبت سفارش
   async sendOtp(phone: string): Promise<SendSmsResponse> {
     try {
-      const cleanPhone = phone
+      const cleanPhone = String(phone)
         .trim()
         .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+        .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
         .replace(/\D/g, "");
 
       const res = await fetch("/api/send-otp", {
@@ -27,19 +33,25 @@ export const smsService = {
 
       return await res.json();
     } catch (err: any) {
-      console.error("smsService sendOtp error:", err);
-      return { success: false, message: err?.message || "خطا در ارتباط با سرور پیامک." };
+      console.error("smsService.sendOtp error:", err);
+      return { success: false, message: err?.message || "خطا در برقراری ارتباط با سامانه پیامکی." };
     }
   },
 
+  // اعتبارسنجی کد ۶ رقمی وارد شده توسط کاربر
   async verifyOtp(phone: string, code: string): Promise<SendSmsResponse> {
     try {
-      const cleanPhone = phone
+      const cleanPhone = String(phone)
         .trim()
         .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+        .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
         .replace(/\D/g, "");
 
-      const cleanCode = code.trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString());
+      const cleanCode = String(code)
+        .trim()
+        .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+        .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+        .replace(/\D/g, "");
 
       const res = await fetch("/api/send-otp", {
         method: "POST",
@@ -48,21 +60,23 @@ export const smsService = {
       });
 
       if (!res.ok) {
-        throw new Error("خطا در اعتبارسنجی پیامک.");
+        throw new Error("خطا در تایید کد پیامکی.");
       }
 
       return await res.json();
     } catch (err: any) {
-      console.error("smsService verifyOtp error:", err);
+      console.error("smsService.verifyOtp error:", err);
       return { success: false, message: err?.message || "خطا در بررسی کد تایید." };
     }
   },
 
+  // ارسال خودکار پیامک بارکد پستی و لینک پیگیری
   async sendTrackingCode(phone: string, nameOrOrderId: string | number, trackingCode: string): Promise<boolean> {
     try {
       const cleanPhone = String(phone)
         .trim()
         .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+        .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
         .replace(/\D/g, "");
 
       const cleanTracking = String(trackingCode).trim();
@@ -80,17 +94,19 @@ export const smsService = {
 
       return res.ok;
     } catch (err) {
-      console.error("smsService sendTrackingCode error:", err);
+      console.error("smsService.sendTrackingCode error:", err);
       return false;
     }
   },
 
+  // ارسال پیامک تغییر وضعیت سفارش
   async sendOrderStatusChange(phone: string, orderId: string, statusName: string): Promise<boolean> {
-    return this.sendTrackingCode(phone, `سفارش ${orderId}`, `تغییر وضعیت به: ${statusName}`);
+    return this.sendTrackingCode(phone, `فاکتور ${orderId}`, `تغییر وضعیت سفارش شما به: ${statusName}`);
   },
 
+  // ارسال پیامک عمومی اطلاع‌رسانی
   async sendSMS(phone: string, message: string): Promise<boolean> {
-    return this.sendTrackingCode(phone, "کاربر گرامی", message);
+    return this.sendTrackingCode(phone, "خریدار گرامی", message);
   },
 };
 

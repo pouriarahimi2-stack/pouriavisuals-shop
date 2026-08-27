@@ -1,4 +1,4 @@
-// components/admin/AdminHealthGuard.tsx
+// File Path: components/admin/AdminHealthGuard.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -20,7 +20,7 @@ export default function AdminHealthGuard() {
       const latency = Math.round(end - start);
       setResponseTime(latency);
 
-      if (error) {
+      if (error && error.code !== "PGRST116") {
         setDbStatus("error");
       } else {
         setDbStatus("connected");
@@ -46,7 +46,7 @@ export default function AdminHealthGuard() {
 
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 25000);
+    const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -65,11 +65,11 @@ export default function AdminHealthGuard() {
               سامانه پایش پایداری، سرعت و سلامت دیتابیس (Health Guard)
             </span>
             <span className="text-[10px] text-[var(--text-secondary)] font-mono">
-              آخرین تست: {lastChecked || "هم‌اکنون"}
+              تست: {lastChecked || "هم‌اکنون"}
             </span>
           </div>
           <span className="text-[11px] text-[var(--text-secondary)] font-medium">
-            پایش مستمر زمان پاسخ‌گویی کوئری‌ها و وضعیت کانال‌های وب‌سوکت
+            پایش مستمر زمان پاسخ‌دهی سرور، کوئری‌ها و وضعیت کانال‌های وب‌سوکت
           </span>
         </div>
       </div>
@@ -87,9 +87,9 @@ export default function AdminHealthGuard() {
           />
           <span className="font-bold text-[var(--text-primary)]">
             {dbStatus === "connected"
-              ? "دیتابیس Supabase: متصل و پایدار"
+              ? "دیتابیس Supabase: متصل و فعال"
               : dbStatus === "checking"
-              ? "در حال پایش..."
+              ? "در حال تست..."
               : "خطا در اتصال پایگاه‌داده"}
           </span>
         </div>
@@ -112,7 +112,7 @@ export default function AdminHealthGuard() {
         )}
 
         <div className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[var(--text-secondary)] font-bold">
-          📦 حجم کش مرورگر: {cacheSize} KB
+          📦 کش مرورگر: {cacheSize} KB
         </div>
 
         <button
@@ -121,7 +121,7 @@ export default function AdminHealthGuard() {
             checkHealth();
           }}
           className="p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] transition cursor-pointer"
-          title="پایش دستی مجدد"
+          title="تست مجدد"
         >
           🔄
         </button>

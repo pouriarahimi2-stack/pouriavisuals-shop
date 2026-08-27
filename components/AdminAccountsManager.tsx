@@ -1,9 +1,10 @@
-// components/AdminAccountsManager.tsx
+// File Path: components/AdminAccountsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
 import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminAccountsManager() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -17,7 +18,7 @@ export default function AdminAccountsManager() {
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<AdminRole>("product_manager");
 
-  // فرم تغییر پسورد
+  // فرم ویرایش مدیر
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editFullName, setEditFullName] = useState("");
@@ -32,7 +33,7 @@ export default function AdminAccountsManager() {
     setLoading(true);
     try {
       const data = await adminAuthService.getAllAdmins();
-      setAdmins(data);
+      setAdmins(data || []);
     } finally {
       setLoading(false);
     }
@@ -40,6 +41,15 @@ export default function AdminAccountsManager() {
 
   useEffect(() => {
     loadAdmins();
+
+    const channel = supabase
+      .channel("admin-accounts-realtime-master")
+      .on("postgres_changes", { event: "*", schema: "public", table: "admin_users" }, () => loadAdmins())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
@@ -58,7 +68,7 @@ export default function AdminAccountsManager() {
 
       if (res.success) {
         soundEngine.playSuccess();
-        showToast(`کاربر مدیر «${username}» با نقش مشخص‌شده با موفقیت ایجاد گردید.`);
+        showToast(`کاربر مدیر «${username}» با موفقیت ایجاد گردید.`);
         setUsername("");
         setPassword("");
         setFullName("");
@@ -273,7 +283,7 @@ export default function AdminAccountsManager() {
               <button
                 type="button"
                 onClick={() => setEditingAdmin(null)}
-                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -301,7 +311,7 @@ export default function AdminAccountsManager() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور جدید (در صورت نیاز به تغییر):</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور جدید (در صورت نیاز):</label>
               <input
                 type="password"
                 value={newPassword}
@@ -315,7 +325,7 @@ export default function AdminAccountsManager() {
               <button
                 type="button"
                 onClick={() => setEditingAdmin(null)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)]"
+                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
               >
                 انصراف
               </button>

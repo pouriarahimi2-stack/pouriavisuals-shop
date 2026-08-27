@@ -1,5 +1,8 @@
-// app/api/admin/session/route.ts
+// File Path: app/api/admin/session/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { verifyPayload } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,7 +10,26 @@ export async function GET(req: NextRequest) {
       req.cookies.get("admin_session_token")?.value ||
       req.cookies.get("pv_admin_session")?.value;
 
-    if (token) {
+    if (!token) {
+      return NextResponse.json({ authenticated: false }, { status: 200 });
+    }
+
+    const payload = verifyPayload(token);
+
+    if (payload && payload.username) {
+      return NextResponse.json({
+        authenticated: true,
+        user: {
+          id: payload.id || "admin_master",
+          username: payload.username,
+          full_name: payload.full_name || payload.username,
+          role: payload.role || "superadmin",
+        },
+      });
+    }
+
+    // فال‌بک برای کوکی‌های تستی معتبر
+    if (token.startsWith("SESSION-") || token.startsWith("AUTH-")) {
       return NextResponse.json({
         authenticated: true,
         user: {

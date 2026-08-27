@@ -163,6 +163,7 @@ components/
   LiveMarketArbitrage.tsx
   Navbar.tsx
   ProductCard.tsx
+  ProductComparisonModal.tsx
   ProductExplodedView.tsx
   ProductList.tsx
   ProductReviews.tsx
@@ -1309,6 +1310,183 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
 }
 </file>
 
+<file path="components/ProductComparisonModal.tsx">
+// File Path: components/ProductComparisonModal.tsx
+"use client";
+
+import React from "react";
+import { Product } from "@/services/productService";
+import { soundEngine } from "@/lib/soundEngine";
+import { useCart } from "@/context/CartContext";
+
+interface ProductComparisonModalProps {
+  products: Product[];
+  isOpen: boolean;
+  onClose: () => void;
+  onRemoveProduct: (id: string) => void;
+}
+
+export default function ProductComparisonModal({
+  products,
+  isOpen,
+  onClose,
+  onRemoveProduct,
+}: ProductComparisonModalProps) {
+  const { addToCart } = useCart();
+
+  if (!isOpen || products.length === 0) return null;
+
+  // استخراج تمام کلیدهای مشخصات فنی از تمام محصولات انتخاب‌شده
+  const allSpecKeys = Array.from(
+    new Set(products.flatMap((p) => Object.keys(p.specs || {})))
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xl font-sans select-none animate-fadeIn text-[var(--text-primary)]"
+      dir="rtl"
+    >
+      <div className="w-full max-w-5xl max-h-[92vh] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden">
+        {/* سربرگ مقایسه */}
+        <header className="p-5 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--input-bg)]">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] flex items-center justify-center text-xl font-black shadow-sm">
+              ⚖️
+            </span>
+            <div>
+              <h3 className="font-black text-sm sm:text-base">
+                ماتریس مقایسه فنی و تخصصی کالاها (Side-by-Side Comparison)
+              </h3>
+              <p className="text-[11px] text-[var(--text-secondary)] font-medium">
+                مقایسه رزولوشن، گاموت رنگی، چیپست و قیمت {products.length} محصول منتخب
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              onClose();
+            }}
+            className="w-9 h-9 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer"
+          >
+            ✕
+          </button>
+        </header>
+
+        {/* جدول مقایسه ساید‌بای‌ساید */}
+        <div className="flex-1 overflow-x-auto overflow-y-auto p-5 sm:p-6 text-xs">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[var(--card-border)]">
+                <th className="p-3 text-right font-black text-[var(--text-secondary)] w-40">مشخصات و کالا</th>
+                {products.map((p) => (
+                  <th key={p.id} className="p-3 text-center min-w-[220px]">
+                    <div className="space-y-2.5 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] relative">
+                      <button
+                        onClick={() => {
+                          soundEngine.playClick();
+                          onRemoveProduct(p.id);
+                        }}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-rose-500/15 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center font-bold text-[10px] transition cursor-pointer"
+                        title="حذف از مقایسه"
+                      >
+                        ✕
+                      </button>
+
+                      <img
+                        src={p.images?.[0] || p.image || "/placeholder.png"}
+                        alt={p.title}
+                        className="w-24 h-24 object-contain mx-auto rounded-xl p-1 bg-white/5"
+                      />
+                      <h4 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-2 leading-snug">
+                        {p.title || p.name}
+                      </h4>
+                      <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                        {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} تومان
+                      </div>
+                      <button
+                        onClick={() => {
+                          soundEngine.playAddToCart();
+                          addToCart({
+                            id: p.id,
+                            title: p.title,
+                            price: p.discountPrice || p.price,
+                            image: p.images?.[0] || p.image,
+                          });
+                        }}
+                        className="w-full py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black text-[11px] shadow-md hover:opacity-90 transition cursor-pointer"
+                      >
+                        🛒 افزودن به سبد
+                      </button>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--card-border)] font-medium">
+              <tr className="bg-black/5 dark:bg-white/5">
+                <td className="p-3.5 font-black text-[var(--accent-blue)]">دسته‌بندی و اصالت</td>
+                {products.map((p) => (
+                  <td key={p.id} className="p-3.5 text-center font-bold">
+                    {p.category || "تجهیزات تخصصی"}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className="p-3.5 font-black text-[var(--text-secondary)]">وضعیت موجودی انبار</td>
+                {products.map((p) => (
+                  <td key={p.id} className="p-3.5 text-center font-bold">
+                    {p.isAvailable !== false && (p.stock ?? 0) > 0 ? (
+                      <span className="text-emerald-500 font-bold">موجود در انبار ✓</span>
+                    ) : (
+                      <span className="text-rose-500 font-bold">ناموجود ✕</span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className="p-3.5 font-black text-[var(--text-secondary)]">گارانتی و خدمات</td>
+                {products.map((p) => (
+                  <td key={p.id} className="p-3.5 text-center font-medium leading-relaxed">
+                    {p.warranty || "۱۸ ماه گارانتی معتبر اصالت"}
+                  </td>
+                ))}
+              </tr>
+
+              {/* رندرر مشخصات فنی دقیق ساید‌بای‌ساید */}
+              {allSpecKeys.map((specKey) => (
+                <tr key={specKey} className="hover:bg-[var(--input-bg)] transition">
+                  <td className="p-3.5 font-bold text-[var(--text-secondary)]">{specKey}</td>
+                  {products.map((p) => (
+                    <td key={p.id} className="p-3.5 text-center font-mono font-bold text-[var(--text-primary)]">
+                      {p.specs?.[specKey] || "---"}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* فوتر مدال */}
+        <footer className="p-4 border-t border-[var(--card-border)] flex justify-end bg-[var(--input-bg)]">
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              onClose();
+            }}
+            className="px-6 py-2.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer"
+          >
+            بستن جدول مقایسه
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="components/ProductExplodedView.tsx">
 // components/ProductExplodedView.tsx
 "use client";
@@ -2085,67 +2263,6 @@ export async function PATCH(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-</file>
-
-<file path="app/api/news/sync/route.ts">
-// app/api/news/sync/route.ts
-import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-
-export async function POST() {
-  try {
-    const freshTrends = [
-      {
-        title: "معرفی نسل جدید هدست‌های واقعیت ترکیبی با نمایشگر میکرو اولد ۴K و ردیابی چشم بی‌درنگ",
-        slug: `mixed-reality-micro-oled-spatial-headset-${Date.now().toString().slice(-4)}`,
-        summary: "عصر جدید ارتباطات بصری با وزن کمتر از ۳۰۰ گرم و تراکم پیکسلی خیره‌کننده ۴۰۰۰ PPI آغاز گردید.",
-        content: "<p>این دستگاه با ادغام هوش مصنوعی تعاملی و سنسورهای لایدار پیشرفته، فضاهای کاری و طراحی سه‌بعدی را متحول می‌سازد.</p>",
-        category: "gadgets",
-        source_name: "TechRadar Global",
-        source_url: "https://techradar.com",
-        image_url: "https://images.unsplash.com/photo-1592478411213-6153e4ebc07d?w=1200",
-        published_at: new Date().toISOString(),
-        trending_score: 98,
-        tags: ["گجت", "VR", "میکرواولد", "هوش مصنوعی"],
-        is_published: true,
-      },
-      {
-        title: "استاندارد گرافیکی جدید و موتورهای بازی‌سازی با شبیه‌سازی نور فیزیکی در لحظه (Path Tracing)",
-        slug: `next-gen-graphics-realtime-path-tracing-unreal-${Date.now().toString().slice(-4)}`,
-        summary: "فناوری نورپردازی ریل‌تایم روی کارت‌های گرافیک استودیویی، مرز بین واقعیت و انیمیشن‌های کامپیوتری را از میان برداشت.",
-        content: "<p>کارت‌های پردازشی با پورت تاندربولت ۵ امکان اتصال به چندین مانیتور ۵K را به طور همزمان و با حداکثر نرخ نوسازی فراهم می‌کنند.</p>",
-        category: "gaming",
-        source_name: "GameSpot / Digital Foundry",
-        source_url: "https://gamespot.com",
-        image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200",
-        published_at: new Date().toISOString(),
-        trending_score: 95,
-        tags: ["گیمینگ", "گرافیک", "تکنولوژی", "سخت‌افزار"],
-        is_published: true,
-      },
-    ];
-
-    const inserted: any[] = [];
-    for (const item of freshTrends) {
-      const { data } = await supabaseAdmin
-        .from("tech_news")
-        .upsert(item, { onConflict: "slug" })
-        .select()
-        .maybeSingle();
-
-      if (data) inserted.push(data);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "همگام‌سازی اخبار با موفقیت انجام شد.",
-      syncedCount: inserted.length,
-      data: inserted,
-    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -4697,6 +4814,127 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("API Blogs POST error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+</file>
+
+<file path="app/api/news/sync/route.ts">
+// File Path: app/api/news/sync/route.ts
+import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export async function POST() {
+  try {
+    let generatedArticles: any[] = [];
+
+    // فراخوانی زنده هوش مصنوعی جمنای برای استخراج داغ‌ترین ترندهای سخت‌افزار، مانیتورینگ و گجت‌ها
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const prompt = `به عنوان سردبیر ارشد یک خبرگزاری بین‌المللی فناوری، ۳ خبر و تحلیل فنی فوق‌العاده جدید و داغ از دنیای سخت‌افزار، مانیتورهای تدوین ۵K/۴K، تراشه‌های هوش مصنوعی و گجت‌های سال ۲۰۲۶ تولید کن.
+خروجی فقط یک آرایه JSON معتبر با ساختار زیر باشد و هیچ متن اضافی ننویس:
+[
+  {
+    "title": "تیتر جذاب و تخصصی خبر",
+    "slug": "unique-english-slug-2026",
+    "summary": "خلاصه خبر جهت سئو و متا دیسکریپشن (حدود ۲ سطر)",
+    "content": "<p>متن کامل تحلیل تخصصی به همراه تگ‌های استاندارد HTML مانند h3 و p...</p>",
+    "category": "hardware", // یکی از این مقادیر: gadgets | gaming | hardware | ai
+    "source_name": "The Verge / TechCrunch / Digital Foundry",
+    "source_url": "https://theverge.com",
+    "image_url": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+    "trending_score": 98,
+    "tags": ["تکنولوژی", "سخت‌افزار", "مانیتور", "هوش مصنوعی"]
+  }
+]`;
+
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+            }),
+          }
+        );
+
+        const geminiJson = await geminiRes.json();
+        const rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          generatedArticles = JSON.parse(jsonMatch[0]);
+        }
+      } catch (aiErr) {
+        console.warn("Live Gemini News Sync Fallback:", aiErr);
+      }
+    }
+
+    // در صورتی که کلید جمنای تنظیم نشده باشد، رویدادهای زنده محاسباتی ایجاد می‌شوند
+    if (generatedArticles.length === 0) {
+      const timestamp = Date.now().toString().slice(-4);
+      generatedArticles = [
+        {
+          title: `استاندارد جدید نرخ نوسازی و کالیبراسیون سخت‌افزاری مانیتورهای ۵K استودیویی (${timestamp})`,
+          slug: `studio-5k-calibration-standard-review-${timestamp}`,
+          summary: "تحلیل پوشش ۱۰۰٪ گاموت رنگی DCI-P3 و انحراف رنگی دلتا E کمتر از ۰.۵ در تجهیزات تدوین.",
+          content: "<p>در نسل جدید نمایشگرهای تخصصی، جدول کالیبراسیون سه‌بعدی ۳D LUT مستقیماً روی پردازنده داخلی مانیتور پردازش می‌شود تا بدون کوچک‌ترین افت فریم، تصحیح رنگ بلادرنگ صورت پذیرد.</p>",
+          category: "hardware",
+          source_name: "TechRadar Global",
+          source_url: "https://techradar.com",
+          image_url: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1200",
+          trending_score: 97,
+          tags: ["مانیتور", "استودیو", "رنگ", "تدوین"],
+        },
+        {
+          title: `پیشرفت خیره‌کننده کارت‌های کپچر و استریم با پهنای باند تاندربولت ۵ (${timestamp})`,
+          slug: `thunderbolt-5-capture-cards-low-latency-${timestamp}`,
+          summary: "انتقال بدون فشرده‌سازی سیگنال‌های ویدیویی ۱۲ بیتی با تاخیر صفر میلی‌ثانیه برای استودیوهای پخش زنده.",
+          content: "<p>پروتکل‌های اتصال نوین امکان رکورد همزمان ۴ کانال ویدیوی 4K HDR با فرمت ProRes RAW را با حداکثر پایداری ممکن ساخته‌اند.</p>",
+          category: "gadgets",
+          source_name: "Engadget / Wired",
+          source_url: "https://wired.com",
+          image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200",
+          trending_score: 94,
+          tags: ["کپچر", "استریم", "تاندربولت", "سخت‌افزار"],
+        },
+      ];
+    }
+
+    const inserted: any[] = [];
+    for (const item of generatedArticles) {
+      const payload = {
+        title: item.title,
+        slug: item.slug,
+        summary: item.summary,
+        content: item.content,
+        category: item.category || "hardware",
+        source_name: item.source_name || "Global Tech Radar",
+        source_url: item.source_url || "",
+        image_url: item.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+        published_at: new Date().toISOString(),
+        trending_score: Number(item.trending_score || 95),
+        tags: Array.isArray(item.tags) ? item.tags : ["تکنولوژی"],
+        is_published: true,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data } = await supabaseAdmin
+        .from("tech_news")
+        .upsert(payload, { onConflict: "slug" })
+        .select()
+        .maybeSingle();
+
+      if (data) inserted.push(data);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "همگام‌سازی هوشمند اخبار با موفقیت انجام شد.",
+      syncedCount: inserted.length,
+      data: inserted,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 </file>
@@ -11333,133 +11571,6 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
 export default supabaseAdmin;
 </file>
 
-<file path="services/menuService.ts">
-// services/menuService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface MenuItem {
-  id: string | number;
-  title: string;
-  name?: string;
-  label?: string;
-  url: string;
-  href?: string;
-  order: number;
-  isActive?: boolean;
-  is_active?: boolean;
-  created_at?: string;
-}
-
-const LOCAL_STORAGE_KEY = "site_menu_items";
-
-export function normalizeMenuItem(raw: any, index: number = 0): MenuItem {
-  if (!raw) return {} as MenuItem;
-
-  const id = raw.id || `menu_${Date.now()}_${index}`;
-  const title = raw.title || raw.name || raw.label || "پیوند";
-  const url = raw.url || raw.href || "#";
-  const order = Number(raw.order ?? index + 1);
-  const isActive =
-    raw.isActive !== undefined
-      ? Boolean(raw.isActive)
-      : raw.is_active !== undefined
-      ? Boolean(raw.is_active)
-      : true;
-
-  return {
-    ...raw,
-    id,
-    title,
-    name: title,
-    label: title,
-    url,
-    href: url,
-    order,
-    isActive,
-    is_active: isActive,
-    created_at: raw.created_at || new Date().toISOString(),
-  };
-}
-
-export const menuService = {
-  async getAll(): Promise<MenuItem[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("menu_items")
-          .select("*")
-          .order("order", { ascending: true });
-
-        if (!error && data && data.length > 0) {
-          const mapped = data.map((d: any, idx: number) => normalizeMenuItem(d, idx));
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
-          }
-          return mapped;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (local) {
-          return JSON.parse(local).map((d: any, idx: number) => normalizeMenuItem(d, idx));
-        }
-      }
-
-      const defaults: MenuItem[] = [
-        { id: "m_1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
-        { id: "m_2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
-        { id: "m_3", title: "📡 رادار اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
-        { id: "m_4", title: "پیگیری مرسوله پستی", url: "/track-order", order: 4, isActive: true },
-        { id: "m_5", title: "مجله و مقالات سئو", url: "/blog", order: 5, isActive: true },
-        { id: "m_6", title: "تماس با پشتیبانی", url: "/contact", order: 6, isActive: true },
-      ];
-
-      return defaults.map((d, idx) => normalizeMenuItem(d, idx));
-    } catch (e) {
-      console.error("Error loading menu:", e);
-      return [];
-    }
-  },
-
-  async getMenuItems(): Promise<MenuItem[]> {
-    return this.getAll();
-  },
-
-  async saveAll(items: MenuItem[]): Promise<boolean> {
-    try {
-      const normalized = items.map((d, idx) => normalizeMenuItem(d, idx));
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
-      }
-
-      if (supabase) {
-        const payload = normalized.map((item) => ({
-          id: item.id,
-          title: item.title,
-          url: item.url,
-          order: item.order,
-          is_active: item.isActive,
-        }));
-
-        await supabase.from("menu_items").delete().neq("id", "0");
-        await supabase.from("menu_items").insert(payload);
-      }
-
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("menu_updated", { detail: normalized }));
-      }
-
-      return true;
-    } catch (e) {
-      console.error("Error saving menu:", e);
-      return false;
-    }
-  },
-};
-</file>
-
 <file path=".gitignore">
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
@@ -12962,86 +13073,113 @@ export default function AIAssistantChat() {
 }
 </file>
 
-<file path="services/categoryService.ts">
-// services/categoryService.ts
+<file path="services/menuService.ts">
+// File Path: services/menuService.ts
 import { supabase } from "@/lib/supabase";
 
-export interface Category {
-  id?: string;
-  name: string;
-  slug: string;
-  icon?: string;
-  description?: string;
-  order_index?: number;
-  display_order?: number;
+export interface MenuItem {
+  id: string | number;
+  title: string;
+  name?: string;
+  label?: string;
+  url: string;
+  href?: string;
+  order: number;
+  isActive?: boolean;
+  is_active?: boolean;
+  created_at?: string;
 }
 
-export const categoryService = {
-  async getAll(): Promise<Category[]> {
+const LOCAL_MENU_KEY = "axon_site_menu_items_cache";
+
+export function normalizeMenuItem(raw: any, index: number = 0): MenuItem {
+  if (!raw) return {} as MenuItem;
+
+  const id = raw.id || `menu_${Date.now()}_${index}`;
+  const title = raw.title || raw.name || raw.label || "پیوند";
+  const url = raw.url || raw.href || "#";
+  const order = Number(raw.order ?? index + 1);
+  const isActive =
+    raw.isActive !== undefined
+      ? Boolean(raw.isActive)
+      : raw.is_active !== undefined
+      ? Boolean(raw.is_active)
+      : true;
+
+  return {
+    ...raw,
+    id,
+    title,
+    name: title,
+    label: title,
+    url,
+    href: url,
+    order,
+    isActive,
+    is_active: isActive,
+    created_at: raw.created_at || new Date().toISOString(),
+  };
+}
+
+export const menuService = {
+  async getAll(): Promise<MenuItem[]> {
     try {
       if (supabase) {
-        const { data, error } = await supabase.from("categories").select("*");
+        const { data, error } = await supabase
+          .from("menu_items")
+          .select("*")
+          .order("order", { ascending: true });
 
-        if (!error && data) {
-          return data.sort(
-            (a: any, b: any) =>
-              (a.order_index ?? a.display_order ?? 0) - (b.order_index ?? b.display_order ?? 0)
-          );
+        if (!error && data && data.length > 0) {
+          const mapped = data.map((d: any, idx: number) => normalizeMenuItem(d, idx));
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_MENU_KEY, JSON.stringify(mapped));
+          }
+          return mapped;
         }
       }
-      return [
-        { name: "نمایشگرهای ۵K و ۴K", slug: "monitors", order_index: 1 },
-        { name: "کارت کپچر و استریم", slug: "capture-cards", order_index: 2 },
-        { name: "کالیبراتور رنگ سخت‌افزاری", slug: "calibrators", order_index: 3 },
-        { name: "لوازم جانبی استودیو", slug: "accessories", order_index: 4 },
-      ];
+
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem(LOCAL_MENU_KEY);
+        if (local) {
+          return JSON.parse(local).map((d: any, idx: number) => normalizeMenuItem(d, idx));
+        }
+      }
+
+      return [];
     } catch (e) {
-      console.error("categoryService.getAll error:", e);
+      console.error("Error loading menu:", e);
       return [];
     }
   },
 
-  async addCategory(cat: Omit<Category, "id">): Promise<Category | null> {
+  async saveAll(items: MenuItem[]): Promise<boolean> {
     try {
-      const payload = {
-        name: cat.name.trim(),
-        slug: (cat.slug || cat.name).trim().toLowerCase().replace(/\s+/g, "-"),
-        order_index: cat.order_index ?? 0,
-        display_order: cat.order_index ?? 0,
-      };
+      const normalized = items.map((d, idx) => normalizeMenuItem(d, idx));
 
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("categories")
-          .insert([payload])
-          .select()
-          .single();
-
-        if (error) throw error;
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("categories_updated", { detail: data }));
-        }
-        return data as Category;
-      }
-      return { id: `cat_${Date.now()}`, ...payload };
-    } catch (e) {
-      console.error("categoryService.addCategory error:", e);
-      return null;
-    }
-  },
-
-  async deleteCategory(id: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        const { error } = await supabase.from("categories").delete().eq("id", id);
-        if (error) throw error;
-      }
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("categories_updated", { detail: id }));
+        localStorage.setItem(LOCAL_MENU_KEY, JSON.stringify(normalized));
       }
+
+      if (supabase) {
+        const payload = normalized.map((item) => ({
+          title: item.title,
+          url: item.url,
+          order: item.order,
+          is_active: item.isActive,
+        }));
+
+        await supabase.from("menu_items").delete().neq("id", "-1");
+        await supabase.from("menu_items").insert(payload);
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("menu_updated", { detail: normalized }));
+      }
+
       return true;
     } catch (e) {
-      console.error("categoryService.deleteCategory error:", e);
+      console.error("Error saving menu:", e);
       return false;
     }
   },
@@ -14281,6 +14419,107 @@ export const adminAuthService = {
 };
 </file>
 
+<file path="services/categoryService.ts">
+// File Path: services/categoryService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface Category {
+  id?: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  description?: string;
+  order_index?: number;
+  display_order?: number;
+}
+
+const LOCAL_CATEGORIES_CACHE = "axon_categories_cache_v2026";
+
+export const categoryService = {
+  async getAll(): Promise<Category[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("categories")
+          .select("*")
+          .order("order_index", { ascending: true });
+
+        if (!error && data) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(data));
+          }
+          return data;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(LOCAL_CATEGORIES_CACHE);
+        if (cached) return JSON.parse(cached);
+      }
+
+      return [];
+    } catch (e) {
+      console.error("categoryService.getAll error:", e);
+      return [];
+    }
+  },
+
+  async addCategory(cat: Omit<Category, "id">): Promise<Category | null> {
+    try {
+      const payload = {
+        name: cat.name.trim(),
+        slug: (cat.slug || cat.name).trim().toLowerCase().replace(/\s+/g, "-"),
+        order_index: cat.order_index ?? 0,
+        display_order: cat.order_index ?? 0,
+      };
+
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("categories")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (typeof window !== "undefined") {
+          const all = await this.getAll();
+          const updated = [...all, data];
+          localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(updated));
+          window.dispatchEvent(new CustomEvent("categories_updated", { detail: data }));
+        }
+
+        return data as Category;
+      }
+      return null;
+    } catch (e) {
+      console.error("categoryService.addCategory error:", e);
+      return null;
+    }
+  },
+
+  async deleteCategory(id: string): Promise<boolean> {
+    try {
+      if (supabase) {
+        const { error } = await supabase.from("categories").delete().eq("id", id);
+        if (error) throw error;
+      }
+
+      if (typeof window !== "undefined") {
+        const all = await this.getAll();
+        const updated = all.filter((c) => c.id !== id);
+        localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("categories_updated", { detail: id }));
+      }
+      return true;
+    } catch (e) {
+      console.error("categoryService.deleteCategory error:", e);
+      return false;
+    }
+  },
+};
+</file>
+
 <file path="services/couponService.ts">
 // File Path: services/couponService.ts
 import { supabase } from "@/lib/supabase";
@@ -15331,95 +15570,6 @@ export function useCart() {
 }
 </file>
 
-<file path="services/bannerService.ts">
-// services/bannerService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface Banner {
-  id: string;
-  title: string;
-  subtitle?: string;
-  badge?: string;
-  badge_text?: string;
-  image: string;
-  image_url?: string;
-  link?: string;
-  link_url?: string;
-  button_text?: string;
-  buttonText?: string;
-  is_active?: boolean;
-  created_at?: string;
-}
-
-const LOCAL_BANNERS_KEY = "axon_banners_cache";
-
-export const bannerService = {
-  async getAll(): Promise<Banner[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("banners")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          const mapped: Banner[] = data.map((b: any) => ({
-            id: String(b.id),
-            title: b.title || "بنر ویژه",
-            subtitle: b.subtitle || "",
-            badge: b.badge || b.badge_text || "",
-            badge_text: b.badge || b.badge_text || "",
-            image: b.image || b.image_url || "/placeholder.png",
-            image_url: b.image || b.image_url || "/placeholder.png",
-            link: b.link || b.link_url || "/products",
-            link_url: b.link || b.link_url || "/products",
-            button_text: b.button_text || b.buttonText || "مشاهده و خرید",
-            buttonText: b.button_text || b.buttonText || "مشاهده و خرید",
-            is_active: b.is_active !== false,
-            created_at: b.created_at,
-          }));
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(mapped));
-          }
-          return mapped;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        const local = localStorage.getItem(LOCAL_BANNERS_KEY);
-        if (local) return JSON.parse(local);
-      }
-
-      return [
-        {
-          id: "default-banner-1",
-          title: "مرجع تخصصی تجهیزات مانیتورینگ و تدوین رنگ ۵K",
-          subtitle: "پوشش رنگ ۱۰۰٪ DCI-P3 به همراه کالیبراسیون سخت‌افزاری و ضمانت اصالت ۱۸ ماهه",
-          badge: "تجهیزات استودیویی ۲۰۲۶",
-          image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1600&auto=format&fit=crop&q=80",
-          link: "/products",
-          button_text: "مشاهده و بررسی کالاها",
-          is_active: true,
-        },
-      ];
-    } catch (e) {
-      console.error("bannerService.getAll error:", e);
-      return [];
-    }
-  },
-
-  async getBanners(): Promise<Banner[]> {
-    return this.getAll();
-  },
-
-  async getActive(): Promise<Banner[]> {
-    const all = await this.getAll();
-    return all.filter((b) => b.is_active !== false);
-  },
-};
-</file>
-
 <file path="components/AdminProducts.tsx">
 // components/AdminProducts.tsx
 "use client";
@@ -16192,6 +16342,80 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     </>
   );
 }
+</file>
+
+<file path="services/bannerService.ts">
+// File Path: services/bannerService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface Banner {
+  id: string;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  badge_text?: string;
+  image: string;
+  image_url?: string;
+  link?: string;
+  link_url?: string;
+  button_text?: string;
+  buttonText?: string;
+  is_active?: boolean;
+  created_at?: string;
+}
+
+const LOCAL_BANNERS_KEY = "axon_banners_cache_v2026";
+
+export const bannerService = {
+  async getAll(): Promise<Banner[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("banners")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          const mapped: Banner[] = data.map((b: any) => ({
+            id: String(b.id),
+            title: b.title || "پیشنهاد ویژه",
+            subtitle: b.subtitle || "",
+            badge: b.badge || b.badge_text || "",
+            badge_text: b.badge || b.badge_text || "",
+            image: b.image || b.image_url || "/placeholder.png",
+            image_url: b.image || b.image_url || "/placeholder.png",
+            link: b.link || b.link_url || "/products",
+            link_url: b.link || b.link_url || "/products",
+            button_text: b.button_text || b.buttonText || "مشاهده و خرید",
+            buttonText: b.button_text || b.buttonText || "مشاهده و خرید",
+            is_active: b.is_active !== false,
+            created_at: b.created_at,
+          }));
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(mapped));
+          }
+          return mapped;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem(LOCAL_BANNERS_KEY);
+        if (local) return JSON.parse(local);
+      }
+
+      return [];
+    } catch (e) {
+      console.error("bannerService.getAll error:", e);
+      return [];
+    }
+  },
+
+  async getActive(): Promise<Banner[]> {
+    const all = await this.getAll();
+    return all.filter((b) => b.is_active !== false);
+  },
+};
 </file>
 
 <file path="services/orderService.ts">
@@ -17736,7 +17960,7 @@ export default function RootLayout({
 </file>
 
 <file path="app/page.tsx">
-// app/page.tsx
+// File Path: app/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -17749,6 +17973,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AIAssistantChat from "@/components/AIAssistantChat";
 import TechRadarFeed from "@/components/TechRadarFeed";
+import ProductComparisonModal from "@/components/ProductComparisonModal";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function HomePage() {
   const router = useRouter();
@@ -17758,6 +17984,10 @@ export default function HomePage() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
+
+  // سیستم مقایسه تعاملی چند کالا
+  const [compareList, setCompareList] = useState<Product[]>([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
 
   const { addToCart } = useCart();
 
@@ -17786,7 +18016,7 @@ export default function HomePage() {
     window.addEventListener("category_selected", handleCategoryChange);
 
     const channel = supabase
-      .channel("public-db-home-realtime-master-v22")
+      .channel("home-master-realtime-channel-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => loadData())
@@ -17806,6 +18036,19 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [banners.length]);
 
+  const toggleCompare = (p: Product) => {
+    soundEngine.playClick();
+    if (compareList.some((item) => item.id === p.id)) {
+      setCompareList(compareList.filter((item) => item.id !== p.id));
+    } else {
+      if (compareList.length >= 4) {
+        alert("حداکثر ۴ محصول را می‌توانید به طور همزمان مقایسه نمایید.");
+        return;
+      }
+      setCompareList([...compareList, p]);
+    }
+  };
+
   const categoriesList = Array.from(
     new Set(products.map((p) => p.category || (p as any).category_name || "کالای دیجیتال"))
   ).filter(Boolean);
@@ -17823,8 +18066,8 @@ export default function HomePage() {
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 space-y-14 mt-6">
         
-        {/* ۱. اسلایدر هوشمند بنرها با طراحی مدرن اپلی */}
-        {banners.length > 0 ? (
+        {/* ۱. اسلایدر هوشمند بنرهای داینامیک برآمده از دیتابیس */}
+        {banners.length > 0 && (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
               className="min-h-[380px] sm:min-h-[480px] p-8 sm:p-16 flex items-center bg-cover bg-center transition-all duration-700 relative"
@@ -17863,7 +18106,10 @@ export default function HomePage() {
                   {banners.map((_, idx) => (
                     <button
                       key={idx}
-                      onClick={() => setCurrentSlideIndex(idx)}
+                      onClick={() => {
+                        soundEngine.playClick();
+                        setCurrentSlideIndex(idx);
+                      }}
                       className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
                         currentSlideIndex === idx ? "w-8 bg-[var(--accent-blue)]" : "w-2.5 bg-white/40 hover:bg-white/70"
                       }`}
@@ -17874,19 +18120,9 @@ export default function HomePage() {
               )}
             </div>
           </section>
-        ) : (
-          <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] p-8 md:p-14 min-h-[280px] flex items-center bg-gradient-to-l from-neutral-900 to-neutral-800 text-white shadow-2xl">
-            <div className="max-w-xl space-y-3 z-10">
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-bold">
-                مرکز تجهیزات تخصصی دیجیتال، تصویر و استودیو
-              </span>
-              <h1 className="text-2xl md:text-4xl font-black">{siteInfo?.site_name || "آکسون | Axon"}</h1>
-              <p className="text-xs md:text-sm text-slate-300 font-medium">{siteInfo?.tagline || "تضمین بهترین قیمت و اصالت کالا در ایران"}</p>
-            </div>
-          </section>
         )}
 
-        {/* ۲. بخش رادار زنده اخبار و ترندهای تکنولوژی روز دنیا */}
+        {/* ۲. رادار زنده اخبار و ترندهای تکنولوژی روز دنیا */}
         <TechRadarFeed />
 
         {/* ۳. فیلتر دسته‌بندی‌ها و کاتالوگ محصولات */}
@@ -17903,7 +18139,10 @@ export default function HomePage() {
 
             <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none text-xs">
               <button
-                onClick={() => setSelectedCategory("all")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setSelectedCategory("all");
+                }}
                 className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
                   selectedCategory === "all"
                     ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -17915,7 +18154,10 @@ export default function HomePage() {
               {categoriesList.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setSelectedCategory(cat);
+                  }}
                   className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
                     selectedCategory === cat
                       ? "bg-[var(--accent-blue)] text-white shadow-md"
@@ -17939,9 +18181,15 @@ export default function HomePage() {
                 <HomeProductCard
                   key={product.id}
                   product={product}
+                  isCompared={compareList.some((item) => item.id === product.id)}
+                  onToggleCompare={toggleCompare}
                   onAddToCart={addToCart}
-                  onOpenDetails={(p) => setSelectedProductForModal(p)}
+                  onOpenDetails={(p) => {
+                    soundEngine.playClick();
+                    setSelectedProductForModal(p);
+                  }}
                   onQuickBuy={(p) => {
+                    soundEngine.playAddToCart();
                     addToCart({
                       id: p.id,
                       title: p.title || p.name,
@@ -17958,6 +18206,34 @@ export default function HomePage() {
             </div>
           )}
         </section>
+
+        {/* نوار شناور مقایسه فعال */}
+        {compareList.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-[var(--card-border)] p-3 px-6 rounded-full shadow-2xl flex items-center gap-4 animate-fadeIn">
+            <span className="text-xs font-black text-[var(--text-primary)] flex items-center gap-2">
+              <span>⚖️</span>
+              <span>{compareList.length} کالا آماده مقایسه</span>
+            </span>
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setIsCompareOpen(true);
+              }}
+              className="px-4 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md cursor-pointer hover:opacity-90 transition"
+            >
+              مشاهده جدول مقایسه 🚀
+            </button>
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setCompareList([]);
+              }}
+              className="text-xs text-rose-500 font-bold hover:underline cursor-pointer"
+            >
+              لغو
+            </button>
+          </div>
+        )}
 
         {/* ۴. بخش مجله تخصصی، راهنمای خرید و مقالات سئو */}
         <section className="p-8 rounded-[2.5rem] space-y-6 my-12 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
@@ -17980,7 +18256,6 @@ export default function HomePage() {
         </section>
       </div>
 
-      {/* مدال بررسی جامع و سریع کالا با کلیه تب‌های مشخصات، گارانتی و مقایسه */}
       {selectedProductForModal && (
         <ProductDetailsModal
           product={selectedProductForModal}
@@ -17989,20 +18264,30 @@ export default function HomePage() {
         />
       )}
 
-      {/* دستیار هوشمند شناور */}
+      {/* مدال مقایسه ساید‌بای‌ساید */}
+      <ProductComparisonModal
+        products={compareList}
+        isOpen={isCompareOpen}
+        onClose={() => setIsCompareOpen(false)}
+        onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))}
+      />
+
       <AIAssistantChat />
     </div>
   );
 }
 
-// کارت محصول صفحه اصلی با دکمه‌های خرید سریع و بررسی
 function HomeProductCard({
   product,
+  isCompared,
+  onToggleCompare,
   onAddToCart,
   onOpenDetails,
   onQuickBuy,
 }: {
   product: Product;
+  isCompared: boolean;
+  onToggleCompare: (product: Product) => void;
   onAddToCart: (item: any) => void;
   onOpenDetails: (product: Product) => void;
   onQuickBuy: (product: Product) => void;
@@ -18036,11 +18321,20 @@ function HomeProductCard({
           </span>
         )}
 
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center backdrop-blur-[2px]">
-          <span className="px-4 py-2 rounded-xl bg-white text-gray-900 text-xs font-black border border-white/30 shadow-2xl">
-            🔍 بررسی جامع کالا
-          </span>
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCompare(product);
+          }}
+          className={`absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition cursor-pointer ${
+            isCompared
+              ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
+              : "bg-black/60 text-white border-white/20 hover:bg-black/80"
+          }`}
+          title="افزودن به مقایسه"
+        >
+          {isCompared ? "✓ در مقایسه" : "⚖️ مقایسه"}
+        </button>
       </div>
 
       <div className="space-y-2 cursor-pointer" onClick={() => onOpenDetails(product)}>
@@ -18081,6 +18375,7 @@ function HomeProductCard({
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--card-border)]">
         <button
           onClick={() => {
+            soundEngine.playAddToCart();
             onAddToCart({
               id: product.id,
               name: productName,
@@ -18108,7 +18403,6 @@ function HomeProductCard({
   );
 }
 
-// مدال بررسی جامع و مشخصات فنی کامل کالا
 function ProductDetailsModal({
   product,
   onClose,
@@ -18132,7 +18426,10 @@ function ProductDetailsModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
       <div className="w-full max-w-4xl max-h-[90vh] bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-8 text-[var(--text-primary)] overflow-y-auto shadow-2xl relative space-y-6">
         <button
-          onClick={onClose}
+          onClick={() => {
+            soundEngine.playClick();
+            onClose();
+          }}
           className="absolute top-6 left-6 w-9 h-9 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold transition cursor-pointer z-10"
         >
           ✕
@@ -18153,7 +18450,10 @@ function ProductDetailsModal({
                 {images.map((imgUrl, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setActiveImage(imgUrl)}
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setActiveImage(imgUrl);
+                    }}
                     className={`w-16 h-16 rounded-2xl overflow-hidden border-2 cursor-pointer transition shrink-0 bg-[var(--input-bg)] p-1 ${
                       activeImage === imgUrl
                         ? "border-[var(--accent-blue)] scale-105 shadow-md"
@@ -18189,10 +18489,12 @@ function ProductDetailsModal({
               )}
             </div>
 
-            {/* تب‌های تکمیلی مدال */}
             <div className="flex gap-2 border-b border-[var(--card-border)] pb-3 overflow-x-auto scrollbar-none text-xs">
               <button
-                onClick={() => setActiveTab("specs")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("specs");
+                }}
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   activeTab === "specs"
                     ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
@@ -18202,7 +18504,10 @@ function ProductDetailsModal({
                 ⚙️ مشخصات فنی
               </button>
               <button
-                onClick={() => setActiveTab("desc")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("desc");
+                }}
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   activeTab === "desc"
                     ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
@@ -18212,7 +18517,10 @@ function ProductDetailsModal({
                 📝 توضیحات
               </button>
               <button
-                onClick={() => setActiveTab("shipping")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("shipping");
+                }}
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   activeTab === "shipping"
                     ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
@@ -18222,7 +18530,10 @@ function ProductDetailsModal({
                 🚚 ارسال و گارانتی
               </button>
               <button
-                onClick={() => setActiveTab("comparison")}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("comparison");
+                }}
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   activeTab === "comparison"
                     ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
@@ -18273,7 +18584,6 @@ function ProductDetailsModal({
               )}
             </div>
 
-            {/* بخش قیمت و دکمه افزودن با تعداد دلخواه */}
             <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
@@ -18291,6 +18601,7 @@ function ProductDetailsModal({
 
                 <button
                   onClick={() => {
+                    soundEngine.playAddToCart();
                     for (let i = 0; i < quantity; i++) {
                       onAddToCart({
                         id: product.id,
@@ -18317,7 +18628,6 @@ function ProductDetailsModal({
   );
 }
 
-// بخش رندر مقالات در صفحه اصلی
 function HomeBlogSection() {
   const [posts, setPosts] = useState<any[]>([]);
 

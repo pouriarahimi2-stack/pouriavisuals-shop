@@ -1,4 +1,4 @@
-// components/AdminBanners.tsx
+// File Path: components/AdminBanners.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -99,6 +99,7 @@ export default function AdminBanners() {
       return;
     }
 
+    soundEngine.playClick();
     setSaving(true);
     const payload = {
       title: title.trim(),
@@ -146,10 +147,7 @@ export default function AdminBanners() {
       handleCreateNew();
       fetchBanners();
       setStatusMessage({ type: "success", text: "بنر با موفقیت حذف گردید." });
-      setTimeout(() => setStatusMessage(null), 3000);
-    } catch (err: any) {
-      alert("خطا در حذف: " + err.message);
-    }
+    } catch {}
   };
 
   return (
@@ -300,7 +298,6 @@ export default function AdminBanners() {
               </div>
             </div>
 
-            {/* پیش‌نمایش لایو بنر */}
             {imageUrl && (
               <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
                 <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش لایو بنر:</span>

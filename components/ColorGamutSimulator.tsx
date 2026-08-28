@@ -150,7 +150,7 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
           </div>
         </div>
 
-        {/* تحلیل تکنیکال و اسلایدر گاما */}
+        {/* تحلیل مهندسی */}
         <div className="lg:col-span-4 space-y-4 text-xs">
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
             <span className="font-black text-[var(--accent-blue)] block text-xs">

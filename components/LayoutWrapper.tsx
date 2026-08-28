@@ -28,7 +28,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     if (!info) return;
     setSiteInfo(info);
 
-    // اعمال زنده فونت سایت
     if (info.active_font_id) {
       fontEngine.applyFontToTarget(info.active_font_id, "body");
     }
@@ -65,7 +64,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
     window.addEventListener("site_info_updated", handleUpdate);
 
-    // اشتراک بلادرنگ وب‌سوکت برای وضعیت سایت
     const channel = supabase
       .channel("layout_maintenance_realtime_v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
@@ -82,7 +80,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  // سیستم حفظ و بازیابی موقعیت کاربر (Path Memory)
+  // ثبت و بازیابی موقعیت کاربر (Path Memory)
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -102,7 +100,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // شمارش معکوس زنده حالت تعمیرات زمان‌دار
+  // تایمر معکوس زنده حالت تعمیرات زمان‌دار
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
@@ -129,7 +127,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     return () => clearInterval(timer);
   }, [maintenanceMode, maintenanceUntil]);
 
-  // دسترسی بدون محدودیت برای پنل ادمین
   if (isAdmin) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -138,7 +135,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // صفحه تعمیرات فوق‌العاده مدرن
+  // صفحه شیشه‌ای و چشم‌نواز حالت تعمیرات
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";

@@ -1,3 +1,4 @@
+// File Path: components/TechRadarFeed.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -33,7 +34,6 @@ export default function TechRadarFeed() {
     };
   }, []);
 
-  // چرخش اتوماتیک هر ۵ ثانیه
   useEffect(() => {
     if (news.length <= 1) return;
     const interval = setInterval(() => {
@@ -54,12 +54,10 @@ export default function TechRadarFeed() {
         onClick={() => soundEngine.playClick()}
         className="group block relative p-4 sm:p-5 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl hover:border-[var(--accent-blue)] transition-all duration-300 backdrop-blur-2xl overflow-hidden"
       >
-        {/* گرادیانت پس‌زمینه نئونی */}
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-indigo-600/5 to-transparent pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
           
-          {/* سمت راست: بج زنده و تیتر خبر */}
           <div className="flex items-center gap-3.5 flex-1 min-w-0">
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black text-xl shadow-lg shadow-blue-500/25 shrink-0 group-hover:scale-105 transition duration-300">
               📡
@@ -82,7 +80,6 @@ export default function TechRadarFeed() {
             </div>
           </div>
 
-          {/* سمت چپ: تصویر بندانگشتی و دکمه هدایت */}
           <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
             {currentNews.image_url && (
               <img

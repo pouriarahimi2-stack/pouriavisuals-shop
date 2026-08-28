@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ۱. پاسخ مستقیم، فوری و قطعی به ربات اینماد در لایه اول سرور
+  // ۱. پاسخ فوری و بدون واسطه به ربات تاییدیه اینماد
   if (pathname === '/27424534.txt' || pathname.includes('27424534.txt')) {
     return new NextResponse('27424534', {
       status: 200,
@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
     });
   }
 
-  // ۲. بررسی احراز هویت ادمین
+  // ۲. گیت امنیتی پنل مدیریت
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
     const sessionToken =
       request.cookies.get('pv_admin_session')?.value ||

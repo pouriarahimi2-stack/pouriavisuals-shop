@@ -1,4 +1,3 @@
-// File Path: components/ProductCard.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -17,7 +16,7 @@ export default function ProductCard({ product }: { product: any }) {
     setMounted(true);
   }, []);
 
-  const title = product.title || product.title_fa || product.name || "کالای دیجیتال";
+  const title = product.title || product.title_fa || product.name || "کالای دیجیتال تخصصی";
   const price = Number(product.price) || 0;
   const discountPrice =
     product.discountPrice !== undefined && product.discountPrice !== null
@@ -114,7 +113,7 @@ export default function ProductCard({ product }: { product: any }) {
         )}
       </div>
 
-      {/* اطلاعات و تیتر کالا - بدون سه نقطه اشتباه اول نام کالا */}
+      {/* اطلاعات و تیتر کالا */}
       <div className="flex flex-col flex-grow space-y-2 mb-3">
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Pro"}</span>
@@ -137,7 +136,7 @@ export default function ProductCard({ product }: { product: any }) {
         </p>
       </div>
 
-      {/* قیمت و دکمه‌های خرید */}
+      {/* قیمت و دکمه‌های خرید سریع */}
       <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
         <div className="flex items-center justify-between">
           <div className="flex flex-col">

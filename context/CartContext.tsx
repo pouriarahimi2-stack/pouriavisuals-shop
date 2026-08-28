@@ -1,4 +1,3 @@
-// File Path: context/CartContext.tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
@@ -46,8 +45,8 @@ interface CartContextType {
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
-const CART_STORAGE_KEY = "pv_cart_items_v2026";
-const COUPON_STORAGE_KEY = "pv_applied_coupon_cache";
+const CART_STORAGE_KEY = "axon_cart_store_v2026";
+const COUPON_STORAGE_KEY = "axon_active_coupon_v2026";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -55,7 +54,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [freeShippingThreshold] = useState<number>(2000000);
 
-  // بارگذاری اولیه از حافظه محلی
+  // بارگذاری داده‌ها در مانت اولیه
   useEffect(() => {
     try {
       const localCart = localStorage.getItem(CART_STORAGE_KEY);
@@ -64,11 +63,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const localCoupon = localStorage.getItem(COUPON_STORAGE_KEY);
       if (localCoupon) setAppliedCoupon(JSON.parse(localCoupon));
     } catch (err) {
-      console.error("Cart init error:", err);
+      console.error("Cart hydration error:", err);
     }
   }, []);
 
-  // همگام‌سازی تغییرات سبد خرید در تمام تب‌های باز مرورگر (Cross-Tab Sync)
+  // همگام‌سازی تغییرات در تمام پنجره‌های باز مرورگر (Cross-Tab Live Sync)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === CART_STORAGE_KEY && e.newValue) {
@@ -236,9 +235,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     try {
-      const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
-      localStorage.setItem("site_orders", JSON.stringify([fullOrder, ...existing]));
-      localStorage.setItem("admin_orders_cache", JSON.stringify([fullOrder, ...existing]));
+      const existing = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([fullOrder, ...existing]));
     } catch {}
     return fullOrder;
   };

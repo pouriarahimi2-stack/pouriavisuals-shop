@@ -1,3 +1,4 @@
+// File Path: app/api/orders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { smsService } from '@/services/smsService';
@@ -17,7 +18,6 @@ export async function POST(req: NextRequest) {
     const couponCode = body.couponCode || body.coupon_code || null;
     const status = body.status || 'processing';
 
-    // پی‌لود استاندارد و تمیز
     const orderPayload: any = {
       id: orderId,
       customer_name: customerName,
@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
     if (postalCode) orderPayload.postal_code = postalCode;
     if (couponCode) orderPayload.coupon_code = couponCode;
 
-    // ثبت امن در Supabase
     const { data, error } = await supabaseAdmin
       .from('orders')
       .upsert(orderPayload, { onConflict: 'id' })
@@ -44,7 +43,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
-    // کسر موجودی انبار
     if (items.length > 0) {
       for (const itm of items) {
         const pId = itm.productId || itm.id;
@@ -71,7 +69,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ارسال پیامک ثبت سفارش
     if (phone) {
       try {
         await smsService.sendOrderStatusChange(phone, orderId, 'در حال پردازش و بسته‌بندی');

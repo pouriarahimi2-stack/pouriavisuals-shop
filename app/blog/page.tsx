@@ -52,7 +52,6 @@ export default function BlogArchivePage() {
         new Map(visible.map((item) => [item.id || item.title, item])).values()
       );
 
-      // مرتب‌سازی بر اساس علایق کاربر
       const topCat = userBehavior.getTopInterestCategory();
       if (topCat !== "all") {
         unique.sort((a, b) => {
@@ -103,7 +102,6 @@ export default function BlogArchivePage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
       
-      {/* سربرگ مجله */}
       <div className="text-center space-y-3">
         <span className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] inline-block text-2xl shadow-sm">
           📚
@@ -114,7 +112,6 @@ export default function BlogArchivePage() {
         </p>
       </div>
 
-      {/* فیلترها و سرچ */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
@@ -153,7 +150,6 @@ export default function BlogArchivePage() {
         </div>
       </div>
 
-      {/* گرید ۳ ستونه مقالات */}
       {loading && posts.length === 0 ? (
         <div className="py-24 text-center">
           <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin mx-auto mb-3" />

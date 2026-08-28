@@ -1,4 +1,3 @@
-// File Path: components/AdminMenu.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";

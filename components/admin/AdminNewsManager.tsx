@@ -1,4 +1,3 @@
-// File Path: components/admin/AdminNewsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";

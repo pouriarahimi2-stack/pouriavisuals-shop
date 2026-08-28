@@ -1,4 +1,3 @@
-// File Path: components/AdminProducts.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -53,18 +52,10 @@ export default function AdminProducts() {
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
 
-  // تایپوگرافی زنده کالا
-  const [fontsList, setFontsList] = useState<CustomFontItem[]>([]);
-  const [productFont, setProductFont] = useState("Vazirmatn");
-  const [productFontWeight, setProductFontWeight] = useState(600);
-
-  // هوش مصنوعی تولید خودکار محتوای کالا
   const [isAiGenerating, setIsAiGenerating] = useState(false);
-
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // پیش‌نمایش کالبدشکافی ۳ بعدی در پنل ادمین
   const [explodedPreviewOpen, setExplodedPreviewOpen] = useState(false);
 
   const loadData = async () => {
@@ -74,7 +65,6 @@ export default function AdminProducts() {
     ]);
     setProducts(prods || []);
     setCategories(cats || []);
-    setFontsList(fontEngine.getAllFonts());
   };
 
   useEffect(() => {
@@ -177,7 +167,6 @@ export default function AdminProducts() {
     setActiveFormTab("general");
   };
 
-  // موتور هوش مصنوعی تولید خودکار مشخصات فنی و متن تبلیغاتی
   const handleAiAutoFill = async () => {
     if (!title.trim()) {
       alert("لطفاً ابتدا عنوان کالا را وارد نمایید.");
@@ -459,7 +448,7 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* فرم ۷ تب تنظیمات پیشرفته کالا */}
+        {/* فرم ۷ تب تنظیمات کالا */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
             <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] scrollbar-none">

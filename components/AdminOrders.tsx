@@ -1,6 +1,3 @@
-// File Path: components/AdminOrders.tsx
-"use client";
-
 import React, { useState, useEffect } from "react";
 import { orderService, Order } from "@/services/orderService";
 import { smsService } from "@/services/smsService";

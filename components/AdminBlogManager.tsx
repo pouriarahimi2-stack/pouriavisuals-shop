@@ -1,4 +1,3 @@
-// File Path: components/AdminBlogManager.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -34,17 +33,14 @@ export default function AdminBlogManager() {
   const [metaDescription, setMetaDescription] = useState("");
   const [isPublished, setIsPublished] = useState(true);
 
-  // سیستم تایپوگرافی زنده
   const [availableFonts, setAvailableFonts] = useState<CustomFontItem[]>([]);
   const [selectedFontFamily, setSelectedFontFamily] = useState("Vazirmatn");
   const [selectedFontWeight, setSelectedFontWeight] = useState(400);
 
-  // آمار سند
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [readTime, setReadTime] = useState(1);
 
-  // مودال تولید مقاله هوش مصنوعی رنک یک گوگل
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiCustomTopic, setAiCustomTopic] = useState("");
   const [aiSelectedProductId, setAiSelectedProductId] = useState<string>("all");
@@ -218,7 +214,6 @@ export default function AdminBlogManager() {
         soundEngine.playSuccess();
         const rawContent = data.response;
 
-        // استخراج تیتر H1
         const titleMatch = rawContent.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || rawContent.match(/^#\s+(.+)$/m);
         if (titleMatch) {
           const cleanTitle = titleMatch[1].replace(/<[^>]*>/g, "").trim();
@@ -229,7 +224,6 @@ export default function AdminBlogManager() {
           setSlug(aiCustomTopic.trim().toLowerCase().replace(/\s+/g, "-"));
         }
 
-        // استخراج متا دیسکریپشن
         const metaMatch = rawContent.match(/Meta Description:\s*([^\n]+)/i);
         if (metaMatch) {
           setMetaDescription(metaMatch[1].trim());
@@ -361,7 +355,7 @@ export default function AdminBlogManager() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* لیست مقالات در سایدبار */}
+        {/* لیست مقالات */}
         <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
           <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
             📑 مقالات منتشر شده ({posts.length})
@@ -391,7 +385,7 @@ export default function AdminBlogManager() {
           </div>
         </div>
 
-        {/* بوم نگارش و فرم مقاله */}
+        {/* فرم نگارش */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -452,7 +446,7 @@ export default function AdminBlogManager() {
               />
             </div>
 
-            {/* نوار ابزار کامل Microsoft Word با تایپوگرافی زنده */}
+            {/* نوار ابزار پیشرفته */}
             <div className="space-y-3 border-t border-[var(--card-border)] pt-4">
               <div className="flex flex-wrap justify-between items-center gap-2">
                 <span className="font-bold text-[var(--text-secondary)]">🎛️ نوار ابزار پیشرفته و تایپوگرافی لایو:</span>
@@ -464,7 +458,6 @@ export default function AdminBlogManager() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 p-3.5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
-                {/* انتخابگر فونت جهانی */}
                 <select
                   value={selectedFontFamily}
                   onChange={(e) => handleFontChange(e.target.value)}
@@ -477,7 +470,6 @@ export default function AdminBlogManager() {
                   ))}
                 </select>
 
-                {/* انتخابگر وزن فونت */}
                 <select
                   value={selectedFontWeight}
                   onChange={(e) => handleWeightChange(Number(e.target.value))}

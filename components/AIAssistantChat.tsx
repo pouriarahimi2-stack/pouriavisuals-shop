@@ -112,7 +112,7 @@ export default function AIAssistantChat() {
 
   return (
     <div className="fixed bottom-6 left-6 z-50 font-sans select-none" dir="rtl">
-      {/* دکمه شناور باز کردن چت */}
+      {/* دکمه شناور چت */}
       {!isOpen && (
         <button
           onClick={() => {
@@ -155,7 +155,7 @@ export default function AIAssistantChat() {
             </button>
           </div>
 
-          {/* بدنه پیام‌ها */}
+          {/* پیام‌ها */}
           <div className="p-4 flex-1 overflow-y-auto space-y-3.5 text-xs leading-relaxed">
             {messages.map((m, idx) => (
               <div key={idx} className="space-y-2">
@@ -214,7 +214,7 @@ export default function AIAssistantChat() {
             </div>
           )}
 
-          {/* پیش‌نمایش تصویر قبل از ارسال */}
+          {/* پیش‌نمایش تصویر پیوست‌شده */}
           {selectedImage && (
             <div className="p-2.5 px-4 bg-[var(--input-bg)] border-t border-[var(--card-border)] flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -227,7 +227,7 @@ export default function AIAssistantChat() {
             </div>
           )}
 
-          {/* فیلد ورودی پیام و آپلود عکس */}
+          {/* فیلد ورودی و دکمه ارسال */}
           <div className="p-3 border-t border-[var(--card-border)] flex items-center gap-2 bg-[var(--modal-bg)]">
             <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
             <button

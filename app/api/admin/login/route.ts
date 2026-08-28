@@ -31,14 +31,12 @@ export async function POST(req: NextRequest) {
     const envAdminUser = process.env.ADMIN_USERNAME || "admin";
     const envAdminPass = process.env.ADMIN_PASSWORD || "admin123456";
 
-    // ۱. بررسی تطابق با متغیرهای محیطی
     if (cleanUsername === envAdminUser && cleanPassword === envAdminPass) {
       isValid = true;
     } else if (cleanUsername === "admin" && cleanPassword === "admin123456") {
       isValid = true;
     }
 
-    // ۲. بررسی تطابق با دیتابیس ادمین‌ها در Supabase
     if (!isValid) {
       try {
         const { data: dbAdmin, error } = await supabaseAdmin
@@ -62,7 +60,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (isValid) {
-      // ایجاد توکن امن دیجیتال
       const sessionToken = signPayload({
         ...userPayload,
         timestamp: Date.now(),

@@ -1,4 +1,3 @@
-// File Path: app/checkout/payment/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -39,7 +38,7 @@ function PaymentGatewayContent() {
 
       if (!found) {
         try {
-          const local = JSON.parse(localStorage.getItem("site_orders") || "[]");
+          const local = JSON.parse(localStorage.getItem("axon_orders_registry_cache_v2026") || "[]");
           found = local.find((o: any) => String(o.id) === String(orderId) || o.orderNumber === orderId);
         } catch {
           found = null;
@@ -81,7 +80,7 @@ function PaymentGatewayContent() {
     setPaying(true);
 
     try {
-      await new Promise((res) => setTimeout(res, 1400));
+      await new Promise((res) => setTimeout(res, 1200));
 
       if (orderId) {
         await orderService.updateStatus(orderId, "paid");
@@ -94,8 +93,8 @@ function PaymentGatewayContent() {
       }
 
       if (typeof window !== "undefined") {
-        localStorage.removeItem("pv_cart_items");
-        localStorage.removeItem("pv_cart_items_v2026");
+        localStorage.removeItem("axon_cart_store_v2026");
+        localStorage.removeItem("axon_active_coupon_v2026");
       }
 
       soundEngine.playSuccess();

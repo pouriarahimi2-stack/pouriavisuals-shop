@@ -19,7 +19,6 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
   const [loading, setLoading] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // نوار پیشرفت مطالعه زنده در بالای صفحه
   useEffect(() => {
     const handleScroll = () => {
       const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -44,7 +43,6 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
           setItem(newsItem);
           userBehavior.trackNewsRead(newsItem.slug, newsItem.category);
 
-          // استخراج کالاهای مرتبط بر اساس دسته‌بندی خبر
           const related = (allProds || []).filter((p) => {
             const prodCat = (p.category || "").toLowerCase();
             const newsCat = newsItem.category.toLowerCase();
@@ -82,13 +80,11 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
   return (
     <article className="max-w-4xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
       
-      {/* نوار نئونی پیشرفت مطالعه در بالاترین بخش صفحه */}
       <div
         className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-emerald-400 z-50 transition-all duration-150"
         style={{ width: `${scrollProgress}%` }}
       />
 
-      {/* مسیر ناوبری */}
       <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-bold">
         <Link href="/" className="hover:text-[var(--accent-blue)] transition">صفحه نخست</Link>
         <span>/</span>
@@ -126,13 +122,11 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
           </div>
         </header>
 
-        {/* محتوای کامل خبر */}
         <div
           dangerouslySetInnerHTML={{ __html: item.content }}
           className="prose max-w-none text-xs md:text-sm leading-loose text-[var(--text-primary)] font-medium space-y-4 text-justify"
         />
 
-        {/* برچسب‌ها و دکمه‌های فوتر مقاله */}
         <footer className="pt-6 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap gap-2">
             {item.tags?.map((t) => (
@@ -151,7 +145,6 @@ export default function SingleNewsPage({ params }: { params: Promise<{ slug: str
         </footer>
       </div>
 
-      {/* پیشنهاد محصولات مرتبط با خبر در انتهای صفحه */}
       {relatedProducts.length > 0 && (
         <section className="space-y-6 pt-4">
           <div className="flex justify-between items-center px-1">

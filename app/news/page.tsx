@@ -1,3 +1,4 @@
+// File Path: app/news/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -14,7 +15,6 @@ export default function TechNewsHubPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  // استیت مودال مطالعه ایمن خبر (Locked Backdrop)
   const [activeModalNews, setActiveModalNews] = useState<TechNewsItem | null>(null);
 
   const loadNewsData = async () => {
@@ -30,7 +30,6 @@ export default function TechNewsHubPage() {
   useEffect(() => {
     loadNewsData();
 
-    // بررسی و فراخوانی خودکار چرخه ۶ ساعته
     fetch("/api/news/sync", { method: "POST" }).catch(() => {});
 
     const channel = supabase
@@ -80,7 +79,6 @@ export default function TechNewsHubPage() {
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
       
-      {/* سربرگ خبرخوان تکنولوژی ۲۰۲۶ */}
       <div className="p-8 sm:p-12 rounded-[2.5rem] bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 backdrop-blur-3xl">
         <div className="space-y-2 max-w-2xl">
           <div className="flex items-center gap-2">
@@ -105,7 +103,6 @@ export default function TechNewsHubPage() {
         </button>
       </div>
 
-      {/* فیلتر موضوعی و سرچ */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 scrollbar-none text-xs">
           {[
@@ -143,7 +140,6 @@ export default function TechNewsHubPage() {
         </div>
       </div>
 
-      {/* گرید ۳ در ۳ کارت‌های اخبار */}
       {loading && news.length === 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -204,7 +200,7 @@ export default function TechNewsHubPage() {
         </div>
       )}
 
-      {/* مودال حرفه‌ای مطالعه خبر (بدون بسته شدن با کلیک تصادفی روی پس‌زمینه) */}
+      {/* مودال مطالعه خبر */}
       {activeModalNews && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-2xl animate-fadeIn font-sans"
@@ -214,7 +210,6 @@ export default function TechNewsHubPage() {
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-4xl max-h-[92vh] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)]"
           >
-            {/* سربرگ مودال و دکمه بستن قطعی */}
             <header className="p-4 sm:p-6 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--input-bg)]">
               <div className="flex items-center gap-3">
                 <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black text-xs">
@@ -234,7 +229,6 @@ export default function TechNewsHubPage() {
               </button>
             </header>
 
-            {/* بدنه محتوای خبر */}
             <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-6 text-xs sm:text-sm">
               <h1 className="text-xl sm:text-3xl font-black leading-snug text-[var(--text-primary)]">
                 {activeModalNews.title}
@@ -271,7 +265,6 @@ export default function TechNewsHubPage() {
               )}
             </div>
 
-            {/* فوتر مودال همراه با ارجاع به محصولات فروشگاه */}
             <footer className="p-4 sm:p-6 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 bg-[var(--input-bg)]">
               <Link
                 href="/#products"

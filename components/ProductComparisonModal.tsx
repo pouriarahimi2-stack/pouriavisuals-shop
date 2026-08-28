@@ -24,7 +24,6 @@ export default function ProductComparisonModal({
 
   if (!isOpen || products.length === 0) return null;
 
-  // استخراج تمام کلیدهای مشخصات فنی از تمام محصولات
   const allSpecKeys = Array.from(
     new Set(products.flatMap((p) => Object.keys(p.specs || {})))
   );

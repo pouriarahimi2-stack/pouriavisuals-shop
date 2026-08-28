@@ -1,4 +1,3 @@
-// File Path: app/track-order/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -52,7 +51,7 @@ function TrackOrderContent() {
     }
   }, [initialOrderId]);
 
-  // اشتراک زنده وب‌سوکت برای به‌روزرسانی لحظه‌ای وضعیت بسته
+  // اشتراک زنده وب‌سوکت برای به‌روزرسانی لحظه‌ای وضعیت بسته پستی
   useEffect(() => {
     if (orders.length === 0 || !supabase) return;
 
@@ -209,7 +208,7 @@ function TrackOrderContent() {
                 </div>
               </div>
 
-              {/* استپر ۵ مرحله‌ای */}
+              {/* استپر ۵ مرحله‌ای ارسال مرسوله */}
               <div className="py-2">
                 <div className="grid grid-cols-5 gap-2 text-center relative">
                   {trackingSteps.map((step, idx) => {

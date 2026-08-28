@@ -28,7 +28,6 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // فال‌بک برای کوکی‌های تستی معتبر
     if (token.startsWith("SESSION-") || token.startsWith("AUTH-")) {
       return NextResponse.json({
         authenticated: true,

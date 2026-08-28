@@ -22,7 +22,6 @@ export default function CheckoutPage() {
   const [postalCode, setPostalCode] = useState("");
   const [notes, setNotes] = useState("");
 
-  // کوپن تخفیف
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState("");
@@ -187,8 +186,6 @@ export default function CheckoutPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* فرم مشخصات خریدار */}
         <form onSubmit={handleCheckoutSubmit} className="lg:col-span-2 p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
           <h3 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             📍 مشخصات تحویل‌گیرنده و نشانی پستی
@@ -294,7 +291,6 @@ export default function CheckoutPage() {
           </button>
         </form>
 
-        {/* خلاصه فاکتور و کوپن */}
         <div className="space-y-6">
           <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3 text-xs">
             <h4 className="font-black text-xs text-[var(--text-primary)]">🏷️ کد تخفیف دارید؟</h4>

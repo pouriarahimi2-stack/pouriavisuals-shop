@@ -1,4 +1,3 @@
-// File Path: components/CartDrawer.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -27,8 +26,8 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
 
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
-  const [selectedProvince, setSelectedProvince] = useState("فارس");
-  const [selectedCity, setSelectedCity] = useState("شیراز");
+  const [selectedProvince, setSelectedProvince] = useState("تهران");
+  const [selectedCity, setSelectedCity] = useState("تهران");
   const [streetAddress, setStreetAddress] = useState("");
   const [buildingNo, setBuildingNo] = useState("");
   const [unitNo, setUnitNo] = useState("");
@@ -200,7 +199,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
           </div>
         </div>
 
-        {/* نوار پیشرفت ارسال رایگان پیشتاز */}
+        {/* نوار وضعیت ارسال رایگان */}
         {totalPrice > 0 && (
           <div className="p-3 bg-[var(--input-bg)] border-b border-[var(--card-border)] text-xs space-y-1.5">
             <div className="flex justify-between text-[11px] font-bold">
@@ -220,7 +219,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
           </div>
         )}
 
-        {/* لیست محصولات و فرم دریافت اطلاعات */}
+        {/* لیست محصولات و فرم تحویل */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
           {cartItems.length === 0 ? (
             <div className="py-28 text-center text-[var(--text-secondary)] space-y-2 font-bold">
@@ -229,7 +228,6 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
             </div>
           ) : (
             <>
-              {/* لیست کالاها */}
               <div className="space-y-3">
                 {cartItems.map((item: any) => {
                   const stockLimit = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
@@ -297,7 +295,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                 })}
               </div>
 
-              {/* باکس کد تخفیف */}
+              {/* باکس تخفیف */}
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                 <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
                 <div className="flex gap-2">
@@ -323,7 +321,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                 )}
               </div>
 
-              {/* فرم مشخصات تحویل‌گیرنده */}
+              {/* فرم آدرس پستی */}
               <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
                 <div className="flex items-center gap-1.5 font-black text-xs text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
                   <span>📋</span>
@@ -458,7 +456,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
           )}
         </div>
 
-        {/* فوتر سبد و دکمه پرداخت */}
+        {/* فوتر تسویه نهایی */}
         {cartItems.length > 0 && (
           <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs">
             <div className="space-y-1.5 font-bold">
@@ -491,7 +489,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
               className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 active:scale-[0.99] transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <span>💳</span>
-              <span>{submitting ? "در حال ثبت سفارش و اتصال..." : "تأیید نهایی و انتقال به درگاه پرداخت شاپرک"}</span>
+              <span>{submitting ? "در حال انتقال به درگاه بانکی..." : "تأیید نهایی و اتصال به شاپرک"}</span>
             </button>
           </div>
         )}

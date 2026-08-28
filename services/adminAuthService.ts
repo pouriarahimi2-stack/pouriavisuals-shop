@@ -1,4 +1,4 @@
-// services/adminAuthService.ts
+// File Path: services/adminAuthService.ts
 import { supabase } from "@/lib/supabase";
 
 export type AdminRole = "superadmin" | "super_admin" | "product_manager" | "inventory_manager" | "content_editor";
@@ -10,7 +10,7 @@ export interface AdminUser {
   role: AdminRole;
 }
 
-const STORAGE_KEY = "admin_current_user";
+const STORAGE_KEY = "axon_admin_active_session_v2026";
 
 export const adminAuthService = {
   async getCurrentSession(): Promise<AdminUser | null> {

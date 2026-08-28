@@ -1,4 +1,3 @@
-// File Path: services/orderService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface OrderItem {
@@ -59,6 +58,8 @@ export interface Order {
   updated_at?: string;
 }
 
+const LOCAL_STORAGE_KEY = "axon_orders_registry_cache_v2026";
+
 export function normalizeOrder(raw: any): Order {
   if (!raw) return {} as Order;
 
@@ -71,11 +72,11 @@ export function normalizeOrder(raw: any): Order {
     raw.customer?.fullName ||
     raw.customer?.name ||
     raw.fullName ||
-    (raw.first_name ? `${raw.first_name || ""} ${raw.last_name || ""}`.trim() : "خریدار محترم");
+    (raw.first_name ? `${raw.first_name || ""} ${raw.last_name || ""}`.trim() : "خریدار گرامی");
 
   const phone = raw.phone || raw.customer_phone || raw.customer?.phone || "";
-  const province = raw.province || raw.customer_province || raw.customer?.province || "";
-  const city = raw.city || raw.customer_city || raw.customer?.city || "";
+  const province = raw.province || raw.customer_province || raw.customer?.province || "تهران";
+  const city = raw.city || raw.customer_city || raw.customer?.city || "تهران";
   const address = raw.address || raw.customer_address || raw.customer?.address || "";
   const postalCode = raw.postal_code || raw.postalCode || raw.customer?.postalCode || raw.customer?.postal_code || "";
   const notes = raw.notes || raw.customer?.notes || "";
@@ -97,8 +98,8 @@ export function normalizeOrder(raw: any): Order {
         ...item,
         productId: item.productId || item.product_id || item.id,
         product_id: item.product_id || item.productId || item.id,
-        name: item.name || item.title || "کالا",
-        title: item.title || item.name || "کالا",
+        name: item.name || item.title || "کالای دیجیتال",
+        title: item.title || item.name || "کالای دیجیتال",
         price: Number(item.price) || 0,
         quantity: Number(item.quantity) || 1,
         image: item.image || item.image_url || "/placeholder.png",
@@ -164,20 +165,19 @@ export const orderService = {
         if (!error && data) {
           const normalized = data.map(normalizeOrder);
           if (typeof window !== "undefined") {
-            localStorage.setItem("site_orders", JSON.stringify(normalized));
-            localStorage.setItem("admin_orders_cache", JSON.stringify(normalized));
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
           }
           return normalized;
         }
       }
 
       if (typeof window !== "undefined") {
-        const cached = localStorage.getItem("site_orders") || localStorage.getItem("admin_orders_cache");
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (cached) return JSON.parse(cached).map(normalizeOrder);
       }
       return [];
     } catch (err) {
-      console.error("getAll Orders Exception:", err);
+      console.error("orderService.getAll error:", err);
       return [];
     }
   },
@@ -200,14 +200,14 @@ export const orderService = {
       const all = await this.getAll();
       return all.find((o) => String(o.id) === cleanId || o.orderNumber === cleanId) || null;
     } catch (err) {
-      console.error(`getById Order Exception:`, err);
+      console.error("orderService.getById error:", err);
       return null;
     }
   },
 
-  async trackOrder(identifier: string): Promise<Order[]> {
+  async trackOrder(queryStr: string): Promise<Order[]> {
     try {
-      const clean = identifier.trim();
+      const clean = queryStr.trim();
       if (supabase) {
         const { data, error } = await supabase
           .from("orders")
@@ -230,7 +230,7 @@ export const orderService = {
           o.trackingCode === clean
       );
     } catch (err) {
-      console.error("trackOrder Exception:", err);
+      console.error("orderService.trackOrder error:", err);
       return [];
     }
   },
@@ -251,15 +251,15 @@ export const orderService = {
 
       const phone = (customerObj.phone || orderData.phone || orderData.customer_phone || "").trim();
       const address = (customerObj.address || orderData.address || orderData.customer_address || "").trim();
-      const province = customerObj.province || orderData.province || "";
-      const city = customerObj.city || orderData.city || "";
+      const province = customerObj.province || orderData.province || "تهران";
+      const city = customerObj.city || orderData.city || "تهران";
       const postalCode = (customerObj.postalCode || customerObj.postal_code || orderData.postalCode || orderData.postal_code || "").trim();
       const notes = customerObj.notes || orderData.notes || "";
 
       const items = Array.isArray(orderData.items) ? orderData.items : [];
       const totalAmount = Number(orderData.totalAmount ?? orderData.total_amount ?? 0);
       const discountAmount = Number(orderData.discountAmount ?? orderData.discount_amount ?? 0);
-      const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? totalAmount - discountAmount);
+      const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? Math.max(0, totalAmount - discountAmount));
 
       const dbPayload: any = {
         id: orderId,
@@ -290,18 +290,17 @@ export const orderService = {
       const normalized = normalizeOrder(dbPayload);
 
       if (typeof window !== "undefined") {
-        const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
+        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
         const updated = [normalized, ...existing.filter((o: any) => o.id !== normalized.id)];
-        localStorage.setItem("site_orders", JSON.stringify(updated));
-        localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
-        localStorage.setItem("pending_payment_amount", String(finalAmount));
-        localStorage.setItem("pending_payment_order_id", orderId);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        sessionStorage.setItem("pending_payment_amount", String(finalAmount));
+        sessionStorage.setItem("pending_payment_order_id", orderId);
         window.dispatchEvent(new CustomEvent("orders_updated", { detail: normalized }));
       }
 
       return normalized;
     } catch (err) {
-      console.error("create Order Exception:", err);
+      console.error("orderService.create error:", err);
       return null;
     }
   },
@@ -330,18 +329,17 @@ export const orderService = {
       }
 
       if (typeof window !== "undefined") {
-        const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
+        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
         const updated = existing.map((o: any) =>
           String(o.id) === String(id) ? { ...o, ...payload } : o
         );
-        localStorage.setItem("site_orders", JSON.stringify(updated));
-        localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
         window.dispatchEvent(new CustomEvent("orders_updated", { detail: { id, ...payload } }));
       }
 
       return true;
     } catch (err) {
-      console.error(`updateStatus Exception:`, err);
+      console.error("orderService.updateStatus error:", err);
       return false;
     }
   },

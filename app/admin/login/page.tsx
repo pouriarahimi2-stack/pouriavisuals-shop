@@ -1,4 +1,4 @@
-// app/admin/login/page.tsx
+// File Path: app/admin/login/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -41,7 +41,7 @@ export default function AdminLoginPage() {
       if (res.ok && data.success) {
         soundEngine.playSuccess();
         if (data.user) {
-          localStorage.setItem("admin_current_user", JSON.stringify(data.user));
+          localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(data.user));
         }
         router.push("/admin");
       } else {
@@ -56,7 +56,7 @@ export default function AdminLoginPage() {
           full_name: "مدیر ارشد سیستم",
           role: "superadmin",
         };
-        localStorage.setItem("admin_current_user", JSON.stringify(defaultUser));
+        localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(defaultUser));
         router.push("/admin");
       } else {
         setErrorMessage("خطا در برقراری ارتباط با سرور. لطفاً مجدداً تلاش کنید.");

@@ -49,7 +49,7 @@ export default function ProductsCatalogPage() {
     loadData();
 
     const channel = supabase
-      .channel("catalog-products-realtime-v2026")
+      .channel("catalog-products-realtime-master-v2026")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
       .subscribe();
 

@@ -2,13 +2,14 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const userMessage = body.message || body.prompt || "";
     const history = body.history || [];
     const role = body.role || "customer";
-    const imageBase64 = body.imageBase64;
     const productsData = body.productsData || [];
     const targetTopic = body.targetTopic || "";
 
@@ -30,7 +31,6 @@ export async function POST(req: Request) {
     const products = productsData.length > 0 ? productsData : productsRes.data || [];
     const siteInfo = siteInfoRes.data || { site_name: "آکسون (Axon)", tagline: "مرجع تخصصی تجهیزات دیجیتال" };
 
-    // موتور هوشمند تولید مقاله جامع رنک یک گوگل
     if (isSeoArticleRequest) {
       let generatedArticle = "";
       if (process.env.GEMINI_API_KEY) {
@@ -54,7 +54,7 @@ ${productContext}
 ۳. فرمت‌بندی کامل HTML با تگ‌های معنایی (h1, h2, h3, p, ul, li, strong).
 ۴. طراحی جدول مقایسه فنی (HTML Table) با استایل تمیز و باکس‌های راهنمای ویژه (Callout Boxes).
 ۵. بخش سوالات متداول (FAQ Schema).
-۶. درج تصاویر مرتبط با تگ <img> با آدرس‌های مستقیم استانداردی مثل https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1000 و متن جایگزین (alt) فوق‌العاده بهینه‌شده.
+۶. درج تصاویر مرتبط با تگ <img> با آدرس‌های مستقیم استانداردی مثل https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1000 و متن جایگزین (alt) بهینه‌شده.
 
 مقاله را فوراً به صورت متن کامل تولید کن:`;
 
@@ -86,7 +86,6 @@ ${productContext}
       });
     }
 
-    // حالت پشتیبانی چت کلاینت
     const productCatalogContext = products
       .map(
         (p: any) =>

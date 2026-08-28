@@ -32,7 +32,7 @@ export interface CustomPage {
   updated_at?: string;
 }
 
-const LOCAL_KEY = "PV_CUSTOM_PAGES_CACHE_V2026";
+const LOCAL_KEY = "axon_custom_pages_registry_v2026";
 
 export const pageService = {
   async getAll(): Promise<CustomPage[]> {

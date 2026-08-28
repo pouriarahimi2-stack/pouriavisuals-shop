@@ -1,7 +1,7 @@
 // File Path: app/admin/page.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminProducts from "@/components/AdminProducts";
@@ -20,7 +20,7 @@ import PageBuilder from "@/components/admin/PageBuilder";
 import AdminBlogManager from "@/components/AdminBlogManager";
 import AdminNewsManager from "@/components/admin/AdminNewsManager";
 import StyleFontManager from "@/components/admin/StyleFontManager";
-import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
 import { productService, Product } from "@/services/productService";
 import { supabase } from "@/lib/supabase";
@@ -114,7 +114,7 @@ export default function AdminPage() {
             setActiveTab("products");
           }
         } else {
-          const localUser = localStorage.getItem("admin_current_user");
+          const localUser = localStorage.getItem("axon_admin_active_session_v2026");
           if (localUser) {
             try {
               const parsed = JSON.parse(localUser);
@@ -236,7 +236,7 @@ export default function AdminPage() {
         if (currentUser) {
           const updatedUser = { ...currentUser, username: newUsername, full_name: newFullName || currentUser.full_name };
           setCurrentUser(updatedUser);
-          localStorage.setItem("admin_current_user", JSON.stringify(updatedUser));
+          localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(updatedUser));
         }
         setTimeout(() => setShowPasswordModal(false), 1800);
       } else {
@@ -454,7 +454,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* نوار تب‌های مدیریت */}
+      {/* نوار تب‌های پیشخوان */}
       <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl backdrop-blur-2xl">
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
           {navTabs.map((tab) => {

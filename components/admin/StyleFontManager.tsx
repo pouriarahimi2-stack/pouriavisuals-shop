@@ -193,8 +193,9 @@ export default function StyleFontManager() {
               onChange={(e) => setSelectedWeight(Number(e.target.value))}
               className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer focus:border-[var(--accent-blue)] font-mono"
             >
-              <option value={300}>300 - باریک (Light)</option>
-              <option value={400}>400 - استاندارد (Regular)</option>
+              <option value={100}>100 - نازک (Thin)</option>
+              <option value={300}>300 - روشن (Light)</option>
+              <option value={400}>400 - عادی (Regular)</option>
               <option value={500}>500 - متوسط (Medium)</option>
               <option value={600}>600 - نیمه‌ضخیم (SemiBold)</option>
               <option value={700}>700 - ضخیم (Bold)</option>
@@ -222,7 +223,7 @@ export default function StyleFontManager() {
             </div>
           </div>
 
-          {/* رنگ دوم */}
+          {/* رنگ مکمل */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-[var(--text-secondary)]">رنگ مکمل (Secondary Accent):</label>
             <div className="flex items-center gap-3">

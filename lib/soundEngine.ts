@@ -1,7 +1,7 @@
-// lib/soundEngine.ts
+// File Path: lib/soundEngine.ts
 /**
  * موتور سنتز بلادرنگ صداهای سیستمی و فیدبک‌های لمسی بر پایه Web Audio API
- * کاملاً ایزوله، سبک، بدون بارگذاری فایل خارجی و ایمن در رندرینگ کلاینت
+ * با قابلیت خودکار بازگشایی تعلیق در مرورگرهای موبایل (iOS Safari / Android)
  */
 
 class SoundEngine {
@@ -17,7 +17,7 @@ class SoundEngine {
       }
     }
     if (this.ctx && this.ctx.state === "suspended") {
-      this.ctx.resume();
+      this.ctx.resume().catch(() => {});
     }
   }
 
@@ -25,7 +25,7 @@ class SoundEngine {
     this.isMuted = muted;
   }
 
-  // ۱. صدای کلیک بسیار نرم اپلی (Subtle Tactile Click)
+  // ۱. صدای کلیک بسیار نرم و لوکس اپلی
   public playClick() {
     if (this.isMuted) return;
     try {
@@ -36,21 +36,21 @@ class SoundEngine {
       const gain = this.ctx.createGain();
 
       osc.type = "sine";
-      osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.04);
+      osc.frequency.setValueAtTime(850, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(220, this.ctx.currentTime + 0.035);
 
-      gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+      gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.035);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start();
-      osc.stop(this.ctx.currentTime + 0.04);
+      osc.stop(this.ctx.currentTime + 0.035);
     } catch {}
   }
 
-  // ۲. صدای اضافه شدن موفق به سبد خرید (Cart Pop Chime)
+  // ۲. صدای اضافه شدن به سبد خرید
   public playAddToCart() {
     if (this.isMuted) return;
     try {
@@ -66,26 +66,26 @@ class SoundEngine {
       osc2.type = "sine";
 
       osc1.frequency.setValueAtTime(523.25, now); // C5
-      osc1.frequency.exponentialRampToValueAtTime(659.25, now + 0.08); // E5
+      osc1.frequency.exponentialRampToValueAtTime(659.25, now + 0.07); // E5
 
-      osc2.frequency.setValueAtTime(659.25, now + 0.08);
-      osc2.frequency.exponentialRampToValueAtTime(1046.5, now + 0.18); // C6
+      osc2.frequency.setValueAtTime(659.25, now + 0.07);
+      osc2.frequency.exponentialRampToValueAtTime(1046.5, now + 0.16); // C6
 
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      gain.gain.setValueAtTime(0.07, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
 
       osc1.connect(gain);
       osc2.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc1.start(now);
-      osc1.stop(now + 0.1);
-      osc2.start(now + 0.08);
-      osc2.stop(now + 0.22);
+      osc1.stop(now + 0.09);
+      osc2.start(now + 0.07);
+      osc2.stop(now + 0.2);
     } catch {}
   }
 
-  // ۳. صدای انفصال و مونتاژ قطعات در نمای انفجاری (Teardown Layer Shift)
+  // ۳. صدای انفصال و حرکت لایه‌های سه‌بعدی (Exploded View)
   public playExplodeShift(freqMultiplier: number = 1) {
     if (this.isMuted) return;
     try {
@@ -97,26 +97,28 @@ class SoundEngine {
       const gain = this.ctx.createGain();
       const filter = this.ctx.createBiquadFilter();
 
+      const validMultiplier = isNaN(freqMultiplier) || freqMultiplier <= 0 ? 1 : freqMultiplier;
+
       osc.type = "triangle";
-      osc.frequency.setValueAtTime(320 * freqMultiplier, now);
-      osc.frequency.exponentialRampToValueAtTime(120 * freqMultiplier, now + 0.07);
+      osc.frequency.setValueAtTime(320 * validMultiplier, now);
+      osc.frequency.exponentialRampToValueAtTime(120 * validMultiplier, now + 0.06);
 
       filter.type = "lowpass";
       filter.frequency.setValueAtTime(1200, now);
 
-      gain.gain.setValueAtTime(0.07, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
 
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.07);
+      osc.stop(now + 0.06);
     } catch {}
   }
 
-  // ۴. صدای پرداخت موفق و صدور فاکتور (Success Payment Bell)
+  // ۴. صدای تایید پرداخت و صدور بارنامه
   public playSuccess() {
     if (this.isMuted) return;
     try {
@@ -124,24 +126,24 @@ class SoundEngine {
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
-      const freqs = [523.25, 659.25, 783.99, 1046.5]; // C - E - G - C Major Arpeggio
+      const notes = [523.25, 659.25, 783.99, 1046.5]; // Arpeggio C Major
 
-      freqs.forEach((f, idx) => {
+      notes.forEach((freq, idx) => {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
 
         osc.type = "sine";
-        osc.frequency.setValueAtTime(f, now + idx * 0.07);
+        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
 
-        gain.gain.setValueAtTime(0.08, now + idx * 0.07);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.35);
+        gain.gain.setValueAtTime(0.06, now + idx * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.06 + 0.3);
 
         osc.connect(gain);
         gain.connect(this.ctx.destination);
 
-        osc.start(now + idx * 0.07);
-        osc.stop(now + idx * 0.07 + 0.35);
+        osc.start(now + idx * 0.06);
+        osc.stop(now + idx * 0.06 + 0.3);
       });
     } catch {}
   }

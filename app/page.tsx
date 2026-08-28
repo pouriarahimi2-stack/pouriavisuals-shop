@@ -1,4 +1,3 @@
-// File Path: app/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -39,7 +38,6 @@ export default function HomePage() {
         siteInfoService.getSiteInfo(),
       ]);
 
-      // مرتب‌سازی هوشمند کالاها بر اساس کوکی و رفتار کاربر
       const topCat = userBehavior.getTopInterestCategory();
       let sortedProducts = prods || [];
       if (topCat !== "all") {
@@ -81,7 +79,7 @@ export default function HomePage() {
     };
   }, []);
 
-  // چرخش اتوماتیک هر ۶ ثانیه اسلایدر
+  // چرخش خودکار اسلایدر هر ۶ ثانیه
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -130,7 +128,7 @@ export default function HomePage() {
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-10 mt-3 sm:mt-5">
         
-        {/* ۱. اسلایدر هوشمند بنرهای تبلیغاتی با دکمه‌های ناوبری */}
+        {/* ۱. اسلایدر بنرهای فروشگاه */}
         {banners.length > 0 && (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
@@ -169,7 +167,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* دکمه‌های ناوبری قبلی/بعدی اسلایدر */}
               {banners.length > 1 && (
                 <>
                   <button
@@ -208,10 +205,10 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ۲. ویجت فشرده جدیدترین اخبار حوزه تکنولوژی */}
+        {/* ۲. تیکر پایش اخبار تکنولوژی */}
         <TechRadarFeed />
 
-        {/* ۳. ویترین و کاتالوگ محصولات */}
+        {/* ۳. ویترین محصولات */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
             <div>
@@ -223,7 +220,6 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* فیلتر تب‌های دسته‌بندی */}
             <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none text-xs">
               <button
                 onClick={() => {
@@ -330,7 +326,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ۴. بخش مجله تخصصی */}
+        {/* ۴. مجله تخصصی */}
         <section className="p-6 sm:p-8 rounded-[2.5rem] space-y-6 my-10 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
@@ -351,7 +347,6 @@ export default function HomePage() {
         </section>
       </div>
 
-      {/* مدال تعاملی بررسی جزئیات کالا */}
       {selectedProductForModal && (
         <ProductDetailsModal
           product={selectedProductForModal}
@@ -360,7 +355,6 @@ export default function HomePage() {
         />
       )}
 
-      {/* مدال مقایسه ساید‌بای‌ساید */}
       <ProductComparisonModal
         products={compareList}
         isOpen={isCompareOpen}

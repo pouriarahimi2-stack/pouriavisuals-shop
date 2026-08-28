@@ -159,7 +159,7 @@ export default function ProductExplodedView({
         ) : (
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
             
-            {/* بوم نمایش تعاملی ۳D Exploded View */}
+            {/* بوم سه‌بعدی تعاملی */}
             <div
               ref={containerRef}
               onPointerDown={handlePointerDown}
@@ -172,7 +172,7 @@ export default function ProductExplodedView({
                 🖱️ درگ کنید تا زاویه تغییر کند (X: {Math.round(rotationX)}°, Y: {Math.round(rotationY)}°)
               </div>
 
-              {/* کانتینر سه‌بعدی */}
+              {/* کانتینر سه‌بعدی لایه‌ها */}
               <div
                 className="relative w-64 h-64 sm:w-80 sm:h-80 transition-transform duration-75 ease-out"
                 style={{
@@ -244,7 +244,7 @@ export default function ProductExplodedView({
                 })}
               </div>
 
-              {/* اسلایدر کنترل انفصال لایه‌ها */}
+              {/* اسلایدر کنترل انفصال */}
               <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-6 bg-slate-950/80 border border-slate-800 p-3.5 rounded-2xl backdrop-blur-xl space-y-2 z-10 sm:w-72 shadow-2xl">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-black text-white flex items-center gap-1.5">
@@ -267,7 +267,7 @@ export default function ProductExplodedView({
               </div>
             </div>
 
-            {/* سایدبار تحلیل مهندسی قطعه انتخاب‌شده */}
+            {/* سایدبار اطلاعات مهندسی */}
             <div className="lg:col-span-5 p-5 sm:p-7 space-y-5 overflow-y-auto bg-slate-950/50 flex flex-col justify-between text-xs">
               {selectedComponent ? (
                 <div className="space-y-4">

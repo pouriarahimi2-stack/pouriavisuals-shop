@@ -71,7 +71,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // به‌روزرسانی وضعیت فاکتور در دیتابیس
     const { error: updateError } = await supabaseAdmin
       .from("orders")
       .update({

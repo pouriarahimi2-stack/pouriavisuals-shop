@@ -1,8 +1,3 @@
-// File Path: services/smsService.ts
-/**
- * سرویس یکپارچه ارسال پیامک، کدهای اعتبارسنجی OTP و اطلاع‌رسانی بارنامه پستی
- */
-
 export interface SendSmsResponse {
   success: boolean;
   message?: string;
@@ -12,7 +7,6 @@ export interface SendSmsResponse {
 }
 
 export const smsService = {
-  // ارسال کد تایید ۶ رقمی ورود/ثبت سفارش
   async sendOtp(phone: string): Promise<SendSmsResponse> {
     try {
       const cleanPhone = String(phone)
@@ -38,7 +32,6 @@ export const smsService = {
     }
   },
 
-  // اعتبارسنجی کد ۶ رقمی وارد شده توسط کاربر
   async verifyOtp(phone: string, code: string): Promise<SendSmsResponse> {
     try {
       const cleanPhone = String(phone)
@@ -70,7 +63,6 @@ export const smsService = {
     }
   },
 
-  // ارسال خودکار پیامک بارکد پستی و لینک پیگیری
   async sendTrackingCode(phone: string, nameOrOrderId: string | number, trackingCode: string): Promise<boolean> {
     try {
       const cleanPhone = String(phone)
@@ -99,12 +91,10 @@ export const smsService = {
     }
   },
 
-  // ارسال پیامک تغییر وضعیت سفارش
   async sendOrderStatusChange(phone: string, orderId: string, statusName: string): Promise<boolean> {
     return this.sendTrackingCode(phone, `فاکتور ${orderId}`, `تغییر وضعیت سفارش شما به: ${statusName}`);
   },
 
-  // ارسال پیامک عمومی اطلاع‌رسانی
   async sendSMS(phone: string, message: string): Promise<boolean> {
     return this.sendTrackingCode(phone, "خریدار گرامی", message);
   },

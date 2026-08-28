@@ -1,3 +1,4 @@
+// File Path: services/newsService.ts
 import { supabase } from "@/lib/supabase";
 import { userBehavior } from "@/lib/userBehavior";
 
@@ -18,7 +19,7 @@ export interface TechNewsItem {
   is_published?: boolean;
 }
 
-const LOCAL_NEWS_KEY = "axon_tech_radar_news_cache_v2";
+const LOCAL_NEWS_KEY = "axon_tech_radar_news_cache_v2026";
 
 export const newsService = {
   async getAll(): Promise<TechNewsItem[]> {
@@ -56,7 +57,6 @@ export const newsService = {
 
     if (topCategory === "all") return all;
 
-    // مرتب‌سازی بر اساس علایق استخراج‌شده از کوکی کاربر
     return [...all].sort((a, b) => {
       const aMatch = a.category.toLowerCase() === topCategory.toLowerCase() ? 1 : 0;
       const bMatch = b.category.toLowerCase() === topCategory.toLowerCase() ? 1 : 0;

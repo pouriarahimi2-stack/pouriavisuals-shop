@@ -1,4 +1,3 @@
-// File Path: app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
@@ -6,7 +5,7 @@ import LayoutWrapper from '@/components/LayoutWrapper';
 
 export const metadata: Metadata = {
   title: '27424534',
-  description: 'فروشگاه آکسون',
+  description: 'فروشگاه تخصصی تجهیزات دیجیتال و مانیتورهای استودیویی آکسون',
   other: {
     enamad: '27424534',
   },

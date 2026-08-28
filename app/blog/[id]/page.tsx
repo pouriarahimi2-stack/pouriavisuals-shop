@@ -26,7 +26,6 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // نوار پیشرفت مطالعه زنده در بالای صفحه
   useEffect(() => {
     const handleScroll = () => {
       const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -60,7 +59,6 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
 
         setPost(found);
 
-        // واکشی کالاهای مرتبط برای نمایش در انتهای مقاله
         const prods = await productService.getAll();
         setRelatedProducts(prods.slice(0, 4));
       } finally {
@@ -99,13 +97,11 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
       
-      {/* نوار پیشرفت مطالعه */}
       <div
         className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 z-50 transition-all duration-150"
         style={{ width: `${scrollProgress}%` }}
       />
 
-      {/* مسیر ناوبری */}
       <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-bold">
         <Link href="/" className="hover:text-[var(--accent-blue)] transition">صفحه اصلی</Link>
         <span>/</span>
@@ -142,7 +138,6 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
           )}
         </header>
 
-        {/* محتوای رندر شده مقاله */}
         <div
           dangerouslySetInnerHTML={{ __html: post.content }}
           className="blog-content prose prose-sm max-w-none text-xs md:text-sm leading-loose text-[var(--text-primary)] font-medium space-y-4 text-justify"
@@ -167,7 +162,6 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
         </footer>
       </article>
 
-      {/* بخش محصولات مرتبط */}
       {relatedProducts.length > 0 && (
         <section className="space-y-6">
           <div className="flex justify-between items-center px-1">

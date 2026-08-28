@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const { orderId, callbackUrl } = await req.json();
 
     if (!orderId) {
-      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شناسه فاکتور سفارش الزامی است." }, { status: 400 });
     }
 
     const { data: order, error } = await supabaseAdmin
@@ -19,14 +19,14 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error || !order) {
-      return NextResponse.json({ success: false, message: "فاکتور سفارش یافت نشد." }, { status: 404 });
+      return NextResponse.json({ success: false, message: "فاکتور سفارش در سیستم یافت نشد." }, { status: 404 });
     }
 
     const payableAmount = order.final_amount || order.total_amount;
     const merchantId = process.env.ZARINPAL_MERCHANT_ID;
     const isSandbox = !merchantId || process.env.NODE_ENV !== "production";
 
-    // اتصال واقعی به درگاه زرین‌پال در محیط پروداکشن
+    // ارتباط مستقیم با زرین‌پال در پروداکشن
     if (!isSandbox && merchantId) {
       const zarinpalUrl = "https://api.zarinpal.com/pg/v4/payment/request.json";
       const gatewayRes = await fetch(zarinpalUrl, {
@@ -51,7 +51,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // شبیه‌ساز امن پرداخت
     const mockAuthority = `AUTH_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     return NextResponse.json({
       success: true,

@@ -26,7 +26,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"specs" | "gamut" | "comparison" | "desc" | "shipping" | "reviews">("specs");
 
-  // مدال کالبدشکافی و نمای انفجاری ۳D
   const [isExplodedViewOpen, setIsExplodedViewOpen] = useState(false);
 
   useEffect(() => {
@@ -140,10 +139,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         <span className="text-[var(--text-primary)] truncate max-w-xs">{product.title}</span>
       </div>
 
-      {/* کارت اصلی معرفی و خرید کالا */}
+      {/* معرفی و خرید کالا */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
         
-        {/* بخش گالری و لانچر کالبدشکافی */}
+        {/* گالری و دکمه کالبدشکافی */}
         <div className="lg:col-span-5 space-y-4">
           <div className="w-full h-80 md:h-[430px] rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] overflow-hidden flex items-center justify-center p-6 relative group">
             <img
@@ -192,7 +191,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
-        {/* مشخصات اصلی، تنوع رنگ و خرید */}
+        {/* مشخصات اصلی، تنوع و خرید */}
         <div className="lg:col-span-7 flex flex-col justify-between space-y-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
@@ -281,7 +280,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
-          {/* باکس قیمت نهایی و دکمه‌های خرید دسکتاپ */}
+          {/* قیمت نهایی و دکمه‌های خرید */}
           <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-5">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی فاکتور:</span>
@@ -340,7 +339,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* تب‌های پیشرفته مشخصات، شبیه‌ساز گاموت و نظرات */}
+      {/* تب‌های مشخصات، شبیه‌ساز گاموت و نظرات */}
       <div className="space-y-6">
         <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] text-xs scrollbar-none">
           {[
@@ -411,7 +410,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {/* نوار چسبان خرید سریع در موبایل (Sticky Mobile Purchase Bar) */}
+      {/* نوار چسبان خرید سریع در موبایل */}
       <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border-t border-[var(--card-border)] p-3 px-4 flex items-center justify-between gap-3 shadow-[0_-10px_25px_rgba(0,0,0,0.2)]">
         <div>
           <span className="text-[10px] text-[var(--text-secondary)] block font-bold">مبلغ نهایی:</span>

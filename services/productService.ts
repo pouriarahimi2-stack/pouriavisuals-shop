@@ -52,13 +52,13 @@ export interface Product {
   updated_at?: string;
 }
 
-const LOCAL_PRODUCTS_CACHE = "PV_STORE_PRODUCTS_CACHE_V2026";
+const LOCAL_PRODUCTS_CACHE = "axon_products_registry_cache_v2026";
 
 export function normalizeProduct(raw: any): Product {
   if (!raw) return {} as Product;
 
   const id = String(raw.id || `p_${Date.now()}`);
-  const title = raw.title || raw.name || "محصول تخصصی";
+  const title = raw.title || raw.name || "کالای دیجیتال تخصصی";
   const name = raw.name || title;
   const price = Number(raw.price || 0);
   const discountPrice =
@@ -122,7 +122,7 @@ export function normalizeProduct(raw: any): Product {
     discountPrice,
     discount_price: discountPrice,
     originalPrice: price,
-    stock: raw.stock !== undefined ? Number(raw.stock) : 0,
+    stock: raw.stock !== undefined ? Number(raw.stock) : 10,
     category: raw.category || raw.category_name || "تجهیزات تخصصی",
     category_id: raw.category_id,
     category_name: raw.category || raw.category_name || "تجهیزات تخصصی",

@@ -398,7 +398,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* بار اصلی هدر با ساختار کپسولی یکپارچه بدون بیرون‌زدگی دکمه‌ها */}
+      {/* بار اصلی هدر - ساختار کپسولی یکپارچه بدون بیرون‌زدگی دکمه‌ها */}
       <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-3 transition-colors duration-300">
         
         {/* راست: لوگو، نام برند و دسته‌بندی */}
@@ -408,14 +408,14 @@ export default function Header() {
               soundEngine.playClick();
               setMobileMenuOpen(!mobileMenuOpen);
             }}
-            className="lg:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
+            className="lg:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
             aria-label="Toggle Mobile Menu"
           >
             ☰
           </button>
 
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl border border-[var(--card-border)] bg-gradient-to-tr from-blue-600 to-indigo-600 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-gradient-to-tr from-blue-600 to-indigo-600 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
               {logoUrl ? (
                 <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
               ) : (
@@ -425,20 +425,20 @@ export default function Header() {
               )}
             </div>
             <div className="flex flex-col text-right">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
                   {storeName}
                 </span>
                 <span
                   className={`w-2 h-2 rounded-full transition-all duration-500 ${
                     isOnline
-                      ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)] animate-pulse"
-                      : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)]"
+                      ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse"
+                      : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"
                   }`}
                   title={isOnline ? "سامانه آنلاین و فعال" : "در حال تعمیرات"}
                 />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
+              <span className="text-[10px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
                 {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و استودیو"}
               </span>
             </div>
@@ -451,7 +451,7 @@ export default function Header() {
                 soundEngine.playClick();
                 setIsCategoryOpen(!isCategoryOpen);
               }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-xs font-black transition-all duration-200 border cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all duration-200 border cursor-pointer ${
                 isCategoryOpen || selectedCategory !== "all"
                   ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
                   : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)]"
@@ -459,14 +459,14 @@ export default function Header() {
             >
               <span>☰</span>
               <span>دسته‌بندی‌ها</span>
-              <span className="text-[9px] opacity-70">▾</span>
+              <span className="text-[9px]">▾</span>
             </button>
 
             {isCategoryOpen && (
-              <div className="absolute top-12 right-0 w-64 p-2.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
+              <div className="absolute top-11 right-0 w-60 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
                 <button
                   onClick={() => handleSelectCategory("all")}
-                  className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                  className={`w-full flex items-center justify-between p-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                     selectedCategory === "all"
                       ? "bg-[var(--accent-blue)] text-white shadow-sm"
                       : "text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
@@ -480,7 +480,7 @@ export default function Header() {
                   <button
                     key={cat.id || cat.name}
                     onClick={() => handleSelectCategory(cat.name)}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    className={`w-full flex items-center justify-between p-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                       selectedCategory === cat.name
                         ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
                         : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
@@ -501,7 +501,7 @@ export default function Header() {
             <Link
               key={idx}
               href={link.href}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
+              className="px-3 py-1.5 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
             >
               {link.title}
             </Link>
@@ -509,9 +509,9 @@ export default function Header() {
         </nav>
 
         {/* چپ: جستجو، تم و دکمه سبد خرید کاملاً درون کپسول هدر */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="relative hidden lg:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-44 shadow-sm h-10">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 shadow-sm h-9">
               <span className="text-xs opacity-70">🔍</span>
               <input
                 type="text"
@@ -524,25 +524,25 @@ export default function Header() {
             </div>
 
             {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-12 left-0 p-2.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-80">
-                <div className="max-h-64 overflow-y-auto space-y-1.5">
+              <div className="absolute top-11 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1 w-72">
+                <div className="max-h-60 overflow-y-auto space-y-1">
                   {searchResults.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
+                    <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--input-bg)] transition gap-2">
                       <Link
                         href={`/products/${p.id}`}
                         onClick={() => {
                           soundEngine.playClick();
                           setIsSearchFocused(false);
                         }}
-                        className="flex items-center gap-2.5 flex-1 min-w-0"
+                        className="flex items-center gap-2 flex-1 min-w-0"
                       >
                         <img
                           src={p.images?.[0] || p.image || "/placeholder.png"}
                           alt=""
-                          className="w-10 h-10 object-contain rounded-lg bg-white/5 p-1 border border-[var(--card-border)] shrink-0"
+                          className="w-8 h-8 object-contain rounded bg-white/5 p-0.5 border border-[var(--card-border)] shrink-0"
                         />
                         <div className="flex-1 min-w-0 text-right">
-                          <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
+                          <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
                           <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400">
                             {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت
                           </span>
@@ -551,9 +551,9 @@ export default function Header() {
                       <button
                         type="button"
                         onClick={(e) => handleQuickAddFromSearch(e, p)}
-                        className="px-2.5 py-1.5 rounded-xl text-[10px] font-black bg-[var(--accent-blue)] text-white cursor-pointer shadow-md"
+                        className="px-2 py-1 rounded-lg text-[10px] font-black bg-[var(--accent-blue)] text-white cursor-pointer shadow-md"
                       >
-                        {addedItemMap[p.id] ? "✓" : "+ خرید"}
+                        {addedItemMap[p.id] ? "✓" : "+"}
                       </button>
                     </div>
                   ))}
@@ -564,24 +564,24 @@ export default function Header() {
 
           <button
             onClick={toggleDarkMode}
-            className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
+            className="w-9 h-9 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
             title="تغییر تم"
           >
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید متصل به دراور */}
+          {/* دکمه سبد خرید در انتهای کپسول هدر */}
           <button
             onClick={() => {
               soundEngine.playClick();
               toggleCart();
             }}
-            className="relative h-10 px-3.5 sm:px-4 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-md shadow-blue-500/20 cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+            className="relative h-9 px-3.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition shadow-md cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap"
           >
-            <span className="text-sm">🛒</span>
+            <span>🛒</span>
             <span className="font-bold hidden sm:inline">سبد خرید</span>
             {totalCartCount > 0 && (
-              <span className="min-w-[1.2rem] h-[1.2rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[10px] flex items-center justify-center shadow-md animate-pulse">
+              <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center shadow-md animate-pulse">
                 {totalCartCount}
               </span>
             )}
@@ -591,64 +591,62 @@ export default function Header() {
 
       {/* منوی ریسپانسیو موبایل */}
       {mobileMenuOpen && (
-        <div className="lg:hidden mt-2 p-4 bg-[var(--modal-bg)] rounded-3xl border border-[var(--card-border)] shadow-2xl space-y-2 animate-fadeIn">
-          <div className="flex flex-col space-y-1.5 text-xs font-bold">
-            {navLinks.map((link, idx) => (
-              <Link
-                key={idx}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-2.5 rounded-xl bg-[var(--input-bg)] flex items-center gap-2"
-              >
-                {link.title}
-              </Link>
-            ))}
-          </div>
+        <div className="lg:hidden mt-2 p-3 bg-[var(--modal-bg)] rounded-2xl border border-[var(--card-border)] shadow-xl space-y-1.5 animate-fadeIn">
+          {navLinks.map((link, idx) => (
+            <Link
+              key={idx}
+              href={link.href}
+              onClick={() => setMobileMenuOpen(false)}
+              className="block p-2 rounded-lg bg-[var(--input-bg)] text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition"
+            >
+              {link.title}
+            </Link>
+          ))}
         </div>
       )}
 
-      {/* دراور کامل سبد خرید و فرم تسویه داخل هدر */}
+      {/* دراور کامل سبد خرید با تمام امکانات و فرم تسویه */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
-          <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-6 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
-                <h3 className="font-black text-lg flex items-center gap-2 text-[var(--text-primary)]">
+          <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-5 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+                <h3 className="font-black text-base flex items-center gap-2">
                   <span>🛒</span> سبد خرید شما ({totalCartCount})
                 </h3>
                 <button
                   onClick={toggleCart}
-                  className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs font-bold cursor-pointer transition text-[var(--text-primary)]"
+                  className="w-7 h-7 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs font-bold cursor-pointer transition"
                 >
                   ✕
                 </button>
               </div>
 
               {cartItems.length === 0 ? (
-                <div className="p-12 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2">
+                <div className="py-20 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2">
                   <span className="text-3xl block">🛍️</span>
                   <p>سبد خرید شما در حال حاضر خالی است.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {cartItems.map((item: any) => (
+                <div className="space-y-2.5">
+                  {cartItems.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs gap-3 shadow-sm"
+                      className="flex items-center justify-between p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs gap-2 shadow-sm"
                     >
-                      <img src={item.image} alt={item.title || item.name} className="w-12 h-12 object-contain rounded-xl bg-[var(--modal-bg)] p-1 border border-[var(--card-border)]" />
-                      <div className="flex-1 space-y-1">
-                        <h4 className="font-bold text-[var(--text-primary)] truncate">{item.title || item.name}</h4>
-                        <span className="text-[var(--accent-blue)] font-black block font-mono">
-                          {((item.discountPrice ?? item.price) * (item.quantity || 1)).toLocaleString("fa-IR")} تومان
+                      <img src={item.image} alt={item.title || item.name} className="w-10 h-10 object-contain rounded bg-[var(--modal-bg)] p-1 border border-[var(--card-border)]" />
+                      <div className="flex-1 space-y-0.5 min-w-0">
+                        <h4 className="font-bold truncate text-[var(--text-primary)]">{item.title || item.name}</h4>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold block">
+                          {((item.discountPrice ?? item.price) * (item.quantity || 1)).toLocaleString("fa-IR")} ت
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl px-2 py-1 font-bold">
-                        <button onClick={() => updateQuantity(item.id, -1)} className="hover:text-[var(--accent-blue)] cursor-pointer px-1 font-bold">-</button>
-                        <span className="font-mono text-[var(--text-primary)]">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, 1)} className="hover:text-[var(--accent-blue)] cursor-pointer px-1 font-bold">+</button>
+                      <div className="flex items-center gap-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-lg px-2 py-0.5">
+                        <button onClick={() => updateQuantity(item.id, -1)} className="hover:text-[var(--accent-blue)] cursor-pointer font-bold text-xs">-</button>
+                        <span className="font-mono font-bold text-[var(--text-primary)]">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, 1)} className="hover:text-[var(--accent-blue)] cursor-pointer font-bold text-xs">+</button>
                       </div>
-                      <button onClick={() => removeFromCart(item.id)} className="text-rose-500 font-bold hover:text-rose-700 transition cursor-pointer p-1">🗑️</button>
+                      <button onClick={() => removeFromCart(item.id)} className="text-rose-500 p-1 cursor-pointer hover:text-rose-700 transition">🗑️</button>
                     </div>
                   ))}
                 </div>
@@ -656,7 +654,7 @@ export default function Header() {
             </div>
 
             {cartItems.length > 0 && (
-              <div className="space-y-4 pt-4 border-t border-[var(--card-border)] text-xs">
+              <div className="space-y-3 pt-3 border-t border-[var(--card-border)] text-xs">
                 {!appliedCoupon ? (
                   <form
                     onSubmit={(e) => {
@@ -671,25 +669,23 @@ export default function Header() {
                       placeholder="کد تخفیف..."
                       value={couponCodeInput}
                       onChange={(e) => setCouponCodeInput(e.target.value)}
-                      className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs uppercase font-mono outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)]"
+                      className="flex-1 p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs uppercase font-mono outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
                     />
-                    <button type="submit" className="px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer hover:opacity-90 transition shrink-0 shadow-md">
+                    <button type="submit" className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer hover:opacity-90 transition shadow-sm">
                       اعمال
                     </button>
                   </form>
                 ) : (
-                  <div className="flex justify-between items-center p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold">
+                  <div className="flex justify-between items-center p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold">
                     <span>کد تخفیف {appliedCoupon.code} فعال است ({appliedCoupon.discountPercent}٪)</span>
-                    <button onClick={removeCoupon} className="text-rose-500 cursor-pointer font-black">✕</button>
+                    <button onClick={removeCoupon} className="text-rose-500 font-black cursor-pointer">✕</button>
                   </div>
                 )}
 
-                <div className="space-y-1.5 text-[var(--text-secondary)] font-medium">
+                <div className="space-y-1 text-[var(--text-secondary)] font-medium">
                   <div className="flex justify-between">
                     <span>جمع کل اقلام:</span>
-                    <span className="text-[var(--text-primary)] font-bold font-mono">
-                      {rawTotal.toLocaleString("fa-IR")} تومان
-                    </span>
+                    <span className="font-bold font-mono text-[var(--text-primary)]">{rawTotal.toLocaleString("fa-IR")} تومان</span>
                   </div>
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
@@ -697,7 +693,7 @@ export default function Header() {
                       <span className="font-mono">- {discountAmount.toLocaleString("fa-IR")} تومان</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-base font-black text-[var(--accent-blue)] pt-1 border-t border-[var(--card-border)]">
+                  <div className="flex justify-between text-sm font-black text-emerald-600 dark:text-emerald-400 pt-1 border-t border-[var(--card-border)]">
                     <span>مبلغ قابل پرداخت:</span>
                     <span className="font-mono">{finalTotal.toLocaleString("fa-IR")} تومان</span>
                   </div>
@@ -706,95 +702,77 @@ export default function Header() {
                 {!showCheckoutForm ? (
                   <button
                     onClick={() => setShowCheckoutForm(true)}
-                    className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-xl shadow-blue-500/25"
+                    className="w-full py-3.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    ادامه و تکمیل مشخصات تحویل 🚀
+                    <span>تکمیل اطلاعات و دریافت پیامک تایید 🚀</span>
                   </button>
                 ) : (
-                  <form onSubmit={handleInitiateOtp} className="space-y-3 pt-3 border-t border-[var(--card-border)] animate-fadeIn">
+                  <form onSubmit={handleInitiateOtp} className="space-y-2.5 pt-2 border-t border-[var(--card-border)] animate-fadeIn">
                     {validationError && (
-                      <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-[11px] leading-relaxed">
+                      <div className="p-2 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-[11px] font-bold">
                         ⚠️ {validationError}
                       </div>
                     )}
 
                     <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5 font-bold">نام تحویل‌گیرنده *</label>
-                        <input
-                          type="text"
-                          placeholder="مثلاً: پوریا"
-                          required
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                          className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5 font-bold">نام خانوادگی *</label>
-                        <input
-                          type="text"
-                          placeholder="مثلاً: رحیمی"
-                          required
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5 font-bold">شماره موبایل *</label>
-                        <input
-                          type="text"
-                          placeholder="09123456789"
-                          required
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono outline-none text-[var(--text-primary)] font-bold focus:border-[var(--accent-blue)] text-center"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5 font-bold">کد پستی ۱۰ رقمی *</label>
-                        <input
-                          type="text"
-                          placeholder="کد ۱۰ رقمی"
-                          required
-                          value={postalCode}
-                          onChange={(e) => setPostalCode(e.target.value)}
-                          className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono outline-none focus:border-[var(--accent-blue)] text-center font-bold text-[var(--text-primary)]"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5 font-bold">نشانی دقیق پستی تحویل *</label>
-                      <textarea
-                        rows={2}
-                        placeholder="استان، شهر، خیابان، پلاک، واحد..."
+                      <input
+                        type="text"
+                        placeholder="نام *"
                         required
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none text-[var(--text-primary)] font-medium focus:border-[var(--accent-blue)]"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="نام خانوادگی *"
+                        required
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
                       />
                     </div>
 
-                    <div className="flex gap-2 pt-1">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="tel"
+                        placeholder="09123456789 *"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="کد پستی ۱۰ رقمی *"
+                        required
+                        value={postalCode}
+                        onChange={(e) => setPostalCode(e.target.value)}
+                        className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
+                      />
+                    </div>
+
+                    <textarea
+                      rows={2}
+                      placeholder="نشانی دقیق پستی تحویل *"
+                      required
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
+                    />
+
+                    <div className="flex gap-2">
                       <button
                         type="submit"
                         disabled={isSendingOtp}
-                        className="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs cursor-pointer transition shadow-md disabled:opacity-50"
+                        className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs cursor-pointer shadow-md disabled:opacity-50"
                       >
-                        {isSendingOtp ? "در حال ارسال پیامک..." : "📲 تایید شماره با پیامک ۶ رقمی"}
+                        {isSendingOtp ? "در حال ارسال پیامک..." : "📲 تایید با پیامک ۶ رقمی"}
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setShowCheckoutForm(false);
-                          setValidationError(null);
-                        }}
-                        className="py-3.5 px-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-bold text-xs cursor-pointer hover:border-[var(--accent-blue)] transition"
+                        onClick={() => setShowCheckoutForm(false)}
+                        className="px-4 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs cursor-pointer"
                       >
                         انصراف
                       </button>
@@ -810,63 +788,39 @@ export default function Header() {
       {/* مدال تایید پیامکی ۶ رقمی (OTP) */}
       {showOtpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans">
-          <div className="max-w-sm w-full bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 text-[var(--text-primary)] space-y-5 shadow-2xl relative">
-            <div className="text-center space-y-2">
-              <span className="text-3xl block">📱</span>
-              <h3 className="font-black text-base text-[var(--text-primary)]">تایید هویت و شماره موبایل</h3>
-              <p className="text-xs text-[var(--text-secondary)] font-medium">
-                کد تایید ۶ رقمی به شماره <span className="font-mono font-bold text-[var(--accent-blue)]">{phone}</span> پیامک شد.
-              </p>
+          <div className="max-w-sm w-full bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 text-[var(--text-primary)] space-y-4 shadow-2xl">
+            <div className="text-center space-y-1">
+              <span className="text-2xl block">📱</span>
+              <h3 className="font-black text-sm">تایید شماره تماس مرسوله</h3>
+              <p className="text-[11px] text-[var(--text-secondary)]">کد ۶ رقمی پیامک‌شده به {phone} را وارد کنید:</p>
             </div>
 
             {generatedOtp && (
-              <div className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-center space-y-1 animate-pulse">
-                <span className="text-[10px] text-[var(--accent-blue)] block font-extrabold">📩 کد تایید ارسالی:</span>
-                <span className="font-mono font-black text-xl text-[var(--accent-blue)] tracking-widest">{generatedOtp}</span>
+              <div className="p-2.5 rounded-xl bg-blue-500/15 border border-blue-500/30 text-center font-mono font-black text-lg text-[var(--accent-blue)]">
+                {generatedOtp}
               </div>
             )}
 
-            <div>
-              <label className="block text-[10px] text-[var(--text-secondary)] mb-1 text-center font-bold">کد ۶ رقمی را وارد کنید:</label>
-              <input
-                type="text"
-                maxLength={6}
-                value={userOtpInput}
-                onChange={(e) => setUserOtpInput(e.target.value.replace(/\D/g, ""))}
-                placeholder="------"
-                className="w-full p-3.5 text-center text-xl font-mono tracking-widest rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)] font-black"
-              />
-            </div>
-
-            <div className="text-center text-[11px] text-[var(--text-secondary)] font-medium">
-              {otpTimer > 0 ? (
-                <span>
-                  زمان باقی‌مانده:{" "}
-                  <strong className="font-mono text-[var(--text-primary)] font-bold">
-                    {Math.floor(otpTimer / 60)}:{("0" + (otpTimer % 60)).slice(-2)}
-                  </strong>
-                </span>
-              ) : (
-                <button
-                  onClick={handleInitiateOtp}
-                  className="text-[var(--accent-blue)] font-bold hover:underline cursor-pointer"
-                >
-                  🔄 ارسال مجدد کد تایید پیامکی
-                </button>
-              )}
-            </div>
-
-            <div className="flex gap-2 pt-2">
+            <input
+              type="text"
+              maxLength={6}
+              value={userOtpInput}
+              onChange={(e) => setUserOtpInput(e.target.value.replace(/\D/g, ""))}
+              placeholder="------"
+              className="w-full p-3 text-center text-xl font-mono tracking-widest rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-black text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+            />
+            
+            <div className="flex gap-2">
               <button
                 onClick={handleVerifyOtpAndProceed}
                 disabled={isVerifyingOtp}
-                className="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs transition cursor-pointer shadow-lg disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs cursor-pointer shadow-md disabled:opacity-50"
               >
-                {isVerifyingOtp ? "در حال تایید..." : "تایید و صدور فاکتور رسمی 💳"}
+                {isVerifyingOtp ? "در حال تایید..." : "تایید و اتصال به درگاه 💳"}
               </button>
               <button
                 onClick={() => setShowOtpModal(false)}
-                className="py-3.5 px-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-bold text-xs hover:border-[var(--accent-blue)] transition cursor-pointer"
+                className="px-4 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs cursor-pointer"
               >
                 انصراف
               </button>

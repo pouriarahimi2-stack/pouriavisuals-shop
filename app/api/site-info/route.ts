@@ -9,13 +9,12 @@ export async function GET() {
     const { data } = await supabaseAdmin
       .from("site_info")
       .select("*")
-      .order("id", { ascending: true })
-      .limit(1)
+      .eq("id", 1)
       .maybeSingle();
 
     return NextResponse.json({ success: true, data: data || null });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }
 }
 
@@ -25,14 +24,8 @@ export async function POST(req: NextRequest) {
     const isAllowed = body.maintenance_mode === "none" && body.allow_google_index !== false;
     const sName = body.site_name || body.siteName || body.storeName || "آکسون | Axon";
 
-    const { data: existingRecords } = await supabaseAdmin
-      .from("site_info")
-      .select("id")
-      .limit(1);
-
-    const existingId = existingRecords && existingRecords.length > 0 ? existingRecords[0].id : null;
-
-    const corePayload: Record<string, any> = {
+    const payload: Record<string, any> = {
+      id: 1,
       site_name: sName,
       store_name: sName,
       tagline: body.tagline || "",
@@ -40,8 +33,8 @@ export async function POST(req: NextRequest) {
       email: body.email || "",
       address: body.address || "",
       working_hours: body.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-      logo_url: body.logo_url || body.logoUrl || "",
-      footer_logo_url: body.footer_logo_url || body.footerLogoUrl || "",
+      logo_url: body.logo_url || body.logoUrl || null,
+      footer_logo_url: body.footer_logo_url || body.footerLogoUrl || null,
       description: body.description || body.footer_text || "",
       footer_text: body.footer_text || body.description || "",
       allow_google_index: isAllowed,
@@ -59,38 +52,23 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    let resultData = null;
+    const { data, error } = await supabaseAdmin
+      .from("site_info")
+      .upsert(payload, { onConflict: "id" })
+      .select()
+      .single();
 
-    if (existingId !== null && existingId !== undefined) {
-      const { data, error } = await supabaseAdmin
-        .from("site_info")
-        .update(corePayload)
-        .eq("id", existingId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      resultData = data;
-    } else {
-      const { data, error } = await supabaseAdmin
-        .from("site_info")
-        .insert([corePayload])
-        .select()
-        .single();
-
-      if (error) throw error;
-      resultData = data;
-    }
+    if (error) throw error;
 
     return NextResponse.json({
       success: true,
-      message: "تنظیمات با موفقیت در دیتابیس ثبت و فعال گردید.",
-      data: resultData || corePayload,
+      message: "تنظیمات با موفقیت در دیتابیس ذخیره شد.",
+      data: data || payload,
     });
   } catch (err: any) {
-    console.error("API Site-Info POST Error:", err);
+    console.error("API Site-Info Save Error:", err);
     return NextResponse.json(
-      { success: false, message: err?.message || "خطا در ذخیره‌سازی اطلاعات" },
+      { success: false, message: err?.message || "خطا در ذخیره‌سازی در دیتابیس" },
       { status: 500 }
     );
   }

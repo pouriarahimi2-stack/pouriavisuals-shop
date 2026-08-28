@@ -227,6 +227,7 @@ export const productService = {
       );
 
       const dbPayload: any = {
+        id: normalized.id,
         title: normalized.title,
         name: normalized.title,
         title_fa: normalized.title_fa || null,
@@ -254,42 +255,29 @@ export const productService = {
         updated_at: new Date().toISOString(),
       };
 
-      let savedData: any = null;
-
-      if (p.id && !p.id.startsWith("temp_") && !p.id.startsWith("p_")) {
+      if (supabase) {
         const { data, error } = await supabase
           .from("products")
-          .update(dbPayload)
-          .eq("id", p.id)
+          .upsert(dbPayload, { onConflict: "id" })
           .select()
           .single();
 
         if (error) throw error;
-        savedData = data;
-      } else {
-        const { data, error } = await supabase
-          .from("products")
-          .insert([dbPayload])
-          .select()
-          .single();
+        const result = normalizeProduct(data || dbPayload);
 
-        if (error) throw error;
-        savedData = data;
+        if (typeof window !== "undefined") {
+          const currentList = this.getAllSync();
+          const updatedList = [
+            result,
+            ...currentList.filter((item) => String(item.id) !== String(result.id)),
+          ];
+          localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updatedList));
+          window.dispatchEvent(new CustomEvent("products_updated", { detail: updatedList }));
+        }
+
+        return result;
       }
-
-      const result = normalizeProduct(savedData || { ...p, ...dbPayload });
-
-      if (typeof window !== "undefined") {
-        const currentList = this.getAllSync();
-        const updatedList = [
-          result,
-          ...currentList.filter((item) => String(item.id) !== String(result.id)),
-        ];
-        localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updatedList));
-        window.dispatchEvent(new CustomEvent("products_updated", { detail: updatedList }));
-      }
-
-      return result;
+      return null;
     } catch (err) {
       console.error("productService.saveProduct error:", err);
       return null;

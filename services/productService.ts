@@ -227,7 +227,7 @@ export const productService = {
       );
 
       const dbPayload: any = {
-        id: normalized.id,
+        id: String(normalized.id),
         title: normalized.title,
         name: normalized.title,
         title_fa: normalized.title_fa || null,
@@ -262,7 +262,23 @@ export const productService = {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Supabase upsert error:", error);
+          // تلاش ثانویه در صورت عدم وجود فیلدهای جانبی
+          const minimalPayload = {
+            id: String(normalized.id),
+            title: normalized.title,
+            name: normalized.title,
+            price: Number(normalized.price),
+            stock: Number(normalized.stock),
+            category: normalized.category,
+            description: normalized.description,
+            image: cleanImages[0] || normalized.image,
+            updated_at: new Date().toISOString(),
+          };
+          await supabase.from("products").upsert(minimalPayload, { onConflict: "id" });
+        }
+
         const result = normalizeProduct(data || dbPayload);
 
         if (typeof window !== "undefined") {

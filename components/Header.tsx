@@ -398,18 +398,18 @@ export default function Header() {
         </div>
       )}
 
-      {/* بار اصلی هدر - ساختار کپسولی یکپارچه بدون بیرون‌زدگی دکمه‌ها */}
-      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-3 transition-colors duration-300">
+      {/* کپسول سراسری هدر: تمام اجزا دقیقاً درون یک کادر منسجم قرار دارند */}
+      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3.5 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-3 transition-colors duration-300">
         
-        {/* راست: لوگو، نام برند و دسته‌بندی */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* ۱. بخش راست: منوی همبرگری موبایل + لوگوی برند + نام سایت + منوی دسته‌بندی */}
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
           <button
             onClick={() => {
               soundEngine.playClick();
               setMobileMenuOpen(!mobileMenuOpen);
             }}
             className="lg:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
-            aria-label="Toggle Mobile Menu"
+            aria-label="Toggle Navigation Menu"
           >
             ☰
           </button>
@@ -426,7 +426,7 @@ export default function Header() {
             </div>
             <div className="flex flex-col text-right">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
+                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
                   {storeName}
                 </span>
                 <span
@@ -438,7 +438,7 @@ export default function Header() {
                   title={isOnline ? "سامانه آنلاین و فعال" : "در حال تعمیرات"}
                 />
               </div>
-              <span className="text-[10px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
+              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
                 {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و استودیو"}
               </span>
             </div>
@@ -459,14 +459,14 @@ export default function Header() {
             >
               <span>☰</span>
               <span>دسته‌بندی‌ها</span>
-              <span className="text-[9px]">▾</span>
+              <span className="text-[9px] opacity-80">▾</span>
             </button>
 
             {isCategoryOpen && (
               <div className="absolute top-11 right-0 w-60 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
                 <button
                   onClick={() => handleSelectCategory("all")}
-                  className={`w-full flex items-center justify-between p-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-black transition cursor-pointer ${
                     selectedCategory === "all"
                       ? "bg-[var(--accent-blue)] text-white shadow-sm"
                       : "text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
@@ -480,7 +480,7 @@ export default function Header() {
                   <button
                     key={cat.id || cat.name}
                     onClick={() => handleSelectCategory(cat.name)}
-                    className={`w-full flex items-center justify-between p-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                       selectedCategory === cat.name
                         ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
                         : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
@@ -495,23 +495,23 @@ export default function Header() {
           </div>
         </div>
 
-        {/* وسط: پیوندهای اصلی ناوبری */}
+        {/* ۲. بخش وسط: پیوندهای ناوبری اصلی */}
         <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
               key={idx}
               href={link.href}
-              className="px-3 py-1.5 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
+              className="px-3.5 py-1.5 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
             >
               {link.title}
             </Link>
           ))}
         </nav>
 
-        {/* چپ: جستجو، تم و دکمه سبد خرید کاملاً درون کپسول هدر */}
+        {/* ۳. بخش چپ: کادر جستجو + تم شب/روز + دکمه سبد خرید فقط آیکون */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative hidden lg:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 shadow-sm h-9">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-44 shadow-sm h-9">
               <span className="text-xs opacity-70">🔍</span>
               <input
                 type="text"
@@ -524,10 +524,10 @@ export default function Header() {
             </div>
 
             {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-11 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1 w-72">
+              <div className="absolute top-11 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72">
                 <div className="max-h-60 overflow-y-auto space-y-1">
                   {searchResults.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--input-bg)] transition gap-2">
+                    <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
                       <Link
                         href={`/products/${p.id}`}
                         onClick={() => {
@@ -539,7 +539,7 @@ export default function Header() {
                         <img
                           src={p.images?.[0] || p.image || "/placeholder.png"}
                           alt=""
-                          className="w-8 h-8 object-contain rounded bg-white/5 p-0.5 border border-[var(--card-border)] shrink-0"
+                          className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 border border-[var(--card-border)] shrink-0"
                         />
                         <div className="flex-1 min-w-0 text-right">
                           <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
@@ -570,18 +570,21 @@ export default function Header() {
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید در انتهای کپسول هدر */}
+          {/* دکمه سبد خرید (فقط آیکون بدون نوشته) */}
           <button
             onClick={() => {
               soundEngine.playClick();
               toggleCart();
             }}
-            className="relative h-9 px-3.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition shadow-md cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+            className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white transition-all shadow-md shadow-blue-500/25 cursor-pointer flex items-center justify-center shrink-0"
+            title="مشاهده سبد خرید"
+            aria-label="سبد خرید"
           >
-            <span>🛒</span>
-            <span className="font-bold hidden sm:inline">سبد خرید</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
             {totalCartCount > 0 && (
-              <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center shadow-md animate-pulse">
+              <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse">
                 {totalCartCount}
               </span>
             )}
@@ -591,17 +594,19 @@ export default function Header() {
 
       {/* منوی ریسپانسیو موبایل */}
       {mobileMenuOpen && (
-        <div className="lg:hidden mt-2 p-3 bg-[var(--modal-bg)] rounded-2xl border border-[var(--card-border)] shadow-xl space-y-1.5 animate-fadeIn">
-          {navLinks.map((link, idx) => (
-            <Link
-              key={idx}
-              href={link.href}
-              onClick={() => setMobileMenuOpen(false)}
-              className="block p-2 rounded-lg bg-[var(--input-bg)] text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition"
-            >
-              {link.title}
-            </Link>
-          ))}
+        <div className="lg:hidden mt-2 p-3 bg-[var(--modal-bg)] rounded-2xl border border-[var(--card-border)] shadow-2xl space-y-1.5 animate-fadeIn">
+          <div className="flex flex-col space-y-1 text-xs font-bold">
+            {navLinks.map((link, idx) => (
+              <Link
+                key={idx}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-xl bg-[var(--input-bg)] flex items-center gap-2"
+              >
+                {link.title}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
@@ -625,7 +630,7 @@ export default function Header() {
               {cartItems.length === 0 ? (
                 <div className="py-20 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2">
                   <span className="text-3xl block">🛍️</span>
-                  <p>سبد خرید شما در حال حاضر خالی است.</p>
+                  <p>سبد خرید شما خالی است.</p>
                 </div>
               ) : (
                 <div className="space-y-2.5">
@@ -634,11 +639,11 @@ export default function Header() {
                       key={item.id}
                       className="flex items-center justify-between p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs gap-2 shadow-sm"
                     >
-                      <img src={item.image} alt={item.title || item.name} className="w-10 h-10 object-contain rounded bg-[var(--modal-bg)] p-1 border border-[var(--card-border)]" />
+                      <img src={item.image} alt={item.title || item.name} className="w-10 h-10 object-contain rounded-lg bg-[var(--modal-bg)] p-1 border border-[var(--card-border)]" />
                       <div className="flex-1 space-y-0.5 min-w-0">
                         <h4 className="font-bold truncate text-[var(--text-primary)]">{item.title || item.name}</h4>
                         <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold block">
-                          {((item.discountPrice ?? item.price) * (item.quantity || 1)).toLocaleString("fa-IR")} ت
+                          {((item.discountPrice ?? item.price) * (item.quantity || 1)).toLocaleString("fa-IR")} تومان
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-lg px-2 py-0.5">

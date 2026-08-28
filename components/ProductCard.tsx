@@ -17,7 +17,7 @@ export default function ProductCard({ product }: { product: any }) {
     setMounted(true);
   }, []);
 
-  const title = product.title || product.title_fa || product.name || "محصول تخصصی";
+  const title = product.title || product.title_fa || product.name || "کالای دیجیتال";
   const price = Number(product.price) || 0;
   const discountPrice =
     product.discountPrice !== undefined && product.discountPrice !== null
@@ -41,16 +41,10 @@ export default function ProductCard({ product }: { product: any }) {
     product.isAvailable !== false &&
     stockCount > 0;
 
-  const isLowStock = isAvailable && stockCount <= 3;
-
   const discountPercent =
     discountPrice && discountPrice < price
       ? Math.round(((price - discountPrice) / price) * 100)
       : 0;
-
-  const handleCardClick = () => {
-    userBehavior.trackProductView(product.id, category);
-  };
 
   const handleQuickBuy = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -87,13 +81,13 @@ export default function ProductCard({ product }: { product: any }) {
 
   return (
     <div
-      onClick={handleCardClick}
-      className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
+      onClick={() => userBehavior.trackProductView(product.id, category)}
+      className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
       dir="rtl"
     >
       {/* باکس تصویر محصول */}
-      <div className="relative w-full h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
-        <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center relative">
+      <div className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-3.5 flex items-center justify-center p-3 border border-[var(--card-border)]">
+        <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center">
           <img
             src={mainImage}
             alt={title}
@@ -102,17 +96,17 @@ export default function ProductCard({ product }: { product: any }) {
         </Link>
         
         {discountPercent > 0 && (
-          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[11px] px-2.5 py-1 rounded-full font-black shadow-lg">
+          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black shadow-lg">
             {discountPercent}٪- تخفیف
           </span>
         )}
 
-        <span className="absolute top-3 left-3 bg-black/50 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-bold">
+        <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">
           {product.badge || category}
         </span>
 
         {!isAvailable && (
-          <div className="absolute inset-0 bg-black/65 backdrop-blur-xs flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
             <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
               ناموجود در انبار
             </span>
@@ -120,17 +114,22 @@ export default function ProductCard({ product }: { product: any }) {
         )}
       </div>
 
-      {/* جزئیات و تایتل */}
-      <div className="flex flex-col flex-grow space-y-2 mb-4">
+      {/* اطلاعات و تیتر کالا - بدون سه نقطه اشتباه اول نام کالا */}
+      <div className="flex flex-col flex-grow space-y-2 mb-3">
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Pro"}</span>
           <span className={`font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
-            {isAvailable ? (isLowStock ? `فقط ${stockCount} عدد باقیست ⚠️` : "موجود در انبار ✓") : "ناموجود"}
+            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
           </span>
         </div>
 
         <Link href={`/products/${product.id}`} className="hover:text-[var(--accent-blue)] transition-colors">
-          <h3 className="font-black text-sm text-[var(--text-primary)] line-clamp-2 leading-snug">{title}</h3>
+          <h3 
+            className="font-black text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
+            style={{ direction: "rtl", textAlign: "right" }}
+          >
+            {title}
+          </h3>
         </Link>
 
         <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 font-medium leading-relaxed">
@@ -147,7 +146,7 @@ export default function ProductCard({ product }: { product: any }) {
                 {mounted ? price.toLocaleString("fa-IR") : price}
               </span>
             )}
-            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
+            <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
               {mounted ? currentPrice.toLocaleString("fa-IR") : currentPrice}{" "}
               <span className="text-xs font-bold font-sans">تومان</span>
             </span>

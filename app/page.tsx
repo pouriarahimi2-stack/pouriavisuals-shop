@@ -1,3 +1,4 @@
+// File Path: app/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -16,6 +17,8 @@ import { userBehavior } from "@/lib/userBehavior";
 
 export default function HomePage() {
   const router = useRouter();
+  const { addToCart } = useCart();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
@@ -23,11 +26,10 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
 
-  // سیستم مقایسه تعاملی چند کالا
+  // سیستم مقایسه چند محصولی
   const [compareList, setCompareList] = useState<Product[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
-
-  const { addToCart } = useCart();
+  const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
@@ -37,7 +39,7 @@ export default function HomePage() {
         siteInfoService.getSiteInfo(),
       ]);
 
-      // مرتب‌سازی هوشمند کالاها بر اساس رفتار و کوکی‌های ثبت‌شده کاربر
+      // مرتب‌سازی هوشمند کالاها بر اساس کوکی و رفتار کاربر
       const topCat = userBehavior.getTopInterestCategory();
       let sortedProducts = prods || [];
       if (topCat !== "all") {
@@ -53,6 +55,8 @@ export default function HomePage() {
       if (info) setSiteInfo(info);
     } catch (e) {
       console.error("Home page realtime fetch error:", e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -77,6 +81,7 @@ export default function HomePage() {
     };
   }, []);
 
+  // چرخش اتوماتیک هر ۶ ثانیه اسلایدر
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -98,6 +103,16 @@ export default function HomePage() {
     }
   };
 
+  const handlePrevSlide = () => {
+    soundEngine.playClick();
+    setCurrentSlideIndex((prev) => (prev === 0 ? banners.length - 1 : prev - 1));
+  };
+
+  const handleNextSlide = () => {
+    soundEngine.playClick();
+    setCurrentSlideIndex((prev) => (prev + 1) % banners.length);
+  };
+
   const categoriesList = Array.from(
     new Set(products.map((p) => p.category || (p as any).category_name || "کالای دیجیتال"))
   ).filter(Boolean);
@@ -113,15 +128,15 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 space-y-12 mt-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-10 mt-3 sm:mt-5">
         
-        {/* ۱. اسلایدر هوشمند بنرهای داینامیک */}
+        {/* ۱. اسلایدر هوشمند بنرهای تبلیغاتی با دکمه‌های ناوبری */}
         {banners.length > 0 && (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
-              className="min-h-[380px] sm:min-h-[480px] p-8 sm:p-16 flex items-center bg-cover bg-center transition-all duration-700 relative"
+              className="min-h-[380px] sm:min-h-[480px] p-6 sm:p-14 flex items-center bg-cover bg-center transition-all duration-700 relative"
               style={{
-                backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.3)), url(${activeBanner?.image || (activeBanner as any)?.image_url || ""})`,
+                backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.35)), url(${activeBanner?.image || (activeBanner as any)?.image_url || ""})`,
               }}
             >
               <div className="max-w-2xl space-y-4 z-10 text-white animate-fadeIn">
@@ -133,16 +148,20 @@ export default function HomePage() {
                   )}
                 </div>
 
-                <h1 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight drop-shadow-md">
+                <h1 className="text-2xl sm:text-5xl font-black leading-tight tracking-tight drop-shadow-md">
                   {activeBanner?.title}
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl font-medium drop-shadow-sm">
-                  {activeBanner?.subtitle}
-                </p>
+                
+                {activeBanner?.subtitle && (
+                  <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl font-medium drop-shadow-sm">
+                    {activeBanner.subtitle}
+                  </p>
+                )}
+
                 <div className="pt-2 flex items-center gap-3">
                   <Link
                     href={activeBanner?.link || (activeBanner as any)?.link_url || "/products"}
-                    className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-white text-gray-900 font-black text-xs hover:bg-slate-100 transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
+                    className="inline-flex items-center gap-2 px-7 py-3.5 sm:px-8 sm:py-4 rounded-2xl bg-white text-gray-900 font-black text-xs hover:bg-slate-100 transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
                   >
                     <span>{activeBanner?.button_text || "مشاهده و بررسی کالا"}</span>
                     <span>←</span>
@@ -150,42 +169,61 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* دکمه‌های ناوبری قبلی/بعدی اسلایدر */}
               {banners.length > 1 && (
-                <div className="absolute bottom-6 left-8 flex items-center gap-2 z-20">
-                  {banners.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        soundEngine.playClick();
-                        setCurrentSlideIndex(idx);
-                      }}
-                      className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                        currentSlideIndex === idx ? "w-8 bg-[var(--accent-blue)]" : "w-2.5 bg-white/40 hover:bg-white/70"
-                      }`}
-                      title={`اسلاید ${idx + 1}`}
-                    />
-                  ))}
-                </div>
+                <>
+                  <button
+                    onClick={handlePrevSlide}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl bg-black/40 hover:bg-black/70 text-white border border-white/20 flex items-center justify-center text-sm font-bold transition opacity-0 group-hover:opacity-100 z-20 cursor-pointer"
+                    title="اسلاید قبلی"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    onClick={handleNextSlide}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl bg-black/40 hover:bg-black/70 text-white border border-white/20 flex items-center justify-center text-sm font-bold transition opacity-0 group-hover:opacity-100 z-20 cursor-pointer"
+                    title="اسلاید بعدی"
+                  >
+                    ◀
+                  </button>
+
+                  <div className="absolute bottom-5 left-6 flex items-center gap-2 z-20">
+                    {banners.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setCurrentSlideIndex(idx);
+                        }}
+                        className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                          currentSlideIndex === idx ? "w-8 bg-[var(--accent-blue)]" : "w-2.5 bg-white/40 hover:bg-white/70"
+                        }`}
+                        title={`اسلاید ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </section>
         )}
 
-        {/* ۲. ویجت فشرده، نئونی و جذاب «جدیدترین اخبار حوزه تکنولوژی» */}
+        {/* ۲. ویجت فشرده جدیدترین اخبار حوزه تکنولوژی */}
         <TechRadarFeed />
 
-        {/* ۳. ویترین و کاتالوگ محصولات با اولویت فروش حداکثری */}
+        {/* ۳. ویترین و کاتالوگ محصولات */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
             <div>
-              <h3 className="text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
+              <h3 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
                 <span>📦</span> محصولات ویژه‌ی فروشگاه
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-                {selectedCategory === "all" ? "تمامی کالاهای موجود با تست سلامت فیزیکی و گارانتی معتبر" : `نمایش دسته‌بندی: ${selectedCategory}`}
+                {selectedCategory === "all" ? "تمامی کالاهای موجود با تست سلامت فیزیکی و گارانتی اصالت معتبر" : `نمایش دسته‌بندی: ${selectedCategory}`}
               </p>
             </div>
 
+            {/* فیلتر تب‌های دسته‌بندی */}
             <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none text-xs">
               <button
                 onClick={() => {
@@ -219,8 +257,14 @@ export default function HomePage() {
             </div>
           </div>
 
-          {filteredProducts.length === 0 ? (
-            <div className="rounded-3xl p-16 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2 bg-[var(--modal-bg)] border border-[var(--card-border)]">
+          {loading && products.length === 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-80 rounded-[2rem] bg-[var(--input-bg)] animate-pulse border border-[var(--card-border)]" />
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="rounded-3xl p-16 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2 bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
               <span className="text-3xl block">📦</span>
               <p>محصولی در این دسته‌بندی یافت نشد.</p>
             </div>
@@ -286,11 +330,11 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ۴. مجله تخصصی، مقالات و راهنمای خرید */}
-        <section className="p-8 rounded-[2.5rem] space-y-6 my-12 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
+        {/* ۴. بخش مجله تخصصی */}
+        <section className="p-6 sm:p-8 rounded-[2.5rem] space-y-6 my-10 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
-              <h3 className="text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
                 <span>📚</span> مجله تخصصی و راهنمای خرید سخت‌افزار
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">جدیدترین تحلیل‌های فنی و مقایسه نمایشگرها</p>
@@ -307,6 +351,7 @@ export default function HomePage() {
         </section>
       </div>
 
+      {/* مدال تعاملی بررسی جزئیات کالا */}
       {selectedProductForModal && (
         <ProductDetailsModal
           product={selectedProductForModal}
@@ -315,6 +360,7 @@ export default function HomePage() {
         />
       )}
 
+      {/* مدال مقایسه ساید‌بای‌ساید */}
       <ProductComparisonModal
         products={compareList}
         isOpen={isCompareOpen}
@@ -354,10 +400,10 @@ function HomeProductCard({
     : 0;
 
   return (
-    <div className="rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 sm:p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] hover:shadow-2xl transition duration-300 group shadow-sm select-none">
+    <div className="rounded-[2.2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 sm:p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] hover:shadow-2xl transition duration-300 group shadow-sm select-none">
       <div
         onClick={() => onOpenDetails(product)}
-        className="relative w-full h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center cursor-pointer border border-[var(--card-border)]"
+        className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center cursor-pointer border border-[var(--card-border)]"
       >
         <img
           src={displayImage}
@@ -366,7 +412,7 @@ function HomeProductCard({
         />
 
         {discountPercent > 0 && (
-          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[11px] px-2.5 py-1 rounded-full font-black shadow-lg">
+          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black shadow-lg">
             {discountPercent}٪- تخفیف
           </span>
         )}
@@ -385,6 +431,14 @@ function HomeProductCard({
         >
           {isCompared ? "✓ در مقایسه" : "⚖️ مقایسه"}
         </button>
+
+        {!isAvailable && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
+            <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
+              ناموجود در انبار
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2 cursor-pointer" onClick={() => onOpenDetails(product)}>
@@ -403,19 +457,22 @@ function HomeProductCard({
           </span>
         </div>
 
-        <h4 className="font-extrabold text-sm hover:text-[var(--accent-blue)] transition text-[var(--text-primary)] leading-snug line-clamp-1">
+        <h4 
+          className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
+          style={{ direction: "rtl", textAlign: "right" }}
+        >
           {productName}
         </h4>
-        <p className="text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
+        <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
           {(product as any).title_fa || product.short_description || product.description}
         </p>
 
         <div className="flex items-center gap-2 pt-1">
-          <span className="font-black text-base text-emerald-600 dark:text-emerald-400 font-mono">
+          <span className="font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 font-mono">
             {currentPrice.toLocaleString("fa-IR")} تومان
           </span>
           {oldPrice > currentPrice && (
-            <span className="text-xs line-through text-[var(--text-secondary)] font-mono">
+            <span className="text-[11px] line-through text-[var(--text-secondary)] font-mono">
               {oldPrice.toLocaleString("fa-IR")}
             </span>
           )}
@@ -436,7 +493,7 @@ function HomeProductCard({
             });
           }}
           disabled={!isAvailable}
-          className="py-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] font-bold text-xs cursor-pointer border border-[var(--card-border)] disabled:opacity-40"
+          className="py-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] font-bold text-xs cursor-pointer border border-[var(--card-border)] disabled:opacity-40 shadow-sm"
         >
           🛒 سبد خرید
         </button>

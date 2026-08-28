@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
-// اعتبارسنجی دقیق الگوریتم کد پستی ده‌رقمی ایران
+// الگوریتم رسمی و بدون نقص اعتبارسنجی کد پستی ۱۰ رقمی ایران
 function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
   const cleanCode = postalCode
@@ -75,7 +75,7 @@ export default function Header() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
 
-  // فرم ثبت مشخصات خریدار درون دراور
+  // فرم ثبت مشخصات خریدار درون دراور سبد خرید
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -85,7 +85,7 @@ export default function Header() {
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // احراز هویت پیامکی دو مرحله‌ای OTP
+  // احراز هویت پیامکی ۲ مرحله‌ای با کد ۶ رقمی OTP
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [userOtpInput, setUserOtpInput] = useState("");
@@ -112,7 +112,7 @@ export default function Header() {
 
   const finalTotal = Math.max(0, rawTotal - discountAmount);
 
-  // تایمر شمارش معکوس OTP
+  // تایمر ۲ دقیقه‌ای شمارنده معکوس کد OTP
   useEffect(() => {
     let interval: any;
     if (showOtpModal && otpTimer > 0) {
@@ -378,7 +378,7 @@ export default function Header() {
       : [
           { title: "صفحه نخست", href: "/" },
           { title: "کاتالوگ محصولات", href: "/#products" },
-          { title: "📡 رادار اخبار تکنولوژی", href: "/news" },
+          { title: "📡 اخبار تکنولوژی", href: "/news" },
           { title: "پیگیری سفارش", href: "/track-order" },
           { title: "مجله تخصصی سئو", href: "/blog" },
           { title: "تماس با ما", href: "/contact" },
@@ -390,17 +390,18 @@ export default function Header() {
 
   return (
     <header className="sticky top-2 sm:top-4 z-40 max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
-      {/* نوار اعلانات هدر */}
+      {/* نوار اعلانات متحرک بالای هدر */}
       {siteInfo?.header_announcement && (
-        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-blue-600/20 border border-[var(--card-border)] text-center text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md">
+        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md">
           {siteInfo.header_announcement}
         </div>
       )}
 
+      {/* بار اصلی هدر با استایل گلس‌مورفیسم */}
       <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-3 rounded-[2rem] shadow-2xl border border-[var(--card-border)] transition-colors duration-300">
         <div className="flex items-center justify-between gap-4">
           
-          {/* بخش راست: لوگو، عنوان فروشگاه و انتخابگر دسته‌بندی */}
+          {/* راست: لوگو، نام برند و انتخابگر دسته‌بندی */}
           <div className="flex items-center gap-3.5 shrink-0">
             <button
               onClick={() => {
@@ -414,7 +415,7 @@ export default function Header() {
             </button>
 
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
+              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
                 {logoUrl ? (
                   <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
                 ) : (
@@ -427,7 +428,7 @@ export default function Header() {
                     {storeName}
                   </span>
                   <span
-                    className={`w-2.5 h-2.5 rounded-full transition-all duration-500 ${
+                    className={`w-2 h-2 rounded-full transition-all duration-500 ${
                       isOnline
                         ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)] animate-pulse"
                         : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)]"
@@ -441,7 +442,7 @@ export default function Header() {
               </div>
             </Link>
 
-            {/* انتخابگر کشویی دسته‌بندی‌ها */}
+            {/* دراپ‌داون انتخاب دسته‌بندی */}
             <div className="relative hidden md:block" ref={categoryDropdownRef}>
               <button
                 onClick={() => {
@@ -492,7 +493,7 @@ export default function Header() {
             </div>
           </div>
 
-          {/* بخش وسط: پیوندهای هدر دسکتاپ */}
+          {/* وسط: پیوندهای اصلی ناوبری */}
           <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
             {navLinks.map((link, idx) => (
               <Link
@@ -505,7 +506,7 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* بخش چپ: جستجو، تم و سبد خرید */}
+          {/* چپ: باکس جستجوی زنده، دکمه تم و سبد خرید */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <div className="relative hidden sm:block" ref={searchContainerRef}>
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 lg:w-48 shadow-sm h-11">
@@ -608,7 +609,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* دراور کامل سبد خرید، فرم آدرس و پرداخت */}
+      {/* دراور کامل سبد خرید و فرم تسویه */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
           <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-6 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
@@ -764,7 +765,7 @@ export default function Header() {
                           required
                           value={postalCode}
                           onChange={(e) => setPostalCode(e.target.value)}
-                          className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono outline-none focus:border-[var(--accent-blue)] text-center font-bold"
+                          className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono outline-none focus:border-[var(--accent-blue)] text-center font-bold text-[var(--text-primary)]"
                         />
                       </div>
                     </div>

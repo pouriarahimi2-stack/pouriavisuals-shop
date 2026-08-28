@@ -13,4 +13,4 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
-export default supabaseAdmin;
+export default supabaseAdmin;ط

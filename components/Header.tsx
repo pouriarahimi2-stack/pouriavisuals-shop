@@ -61,7 +61,7 @@ export default function Header() {
   const submitOrder = cartContext?.submitOrder;
 
   const [mounted, setMounted] = useState(false);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
@@ -347,9 +347,10 @@ export default function Header() {
         if (typeof submitOrder === "function") {
           submitOrder(orderData);
         } else {
-          const existing = JSON.parse(localStorage.getItem("site_orders") || "[]");
-          localStorage.setItem("site_orders", JSON.stringify([orderData, ...existing]));
-          localStorage.setItem("admin_orders_cache", JSON.stringify([orderData, ...existing]));
+          const existing = JSON.parse(localStorage.getItem("axon_orders_registry_cache_v2026") || "[]");
+          localStorage.setItem("axon_orders_registry_cache_v2026", JSON.stringify([orderData, ...existing]));
+          sessionStorage.setItem("pending_payment_amount", String(finalTotal));
+          sessionStorage.setItem("pending_payment_order_id", orderId);
         }
 
         setFirstName("");
@@ -389,7 +390,7 @@ export default function Header() {
   const isOnline = siteInfo?.maintenance_mode === "none";
 
   return (
-    <header className="sticky top-2 sm:top-4 z-40 max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
+    <header className="sticky top-2 sm:top-4 z-40 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
       {/* نوار اعلانات متحرک بالای هدر */}
       {siteInfo?.header_announcement && (
         <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md">
@@ -397,210 +398,207 @@ export default function Header() {
         </div>
       )}
 
-      {/* بار اصلی هدر با استایل گلس‌مورفیسم */}
-      <div className="bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-3 rounded-[2rem] shadow-2xl border border-[var(--card-border)] transition-colors duration-300">
-        <div className="flex items-center justify-between gap-4">
-          
-          {/* راست: لوگو، نام برند و انتخابگر دسته‌بندی */}
-          <div className="flex items-center gap-3.5 shrink-0">
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setMobileMenuOpen(!mobileMenuOpen);
-              }}
-              className="lg:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
-              aria-label="Toggle Mobile Menu"
-            >
-              ☰
-            </button>
+      {/* بار اصلی هدر با ساختار کپسولی یکپارچه بدون بیرون‌زدگی دکمه‌ها */}
+      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-3 transition-colors duration-300">
+        
+        {/* راست: لوگو، نام برند و دسته‌بندی */}
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              setMobileMenuOpen(!mobileMenuOpen);
+            }}
+            className="lg:hidden p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
+            aria-label="Toggle Mobile Menu"
+          >
+            ☰
+          </button>
 
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl border border-[var(--card-border)] bg-white/5 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
-                {logoUrl ? (
-                  <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
-                ) : (
-                  <span className="text-2xl font-black text-[var(--accent-blue)]">⚡</span>
-                )}
-              </div>
-              <div className="flex flex-col text-right">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
-                    {storeName}
-                  </span>
-                  <span
-                    className={`w-2 h-2 rounded-full transition-all duration-500 ${
-                      isOnline
-                        ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)] animate-pulse"
-                        : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)]"
-                    }`}
-                    title={isOnline ? "سامانه آنلاین و فعال" : "در حال تعمیرات"}
-                  />
-                </div>
-                <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
-                  {siteInfo?.tagline || "فراتر از تکنولوژی"}
-                </span>
-              </div>
-            </Link>
-
-            {/* دراپ‌داون انتخاب دسته‌بندی */}
-            <div className="relative hidden md:block" ref={categoryDropdownRef}>
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  setIsCategoryOpen(!isCategoryOpen);
-                }}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-black transition-all duration-200 border cursor-pointer ${
-                  isCategoryOpen || selectedCategory !== "all"
-                    ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
-                    : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)]"
-                }`}
-              >
-                <span>☰</span>
-                <span>دسته‌بندی‌ها</span>
-                <span className="text-[9px] opacity-70">▾</span>
-              </button>
-
-              {isCategoryOpen && (
-                <div className="absolute top-14 right-0 w-64 p-2.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
-                  <button
-                    onClick={() => handleSelectCategory("all")}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
-                      selectedCategory === "all"
-                        ? "bg-[var(--accent-blue)] text-white shadow-sm"
-                        : "text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-                    }`}
-                  >
-                    <span>📦 تمامی کالاها</span>
-                    {selectedCategory === "all" && <span>✓</span>}
-                  </button>
-
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.id || cat.name}
-                      onClick={() => handleSelectCategory(cat.name)}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                        selectedCategory === cat.name
-                          ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
-                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-                      }`}
-                    >
-                      <span>🏷️ {cat.name}</span>
-                      {selectedCategory === cat.name && <span>✓</span>}
-                    </button>
-                  ))}
-                </div>
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl border border-[var(--card-border)] bg-gradient-to-tr from-blue-600 to-indigo-600 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
+              {logoUrl ? (
+                <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
+              ) : (
+                <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
               )}
             </div>
-          </div>
-
-          {/* وسط: پیوندهای اصلی ناوبری */}
-          <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)] shadow-inner">
-            {navLinks.map((link, idx) => (
-              <Link
-                key={idx}
-                href={link.href}
-                className="px-3.5 py-2 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
-              >
-                {link.title}
-              </Link>
-            ))}
-          </nav>
-
-          {/* چپ: باکس جستجوی زنده، دکمه تم و سبد خرید */}
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            <div className="relative hidden sm:block" ref={searchContainerRef}>
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 lg:w-48 shadow-sm h-11">
-                <span className="text-xs opacity-70">🔍</span>
-                <input
-                  type="text"
-                  placeholder="جستجو در کالاها..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setIsSearchFocused(true)}
-                  className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] font-bold placeholder-slate-400"
+            <div className="flex flex-col text-right">
+              <div className="flex items-center gap-2">
+                <span className="text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
+                  {storeName}
+                </span>
+                <span
+                  className={`w-2 h-2 rounded-full transition-all duration-500 ${
+                    isOnline
+                      ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)] animate-pulse"
+                      : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)]"
+                  }`}
+                  title={isOnline ? "سامانه آنلاین و فعال" : "در حال تعمیرات"}
                 />
               </div>
-
-              {isSearchFocused && searchResults.length > 0 && (
-                <div className="absolute top-14 left-0 p-2.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-80">
-                  <div className="max-h-64 overflow-y-auto space-y-1.5">
-                    {searchResults.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
-                        <Link
-                          href={`/products/${p.id}`}
-                          onClick={() => {
-                            soundEngine.playClick();
-                            setIsSearchFocused(false);
-                          }}
-                          className="flex items-center gap-2.5 flex-1 min-w-0"
-                        >
-                          <img
-                            src={p.images?.[0] || p.image || "/placeholder.png"}
-                            alt=""
-                            className="w-10 h-10 object-contain rounded-lg bg-white/5 p-1 border border-[var(--card-border)] shrink-0"
-                          />
-                          <div className="flex-1 min-w-0 text-right">
-                            <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
-                            <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400">
-                              {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت
-                            </span>
-                          </div>
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={(e) => handleQuickAddFromSearch(e, p)}
-                          className="px-2.5 py-1.5 rounded-xl text-[10px] font-black bg-[var(--accent-blue)] text-white cursor-pointer shadow-md"
-                        >
-                          {addedItemMap[p.id] ? "✓ اضافه شد" : "+ خرید"}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <span className="text-[10px] sm:text-[11px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
+                {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و استودیو"}
+              </span>
             </div>
+          </Link>
 
-            <button
-              onClick={toggleDarkMode}
-              className="w-11 h-11 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
-              title="تغییر تم"
-            >
-              {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
-            </button>
-
+          {/* دراپ‌داون انتخاب دسته‌بندی */}
+          <div className="relative hidden md:block" ref={categoryDropdownRef}>
             <button
               onClick={() => {
                 soundEngine.playClick();
-                toggleCart();
+                setIsCategoryOpen(!isCategoryOpen);
               }}
-              className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-lg shadow-blue-500/25 cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"
+              className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-xs font-black transition-all duration-200 border cursor-pointer ${
+                isCategoryOpen || selectedCategory !== "all"
+                  ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
+                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)]"
+              }`}
             >
-              <div className="relative flex items-center justify-center">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                {totalCartCount > 0 && (
-                  <span className="absolute -top-2.5 -right-2.5 min-w-[1.2rem] h-[1.2rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[10px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse">
-                    {totalCartCount}
-                  </span>
-                )}
-              </div>
-              <span className="font-bold">سبد خرید</span>
+              <span>☰</span>
+              <span>دسته‌بندی‌ها</span>
+              <span className="text-[9px] opacity-70">▾</span>
             </button>
+
+            {isCategoryOpen && (
+              <div className="absolute top-12 right-0 w-64 p-2.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
+                <button
+                  onClick={() => handleSelectCategory("all")}
+                  className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                    selectedCategory === "all"
+                      ? "bg-[var(--accent-blue)] text-white shadow-sm"
+                      : "text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
+                  }`}
+                >
+                  <span>📦 تمامی کالاها</span>
+                  {selectedCategory === "all" && <span>✓</span>}
+                </button>
+
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id || cat.name}
+                    onClick={() => handleSelectCategory(cat.name)}
+                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      selectedCategory === cat.name
+                        ? "bg-[var(--accent-blue)] text-white shadow-sm font-black"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
+                    }`}
+                  >
+                    <span>🏷️ {cat.name}</span>
+                    {selectedCategory === cat.name && <span>✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* وسط: پیوندهای اصلی ناوبری */}
+        <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
+          {navLinks.map((link, idx) => (
+            <Link
+              key={idx}
+              href={link.href}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap"
+            >
+              {link.title}
+            </Link>
+          ))}
+        </nav>
+
+        {/* چپ: جستجو، تم و دکمه سبد خرید کاملاً درون کپسول هدر */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="relative hidden lg:block" ref={searchContainerRef}>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-44 shadow-sm h-10">
+              <span className="text-xs opacity-70">🔍</span>
+              <input
+                type="text"
+                placeholder="جستجو..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] font-bold placeholder-slate-400"
+              />
+            </div>
+
+            {isSearchFocused && searchResults.length > 0 && (
+              <div className="absolute top-12 left-0 p-2.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-80">
+                <div className="max-h-64 overflow-y-auto space-y-1.5">
+                  {searchResults.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
+                      <Link
+                        href={`/products/${p.id}`}
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setIsSearchFocused(false);
+                        }}
+                        className="flex items-center gap-2.5 flex-1 min-w-0"
+                      >
+                        <img
+                          src={p.images?.[0] || p.image || "/placeholder.png"}
+                          alt=""
+                          className="w-10 h-10 object-contain rounded-lg bg-white/5 p-1 border border-[var(--card-border)] shrink-0"
+                        />
+                        <div className="flex-1 min-w-0 text-right">
+                          <h4 className="text-xs font-black text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
+                          <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400">
+                            {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت
+                          </span>
+                        </div>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={(e) => handleQuickAddFromSearch(e, p)}
+                        className="px-2.5 py-1.5 rounded-xl text-[10px] font-black bg-[var(--accent-blue)] text-white cursor-pointer shadow-md"
+                      >
+                        {addedItemMap[p.id] ? "✓" : "+ خرید"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={toggleDarkMode}
+            className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
+            title="تغییر تم"
+          >
+            {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
+          </button>
+
+          {/* دکمه سبد خرید متصل به دراور */}
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              toggleCart();
+            }}
+            className="relative h-10 px-3.5 sm:px-4 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white font-black text-xs transition-all shadow-md shadow-blue-500/20 cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+          >
+            <span className="text-sm">🛒</span>
+            <span className="font-bold hidden sm:inline">سبد خرید</span>
+            {totalCartCount > 0 && (
+              <span className="min-w-[1.2rem] h-[1.2rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[10px] flex items-center justify-center shadow-md animate-pulse">
+                {totalCartCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
       {/* منوی ریسپانسیو موبایل */}
       {mobileMenuOpen && (
-        <div className="lg:hidden mt-2 p-5 bg-[var(--modal-bg)] rounded-3xl border border-[var(--card-border)] shadow-2xl space-y-3 animate-fadeIn">
-          <div className="flex flex-col space-y-2 text-xs font-bold">
+        <div className="lg:hidden mt-2 p-4 bg-[var(--modal-bg)] rounded-3xl border border-[var(--card-border)] shadow-2xl space-y-2 animate-fadeIn">
+          <div className="flex flex-col space-y-1.5 text-xs font-bold">
             {navLinks.map((link, idx) => (
               <Link
                 key={idx}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-3 rounded-2xl bg-[var(--input-bg)] flex items-center gap-2"
+                className="p-2.5 rounded-xl bg-[var(--input-bg)] flex items-center gap-2"
               >
                 {link.title}
               </Link>
@@ -609,7 +607,7 @@ export default function Header() {
         </div>
       )}
 
-      {/* دراور کامل سبد خرید و فرم تسویه */}
+      {/* دراور کامل سبد خرید و فرم تسویه داخل هدر */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
           <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-6 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
@@ -633,7 +631,7 @@ export default function Header() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {cartItems.map((item) => (
+                  {cartItems.map((item: any) => (
                     <div
                       key={item.id}
                       className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs gap-3 shadow-sm"

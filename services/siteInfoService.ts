@@ -40,8 +40,16 @@ export interface SiteInfo {
   updated_at?: string;
 }
 
+const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
+
 export const siteInfoService = {
   getSiteInfoSync(): SiteInfo {
+    if (typeof window !== "undefined") {
+      try {
+        const local = localStorage.getItem(LOCAL_STORAGE_SITE_INFO);
+        if (local) return JSON.parse(local);
+      } catch {}
+    }
     return {
       site_name: "آکسون | Axon",
       siteName: "آکسون | Axon",
@@ -72,12 +80,12 @@ export const siteInfoService = {
 
         if (data && !error) {
           const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
-          return {
+          const mapped: SiteInfo = {
             id: data.id,
             site_name: data.site_name || data.store_name || "آکسون | Axon",
             siteName: data.site_name || data.store_name || "آکسون | Axon",
             storeName: data.site_name || data.store_name || "آکسون | Axon",
-            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال",
+            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال و استودیو",
             phone: data.phone || "",
             email: data.email || "",
             address: data.address || "",
@@ -103,16 +111,17 @@ export const siteInfoService = {
             youtube: data.youtube || "",
             updated_at: data.updated_at,
           };
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
+          }
+          return mapped;
         }
       }
       return this.getSiteInfoSync();
     } catch {
       return this.getSiteInfoSync();
     }
-  },
-
-  async getAll(): Promise<SiteInfo | null> {
-    return this.getSiteInfo();
   },
 
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
@@ -150,17 +159,16 @@ export const siteInfoService = {
         updated_at: new Date().toISOString(),
       };
 
-      try {
-        await fetch("/api/site-info", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(dbPayload),
-        });
-      } catch {}
-
       if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(dbPayload));
         window.dispatchEvent(new CustomEvent("site_info_updated", { detail: dbPayload }));
       }
+
+      await fetch("/api/site-info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dbPayload),
+      });
 
       return dbPayload;
     } catch {

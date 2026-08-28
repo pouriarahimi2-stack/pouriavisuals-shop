@@ -3,9 +3,6 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "pv_admin_super_secret_session_key_2026_apple_store_secure";
 
-/**
- * تولید توکن امن با امضای دیجیتال HMAC-SHA256
- */
 export function signPayload(payload: any): string {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const hmac = createHmac("sha256", SESSION_SECRET);
@@ -14,9 +11,6 @@ export function signPayload(payload: any): string {
   return `${data}.${signature}`;
 }
 
-/**
- * تأیید صحت امضای دیجیتال و بازیابی پی‌لود
- */
 export function verifyPayload(token: string): any | null {
   try {
     const parts = token.split(".");

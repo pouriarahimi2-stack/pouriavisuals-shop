@@ -3,14 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { smsService } from '@/services/smsService';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const orderId = body.id || `ORD-${Date.now().toString().slice(-6)}`;
 
-    const customerName = (body.customerName || body.customer_name || 'مشتری').trim();
-    const phone = (body.phone || '').trim();
-    const address = (body.address || '').trim();
+    const customerName = String(body.customerName || body.customer_name || 'مشتری گرامی').trim();
+    const phone = String(body.phone || body.customer_phone || '').trim();
+    const address = String(body.address || body.customer_address || '').trim();
     const postalCode = body.postalCode || body.postal_code || null;
     const items = Array.isArray(body.items) ? body.items : [];
     const totalAmount = Number(body.totalAmount || body.total_amount || 0);
@@ -20,17 +22,20 @@ export async function POST(req: NextRequest) {
 
     const orderPayload: any = {
       id: orderId,
+      order_number: orderId,
       customer_name: customerName,
       phone,
       address,
       items,
       total_amount: totalAmount,
       discount_amount: discountAmount,
+      final_amount: Math.max(0, totalAmount - discountAmount),
       status,
+      updated_at: new Date().toISOString(),
     };
 
-    if (postalCode) orderPayload.postal_code = postalCode;
-    if (couponCode) orderPayload.coupon_code = couponCode;
+    if (postalCode) orderPayload.postal_code = String(postalCode).trim();
+    if (couponCode) orderPayload.coupon_code = String(couponCode).trim();
 
     const { data, error } = await supabaseAdmin
       .from('orders')
@@ -45,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     if (items.length > 0) {
       for (const itm of items) {
-        const pId = itm.productId || itm.id;
+        const pId = itm.productId || itm.id || itm.product_id;
         if (pId) {
           try {
             const { data: pData } = await supabaseAdmin

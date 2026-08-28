@@ -1,6 +1,9 @@
+// File Path: app/api/orders/track/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { normalizeOrder } from '@/services/orderService';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,11 +19,10 @@ export async function GET(req: NextRequest) {
 
     const cleanQuery = query.trim();
 
-    // جستجو در فیلدهای مختلف سفارش در جدول orders
     const { data, error } = await supabase
       .from('orders')
       .select('*')
-      .or(`order_number.eq.${cleanQuery},id.eq.${cleanQuery},customer_phone.eq.${cleanQuery},tracking_code.eq.${cleanQuery}`)
+      .or(`order_number.eq.${cleanQuery},id.eq.${cleanQuery},phone.eq.${cleanQuery},tracking_code.eq.${cleanQuery}`)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -31,7 +33,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // در صورتی که فیلدهای تخت پیدا نشد، بررسی کل سفارشات برای تطبیق درون آبجکت customer
     let matchedOrders = data || [];
 
     if (matchedOrders.length === 0) {
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
           String(norm.id) === cleanQuery ||
           norm.orderNumber === cleanQuery ||
           norm.customer.phone === cleanQuery ||
+          norm.phone === cleanQuery ||
           norm.trackingCode === cleanQuery
         );
       });
@@ -60,16 +62,15 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // فرمت‌بندی خروجی منطبق با استیت‌های کامپوننت فرانت‌اند
     const formattedData = matchedOrders.map((ord: any) => {
       const norm = normalizeOrder(ord);
       return {
         id: norm.orderNumber || norm.id,
         orderNumber: norm.orderNumber,
         customerName: norm.customer.fullName || norm.customer.name || 'مشتری گرامی',
-        phone: norm.customer.phone,
-        address: norm.customer.address,
-        postalCode: norm.customer.postalCode,
+        phone: norm.customer.phone || norm.phone,
+        address: norm.customer.address || norm.address,
+        postalCode: norm.customer.postalCode || norm.postalCode,
         items: norm.items,
         totalAmount: norm.finalAmount || norm.totalAmount,
         discountAmount: norm.discountAmount,

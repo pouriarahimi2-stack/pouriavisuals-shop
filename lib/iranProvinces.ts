@@ -1,4 +1,4 @@
-/ File Path: lib/iranProvinces.ts
+// File Path: lib/iranProvinces.ts
 export interface ProvinceData {
   name: string;
   cities: string[];

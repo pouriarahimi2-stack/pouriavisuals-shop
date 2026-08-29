@@ -249,3 +249,5 @@ export const couponService = {
     }
   },
 };
+
+export default couponService;

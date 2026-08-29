@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from "react";
 import { pageService, CustomPage, PageBlock } from "@/services/pageService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function PageBuilder() {
@@ -25,13 +24,13 @@ export default function PageBuilder() {
   useEffect(() => {
     fetchPages();
 
-    const pageChannel = supabase
-      .channel("pagebuilder-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_pages" }, () => fetchPages())
-      .subscribe();
+    const handlePagesUpdate = () => fetchPages();
+    window.addEventListener("page_structure_updated", handlePagesUpdate);
+    window.addEventListener("page_deleted", handlePagesUpdate);
 
     return () => {
-      supabase.removeChannel(pageChannel);
+      window.removeEventListener("page_structure_updated", handlePagesUpdate);
+      window.removeEventListener("page_deleted", handlePagesUpdate);
     };
   }, []);
 

@@ -1,4 +1,3 @@
-// File Path: app/products/[id]/page.tsx
 "use client";
 
 import React, { useState, useEffect, use } from "react";
@@ -207,7 +206,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.title}
             </h1>
 
-            {/* بنرهای تعاملی معرفی کالبدشکافی و گاموت رنگی */}
+            {/* بنرهای تعاملی کالبدشکافی و گاموت رنگی */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div
                 onClick={() => {

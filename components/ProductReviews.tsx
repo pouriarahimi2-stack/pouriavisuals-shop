@@ -58,13 +58,15 @@ export default function ProductReviews({ productId }: { productId: string }) {
   useEffect(() => {
     loadReviews();
 
-    const channel = supabase
-      .channel(`reviews-${productId}-realtime`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "product_reviews" }, () => loadReviews())
-      .subscribe();
+    const handleReviewsUpdate = (e: any) => {
+      if (e.detail?.table === "product_reviews") {
+        loadReviews();
+      }
+    };
+    window.addEventListener("product_reviews_updated", handleReviewsUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("product_reviews_updated", handleReviewsUpdate);
     };
   }, [productId]);
 
@@ -116,7 +118,6 @@ export default function ProductReviews({ productId }: { productId: string }) {
         </div>
       )}
 
-      {/* فرم ثبت دیدگاه */}
       <form onSubmit={handleSubmit} className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4 text-xs">
         <h4 className="font-black text-sm text-[var(--accent-blue)]">✍️ ثبت نظر و امتیاز برای این کالا</h4>
 
@@ -170,7 +171,6 @@ export default function ProductReviews({ productId }: { productId: string }) {
         </button>
       </form>
 
-      {/* لیست دیدگاه‌ها */}
       <div className="space-y-3">
         <h4 className="font-black text-xs text-[var(--text-secondary)]">نظرات ثبت‌شده خریداران ({reviews.length})</h4>
 

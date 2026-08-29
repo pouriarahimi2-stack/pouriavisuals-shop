@@ -93,7 +93,6 @@ export async function PATCH(req: NextRequest) {
 
     if (error || !data) throw error;
 
-    // ارسال پیامک خودکار حاوی پاسخ کارشناس به شماره خریدار
     if (data.phone) {
       const smsText = `کاربر گرامی ${data.full_name}، به پیام شما با موضوع «${data.subject || "مشاوره"}» پاسخ داده شد:\n${admin_reply.substring(0, 120)}\nفروشگاه آکسون`;
       smsService.sendSMS(data.phone, smsText).catch(() => {});

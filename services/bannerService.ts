@@ -69,3 +69,5 @@ export const bannerService = {
     return all.filter((b) => b.is_active !== false);
   },
 };
+
+export default bannerService;

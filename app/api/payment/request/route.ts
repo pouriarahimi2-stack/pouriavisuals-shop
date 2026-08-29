@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select("id, total_amount, final_amount, phone")
-      .eq("id", orderId)
+      .eq("id", String(orderId))
       .single();
 
     if (error || !order) {
@@ -26,7 +26,6 @@ export async function POST(req: NextRequest) {
     const merchantId = process.env.ZARINPAL_MERCHANT_ID;
     const isSandbox = !merchantId || process.env.NODE_ENV !== "production";
 
-    // ارتباط مستقیم با زرین‌پال در پروداکشن
     if (!isSandbox && merchantId) {
       const zarinpalUrl = "https://api.zarinpal.com/pg/v4/payment/request.json";
       const gatewayRes = await fetch(zarinpalUrl, {
@@ -35,7 +34,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           merchant_id: merchantId,
           amount: payableAmount,
-          callback_url: callbackUrl || `${req.nextUrl.origin}/checkout/payment`,
+          callback_url: callbackUrl || `${req.nextUrl.origin}/checkout/payment?orderId=${order.id}`,
           description: `پرداخت فاکتور سفارش ${order.id}`,
           metadata: { mobile: order.phone },
         }),

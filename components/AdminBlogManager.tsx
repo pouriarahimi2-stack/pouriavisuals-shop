@@ -78,16 +78,14 @@ export default function AdminBlogManager() {
     };
     window.addEventListener("fonts_updated", handleFontsUpdated);
 
-    const channel = supabase
-      .channel("posts-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
-        fetchPosts();
-      })
-      .subscribe();
+    const handlePostsUpdate = (e: any) => {
+      if (e.detail?.table === "posts") fetchPosts();
+    };
+    window.addEventListener("posts_updated", handlePostsUpdate);
 
     return () => {
       window.removeEventListener("fonts_updated", handleFontsUpdated);
-      supabase.removeChannel(channel);
+      window.removeEventListener("posts_updated", handlePostsUpdate);
     };
   }, []);
 

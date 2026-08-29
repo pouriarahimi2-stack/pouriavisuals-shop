@@ -1,4 +1,3 @@
-// File Path: app/checkout/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -121,6 +120,12 @@ export default function CheckoutPage() {
           postalCode: postalCode.trim() || undefined,
           notes: notes.trim() || undefined,
         },
+        customer_name: customerName.trim(),
+        phone: cleanPhone,
+        province,
+        city,
+        address: fullAddress,
+        postal_code: postalCode.trim() || undefined,
         items: cartItems.map((item) => ({
           productId: item.id,
           product_id: item.id,
@@ -130,11 +135,16 @@ export default function CheckoutPage() {
           quantity: item.quantity || 1,
           image: item.image,
         })),
+        total_amount: rawTotal,
         totalAmount: rawTotal,
+        discount_amount: discountAmount > 0 ? discountAmount : undefined,
         discountAmount: discountAmount > 0 ? discountAmount : undefined,
+        coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        final_amount: finalPayable,
         finalAmount: finalPayable,
         status: "pending" as const,
+        payment_status: "pending" as const,
         paymentStatus: "pending" as const,
       };
 

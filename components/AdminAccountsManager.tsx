@@ -1,10 +1,8 @@
-// File Path: components/AdminAccountsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
 import { soundEngine } from "@/lib/soundEngine";
-import { supabase } from "@/lib/supabase";
 
 export default function AdminAccountsManager() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -12,13 +10,11 @@ export default function AdminAccountsManager() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // فرم ثبت ادمین جدید
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<AdminRole>("product_manager");
 
-  // فرم ویرایش مدیر
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editFullName, setEditFullName] = useState("");
@@ -41,15 +37,6 @@ export default function AdminAccountsManager() {
 
   useEffect(() => {
     loadAdmins();
-
-    const channel = supabase
-      .channel("admin-accounts-realtime-master")
-      .on("postgres_changes", { event: "*", schema: "public", table: "admin_users" }, () => loadAdmins())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
@@ -236,7 +223,7 @@ export default function AdminAccountsManager() {
         ) : admins.length === 0 ? (
           <div className="py-12 text-center text-xs font-bold text-[var(--text-secondary)]">مدیری ثبت نشده است.</div>
         ) : (
-          <table className="w-full text-right text-xs">
+          <table className="w-full text-right text-xs min-w-[600px]">
             <thead>
               <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
                 <th className="pb-3 px-2">نام مدیر</th>

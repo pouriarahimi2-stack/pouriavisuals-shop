@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
 import { bannerService, Banner } from "@/services/bannerService";
 import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminBanners() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -34,15 +34,14 @@ export default function AdminBanners() {
   useEffect(() => {
     fetchBanners();
 
-    const channel = supabase
-      .channel("banners-admin-realtime-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
-        fetchBanners();
-      })
-      .subscribe();
+    const handleBannersUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setBanners(e.detail);
+      else fetchBanners();
+    };
 
+    window.addEventListener("banners_updated", handleBannersUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("banners_updated", handleBannersUpdate);
     };
   }, []);
 

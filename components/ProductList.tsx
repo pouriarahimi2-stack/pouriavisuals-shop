@@ -6,7 +6,6 @@ import { productService, Product } from "@/services/productService";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
-import { supabase } from "@/lib/supabase";
 
 export default function ProductList() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -39,7 +38,7 @@ export default function ProductList() {
     loadProducts();
 
     const handleUpdate = (e: any) => {
-      if (e.detail) setProducts(e.detail);
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
       else loadProducts();
     };
 
@@ -50,15 +49,9 @@ export default function ProductList() {
     window.addEventListener("products_updated", handleUpdate);
     window.addEventListener("category_selected", handleCategorySelect);
 
-    const channel = supabase
-      .channel("product-list-realtime-master")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadProducts())
-      .subscribe();
-
     return () => {
       window.removeEventListener("products_updated", handleUpdate);
       window.removeEventListener("category_selected", handleCategorySelect);
-      supabase.removeChannel(channel);
     };
   }, []);
 

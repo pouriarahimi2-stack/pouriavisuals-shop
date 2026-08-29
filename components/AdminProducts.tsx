@@ -3,9 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { productService, Product, ProductVariant, MarketBenchmark } from "@/services/productService";
 import { categoryService, Category } from "@/services/categoryService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
-import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
 import ProductExplodedView from "@/components/ProductExplodedView";
 
 export default function AdminProducts() {
@@ -70,14 +68,21 @@ export default function AdminProducts() {
   useEffect(() => {
     loadData();
 
-    const channel = supabase
-      .channel("admin-products-master-realtime-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => loadData())
-      .subscribe();
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
+      else loadData();
+    };
+    const handleCategoriesUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
+      else categoryService.getAll().then((c) => c && setCategories(c));
+    };
+
+    window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("categories_updated", handleCategoriesUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("categories_updated", handleCategoriesUpdate);
     };
   }, []);
 
@@ -178,7 +183,7 @@ export default function AdminProducts() {
 
     try {
       const prompt = `به عنوان مهندس ارشد سخت‌افزار، مشخصات فنی دقیق، توضیحات تبلیغاتی، نکات برجسته و سئو برای کالای «${title.trim()}» در دسته «${category}» تولید کن.
-خروجی فقط یک JSON با ساختار زیر باشد:
+خروجی فقط یک JSON معتبر:
 {
   "titleFa": "عنوان فارسی جذاب",
   "shortDesc": "خلاصه دو خطی جذاب",

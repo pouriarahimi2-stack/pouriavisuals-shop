@@ -1,7 +1,7 @@
 // File Path: lib/fontEngine.ts
 /**
  * موتور مدیریت فونت‌های زنده و تزریق داینامیک تایپوگرافی جهانی به ساختار DOM
- * ذخیره‌سازی ابری در Supabase و کش محلی با پشتیبانی از وزن‌های ۱۰۰ تا ۹۰۰
+ * با پشتیبانی از وزن‌های ۱۰۰ تا ۹۰۰ و کش محلی
  */
 
 export interface CustomFontItem {
@@ -17,7 +17,7 @@ export interface CustomFontItem {
 export const PRESET_FONTS: CustomFontItem[] = [
   {
     id: "vazirmatn",
-    name: "وزیرمتن (Vazirmatn - پیش‌فرض اپلی)",
+    name: "وزیرمتن (Vazirmatn - پیش‌فرض)",
     fontFamily: "Vazirmatn",
     fontUrlOrBase64: "",
     format: "woff2",
@@ -92,7 +92,6 @@ export const PRESET_FONTS: CustomFontItem[] = [
 const LOCAL_FONTS_KEY = "axon_custom_typography_registry_v2026";
 
 export const fontEngine = {
-  // دریافت لیست تمام فونت‌ها
   getAllFonts(): CustomFontItem[] {
     if (typeof window === "undefined") return PRESET_FONTS;
     try {
@@ -105,7 +104,6 @@ export const fontEngine = {
     return PRESET_FONTS;
   },
 
-  // ثبت و تزریق فونت جدید آپلودشده
   registerCustomFont(font: CustomFontItem): boolean {
     if (typeof window === "undefined") return false;
     try {
@@ -123,7 +121,6 @@ export const fontEngine = {
     }
   },
 
-  // تزریق CSS @font-face به هد مرورگر
   injectFontFace(font: CustomFontItem) {
     if (typeof window === "undefined" || !font.fontUrlOrBase64) return;
     const styleId = `font-face-${font.id}`;
@@ -145,7 +142,6 @@ export const fontEngine = {
     `;
   },
 
-  // اعمال فوری فونت انتخابی روی کل سایت یا المنتی خاص
   applyFontToTarget(fontFamily: string, targetSelector: string = "body") {
     if (typeof window === "undefined") return;
     const el = document.querySelector(targetSelector) as HTMLElement | null;

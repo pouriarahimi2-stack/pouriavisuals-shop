@@ -16,12 +16,14 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
   realtime: {
     params: {
       apikey: supabaseAnonKey,
-      eventsPerSecond: 20,
+      eventsPerSecond: 40,
     },
   },
   global: {
     headers: {
-      "x-application-name": "axon-pro-store",
+      "x-application-name": "axon-pro-store-realtime",
     },
   },
 });
+
+export default supabase;

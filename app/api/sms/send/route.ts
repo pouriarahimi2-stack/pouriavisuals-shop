@@ -1,4 +1,4 @@
-// app/api/sms/send/route.ts
+// File Path: app/api/sms/send/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { sendSMS } from '@/services/smsService';
 

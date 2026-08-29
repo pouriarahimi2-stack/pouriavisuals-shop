@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminInventoryManager() {
@@ -18,15 +17,14 @@ export default function AdminInventoryManager() {
   useEffect(() => {
     fetchProducts();
 
-    const channel = supabase
-      .channel("inventory-realtime-channel-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        fetchProducts();
-      })
-      .subscribe();
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
+      else fetchProducts();
+    };
 
+    window.addEventListener("products_updated", handleProductsUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("products_updated", handleProductsUpdate);
     };
   }, []);
 
@@ -34,19 +32,15 @@ export default function AdminInventoryManager() {
     soundEngine.playClick();
     const stockVal = Math.max(0, newStock);
     setUpdatingId(id);
-    if (supabase) {
-      await supabase.from("products").update({ stock: stockVal, is_available: stockVal > 0 }).eq("id", id);
-    }
-    setProducts(products.map((p) => (p.id === id ? { ...p, stock: stockVal, is_available: stockVal > 0 } : p)));
+    await productService.saveProduct({ id, stock: stockVal, isAvailable: stockVal > 0, is_available: stockVal > 0 });
+    setProducts(products.map((p) => (p.id === id ? { ...p, stock: stockVal, is_available: stockVal > 0, isAvailable: stockVal > 0 } : p)));
     setUpdatingId(null);
   };
 
   const toggleAvailability = async (id: string, current: boolean) => {
     soundEngine.playClick();
     setUpdatingId(id);
-    if (supabase) {
-      await supabase.from("products").update({ is_available: !current }).eq("id", id);
-    }
+    await productService.saveProduct({ id, isAvailable: !current, is_available: !current });
     setProducts(products.map((p) => (p.id === id ? { ...p, is_available: !current, isAvailable: !current } : p)));
     setUpdatingId(null);
   };
@@ -81,7 +75,7 @@ export default function AdminInventoryManager() {
       </div>
 
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm overflow-x-auto">
-        <table className="w-full text-right text-xs border-collapse">
+        <table className="w-full text-right text-xs border-collapse min-w-[650px]">
           <thead>
             <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
               <th className="p-3">تصویر</th>
@@ -139,15 +133,15 @@ export default function AdminInventoryManager() {
                   </td>
                   <td className="p-3 text-center">
                     <button
-                      onClick={() => toggleAvailability(p.id, p.is_available !== false)}
+                      onClick={() => toggleAvailability(p.id, p.is_available !== false && p.isAvailable !== false)}
                       disabled={updatingId === p.id}
                       className={`px-4 py-2 rounded-2xl font-black text-xs transition cursor-pointer ${
-                        p.is_available !== false && currentStock > 0
+                        p.is_available !== false && p.isAvailable !== false && currentStock > 0
                           ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
                           : "bg-rose-500/15 text-rose-600 border border-rose-500/30 hover:bg-rose-500 hover:text-white"
                       }`}
                     >
-                      {p.is_available !== false && currentStock > 0 ? "موجود در انبار ✓" : "ناموجود ✕"}
+                      {p.is_available !== false && p.isAvailable !== false && currentStock > 0 ? "موجود در انبار ✓" : "ناموجود ✕"}
                     </button>
                   </td>
                 </tr>

@@ -1,7 +1,8 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { orderService, Order } from "@/services/orderService";
 import { smsService } from "@/services/smsService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminOrders() {
@@ -33,15 +34,14 @@ export default function AdminOrders() {
   useEffect(() => {
     fetchOrders();
 
-    const channel = supabase
-      .channel("orders-admin-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        fetchOrders();
-      })
-      .subscribe();
+    const handleOrdersUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setOrders(e.detail);
+      else fetchOrders();
+    };
 
+    window.addEventListener("orders_updated", handleOrdersUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("orders_updated", handleOrdersUpdate);
     };
   }, []);
 

@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import AdminProducts from "@/components/AdminProducts";
 import AdminCoupons from "@/components/AdminCoupons";
 import AdminBanners from "@/components/AdminBanners";
@@ -23,7 +22,6 @@ import StyleFontManager from "@/components/admin/StyleFontManager";
 import { SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
 import { productService, Product } from "@/services/productService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminPage() {
@@ -50,14 +48,12 @@ export default function AdminPage() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
-  // کنترل وضعیت آنلاین بودن / تعمیرات زمان‌دار / تعمیرات نامحدود
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
   const [maintMinutes, setMaintMinutes] = useState<number>(0);
   const [isSavingMaint, setIsSavingMaint] = useState(false);
 
-  // مدال تغییر رمز عبور و مشخصات
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
@@ -68,7 +64,6 @@ export default function AdminPage() {
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  // مدال مدیریت حساب‌های ادمین و سطوح دسترسی
   const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
   const [newAdminUsername, setNewAdminUsername] = useState("");
@@ -139,13 +134,11 @@ export default function AdminPage() {
     checkAuth();
     fetchSiteInfoLive();
 
-    const channel = supabase
-      .channel("admin-siteinfo-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchSiteInfoLive())
-      .subscribe();
+    const handleSiteUpdate = () => fetchSiteInfoLive();
+    window.addEventListener("site_info_updated", handleSiteUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
     };
   }, [router]);
 

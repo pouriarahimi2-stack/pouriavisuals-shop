@@ -9,7 +9,6 @@ import CartDrawer from "@/components/CartDrawer";
 import { initRealtimeSync } from "@/lib/realtimeSync";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { fontEngine } from "@/lib/fontEngine";
-import { supabase } from "@/lib/supabase";
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -64,19 +63,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
     window.addEventListener("site_info_updated", handleUpdate);
 
-    const channel = supabase
-      .channel("layout_maintenance_realtime_v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
-        if (payload?.new) {
-          updateMaintenanceState(payload.new);
-        }
-      })
-      .subscribe();
-
     return () => {
       if (typeof cleanup === "function") cleanup();
       window.removeEventListener("site_info_updated", handleUpdate);
-      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -135,7 +124,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // صفحه شیشه‌ای و چشم‌نواز حالت تعمیرات
+  // صفحه شیشه‌ای حالت تعمیرات
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";

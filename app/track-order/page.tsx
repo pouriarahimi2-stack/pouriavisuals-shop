@@ -3,7 +3,6 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { Order, orderService } from "@/services/orderService";
 import { soundEngine } from "@/lib/soundEngine";
 
@@ -16,7 +15,6 @@ function TrackOrderContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const fetchOrders = async (queryText: string) => {
@@ -25,7 +23,6 @@ function TrackOrderContent() {
     soundEngine.playClick();
     setLoading(true);
     setErrorMessage(null);
-    setHasSearched(true);
 
     try {
       const results = await orderService.trackOrder(queryText.trim());
@@ -53,39 +50,19 @@ function TrackOrderContent() {
 
   // اشتراک زنده وب‌سوکت برای به‌روزرسانی لحظه‌ای وضعیت بسته پستی
   useEffect(() => {
-    if (orders.length === 0 || !supabase) return;
-
-    const orderIds = orders.map((o) => String(o.id));
-
-    const channel = supabase
-      .channel("track_order_live_realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        (payload: any) => {
-          const updated = payload.new;
-          if (updated && orderIds.includes(String(updated.id))) {
-            setOrders((prev) =>
-              prev.map((ord) =>
-                String(ord.id) === String(updated.id)
-                  ? {
-                      ...ord,
-                      status: updated.status || ord.status,
-                      trackingCode: updated.tracking_code || ord.trackingCode,
-                      tracking_code: updated.tracking_code || ord.tracking_code,
-                    }
-                  : ord
-              )
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    const handleOrdersUpdate = () => {
+      if (searchQuery.trim()) {
+        orderService.trackOrder(searchQuery.trim()).then((res) => {
+          if (res && res.length > 0) setOrders(res);
+        });
+      }
     };
-  }, [orders]);
+
+    window.addEventListener("orders_updated", handleOrdersUpdate);
+    return () => {
+      window.removeEventListener("orders_updated", handleOrdersUpdate);
+    };
+  }, [searchQuery]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();

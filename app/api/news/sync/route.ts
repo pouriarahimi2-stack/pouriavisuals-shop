@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
-    // ۱. پاکسازی اخبار قدیمی‌تر از ۷ روز
+    // ۱. پاکسازی خودکار اخبار قدیمی‌تر از ۷ روز
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     try {
       await supabaseAdmin
@@ -36,14 +36,14 @@ export async function POST() {
 
     if (shouldFetchNew && process.env.GEMINI_API_KEY) {
       try {
-        const prompt = `به عنوان سردبیر و تحلیل‌گر ارشد حوزه تکنولوژی و سخت‌افزار، ۳ خبر داغ و معتبر حوزه مانیتور و گجت برای سال ۲۰۲۶ تولید کن.
-خروجی فقط یک JSON Array معتبر بدون هیچ مارک‌داون اضافی باشد:
+        const prompt = `به عنوان سردبیر ارشد فناوری، ۳ خبر داغ مانیتور، سخت‌افزار و هوش مصنوعی ۲۰۲۶ تولید کن.
+خروجی فقط یک JSON Array معتبر:
 [
   {
-    "title": "تیتر جذاب خبر",
-    "slug": "unique-slug-2026-${Date.now()}",
+    "title": "تیتر خبر",
+    "slug": "unique-slug-${Date.now()}",
     "summary": "خلاصه خبر",
-    "content": "<p>متن کامل خبر</p>",
+    "content": "<p>متن خبر</p>",
     "category": "gadgets",
     "source_name": "The Verge",
     "source_url": "https://theverge.com",

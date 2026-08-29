@@ -159,14 +159,14 @@ export default function ProductExplodedView({
         ) : (
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
             
-            {/* بوم سه‌بعدی تعاملی */}
+            {/* بوم سه‌بعدی تعاملی با رفع کامل مشکل اسکرول در تاچ */}
             <div
               ref={containerRef}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onPointerLeave={handlePointerUp}
-              className="lg:col-span-7 h-[360px] lg:h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden bg-radial from-blue-950/20 via-slate-950 to-slate-950 border-b lg:border-b-0 lg:border-l border-slate-800"
+              className="lg:col-span-7 h-[360px] lg:h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden bg-radial from-blue-950/20 via-slate-950 to-slate-950 border-b lg:border-b-0 lg:border-l border-slate-800 touch-none"
             >
               <div className="absolute top-4 right-4 z-10 bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-mono text-slate-400 backdrop-blur-md">
                 🖱️ درگ کنید تا زاویه تغییر کند (X: {Math.round(rotationX)}°, Y: {Math.round(rotationY)}°)

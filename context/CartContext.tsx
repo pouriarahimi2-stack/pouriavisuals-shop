@@ -1,6 +1,7 @@
+// File Path: context/CartContext.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { couponService } from "@/services/couponService";
 
 export interface CartItem {
@@ -39,6 +40,8 @@ interface CartContextType {
   removeCoupon: () => void;
   totalPrice: number;
   totalAmount: number;
+  discountAmount: number;
+  finalPayable: number;
   freeShippingThreshold: number;
   amountUntilFreeShipping: number;
   submitOrder?: (orderData: any) => { id: string; [key: string]: any };
@@ -54,25 +57,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [freeShippingThreshold] = useState<number>(2000000);
 
-  // بارگذاری داده‌ها در مانت اولیه
+  // بارگذاری امن داده‌ها از LocalStorage در مرحله کلاینت
   useEffect(() => {
     try {
       const localCart = localStorage.getItem(CART_STORAGE_KEY);
-      if (localCart) setCartItems(JSON.parse(localCart));
+      if (localCart) {
+        const parsed = JSON.parse(localCart);
+        if (Array.isArray(parsed)) setCartItems(parsed);
+      }
 
       const localCoupon = localStorage.getItem(COUPON_STORAGE_KEY);
-      if (localCoupon) setAppliedCoupon(JSON.parse(localCoupon));
+      if (localCoupon) {
+        const parsed = JSON.parse(localCoupon);
+        if (parsed && typeof parsed === "object") setAppliedCoupon(parsed);
+      }
     } catch (err) {
       console.error("Cart hydration error:", err);
     }
   }, []);
 
-  // همگام‌سازی تغییرات در تمام پنجره‌های باز مرورگر (Cross-Tab Live Sync)
+  // همگام‌سازی بلادرنگ سبد خرید بین تمام تب‌های باز مرورگر (Cross-Tab Sync)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === CART_STORAGE_KEY && e.newValue) {
         try {
-          setCartItems(JSON.parse(e.newValue));
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) setCartItems(parsed);
         } catch {}
       }
       if (e.key === COUPON_STORAGE_KEY) {
@@ -194,12 +204,30 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const closeCart = () => setIsCartOpen(false);
   const toggleCart = () => setIsCartOpen((prev) => !prev);
 
-  const totalPrice = cartItems.reduce(
-    (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
-    0
-  );
+  const totalPrice = useMemo(() => {
+    return cartItems.reduce(
+      (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
+      0
+    );
+  }, [cartItems]);
 
-  const totalItems = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+  const discountAmount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    let disc = Math.round((totalPrice * appliedCoupon.discountPercent) / 100);
+    if (appliedCoupon.maxDiscount && disc > appliedCoupon.maxDiscount) {
+      disc = appliedCoupon.maxDiscount;
+    }
+    return disc;
+  }, [totalPrice, appliedCoupon]);
+
+  const finalPayable = useMemo(() => {
+    return Math.max(0, totalPrice - discountAmount);
+  }, [totalPrice, discountAmount]);
+
+  const totalItems = useMemo(() => {
+    return cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+  }, [cartItems]);
+
   const amountUntilFreeShipping = Math.max(0, freeShippingThreshold - totalPrice);
 
   const applyCoupon = async (code: string) => {
@@ -232,6 +260,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       ...orderData,
       items: cartItems,
       totalAmount: totalPrice,
+      finalAmount: finalPayable,
+      discountAmount,
       createdAt: new Date().toISOString(),
     };
     try {
@@ -261,6 +291,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeCoupon,
         totalPrice,
         totalAmount: totalPrice,
+        discountAmount,
+        finalPayable,
         freeShippingThreshold,
         amountUntilFreeShipping,
         submitOrder,

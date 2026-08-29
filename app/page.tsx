@@ -7,7 +7,6 @@ import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import AIAssistantChat from "@/components/AIAssistantChat";
 import TechRadarFeed from "@/components/TechRadarFeed";
 import ProductComparisonModal from "@/components/ProductComparisonModal";
@@ -25,7 +24,6 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
 
-  // سیستم مقایسه چند محصولی
   const [compareList, setCompareList] = useState<Product[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -64,18 +62,28 @@ export default function HomePage() {
     const handleCategoryChange = (e: any) => {
       setSelectedCategory(e.detail || "all");
     };
-    window.addEventListener("category_selected", handleCategoryChange);
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
+      else loadData();
+    };
+    const handleBannersUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setBanners(e.detail);
+      else loadData();
+    };
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
 
-    const channel = supabase
-      .channel("home-master-realtime-channel-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => loadData())
-      .subscribe();
+    window.addEventListener("category_selected", handleCategoryChange);
+    window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("banners_updated", handleBannersUpdate);
+    window.addEventListener("site_info_updated", handleSiteUpdate);
 
     return () => {
       window.removeEventListener("category_selected", handleCategoryChange);
-      supabase.removeChannel(channel);
+      window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("banners_updated", handleBannersUpdate);
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
     };
   }, []);
 

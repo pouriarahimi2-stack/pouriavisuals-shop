@@ -1,10 +1,8 @@
-// File Path: app/news/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { newsService, TechNewsItem } from "@/services/newsService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
@@ -32,13 +30,11 @@ export default function TechNewsHubPage() {
 
     fetch("/api/news/sync", { method: "POST" }).catch(() => {});
 
-    const channel = supabase
-      .channel("tech-news-hub-realtime-master")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => loadNewsData())
-      .subscribe();
+    const handleNewsUpdate = () => loadNewsData();
+    window.addEventListener("news_updated", handleNewsUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("news_updated", handleNewsUpdate);
     };
   }, []);
 

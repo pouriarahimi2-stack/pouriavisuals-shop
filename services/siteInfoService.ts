@@ -176,3 +176,5 @@ export const siteInfoService = {
     }
   },
 };
+
+export default siteInfoService;

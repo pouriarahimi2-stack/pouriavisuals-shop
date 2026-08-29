@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { supabase } from "@/lib/supabase";
 
 export default function Footer() {
   const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
@@ -27,14 +26,8 @@ export default function Footer() {
 
     window.addEventListener("site_info_updated", handleUpdate);
 
-    const channel = supabase
-      .channel("footer-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchFooterData())
-      .subscribe();
-
     return () => {
       window.removeEventListener("site_info_updated", handleUpdate);
-      supabase.removeChannel(channel);
     };
   }, []);
 

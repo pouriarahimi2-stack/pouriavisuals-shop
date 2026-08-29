@@ -5,12 +5,14 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { orderService } from "@/services/orderService";
 import { soundEngine } from "@/lib/soundEngine";
+import { smsService } from "@/services/smsService";
 
 function PaymentGatewayForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId") || "";
 
+  const [order, setOrder] = useState<any>(null);
   const [amount, setAmount] = useState<number>(0);
   const [cardNumber, setCardNumber] = useState("");
   const [cvv2, setCvv2] = useState("");
@@ -23,17 +25,35 @@ function PaymentGatewayForm() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    const savedAmount = sessionStorage.getItem("pending_payment_amount");
-    if (savedAmount) {
-      setAmount(Number(savedAmount));
+    async function loadOrderInfo() {
+      if (orderId) {
+        try {
+          const found = await orderService.getById(orderId);
+          if (found) {
+            setOrder(found);
+            const finalPayable = Number(found.finalAmount || found.final_amount || found.totalAmount || 0);
+            setAmount(finalPayable);
+            return;
+          }
+        } catch (e) {
+          console.error("Order load error:", e);
+        }
+      }
+
+      const savedAmount = sessionStorage.getItem("pending_payment_amount");
+      if (savedAmount) {
+        setAmount(Number(savedAmount));
+      }
     }
+
+    loadOrderInfo();
 
     const timer = setInterval(() => {
       setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [orderId]);
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,14 +81,21 @@ function PaymentGatewayForm() {
     try {
       await new Promise((res) => setTimeout(res, 1400));
 
-      if (typeof orderService.updateOrderStatus === "function") {
-        await orderService.updateOrderStatus(orderId, "paid");
-      } else {
-        const local = JSON.parse(localStorage.getItem("admin_orders_cache") || "[]");
-        const updated = local.map((o: any) =>
-          o.id === orderId ? { ...o, status: "paid", paid_at: new Date().toISOString() } : o
-        );
-        localStorage.setItem("admin_orders_cache", JSON.stringify(updated));
+      if (orderId) {
+        await orderService.updateStatus(orderId, "paid");
+
+        const targetPhone = order?.customer?.phone || order?.phone;
+        const targetName = order?.customer?.fullName || order?.customer_name || "مشتری گرامی";
+        if (targetPhone) {
+          try {
+            await smsService.sendTrackingCode(targetPhone, targetName, `پرداخت فاکتور ${orderId} با موفقیت تایید شد.`);
+          } catch {}
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("axon_cart_store_v2026");
+        localStorage.removeItem("axon_active_coupon_v2026");
       }
 
       soundEngine.playSuccess();

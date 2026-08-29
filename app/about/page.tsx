@@ -1,9 +1,7 @@
-// File Path: app/about/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 
 export default function AboutPage() {
@@ -17,13 +15,13 @@ export default function AboutPage() {
   useEffect(() => {
     fetchAboutData();
 
-    const channel = supabase
-      .channel("about-page-realtime-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchAboutData())
-      .subscribe();
+    const handleUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
 
+    window.addEventListener("site_info_updated", handleUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("site_info_updated", handleUpdate);
     };
   }, []);
 

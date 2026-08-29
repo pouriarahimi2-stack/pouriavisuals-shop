@@ -1,6 +1,6 @@
 // File Path: app/api/ai-assistant/route.ts
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
@@ -22,14 +22,14 @@ export async function POST(req: Request) {
         Boolean(targetTopic));
 
     const [productsRes, siteInfoRes] = await Promise.all([
-      supabase
+      supabaseAdmin
         .from("products")
         .select("id, title, name, price, discount_price, category, stock, is_available, description, specs, highlights, images, image"),
-      supabase.from("site_info").select("site_name, tagline, phone, description").limit(1).maybeSingle(),
+      supabaseAdmin.from("site_info").select("site_name, tagline, phone, description").limit(1).maybeSingle(),
     ]);
 
     const products = productsData.length > 0 ? productsData : productsRes.data || [];
-    const siteInfo = siteInfoRes.data || { site_name: "آکسون (Axon)", tagline: "مرجع تخصصی تجهیزات دیجیتال" };
+    const siteInfo = siteInfoRes.data || { site_name: "آکسون (Axon)", tagline: "مرجع تخصصی تجهیزات دیجیتال و استودیو" };
 
     if (isSeoArticleRequest) {
       let generatedArticle = "";
@@ -39,24 +39,19 @@ export async function POST(req: Request) {
             .slice(0, 10)
             .map(
               (p: any) =>
-                `• عنوان: ${p.title || p.name} | آی‌دی محصول: ${p.id} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | دسته‌بندی: ${p.category} | لینک مستقیم: /products/${p.id} | مشخصات: ${JSON.stringify(p.specs || {})}`
+                `• عنوان: ${p.title || p.name} | شناسه: ${p.id} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | دسته: ${p.category} | لینک: /products/${p.id} | مشخصات: ${JSON.stringify(p.specs || {})}`
             )
             .join("\n");
 
-          const prompt = `تو برترین استراتژیست محتوا و متخصص ارشد SEO فنی و معنایی برای گوگل (Google Search Rank-1) در ایران هستی.
-وظیفه تو نگارش یک مقاله کامل، فوق‌العاده جامع، موشکافانه و جذاب در مورد موضوع زیر است:
-«${targetTopic || userMessage}»
-
-الزامات حیاتی مقاله:
-۱. عنوان جذاب (Title Tag) با CTR حداکثری و برچسب‌های متا (Meta Description).
-۲. لینک‌دهی هوشمند داخلی به محصولات مرتبط فروشگاه «${siteInfo.site_name}» با استفاده از لینک‌های واقعی زیر:
+          const prompt = `تو متخصص ارشد سئو رنک ۱ گوگل در ایران هستی.
+یک مقاله جامع، استثنایی و با کیفیت درباره «${targetTopic || userMessage}» تولید کن.
+الزامات:
+۱. عنوان جذاب سئو (H1) و Meta Description.
+۲. لینک‌دهی هوشمند به محصولات زیر:
 ${productContext}
-۳. فرمت‌بندی کامل HTML با تگ‌های معنایی (h1, h2, h3, p, ul, li, strong).
-۴. طراحی جدول مقایسه فنی (HTML Table) با استایل تمیز و باکس‌های راهنمای ویژه (Callout Boxes).
-۵. بخش سوالات متداول (FAQ Schema).
-۶. درج تصاویر مرتبط با تگ <img> با آدرس‌های مستقیم استانداردی مثل https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1000 و متن جایگزین (alt) بهینه‌شده.
-
-مقاله را فوراً به صورت متن کامل تولید کن:`;
+۳. فرمت HTML با تگ‌های معنایی کامل.
+۴. جدول مقایسه فنی و بخش FAQ Schema.
+۵. تصاویر مرتبط با تگ <img> از دامنه Unsplash.`;
 
           const geminiReq = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -89,11 +84,11 @@ ${productContext}
     const productCatalogContext = products
       .map(
         (p: any) =>
-          `• [شناسه: ${p.id}] ${p.title || p.name} | دسته: ${p.category} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 0} عدد`
+          `• [کد: ${p.id}] ${p.title || p.name} | دسته: ${p.category} | قیمت: ${(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 0} عدد`
       )
       .join("\n");
 
-    const systemPrompt = `تو مشاور تخصصی فروشگاه ${siteInfo.site_name} هستی. به تمام سوالات پیرامون مانیتور، تدوین، سخت‌افزار و قیمت‌ها به صورت حرفه‌ای پاسخ بده و کالاها را پیشنهاد بده.`;
+    const systemPrompt = `تو مشاور تخصصی و دستیار هوش مصنوعی فروشگاه «${siteInfo.site_name}» هستی. به تمام سوالات در زمینه مانیتورها، کالیبراسیون تصویر و تجهیزات استودیویی با دقت مهندسی پاسخ بده.`;
 
     let aiResponse = "";
     let matchedProductId: string | null = null;
@@ -105,7 +100,7 @@ ${productContext}
         (p.name && lowerQuery.includes(p.name.toLowerCase()))
     );
 
-    if (matchedProduct) matchedProductId = matchedProduct.id;
+    if (matchedProduct) matchedProductId = String(matchedProduct.id);
 
     if (process.env.GEMINI_API_KEY) {
       try {
@@ -121,7 +116,7 @@ ${productContext}
                   parts: [
                     { text: `${systemPrompt}\nکاتالوگ فروشگاه:\n${productCatalogContext}` },
                     ...history.map((h: any) => ({ text: `${h.role === "user" ? "کاربر" : "دستیار"}: ${h.text || (h.parts && h.parts[0]?.text) || ""}` })),
-                    { text: `پیام کاربر: ${userMessage}` },
+                    { text: `پرسش کاربر: ${userMessage}` },
                   ],
                 },
               ],
@@ -129,15 +124,15 @@ ${productContext}
           }
         );
         const geminiData = await geminiReq.json();
-        aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+        aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
       } catch {}
     }
 
     if (!aiResponse) {
       if (matchedProduct) {
-        aiResponse = `محصول **«${matchedProduct.title || matchedProduct.name}»** در دسته **${matchedProduct.category}** با مشخصات زیر موجود است:\n\n🔹 **قیمت:** ${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان\n🔹 **موجودی:** ${matchedProduct.stock ?? 0} عدد در انبار\n\nبرای مشاهده مشخصات کامل یا خرید روی دکمه زیر کلیک فرمایید.`;
+        aiResponse = `کالای **«${matchedProduct.title || matchedProduct.name}»** در دسته **${matchedProduct.category}** با مشخصات زیر موجود است:\n\n🔹 **قیمت با تخفیف:** ${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان\n🔹 **وضعیت موجودی:** ${matchedProduct.stock ?? 0} عدد در انبار\n\nجهت بررسی جزئیات کالبدشکافی ۳D یا ثبت سفارش از دکمه زیر استفاده نمایید.`;
       } else {
-        aiResponse = `درود! چطور می‌توانم در خصوص خرید، مشخصات مانیتورها و تجهیزات استودیویی به شما کمک کنم؟`;
+        aiResponse = `درود! چطور می‌توانم در خصوص خرید، مشخصات مانیتورهای ۵K، کارت‌های کپچر و تجهیزات استودیویی به شما کمک کنم؟`;
       }
     }
 
@@ -159,7 +154,7 @@ function generateRankOneSeoArticle(products: any[], storeName: string, topic: st
   return `<h1>راهنمای جامع خرید و بررسی تخصصی: ${topic || p.title} (استاندارد ۲۰۲۶)</h1>
 
 <p><strong>Title Tag:</strong> بررسی و خرید ${topic || p.title} با گارانتی اصالت طلایی | فروشگاه ${storeName}</p>
-<p><strong>Meta Description:</strong> راهنمای جامع خرید ${topic || p.title}، تست کالیبراسیون سخت‌افزاری رنگ و بنچ‌مارک در فروشگاه تخصصی ${storeName}.</p>
+<p><strong>Meta Description:</strong> راهنمای تخصصی خرید ${topic || p.title}، کالیبراسیون سخت‌افزاری رنگ و بنچ‌مارک در فروشگاه تخصصی ${storeName}.</p>
 
 <img src="https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1000" alt="${topic || p.title}" style="width:100%; border-radius:24px; margin:20px 0;" />
 

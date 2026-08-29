@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
-    const limit = Number(searchParams.get("limit") || 20);
+    const limit = Number(searchParams.get("limit") || 30);
 
     let query = supabaseAdmin
       .from("tech_news")

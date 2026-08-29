@@ -24,22 +24,21 @@ export default function DiscountManager() {
       const data = await couponService.getAll();
       setCoupons(data || []);
     } catch (e) {
-      console.error("Error loading coupons:", e);
+      console.error("Error loading coupons in DiscountManager:", e);
     }
   };
 
   useEffect(() => {
     fetchCoupons();
 
-    const channel = supabase
-      .channel("coupons-realtime-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
-        fetchCoupons();
-      })
-      .subscribe();
+    const handleCouponsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setCoupons(e.detail);
+      else fetchCoupons();
+    };
 
+    window.addEventListener("coupons_updated", handleCouponsUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("coupons_updated", handleCouponsUpdate);
     };
   }, []);
 

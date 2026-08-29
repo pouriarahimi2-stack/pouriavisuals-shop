@@ -6,12 +6,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("site_info")
       .select("*")
-      .eq("id", 1)
+      .order("id", { ascending: true })
+      .limit(1)
       .maybeSingle();
 
+    if (error) throw error;
     return NextResponse.json({ success: true, data: data || null });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
@@ -24,8 +26,15 @@ export async function POST(req: NextRequest) {
     const isAllowed = body.maintenance_mode === "none" && body.allow_google_index !== false;
     const sName = body.site_name || body.siteName || body.storeName || "آکسون | Axon";
 
+    const { data: existingRecords } = await supabaseAdmin
+      .from("site_info")
+      .select("id")
+      .limit(1);
+
+    const existingId = existingRecords && existingRecords.length > 0 ? existingRecords[0].id : 1;
+
     const payload: Record<string, any> = {
-      id: 1,
+      id: existingId,
       site_name: sName,
       store_name: sName,
       tagline: body.tagline || "",

@@ -1,4 +1,3 @@
-// File Path: lib/session.ts
 import { createHmac, timingSafeEqual } from "crypto";
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "pv_admin_super_secret_session_key_2026_apple_store_secure";
@@ -13,6 +12,7 @@ export function signPayload(payload: any): string {
 
 export function verifyPayload(token: string): any | null {
   try {
+    if (!token || typeof token !== "string") return null;
     const parts = token.split(".");
     if (parts.length !== 2) return null;
     const [data, signature] = parts;

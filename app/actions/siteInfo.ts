@@ -19,7 +19,7 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
         site_name: "آکسون | Axon",
         siteName: "آکسون | Axon",
         storeName: "آکسون | Axon",
-        tagline: "مرجع تخصصی تجهیزات دیجیتال و استودیو",
+        tagline: "مرجع تخصصی تجهیزات تصویر، مانیتور و استودیو",
         allow_google_index: true,
         allowGoogleIndex: true,
         maintenance_mode: "none",
@@ -72,7 +72,6 @@ export async function updateSiteInfoServer(info: Partial<SiteInfo>) {
         ? info.allowGoogleIndex
         : info.maintenance_mode === "none";
 
-    // بررسی رکورد موجود در دیتابیس
     const { data: existingRecords } = await supabaseAdmin
       .from("site_info")
       .select("id")

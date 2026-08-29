@@ -12,30 +12,36 @@ export async function POST(req: NextRequest) {
 
     const customerName = String(body.customerName || body.customer_name || 'مشتری گرامی').trim();
     const phone = String(body.phone || body.customer_phone || '').trim();
+    const province = String(body.province || 'تهران').trim();
+    const city = String(body.city || 'تهران').trim();
     const address = String(body.address || body.customer_address || '').trim();
     const postalCode = body.postalCode || body.postal_code || null;
     const items = Array.isArray(body.items) ? body.items : [];
     const totalAmount = Number(body.totalAmount || body.total_amount || 0);
     const discountAmount = Number(body.discountAmount || body.discount_amount || 0);
     const couponCode = body.couponCode || body.coupon_code || null;
-    const status = body.status || 'processing';
+    const status = body.status || 'pending';
+    const paymentStatus = body.paymentStatus || body.payment_status || 'pending';
 
     const orderPayload: any = {
       id: orderId,
       order_number: orderId,
       customer_name: customerName,
       phone,
+      province,
+      city,
       address,
       items,
       total_amount: totalAmount,
       discount_amount: discountAmount,
       final_amount: Math.max(0, totalAmount - discountAmount),
       status,
+      payment_status: paymentStatus,
       updated_at: new Date().toISOString(),
     };
 
     if (postalCode) orderPayload.postal_code = String(postalCode).trim();
-    if (couponCode) orderPayload.coupon_code = String(couponCode).trim();
+    if (couponCode) orderPayload.coupon_code = String(couponCode).trim().toUpperCase();
 
     const { data, error } = await supabaseAdmin
       .from('orders')
@@ -44,7 +50,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (error) {
-      console.error('Supabase DB Error:', error);
+      console.error('Supabase DB Order Error:', error);
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
@@ -56,7 +62,7 @@ export async function POST(req: NextRequest) {
             const { data: pData } = await supabaseAdmin
               .from('products')
               .select('stock')
-              .eq('id', pId)
+              .eq('id', String(pId))
               .maybeSingle();
 
             if (pData && pData.stock !== null && pData.stock !== undefined) {
@@ -65,7 +71,7 @@ export async function POST(req: NextRequest) {
               await supabaseAdmin
                 .from('products')
                 .update({ stock: nextStock, is_available: nextStock > 0 })
-                .eq('id', pId);
+                .eq('id', String(pId));
             }
           } catch (stkErr) {
             console.error('Stock decrement error:', stkErr);
@@ -74,7 +80,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (phone) {
+    if (phone && status === 'processing') {
       try {
         await smsService.sendOrderStatusChange(phone, orderId, 'در حال پردازش و بسته‌بندی');
       } catch (smsErr) {

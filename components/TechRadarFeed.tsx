@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { newsService, TechNewsItem } from "@/services/newsService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function TechRadarFeed() {
@@ -24,14 +23,13 @@ export default function TechRadarFeed() {
   useEffect(() => {
     loadTopNews();
 
-    const channel = supabase
-      .channel("home-news-compact-ticker")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => loadTopNews())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    const handleNewsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setNews(e.detail.slice(0, 6));
+      else loadTopNews();
     };
+
+    window.addEventListener("news_updated", handleNewsUpdate);
+    return () => window.removeEventListener("news_updated", handleNewsUpdate);
   }, []);
 
   useEffect(() => {
@@ -51,7 +49,6 @@ export default function TechRadarFeed() {
     <section className="w-full max-w-7xl mx-auto font-sans select-none px-1 my-1" dir="rtl">
       <div className="group relative flex items-center justify-between p-2 px-3 rounded-2xl bg-[var(--modal-bg)]/90 border border-[var(--card-border)] hover:border-[var(--accent-blue)] shadow-sm hover:shadow-md transition-all duration-300 backdrop-blur-md">
         
-        {/* سمت راست: عکس کوچک + بج + منبع و تیتر با لینک مستقیم */}
         <Link
           href={`/news/${currentNews.slug}`}
           onClick={() => soundEngine.playClick()}
@@ -79,7 +76,6 @@ export default function TechRadarFeed() {
           </div>
         </Link>
 
-        {/* سمت چپ: دکمه هدایت به مرکز اخبار */}
         <Link
           href="/news"
           onClick={() => soundEngine.playClick()}

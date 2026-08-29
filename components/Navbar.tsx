@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { menuService, MenuItem } from "@/services/menuService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function Navbar() {
@@ -34,18 +33,23 @@ export default function Navbar() {
   useEffect(() => {
     fetchNavbarData();
 
-    const navbarChannel = supabase
-      .channel("navbar-realtime-sync-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchNavbarData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => fetchNavbarData())
-      .subscribe();
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
+    const handleMenuUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setMenuItems(e.detail);
+    };
+
+    window.addEventListener("site_info_updated", handleSiteUpdate);
+    window.addEventListener("menu_updated", handleMenuUpdate);
 
     const savedTheme = localStorage.getItem("theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     setIsDarkMode(savedTheme === "dark" || (!savedTheme && prefersDark));
 
     return () => {
-      supabase.removeChannel(navbarChannel);
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
+      window.removeEventListener("menu_updated", handleMenuUpdate);
     };
   }, []);
 
@@ -80,23 +84,23 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border-b border-[var(--card-border)] font-sans select-none text-[var(--text-primary)] transition-colors duration-300 shadow-md" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         
         {/* لوگو و نام فروشگاه */}
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
               {logoSrc ? (
                 <img src={logoSrc} alt={storeName} className="w-full h-full object-contain" />
               ) : (
-                <span className="text-2xl font-black text-[var(--accent-blue)]">⚡</span>
+                <span className="text-xl sm:text-2xl font-black text-[var(--accent-blue)]">⚡</span>
               )}
             </div>
             <div>
-              <h1 className="font-black text-base leading-tight tracking-tight text-[var(--text-primary)]">
+              <h1 className="font-black text-sm sm:text-base leading-tight tracking-tight text-[var(--text-primary)]">
                 {storeName}
               </h1>
-              <span className="text-[11px] text-[var(--accent-blue)] font-bold block mt-0.5">
+              <span className="text-[10px] sm:text-[11px] text-[var(--accent-blue)] font-bold block mt-0.5">
                 {tagline}
               </span>
             </div>
@@ -120,7 +124,7 @@ export default function Navbar() {
         <div className="flex items-center gap-2.5 sm:gap-3">
           <button
             onClick={toggleTheme}
-            className="w-11 h-11 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center"
+            className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center"
             title="تغییر تم"
           >
             {isDarkMode ? "🌙" : "☀️"}
@@ -131,7 +135,7 @@ export default function Navbar() {
               soundEngine.playClick();
               setIsCartOpen(true);
             }}
-            className="relative h-11 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer"
+            className="relative h-10 px-4 sm:px-5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer"
           >
             <span className="text-base">🛒</span>
             <span className="hidden sm:inline">سبد خرید</span>

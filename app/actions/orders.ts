@@ -4,7 +4,7 @@
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export interface OrderItemInput {
-  productId: string;
+  productId: string | number;
   title: string;
   price: number;
   quantity: number;
@@ -38,8 +38,12 @@ export async function createOrderServer(payload: CreateOrderInput) {
       return { success: false, error: "مشخصات گیرنده و آدرس تحویل ناقص است." };
     }
 
-    // ۱. استعلام قیمت‌ها و موجودی مستقیم از دیتابیس جهت جلوگیری از تقلب در قیمت کلاینت
-    const productIds = items.map((i) => i.productId).filter(Boolean);
+    const cleanPhone = customer.phone
+      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/\D/g, "");
+
+    // ۱. استعلام قیمت‌ها و موجودی مستقیم از دیتابیس جهت جلوگیری از دستکاری قیمت کلاینت
+    const productIds = items.map((i) => String(i.productId)).filter(Boolean);
     const { data: dbProducts } = await supabaseAdmin
       .from("products")
       .select("id, price, discount_price, stock")
@@ -47,14 +51,17 @@ export async function createOrderServer(payload: CreateOrderInput) {
 
     let calculatedTotal = 0;
     const validatedItems = items.map((item) => {
-      const dbProduct = dbProducts?.find((p) => String(p.id) === String(item.productId));
+      const dbProduct = dbProducts?.find((p: any) => String(p.id) === String(item.productId));
       const unitPrice = dbProduct
-        ? (dbProduct.discount_price && dbProduct.discount_price > 0 ? Number(dbProduct.discount_price) : Number(dbProduct.price))
+        ? (dbProduct.discount_price && Number(dbProduct.discount_price) > 0
+            ? Number(dbProduct.discount_price)
+            : Number(dbProduct.price))
         : Number(item.price);
 
       calculatedTotal += unitPrice * Number(item.quantity || 1);
       return {
         ...item,
+        productId: String(item.productId),
         price: unitPrice,
       };
     });
@@ -70,7 +77,10 @@ export async function createOrderServer(payload: CreateOrderInput) {
         .maybeSingle();
 
       if (coupon) {
-        const isPercent = coupon.type === "percent" || coupon.discount_type === "percent" || Boolean(coupon.discount_percent);
+        const isPercent =
+          coupon.type === "percent" ||
+          coupon.discount_type === "percent" ||
+          Boolean(coupon.discount_percent);
         const val = Number(coupon.value || coupon.discount_value || coupon.discount_percent || 0);
 
         if (isPercent) {
@@ -88,16 +98,16 @@ export async function createOrderServer(payload: CreateOrderInput) {
     const finalPayable = Math.max(0, calculatedTotal - discountAmount + shippingCost);
     const orderId = `ORD-${Date.now().toString().slice(-6)}`;
 
-    // ۳. ثبت فاکتور رسمی در جدول orders
+    // ۳. ثبت فاکتور رسمی در جدول orders با اسکیمای استاندارد
     const { data: newOrder, error: insertError } = await supabaseAdmin
       .from("orders")
       .insert({
         id: orderId,
         order_number: orderId,
         customer_name: customer.fullName.trim(),
-        phone: customer.phone.trim(),
-        province: customer.province || "",
-        city: customer.city || "",
+        phone: cleanPhone,
+        province: customer.province || "تهران",
+        city: customer.city || "تهران",
         address: customer.address.trim(),
         postal_code: customer.postalCode.trim(),
         notes: customer.notes || "",
@@ -105,10 +115,11 @@ export async function createOrderServer(payload: CreateOrderInput) {
         total_amount: calculatedTotal,
         discount_amount: discountAmount,
         final_amount: finalPayable,
-        coupon_code: couponCode || null,
+        coupon_code: couponCode ? couponCode.trim().toUpperCase() : null,
         payment_status: "pending",
         status: "pending",
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -152,7 +163,7 @@ export async function createOrderServer(payload: CreateOrderInput) {
   }
 }
 
-export async function updateOrderStatusServer(orderId: string, status: string, paymentStatus?: string) {
+export async function updateOrderStatusServer(orderId: string, status: string, paymentStatus?: string, trackingCode?: string) {
   try {
     const updateData: Record<string, any> = {
       status,
@@ -161,6 +172,9 @@ export async function updateOrderStatusServer(orderId: string, status: string, p
 
     if (paymentStatus) {
       updateData.payment_status = paymentStatus;
+    }
+    if (trackingCode) {
+      updateData.tracking_code = trackingCode.trim();
     }
 
     const { error } = await supabaseAdmin

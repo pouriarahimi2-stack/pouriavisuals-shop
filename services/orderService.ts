@@ -1,3 +1,4 @@
+// File Path: services/orderService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface OrderItem {
@@ -72,7 +73,7 @@ export function normalizeOrder(raw: any): Order {
     raw.customer?.fullName ||
     raw.customer?.name ||
     raw.fullName ||
-    (raw.first_name ? `${raw.first_name || ""} ${raw.last_name || ""}`.trim() : "خریدار گرامی");
+    (raw.first_name ? `${raw.first_name || ""} ${raw.last_name || ""}`.trim() : "خریدار محترم");
 
   const phone = raw.phone || raw.customer_phone || raw.customer?.phone || "";
   const province = raw.province || raw.customer_province || raw.customer?.province || "تهران";
@@ -348,3 +349,5 @@ export const orderService = {
     return this.updateStatus(id, status);
   },
 };
+
+export default orderService;

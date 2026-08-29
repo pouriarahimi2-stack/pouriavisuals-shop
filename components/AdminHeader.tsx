@@ -1,11 +1,9 @@
-// File Path: components/AdminHeader.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
-import { supabase } from "@/lib/supabase";
 
 export default function AdminHeader() {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -34,13 +32,13 @@ export default function AdminHeader() {
       }
     } catch {}
 
-    const channel = supabase
-      .channel("admin-header-realtime-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => fetchHeaderInfo())
-      .subscribe();
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
 
+    window.addEventListener("site_info_updated", handleSiteUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
     };
   }, []);
 

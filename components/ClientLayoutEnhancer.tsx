@@ -6,28 +6,16 @@ import { siteInfoService } from "@/services/siteInfoService";
 
 export default function ClientLayoutEnhancer() {
   useEffect(() => {
-    // در زمان تایید اینماد عنوان دست‌نخورده باقی می‌ماند
-    if (document.title === "27424534") return;
-
     const applyTitle = (info: any) => {
       if (!info) return;
-      if (document.title === "27424534") return;
-      const sName = info.storeName || info.site_name || info.siteName || "";
-      const sTitle = info.siteTitle || info.site_title || info.tagline || info.description || "";
-      if (sName && typeof document !== "undefined") {
-        document.title = sTitle ? `${sName} | ${sTitle}` : sName;
+      const sName = info.storeName || info.site_name || info.siteName || "آکسون";
+      const sTitle = info.siteTitle || info.site_title || info.tagline || "مرجع تخصصی مانیتور و استودیو";
+      if (typeof document !== "undefined") {
+        document.title = `${sName} | ${sTitle}`;
       }
     };
 
-    async function init() {
-      try {
-        const data = await siteInfoService.getSiteInfo();
-        applyTitle(data);
-      } catch (e) {
-        console.warn("Title enhancer fallback:", e);
-      }
-    }
-    init();
+    siteInfoService.getSiteInfo().then(applyTitle);
 
     const handleUpdate = (e: any) => {
       if (e.detail) applyTitle(e.detail);

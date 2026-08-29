@@ -6,7 +6,6 @@ export const dynamic = "force-dynamic";
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
-
   let allowIndex = true;
 
   try {
@@ -20,7 +19,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
       allowIndex = false;
     }
   } catch (err) {
-    console.warn("Robots database query fallback:", err);
+    console.warn("Robots database fallback query:", err);
   }
 
   if (!allowIndex) {

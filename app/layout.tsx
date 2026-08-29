@@ -1,11 +1,12 @@
+// File Path: app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import LayoutWrapper from '@/components/LayoutWrapper';
 
 export const metadata: Metadata = {
-  title: '27424534',
-  description: 'فروشگاه تخصصی تجهیزات دیجیتال و مانیتورهای استودیویی آکسون',
+  title: 'فروشگاه تخصصی تجهیزات دیجیتال و استودیو | آکسون',
+  description: 'مرجع تخصصی مانیتورهای ۵K و ۴K تدوین، کالیبراسیون سخت‌افزاری رنگ و تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی',
   other: {
     enamad: '27424534',
   },
@@ -19,7 +20,6 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" className="dark" suppressHydrationWarning>
       <head>
-        <title>27424534</title>
         <meta name="enamad" content="27424534" />
       </head>
       <body

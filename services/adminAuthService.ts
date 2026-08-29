@@ -17,7 +17,7 @@ export const adminAuthService = {
     try {
       if (typeof window !== "undefined") {
         try {
-          const res = await fetch("/api/admin/session", { method: "GET" });
+          const res = await fetch("/api/admin/session", { method: "GET", cache: "no-store" });
           if (res.ok) {
             const data = await res.json();
             if (data.authenticated && data.user) {
@@ -113,3 +113,5 @@ export const adminAuthService = {
     }
   },
 };
+
+export default adminAuthService;

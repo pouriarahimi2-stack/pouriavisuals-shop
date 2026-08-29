@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { couponService, Coupon } from "@/services/couponService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminCoupons() {
@@ -40,15 +39,14 @@ export default function AdminCoupons() {
   useEffect(() => {
     loadCoupons();
 
-    const channel = supabase
-      .channel("coupons-admin-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
-        loadCoupons();
-      })
-      .subscribe();
+    const handleCouponsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setCoupons(e.detail);
+      else loadCoupons();
+    };
 
+    window.addEventListener("coupons_updated", handleCouponsUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("coupons_updated", handleCouponsUpdate);
     };
   }, []);
 
@@ -245,7 +243,7 @@ export default function AdminCoupons() {
         ) : coupons.length === 0 ? (
           <div className="py-12 text-center text-xs font-bold text-[var(--text-secondary)]">هیچ کد تخفیفی تعریف نشده است.</div>
         ) : (
-          <table className="w-full text-right text-xs">
+          <table className="w-full text-right text-xs min-w-[650px]">
             <thead>
               <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
                 <th className="pb-3 px-2">کد تخفیف</th>

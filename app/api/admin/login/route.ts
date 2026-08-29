@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
           };
         }
       } catch (dbErr) {
-        console.warn("Database Admin Auth warning:", dbErr);
+        console.warn("Database Admin Auth fallback query:", dbErr);
       }
     }
 

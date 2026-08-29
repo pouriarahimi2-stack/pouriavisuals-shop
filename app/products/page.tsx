@@ -1,4 +1,3 @@
-// File Path: app/products/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,7 +6,6 @@ import { productService, Product } from "@/services/productService";
 import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
-import { supabase } from "@/lib/supabase";
 
 export default function ProductsCatalogPage() {
   const [products, setProducts] = useState<Product[]>(() => productService.getAllSync());
@@ -48,13 +46,20 @@ export default function ProductsCatalogPage() {
   useEffect(() => {
     loadData();
 
-    const channel = supabase
-      .channel("catalog-products-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadData())
-      .subscribe();
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
+      else loadData();
+    };
+    const handleCategoriesUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
+    };
+
+    window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("categories_updated", handleCategoriesUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("categories_updated", handleCategoriesUpdate);
     };
   }, [sortBy]);
 

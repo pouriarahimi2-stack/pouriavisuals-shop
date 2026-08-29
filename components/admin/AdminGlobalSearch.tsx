@@ -1,4 +1,3 @@
-// File Path: components/admin/AdminGlobalSearch.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";

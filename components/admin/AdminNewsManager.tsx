@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { newsService, TechNewsItem } from "@/services/newsService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminNewsManager() {
@@ -31,13 +30,14 @@ export default function AdminNewsManager() {
   useEffect(() => {
     fetchNews();
 
-    const channel = supabase
-      .channel("admin-news-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => fetchNews())
-      .subscribe();
+    const handleNewsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setNews(e.detail);
+      else fetchNews();
+    };
 
+    window.addEventListener("news_updated", handleNewsUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("news_updated", handleNewsUpdate);
     };
   }, []);
 

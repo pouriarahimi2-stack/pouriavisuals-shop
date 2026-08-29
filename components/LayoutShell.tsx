@@ -1,4 +1,4 @@
-// components/LayoutShell.tsx
+// File Path: components/LayoutShell.tsx
 'use client';
 
 import React from 'react';

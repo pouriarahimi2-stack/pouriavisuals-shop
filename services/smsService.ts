@@ -1,3 +1,4 @@
+// File Path: services/smsService.ts
 export interface SendSmsResponse {
   success: boolean;
   message?: string;
@@ -104,3 +105,4 @@ export const sendSMS = smsService.sendSMS.bind(smsService);
 export const sendOtp = smsService.sendOtp.bind(smsService);
 export const verifyOtp = smsService.verifyOtp.bind(smsService);
 export const sendTrackingCode = smsService.sendTrackingCode.bind(smsService);
+export default smsService;

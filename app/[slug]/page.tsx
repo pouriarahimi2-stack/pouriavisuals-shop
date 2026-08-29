@@ -1,4 +1,3 @@
-// File Path: app/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -6,7 +5,6 @@ import { useParams } from "next/navigation";
 import { pageService, CustomPage, PageBlock } from "@/services/pageService";
 import { productService, Product } from "@/services/productService";
 import { useCart } from "@/context/CartContext";
-import { supabase } from "@/lib/supabase";
 import ProductCard from "@/components/ProductCard";
 import Link from "next/link";
 
@@ -42,13 +40,12 @@ export default function DynamicCustomPage() {
 
   useEffect(() => {
     loadPage();
-    const channel = supabase
-      .channel(`page-${slug}-realtime-v2026`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_pages" }, () => loadPage())
-      .subscribe();
+
+    const handlePageUpdate = () => loadPage();
+    window.addEventListener("page_structure_updated", handlePageUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("page_structure_updated", handlePageUpdate);
     };
   }, [slug]);
 

@@ -9,12 +9,11 @@ import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { productService, Product } from "@/services/productService";
 import { menuService, MenuItem } from "@/services/menuService";
 import { categoryService, Category } from "@/services/categoryService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
 // الگوریتم رسمی و بدون نقص اعتبارسنجی کد پستی ۱۰ رقمی ایران
-function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
+export function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
   const cleanCode = postalCode
     .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
@@ -49,16 +48,7 @@ function isValidIranianPostalCode(postalCode: string): { valid: boolean; message
 export default function Header() {
   const router = useRouter();
   const cartContext = useCart();
-  const cartItems = cartContext?.cartItems || [];
-  const isCartOpen = cartContext?.isCartOpen || false;
-  const toggleCart = cartContext?.toggleCart || (() => {});
-  const addToCart = cartContext?.addToCart || (() => {});
-  const removeFromCart = cartContext?.removeFromCart || (() => {});
-  const updateQuantity = cartContext?.updateQuantity || (() => {});
-  const appliedCoupon = cartContext?.appliedCoupon || null;
-  const applyCoupon = cartContext?.applyCoupon || (() => Promise.resolve({ success: false, message: "" }));
-  const removeCoupon = cartContext?.removeCoupon || (() => {});
-  const submitOrder = cartContext?.submitOrder;
+  const { totalItems, toggleCart, addToCart, isCartOpen, setIsCartOpen } = cartContext;
 
   const [mounted, setMounted] = useState(false);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
@@ -75,53 +65,8 @@ export default function Header() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
 
-  // فرم ثبت مشخصات خریدار درون دراور سبد خرید
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [address, setAddress] = useState("");
-  const [couponCodeInput, setCouponCodeInput] = useState("");
-  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
-
-  // احراز هویت پیامکی ۲ مرحله‌ای با کد ۶ رقمی OTP
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [generatedOtp, setGeneratedOtp] = useState("");
-  const [userOtpInput, setUserOtpInput] = useState("");
-  const [otpTimer, setOtpTimer] = useState(120);
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
-
-  const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
-  const rawTotal = cartItems.reduce(
-    (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
-    0
-  );
-
-  let discountAmount = 0;
-  if (appliedCoupon) {
-    discountAmount = Math.round((rawTotal * appliedCoupon.discountPercent) / 100);
-    if (appliedCoupon.maxDiscount && discountAmount > appliedCoupon.maxDiscount) {
-      discountAmount = appliedCoupon.maxDiscount;
-    }
-  }
-
-  const finalTotal = Math.max(0, rawTotal - discountAmount);
-
-  // تایمر ۲ دقیقه‌ای شمارنده معکوس کد OTP
-  useEffect(() => {
-    let interval: any;
-    if (showOtpModal && otpTimer > 0) {
-      interval = setInterval(() => {
-        setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [showOtpModal, otpTimer]);
 
   useEffect(() => {
     setMounted(true);
@@ -137,7 +82,7 @@ export default function Header() {
       }
     } catch {}
 
-    const initData = async () => {
+    const initHeaderData = async () => {
       const [info, prods, menus, cats] = await Promise.all([
         siteInfoService.getSiteInfo(),
         productService.getAll(),
@@ -150,34 +95,28 @@ export default function Header() {
       if (cats) setCategories(cats);
     };
 
-    initData();
+    initHeaderData();
 
     const handleSiteInfoUpdate = (e: any) => {
       if (e.detail) setSiteInfo(e.detail);
     };
     const handleProductsUpdate = (e: any) => {
-      if (e.detail) setAllProducts(e.detail);
+      if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
       else productService.getAll().then((prods) => prods && setAllProducts(prods));
+    };
+    const handleMenuUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setMenuItems(e.detail);
+      else menuService.getAll().then((menus) => menus && setMenuItems(menus));
+    };
+    const handleCategoriesUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
+      else categoryService.getAll().then((cats) => cats && setCategories(cats));
     };
 
     window.addEventListener("site_info_updated", handleSiteInfoUpdate);
     window.addEventListener("products_updated", handleProductsUpdate);
-
-    const channel = supabase
-      .channel("header-unified-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
-        if (payload?.new) setSiteInfo(payload.new);
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        productService.getAll().then((prods) => prods && setAllProducts(prods));
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
-        menuService.getAll().then((menus) => menus && setMenuItems(menus));
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => {
-        categoryService.getAll().then((cats) => cats && setCategories(cats));
-      })
-      .subscribe();
+    window.addEventListener("menu_updated", handleMenuUpdate);
+    window.addEventListener("categories_updated", handleCategoriesUpdate);
 
     const handleClickOutside = (e: MouseEvent) => {
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
@@ -192,8 +131,9 @@ export default function Header() {
     return () => {
       window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
       window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("menu_updated", handleMenuUpdate);
+      window.removeEventListener("categories_updated", handleCategoriesUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
-      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -258,121 +198,6 @@ export default function Header() {
     }, 1500);
   };
 
-  const handleInitiateOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setValidationError(null);
-
-    if (!firstName.trim() || !lastName.trim() || !phone.trim() || !address.trim() || !postalCode.trim()) {
-      setValidationError("لطفاً تمامی مشخصات گیرنده و آدرس پستی را تکمیل نمایید.");
-      return;
-    }
-
-    const cleanPhone = phone
-      .trim()
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/\D/g, "");
-
-    if (!/^09\d{9}$/.test(cleanPhone)) {
-      setValidationError("شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.");
-      return;
-    }
-
-    const postalCheck = isValidIranianPostalCode(postalCode);
-    if (!postalCheck.valid) {
-      setValidationError(postalCheck.message || "کد پستی ۱۰ رقمی نامعتبر است.");
-      return;
-    }
-
-    setIsSendingOtp(true);
-    try {
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone, action: "send" }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setGeneratedOtp(data.simulatedCode || "");
-        setOtpTimer(120);
-        setUserOtpInput("");
-        setShowOtpModal(true);
-      } else {
-        setValidationError(data.message || "خطا در ارسال پیامک رمز تایید.");
-      }
-    } catch {
-      setValidationError("خطا در برقراری ارتباط با سامانه پیامکی.");
-    } finally {
-      setIsSendingOtp(false);
-    }
-  };
-
-  const handleVerifyOtpAndProceed = async () => {
-    if (userOtpInput.trim().length !== 6) {
-      alert("لطفاً کد تایید ۶ رقمی پیامک‌شده را به طور کامل وارد نمایید.");
-      return;
-    }
-
-    const cleanPhone = phone
-      .trim()
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/\D/g, "");
-
-    setIsVerifyingOtp(true);
-    try {
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone, code: userOtpInput.trim(), action: "verify" }),
-      });
-      const data = await res.json();
-
-      if (data.success && data.verified) {
-        const orderId = `ORD-${Date.now().toString().slice(-6)}`;
-        const orderData = {
-          id: orderId,
-          order_number: orderId,
-          customer_name: `${firstName.trim()} ${lastName.trim()}`,
-          phone: cleanPhone,
-          address: address.trim(),
-          postal_code: postalCode.trim(),
-          items: cartItems,
-          total_amount: rawTotal,
-          discount_amount: discountAmount,
-          final_amount: finalTotal,
-          coupon_code: appliedCoupon ? appliedCoupon.code : null,
-          status: "pending",
-          payment_status: "pending",
-        };
-
-        if (typeof submitOrder === "function") {
-          submitOrder(orderData);
-        } else {
-          const existing = JSON.parse(localStorage.getItem("axon_orders_registry_cache_v2026") || "[]");
-          localStorage.setItem("axon_orders_registry_cache_v2026", JSON.stringify([orderData, ...existing]));
-          sessionStorage.setItem("pending_payment_amount", String(finalTotal));
-          sessionStorage.setItem("pending_payment_order_id", orderId);
-        }
-
-        setFirstName("");
-        setLastName("");
-        setPhone("");
-        setPostalCode("");
-        setAddress("");
-        setShowCheckoutForm(false);
-        setShowOtpModal(false);
-        toggleCart();
-
-        router.push(`/checkout/payment?orderId=${orderId}`);
-      } else {
-        alert(data.message || "کد ۶ رقمی وارد شده اشتباه یا منقضی شده است.");
-      }
-    } catch {
-      alert("خطا در اعتبارسنجی پیامک.");
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  };
-
   const navLinks =
     menuItems.length > 0
       ? menuItems.map((m) => ({ title: m.title || m.label || "پیوند", href: m.url || m.href || "/" }))
@@ -390,47 +215,45 @@ export default function Header() {
   const isOnline = siteInfo?.maintenance_mode === "none";
 
   return (
-    <header className="sticky top-2 sm:top-4 z-40 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
+    <header className="sticky top-2 sm:top-4 z-40 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
       {/* نوار اعلانات متحرک بالای هدر */}
       {siteInfo?.header_announcement && (
-        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md">
+        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate">
           {siteInfo.header_announcement}
         </div>
       )}
 
-      {/* کپسول سراسری هدر: تمام اجزا دقیقاً درون یک کادر منسجم قرار دارند */}
-      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3.5 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-3 transition-colors duration-300">
+      {/* کپسول سراسری و یکپارچه هدر */}
+      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-3 transition-colors duration-300">
         
-        {/* ۱. بخش راست: منوی همبرگری موبایل + لوگوی برند + نام سایت + منوی دسته‌بندی */}
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        {/* ۱. بخش راست: منوی همبرگری + لوگو و نام برند + دسته‌بندی */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
             onClick={() => {
               soundEngine.playClick();
               setMobileMenuOpen(!mobileMenuOpen);
             }}
-            className="lg:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer"
+            className="lg:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer shrink-0"
             aria-label="Toggle Navigation Menu"
           >
             ☰
           </button>
 
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-gradient-to-tr from-blue-600 to-indigo-600 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
+          <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-gradient-to-tr from-blue-600 to-indigo-600 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
               {logoUrl ? (
                 <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
               ) : (
-                <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
+                <span className="text-white text-base sm:text-lg font-black">⚡</span>
               )}
             </div>
             <div className="flex flex-col text-right">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)]" suppressHydrationWarning>
+                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[110px] sm:max-w-[160px]" suppressHydrationWarning>
                   {storeName}
                 </span>
                 <span
-                  className={`w-2 h-2 rounded-full transition-all duration-500 ${
+                  className={`w-2 h-2 rounded-full shrink-0 transition-all duration-500 ${
                     isOnline
                       ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse"
                       : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"
@@ -438,13 +261,13 @@ export default function Header() {
                   title={isOnline ? "سامانه آنلاین و فعال" : "در حال تعمیرات"}
                 />
               </div>
-              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
-                {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و استودیو"}
+              <span className="text-[8px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[110px] sm:max-w-[160px]" suppressHydrationWarning>
+                {siteInfo?.tagline || "مرجع تخصصی مانیتور و تصویر"}
               </span>
             </div>
           </Link>
 
-          {/* دراپ‌داون انتخاب دسته‌بندی */}
+          {/* دراپ‌داون دسته‌بندی‌ها */}
           <div className="relative hidden md:block" ref={categoryDropdownRef}>
             <button
               onClick={() => {
@@ -495,7 +318,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* ۲. بخش وسط: پیوندهای ناوبری اصلی */}
+        {/* ۲. بخش وسط: پیوندهای ناوبری اصلی دسکتاپ */}
         <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
@@ -508,8 +331,8 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* ۳. بخش چپ: کادر جستجو + تم شب/روز + دکمه سبد خرید فقط آیکون */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* ۳. بخش چپ: جستجو + تم شب/روز + دکمه سبد خرید */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative hidden lg:block" ref={searchContainerRef}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-44 shadow-sm h-9">
               <span className="text-xs opacity-70">🔍</span>
@@ -570,7 +393,7 @@ export default function Header() {
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید (فقط آیکون بدون نوشته) */}
+          {/* دکمه سبد خرید (فقط آیکون کپسولی) */}
           <button
             onClick={() => {
               soundEngine.playClick();
@@ -583,9 +406,9 @@ export default function Header() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
-            {totalCartCount > 0 && (
+            {totalItems > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse">
-                {totalCartCount}
+                {totalItems}
               </span>
             )}
           </button>
@@ -594,242 +417,19 @@ export default function Header() {
 
       {/* منوی ریسپانسیو موبایل */}
       {mobileMenuOpen && (
-        <div className="lg:hidden mt-2 p-3 bg-[var(--modal-bg)] rounded-2xl border border-[var(--card-border)] shadow-2xl space-y-1.5 animate-fadeIn">
+        <div className="lg:hidden mt-2 p-3.5 bg-[var(--modal-bg)] rounded-2xl border border-[var(--card-border)] shadow-2xl space-y-1.5 animate-fadeIn">
           <div className="flex flex-col space-y-1 text-xs font-bold">
             {navLinks.map((link, idx) => (
               <Link
                 key={idx}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 rounded-xl bg-[var(--input-bg)] flex items-center gap-2"
+                className="p-2.5 rounded-xl bg-[var(--input-bg)] flex items-center justify-between text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition"
               >
-                {link.title}
+                <span>{link.title}</span>
+                <span className="text-xs opacity-60">←</span>
               </Link>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* دراور کامل سبد خرید با تمام امکانات و فرم تسویه */}
-      {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
-          <div className="w-full max-w-md h-full bg-[var(--modal-bg)] border-r border-[var(--card-border)] p-5 text-[var(--text-primary)] flex flex-col justify-between shadow-2xl overflow-y-auto">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-                <h3 className="font-black text-base flex items-center gap-2">
-                  <span>🛒</span> سبد خرید شما ({totalCartCount})
-                </h3>
-                <button
-                  onClick={toggleCart}
-                  className="w-7 h-7 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs font-bold cursor-pointer transition"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {cartItems.length === 0 ? (
-                <div className="py-20 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2">
-                  <span className="text-3xl block">🛍️</span>
-                  <p>سبد خرید شما خالی است.</p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {cartItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs gap-2 shadow-sm"
-                    >
-                      <img src={item.image} alt={item.title || item.name} className="w-10 h-10 object-contain rounded-lg bg-[var(--modal-bg)] p-1 border border-[var(--card-border)]" />
-                      <div className="flex-1 space-y-0.5 min-w-0">
-                        <h4 className="font-bold truncate text-[var(--text-primary)]">{item.title || item.name}</h4>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold block">
-                          {((item.discountPrice ?? item.price) * (item.quantity || 1)).toLocaleString("fa-IR")} تومان
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-lg px-2 py-0.5">
-                        <button onClick={() => updateQuantity(item.id, -1)} className="hover:text-[var(--accent-blue)] cursor-pointer font-bold text-xs">-</button>
-                        <span className="font-mono font-bold text-[var(--text-primary)]">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, 1)} className="hover:text-[var(--accent-blue)] cursor-pointer font-bold text-xs">+</button>
-                      </div>
-                      <button onClick={() => removeFromCart(item.id)} className="text-rose-500 p-1 cursor-pointer hover:text-rose-700 transition">🗑️</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {cartItems.length > 0 && (
-              <div className="space-y-3 pt-3 border-t border-[var(--card-border)] text-xs">
-                {!appliedCoupon ? (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (couponCodeInput.trim()) applyCoupon(couponCodeInput.trim());
-                      setCouponCodeInput("");
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      type="text"
-                      placeholder="کد تخفیف..."
-                      value={couponCodeInput}
-                      onChange={(e) => setCouponCodeInput(e.target.value)}
-                      className="flex-1 p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs uppercase font-mono outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-                    />
-                    <button type="submit" className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer hover:opacity-90 transition shadow-sm">
-                      اعمال
-                    </button>
-                  </form>
-                ) : (
-                  <div className="flex justify-between items-center p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold">
-                    <span>کد تخفیف {appliedCoupon.code} فعال است ({appliedCoupon.discountPercent}٪)</span>
-                    <button onClick={removeCoupon} className="text-rose-500 font-black cursor-pointer">✕</button>
-                  </div>
-                )}
-
-                <div className="space-y-1 text-[var(--text-secondary)] font-medium">
-                  <div className="flex justify-between">
-                    <span>جمع کل اقلام:</span>
-                    <span className="font-bold font-mono text-[var(--text-primary)]">{rawTotal.toLocaleString("fa-IR")} تومان</span>
-                  </div>
-                  {discountAmount > 0 && (
-                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
-                      <span>تخفیف:</span>
-                      <span className="font-mono">- {discountAmount.toLocaleString("fa-IR")} تومان</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-black text-emerald-600 dark:text-emerald-400 pt-1 border-t border-[var(--card-border)]">
-                    <span>مبلغ قابل پرداخت:</span>
-                    <span className="font-mono">{finalTotal.toLocaleString("fa-IR")} تومان</span>
-                  </div>
-                </div>
-
-                {!showCheckoutForm ? (
-                  <button
-                    onClick={() => setShowCheckoutForm(true)}
-                    className="w-full py-3.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <span>تکمیل اطلاعات و دریافت پیامک تایید 🚀</span>
-                  </button>
-                ) : (
-                  <form onSubmit={handleInitiateOtp} className="space-y-2.5 pt-2 border-t border-[var(--card-border)] animate-fadeIn">
-                    {validationError && (
-                      <div className="p-2 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-[11px] font-bold">
-                        ⚠️ {validationError}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        placeholder="نام *"
-                        required
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
-                      />
-                      <input
-                        type="text"
-                        placeholder="نام خانوادگی *"
-                        required
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="tel"
-                        placeholder="09123456789 *"
-                        required
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
-                      />
-                      <input
-                        type="text"
-                        placeholder="کد پستی ۱۰ رقمی *"
-                        required
-                        value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
-                        className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
-                      />
-                    </div>
-
-                    <textarea
-                      rows={2}
-                      placeholder="نشانی دقیق پستی تحویل *"
-                      required
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-[var(--text-primary)] focus:border-[var(--accent-blue)] text-xs"
-                    />
-
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={isSendingOtp}
-                        className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs cursor-pointer shadow-md disabled:opacity-50"
-                      >
-                        {isSendingOtp ? "در حال ارسال پیامک..." : "📲 تایید با پیامک ۶ رقمی"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowCheckoutForm(false)}
-                        className="px-4 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs cursor-pointer"
-                      >
-                        انصراف
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* مدال تایید پیامکی ۶ رقمی (OTP) */}
-      {showOtpModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans">
-          <div className="max-w-sm w-full bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 text-[var(--text-primary)] space-y-4 shadow-2xl">
-            <div className="text-center space-y-1">
-              <span className="text-2xl block">📱</span>
-              <h3 className="font-black text-sm">تایید شماره تماس مرسوله</h3>
-              <p className="text-[11px] text-[var(--text-secondary)]">کد ۶ رقمی پیامک‌شده به {phone} را وارد کنید:</p>
-            </div>
-
-            {generatedOtp && (
-              <div className="p-2.5 rounded-xl bg-blue-500/15 border border-blue-500/30 text-center font-mono font-black text-lg text-[var(--accent-blue)]">
-                {generatedOtp}
-              </div>
-            )}
-
-            <input
-              type="text"
-              maxLength={6}
-              value={userOtpInput}
-              onChange={(e) => setUserOtpInput(e.target.value.replace(/\D/g, ""))}
-              placeholder="------"
-              className="w-full p-3 text-center text-xl font-mono tracking-widest rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-black text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-            />
-            
-            <div className="flex gap-2">
-              <button
-                onClick={handleVerifyOtpAndProceed}
-                disabled={isVerifyingOtp}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs cursor-pointer shadow-md disabled:opacity-50"
-              >
-                {isVerifyingOtp ? "در حال تایید..." : "تایید و اتصال به درگاه 💳"}
-              </button>
-              <button
-                onClick={() => setShowOtpModal(false)}
-                className="px-4 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs cursor-pointer"
-              >
-                انصراف
-              </button>
-            </div>
           </div>
         </div>
       )}

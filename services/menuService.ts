@@ -108,3 +108,5 @@ export const menuService = {
     }
   },
 };
+
+export default menuService;

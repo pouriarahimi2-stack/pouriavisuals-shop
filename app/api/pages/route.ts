@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("site_pages")
       .select("*")
-      .eq("slug", slug)
+      .eq("slug", slug.trim().toLowerCase())
       .maybeSingle();
 
     if (error) throw error;
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const payload = {
       id: cleanSlug,
       slug: cleanSlug,
-      title: title || "صفحه اصلی",
+      title: title || "صفحه اختصاصی",
       sections: sections || content || [],
       content: content || sections || [],
       meta_description: meta_description || null,

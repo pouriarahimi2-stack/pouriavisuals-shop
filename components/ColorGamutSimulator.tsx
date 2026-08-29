@@ -63,7 +63,6 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
   return (
     <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* سربرگ ماژول کالیبراسیون */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-xl shadow-lg shadow-blue-500/25">
@@ -74,7 +73,7 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
               شبیه‌ساز زنده گاموت رنگی و کالیبراسیون سخت‌افزاری (Color Gamut Engine)
             </h3>
             <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
-              تست تعاملی پوشش رنگی پنل در نرم‌افزارهای تدوین و اصلاح رنگ برای: <strong className="text-[var(--text-primary)]">{productTitle}</strong>
+              تست تعاملی پوشش رنگی پنل در نرم‌افزارهای تدوین برای: <strong className="text-[var(--text-primary)]">{productTitle}</strong>
             </p>
           </div>
         </div>
@@ -84,7 +83,6 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
         </span>
       </div>
 
-      {/* انتخابگر فضای رنگی */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {(Object.keys(gamuts) as Array<keyof typeof gamuts>).map((key) => {
           const item = gamuts[key];
@@ -111,7 +109,6 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
         })}
       </div>
 
-      {/* پیش‌نمایش تصویر و فیلتر رنگی */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
         <div className="lg:col-span-8 relative h-72 sm:h-96 rounded-3xl overflow-hidden bg-black border border-[var(--card-border)] shadow-inner flex items-center justify-center group">
           <img
@@ -150,7 +147,6 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
           </div>
         </div>
 
-        {/* تحلیل مهندسی */}
         <div className="lg:col-span-4 space-y-4 text-xs">
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
             <span className="font-black text-[var(--accent-blue)] block text-xs">

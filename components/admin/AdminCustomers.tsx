@@ -1,4 +1,3 @@
-// File Path: components/admin/AdminCustomers.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -73,13 +72,10 @@ export default function AdminCustomers() {
 
   useEffect(() => {
     fetchCustomers();
-    const channel = supabase
-      .channel("admin-customers-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchCustomers())
-      .subscribe();
-
+    const handleOrdersUpdate = () => fetchCustomers();
+    window.addEventListener("orders_updated", handleOrdersUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("orders_updated", handleOrdersUpdate);
     };
   }, []);
 
@@ -131,7 +127,7 @@ export default function AdminCustomers() {
         ) : filtered.length === 0 ? (
           <div className="py-12 text-center text-xs font-bold text-[var(--text-secondary)]">مشتری با این مشخصات یافت نشد.</div>
         ) : (
-          <table className="w-full text-right text-xs border-collapse">
+          <table className="w-full text-right text-xs border-collapse min-w-[700px]">
             <thead>
               <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
                 <th className="p-3.5">نام و نام خانوادگی</th>

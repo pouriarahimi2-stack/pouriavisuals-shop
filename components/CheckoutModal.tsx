@@ -1,4 +1,4 @@
-// components/CheckoutModal.tsx
+// File Path: components/CheckoutModal.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -15,9 +15,9 @@ interface CheckoutModalProps {
 
 export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const router = useRouter();
-  const { cartItems, cart, totalPrice, clearCart } = useCart() as any;
+  const { cartItems, totalPrice, clearCart } = useCart() as any;
 
-  const items = cartItems || cart || [];
+  const items = cartItems || [];
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -246,7 +246,6 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           </div>
         )}
 
-        {/* فرم تحویل */}
         <form onSubmit={handleSubmit} className="space-y-4 text-xs text-right">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

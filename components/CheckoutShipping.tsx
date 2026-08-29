@@ -1,4 +1,4 @@
-// components/CheckoutShipping.tsx
+// File Path: components/CheckoutShipping.tsx
 "use client";
 
 import React from "react";

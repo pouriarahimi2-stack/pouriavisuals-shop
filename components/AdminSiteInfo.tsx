@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminSiteInfo() {
@@ -65,17 +64,13 @@ export default function AdminSiteInfo() {
       if (data) populateForm(data);
     });
 
-    const channel = supabase
-      .channel("site-info-admin-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
-        siteInfoService.getSiteInfo().then((data) => {
-          if (data) populateForm(data);
-        });
-      })
-      .subscribe();
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) populateForm(e.detail);
+    };
 
+    window.addEventListener("site_info_updated", handleSiteUpdate);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
     };
   }, []);
 

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { menuService, MenuItem } from "@/services/menuService";
 import { categoryService, Category } from "@/services/categoryService";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminMenu() {
@@ -28,14 +27,21 @@ export default function AdminMenu() {
   useEffect(() => {
     loadAll();
 
-    const channel = supabase
-      .channel("menu-admin-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => loadAll())
-      .subscribe();
+    const handleMenuUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setItems(e.detail);
+      else loadAll();
+    };
+    const handleCategoriesUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
+      else loadAll();
+    };
+
+    window.addEventListener("menu_updated", handleMenuUpdate);
+    window.addEventListener("categories_updated", handleCategoriesUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("menu_updated", handleMenuUpdate);
+      window.removeEventListener("categories_updated", handleCategoriesUpdate);
     };
   }, []);
 

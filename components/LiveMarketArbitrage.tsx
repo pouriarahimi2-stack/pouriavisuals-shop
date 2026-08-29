@@ -53,7 +53,6 @@ export default function LiveMarketArbitrage({
   return (
     <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* سربرگ آربیتراژ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center text-xl shadow-lg">
@@ -76,7 +75,6 @@ export default function LiveMarketArbitrage({
         )}
       </div>
 
-      {/* لیست فروشگاه‌ها */}
       <div className="space-y-3">
         {competitors.map((comp, idx) => (
           <div

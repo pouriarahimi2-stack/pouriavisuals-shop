@@ -86,6 +86,8 @@ export function normalizeProduct(raw: any): Product {
   let specsObj: Record<string, string> = {};
   if (raw.specs && typeof raw.specs === "object" && !Array.isArray(raw.specs)) {
     specsObj = raw.specs;
+  } else if (raw.specifications && typeof raw.specifications === "object") {
+    specsObj = raw.specifications;
   }
 
   let variantsList: ProductVariant[] = [];
@@ -98,6 +100,8 @@ export function normalizeProduct(raw: any): Product {
     highlightsList = raw.highlights.filter(Boolean);
   } else if (typeof raw.highlights === "string") {
     highlightsList = raw.highlights.split("\n").map((h: string) => h.trim()).filter(Boolean);
+  } else if (Array.isArray(raw.features)) {
+    highlightsList = raw.features.filter(Boolean);
   }
 
   let comparisonList: MarketBenchmark[] = [];
@@ -263,8 +267,7 @@ export const productService = {
           .single();
 
         if (error) {
-          console.error("Supabase upsert error:", error);
-          // تلاش ثانویه در صورت عدم وجود فیلدهای جانبی
+          console.error("Supabase upsert fallback execution:", error);
           const minimalPayload = {
             id: String(normalized.id),
             title: normalized.title,
@@ -320,3 +323,5 @@ export const productService = {
     }
   },
 };
+
+export default productService;

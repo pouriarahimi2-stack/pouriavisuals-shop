@@ -35,7 +35,6 @@ export default function ProductComparisonModal({
     >
       <div className="w-full max-w-5xl max-h-[92vh] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden">
         
-        {/* سربرگ مقایسه */}
         <header className="p-5 border-b border-[var(--card-border)] flex flex-wrap items-center justify-between gap-3 bg-[var(--input-bg)]">
           <div className="flex items-center gap-3">
             <span className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] flex items-center justify-center text-xl font-black shadow-sm">
@@ -78,7 +77,6 @@ export default function ProductComparisonModal({
           </div>
         </header>
 
-        {/* جدول مقایسه */}
         <div className="flex-1 overflow-x-auto overflow-y-auto p-5 sm:p-6 text-xs">
           <table className="w-full border-collapse">
             <thead>
@@ -187,7 +185,6 @@ export default function ProductComparisonModal({
           </table>
         </div>
 
-        {/* فوتر مدال */}
         <footer className="p-4 border-t border-[var(--card-border)] flex justify-end bg-[var(--input-bg)]">
           <button
             onClick={() => {

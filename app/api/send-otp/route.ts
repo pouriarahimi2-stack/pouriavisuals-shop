@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
       .replace(/\D/g, "");
 
-    // ارسال پیامک کد رهگیری شرکت پست
+    // ارسال پیامک کد رهگیری پست پیشتاز
     if (action === "tracking") {
       if (!trackingCode) {
         return NextResponse.json(
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       if (smsApiKey) {
         try {
           const text = encodeURIComponent(
-            `${customerName || "خریدار گرامی"}، مرسوله شما تحویل شرکت ملی پست گردید.\nکد رهگیری ۲۴ رقمی: ${trackingCode}\nپیگیری: https://tracking.post.ir/?id=${trackingCode}\nفروشگاه آکسون`
+            `${customerName || "خریدار گرامی"}، مرسوله شما تحویل شرکت ملی پست گردید.\nکد رهگیری ۲۴ رقمی: ${trackingCode}\nسامانه پیگیری: https://tracking.post.ir/?id=${trackingCode}\nفروشگاه آکسون`
           );
           await fetch(
             `https://api.kavenegar.com/v1/${smsApiKey}/sms/send.json?receptor=${cleanPhone}&message=${text}`
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // تایید کد ۶ رقمی
+    // تایید کد ۶ رقمی OTP
     if (action === "verify") {
       if (!code) {
         return NextResponse.json(

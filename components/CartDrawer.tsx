@@ -1,3 +1,4 @@
+// File Path: components/CartDrawer.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -18,10 +19,12 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
   const cartContext = useCart();
   const cartItems = cartContext?.cartItems || [];
   const isCartOpen = propIsOpen !== undefined ? propIsOpen : (cartContext?.isCartOpen || false);
-  const setIsCartOpen = propOnClose || cartContext?.setIsCartOpen || (() => {});
+  const closeCart = propOnClose || cartContext?.closeCart || (() => {});
   const removeFromCart = cartContext?.removeFromCart || (() => {});
   const updateQuantity = cartContext?.updateQuantity || (() => {});
   const totalPrice = cartContext?.totalPrice || 0;
+  const discountAmount = cartContext?.discountAmount || 0;
+  const finalPayable = cartContext?.finalPayable || totalPrice;
   const amountUntilFreeShipping = cartContext?.amountUntilFreeShipping || 0;
 
   const [customerName, setCustomerName] = useState("");
@@ -35,8 +38,6 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
   const [postalCode, setPostalCode] = useState("");
 
   const [couponCode, setCouponCode] = useState("");
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
-  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [couponMsg, setCouponMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -73,24 +74,14 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
     setCouponMsg(null);
     soundEngine.playClick();
 
-    try {
-      const res = await couponService.validateCoupon(couponCode, totalPrice);
-      if (res.valid) {
-        soundEngine.playSuccess();
-        setDiscountAmount(res.discount);
-        setAppliedCoupon(couponCode.trim().toUpperCase());
-        setCouponMsg({ type: "success", text: res.message });
-      } else {
-        setCouponMsg({ type: "error", text: res.message });
-        setDiscountAmount(0);
-        setAppliedCoupon(null);
-      }
-    } catch {
-      setCouponMsg({ type: "error", text: "خطا در بررسی کد تخفیف." });
+    const res = await cartContext.applyCoupon(couponCode);
+    if (res.success) {
+      soundEngine.playSuccess();
+      setCouponMsg({ type: "success", text: res.message });
+    } else {
+      setCouponMsg({ type: "error", text: res.message });
     }
   };
-
-  const finalPayable = Math.max(0, totalPrice - discountAmount);
 
   const handleFinalCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,7 +144,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
         total_amount: totalPrice,
         discount_amount: discountAmount,
         final_amount: finalPayable,
-        coupon_code: appliedCoupon || null,
+        coupon_code: cartContext.appliedCoupon ? cartContext.appliedCoupon.code : null,
         status: "pending" as const,
         payment_status: "pending" as const,
       };
@@ -161,7 +152,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
       const newOrder = await orderService.create(orderPayload);
 
       if (newOrder) {
-        if (typeof setIsCartOpen === "function") setIsCartOpen(false);
+        closeCart();
         router.push(`/checkout/payment?orderId=${newOrder.orderNumber || newOrder.id}`);
       } else {
         throw new Error("خطا در ایجاد فاکتور در سرور.");
@@ -182,9 +173,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
         {/* هدر کشو */}
         <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between">
           <button
-            onClick={() => {
-              if (typeof setIsCartOpen === "function") setIsCartOpen(false);
-            }}
+            onClick={closeCart}
             className="w-9 h-9 rounded-2xl bg-[var(--input-bg)] flex items-center justify-center font-bold text-xs hover:border-[var(--accent-blue)] border border-[var(--card-border)] transition cursor-pointer text-[var(--text-primary)]"
           >
             ✕
@@ -199,7 +188,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
           </div>
         </div>
 
-        {/* نوار وضعیت ارسال رایگان */}
+        {/* وضعیت ارسال رایگان */}
         {totalPrice > 0 && (
           <div className="p-3 bg-[var(--input-bg)] border-b border-[var(--card-border)] text-xs space-y-1.5">
             <div className="flex justify-between text-[11px] font-bold">

@@ -9,9 +9,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { authority, status, orderId } = body;
 
-    if (!authority || status !== "OK" || !orderId) {
+    if (!orderId) {
       return NextResponse.json(
-        { success: false, message: "تراکنش نامعتبر است یا توسط خریدار لغو شد." },
+        { success: false, message: "شناسه فاکتور سفارش الزامی است." },
         { status: 400 }
       );
     }
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
       .select("id, total_amount, final_amount, payment_status")
-      .eq("id", orderId)
+      .eq("id", String(orderId))
       .single();
 
     if (fetchError || !order) {
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (order.payment_status === "paid" || order.payment_status === "PAID") {
+    if (order.payment_status === "paid") {
       return NextResponse.json({
         success: true,
         message: "این سفارش قبلاً با موفقیت پرداخت و تایید شده است.",
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     let isVerified = false;
     let refId = `REF-${Date.now().toString().slice(-8)}`;
 
-    if (!isSandbox && merchantId) {
+    if (!isSandbox && merchantId && authority) {
       const zarinpalUrl = "https://api.zarinpal.com/pg/v4/payment/verify.json";
       const verifyRes = await fetch(zarinpalUrl, {
         method: "POST",
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     if (!isVerified) {
       return NextResponse.json(
-        { success: false, message: "اعتبارسنجی پرداخت از سمت سوئیچ شاپرک تایید نشد." },
+        { success: false, message: "اعتبارسنجی پرداخت از سمت شاپرک تایید نشد." },
         { status: 402 }
       );
     }
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         status: "processing",
         updated_at: new Date().toISOString(),
       })
-      .eq("id", orderId);
+      .eq("id", String(orderId));
 
     if (updateError) {
       return NextResponse.json(

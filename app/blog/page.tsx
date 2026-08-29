@@ -1,11 +1,9 @@
-// File Path: app/blog/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
-import { supabase } from "@/lib/supabase";
 
 interface BlogPost {
   id: string;
@@ -70,13 +68,11 @@ export default function BlogArchivePage() {
   useEffect(() => {
     loadBlogs();
 
-    const channel = supabase
-      .channel("blog-archive-realtime-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadBlogs())
-      .subscribe();
+    const handlePostsUpdate = () => loadBlogs();
+    window.addEventListener("posts_updated", handlePostsUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("posts_updated", handlePostsUpdate);
     };
   }, []);
 

@@ -1,4 +1,3 @@
-// File Path: components/admin/AdminDashboardStats.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -33,8 +32,8 @@ export default function AdminDashboardStats() {
         if (typeof window !== "undefined") {
           try {
             const localOrders = JSON.parse(
+              localStorage.getItem("axon_orders_registry_cache_v2026") ||
               localStorage.getItem("admin_orders_cache") ||
-              localStorage.getItem("site_orders") ||
               "[]"
             );
             if (Array.isArray(localOrders) && localOrders.length > 0) {
@@ -74,16 +73,21 @@ export default function AdminDashboardStats() {
   useEffect(() => {
     loadStats();
 
-    const channel = supabase
-      .channel("dashboard-stats-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadStats())
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => loadStats())
-      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => loadStats())
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadStats())
-      .subscribe();
+    const handleProductsUpdate = () => loadStats();
+    const handleOrdersUpdate = () => loadStats();
+    const handleMessagesUpdate = () => loadStats();
+    const handlePostsUpdate = () => loadStats();
+
+    window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("orders_updated", handleOrdersUpdate);
+    window.addEventListener("contact_messages_updated", handleMessagesUpdate);
+    window.addEventListener("posts_updated", handlePostsUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("orders_updated", handleOrdersUpdate);
+      window.removeEventListener("contact_messages_updated", handleMessagesUpdate);
+      window.removeEventListener("posts_updated", handlePostsUpdate);
     };
   }, []);
 

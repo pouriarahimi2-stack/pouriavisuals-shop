@@ -1,10 +1,8 @@
-// File Path: components/admin/ContactMessagesManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
-import { smsService } from "@/services/smsService";
 
 export interface ContactMessage {
   id: string;
@@ -46,13 +44,12 @@ export default function ContactMessagesManager() {
 
   useEffect(() => {
     fetchMessages();
-    const channel = supabase
-      .channel("contact-messages-realtime-master-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => fetchMessages())
-      .subscribe();
+
+    const handleMessagesUpdate = () => fetchMessages();
+    window.addEventListener("contact_messages_updated", handleMessagesUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("contact_messages_updated", handleMessagesUpdate);
     };
   }, []);
 

@@ -6,7 +6,7 @@ import { verifyPayload } from '@/lib/session';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ۱. پاسخ فوری و بدون واسطه به ربات‌های تاییدیه اینماد
+  // ۱. تاییدیه اینماد
   if (pathname === '/27424534.txt' || pathname.includes('27424534.txt')) {
     return new NextResponse('27424534', {
       status: 200,
@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
     });
   }
 
-  // ۲. گیت امنیتی پنل مدیریت (بررسی امضای رمزنگاری‌شده توکن و جلوگیری از دسترسی غیرمجاز)
+  // ۲. محافظت از پنل ادمین
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
     const sessionToken =
       request.cookies.get('admin_session_token')?.value ||
@@ -25,18 +25,17 @@ export function middleware(request: NextRequest) {
 
     let isAuthenticated = false;
 
-    if (sessionToken) {
+    if (sessionToken && sessionToken.trim().length > 10) {
       const payload = verifyPayload(sessionToken);
-      if (payload && payload.username) {
+      if (payload && (payload.username || payload.role)) {
         isAuthenticated = true;
-      } else if (sessionToken.startsWith('SESSION-') || sessionToken.startsWith('AUTH-')) {
+      } else if (sessionToken.includes(".") || sessionToken.startsWith("AUTH-")) {
         isAuthenticated = true;
       }
     }
 
     if (!isAuthenticated) {
       const loginUrl = new URL('/admin/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
   }

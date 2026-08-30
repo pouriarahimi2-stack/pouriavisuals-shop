@@ -2,12 +2,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,12 +41,15 @@ export default function AdminLoginPage() {
         if (data.user) {
           localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(data.user));
         }
-        router.push("/admin");
+        // هدایت مستقیم با رفرش کامل برای خوانده شدن قطعی کوکی‌ها توسط سرور
+        window.location.href = "/admin";
       } else {
         setErrorMessage(data.message || "نام کاربری یا کلمه عبور اشتباه است.");
+        setLoading(false);
       }
     } catch (err: any) {
       console.error("Login Error:", err);
+      // ورود اضطراری لوکال
       if (username.trim() === "admin" && password.trim() === "admin123456") {
         const defaultUser = {
           id: "admin_master",
@@ -57,12 +58,11 @@ export default function AdminLoginPage() {
           role: "superadmin",
         };
         localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(defaultUser));
-        router.push("/admin");
+        window.location.href = "/admin";
       } else {
         setErrorMessage("خطا در برقراری ارتباط با سرور. لطفاً مجدداً تلاش کنید.");
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
     }
   };
 

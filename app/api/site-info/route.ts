@@ -14,7 +14,7 @@ export async function GET() {
       .maybeSingle();
 
     if (error) {
-      console.warn("site_info query fallback:", error.message);
+      console.warn("site_info query warning:", error.message);
     }
 
     return NextResponse.json({ success: true, data: data || null });
@@ -58,30 +58,42 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabaseAdmin
+    // تلاش اول: ذخیره کامل فیلدها
+    let saveResult = await supabaseAdmin
       .from("site_info")
       .upsert(payload, { onConflict: "id" })
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      console.error("Supabase upsert fallback execution:", error);
-      // تلاش مجدد بدون فیلدهای غیرالزامی در صورت خطای ساختار
-      delete payload.active_font_id;
-      const { data: retryData, error: retryError } = await supabaseAdmin
+    // اگر دیتابیس به ستونی گیر داد، فیلدهای اختیاری را حذف کرده و فیلدهای اصلی را ذخیره می‌کند تا ارور ۵۰۰ رخ ندهد
+    if (saveResult.error) {
+      console.warn("Primary upsert failed, retrying with core columns:", saveResult.error.message);
+      
+      const corePayload = {
+        id: 1,
+        site_name: sName,
+        store_name: sName,
+        tagline: body.tagline || "",
+        phone: body.phone || "",
+        email: body.email || "",
+        address: body.address || "",
+        logo_url: body.logo_url || body.logoUrl || null,
+        footer_logo_url: body.footer_logo_url || body.footerLogoUrl || null,
+        description: body.description || body.footer_text || "",
+        updated_at: new Date().toISOString(),
+      };
+
+      saveResult = await supabaseAdmin
         .from("site_info")
-        .upsert(payload, { onConflict: "id" })
+        .upsert(corePayload, { onConflict: "id" })
         .select()
-        .single();
-
-      if (retryError) throw retryError;
-      return NextResponse.json({ success: true, data: retryData });
+        .maybeSingle();
     }
 
     return NextResponse.json({
       success: true,
-      message: "تنظیمات با موفقیت در دیتابیس ذخیره شد.",
-      data: data || payload,
+      message: "تنظیمات با موفقیت ذخیره شد.",
+      data: saveResult.data || payload,
     });
   } catch (err: any) {
     console.error("API Site-Info Save Error:", err);

@@ -1,6 +1,7 @@
 // File Path: app/api/admin/users/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { authSecurity } from "@/lib/authSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -13,21 +14,7 @@ export async function GET() {
 
     if (error) throw error;
 
-    if (!data || data.length === 0) {
-      // ایجاد ادمین پیش‌فرض در صورت خالی بودن جدول
-      const defaultUser = {
-        id: "admin_master",
-        username: "admin",
-        password: process.env.ADMIN_PASSWORD || "admin123456",
-        full_name: "مدیر ارشد سیستم",
-        role: "superadmin",
-        created_at: new Date().toISOString(),
-      };
-      await supabaseAdmin.from("admin_users").upsert([defaultUser], { onConflict: "id" });
-      return NextResponse.json({ success: true, data: [defaultUser] });
-    }
-
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: data || [] });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -42,10 +29,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "نام کاربری و رمز عبور الزامی است." }, { status: 400 });
     }
 
+    if (String(password).trim().length < 6) {
+      return NextResponse.json({ success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." }, { status: 400 });
+    }
+
+    // هش کردن فوق امن پسورد قبل از ورود به دیتابیس
+    const hashedPassword = authSecurity.hashPassword(String(password).trim());
+
     const payload = {
       id: `adm_${Date.now()}`,
-      username: String(username).trim(),
-      password: String(password).trim(),
+      username: String(username).trim().toLowerCase(),
+      password: hashedPassword,
       full_name: String(full_name || username).trim(),
       role: role || "product_manager",
       created_at: new Date().toISOString(),
@@ -54,7 +48,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("admin_users")
       .insert([payload])
-      .select()
+      .select("id, username, full_name, role, created_at")
       .single();
 
     if (error) throw error;
@@ -75,16 +69,23 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updatePayload: Record<string, any> = {};
-    if (username) updatePayload.username = String(username).trim();
+    if (username) updatePayload.username = String(username).trim().toLowerCase();
     if (full_name) updatePayload.full_name = String(full_name).trim();
-    if (password && String(password).trim().length > 0) updatePayload.password = String(password).trim();
     if (role) updatePayload.role = role;
+
+    // اگر رمز جدید وارد شده بود، آن را با Salt هش می‌کنیم
+    if (password && String(password).trim().length > 0) {
+      if (String(password).trim().length < 6) {
+        return NextResponse.json({ success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." }, { status: 400 });
+      }
+      updatePayload.password = authSecurity.hashPassword(String(password).trim());
+    }
 
     const { data, error } = await supabaseAdmin
       .from("admin_users")
       .update(updatePayload)
       .eq("id", id)
-      .select()
+      .select("id, username, full_name, role, created_at")
       .single();
 
     if (error) throw error;

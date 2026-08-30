@@ -1,11 +1,10 @@
-// File Path: lib/supabase.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hooaobrxgwakqqibcfdy.supabase.co";
 const supabaseAnonKey = 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.dummyKey";
+  "sb_publishable_4W6VSBnjKZzSUTQp13PUpG_hzW7qMeG";
 
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -18,11 +17,6 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
     params: {
       apikey: supabaseAnonKey,
       eventsPerSecond: 50,
-    },
-  },
-  global: {
-    headers: {
-      "x-application-name": "axon-pro-store-realtime",
     },
   },
 });

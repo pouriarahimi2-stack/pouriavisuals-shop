@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data, error } = await supabaseAdmin.from("admin_users").upsert(updatePayload, { onConflict: "id" }).select("id, username, full_name, role, created_at").single();
     if (error) throw error;
-    return NextResponse.json({ success: true, message: "مشخصات مدیر به‌روز شد", data, user: data });
+    return NextResponse.json({ success: true, message: "مشخصات مدیر با موفقیت به‌روز شد", data, user: data });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }

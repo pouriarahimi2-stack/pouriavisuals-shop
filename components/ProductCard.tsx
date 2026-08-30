@@ -1,4 +1,3 @@
-// File Path: components/ProductCard.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -45,39 +44,6 @@ export default function ProductCard({ product }: { product: any }) {
     discountPrice && discountPrice < price
       ? Math.round(((price - discountPrice) / price) * 100)
       : 0;
-
-  const handleQuickBuy = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    userBehavior.trackProductView(product.id, category);
-    addToCart({
-      id: product.id,
-      title,
-      name: title,
-      price: currentPrice,
-      image: mainImage,
-      stock: stockCount,
-      quantity: 1,
-    });
-    router.push("/checkout");
-  };
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    userBehavior.trackProductView(product.id, category);
-    addToCart({
-      id: product.id,
-      title,
-      name: title,
-      price: currentPrice,
-      image: mainImage,
-      stock: stockCount,
-      quantity: 1,
-    });
-  };
 
   return (
     <div
@@ -155,14 +121,43 @@ export default function ProductCard({ product }: { product: any }) {
 
         <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={handleAddToCart}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              soundEngine.playAddToCart();
+              userBehavior.trackProductView(product.id, category);
+              addToCart({
+                id: product.id,
+                title,
+                name: title,
+                price: currentPrice,
+                image: mainImage,
+                stock: stockCount,
+                quantity: 1,
+              });
+            }}
             disabled={!isAvailable}
             className="py-2.5 bg-[var(--input-bg)] text-[var(--text-primary)] text-xs font-black rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] cursor-pointer disabled:opacity-40 transition shadow-sm"
           >
             🛒 سبد خرید
           </button>
           <button
-            onClick={handleQuickBuy}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              soundEngine.playAddToCart();
+              userBehavior.trackProductView(product.id, category);
+              addToCart({
+                id: product.id,
+                title,
+                name: title,
+                price: currentPrice,
+                image: mainImage,
+                stock: stockCount,
+                quantity: 1,
+              });
+              router.push("/checkout");
+            }}
             disabled={!isAvailable}
             className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition"
           >

@@ -1,4 +1,3 @@
-// File Path: components/TechRadarFeed.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -9,32 +8,11 @@ import { soundEngine } from "@/lib/soundEngine";
 export default function TechRadarFeed() {
   const [newsList, setNewsList] = useState<TechNewsItem[]>([]);
   const [startIndex, setStartIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  const loadTopNews = async () => {
-    try {
-      const items = await newsService.getPersonalizedNews();
-      setNewsList(items || []);
-    } catch (e) {
-      console.warn("TechRadarFeed fetch error:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    loadTopNews();
-
-    const handleNewsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setNewsList(e.detail);
-      else loadTopNews();
-    };
-
-    window.addEventListener("news_updated", handleNewsUpdate);
-    return () => window.removeEventListener("news_updated", handleNewsUpdate);
+    newsService.getPersonalizedNews().then((data) => setNewsList(data || []));
   }, []);
 
-  // چرخش ۳ تایی اخبار هر ۵.۵ ثانیه
   useEffect(() => {
     if (newsList.length <= 3) return;
     const interval = setInterval(() => {
@@ -43,13 +21,8 @@ export default function TechRadarFeed() {
     return () => clearInterval(interval);
   }, [newsList.length]);
 
-  if (loading && newsList.length === 0) return null;
   if (newsList.length === 0) return null;
-
   const visibleNews = newsList.slice(startIndex, startIndex + 3);
-  if (visibleNews.length < 3 && newsList.length >= 3) {
-    visibleNews.push(...newsList.slice(0, 3 - visibleNews.length));
-  }
 
   return (
     <section className="w-full max-w-7xl mx-auto font-sans select-none px-2 my-2" dir="rtl">
@@ -60,34 +33,15 @@ export default function TechRadarFeed() {
             جدیدترین اخبار تکنولوژی
           </span>
         </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 w-full">
           {visibleNews.map((item, idx) => (
-            <Link
-              key={`${item.id || item.slug}-${idx}`}
-              href={`/news/${item.slug}`}
-              onClick={() => soundEngine.playClick()}
-              className="flex items-center gap-2 p-1.5 px-2 rounded-xl bg-[var(--input-bg)] hover:bg-[var(--accent-blue)]/10 transition border border-transparent hover:border-[var(--card-border)] overflow-hidden group min-w-0"
-            >
-              <img
-                src={item.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=100"}
-                alt={item.title}
-                className="w-7 h-7 rounded-lg object-cover shrink-0 border border-[var(--card-border)]"
-              />
-              <h4 className="text-[11px] font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition truncate">
-                {item.title}
-              </h4>
+            <Link key={idx} href={`/news/${item.slug}`} onClick={() => soundEngine.playClick()} className="flex items-center gap-2 p-1.5 px-2 rounded-xl bg-[var(--input-bg)] hover:bg-[var(--accent-blue)]/10 transition border border-transparent hover:border-[var(--card-border)] overflow-hidden group min-w-0">
+              <img src={item.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=100"} alt="" className="w-7 h-7 rounded-lg object-cover shrink-0 border border-[var(--card-border)]" />
+              <h4 className="text-[11px] font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition truncate">{item.title}</h4>
             </Link>
           ))}
         </div>
-
-        <Link
-          href="/news"
-          onClick={() => soundEngine.playClick()}
-          className="text-[10px] font-black text-[var(--accent-blue)] hover:underline shrink-0 px-2"
-        >
-          آرشیو اخبار ←
-        </Link>
+        <Link href="/news" className="text-[10px] font-black text-[var(--accent-blue)] hover:underline shrink-0 px-2">آرشیو اخبار ←</Link>
       </div>
     </section>
   );

@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       data = retry.data || safePayload;
     }
 
-    return NextResponse.json({ success: true, message: "تنظیمات ذخیره شد", data: data || payload });
+    return NextResponse.json({ success: true, message: "تنظیمات با موفقیت در دیتابیس ثبت شد", data: data || payload });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }

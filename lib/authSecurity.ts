@@ -1,7 +1,7 @@
 // File Path: lib/authSecurity.ts
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 
-// ۱. سیستم ضد بروت‌فورس (Rate Limiter) در حافظه امن
+// سیستم ضد بروت‌فورس (Rate Limiter) در حافظه امن
 interface RateLimitEntry {
   attempts: number;
   blockedUntil: number;
@@ -9,7 +9,7 @@ interface RateLimitEntry {
 
 const loginAttempts = new Map<string, RateLimitEntry>();
 const MAX_ATTEMPTS = 5;
-const BLOCK_DURATION_MS = 15 * 60 * 1000; // ۱۵ دقیقه بلاک بعد از ۵ تلاش اشتباه
+const BLOCK_DURATION_MS = 15 * 60 * 1000; // ۱۵ دقیقه مسدودسازی پس از ۵ تلاش اشتباه
 
 export const authSecurity = {
   // بررسی و مهار حملات بروت‌فورس
@@ -47,7 +47,7 @@ export const authSecurity = {
     loginAttempts.delete(ip);
   },
 
-  // ۲. هش کردن رمز عبور با تولید Salt اختصاصی و الگوریتم Scrypt
+  // هش کردن رمز عبور با تولید Salt اختصاصی و الگوریتم Scrypt
   hashPassword(password: string): string {
     const clean = String(password).trim();
     const salt = randomBytes(16).toString("hex");
@@ -55,7 +55,7 @@ export const authSecurity = {
     return `${salt}:${hash}`;
   },
 
-  // ۳. اعتبارسنجی امن کلمه عبور با مقایسه تساوی زمانی (Timing-Safe)
+  // اعتبارسنجی امن کلمه عبور با مقایسه تساوی زمانی (Timing-Safe)
   verifyPassword(password: string, storedHashOrPlain: string): boolean {
     try {
       const clean = String(password).trim();
@@ -73,7 +73,7 @@ export const authSecurity = {
         return timingSafeEqual(keyBuffer, derivedKeyBuffer);
       }
 
-      // پشتیبانی موقت برای کاربرانی که رمز قبلی ساده داشتند با مقایسه تساوی زمانی
+      // پشتیبانی موقت برای رمزهای پیش‌فرض با مقایسه تساوی زمانی
       const inputBuffer = Buffer.from(clean);
       const storedBuffer = Buffer.from(stored);
 

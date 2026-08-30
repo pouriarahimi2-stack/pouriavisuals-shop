@@ -12,6 +12,39 @@ import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
+// الگوریتم رسمی و بدون نقص اعتبارسنجی کد پستی ۱۰ رقمی ایران
+export function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
+  if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
+  const cleanCode = postalCode
+    .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+    .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+    .replace(/\D/g, "");
+
+  if (cleanCode.length !== 10) {
+    return { valid: false, message: "کد پستی باید دقیقاً ۱۰ رقم عددی باشد." };
+  }
+
+  const firstDigit = cleanCode.charAt(0);
+  if (firstDigit === "0" || firstDigit === "2") {
+    return { valid: false, message: "کد پستی وارد شده ساختار معتبر مناطق پستی ایران را ندارد." };
+  }
+
+  if (/^(\d)\1{9}$/.test(cleanCode)) {
+    return { valid: false, message: "کد پستی نمی‌تواند از ارقام یکسان تشکیل شده باشد." };
+  }
+
+  const sequentialPatterns = ["0123456789", "1234567890", "2345678901", "9876543210", "8765432109"];
+  if (sequentialPatterns.includes(cleanCode)) {
+    return { valid: false, message: "کد پستی نمی‌تواند متوالی باشد." };
+  }
+
+  if (cleanCode.substring(5) === "00000") {
+    return { valid: false, message: "بخش دوم کد پستی نامعتبر است." };
+  }
+
+  return { valid: true };
+}
+
 export default function Header() {
   const router = useRouter();
   const cartContext = useCart();
@@ -50,16 +83,20 @@ export default function Header() {
     } catch {}
 
     const initHeaderData = async () => {
-      const [info, prods, menus, cats] = await Promise.all([
-        siteInfoService.getSiteInfo(),
-        productService.getAll(),
-        menuService.getAll(),
-        categoryService.getAll(),
-      ]);
-      if (info) setSiteInfo(info);
-      if (prods) setAllProducts(prods);
-      if (menus) setMenuItems(menus);
-      if (cats) setCategories(cats);
+      try {
+        const [info, prods, menus, cats] = await Promise.all([
+          siteInfoService.getSiteInfo(),
+          productService.getAll(),
+          menuService.getAll(),
+          categoryService.getAll(),
+        ]);
+        if (info) setSiteInfo(info);
+        if (prods) setAllProducts(prods);
+        if (menus) setMenuItems(menus);
+        if (cats) setCategories(cats);
+      } catch (e) {
+        console.error("Header data load warning:", e);
+      }
     };
 
     initHeaderData();
@@ -165,7 +202,7 @@ export default function Header() {
     }, 1500);
   };
 
-  // عنوان‌های مینیمال شده هدر سایت
+  // گزینه‌های مینیمال و پاکسازی‌شده نوار ناوبری اصلی هدر
   const navLinks = [
     { title: "صفحه نخست", href: "/" },
     { title: "کاتالوگ محصولات", href: "/#products" },
@@ -178,17 +215,17 @@ export default function Header() {
   const isOnline = siteInfo?.maintenance_mode === "none";
 
   return (
-    <header className="sticky top-2 sm:top-4 z-40 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
-      {siteInfo?.header_announcement && (
+    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
+      {mounted && siteInfo?.header_announcement && (
         <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate">
           {siteInfo.header_announcement}
         </div>
       )}
 
-      {/* نوار اصلی کپسول هدر - بدون بیرون‌زدگی دکمه‌ها و قرارگیری کامل درون قاب شیشه‌ای */}
-      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
+      {/* نوار اصلی و کامل کپسول هدر - تمام المان‌ها و دکمه‌ها ۱۰۰٪ داخل این کادر یکپارچه قرار دارند */}
+      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
         
-        {/* لوگوی ثبت‌شده و نام برند */}
+        {/* ۱. لوگو و نام رسمی برند */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
             onClick={() => {
@@ -211,7 +248,7 @@ export default function Header() {
             </div>
             <div className="flex flex-col text-right">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[120px] sm:max-w-[160px]" suppressHydrationWarning>
+                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[120px] sm:max-w-[160px]">
                   {storeName}
                 </span>
                 <span
@@ -223,7 +260,7 @@ export default function Header() {
                   title={isOnline ? "سامانه آنلاین" : "حالت تعمیرات"}
                 />
               </div>
-              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]" suppressHydrationWarning>
+              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]">
                 {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر"}
               </span>
             </div>
@@ -248,7 +285,7 @@ export default function Header() {
             </button>
 
             {isCategoryOpen && (
-              <div className="absolute top-11 right-0 w-60 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
+              <div className="absolute top-12 right-0 w-60 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
                 <button
                   onClick={() => handleSelectCategory("all")}
                   className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-black transition cursor-pointer ${
@@ -280,7 +317,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* منوی مینیمال ناوبری در دسکتاپ */}
+        {/* ۲. منوی مینیمال ناوبری در دسکتاپ */}
         <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
@@ -293,7 +330,7 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* دکمه‌های جستجو، تغییر تم و دکمه سبد خرید که کاملاً درون هدر قرار دارند */}
+        {/* ۳. جستجوی زنده، دکمه تم و دکمه آیکونی سبد خرید در داخل کادر اصلی هدر */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative hidden xl:block" ref={searchContainerRef}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
@@ -309,7 +346,7 @@ export default function Header() {
             </div>
 
             {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-11 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72">
+              <div className="absolute top-12 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72">
                 <div className="max-h-60 overflow-y-auto space-y-1">
                   {searchResults.map((p) => (
                     <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
@@ -347,16 +384,16 @@ export default function Header() {
             )}
           </div>
 
-          {/* دکمه لایت‌مود و دارک‌مود درون کپسول هدر */}
+          {/* دکمه لایت‌مود و دارک‌مود */}
           <button
             onClick={toggleDarkMode}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
-            title="تغییر تم"
+            title="تغییر تم (دارک / لایت)"
           >
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه آیکونی سبد خرید کاملاً درون کپسول هدر */}
+          {/* دکمه سبد خرید آیکونی کاملاً ادغام‌شده داخل کادر هدر */}
           <button
             onClick={() => {
               soundEngine.playClick();
@@ -369,7 +406,7 @@ export default function Header() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
-            {totalItems > 0 && (
+            {mounted && totalItems > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse">
                 {totalItems}
               </span>

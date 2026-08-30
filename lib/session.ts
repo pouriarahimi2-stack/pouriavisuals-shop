@@ -20,7 +20,7 @@ export function verifyPayload(token: string): any | null {
   try {
     if (!token || typeof token !== "string") return null;
 
-    // پشتیبانی از توکن‌های استاندارد با امضا
+    // ۱. بررسی توکن‌های استاندارد با امضای HMAC
     if (token.includes(".")) {
       const parts = token.split(".");
       if (parts.length === 2) {
@@ -31,12 +31,19 @@ export function verifyPayload(token: string): any | null {
 
         if (signature === expectedSignature) {
           const jsonStr = Buffer.from(data, "base64url").toString("utf-8");
-          return JSON.parse(jsonStr);
+          const parsed = JSON.parse(jsonStr);
+
+          // بررسی تاریخ انقضای سشن توکن
+          if (parsed && parsed.exp && Date.now() > parsed.exp) {
+            return null;
+          }
+
+          return parsed;
         }
       }
     }
 
-    // پشتیبانی از توکن‌های فال‌بک
+    // ۲. بررسی توکن‌های فال‌بک
     if (token.startsWith("AUTH-")) {
       const base64Data = token.replace("AUTH-", "");
       const jsonStr = Buffer.from(base64Data, "base64").toString("utf-8");

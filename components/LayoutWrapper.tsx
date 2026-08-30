@@ -69,7 +69,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  // ثبت و بازیابی بلادرنگ موقعیت کاربر (User Path Memory)
+  // ثبت و بازیابی بلادرنگ موقعیت کاربر در حافظه سیستم (User Path Memory)
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -89,7 +89,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // شمارنده معکوس حالت تعمیرات زمان‌دار
+  // تایمر شمارش معکوس حالت تعمیرات زمان‌دار
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
@@ -124,7 +124,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // نمایش صفحه شیشه‌ای تعمیرات در صورت فعال بودن
+  // نمایش صفحه شیشه‌ای تعمیرات با امکان بازیابی موقعیت کاربر
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";

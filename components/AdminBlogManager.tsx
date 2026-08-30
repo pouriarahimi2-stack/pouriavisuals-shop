@@ -181,7 +181,7 @@ export default function AdminBlogManager() {
         setSelectedFontFamily(fontName);
         handleFontChange(fontName);
         soundEngine.playSuccess();
-        alert(`فونت «${fontName}» با موفقیت بارگذاری و برای همیشه در سایت ذخیره شد.`);
+        alert(`فونت اختصاصی «${fontName}» با موفقیت بارگذاری و برای همیشه در سایت ذخیره شد.`);
       }
     };
     reader.readAsDataURL(file);
@@ -622,7 +622,7 @@ export default function AdminBlogManager() {
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
+                className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
               >
                 انصراف
               </button>

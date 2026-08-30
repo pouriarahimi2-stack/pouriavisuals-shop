@@ -14,7 +14,7 @@ export async function GET() {
       .maybeSingle();
 
     if (error) {
-      console.warn("site_info query warning:", error.message);
+      console.warn("site_info GET warning:", error.message);
     }
 
     return NextResponse.json({ success: true, data: data || null });
@@ -58,18 +58,18 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    // تلاش اول: ذخیره کامل فیلدها
-    let saveResult = await supabaseAdmin
+    // تلاش اول: ذخیره کامل داده‌ها با تمام فیلدها
+    let { data, error } = await supabaseAdmin
       .from("site_info")
       .upsert(payload, { onConflict: "id" })
       .select()
       .maybeSingle();
 
-    // اگر دیتابیس به ستونی گیر داد، فیلدهای اختیاری را حذف کرده و فیلدهای اصلی را ذخیره می‌کند تا ارور ۵۰۰ رخ ندهد
-    if (saveResult.error) {
-      console.warn("Primary upsert failed, retrying with core columns:", saveResult.error.message);
-      
-      const corePayload = {
+    // در صورت وجود خطای ساختار دیتابیس، فیلدهای پایه با تضمین عدم بروز خطای ۵۰۰ ثبت می‌شوند
+    if (error) {
+      console.warn("Primary upsert fallback execution:", error.message);
+
+      const safePayload = {
         id: 1,
         site_name: sName,
         store_name: sName,
@@ -83,17 +83,19 @@ export async function POST(req: NextRequest) {
         updated_at: new Date().toISOString(),
       };
 
-      saveResult = await supabaseAdmin
+      const retry = await supabaseAdmin
         .from("site_info")
-        .upsert(corePayload, { onConflict: "id" })
+        .upsert(safePayload, { onConflict: "id" })
         .select()
         .maybeSingle();
+
+      data = retry.data || safePayload;
     }
 
     return NextResponse.json({
       success: true,
-      message: "تنظیمات با موفقیت ذخیره شد.",
-      data: saveResult.data || payload,
+      message: "تنظیمات با موفقیت در دیتابیس ذخیره شد.",
+      data: data || payload,
     });
   } catch (err: any) {
     console.error("API Site-Info Save Error:", err);

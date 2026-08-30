@@ -25,7 +25,7 @@ export default function AdminProducts() {
   const [description, setDescription] = useState("");
   const [highlights, setHighlights] = useState<string[]>([""]);
 
-  // قیمت‌گذاری با قابلیت جداسازی ۳ رقمی ارقام
+  // قیمت‌گذاری با جداسازی ۳ رقمی ارقام
   const [priceRaw, setPriceRaw] = useState<number | "">("");
   const [discountPriceRaw, setDiscountPriceRaw] = useState<number | "">("");
   const [stock, setStock] = useState<number | "">(10);
@@ -239,7 +239,6 @@ export default function AdminProducts() {
     }
   };
 
-  // فشرده‌سازی خودکار تصویر در مرورگر قبل از آپلود
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve) => {
       const reader = new FileReader();

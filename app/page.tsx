@@ -88,7 +88,6 @@ export default function HomePage() {
     };
   }, []);
 
-  // چرخش خودکار اسلایدر بنرها هر ۶ ثانیه
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -137,7 +136,7 @@ export default function HomePage() {
     <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-10 mt-3 sm:mt-5">
         
-        {/* ۱. اسلایدر بنرهای فروشگاه */}
+        {/* اسلایدر عریض بنرها */}
         {banners.length > 0 && (
           <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
             <div
@@ -214,10 +213,10 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ۲. تیکر پایش اخبار تکنولوژی زیر هدر */}
+        {/* تیکر جمع‌وجور اخبار تکنولوژی زیر هدر */}
         <TechRadarFeed />
 
-        {/* ۳. ویترین اصلی محصولات - تمرکز کامل وب‌سایت */}
+        {/* ویترین اصلی کاتالوگ محصولات - تمرکز اساسی سایت */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
             <div>
@@ -335,7 +334,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ۴. کادر کوچک و شکیل مجله تخصصی و مقالات سئو دقیقاً پیش از فوتر */}
+        {/* کادر جمع‌وجور مجله تخصصی سئو دقیقاً پیش از فوتر */}
         <section className="p-5 sm:p-7 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <div>

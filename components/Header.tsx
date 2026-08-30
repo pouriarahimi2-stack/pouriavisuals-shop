@@ -12,38 +12,6 @@ import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
-export function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
-  if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
-  const cleanCode = postalCode
-    .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-    .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
-    .replace(/\D/g, "");
-
-  if (cleanCode.length !== 10) {
-    return { valid: false, message: "کد پستی باید دقیقاً ۱۰ رقم عددی باشد." };
-  }
-
-  const firstDigit = cleanCode.charAt(0);
-  if (firstDigit === "0" || firstDigit === "2") {
-    return { valid: false, message: "کد پستی وارد شده ساختار معتبر مناطق پستی ایران را ندارد." };
-  }
-
-  if (/^(\d)\1{9}$/.test(cleanCode)) {
-    return { valid: false, message: "کد پستی نمی‌تواند از ارقام یکسان تشکیل شده باشد." };
-  }
-
-  const sequentialPatterns = ["0123456789", "1234567890", "2345678901", "9876543210", "8765432109"];
-  if (sequentialPatterns.includes(cleanCode)) {
-    return { valid: false, message: "کد پستی نمی‌تواند متوالی باشد." };
-  }
-
-  if (cleanCode.substring(5) === "00000") {
-    return { valid: false, message: "بخش دوم کد پستی نامعتبر است." };
-  }
-
-  return { valid: true };
-}
-
 export default function Header() {
   const router = useRouter();
   const cartContext = useCart();
@@ -197,7 +165,7 @@ export default function Header() {
     }, 1500);
   };
 
-  // عنوان‌های مینیمال و تمیز هدر سایت
+  // عنوان‌های مینیمال شده هدر سایت
   const navLinks = [
     { title: "صفحه نخست", href: "/" },
     { title: "کاتالوگ محصولات", href: "/#products" },
@@ -217,10 +185,10 @@ export default function Header() {
         </div>
       )}
 
-      {/* نوار اصلی کپسولی هدر - دربرگیرنده تمامی دکمه‌ها و لوگو در یک کادر واحد */}
-      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
+      {/* نوار اصلی کپسول هدر - بدون بیرون‌زدگی دکمه‌ها و قرارگیری کامل درون قاب شیشه‌ای */}
+      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
         
-        {/* لوگو و نام برند */}
+        {/* لوگوی ثبت‌شده و نام برند */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
             onClick={() => {
@@ -312,7 +280,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* ناوبری مینیمال دسکتاپ */}
+        {/* منوی مینیمال ناوبری در دسکتاپ */}
         <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
@@ -325,7 +293,7 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* دکمه‌های تم و سبد خرید درون کادر هدر */}
+        {/* دکمه‌های جستجو، تغییر تم و دکمه سبد خرید که کاملاً درون هدر قرار دارند */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative hidden xl:block" ref={searchContainerRef}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
@@ -379,16 +347,16 @@ export default function Header() {
             )}
           </div>
 
-          {/* دکمه لایت‌مود و دارک‌مود */}
+          {/* دکمه لایت‌مود و دارک‌مود درون کپسول هدر */}
           <button
             onClick={toggleDarkMode}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
-            title="تغییر تم (دارک / لایت)"
+            title="تغییر تم"
           >
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید آیکونی */}
+          {/* دکمه آیکونی سبد خرید کاملاً درون کپسول هدر */}
           <button
             onClick={() => {
               soundEngine.playClick();

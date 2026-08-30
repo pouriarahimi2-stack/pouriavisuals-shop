@@ -630,7 +630,7 @@ export default function AdminBlogManager() {
                 type="button"
                 disabled={isAiGenerating}
                 onClick={handleGenerateAiRank1Article}
-                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-md cursor-pointer disabled:opacity-50"
+                className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-md cursor-pointer disabled:opacity-50"
               >
                 {isAiGenerating ? "در حال تولید مهندسی‌شده مقاله..." : "شروع نگارش هوشمند 🚀"}
               </button>

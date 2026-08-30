@@ -1,4 +1,3 @@
-// File Path: services/siteInfoService.ts
 import { supabase } from "@/lib/supabase";
 
 export type MaintenanceMode = "none" | "timed" | "indefinite";
@@ -50,7 +49,7 @@ export const siteInfoService = {
       site_name: "آکسون | Axon",
       siteName: "آکسون | Axon",
       storeName: "آکسون | Axon",
-      tagline: "مرجع تخصصی تجهیزات تصویر، مانیتور و استودیو",
+      tagline: "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
       allow_google_index: true,
       allowGoogleIndex: true,
       maintenance_mode: "none",
@@ -65,22 +64,19 @@ export const siteInfoService = {
 
   async getSiteInfo(): Promise<SiteInfo | null> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("site_info")
-          .select("*")
-          .order("id", { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
-        if (data && !error) {
+      // دریافت مستقیم و بدون کش از API سرور
+      const res = await fetch("/api/site-info", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          const data = json.data;
           const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
           const mapped: SiteInfo = {
             id: data.id,
             site_name: data.site_name || data.store_name || "آکسون | Axon",
             siteName: data.site_name || data.store_name || "آکسون | Axon",
             storeName: data.site_name || data.store_name || "آکسون | Axon",
-            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال و استودیو",
+            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
             phone: data.phone || "۰۲۱-۸۸۸۸۸۸۸۸",
             email: data.email || "info@axoncore.ir",
             address: data.address || "تهران، خیابان ولیعصر، تقاطع میرداماد",
@@ -157,18 +153,21 @@ export const siteInfoService = {
         updated_at: new Date().toISOString(),
       };
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(dbPayload));
-        window.dispatchEvent(new CustomEvent("site_info_updated", { detail: dbPayload }));
-      }
-
-      await fetch("/api/site-info", {
+      const res = await fetch("/api/site-info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dbPayload),
       });
 
-      return dbPayload;
+      const json = await res.json();
+      const finalData = json.data || dbPayload;
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
+        window.dispatchEvent(new CustomEvent("site_info_updated", { detail: finalData }));
+      }
+
+      return finalData;
     } catch {
       return null;
     }

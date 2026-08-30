@@ -48,12 +48,14 @@ export default function AdminPage() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
+  // مودال وضعیت آنلاین / تعمیرات
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
   const [maintMinutes, setMaintMinutes] = useState<number>(0);
   const [isSavingMaint, setIsSavingMaint] = useState(false);
 
+  // مودال تغییر مشخصات و رمز عبور
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
@@ -65,6 +67,7 @@ export default function AdminPage() {
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
+  // مودال مدیریت ادمین‌ها
   const [showAdminManagerModal, setShowAdminManagerModal] = useState(false);
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
   const [newAdminUsername, setNewAdminUsername] = useState("");
@@ -317,7 +320,10 @@ export default function AdminPage() {
     if (role === "product_manager" || role === "inventory_manager") {
       return <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-[10px]">📦 مدیر انبار و کالا</span>;
     }
-    return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات سئو</span>;
+    if (role === "content_editor") {
+      return <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black text-[10px]">✍️ ویراستار مقالات سئو</span>;
+    }
+    return <span className="px-2.5 py-1 rounded-full bg-slate-500/15 text-slate-400 border border-slate-500/30 font-black text-[10px]">👁️ ناظر (Viewer)</span>;
   };
 
   const navTabs = [
@@ -356,7 +362,7 @@ export default function AdminPage() {
     >
       <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
 
-      {/* هدر پیشخوان ادمین */}
+      {/* هدر یکپارچه پیشخوان با کنترل زنده وضعیت سایت */}
       <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">

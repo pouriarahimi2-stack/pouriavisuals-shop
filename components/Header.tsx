@@ -211,10 +211,10 @@ export default function Header() {
         </div>
       )}
 
-      {/* نوار کپسولی یکپارچه هدر با ساختار Flex بدون شکست */}
+      {/* نوار کپسولی یکپارچه بدون شکست Flex */}
       <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
         
-        {/* ۱. بخش لوگو، نام سایت و دراپ‌داون دسته‌بندی */}
+        {/* ۱. لوگو، نام سایت و دراپ‌داون دسته‌بندی */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
             onClick={() => {
@@ -222,7 +222,7 @@ export default function Header() {
               setMobileMenuOpen(!mobileMenuOpen);
             }}
             className="lg:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer shrink-0"
-            aria-label="منوی موبایل"
+            aria-label="منوی ناوبری"
           >
             ☰
           </button>
@@ -306,7 +306,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* ۲. منوی ناوبری ۴تایی */}
+        {/* ۲. منوی ناوبری ۴ تایی */}
         <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
@@ -319,7 +319,7 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* ۳. جستجو، دکمه تم و دکمه سبد خرید در داخل کپسول */}
+        {/* ۳. جستجو، دکمه تم و دکمه آیکونی سبد خرید ۱۰۰٪ در کپسول هدر */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative hidden xl:block" ref={searchContainerRef}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
@@ -373,7 +373,7 @@ export default function Header() {
             )}
           </div>
 
-          {/* دکمه تغییر تم (لایت / دارک) */}
+          {/* دکمه تغییر تم دارک / لایت */}
           <button
             onClick={toggleDarkMode}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
@@ -383,7 +383,7 @@ export default function Header() {
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید آیکونی با بج تعداد */}
+          {/* دکمه سبد خرید آیکونی با بج تعداد داخل کپسول */}
           <button
             onClick={() => {
               soundEngine.playClick();

@@ -607,124 +607,6 @@ export async function POST() {
 }
 </file>
 
-<file path="app/api/admin/users/route.ts">
-// File Path: app/api/admin/users/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { authSecurity } from "@/lib/authSecurity";
-
-export const dynamic = "force-dynamic";
-
-export async function GET() {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("admin_users")
-      .select("id, username, full_name, role, created_at")
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, data: data || [] });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { username, password, full_name, role } = body;
-
-    if (!username || !password) {
-      return NextResponse.json({ success: false, message: "نام کاربری و رمز عبور الزامی است." }, { status: 400 });
-    }
-
-    if (String(password).trim().length < 6) {
-      return NextResponse.json({ success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." }, { status: 400 });
-    }
-
-    // هش کردن فوق امن پسورد قبل از ورود به دیتابیس
-    const hashedPassword = authSecurity.hashPassword(String(password).trim());
-
-    const payload = {
-      id: `adm_${Date.now()}`,
-      username: String(username).trim().toLowerCase(),
-      password: hashedPassword,
-      full_name: String(full_name || username).trim(),
-      role: role || "product_manager",
-      created_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await supabaseAdmin
-      .from("admin_users")
-      .insert([payload])
-      .select("id, username, full_name, role, created_at")
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function PATCH(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { id, username, password, full_name, role } = body;
-
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه ادمین الزامی است." }, { status: 400 });
-    }
-
-    const updatePayload: Record<string, any> = {};
-    if (username) updatePayload.username = String(username).trim().toLowerCase();
-    if (full_name) updatePayload.full_name = String(full_name).trim();
-    if (role) updatePayload.role = role;
-
-    // اگر رمز جدید وارد شده بود، آن را با Salt هش می‌کنیم
-    if (password && String(password).trim().length > 0) {
-      if (String(password).trim().length < 6) {
-        return NextResponse.json({ success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." }, { status: 400 });
-      }
-      updatePayload.password = authSecurity.hashPassword(String(password).trim());
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from("admin_users")
-      .update(updatePayload)
-      .eq("id", id)
-      .select("id, username, full_name, role, created_at")
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه الزامی است." }, { status: 400 });
-    }
-
-    const { error } = await supabaseAdmin.from("admin_users").delete().eq("id", id);
-    if (error) throw error;
-
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-</file>
-
 <file path="app/api/blogs/route.ts">
 // File Path: app/api/blogs/route.ts
 import { NextResponse } from "next/server";
@@ -2232,6 +2114,173 @@ export async function updateOrderStatusServer(orderId: string, status: string, p
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+}
+</file>
+
+<file path="app/api/admin/users/route.ts">
+// File Path: app/api/admin/users/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { authSecurity } from "@/lib/authSecurity";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("admin_users")
+      .select("id, username, full_name, role, created_at")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.warn("admin_users GET warning:", error.message);
+    }
+
+    if (!data || data.length === 0) {
+      const defaultPassword = process.env.ADMIN_PASSWORD || "admin123456";
+      const hashedPassword = authSecurity.hashPassword(defaultPassword);
+      const defaultUser = {
+        id: "admin_master",
+        username: "admin",
+        password: hashedPassword,
+        full_name: "مدیر ارشد سیستم",
+        role: "superadmin",
+        created_at: new Date().toISOString(),
+      };
+      await supabaseAdmin.from("admin_users").upsert([defaultUser], { onConflict: "id" });
+      return NextResponse.json({
+        success: true,
+        data: [
+          {
+            id: defaultUser.id,
+            username: defaultUser.username,
+            full_name: defaultUser.full_name,
+            role: defaultUser.role,
+            created_at: defaultUser.created_at,
+          },
+        ],
+      });
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message || "خطای سرور" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { username, password, full_name, role } = body;
+
+    if (!username || !password) {
+      return NextResponse.json(
+        { success: false, message: "نام کاربری و رمز عبور الزامی است." },
+        { status: 400 }
+      );
+    }
+
+    if (String(password).trim().length < 6) {
+      return NextResponse.json(
+        { success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." },
+        { status: 400 }
+      );
+    }
+
+    const hashedPassword = authSecurity.hashPassword(String(password).trim());
+    const payload = {
+      id: `adm_${Date.now()}`,
+      username: String(username).trim().toLowerCase(),
+      password: hashedPassword,
+      full_name: String(full_name || username).trim(),
+      role: role || "product_manager",
+      created_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from("admin_users")
+      .insert([payload])
+      .select("id, username, full_name, role, created_at")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message || "خطا در ثبت کاربر" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, username, password, full_name, role } = body;
+
+    const targetId = id || "admin_master";
+    const updatePayload: Record<string, any> = {
+      id: targetId,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (username) updatePayload.username = String(username).trim().toLowerCase();
+    if (full_name) updatePayload.full_name = String(full_name).trim();
+    if (role) updatePayload.role = role;
+
+    if (password && String(password).trim().length > 0) {
+      if (String(password).trim().length < 6) {
+        return NextResponse.json(
+          { success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." },
+          { status: 400 }
+        );
+      }
+      updatePayload.password = authSecurity.hashPassword(String(password).trim());
+    }
+
+    // استفاده از upsert برای جلوگیری از خطای عدم وجود رکورد
+    const { data, error } = await supabaseAdmin
+      .from("admin_users")
+      .upsert(updatePayload, { onConflict: "id" })
+      .select("id, username, full_name, role, created_at")
+      .single();
+
+    if (error) {
+      console.error("Admin user update error:", error);
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "مشخصات مدیر با موفقیت به‌روزرسانی شد.",
+      data,
+      user: data,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message || "خطای سرور در ویرایش" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه الزامی است." }, { status: 400 });
+    }
+
+    if (id === "admin_master") {
+      return NextResponse.json({ success: false, message: "حذف مدیر ارشد سیستم امکان‌پذیر نیست." }, { status: 403 });
+    }
+
+    const { error } = await supabaseAdmin.from("admin_users").delete().eq("id", id);
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, message: "کاربر با موفقیت حذف شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message || "خطا در حذف" }, { status: 500 });
   }
 }
 </file>
@@ -6222,6 +6271,262 @@ class SoundEngine {
 export const soundEngine = new SoundEngine();
 </file>
 
+<file path="services/couponService.ts">
+// File Path: services/couponService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface Coupon {
+  id: string | number;
+  code: string;
+  type?: "percent" | "fixed";
+  discount_type?: "percent" | "fixed";
+  value?: number;
+  discount_value?: number;
+  discountPercent?: number;
+  min_order_amount?: number;
+  minOrder?: number;
+  max_discount_amount?: number;
+  max_discount?: number;
+  maxDiscount?: number;
+  usage_limit?: number;
+  used_count?: number;
+  expires_at?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+const LOCAL_STORAGE_KEY = "axon_coupons_cache_v2026";
+
+export function normalizeCoupon(raw: any): Coupon {
+  if (!raw) return {} as Coupon;
+
+  const id = raw.id || `coupon_${Date.now()}`;
+  const code = (raw.code || "").trim().toUpperCase();
+  const type = raw.discount_type || raw.type || (raw.discountPercent ? "percent" : "fixed");
+  const value = Number(raw.discount_value ?? raw.value ?? raw.discountPercent ?? 0);
+  const min_order_amount = raw.min_order_amount !== undefined ? Number(raw.min_order_amount) : (raw.minOrder !== undefined ? Number(raw.minOrder) : undefined);
+  const max_discount = raw.max_discount !== undefined ? Number(raw.max_discount) : (raw.max_discount_amount !== undefined ? Number(raw.max_discount_amount) : (raw.maxDiscount !== undefined ? Number(raw.maxDiscount) : undefined));
+  const is_active = raw.is_active !== undefined ? Boolean(raw.is_active) : true;
+
+  return {
+    ...raw,
+    id,
+    code,
+    type,
+    discount_type: type,
+    value,
+    discount_value: value,
+    discountPercent: type === "percent" ? value : undefined,
+    min_order_amount,
+    minOrder: min_order_amount,
+    max_discount,
+    max_discount_amount: max_discount,
+    maxDiscount: max_discount,
+    usage_limit: raw.usage_limit !== undefined ? Number(raw.usage_limit) : undefined,
+    used_count: Number(raw.used_count ?? 0),
+    expires_at: raw.expires_at || undefined,
+    is_active,
+    created_at: raw.created_at || new Date().toISOString(),
+    updated_at: raw.updated_at || new Date().toISOString(),
+  };
+}
+
+export const couponService = {
+  async getAll(): Promise<Coupon[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          const mapped = data.map(normalizeCoupon);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+          }
+          return mapped;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (cached) {
+          return JSON.parse(cached).map(normalizeCoupon);
+        }
+      }
+
+      return [];
+    } catch (err) {
+      console.error("couponService getAll error:", err);
+      return [];
+    }
+  },
+
+  async validateCoupon(
+    code: string,
+    totalAmount: number
+  ): Promise<{ valid: boolean; discount: number; message: string; coupon?: Coupon }> {
+    try {
+      const cleanCode = code.trim().toUpperCase();
+
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .eq("code", cleanCode)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (!error && data) {
+          const matched = normalizeCoupon(data);
+
+          if (matched.expires_at && new Date(matched.expires_at) < new Date()) {
+            return { valid: false, discount: 0, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." };
+          }
+
+          if (matched.min_order_amount && totalAmount < matched.min_order_amount) {
+            return {
+              valid: false,
+              discount: 0,
+              message: `حداقل مبلغ سفارش برای اعمال این کد ${matched.min_order_amount.toLocaleString("fa-IR")} تومان است.`,
+            };
+          }
+
+          if (matched.usage_limit && (matched.used_count ?? 0) >= matched.usage_limit) {
+            return { valid: false, discount: 0, message: "ظرفیت استفاده از این کد تخفیف تکمیل شده است." };
+          }
+
+          let calculatedDiscount = 0;
+          const type = matched.discount_type || matched.type;
+          const val = Number(matched.discount_value ?? matched.value ?? 0);
+
+          if (type === "percent") {
+            calculatedDiscount = (totalAmount * val) / 100;
+            const maxLimit = matched.max_discount ?? matched.max_discount_amount ?? matched.maxDiscount;
+            if (maxLimit && calculatedDiscount > maxLimit) {
+              calculatedDiscount = maxLimit;
+            }
+          } else {
+            calculatedDiscount = val;
+          }
+
+          calculatedDiscount = Math.min(calculatedDiscount, totalAmount);
+
+          return {
+            valid: true,
+            discount: calculatedDiscount,
+            message: "کد تخفیف با موفقیت اعمال گردید.",
+            coupon: matched,
+          };
+        }
+      }
+
+      return { valid: false, discount: 0, message: "کد تخفیف وارد شده معتبر نیست یا غیرفعال شده است." };
+    } catch (err) {
+      console.error("couponService validateCoupon error:", err);
+      return { valid: false, discount: 0, message: "خطا در پردازش کد تخفیف." };
+    }
+  },
+
+  async create(couponData: Partial<Coupon>): Promise<Coupon | null> {
+    try {
+      const normalized = normalizeCoupon({
+        ...couponData,
+        id: `cp_${Date.now()}`,
+      });
+
+      if (supabase) {
+        const payload = {
+          code: normalized.code,
+          type: normalized.type,
+          discount_type: normalized.discount_type,
+          value: normalized.value,
+          discount_value: normalized.discount_value,
+          min_order_amount: normalized.min_order_amount || null,
+          max_discount: normalized.max_discount || null,
+          usage_limit: normalized.usage_limit || null,
+          used_count: 0,
+          expires_at: normalized.expires_at || null,
+          is_active: normalized.is_active,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabase
+          .from("coupons")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (!error && data) {
+          const current = await this.getAll();
+          const updatedList = [normalizeCoupon(data), ...current.filter((c) => String(c.id) !== String(data.id))];
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+            window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
+          }
+          return normalizeCoupon(data);
+        }
+      }
+
+      return null;
+    } catch (err) {
+      console.error("couponService create error:", err);
+      return null;
+    }
+  },
+
+  async update(id: string | number, couponData: Partial<Coupon>): Promise<boolean> {
+    try {
+      if (supabase) {
+        const payload: any = {
+          ...couponData,
+          updated_at: new Date().toISOString(),
+        };
+        await supabase.from("coupons").update(payload).eq("id", id);
+      }
+
+      const current = await this.getAll();
+      const updatedList = current.map((c) =>
+        String(c.id) === String(id) ? normalizeCoupon({ ...c, ...couponData }) : c
+      );
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
+      }
+      return true;
+    } catch (err) {
+      console.error("couponService update error:", err);
+      return false;
+    }
+  },
+
+  async delete(id: string | number): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("coupons").delete().eq("id", id);
+      }
+
+      const current = await this.getAll();
+      const updatedList = current.filter((c) => String(c.id) !== String(id));
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
+      }
+      return true;
+    } catch (err) {
+      console.error("couponService delete error:", err);
+      return false;
+    }
+  },
+};
+
+export default couponService;
+</file>
+
 <file path="services/menuService.ts">
 // File Path: services/menuService.ts
 import { supabase } from "@/lib/supabase";
@@ -8686,260 +8991,107 @@ export default function ProductExplodedView({
 27424534
 </file>
 
-<file path="services/couponService.ts">
-// File Path: services/couponService.ts
+<file path="services/categoryService.ts">
+// File Path: services/categoryService.ts
 import { supabase } from "@/lib/supabase";
 
-export interface Coupon {
-  id: string | number;
-  code: string;
-  type?: "percent" | "fixed";
-  discount_type?: "percent" | "fixed";
-  value?: number;
-  discount_value?: number;
-  discountPercent?: number;
-  min_order_amount?: number;
-  minOrder?: number;
-  max_discount_amount?: number;
-  max_discount?: number;
-  maxDiscount?: number;
-  usage_limit?: number;
-  used_count?: number;
-  expires_at?: string;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
+export interface Category {
+  id?: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  description?: string;
+  order_index?: number;
+  display_order?: number;
 }
 
-const LOCAL_STORAGE_KEY = "axon_coupons_cache_v2026";
+const LOCAL_CATEGORIES_CACHE = "axon_categories_cache_v2026";
 
-export function normalizeCoupon(raw: any): Coupon {
-  if (!raw) return {} as Coupon;
-
-  const id = raw.id || `coupon_${Date.now()}`;
-  const code = (raw.code || "").trim().toUpperCase();
-  const type = raw.discount_type || raw.type || (raw.discountPercent ? "percent" : "fixed");
-  const value = Number(raw.discount_value ?? raw.value ?? raw.discountPercent ?? 0);
-  const min_order_amount = raw.min_order_amount !== undefined ? Number(raw.min_order_amount) : (raw.minOrder !== undefined ? Number(raw.minOrder) : undefined);
-  const max_discount = raw.max_discount !== undefined ? Number(raw.max_discount) : (raw.max_discount_amount !== undefined ? Number(raw.max_discount_amount) : (raw.maxDiscount !== undefined ? Number(raw.maxDiscount) : undefined));
-  const is_active = raw.is_active !== undefined ? Boolean(raw.is_active) : true;
-
-  return {
-    ...raw,
-    id,
-    code,
-    type,
-    discount_type: type,
-    value,
-    discount_value: value,
-    discountPercent: type === "percent" ? value : undefined,
-    min_order_amount,
-    minOrder: min_order_amount,
-    max_discount,
-    max_discount_amount: max_discount,
-    maxDiscount: max_discount,
-    usage_limit: raw.usage_limit !== undefined ? Number(raw.usage_limit) : undefined,
-    used_count: Number(raw.used_count ?? 0),
-    expires_at: raw.expires_at || undefined,
-    is_active,
-    created_at: raw.created_at || new Date().toISOString(),
-    updated_at: raw.updated_at || new Date().toISOString(),
-  };
-}
-
-export const couponService = {
-  async getAll(): Promise<Coupon[]> {
+export const categoryService = {
+  async getAll(): Promise<Category[]> {
     try {
       if (supabase) {
         const { data, error } = await supabase
-          .from("coupons")
+          .from("categories")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("order_index", { ascending: true });
 
         if (!error && data) {
-          const mapped = data.map(normalizeCoupon);
           if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
+            localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(data));
           }
-          return mapped;
+          return data;
         }
       }
 
       if (typeof window !== "undefined") {
-        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (cached) {
-          return JSON.parse(cached).map(normalizeCoupon);
-        }
+        const cached = localStorage.getItem(LOCAL_CATEGORIES_CACHE);
+        if (cached) return JSON.parse(cached);
       }
 
       return [];
-    } catch (err) {
-      console.error("couponService getAll error:", err);
+    } catch (e) {
+      console.error("categoryService.getAll error:", e);
       return [];
     }
   },
 
-  async validateCoupon(
-    code: string,
-    totalAmount: number
-  ): Promise<{ valid: boolean; discount: number; message: string; coupon?: Coupon }> {
+  async addCategory(cat: Omit<Category, "id">): Promise<Category | null> {
     try {
-      const cleanCode = code.trim().toUpperCase();
+      const payload = {
+        name: cat.name.trim(),
+        slug: (cat.slug || cat.name).trim().toLowerCase().replace(/\s+/g, "-"),
+        order_index: cat.order_index ?? 0,
+        display_order: cat.order_index ?? 0,
+      };
 
       if (supabase) {
         const { data, error } = await supabase
-          .from("coupons")
-          .select("*")
-          .eq("code", cleanCode)
-          .eq("is_active", true)
-          .maybeSingle();
-
-        if (!error && data) {
-          const matched = normalizeCoupon(data);
-
-          if (matched.expires_at && new Date(matched.expires_at) < new Date()) {
-            return { valid: false, discount: 0, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." };
-          }
-
-          if (matched.min_order_amount && totalAmount < matched.min_order_amount) {
-            return {
-              valid: false,
-              discount: 0,
-              message: `حداقل مبلغ سفارش برای اعمال این کد ${matched.min_order_amount.toLocaleString("fa-IR")} تومان است.`,
-            };
-          }
-
-          if (matched.usage_limit && (matched.used_count ?? 0) >= matched.usage_limit) {
-            return { valid: false, discount: 0, message: "ظرفیت استفاده از این کد تخفیف تکمیل شده است." };
-          }
-
-          let calculatedDiscount = 0;
-          const type = matched.discount_type || matched.type;
-          const val = Number(matched.discount_value ?? matched.value ?? 0);
-
-          if (type === "percent") {
-            calculatedDiscount = (totalAmount * val) / 100;
-            const maxLimit = matched.max_discount ?? matched.max_discount_amount ?? matched.maxDiscount;
-            if (maxLimit && calculatedDiscount > maxLimit) {
-              calculatedDiscount = maxLimit;
-            }
-          } else {
-            calculatedDiscount = val;
-          }
-
-          calculatedDiscount = Math.min(calculatedDiscount, totalAmount);
-
-          return {
-            valid: true,
-            discount: calculatedDiscount,
-            message: "کد تخفیف با موفقیت اعمال گردید.",
-            coupon: matched,
-          };
-        }
-      }
-
-      return { valid: false, discount: 0, message: "کد تخفیف وارد شده معتبر نیست یا غیرفعال شده است." };
-    } catch (err) {
-      console.error("couponService validateCoupon error:", err);
-      return { valid: false, discount: 0, message: "خطا در پردازش کد تخفیف." };
-    }
-  },
-
-  async create(couponData: Partial<Coupon>): Promise<Coupon | null> {
-    try {
-      const normalized = normalizeCoupon({
-        ...couponData,
-        id: `cp_${Date.now()}`,
-      });
-
-      if (supabase) {
-        const payload = {
-          code: normalized.code,
-          type: normalized.type,
-          discount_type: normalized.discount_type,
-          value: normalized.value,
-          discount_value: normalized.discount_value,
-          min_order_amount: normalized.min_order_amount || null,
-          max_discount: normalized.max_discount || null,
-          usage_limit: normalized.usage_limit || null,
-          used_count: 0,
-          expires_at: normalized.expires_at || null,
-          is_active: normalized.is_active,
-          updated_at: new Date().toISOString(),
-        };
-
-        const { data, error } = await supabase
-          .from("coupons")
+          .from("categories")
           .insert([payload])
           .select()
           .single();
 
-        if (!error && data) {
-          const current = await this.getAll();
-          const updatedList = [normalizeCoupon(data), ...current.filter((c) => String(c.id) !== String(data.id))];
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-            window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
-          }
-          return normalizeCoupon(data);
+        if (error) throw error;
+
+        if (typeof window !== "undefined") {
+          const all = await this.getAll();
+          const updated = [...all, data];
+          localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(updated));
+          window.dispatchEvent(new CustomEvent("categories_updated", { detail: data }));
         }
-      }
 
+        return data as Category;
+      }
       return null;
-    } catch (err) {
-      console.error("couponService create error:", err);
+    } catch (e) {
+      console.error("categoryService.addCategory error:", e);
       return null;
     }
   },
 
-  async update(id: string | number, couponData: Partial<Coupon>): Promise<boolean> {
+  async deleteCategory(id: string): Promise<boolean> {
     try {
       if (supabase) {
-        const payload: any = {
-          ...couponData,
-          updated_at: new Date().toISOString(),
-        };
-        await supabase.from("coupons").update(payload).eq("id", id);
+        const { error } = await supabase.from("categories").delete().eq("id", id);
+        if (error) throw error;
       }
-
-      const current = await this.getAll();
-      const updatedList = current.map((c) =>
-        String(c.id) === String(id) ? normalizeCoupon({ ...c, ...couponData }) : c
-      );
 
       if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
+        const all = await this.getAll();
+        const updated = all.filter((c) => c.id !== id);
+        localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("categories_updated", { detail: id }));
       }
       return true;
-    } catch (err) {
-      console.error("couponService update error:", err);
-      return false;
-    }
-  },
-
-  async delete(id: string | number): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("coupons").delete().eq("id", id);
-      }
-
-      const current = await this.getAll();
-      const updatedList = current.filter((c) => String(c.id) !== String(id));
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
-        window.dispatchEvent(new CustomEvent("coupons_updated", { detail: updatedList }));
-      }
-      return true;
-    } catch (err) {
-      console.error("couponService delete error:", err);
+    } catch (e) {
+      console.error("categoryService.deleteCategory error:", e);
       return false;
     }
   },
 };
 
-export default couponService;
+export default categoryService;
 </file>
 
 <file path="app/api/admin/session/route.ts">
@@ -11424,226 +11576,6 @@ export function initRealtimeSync(): () => void {
 export default MasterRealtimeEngine;
 </file>
 
-<file path="services/adminAuthService.ts">
-// File Path: app/api/admin/users/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-
-export const dynamic = "force-dynamic";
-
-export async function GET() {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("admin_users")
-      .select("id, username, full_name, role, created_at")
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      // ایجاد ادمین پیش‌فرض در صورت خالی بودن جدول
-      const defaultUser = {
-        id: "admin_master",
-        username: "admin",
-        password: process.env.ADMIN_PASSWORD || "admin123456",
-        full_name: "مدیر ارشد سیستم",
-        role: "superadmin",
-        created_at: new Date().toISOString(),
-      };
-      await supabaseAdmin.from("admin_users").upsert([defaultUser], { onConflict: "id" });
-      return NextResponse.json({ success: true, data: [defaultUser] });
-    }
-
-    return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { username, password, full_name, role } = body;
-
-    if (!username || !password) {
-      return NextResponse.json({ success: false, message: "نام کاربری و رمز عبور الزامی است." }, { status: 400 });
-    }
-
-    const payload = {
-      id: `adm_${Date.now()}`,
-      username: String(username).trim(),
-      password: String(password).trim(),
-      full_name: String(full_name || username).trim(),
-      role: role || "product_manager",
-      created_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await supabaseAdmin
-      .from("admin_users")
-      .insert([payload])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function PATCH(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { id, username, password, full_name, role } = body;
-
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه ادمین الزامی است." }, { status: 400 });
-    }
-
-    const updatePayload: Record<string, any> = {};
-    if (username) updatePayload.username = String(username).trim();
-    if (full_name) updatePayload.full_name = String(full_name).trim();
-    if (password && String(password).trim().length > 0) updatePayload.password = String(password).trim();
-    if (role) updatePayload.role = role;
-
-    const { data, error } = await supabaseAdmin
-      .from("admin_users")
-      .update(updatePayload)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه الزامی است." }, { status: 400 });
-    }
-
-    const { error } = await supabaseAdmin.from("admin_users").delete().eq("id", id);
-    if (error) throw error;
-
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-</file>
-
-<file path="services/categoryService.ts">
-// File Path: services/categoryService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface Category {
-  id?: string;
-  name: string;
-  slug: string;
-  icon?: string;
-  description?: string;
-  order_index?: number;
-  display_order?: number;
-}
-
-const LOCAL_CATEGORIES_CACHE = "axon_categories_cache_v2026";
-
-export const categoryService = {
-  async getAll(): Promise<Category[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("categories")
-          .select("*")
-          .order("order_index", { ascending: true });
-
-        if (!error && data) {
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(data));
-          }
-          return data;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem(LOCAL_CATEGORIES_CACHE);
-        if (cached) return JSON.parse(cached);
-      }
-
-      return [];
-    } catch (e) {
-      console.error("categoryService.getAll error:", e);
-      return [];
-    }
-  },
-
-  async addCategory(cat: Omit<Category, "id">): Promise<Category | null> {
-    try {
-      const payload = {
-        name: cat.name.trim(),
-        slug: (cat.slug || cat.name).trim().toLowerCase().replace(/\s+/g, "-"),
-        order_index: cat.order_index ?? 0,
-        display_order: cat.order_index ?? 0,
-      };
-
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("categories")
-          .insert([payload])
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        if (typeof window !== "undefined") {
-          const all = await this.getAll();
-          const updated = [...all, data];
-          localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(updated));
-          window.dispatchEvent(new CustomEvent("categories_updated", { detail: data }));
-        }
-
-        return data as Category;
-      }
-      return null;
-    } catch (e) {
-      console.error("categoryService.addCategory error:", e);
-      return null;
-    }
-  },
-
-  async deleteCategory(id: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        const { error } = await supabase.from("categories").delete().eq("id", id);
-        if (error) throw error;
-      }
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = all.filter((c) => c.id !== id);
-        localStorage.setItem(LOCAL_CATEGORIES_CACHE, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("categories_updated", { detail: id }));
-      }
-      return true;
-    } catch (e) {
-      console.error("categoryService.deleteCategory error:", e);
-      return false;
-    }
-  },
-};
-
-export default categoryService;
-</file>
-
 <file path="services/newsService.ts">
 // File Path: services/newsService.ts
 import { supabase } from "@/lib/supabase";
@@ -13623,6 +13555,583 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 export default supabaseAdmin;
 </file>
 
+<file path="services/adminAuthService.ts">
+// File Path: services/adminAuthService.ts
+export type AdminRole = "superadmin" | "super_admin" | "product_manager" | "content_editor" | "inventory_manager";
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  full_name?: string;
+  role: AdminRole;
+  created_at?: string;
+}
+
+export const adminAuthService = {
+  async getCurrentSession(): Promise<AdminUser | null> {
+    try {
+      const res = await fetch("/api/admin/session", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated && data.user) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(data.user));
+          }
+          return data.user;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem("axon_admin_active_session_v2026");
+        if (local) return JSON.parse(local);
+      }
+      return null;
+    } catch {
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem("axon_admin_active_session_v2026");
+        if (local) return JSON.parse(local);
+      }
+      return null;
+    }
+  },
+
+  async login(username: string, password: string): Promise<{ success: boolean; user?: AdminUser; message?: string }> {
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password: password.trim() }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (typeof window !== "undefined" && data.user) {
+          localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(data.user));
+        }
+        return { success: true, user: data.user };
+      }
+      return { success: false, message: data.message || "نام کاربری یا رمز عبور اشتباه است." };
+    } catch {
+      return { success: false, message: "خطا در برقراری ارتباط با سرور." };
+    }
+  },
+
+  async logout(): Promise<boolean> {
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("axon_admin_active_session_v2026");
+      }
+      return true;
+    } catch {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("axon_admin_active_session_v2026");
+      }
+      return true;
+    }
+  },
+
+  async getAllAdmins(): Promise<AdminUser[]> {
+    try {
+      const res = await fetch("/api/admin/users", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  async createAdmin(userData: {
+    username: string;
+    password: string;
+    full_name?: string;
+    role?: AdminRole;
+  }): Promise<{ success: boolean; data?: AdminUser; message?: string }> {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData),
+      });
+
+      const json = await res.json();
+      return json;
+    } catch {
+      return { success: false, message: "خطا در ارتباط با سرور." };
+    }
+  },
+
+  async updateCredentials(
+    id: string,
+    username?: string,
+    password?: string,
+    full_name?: string,
+    role?: AdminRole
+  ): Promise<{ success: boolean; data?: AdminUser; message?: string }> {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, username, password, full_name, role }),
+      });
+
+      const json = await res.json();
+      return json;
+    } catch {
+      return { success: false, message: "خطا در ثبت تغییرات در سرور." };
+    }
+  },
+
+  async deleteAdmin(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+};
+
+export default adminAuthService;
+</file>
+
+<file path="services/bannerService.ts">
+// File Path: services/bannerService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface Banner {
+  id: string;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  badge_text?: string;
+  image: string;
+  image_url?: string;
+  link?: string;
+  link_url?: string;
+  button_text?: string;
+  buttonText?: string;
+  is_active?: boolean;
+  created_at?: string;
+}
+
+const LOCAL_BANNERS_KEY = "axon_banners_cache_v2026";
+
+export const bannerService = {
+  async getAll(): Promise<Banner[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("banners")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          const mapped: Banner[] = data.map((b: any) => ({
+            id: String(b.id),
+            title: b.title || "پیشنهاد ویژه",
+            subtitle: b.subtitle || "",
+            badge: b.badge || b.badge_text || "",
+            badge_text: b.badge || b.badge_text || "",
+            image: b.image || b.image_url || "/placeholder.png",
+            image_url: b.image || b.image_url || "/placeholder.png",
+            link: b.link || b.link_url || "/products",
+            link_url: b.link || b.link_url || "/products",
+            button_text: b.button_text || b.buttonText || "مشاهده و خرید کالا",
+            buttonText: b.button_text || b.buttonText || "مشاهده و خرید کالا",
+            is_active: b.is_active !== false,
+            created_at: b.created_at,
+          }));
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(mapped));
+          }
+          return mapped;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem(LOCAL_BANNERS_KEY);
+        if (local) return JSON.parse(local);
+      }
+
+      return [];
+    } catch (e) {
+      console.error("bannerService.getAll error:", e);
+      return [];
+    }
+  },
+
+  async getActive(): Promise<Banner[]> {
+    const all = await this.getAll();
+    return all.filter((b) => b.is_active !== false);
+  },
+};
+
+export default bannerService;
+</file>
+
+<file path="services/orderService.ts">
+// File Path: services/orderService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface OrderItem {
+  id?: string | number;
+  product_id?: string | number;
+  productId?: string | number;
+  title?: string;
+  name?: string;
+  price: number;
+  quantity: number;
+  image?: string;
+  image_url?: string;
+}
+
+export interface CustomerInfo {
+  fullName?: string;
+  name?: string;
+  phone: string;
+  province?: string;
+  city?: string;
+  address: string;
+  postalCode?: string;
+  postal_code?: string;
+  notes?: string;
+}
+
+export interface Order {
+  id: string | number;
+  orderNumber?: string;
+  order_number?: string;
+  customer: CustomerInfo;
+  customerName?: string;
+  customer_name?: string;
+  phone?: string;
+  address?: string;
+  postalCode?: string;
+  postal_code?: string;
+  items: OrderItem[];
+  totalAmount: number;
+  total_amount?: number;
+  discountAmount?: number;
+  discount_amount?: number;
+  couponCode?: string;
+  coupon_code?: string;
+  shippingFee?: number;
+  shipping_fee?: number;
+  finalAmount: number;
+  final_amount?: number;
+  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+  paymentStatus: "pending" | "paid" | "failed";
+  payment_status?: "pending" | "paid" | "failed";
+  paymentMethod?: string;
+  payment_method?: string;
+  trackingCode?: string;
+  tracking_code?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+const LOCAL_STORAGE_KEY = "axon_orders_registry_cache_v2026";
+
+export function normalizeOrder(raw: any): Order {
+  if (!raw) return {} as Order;
+
+  const id = raw.id || `ORD-${Date.now().toString().slice(-6)}`;
+  const orderNumber = raw.order_number || raw.orderNumber || (typeof id === "string" ? id : `ORD-${id}`);
+
+  const fullName =
+    raw.customer_name ||
+    raw.customerName ||
+    raw.customer?.fullName ||
+    raw.customer?.name ||
+    raw.fullName ||
+    (raw.first_name ? `${raw.first_name || ""} ${raw.last_name || ""}`.trim() : "خریدار محترم");
+
+  const phone = raw.phone || raw.customer_phone || raw.customer?.phone || "";
+  const province = raw.province || raw.customer_province || raw.customer?.province || "تهران";
+  const city = raw.city || raw.customer_city || raw.customer?.city || "تهران";
+  const address = raw.address || raw.customer_address || raw.customer?.address || "";
+  const postalCode = raw.postal_code || raw.postalCode || raw.customer?.postalCode || raw.customer?.postal_code || "";
+  const notes = raw.notes || raw.customer?.notes || "";
+
+  const customer: CustomerInfo = {
+    fullName,
+    name: fullName,
+    phone,
+    province,
+    city,
+    address,
+    postalCode,
+    postal_code: postalCode,
+    notes,
+  };
+
+  const items: OrderItem[] = Array.isArray(raw.items)
+    ? raw.items.map((item: any) => ({
+        ...item,
+        productId: item.productId || item.product_id || item.id,
+        product_id: item.product_id || item.productId || item.id,
+        name: item.name || item.title || "کالای دیجیتال",
+        title: item.title || item.name || "کالای دیجیتال",
+        price: Number(item.price) || 0,
+        quantity: Number(item.quantity) || 1,
+        image: item.image || item.image_url || "/placeholder.png",
+        image_url: item.image || item.image_url || "/placeholder.png",
+      }))
+    : [];
+
+  const finalAmount = Number(
+    raw.final_amount ?? raw.finalAmount ?? raw.total_amount ?? raw.totalAmount ?? 0
+  );
+  const totalAmount = Number(raw.total_amount ?? raw.totalAmount ?? finalAmount);
+  const discountAmount = Number(raw.discount_amount ?? raw.discountAmount ?? 0);
+  const couponCode = raw.coupon_code || raw.couponCode || "";
+  const trackingCode = raw.tracking_code || raw.trackingCode || "";
+  const paymentStatus = raw.payment_status || raw.paymentStatus || "pending";
+  const status = raw.status || "pending";
+
+  return {
+    ...raw,
+    id,
+    orderNumber,
+    order_number: orderNumber,
+    customer,
+    customerName: fullName,
+    customer_name: fullName,
+    phone,
+    address,
+    postalCode,
+    postal_code: postalCode,
+    items,
+    totalAmount,
+    total_amount: totalAmount,
+    discountAmount,
+    discount_amount: discountAmount,
+    couponCode,
+    coupon_code: couponCode,
+    shippingFee: Number(raw.shipping_fee ?? raw.shippingFee ?? 0),
+    shipping_fee: Number(raw.shipping_fee ?? raw.shippingFee ?? 0),
+    finalAmount,
+    final_amount: finalAmount,
+    status,
+    paymentStatus,
+    payment_status: paymentStatus,
+    paymentMethod: raw.payment_method || raw.paymentMethod || "online",
+    payment_method: raw.payment_method || raw.paymentMethod || "online",
+    trackingCode,
+    tracking_code: trackingCode,
+    notes,
+    created_at: raw.created_at || new Date().toISOString(),
+    updated_at: raw.updated_at || new Date().toISOString(),
+  };
+}
+
+export const orderService = {
+  async getAll(): Promise<Order[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          const normalized = data.map(normalizeOrder);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
+          }
+          return normalized;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (cached) return JSON.parse(cached).map(normalizeOrder);
+      }
+      return [];
+    } catch (err) {
+      console.error("orderService.getAll error:", err);
+      return [];
+    }
+  },
+
+  async getById(id: string | number): Promise<Order | null> {
+    try {
+      const cleanId = String(id).trim();
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .or(`id.eq.${cleanId},order_number.eq.${cleanId}`)
+          .maybeSingle();
+
+        if (!error && data) {
+          return normalizeOrder(data);
+        }
+      }
+
+      const all = await this.getAll();
+      return all.find((o) => String(o.id) === cleanId || o.orderNumber === cleanId) || null;
+    } catch (err) {
+      console.error("orderService.getById error:", err);
+      return null;
+    }
+  },
+
+  async trackOrder(queryStr: string): Promise<Order[]> {
+    try {
+      const clean = queryStr.trim();
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .or(`order_number.eq.${clean},id.eq.${clean},phone.eq.${clean},tracking_code.eq.${clean}`)
+          .order("created_at", { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          return data.map(normalizeOrder);
+        }
+      }
+
+      const all = await this.getAll();
+      return all.filter(
+        (o) =>
+          String(o.id) === clean ||
+          o.orderNumber === clean ||
+          o.customer?.phone === clean ||
+          o.phone === clean ||
+          o.trackingCode === clean
+      );
+    } catch (err) {
+      console.error("orderService.trackOrder error:", err);
+      return [];
+    }
+  },
+
+  async create(orderData: Partial<Order> | any): Promise<Order | null> {
+    try {
+      const orderId = orderData.id || `ORD-${Date.now().toString().slice(-6)}`;
+      const orderNumber = orderData.orderNumber || orderData.order_number || orderId;
+
+      const customerObj = orderData.customer || {};
+      const customerName = (
+        customerObj.fullName ||
+        customerObj.name ||
+        orderData.customer_name ||
+        orderData.customerName ||
+        "خریدار محترم"
+      ).trim();
+
+      const phone = (customerObj.phone || orderData.phone || orderData.customer_phone || "").trim();
+      const address = (customerObj.address || orderData.address || orderData.customer_address || "").trim();
+      const province = customerObj.province || orderData.province || "تهران";
+      const city = customerObj.city || orderData.city || "تهران";
+      const postalCode = (customerObj.postalCode || customerObj.postal_code || orderData.postalCode || orderData.postal_code || "").trim();
+      const notes = customerObj.notes || orderData.notes || "";
+
+      const items = Array.isArray(orderData.items) ? orderData.items : [];
+      const totalAmount = Number(orderData.totalAmount ?? orderData.total_amount ?? 0);
+      const discountAmount = Number(orderData.discountAmount ?? orderData.discount_amount ?? 0);
+      const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? Math.max(0, totalAmount - discountAmount));
+
+      const dbPayload: any = {
+        id: orderId,
+        order_number: orderNumber,
+        customer_name: customerName,
+        phone,
+        province,
+        city,
+        address,
+        postal_code: postalCode,
+        items,
+        total_amount: totalAmount,
+        discount_amount: discountAmount,
+        final_amount: finalAmount,
+        coupon_code: orderData.couponCode || orderData.coupon_code || null,
+        status: orderData.status || "pending",
+        payment_status: orderData.paymentStatus || orderData.payment_status || "pending",
+        payment_method: orderData.paymentMethod || orderData.payment_method || "online",
+        tracking_code: orderData.trackingCode || orderData.tracking_code || null,
+        notes,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (supabase) {
+        await supabase.from("orders").upsert(dbPayload, { onConflict: "id" });
+      }
+
+      const normalized = normalizeOrder(dbPayload);
+
+      if (typeof window !== "undefined") {
+        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+        const updated = [normalized, ...existing.filter((o: any) => o.id !== normalized.id)];
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        sessionStorage.setItem("pending_payment_amount", String(finalAmount));
+        sessionStorage.setItem("pending_payment_order_id", orderId);
+        window.dispatchEvent(new CustomEvent("orders_updated", { detail: normalized }));
+      }
+
+      return normalized;
+    } catch (err) {
+      console.error("orderService.create error:", err);
+      return null;
+    }
+  },
+
+  async updateStatus(
+    id: string | number,
+    status: Order["status"],
+    trackingCode?: string
+  ): Promise<boolean> {
+    try {
+      const payload: any = {
+        status,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (status === "paid") {
+        payload.payment_status = "paid";
+      }
+
+      if (trackingCode !== undefined) {
+        payload.tracking_code = trackingCode.trim() || null;
+      }
+
+      if (supabase) {
+        await supabase.from("orders").update(payload).eq("id", id);
+      }
+
+      if (typeof window !== "undefined") {
+        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+        const updated = existing.map((o: any) =>
+          String(o.id) === String(id) ? { ...o, ...payload } : o
+        );
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("orders_updated", { detail: { id, ...payload } }));
+      }
+
+      return true;
+    } catch (err) {
+      console.error("orderService.updateStatus error:", err);
+      return false;
+    }
+  },
+
+  async updateOrderStatus(id: string | number, status: Order["status"]): Promise<boolean> {
+    return this.updateStatus(id, status);
+  },
+};
+
+export default orderService;
+</file>
+
 <file path="services/smsService.ts">
 // File Path: services/smsService.ts
 export interface SendSmsResponse {
@@ -14894,438 +15403,6 @@ export function verifyPayload(token: string): any | null {
 }
 </file>
 
-<file path="services/bannerService.ts">
-// File Path: services/bannerService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface Banner {
-  id: string;
-  title: string;
-  subtitle?: string;
-  badge?: string;
-  badge_text?: string;
-  image: string;
-  image_url?: string;
-  link?: string;
-  link_url?: string;
-  button_text?: string;
-  buttonText?: string;
-  is_active?: boolean;
-  created_at?: string;
-}
-
-const LOCAL_BANNERS_KEY = "axon_banners_cache_v2026";
-
-export const bannerService = {
-  async getAll(): Promise<Banner[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("banners")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          const mapped: Banner[] = data.map((b: any) => ({
-            id: String(b.id),
-            title: b.title || "پیشنهاد ویژه",
-            subtitle: b.subtitle || "",
-            badge: b.badge || b.badge_text || "",
-            badge_text: b.badge || b.badge_text || "",
-            image: b.image || b.image_url || "/placeholder.png",
-            image_url: b.image || b.image_url || "/placeholder.png",
-            link: b.link || b.link_url || "/products",
-            link_url: b.link || b.link_url || "/products",
-            button_text: b.button_text || b.buttonText || "مشاهده و خرید کالا",
-            buttonText: b.button_text || b.buttonText || "مشاهده و خرید کالا",
-            is_active: b.is_active !== false,
-            created_at: b.created_at,
-          }));
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(mapped));
-          }
-          return mapped;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        const local = localStorage.getItem(LOCAL_BANNERS_KEY);
-        if (local) return JSON.parse(local);
-      }
-
-      return [];
-    } catch (e) {
-      console.error("bannerService.getAll error:", e);
-      return [];
-    }
-  },
-
-  async getActive(): Promise<Banner[]> {
-    const all = await this.getAll();
-    return all.filter((b) => b.is_active !== false);
-  },
-};
-
-export default bannerService;
-</file>
-
-<file path="services/orderService.ts">
-// File Path: services/orderService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface OrderItem {
-  id?: string | number;
-  product_id?: string | number;
-  productId?: string | number;
-  title?: string;
-  name?: string;
-  price: number;
-  quantity: number;
-  image?: string;
-  image_url?: string;
-}
-
-export interface CustomerInfo {
-  fullName?: string;
-  name?: string;
-  phone: string;
-  province?: string;
-  city?: string;
-  address: string;
-  postalCode?: string;
-  postal_code?: string;
-  notes?: string;
-}
-
-export interface Order {
-  id: string | number;
-  orderNumber?: string;
-  order_number?: string;
-  customer: CustomerInfo;
-  customerName?: string;
-  customer_name?: string;
-  phone?: string;
-  address?: string;
-  postalCode?: string;
-  postal_code?: string;
-  items: OrderItem[];
-  totalAmount: number;
-  total_amount?: number;
-  discountAmount?: number;
-  discount_amount?: number;
-  couponCode?: string;
-  coupon_code?: string;
-  shippingFee?: number;
-  shipping_fee?: number;
-  finalAmount: number;
-  final_amount?: number;
-  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
-  paymentStatus: "pending" | "paid" | "failed";
-  payment_status?: "pending" | "paid" | "failed";
-  paymentMethod?: string;
-  payment_method?: string;
-  trackingCode?: string;
-  tracking_code?: string;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-const LOCAL_STORAGE_KEY = "axon_orders_registry_cache_v2026";
-
-export function normalizeOrder(raw: any): Order {
-  if (!raw) return {} as Order;
-
-  const id = raw.id || `ORD-${Date.now().toString().slice(-6)}`;
-  const orderNumber = raw.order_number || raw.orderNumber || (typeof id === "string" ? id : `ORD-${id}`);
-
-  const fullName =
-    raw.customer_name ||
-    raw.customerName ||
-    raw.customer?.fullName ||
-    raw.customer?.name ||
-    raw.fullName ||
-    (raw.first_name ? `${raw.first_name || ""} ${raw.last_name || ""}`.trim() : "خریدار محترم");
-
-  const phone = raw.phone || raw.customer_phone || raw.customer?.phone || "";
-  const province = raw.province || raw.customer_province || raw.customer?.province || "تهران";
-  const city = raw.city || raw.customer_city || raw.customer?.city || "تهران";
-  const address = raw.address || raw.customer_address || raw.customer?.address || "";
-  const postalCode = raw.postal_code || raw.postalCode || raw.customer?.postalCode || raw.customer?.postal_code || "";
-  const notes = raw.notes || raw.customer?.notes || "";
-
-  const customer: CustomerInfo = {
-    fullName,
-    name: fullName,
-    phone,
-    province,
-    city,
-    address,
-    postalCode,
-    postal_code: postalCode,
-    notes,
-  };
-
-  const items: OrderItem[] = Array.isArray(raw.items)
-    ? raw.items.map((item: any) => ({
-        ...item,
-        productId: item.productId || item.product_id || item.id,
-        product_id: item.product_id || item.productId || item.id,
-        name: item.name || item.title || "کالای دیجیتال",
-        title: item.title || item.name || "کالای دیجیتال",
-        price: Number(item.price) || 0,
-        quantity: Number(item.quantity) || 1,
-        image: item.image || item.image_url || "/placeholder.png",
-        image_url: item.image || item.image_url || "/placeholder.png",
-      }))
-    : [];
-
-  const finalAmount = Number(
-    raw.final_amount ?? raw.finalAmount ?? raw.total_amount ?? raw.totalAmount ?? 0
-  );
-  const totalAmount = Number(raw.total_amount ?? raw.totalAmount ?? finalAmount);
-  const discountAmount = Number(raw.discount_amount ?? raw.discountAmount ?? 0);
-  const couponCode = raw.coupon_code || raw.couponCode || "";
-  const trackingCode = raw.tracking_code || raw.trackingCode || "";
-  const paymentStatus = raw.payment_status || raw.paymentStatus || "pending";
-  const status = raw.status || "pending";
-
-  return {
-    ...raw,
-    id,
-    orderNumber,
-    order_number: orderNumber,
-    customer,
-    customerName: fullName,
-    customer_name: fullName,
-    phone,
-    address,
-    postalCode,
-    postal_code: postalCode,
-    items,
-    totalAmount,
-    total_amount: totalAmount,
-    discountAmount,
-    discount_amount: discountAmount,
-    couponCode,
-    coupon_code: couponCode,
-    shippingFee: Number(raw.shipping_fee ?? raw.shippingFee ?? 0),
-    shipping_fee: Number(raw.shipping_fee ?? raw.shippingFee ?? 0),
-    finalAmount,
-    final_amount: finalAmount,
-    status,
-    paymentStatus,
-    payment_status: paymentStatus,
-    paymentMethod: raw.payment_method || raw.paymentMethod || "online",
-    payment_method: raw.payment_method || raw.paymentMethod || "online",
-    trackingCode,
-    tracking_code: trackingCode,
-    notes,
-    created_at: raw.created_at || new Date().toISOString(),
-    updated_at: raw.updated_at || new Date().toISOString(),
-  };
-}
-
-export const orderService = {
-  async getAll(): Promise<Order[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data) {
-          const normalized = data.map(normalizeOrder);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
-          }
-          return normalized;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (cached) return JSON.parse(cached).map(normalizeOrder);
-      }
-      return [];
-    } catch (err) {
-      console.error("orderService.getAll error:", err);
-      return [];
-    }
-  },
-
-  async getById(id: string | number): Promise<Order | null> {
-    try {
-      const cleanId = String(id).trim();
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .or(`id.eq.${cleanId},order_number.eq.${cleanId}`)
-          .maybeSingle();
-
-        if (!error && data) {
-          return normalizeOrder(data);
-        }
-      }
-
-      const all = await this.getAll();
-      return all.find((o) => String(o.id) === cleanId || o.orderNumber === cleanId) || null;
-    } catch (err) {
-      console.error("orderService.getById error:", err);
-      return null;
-    }
-  },
-
-  async trackOrder(queryStr: string): Promise<Order[]> {
-    try {
-      const clean = queryStr.trim();
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .or(`order_number.eq.${clean},id.eq.${clean},phone.eq.${clean},tracking_code.eq.${clean}`)
-          .order("created_at", { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          return data.map(normalizeOrder);
-        }
-      }
-
-      const all = await this.getAll();
-      return all.filter(
-        (o) =>
-          String(o.id) === clean ||
-          o.orderNumber === clean ||
-          o.customer?.phone === clean ||
-          o.phone === clean ||
-          o.trackingCode === clean
-      );
-    } catch (err) {
-      console.error("orderService.trackOrder error:", err);
-      return [];
-    }
-  },
-
-  async create(orderData: Partial<Order> | any): Promise<Order | null> {
-    try {
-      const orderId = orderData.id || `ORD-${Date.now().toString().slice(-6)}`;
-      const orderNumber = orderData.orderNumber || orderData.order_number || orderId;
-
-      const customerObj = orderData.customer || {};
-      const customerName = (
-        customerObj.fullName ||
-        customerObj.name ||
-        orderData.customer_name ||
-        orderData.customerName ||
-        "خریدار محترم"
-      ).trim();
-
-      const phone = (customerObj.phone || orderData.phone || orderData.customer_phone || "").trim();
-      const address = (customerObj.address || orderData.address || orderData.customer_address || "").trim();
-      const province = customerObj.province || orderData.province || "تهران";
-      const city = customerObj.city || orderData.city || "تهران";
-      const postalCode = (customerObj.postalCode || customerObj.postal_code || orderData.postalCode || orderData.postal_code || "").trim();
-      const notes = customerObj.notes || orderData.notes || "";
-
-      const items = Array.isArray(orderData.items) ? orderData.items : [];
-      const totalAmount = Number(orderData.totalAmount ?? orderData.total_amount ?? 0);
-      const discountAmount = Number(orderData.discountAmount ?? orderData.discount_amount ?? 0);
-      const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? Math.max(0, totalAmount - discountAmount));
-
-      const dbPayload: any = {
-        id: orderId,
-        order_number: orderNumber,
-        customer_name: customerName,
-        phone,
-        province,
-        city,
-        address,
-        postal_code: postalCode,
-        items,
-        total_amount: totalAmount,
-        discount_amount: discountAmount,
-        final_amount: finalAmount,
-        coupon_code: orderData.couponCode || orderData.coupon_code || null,
-        status: orderData.status || "pending",
-        payment_status: orderData.paymentStatus || orderData.payment_status || "pending",
-        payment_method: orderData.paymentMethod || orderData.payment_method || "online",
-        tracking_code: orderData.trackingCode || orderData.tracking_code || null,
-        notes,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (supabase) {
-        await supabase.from("orders").upsert(dbPayload, { onConflict: "id" });
-      }
-
-      const normalized = normalizeOrder(dbPayload);
-
-      if (typeof window !== "undefined") {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
-        const updated = [normalized, ...existing.filter((o: any) => o.id !== normalized.id)];
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-        sessionStorage.setItem("pending_payment_amount", String(finalAmount));
-        sessionStorage.setItem("pending_payment_order_id", orderId);
-        window.dispatchEvent(new CustomEvent("orders_updated", { detail: normalized }));
-      }
-
-      return normalized;
-    } catch (err) {
-      console.error("orderService.create error:", err);
-      return null;
-    }
-  },
-
-  async updateStatus(
-    id: string | number,
-    status: Order["status"],
-    trackingCode?: string
-  ): Promise<boolean> {
-    try {
-      const payload: any = {
-        status,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (status === "paid") {
-        payload.payment_status = "paid";
-      }
-
-      if (trackingCode !== undefined) {
-        payload.tracking_code = trackingCode.trim() || null;
-      }
-
-      if (supabase) {
-        await supabase.from("orders").update(payload).eq("id", id);
-      }
-
-      if (typeof window !== "undefined") {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
-        const updated = existing.map((o: any) =>
-          String(o.id) === String(id) ? { ...o, ...payload } : o
-        );
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("orders_updated", { detail: { id, ...payload } }));
-      }
-
-      return true;
-    } catch (err) {
-      console.error("orderService.updateStatus error:", err);
-      return false;
-    }
-  },
-
-  async updateOrderStatus(id: string | number, status: Order["status"]): Promise<boolean> {
-    return this.updateStatus(id, status);
-  },
-};
-
-export default orderService;
-</file>
-
 <file path="app/api/admin/login/route.ts">
 // File Path: app/api/admin/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
@@ -15860,187 +15937,6 @@ import Header from "@/components/Header";
 
 export default function Navbar() {
   return <Header />;
-}
-</file>
-
-<file path="components/ProductCard.tsx">
-// File Path: components/ProductCard.tsx
-"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
-
-export default function ProductCard({ product }: { product: any }) {
-  const { addToCart } = useCart();
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const title = product.title || product.title_fa || product.name || "کالای دیجیتال تخصصی";
-  const price = Number(product.price) || 0;
-  const discountPrice =
-    product.discountPrice !== undefined && product.discountPrice !== null
-      ? Number(product.discountPrice)
-      : product.discount_price !== undefined && product.discount_price !== null
-      ? Number(product.discount_price)
-      : undefined;
-
-  const currentPrice = discountPrice || price;
-  const stockCount = product.stock !== undefined && product.stock !== null ? Number(product.stock) : 10;
-
-  const images =
-    Array.isArray(product.images) && product.images.length > 0
-      ? product.images
-      : [product.image_url || product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600"];
-
-  const mainImage = images[0];
-  const category = product.category || product.category_name || "تجهیزات تخصصی";
-  const isAvailable =
-    product.is_available !== false &&
-    product.isAvailable !== false &&
-    stockCount > 0;
-
-  const discountPercent =
-    discountPrice && discountPrice < price
-      ? Math.round(((price - discountPrice) / price) * 100)
-      : 0;
-
-  const handleQuickBuy = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    userBehavior.trackProductView(product.id, category);
-    addToCart({
-      id: product.id,
-      title,
-      name: title,
-      price: currentPrice,
-      image: mainImage,
-      stock: stockCount,
-      quantity: 1,
-    });
-    router.push("/checkout");
-  };
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    userBehavior.trackProductView(product.id, category);
-    addToCart({
-      id: product.id,
-      title,
-      name: title,
-      price: currentPrice,
-      image: mainImage,
-      stock: stockCount,
-      quantity: 1,
-    });
-  };
-
-  return (
-    <div
-      onClick={() => userBehavior.trackProductView(product.id, category)}
-      className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
-      dir="rtl"
-    >
-      {/* باکس تصویر محصول */}
-      <div className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-3.5 flex items-center justify-center p-3 border border-[var(--card-border)]">
-        <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center">
-          <img
-            src={mainImage}
-            alt={title}
-            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-          />
-        </Link>
-        
-        {discountPercent > 0 && (
-          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black shadow-lg">
-            {discountPercent}٪- تخفیف
-          </span>
-        )}
-
-        <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">
-          {product.badge || category}
-        </span>
-
-        {!isAvailable && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
-            <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
-              ناموجود در انبار
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* اطلاعات و تیتر کالا */}
-      <div className="flex flex-col flex-grow space-y-2 mb-3">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Pro"}</span>
-          <span className={`font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
-            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
-          </span>
-        </div>
-
-        <Link href={`/products/${product.id}`} className="hover:text-[var(--accent-blue)] transition-colors">
-          <h3 
-            className="font-black text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
-            style={{ direction: "rtl", textAlign: "right" }}
-          >
-            {title}
-          </h3>
-        </Link>
-
-        <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 font-medium leading-relaxed">
-          {product.short_description || product.description || "تجهیزات تخصصی با گارانتی اصالت طلایی"}
-        </p>
-      </div>
-
-      {/* قیمت و دکمه‌های خرید سریع */}
-      <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            {discountPrice && discountPrice < price && (
-              <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>
-                {mounted ? price.toLocaleString("fa-IR") : price}
-              </span>
-            )}
-            <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
-              {mounted ? currentPrice.toLocaleString("fa-IR") : currentPrice}{" "}
-              <span className="text-xs font-bold font-sans">تومان</span>
-            </span>
-          </div>
-          <Link href={`/products/${product.id}`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline transition">
-            بررسی کالا ←
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={handleAddToCart}
-            disabled={!isAvailable}
-            className="py-2.5 bg-[var(--input-bg)] text-[var(--text-primary)] text-xs font-black rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] cursor-pointer disabled:opacity-40 transition shadow-sm"
-          >
-            🛒 سبد خرید
-          </button>
-          <button
-            onClick={handleQuickBuy}
-            disabled={!isAvailable}
-            className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition"
-          >
-            ⚡ خرید سریع
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 </file>
 
@@ -16915,165 +16811,6 @@ export default function AdminBlogManager() {
 }
 </file>
 
-<file path="components/AdminInventoryManager.tsx">
-// File Path: components/AdminInventoryManager.tsx
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { productService, Product } from "@/services/productService";
-import { soundEngine } from "@/lib/soundEngine";
-
-export default function AdminInventoryManager() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [search, setSearch] = useState("");
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-
-  const fetchProducts = async () => {
-    const data = await productService.getAll();
-    setProducts(data || []);
-  };
-
-  useEffect(() => {
-    fetchProducts();
-
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
-      else fetchProducts();
-    };
-
-    window.addEventListener("products_updated", handleProductsUpdate);
-    return () => {
-      window.removeEventListener("products_updated", handleProductsUpdate);
-    };
-  }, []);
-
-  const handleStockChange = async (id: string, newStock: number) => {
-    soundEngine.playClick();
-    const stockVal = Math.max(0, newStock);
-    setUpdatingId(id);
-    await productService.saveProduct({ id, stock: stockVal, isAvailable: stockVal > 0, is_available: stockVal > 0 });
-    setProducts(products.map((p) => (p.id === id ? { ...p, stock: stockVal, is_available: stockVal > 0, isAvailable: stockVal > 0 } : p)));
-    setUpdatingId(null);
-  };
-
-  const toggleAvailability = async (id: string, current: boolean) => {
-    soundEngine.playClick();
-    setUpdatingId(id);
-    await productService.saveProduct({ id, isAvailable: !current, is_available: !current });
-    setProducts(products.map((p) => (p.id === id ? { ...p, is_available: !current, isAvailable: !current } : p)));
-    setUpdatingId(null);
-  };
-
-  const filtered = products.filter(
-    (p) =>
-      (p.title || p.name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.category || "").toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📥</span> مدیریت سریع موجودی انبار و وضعیت عرضه
-          </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            افزایش/کاهش سریع تعداد موجودی، رصد کالاهای در معرض اتمام و تغییر زنده وضعیت عرضه
-          </p>
-        </div>
-
-        <div className="w-full sm:w-72">
-          <input
-            type="text"
-            placeholder="🔍 جستجو در نام کالا یا دسته..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-          />
-        </div>
-      </div>
-
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm overflow-x-auto">
-        <table className="w-full text-right text-xs border-collapse min-w-[650px]">
-          <thead>
-            <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
-              <th className="p-3">تصویر</th>
-              <th className="p-3">نام محصول</th>
-              <th className="p-3">دسته‌بندی</th>
-              <th className="p-3">قیمت فعلی</th>
-              <th className="p-3 text-center">موجودی انبار</th>
-              <th className="p-3 text-center">وضعیت عرضه</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--card-border)] font-medium">
-            {filtered.map((p) => {
-              const currentStock = p.stock ?? 0;
-              const isCritical = currentStock < 3;
-
-              return (
-                <tr key={p.id} className="hover:bg-[var(--input-bg)]/50 transition">
-                  <td className="p-3">
-                    <img
-                      src={p.images?.[0] || p.image || "/placeholder.png"}
-                      alt=""
-                      className="w-11 h-11 object-contain rounded-xl bg-white/5 p-1 border border-[var(--card-border)]"
-                    />
-                  </td>
-                  <td className="p-3">
-                    <div className="font-extrabold text-[var(--text-primary)]">{p.title || p.name}</div>
-                    {isCritical && (
-                      <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold text-[10px]">
-                        ⚠️ موجودی بحرانی ({currentStock} عدد)
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-[var(--text-secondary)] font-medium">{p.category || "عمومی"}</td>
-                  <td className="p-3 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                    {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleStockChange(p.id, currentStock - 1)}
-                        className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-black hover:border-[var(--accent-blue)] cursor-pointer"
-                      >
-                        -
-                      </button>
-                      <span className="w-10 text-center font-mono font-black text-sm text-[var(--text-primary)]">
-                        {currentStock}
-                      </span>
-                      <button
-                        onClick={() => handleStockChange(p.id, currentStock + 1)}
-                        className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-black hover:border-[var(--accent-blue)] cursor-pointer"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-                  <td className="p-3 text-center">
-                    <button
-                      onClick={() => toggleAvailability(p.id, p.is_available !== false && p.isAvailable !== false)}
-                      disabled={updatingId === p.id}
-                      className={`px-4 py-2 rounded-2xl font-black text-xs transition cursor-pointer ${
-                        p.is_available !== false && p.isAvailable !== false && currentStock > 0
-                          ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
-                          : "bg-rose-500/15 text-rose-600 border border-rose-500/30 hover:bg-rose-500 hover:text-white"
-                      }`}
-                    >
-                      {p.is_available !== false && p.isAvailable !== false && currentStock > 0 ? "موجود در انبار ✓" : "ناموجود ✕"}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="components/CartDrawer.tsx">
 // File Path: components/CartDrawer.tsx
 "use client";
@@ -17689,6 +17426,184 @@ export default function Footer() {
 }
 </file>
 
+<file path="components/ProductCard.tsx">
+// File Path: components/ProductCard.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
+import { userBehavior } from "@/lib/userBehavior";
+
+export default function ProductCard({ product }: { product: any }) {
+  const { addToCart } = useCart();
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const title = product.title || product.title_fa || product.name || "کالای دیجیتال تخصصی";
+  const price = Number(product.price) || 0;
+  const discountPrice =
+    product.discountPrice !== undefined && product.discountPrice !== null
+      ? Number(product.discountPrice)
+      : product.discount_price !== undefined && product.discount_price !== null
+      ? Number(product.discount_price)
+      : undefined;
+
+  const currentPrice = discountPrice || price;
+  const stockCount = product.stock !== undefined && product.stock !== null ? Number(product.stock) : 10;
+
+  const images =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images
+      : [product.image_url || product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600"];
+
+  const mainImage = images[0];
+  const category = product.category || product.category_name || "تجهیزات تخصصی";
+  const isAvailable =
+    product.is_available !== false &&
+    product.isAvailable !== false &&
+    stockCount > 0;
+
+  const discountPercent =
+    discountPrice && discountPrice < price
+      ? Math.round(((price - discountPrice) / price) * 100)
+      : 0;
+
+  const handleQuickBuy = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    soundEngine.playAddToCart();
+    userBehavior.trackProductView(product.id, category);
+    addToCart({
+      id: product.id,
+      title,
+      name: title,
+      price: currentPrice,
+      image: mainImage,
+      stock: stockCount,
+      quantity: 1,
+    });
+    router.push("/checkout");
+  };
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    soundEngine.playAddToCart();
+    userBehavior.trackProductView(product.id, category);
+    addToCart({
+      id: product.id,
+      title,
+      name: title,
+      price: currentPrice,
+      image: mainImage,
+      stock: stockCount,
+      quantity: 1,
+    });
+  };
+
+  return (
+    <div
+      onClick={() => userBehavior.trackProductView(product.id, category)}
+      className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
+      dir="rtl"
+    >
+      <div className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-3.5 flex items-center justify-center p-3 border border-[var(--card-border)]">
+        <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center">
+          <img
+            src={mainImage}
+            alt={title}
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+          />
+        </Link>
+
+        {discountPercent > 0 && (
+          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black shadow-lg">
+            {discountPercent}٪- تخفیف
+          </span>
+        )}
+
+        <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+          {product.badge || category}
+        </span>
+
+        {!isAvailable && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
+            <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
+              ناموجود در انبار
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col flex-grow space-y-2 mb-3">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Pro"}</span>
+          <span className={`font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
+            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
+          </span>
+        </div>
+
+        <Link href={`/products/${product.id}`} className="hover:text-[var(--accent-blue)] transition-colors">
+          <h3
+            className="font-black text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
+            style={{ direction: "rtl", textAlign: "right" }}
+          >
+            {title}
+          </h3>
+        </Link>
+
+        <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 font-medium leading-relaxed">
+          {product.short_description || product.description || "تجهیزات تخصصی با گارانتی اصالت طلایی"}
+        </p>
+      </div>
+
+      <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            {discountPrice && discountPrice < price && (
+              <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>
+                {mounted ? price.toLocaleString("fa-IR") : price}
+              </span>
+            )}
+            <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
+              {mounted ? currentPrice.toLocaleString("fa-IR") : currentPrice}{" "}
+              <span className="text-xs font-bold font-sans">تومان</span>
+            </span>
+          </div>
+          <Link href={`/products/${product.id}`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline transition">
+            بررسی کالا ←
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handleAddToCart}
+            disabled={!isAvailable}
+            className="py-2.5 bg-[var(--input-bg)] text-[var(--text-primary)] text-xs font-black rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] cursor-pointer disabled:opacity-40 transition shadow-sm"
+          >
+            🛒 سبد خرید
+          </button>
+          <button
+            onClick={handleQuickBuy}
+            disabled={!isAvailable}
+            className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition"
+          >
+            ⚡ خرید سریع
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="services/productService.ts">
 // File Path: services/productService.ts
 import { supabase } from "@/lib/supabase";
@@ -18019,9 +17934,168 @@ export const productService = {
 export default productService;
 </file>
 
+<file path="components/AdminInventoryManager.tsx">
+// File Path: components/AdminInventoryManager.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { productService, Product } from "@/services/productService";
+import { soundEngine } from "@/lib/soundEngine";
+
+export default function AdminInventoryManager() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState("");
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const fetchProducts = async () => {
+    const data = await productService.getAll();
+    setProducts(data || []);
+  };
+
+  useEffect(() => {
+    fetchProducts();
+
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
+      else fetchProducts();
+    };
+
+    window.addEventListener("products_updated", handleProductsUpdate);
+    return () => {
+      window.removeEventListener("products_updated", handleProductsUpdate);
+    };
+  }, []);
+
+  const handleStockChange = async (id: string, newStock: number) => {
+    soundEngine.playClick();
+    const stockVal = Math.max(0, newStock);
+    setUpdatingId(id);
+    await productService.saveProduct({ id, stock: stockVal, isAvailable: stockVal > 0, is_available: stockVal > 0 });
+    setProducts(products.map((p) => (p.id === id ? { ...p, stock: stockVal, is_available: stockVal > 0, isAvailable: stockVal > 0 } : p)));
+    setUpdatingId(null);
+  };
+
+  const toggleAvailability = async (id: string, current: boolean) => {
+    soundEngine.playClick();
+    setUpdatingId(id);
+    await productService.saveProduct({ id, isAvailable: !current, is_available: !current });
+    setProducts(products.map((p) => (p.id === id ? { ...p, is_available: !current, isAvailable: !current } : p)));
+    setUpdatingId(null);
+  };
+
+  const filtered = products.filter(
+    (p) =>
+      (p.title || p.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.category || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>📥</span> مدیریت سریع موجودی انبار و وضعیت عرضه
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            افزایش/کاهش سریع تعداد موجودی، رصد کالاهای در معرض اتمام و تغییر زنده وضعیت عرضه
+          </p>
+        </div>
+
+        <div className="w-full sm:w-72">
+          <input
+            type="text"
+            placeholder="🔍 جستجو در نام کالا یا دسته..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+          />
+        </div>
+      </div>
+
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm overflow-x-auto">
+        <table className="w-full text-right text-xs border-collapse min-w-[650px]">
+          <thead>
+            <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
+              <th className="p-3">تصویر</th>
+              <th className="p-3">نام محصول</th>
+              <th className="p-3">دسته‌بندی</th>
+              <th className="p-3">قیمت فعلی</th>
+              <th className="p-3 text-center">موجودی انبار</th>
+              <th className="p-3 text-center">وضعیت عرضه</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--card-border)] font-medium">
+            {filtered.map((p) => {
+              const currentStock = p.stock ?? 0;
+              const isCritical = currentStock < 3;
+
+              return (
+                <tr key={p.id} className="hover:bg-[var(--input-bg)]/50 transition">
+                  <td className="p-3">
+                    <img
+                      src={p.images?.[0] || p.image || "/placeholder.png"}
+                      alt=""
+                      className="w-11 h-11 object-contain rounded-xl bg-white/5 p-1 border border-[var(--card-border)]"
+                    />
+                  </td>
+                  <td className="p-3">
+                    <div className="font-extrabold text-[var(--text-primary)]">{p.title || p.name}</div>
+                    {isCritical && (
+                      <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold text-[10px]">
+                        ⚠️ موجودی بحرانی ({currentStock} عدد)
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3 text-[var(--text-secondary)] font-medium">{p.category || "عمومی"}</td>
+                  <td className="p-3 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                    {Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleStockChange(p.id, currentStock - 1)}
+                        className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-black hover:border-[var(--accent-blue)] cursor-pointer"
+                      >
+                        -
+                      </button>
+                      <span className="w-10 text-center font-mono font-black text-sm text-[var(--text-primary)]">
+                        {currentStock}
+                      </span>
+                      <button
+                        onClick={() => handleStockChange(p.id, currentStock + 1)}
+                        className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-black hover:border-[var(--accent-blue)] cursor-pointer"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => toggleAvailability(p.id, p.is_available !== false && p.isAvailable !== false)}
+                      disabled={updatingId === p.id}
+                      className={`px-4 py-2 rounded-2xl font-black text-xs transition cursor-pointer ${
+                        p.is_available !== false && p.isAvailable !== false && currentStock > 0
+                          ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
+                          : "bg-rose-500/15 text-rose-600 border border-rose-500/30 hover:bg-rose-500 hover:text-white"
+                      }`}
+                    >
+                      {p.is_available !== false && p.isAvailable !== false && currentStock > 0 ? "موجود در انبار ✓" : "ناموجود ✕"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="app/layout.tsx">
 // File Path: app/layout.tsx
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import LayoutWrapper from '@/components/LayoutWrapper';
@@ -18034,15 +18108,32 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#07090e' },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" className="dark" suppressHydrationWarning>
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
         <meta name="enamad" content="27424534" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"
+          rel="stylesheet"
+          type="text/css"
+        />
       </head>
       <body
         className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between"
@@ -18075,6 +18166,8 @@ export default function TechRadarFeed() {
     try {
       const items = await newsService.getPersonalizedNews();
       setNewsList(items || []);
+    } catch (e) {
+      console.warn("TechRadarFeed fetch error:", e);
     } finally {
       setLoading(false);
     }
@@ -18092,7 +18185,7 @@ export default function TechRadarFeed() {
     return () => window.removeEventListener("news_updated", handleNewsUpdate);
   }, []);
 
-  // چرخش ۳ تایی اخبار با ترجمه فارسی هر ۵.۵ ثانیه
+  // چرخش ۳ تایی اخبار هر ۵.۵ ثانیه
   useEffect(() => {
     if (newsList.length <= 3) return;
     const interval = setInterval(() => {
@@ -18111,28 +18204,26 @@ export default function TechRadarFeed() {
 
   return (
     <section className="w-full max-w-7xl mx-auto font-sans select-none px-2 my-2" dir="rtl">
-      {/* کادر جمع‌وجور و هم‌اندازه با نوار جستجو جهت نمایش ۳ خبر تکنولوژی */}
       <div className="flex flex-col sm:flex-row items-center justify-between p-2 px-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] shadow-sm transition-all duration-300 gap-2">
         <div className="flex items-center gap-2 shrink-0">
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-black text-[10px]">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-black text-[10px]">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
             جدیدترین اخبار تکنولوژی
           </span>
         </div>
 
-        {/* گرید ۳تایی اخبار با تصاویر بندانگشتی و تیترهای فارسی */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 w-full">
           {visibleNews.map((item, idx) => (
             <Link
-              key={`${item.id}-${idx}`}
+              key={`${item.id || item.slug}-${idx}`}
               href={`/news/${item.slug}`}
               onClick={() => soundEngine.playClick()}
-              className="flex items-center gap-2 p-1 px-2 rounded-xl bg-[var(--input-bg)] hover:bg-[var(--accent-blue)]/10 transition border border-transparent hover:border-[var(--card-border)] overflow-hidden group min-w-0"
+              className="flex items-center gap-2 p-1.5 px-2 rounded-xl bg-[var(--input-bg)] hover:bg-[var(--accent-blue)]/10 transition border border-transparent hover:border-[var(--card-border)] overflow-hidden group min-w-0"
             >
               <img
                 src={item.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=100"}
                 alt={item.title}
-                className="w-7 h-7 rounded-lg object-cover shrink-0"
+                className="w-7 h-7 rounded-lg object-cover shrink-0 border border-[var(--card-border)]"
               />
               <h4 className="text-[11px] font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition truncate">
                 {item.title}
@@ -18182,7 +18273,6 @@ export default function AdminProducts() {
   const [description, setDescription] = useState("");
   const [highlights, setHighlights] = useState<string[]>([""]);
 
-  // قیمت‌گذاری با جداسازی ۳ رقمی ارقام
   const [priceRaw, setPriceRaw] = useState<number | "">("");
   const [discountPriceRaw, setDiscountPriceRaw] = useState<number | "">("");
   const [stock, setStock] = useState<number | "">(10);
@@ -18201,7 +18291,6 @@ export default function AdminProducts() {
     { key: "درگاه‌های اتصال", value: "یک تاندربولت ۳ و ۳ عدد USB-C" },
   ]);
 
-  // سامانه پایش و تحلیل هوشمند قیمت رقبای بازار (ترب، ایمالز، دیجی‌کالا، باسلام و دیوار)
   const [marketBenchmarks, setMarketBenchmarks] = useState<MarketBenchmark[]>([
     { storeName: "متوسط ترب و ایمالز", price: 0, minPrice: 0, maxPrice: 0, warranty: "گارانتی متفرقه", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
     { storeName: "دیجی‌کالا / باسلام", price: 0, minPrice: 0, maxPrice: 0, warranty: "گارانتی شرکتی", isOurStore: false, deliveryTime: "۲ الی ۴ روز" },
@@ -18280,9 +18369,10 @@ export default function AdminProducts() {
     if (p.market_comparison && p.market_comparison.length > 0) {
       setMarketBenchmarks(p.market_comparison);
     } else {
+      const base = Number(p.price || 0);
       setMarketBenchmarks([
-        { storeName: "متوسط ترب و ایمالز", price: Number(p.price || 0) + 1500000, minPrice: Number(p.price || 0) + 1000000, maxPrice: Number(p.price || 0) + 2500000, warranty: "گارانتی معمولی", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
-        { storeName: "دیجی‌کالا / باسلام", price: Number(p.price || 0) + 2000000, minPrice: Number(p.price || 0) + 1800000, maxPrice: Number(p.price || 0) + 3000000, warranty: "گارانتی شرکتی", isOurStore: false, deliveryTime: "۲ الی ۴ روز" },
+        { storeName: "متوسط ترب و ایمالز", price: base + 1500000, minPrice: base + 1000000, maxPrice: base + 2500000, warranty: "گارانتی معمولی", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
+        { storeName: "دیجی‌کالا / باسلام", price: base + 2000000, minPrice: base + 1800000, maxPrice: base + 3000000, warranty: "گارانتی شرکتی", isOurStore: false, deliveryTime: "۲ الی ۴ روز" },
         { storeName: "فروشگاه مستقیم ما (تضمین کمترین نرخ)", price: Number(p.discountPrice || p.price || 0), minPrice: Number(p.discountPrice || p.price || 0), maxPrice: Number(p.discountPrice || p.price || 0), warranty: p.warranty || "گارانتی طلایی ۱۸ ماهه", isOurStore: true, deliveryTime: "ارسال فوری پیشتاز" },
       ]);
     }
@@ -18615,7 +18705,6 @@ export default function AdminProducts() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* لیست محصولات */}
         <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
           <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
             📦 کاتالوگ کالاها ({products.length})
@@ -18643,7 +18732,6 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* فرم ۷ تب تنظیمات کالا */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
             <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] scrollbar-none">
@@ -19354,7 +19442,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  // ثبت و بازیابی بلادرنگ موقعیت کاربر در حافظه سیستم (User Path Memory)
+  // سیستم ذخیره و بازیابی هوشمند موقعیت کاربر (Path Memory)
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -19374,7 +19462,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // تایمر شمارش معکوس حالت تعمیرات زمان‌دار
+  // تایمر معکوس بازگشایی خودکار سایت
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
@@ -19409,7 +19497,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // نمایش صفحه شیشه‌ای تعمیرات با امکان بازیابی موقعیت کاربر
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
@@ -19425,7 +19512,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />
 
         <div className="max-w-2xl w-full rounded-[3rem] bg-slate-900/90 border border-slate-800 p-8 sm:p-14 text-center space-y-8 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.95)] backdrop-blur-3xl relative z-10 animate-fadeIn">
-          
           <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black shadow-lg">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -19440,11 +19526,11 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             <div className="w-20 h-20 mx-auto rounded-3xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-3xl shadow-2xl shadow-blue-500/20 animate-bounce">
               ⚡
             </div>
-            
+
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-snug">
               {isTimed ? `فروشگاه ${storeName} به زودی بازمی‌گردد` : `فروشگاه ${storeName} در حال به‌روزرسانی است`}
             </h1>
-            
+
             <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed font-medium">
               {isTimed
                 ? "به منظور افزایش سرعت پردازش و اضافه شدن امکانات جدید، وب‌سایت طبق زمان‌سنج زیر به طور خودکار بازگشایی خواهد شد."
@@ -19525,9 +19611,25 @@ export async function GET() {
       console.warn("site_info GET warning:", error.message);
     }
 
-    return NextResponse.json({ success: true, data: data || null });
+    return NextResponse.json({
+      success: true,
+      data: data || {
+        id: 1,
+        site_name: "آکسون | Axon",
+        store_name: "آکسون | Axon",
+        tagline: "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
+        allow_google_index: true,
+        maintenance_mode: "none",
+        phone: "۰۲۱-۸۸۸۸۸۸۸۸",
+        email: "info@axoncore.ir",
+        address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
+        working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+        header_announcement: "⚡ ارسال رایگان خریدهای بالای ۲ میلیون تومان | گارانتی اصالت طلایی ۱۸ ماهه",
+        free_shipping_threshold: 2000000,
+      },
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -19566,16 +19668,14 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    // تلاش اول: ذخیره کامل داده‌ها با تمام فیلدها
     let { data, error } = await supabaseAdmin
       .from("site_info")
       .upsert(payload, { onConflict: "id" })
       .select()
       .maybeSingle();
 
-    // در صورت وجود خطای ساختار دیتابیس، فیلدهای پایه با تضمین عدم بروز خطای ۵۰۰ ثبت می‌شوند
     if (error) {
-      console.warn("Primary upsert fallback execution:", error.message);
+      console.warn("Primary site_info upsert warning, attempting safe fallback:", error.message);
 
       const safePayload = {
         id: 1,
@@ -19588,6 +19688,8 @@ export async function POST(req: NextRequest) {
         logo_url: body.logo_url || body.logoUrl || null,
         footer_logo_url: body.footer_logo_url || body.footerLogoUrl || null,
         description: body.description || body.footer_text || "",
+        allow_google_index: isAllowed,
+        maintenance_mode: body.maintenance_mode || "none",
         updated_at: new Date().toISOString(),
       };
 
@@ -19602,814 +19704,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "تنظیمات با موفقیت در دیتابیس ذخیره شد.",
+      message: "تنظیمات با موفقیت در پایگاه داده ثبت گردید.",
       data: data || payload,
     });
   } catch (err: any) {
-    console.error("API Site-Info Save Error:", err);
+    console.error("API Site-Info Save Fatal Error:", err);
     return NextResponse.json(
-      { success: false, message: err?.message || "خطا در ذخیره‌سازی در دیتابیس" },
+      { success: false, message: err?.message || "خطا در ذخیره‌سازی اطلاعات سایت" },
       { status: 500 }
     );
   }
-}
-</file>
-
-<file path="app/page.tsx">
-// File Path: app/page.tsx
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { productService, Product } from "@/services/productService";
-import { bannerService, Banner } from "@/services/bannerService";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { useCart } from "@/context/CartContext";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import AIAssistantChat from "@/components/AIAssistantChat";
-import TechRadarFeed from "@/components/TechRadarFeed";
-import ProductComparisonModal from "@/components/ProductComparisonModal";
-import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
-
-export default function HomePage() {
-  const router = useRouter();
-  const { addToCart } = useCart();
-
-  const [products, setProducts] = useState<Product[]>([]);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
-
-  const [compareList, setCompareList] = useState<Product[]>([]);
-  const [isCompareOpen, setIsCompareOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const loadData = async () => {
-    try {
-      const [prods, bans, info] = await Promise.all([
-        productService.getAll(),
-        bannerService.getAll(),
-        siteInfoService.getSiteInfo(),
-      ]);
-
-      const topCat = userBehavior.getTopInterestCategory();
-      let sortedProducts = prods || [];
-      if (topCat !== "all") {
-        sortedProducts = [...sortedProducts].sort((a, b) => {
-          const aMatch = (a.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
-          const bMatch = (b.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
-          return bMatch - aMatch;
-        });
-      }
-
-      setProducts(sortedProducts);
-      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
-      if (info) setSiteInfo(info);
-    } catch (e) {
-      console.error("Home page realtime fetch error:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-
-    const handleCategoryChange = (e: any) => {
-      setSelectedCategory(e.detail || "all");
-    };
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
-      else loadData();
-    };
-    const handleBannersUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setBanners(e.detail);
-      else loadData();
-    };
-    const handleSiteUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-    };
-
-    window.addEventListener("category_selected", handleCategoryChange);
-    window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("banners_updated", handleBannersUpdate);
-    window.addEventListener("site_info_updated", handleSiteUpdate);
-
-    return () => {
-      window.removeEventListener("category_selected", handleCategoryChange);
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("banners_updated", handleBannersUpdate);
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
-    };
-  }, []);
-
-  // چرخش خودکار اسلایدر بنرها هر ۶ ثانیه
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentSlideIndex((prev) => (prev + 1) % banners.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [banners.length]);
-
-  const toggleCompare = (p: Product) => {
-    soundEngine.playClick();
-    if (compareList.some((item) => item.id === p.id)) {
-      setCompareList(compareList.filter((item) => item.id !== p.id));
-    } else {
-      if (compareList.length >= 4) {
-        alert("حداکثر ۴ محصول را می‌توانید به طور همزمان مقایسه نمایید.");
-        return;
-      }
-      setCompareList([...compareList, p]);
-    }
-  };
-
-  const handlePrevSlide = () => {
-    soundEngine.playClick();
-    setCurrentSlideIndex((prev) => (prev === 0 ? banners.length - 1 : prev - 1));
-  };
-
-  const handleNextSlide = () => {
-    soundEngine.playClick();
-    setCurrentSlideIndex((prev) => (prev + 1) % banners.length);
-  };
-
-  const categoriesList = Array.from(
-    new Set(products.map((p) => p.category || (p as any).category_name || "کالای دیجیتال"))
-  ).filter(Boolean);
-
-  const filteredProducts = products.filter((product) => {
-    if (selectedCategory === "all") return true;
-    const cat = (product.category || (product as any).category_name || "").toLowerCase();
-    const target = selectedCategory.toLowerCase();
-    return cat === target || cat.includes(target) || target.includes(cat);
-  });
-
-  const activeBanner = banners[currentSlideIndex] || banners[0];
-
-  return (
-    <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-10 mt-3 sm:mt-5">
-        
-        {/* ۱. اسلایدر عریض بنرها */}
-        {banners.length > 0 && (
-          <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
-            <div
-              className="min-h-[380px] sm:min-h-[480px] p-6 sm:p-14 flex items-center bg-cover bg-center transition-all duration-700 relative"
-              style={{
-                backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.35)), url(${activeBanner?.image || (activeBanner as any)?.image_url || ""})`,
-              }}
-            >
-              <div className="max-w-2xl space-y-4 z-10 text-white animate-fadeIn">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {activeBanner?.badge && (
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/20 text-white border border-white/30 text-xs font-black backdrop-blur-md shadow-sm">
-                      {activeBanner.badge}
-                    </span>
-                  )}
-                </div>
-
-                <h1 className="text-2xl sm:text-5xl font-black leading-tight tracking-tight drop-shadow-md">
-                  {activeBanner?.title}
-                </h1>
-                
-                {activeBanner?.subtitle && (
-                  <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl font-medium drop-shadow-sm">
-                    {activeBanner.subtitle}
-                  </p>
-                )}
-
-                <div className="pt-2 flex items-center gap-3">
-                  <Link
-                    href={activeBanner?.link || (activeBanner as any)?.link_url || "/products"}
-                    className="inline-flex items-center gap-2 px-7 py-3.5 sm:px-8 sm:py-4 rounded-2xl bg-white text-gray-900 font-black text-xs hover:bg-slate-100 transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
-                  >
-                    <span>{activeBanner?.button_text || "مشاهده و بررسی کالا"}</span>
-                    <span>←</span>
-                  </Link>
-                </div>
-              </div>
-
-              {banners.length > 1 && (
-                <>
-                  <button
-                    onClick={handlePrevSlide}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl bg-black/40 hover:bg-black/70 text-white border border-white/20 flex items-center justify-center text-sm font-bold transition opacity-0 group-hover:opacity-100 z-20 cursor-pointer"
-                    title="اسلاید قبلی"
-                  >
-                    ▶
-                  </button>
-                  <button
-                    onClick={handleNextSlide}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl bg-black/40 hover:bg-black/70 text-white border border-white/20 flex items-center justify-center text-sm font-bold transition opacity-0 group-hover:opacity-100 z-20 cursor-pointer"
-                    title="اسلاید بعدی"
-                  >
-                    ◀
-                  </button>
-
-                  <div className="absolute bottom-5 left-6 flex items-center gap-2 z-20">
-                    {banners.map((_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setCurrentSlideIndex(idx);
-                        }}
-                        className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                          currentSlideIndex === idx ? "w-8 bg-[var(--accent-blue)]" : "w-2.5 bg-white/40 hover:bg-white/70"
-                        }`}
-                        title={`اسلاید ${idx + 1}`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* ۲. تیکر جمع‌وجور اخبار تکنولوژی زیر هدر */}
-        <TechRadarFeed />
-
-        {/* ۳. ویترین اصلی کاتالوگ محصولات - تمرکز اساسی سایت */}
-        <section id="products" className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
-            <div>
-              <h3 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
-                <span>📦</span> محصولات ویژه‌ی فروشگاه
-              </h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-                {selectedCategory === "all" ? "تمامی کالاهای موجود با تست سلامت فیزیکی و گارانتی اصالت معتبر" : `نمایش دسته‌بندی: ${selectedCategory}`}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none text-xs">
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  setSelectedCategory("all");
-                }}
-                className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
-                  selectedCategory === "all"
-                    ? "bg-[var(--accent-blue)] text-white shadow-md"
-                    : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                همه ({products.length})
-              </button>
-              {categoriesList.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setSelectedCategory(cat);
-                  }}
-                  className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
-                    selectedCategory === cat
-                      ? "bg-[var(--accent-blue)] text-white shadow-md"
-                      : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {loading && products.length === 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-80 rounded-[2rem] bg-[var(--input-bg)] animate-pulse border border-[var(--card-border)]" />
-              ))}
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="rounded-3xl p-16 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2 bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
-              <span className="text-3xl block">📦</span>
-              <p>محصولی در این دسته‌بندی یافت نشد.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {filteredProducts.map((product) => (
-                <HomeProductCard
-                  key={product.id}
-                  product={product}
-                  isCompared={compareList.some((item) => item.id === product.id)}
-                  onToggleCompare={toggleCompare}
-                  onAddToCart={addToCart}
-                  onOpenDetails={(p) => {
-                    soundEngine.playClick();
-                    userBehavior.trackProductView(p.id, p.category);
-                    setSelectedProductForModal(p);
-                  }}
-                  onQuickBuy={(p) => {
-                    soundEngine.playAddToCart();
-                    userBehavior.trackProductView(p.id, p.category);
-                    addToCart({
-                      id: p.id,
-                      title: p.title || p.name,
-                      name: p.title || p.name,
-                      price: Number(p.discountPrice || p.discount_price || p.price || 0),
-                      image: p.images?.[0] || p.image || "/placeholder.png",
-                      stock: p.stock ?? 10,
-                      quantity: 1,
-                    });
-                    router.push("/checkout");
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* نوار مقایسه شناور */}
-        {compareList.length > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-[var(--card-border)] p-3 px-6 rounded-full shadow-2xl flex items-center gap-4 animate-fadeIn">
-            <span className="text-xs font-black text-[var(--text-primary)] flex items-center gap-2">
-              <span>⚖️</span>
-              <span>{compareList.length} کالا آماده مقایسه</span>
-            </span>
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setIsCompareOpen(true);
-              }}
-              className="px-4 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md cursor-pointer hover:opacity-90 transition"
-            >
-              مشاهده جدول مقایسه 🚀
-            </button>
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setCompareList([]);
-              }}
-              className="text-xs text-rose-500 font-bold hover:underline cursor-pointer"
-            >
-              لغو
-            </button>
-          </div>
-        )}
-
-        {/* ۴. کادر جمع‌وجور مجله تخصصی سئو دقیقاً پیش از فوتر */}
-        <section className="p-5 sm:p-7 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
-          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-            <div>
-              <h3 className="text-sm sm:text-base font-black text-[var(--text-primary)] flex items-center gap-2">
-                <span>📚</span> مجله و مقالات تخصصی سئو
-              </h3>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">جدیدترین تحلیل‌های سخت‌افزاری و راهنمای خرید</p>
-            </div>
-            <Link
-              href="/blog"
-              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-bold hover:bg-[var(--accent-blue)] hover:text-white transition shadow-sm"
-            >
-              مشاهده همه مقالات ←
-            </Link>
-          </div>
-
-          <HomeBlogSection />
-        </section>
-      </div>
-
-      {selectedProductForModal && (
-        <ProductDetailsModal
-          product={selectedProductForModal}
-          onClose={() => setSelectedProductForModal(null)}
-          onAddToCart={addToCart}
-        />
-      )}
-
-      <ProductComparisonModal
-        products={compareList}
-        isOpen={isCompareOpen}
-        onClose={() => setIsCompareOpen(false)}
-        onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))}
-      />
-
-      <AIAssistantChat />
-    </div>
-  );
-}
-
-function HomeProductCard({
-  product,
-  isCompared,
-  onToggleCompare,
-  onAddToCart,
-  onOpenDetails,
-  onQuickBuy,
-}: {
-  product: Product;
-  isCompared: boolean;
-  onToggleCompare: (product: Product) => void;
-  onAddToCart: (item: any) => void;
-  onOpenDetails: (product: Product) => void;
-  onQuickBuy: (product: Product) => void;
-}) {
-  const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
-  const displayImage = images[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500";
-  const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
-  const productName = product.title || product.name || "محصول دیجیتال";
-  const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
-  const oldPrice = Number(product.originalPrice ?? product.price ?? 0);
-
-  const discountPercent = product.discountPrice && Number(product.discountPrice) < Number(product.price)
-    ? Math.round(((Number(product.price) - Number(product.discountPrice)) / Number(product.price)) * 100)
-    : 0;
-
-  return (
-    <div className="rounded-[2.2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 sm:p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] hover:shadow-2xl transition duration-300 group shadow-sm select-none">
-      <div
-        onClick={() => onOpenDetails(product)}
-        className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center cursor-pointer border border-[var(--card-border)]"
-      >
-        <img
-          src={displayImage}
-          alt={productName}
-          className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-500"
-        />
-
-        {discountPercent > 0 && (
-          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black shadow-lg">
-            {discountPercent}٪- تخفیف
-          </span>
-        )}
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleCompare(product);
-          }}
-          className={`absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition cursor-pointer ${
-            isCompared
-              ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
-              : "bg-black/60 text-white border-white/20 hover:bg-black/80"
-          }`}
-          title="افزودن به مقایسه"
-        >
-          {isCompared ? "✓ در مقایسه" : "⚖️ مقایسه"}
-        </button>
-
-        {!isAvailable && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
-            <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
-              ناموجود در انبار
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-2 cursor-pointer" onClick={() => onOpenDetails(product)}>
-        <div className="flex items-center justify-between text-[10px]">
-          <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full font-bold">
-            {product.category || "کالای دیجیتال"}
-          </span>
-          <span
-            className={`font-bold px-2.5 py-0.5 rounded-full ${
-              isAvailable
-                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-            }`}
-          >
-            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
-          </span>
-        </div>
-
-        <h4 
-          className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
-          style={{ direction: "rtl", textAlign: "right" }}
-        >
-          {productName}
-        </h4>
-        <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
-          {(product as any).title_fa || product.short_description || product.description}
-        </p>
-
-        <div className="flex items-center gap-2 pt-1">
-          <span className="font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 font-mono">
-            {currentPrice.toLocaleString("fa-IR")} تومان
-          </span>
-          {oldPrice > currentPrice && (
-            <span className="text-[11px] line-through text-[var(--text-secondary)] font-mono">
-              {oldPrice.toLocaleString("fa-IR")}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--card-border)]">
-        <button
-          onClick={() => {
-            soundEngine.playAddToCart();
-            onAddToCart({
-              id: product.id,
-              name: productName,
-              title: productName,
-              price: currentPrice,
-              image: displayImage,
-              stock: product.stock ?? 10,
-            });
-          }}
-          disabled={!isAvailable}
-          className="py-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] font-bold text-xs cursor-pointer border border-[var(--card-border)] disabled:opacity-40 shadow-sm"
-        >
-          🛒 سبد خرید
-        </button>
-
-        <button
-          onClick={() => onQuickBuy(product)}
-          disabled={!isAvailable}
-          className="py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-md disabled:opacity-40"
-        >
-          ⚡ خرید سریع
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ProductDetailsModal({
-  product,
-  onClose,
-  onAddToCart,
-}: {
-  product: Product;
-  onClose: () => void;
-  onAddToCart: (item: any) => void;
-}) {
-  const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
-  const [activeImage, setActiveImage] = useState(images[0]);
-  const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState<"specs" | "desc" | "shipping" | "comparison">("specs");
-
-  const specsEntries = product.specs ? Object.entries(product.specs) : [];
-  const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
-  const productName = product.title || product.name || "";
-  const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
-      <div className="w-full max-w-4xl max-h-[90vh] bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-8 text-[var(--text-primary)] overflow-y-auto shadow-2xl relative space-y-6">
-        <button
-          onClick={() => {
-            soundEngine.playClick();
-            onClose();
-          }}
-          className="absolute top-6 left-6 w-9 h-9 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold transition cursor-pointer z-10"
-        >
-          ✕
-        </button>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          <div className="space-y-4">
-            <div className="w-full h-72 md:h-96 rounded-3xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center border border-[var(--card-border)] p-4">
-              <img
-                src={activeImage || product.image || ""}
-                alt={productName}
-                className="w-full h-full object-contain"
-              />
-            </div>
-
-            {images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                {images.map((imgUrl, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setActiveImage(imgUrl);
-                    }}
-                    className={`w-16 h-16 rounded-2xl overflow-hidden border-2 cursor-pointer transition shrink-0 bg-[var(--input-bg)] p-1 ${
-                      activeImage === imgUrl
-                        ? "border-[var(--accent-blue)] scale-105 shadow-md"
-                        : "border-[var(--card-border)] opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <img src={imgUrl} alt="" className="w-full h-full object-contain" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-5">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-1 rounded-full font-bold">
-                  {product.category || "کالای دیجیتال"}
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                    isAvailable
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                  }`}
-                >
-                  {isAvailable ? "موجود در انبار" : "ناموجود"}
-                </span>
-              </div>
-              <h2 className="text-xl md:text-2xl font-black mt-1 leading-snug text-[var(--text-primary)]">{productName}</h2>
-              {(product as any).title_fa && (
-                <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">{(product as any).title_fa}</p>
-              )}
-            </div>
-
-            <div className="flex gap-2 border-b border-[var(--card-border)] pb-3 overflow-x-auto scrollbar-none text-xs">
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  setActiveTab("specs");
-                }}
-                className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
-                  activeTab === "specs"
-                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
-                    : "bg-[var(--input-bg)] text-[var(--text-secondary)]"
-                }`}
-              >
-                ⚙️ مشخصات فنی
-              </button>
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  setActiveTab("desc");
-                }}
-                className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
-                  activeTab === "desc"
-                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
-                    : "bg-[var(--input-bg)] text-[var(--text-secondary)]"
-                }`}
-              >
-                📝 توضیحات
-              </button>
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  setActiveTab("shipping");
-                }}
-                className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
-                  activeTab === "shipping"
-                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
-                    : "bg-[var(--input-bg)] text-[var(--text-secondary)]"
-                }`}
-              >
-                🚚 ارسال و گارانتی
-              </button>
-              <button
-                onClick={() => {
-                  soundEngine.playClick();
-                  setActiveTab("comparison");
-                }}
-                className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
-                  activeTab === "comparison"
-                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
-                    : "bg-[var(--input-bg)] text-[var(--text-secondary)]"
-                }`}
-              >
-                📊 مقایسه بازار
-              </button>
-            </div>
-
-            <div className="min-h-[140px] text-xs">
-              {activeTab === "specs" && (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {specsEntries.length > 0 ? (
-                    specsEntries.map(([key, val], idx) => (
-                      <div key={idx} className="flex justify-between p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-                        <span className="text-[var(--text-secondary)] font-bold">{key}:</span>
-                        <span className="font-semibold text-[var(--text-primary)]">{String(val)}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-[var(--text-secondary)]">مشخصات فنی ثبت نشده است.</p>
-                  )}
-                </div>
-              )}
-
-              {activeTab === "desc" && (
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed whitespace-pre-line font-medium max-h-48 overflow-y-auto">
-                  {product.description || "توضیحات تکمیلی برای این محصول ثبت نشده است."}
-                </p>
-              )}
-
-              {activeTab === "shipping" && (
-                <div className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-                  <p>✅ {product.warranty || "۱۸ ماه گارانتی شرکتی و سلامت فیزیکی"}</p>
-                  <p>✅ ارسال سریع اکسپرس با بسته‌بندی ایمن ضدضربه</p>
-                  <p>✅ ضمانت ۱۰۰٪ اصالت فیزیکی کالا</p>
-                </div>
-              )}
-
-              {activeTab === "comparison" && (
-                <div className="space-y-2 text-xs">
-                  <p className="font-bold text-[var(--accent-blue)]">قیمت ما در مقایسه با بازار:</p>
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold">
-                    ✓ تضمین کمترین قیمت بازار به همراه گارانتی اصالت طلایی
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
-                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                  {currentPrice.toLocaleString("fa-IR")} تومان
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <div className="flex items-center gap-2 bg-[var(--modal-bg)] rounded-xl px-3 py-2 border border-[var(--card-border)] font-bold text-xs">
-                  <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="px-1 text-sm font-black cursor-pointer">-</button>
-                  <span className="font-mono text-sm">{quantity}</span>
-                  <button onClick={() => setQuantity((q) => q + 1)} className="px-1 text-sm font-black cursor-pointer">+</button>
-                </div>
-
-                <button
-                  onClick={() => {
-                    soundEngine.playAddToCart();
-                    for (let i = 0; i < quantity; i++) {
-                      onAddToCart({
-                        id: product.id,
-                        name: productName,
-                        title: productName,
-                        price: currentPrice,
-                        image: activeImage || product.image || "",
-                        stock: product.stock ?? 10,
-                      });
-                    }
-                    onClose();
-                  }}
-                  disabled={!isAvailable}
-                  className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-40"
-                >
-                  افزودن به سبد خرید ({quantity}) 🛒
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HomeBlogSection() {
-  const [posts, setPosts] = useState<any[]>([]);
-
-  useEffect(() => {
-    async function loadBlogs() {
-      try {
-        const res = await fetch("/api/blogs");
-        const data = await res.json();
-        const items = data.data || data.posts || [];
-        setPosts(items.filter((p: any) => p.isVisible !== false && p.isPublished !== false).slice(0, 3));
-      } catch (e) {
-        console.error("Error loading blogs:", e);
-      }
-    }
-    loadBlogs();
-  }, []);
-
-  if (posts.length === 0) {
-    return (
-      <div className="text-center py-6 text-xs text-[var(--text-secondary)] font-bold">
-        هنوز مقاله‌ای در مجله منتشر نشده است.
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {posts.map((post) => (
-        <article
-          key={post.id || post.title}
-          className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5 flex flex-col justify-between hover:border-[var(--accent-blue)] transition duration-300 shadow-sm"
-        >
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] font-bold">
-              <span>📅 {post.createdAt || "امروز"}</span>
-              <span className="text-[var(--accent-blue)] font-black">{post.category || "مقاله تخصصی"}</span>
-            </div>
-            <h4 className="font-black text-xs line-clamp-2 text-[var(--text-primary)] leading-snug">
-              {post.title}
-            </h4>
-            <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
-              {post.metaDescription || (post.content ? post.content.replace(/<[^>]*>?/gm, "").substring(0, 80) + "..." : "")}
-            </p>
-          </div>
-          <Link
-            href={`/blog/${post.id}`}
-            className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-1.5 border-t border-[var(--card-border)]"
-          >
-            مطالعه مقاله ←
-          </Link>
-        </article>
-      ))}
-    </div>
-  );
 }
 </file>
 
@@ -21955,6 +21259,803 @@ function formatMarkdownText(text: string) {
 }
 </file>
 
+<file path="app/page.tsx">
+// File Path: app/page.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { productService, Product } from "@/services/productService";
+import { bannerService, Banner } from "@/services/bannerService";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { useCart } from "@/context/CartContext";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import AIAssistantChat from "@/components/AIAssistantChat";
+import TechRadarFeed from "@/components/TechRadarFeed";
+import ProductComparisonModal from "@/components/ProductComparisonModal";
+import { soundEngine } from "@/lib/soundEngine";
+import { userBehavior } from "@/lib/userBehavior";
+
+export default function HomePage() {
+  const router = useRouter();
+  const { addToCart } = useCart();
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
+
+  const [compareList, setCompareList] = useState<Product[]>([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    try {
+      const [prods, bans, info] = await Promise.all([
+        productService.getAll(),
+        bannerService.getAll(),
+        siteInfoService.getSiteInfo(),
+      ]);
+
+      const topCat = userBehavior.getTopInterestCategory();
+      let sortedProducts = prods || [];
+      if (topCat !== "all") {
+        sortedProducts = [...sortedProducts].sort((a, b) => {
+          const aMatch = (a.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
+          const bMatch = (b.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
+          return bMatch - aMatch;
+        });
+      }
+
+      setProducts(sortedProducts);
+      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
+      if (info) setSiteInfo(info);
+    } catch (e) {
+      console.error("Home page fetch error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+
+    const handleCategoryChange = (e: any) => {
+      setSelectedCategory(e.detail || "all");
+    };
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
+      else loadData();
+    };
+    const handleBannersUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setBanners(e.detail);
+      else loadData();
+    };
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
+
+    window.addEventListener("category_selected", handleCategoryChange);
+    window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("banners_updated", handleBannersUpdate);
+    window.addEventListener("site_info_updated", handleSiteUpdate);
+
+    return () => {
+      window.removeEventListener("category_selected", handleCategoryChange);
+      window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("banners_updated", handleBannersUpdate);
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlideIndex((prev) => (prev + 1) % banners.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [banners.length]);
+
+  const toggleCompare = (p: Product) => {
+    soundEngine.playClick();
+    if (compareList.some((item) => item.id === p.id)) {
+      setCompareList(compareList.filter((item) => item.id !== p.id));
+    } else {
+      if (compareList.length >= 4) {
+        alert("حداکثر ۴ محصول را می‌توانید به طور همزمان مقایسه نمایید.");
+        return;
+      }
+      setCompareList([...compareList, p]);
+    }
+  };
+
+  const handlePrevSlide = () => {
+    soundEngine.playClick();
+    setCurrentSlideIndex((prev) => (prev === 0 ? banners.length - 1 : prev - 1));
+  };
+
+  const handleNextSlide = () => {
+    soundEngine.playClick();
+    setCurrentSlideIndex((prev) => (prev + 1) % banners.length);
+  };
+
+  const categoriesList = Array.from(
+    new Set(products.map((p) => p.category || (p as any).category_name || "کالای دیجیتال"))
+  ).filter(Boolean);
+
+  const filteredProducts = products.filter((product) => {
+    if (selectedCategory === "all") return true;
+    const cat = (product.category || (product as any).category_name || "").toLowerCase();
+    const target = selectedCategory.toLowerCase();
+    return cat === target || cat.includes(target) || target.includes(cat);
+  });
+
+  const activeBanner = banners[currentSlideIndex] || banners[0];
+
+  return (
+    <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-10 mt-3 sm:mt-5">
+        
+        {/* ۱. اسلایدر عریض بنرها */}
+        {banners.length > 0 && (
+          <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
+            <div
+              className="min-h-[380px] sm:min-h-[480px] p-6 sm:p-14 flex items-center bg-cover bg-center transition-all duration-700 relative"
+              style={{
+                backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.35)), url(${activeBanner?.image || (activeBanner as any)?.image_url || ""})`,
+              }}
+            >
+              <div className="max-w-2xl space-y-4 z-10 text-white animate-fadeIn">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {activeBanner?.badge && (
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/20 text-white border border-white/30 text-xs font-black backdrop-blur-md shadow-sm">
+                      {activeBanner.badge}
+                    </span>
+                  )}
+                </div>
+
+                <h1 className="text-2xl sm:text-5xl font-black leading-tight tracking-tight drop-shadow-md">
+                  {activeBanner?.title}
+                </h1>
+                
+                {activeBanner?.subtitle && (
+                  <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl font-medium drop-shadow-sm">
+                    {activeBanner.subtitle}
+                  </p>
+                )}
+
+                <div className="pt-2 flex items-center gap-3">
+                  <Link
+                    href={activeBanner?.link || (activeBanner as any)?.link_url || "/products"}
+                    className="inline-flex items-center gap-2 px-7 py-3.5 sm:px-8 sm:py-4 rounded-2xl bg-white text-gray-900 font-black text-xs hover:bg-slate-100 transition-all duration-300 shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
+                  >
+                    <span>{activeBanner?.button_text || "مشاهده و بررسی کالا"}</span>
+                    <span>←</span>
+                  </Link>
+                </div>
+              </div>
+
+              {banners.length > 1 && (
+                <>
+                  <button
+                    onClick={handlePrevSlide}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl bg-black/40 hover:bg-black/70 text-white border border-white/20 flex items-center justify-center text-sm font-bold transition opacity-0 group-hover:opacity-100 z-20 cursor-pointer"
+                    title="اسلاید قبلی"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    onClick={handleNextSlide}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl bg-black/40 hover:bg-black/70 text-white border border-white/20 flex items-center justify-center text-sm font-bold transition opacity-0 group-hover:opacity-100 z-20 cursor-pointer"
+                    title="اسلاید بعدی"
+                  >
+                    ◀
+                  </button>
+
+                  <div className="absolute bottom-5 left-6 flex items-center gap-2 z-20">
+                    {banners.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setCurrentSlideIndex(idx);
+                        }}
+                        className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                          currentSlideIndex === idx ? "w-8 bg-[var(--accent-blue)]" : "w-2.5 bg-white/40 hover:bg-white/70"
+                        }`}
+                        title={`اسلاید ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ۲. تیکر جمع‌وجور اخبار تکنولوژی */}
+        <TechRadarFeed />
+
+        {/* ۳. ویترین اصلی کاتالوگ محصولات */}
+        <section id="products" className="space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
+            <div>
+              <h3 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
+                <span>📦</span> محصولات ویژه‌ی فروشگاه
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+                {selectedCategory === "all" ? "تمامی کالاهای موجود با تست سلامت فیزیکی و گارانتی اصالت معتبر" : `نمایش دسته‌بندی: ${selectedCategory}`}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none text-xs">
+              <button
+                onClick={() => {
+                  soundEngine.playClick();
+                  setSelectedCategory("all");
+                }}
+                className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
+                  selectedCategory === "all"
+                    ? "bg-[var(--accent-blue)] text-white shadow-md"
+                    : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                همه ({products.length})
+              </button>
+              {categoriesList.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setSelectedCategory(cat);
+                  }}
+                  className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
+                    selectedCategory === cat
+                      ? "bg-[var(--accent-blue)] text-white shadow-md"
+                      : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading && products.length === 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-80 rounded-[2rem] bg-[var(--input-bg)] animate-pulse border border-[var(--card-border)]" />
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="rounded-3xl p-16 text-center text-[var(--text-secondary)] text-xs font-bold space-y-2 bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
+              <span className="text-3xl block">📦</span>
+              <p>محصولی در این دسته‌بندی یافت نشد.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {filteredProducts.map((product) => (
+                <HomeProductCard
+                  key={product.id}
+                  product={product}
+                  isCompared={compareList.some((item) => item.id === product.id)}
+                  onToggleCompare={toggleCompare}
+                  onAddToCart={addToCart}
+                  onOpenDetails={(p) => {
+                    soundEngine.playClick();
+                    userBehavior.trackProductView(p.id, p.category);
+                    setSelectedProductForModal(p);
+                  }}
+                  onQuickBuy={(p) => {
+                    soundEngine.playAddToCart();
+                    userBehavior.trackProductView(p.id, p.category);
+                    addToCart({
+                      id: p.id,
+                      title: p.title || p.name,
+                      name: p.title || p.name,
+                      price: Number(p.discountPrice || p.discount_price || p.price || 0),
+                      image: p.images?.[0] || p.image || "/placeholder.png",
+                      stock: p.stock ?? 10,
+                      quantity: 1,
+                    });
+                    router.push("/checkout");
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* نوار مقایسه شناور */}
+        {compareList.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-[var(--card-border)] p-3 px-6 rounded-full shadow-2xl flex items-center gap-4 animate-fadeIn">
+            <span className="text-xs font-black text-[var(--text-primary)] flex items-center gap-2">
+              <span>⚖️</span>
+              <span>{compareList.length} کالا آماده مقایسه</span>
+            </span>
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setIsCompareOpen(true);
+              }}
+              className="px-4 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md cursor-pointer hover:opacity-90 transition"
+            >
+              مشاهده جدول مقایسه 🚀
+            </button>
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setCompareList([]);
+              }}
+              className="text-xs text-rose-500 font-bold hover:underline cursor-pointer"
+            >
+              لغو
+            </button>
+          </div>
+        )}
+
+        {/* ۴. مجله تخصصی سئو قبل از فوتر */}
+        <section className="p-5 sm:p-7 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-[var(--text-primary)] flex items-center gap-2">
+                <span>📚</span> مجله و مقالات تخصصی سئو
+              </h3>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">جدیدترین تحلیل‌های سخت‌افزاری و راهنمای خرید</p>
+            </div>
+            <Link
+              href="/blog"
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-bold hover:bg-[var(--accent-blue)] hover:text-white transition shadow-sm"
+            >
+              مشاهده همه مقالات ←
+            </Link>
+          </div>
+
+          <HomeBlogSection />
+        </section>
+      </div>
+
+      {selectedProductForModal && (
+        <ProductDetailsModal
+          product={selectedProductForModal}
+          onClose={() => setSelectedProductForModal(null)}
+          onAddToCart={addToCart}
+        />
+      )}
+
+      <ProductComparisonModal
+        products={compareList}
+        isOpen={isCompareOpen}
+        onClose={() => setIsCompareOpen(false)}
+        onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))}
+      />
+
+      <AIAssistantChat />
+    </div>
+  );
+}
+
+function HomeProductCard({
+  product,
+  isCompared,
+  onToggleCompare,
+  onAddToCart,
+  onOpenDetails,
+  onQuickBuy,
+}: {
+  product: Product;
+  isCompared: boolean;
+  onToggleCompare: (product: Product) => void;
+  onAddToCart: (item: any) => void;
+  onOpenDetails: (product: Product) => void;
+  onQuickBuy: (product: Product) => void;
+}) {
+  const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
+  const displayImage = images[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500";
+  const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
+  const productName = product.title || product.name || "محصول دیجیتال";
+  const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
+  const oldPrice = Number(product.originalPrice ?? product.price ?? 0);
+
+  const discountPercent = product.discountPrice && Number(product.discountPrice) < Number(product.price)
+    ? Math.round(((Number(product.price) - Number(product.discountPrice)) / Number(product.price)) * 100)
+    : 0;
+
+  return (
+    <div className="rounded-[2.2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 sm:p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] hover:shadow-2xl transition duration-300 group shadow-sm select-none">
+      <div
+        onClick={() => onOpenDetails(product)}
+        className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center cursor-pointer border border-[var(--card-border)]"
+      >
+        <img
+          src={displayImage}
+          alt={productName}
+          className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-500"
+        />
+
+        {discountPercent > 0 && (
+          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black shadow-lg">
+            {discountPercent}٪- تخفیف
+          </span>
+        )}
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCompare(product);
+          }}
+          className={`absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition cursor-pointer ${
+            isCompared
+              ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
+              : "bg-black/60 text-white border-white/20 hover:bg-black/80"
+          }`}
+          title="افزودن به مقایسه"
+        >
+          {isCompared ? "✓ در مقایسه" : "⚖️ مقایسه"}
+        </button>
+
+        {!isAvailable && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
+            <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
+              ناموجود در انبار
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2 cursor-pointer" onClick={() => onOpenDetails(product)}>
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full font-bold">
+            {product.category || "کالای دیجیتال"}
+          </span>
+          <span
+            className={`font-bold px-2.5 py-0.5 rounded-full ${
+              isAvailable
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+            }`}
+          >
+            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
+          </span>
+        </div>
+
+        <h4
+          className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
+          style={{ direction: "rtl", textAlign: "right" }}
+        >
+          {productName}
+        </h4>
+        <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
+          {(product as any).title_fa || product.short_description || product.description}
+        </p>
+
+        <div className="flex items-center gap-2 pt-1">
+          <span className="font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 font-mono">
+            {currentPrice.toLocaleString("fa-IR")} تومان
+          </span>
+          {oldPrice > currentPrice && (
+            <span className="text-[11px] line-through text-[var(--text-secondary)] font-mono">
+              {oldPrice.toLocaleString("fa-IR")}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--card-border)]">
+        <button
+          onClick={() => {
+            soundEngine.playAddToCart();
+            onAddToCart({
+              id: product.id,
+              name: productName,
+              title: productName,
+              price: currentPrice,
+              image: displayImage,
+              stock: product.stock ?? 10,
+            });
+          }}
+          disabled={!isAvailable}
+          className="py-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] font-bold text-xs cursor-pointer border border-[var(--card-border)] disabled:opacity-40 shadow-sm"
+        >
+          🛒 سبد خرید
+        </button>
+
+        <button
+          onClick={() => onQuickBuy(product)}
+          disabled={!isAvailable}
+          className="py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-md disabled:opacity-40"
+        >
+          ⚡ خرید سریع
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ProductDetailsModal({
+  product,
+  onClose,
+  onAddToCart,
+}: {
+  product: Product;
+  onClose: () => void;
+  onAddToCart: (item: any) => void;
+}) {
+  const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
+  const [activeImage, setActiveImage] = useState(images[0]);
+  const [quantity, setQuantity] = useState(1);
+  const [activeTab, setActiveTab] = useState<"specs" | "desc" | "shipping" | "comparison">("specs");
+
+  const specsEntries = product.specs ? Object.entries(product.specs) : [];
+  const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
+  const productName = product.title || product.name || "";
+  const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
+      <div className="w-full max-w-4xl max-h-[90vh] bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-8 text-[var(--text-primary)] overflow-y-auto shadow-2xl relative space-y-6">
+        <button
+          onClick={() => {
+            soundEngine.playClick();
+            onClose();
+          }}
+          className="absolute top-6 left-6 w-9 h-9 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold transition cursor-pointer z-10"
+        >
+          ✕
+        </button>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+          <div className="space-y-4">
+            <div className="w-full h-72 md:h-96 rounded-3xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center border border-[var(--card-border)] p-4">
+              <img
+                src={activeImage || product.image || ""}
+                alt={productName}
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            {images.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                {images.map((imgUrl, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setActiveImage(imgUrl);
+                    }}
+                    className={`w-16 h-16 rounded-2xl overflow-hidden border-2 cursor-pointer transition shrink-0 bg-[var(--input-bg)] p-1 ${
+                      activeImage === imgUrl
+                        ? "border-[var(--accent-blue)] scale-105 shadow-md"
+                        : "border-[var(--card-border)] opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    <img src={imgUrl} alt="" className="w-full h-full object-contain" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-5">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-1 rounded-full font-bold">
+                  {product.category || "کالای دیجیتال"}
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                    isAvailable
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                  }`}
+                >
+                  {isAvailable ? "موجود در انبار" : "ناموجود"}
+                </span>
+              </div>
+              <h2 className="text-xl md:text-2xl font-black mt-1 leading-snug text-[var(--text-primary)]">{productName}</h2>
+              {(product as any).title_fa && (
+                <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">{(product as any).title_fa}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2 border-b border-[var(--card-border)] pb-3 overflow-x-auto scrollbar-none text-xs">
+              <button
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("specs");
+                }}
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                  activeTab === "specs"
+                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
+                    : "bg-[var(--input-bg)] text-[var(--text-secondary)]"
+                }`}
+              >
+                ⚙️ مشخصات فنی
+              </button>
+              <button
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("desc");
+                }}
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                  activeTab === "desc"
+                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
+                    : "bg-[var(--input-bg)] text-[var(--text-secondary)]"
+                }`}
+              >
+                📝 توضیحات
+              </button>
+              <button
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("shipping");
+                }}
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                  activeTab === "shipping"
+                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
+                    : "bg-[var(--input-bg)] text-[var(--text-secondary)]"
+                }`}
+              >
+                🚚 ارسال و گارانتی
+              </button>
+              <button
+                onClick={() => {
+                  soundEngine.playClick();
+                  setActiveTab("comparison");
+                }}
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                  activeTab === "comparison"
+                    ? "bg-[var(--accent-blue)] text-white shadow-md font-black"
+                    : "bg-[var(--input-bg)] text-[var(--text-secondary)]"
+                }`}
+              >
+                📊 مقایسه بازار
+              </button>
+            </div>
+
+            <div className="min-h-[140px] text-xs">
+              {activeTab === "specs" && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {specsEntries.length > 0 ? (
+                    specsEntries.map(([key, val], idx) => (
+                      <div key={idx} className="flex justify-between p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                        <span className="text-[var(--text-secondary)] font-bold">{key}:</span>
+                        <span className="font-semibold text-[var(--text-primary)]">{String(val)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-[var(--text-secondary)]">مشخصات فنی ثبت نشده است.</p>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "desc" && (
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed whitespace-pre-line font-medium max-h-48 overflow-y-auto">
+                  {product.description || "توضیحات تکمیلی برای این محصول ثبت نشده است."}
+                </p>
+              )}
+
+              {activeTab === "shipping" && (
+                <div className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+                  <p>✅ {product.warranty || "۱۸ ماه گارانتی شرکتی و سلامت فیزیکی"}</p>
+                  <p>✅ ارسال سریع اکسپرس با بسته‌بندی ایمن ضدضربه</p>
+                  <p>✅ ضمانت ۱۰۰٪ اصالت فیزیکی کالا</p>
+                </div>
+              )}
+
+              {activeTab === "comparison" && (
+                <div className="space-y-2 text-xs">
+                  <p className="font-bold text-[var(--accent-blue)]">قیمت ما در مقایسه با بازار:</p>
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold">
+                    ✓ تضمین کمترین قیمت بازار به همراه گارانتی اصالت طلایی
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
+                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  {currentPrice.toLocaleString("fa-IR")} تومان
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2 bg-[var(--modal-bg)] rounded-xl px-3 py-2 border border-[var(--card-border)] font-bold text-xs">
+                  <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="px-1 text-sm font-black cursor-pointer">-</button>
+                  <span className="font-mono text-sm">{quantity}</span>
+                  <button onClick={() => setQuantity((q) => q + 1)} className="px-1 text-sm font-black cursor-pointer">+</button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    soundEngine.playAddToCart();
+                    for (let i = 0; i < quantity; i++) {
+                      onAddToCart({
+                        id: product.id,
+                        name: productName,
+                        title: productName,
+                        price: currentPrice,
+                        image: activeImage || product.image || "",
+                        stock: product.stock ?? 10,
+                      });
+                    }
+                    onClose();
+                  }}
+                  disabled={!isAvailable}
+                  className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-lg disabled:opacity-40"
+                >
+                  افزودن به سبد خرید ({quantity}) 🛒
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HomeBlogSection() {
+  const [posts, setPosts] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadBlogs() {
+      try {
+        const res = await fetch("/api/blogs");
+        const data = await res.json();
+        const items = data.data || data.posts || [];
+        setPosts(items.filter((p: any) => p.isVisible !== false && p.isPublished !== false).slice(0, 3));
+      } catch (e) {
+        console.error("Error loading blogs:", e);
+      }
+    }
+    loadBlogs();
+  }, []);
+
+  if (posts.length === 0) {
+    return (
+      <div className="text-center py-6 text-xs text-[var(--text-secondary)] font-bold">
+        هنوز مقاله‌ای در مجله منتشر نشده است.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {posts.map((post) => (
+        <article
+          key={post.id || post.title}
+          className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5 flex flex-col justify-between hover:border-[var(--accent-blue)] transition duration-300 shadow-sm"
+        >
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] font-bold">
+              <span>📅 {post.createdAt || "امروز"}</span>
+              <span className="text-[var(--accent-blue)] font-black">{post.category || "مقاله تخصصی"}</span>
+            </div>
+            <h4 className="font-black text-xs line-clamp-2 text-[var(--text-primary)] leading-snug">
+              {post.title}
+            </h4>
+            <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
+              {post.metaDescription || (post.content ? post.content.replace(/<[^>]*>?/gm, "").substring(0, 80) + "..." : "")}
+            </p>
+          </div>
+          <Link
+            href={`/blog/${post.id}`}
+            className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-1.5 border-t border-[var(--card-border)]"
+          >
+            مطالعه مقاله ←
+          </Link>
+        </article>
+      ))}
+    </div>
+  );
+}
+</file>
+
 <file path="services/siteInfoService.ts">
 import { supabase } from "@/lib/supabase";
 
@@ -22145,12 +22246,10 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { productService, Product } from "@/services/productService";
-import { menuService, MenuItem } from "@/services/menuService";
 import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
-// الگوریتم رسمی و بدون نقص اعتبارسنجی کد پستی ۱۰ رقمی ایران
 export function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
   const cleanCode = postalCode
@@ -22190,7 +22289,6 @@ export default function Header() {
 
   const [mounted, setMounted] = useState(false);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -22222,15 +22320,13 @@ export default function Header() {
 
     const initHeaderData = async () => {
       try {
-        const [info, prods, menus, cats] = await Promise.all([
+        const [info, prods, cats] = await Promise.all([
           siteInfoService.getSiteInfo(),
           productService.getAll(),
-          menuService.getAll(),
           categoryService.getAll(),
         ]);
         if (info) setSiteInfo(info);
         if (prods) setAllProducts(prods);
-        if (menus) setMenuItems(menus);
         if (cats) setCategories(cats);
       } catch (e) {
         console.error("Header data load warning:", e);
@@ -22246,10 +22342,6 @@ export default function Header() {
       if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
       else productService.getAll().then((prods) => prods && setAllProducts(prods));
     };
-    const handleMenuUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setMenuItems(e.detail);
-      else menuService.getAll().then((menus) => menus && setMenuItems(menus));
-    };
     const handleCategoriesUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
       else categoryService.getAll().then((cats) => cats && setCategories(cats));
@@ -22257,7 +22349,6 @@ export default function Header() {
 
     window.addEventListener("site_info_updated", handleSiteInfoUpdate);
     window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("menu_updated", handleMenuUpdate);
     window.addEventListener("categories_updated", handleCategoriesUpdate);
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -22273,7 +22364,6 @@ export default function Header() {
     return () => {
       window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
       window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("menu_updated", handleMenuUpdate);
       window.removeEventListener("categories_updated", handleCategoriesUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -22315,6 +22405,7 @@ export default function Header() {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("category_selected", { detail: catName }));
     }
+    router.push("/#products");
   };
 
   const handleQuickAddFromSearch = (e: React.MouseEvent, product: Product) => {
@@ -22340,7 +22431,6 @@ export default function Header() {
     }, 1500);
   };
 
-  // گزینه‌های مینیمال و پاکسازی‌شده نوار ناوبری اصلی هدر
   const navLinks = [
     { title: "صفحه نخست", href: "/" },
     { title: "کاتالوگ محصولات", href: "/#products" },
@@ -22350,7 +22440,7 @@ export default function Header() {
 
   const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-  const isOnline = siteInfo?.maintenance_mode === "none";
+  const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
 
   return (
     <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
@@ -22360,10 +22450,10 @@ export default function Header() {
         </div>
       )}
 
-      {/* نوار اصلی و کامل کپسول هدر - تمام المان‌ها و دکمه‌ها ۱۰۰٪ داخل این کادر یکپارچه قرار دارند */}
+      {/* نوار کپسولی یکپارچه هدر با ساختار Flex بدون شکست */}
       <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
         
-        {/* ۱. لوگو و نام رسمی برند */}
+        {/* ۱. بخش لوگو، نام سایت و دراپ‌داون دسته‌بندی */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
             onClick={() => {
@@ -22371,7 +22461,7 @@ export default function Header() {
               setMobileMenuOpen(!mobileMenuOpen);
             }}
             className="lg:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer shrink-0"
-            aria-label="Toggle Navigation Menu"
+            aria-label="منوی موبایل"
           >
             ☰
           </button>
@@ -22455,7 +22545,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* ۲. منوی مینیمال ناوبری در دسکتاپ */}
+        {/* ۲. منوی ناوبری ۴تایی */}
         <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
@@ -22468,7 +22558,7 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* ۳. جستجوی زنده، دکمه تم و دکمه آیکونی سبد خرید در داخل کادر اصلی هدر */}
+        {/* ۳. جستجو، دکمه تم و دکمه سبد خرید در داخل کپسول */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative hidden xl:block" ref={searchContainerRef}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
@@ -22522,16 +22612,17 @@ export default function Header() {
             )}
           </div>
 
-          {/* دکمه لایت‌مود و دارک‌مود */}
+          {/* دکمه تغییر تم (لایت / دارک) */}
           <button
             onClick={toggleDarkMode}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
             title="تغییر تم (دارک / لایت)"
+            aria-label="تغییر تم"
           >
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید آیکونی کاملاً ادغام‌شده داخل کادر هدر */}
+          {/* دکمه سبد خرید آیکونی با بج تعداد */}
           <button
             onClick={() => {
               soundEngine.playClick();
@@ -22553,7 +22644,7 @@ export default function Header() {
         </div>
       </div>
 
-      {/* منوی ریسپانسیو موبایل */}
+      {/* منوی بازشونده موبایل */}
       {mobileMenuOpen && (
         <div className="lg:hidden mt-2 p-3.5 bg-[var(--modal-bg)] rounded-2xl border border-[var(--card-border)] shadow-2xl space-y-1.5 animate-fadeIn">
           <div className="flex flex-col space-y-1 text-xs font-bold">

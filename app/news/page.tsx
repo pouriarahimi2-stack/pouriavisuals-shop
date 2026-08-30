@@ -8,6 +8,7 @@ import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
 export default function TechNewsHubPage() {
+  const [mounted, setMounted] = useState(false);
   const [news, setNews] = useState<TechNewsItem[]>([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -20,13 +21,16 @@ export default function TechNewsHubPage() {
     setLoading(true);
     try {
       const data = await newsService.getPersonalizedNews();
-      setNews(data);
+      setNews(data || []);
+    } catch (e) {
+      console.warn("News hub fetch error:", e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setMounted(true);
     loadNewsData();
 
     fetch("/api/news/sync", { method: "POST" }).catch(() => {});
@@ -72,6 +76,15 @@ export default function TechNewsHubPage() {
       item.summary.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+
+  const formatDate = (dateStr: string) => {
+    if (!mounted) return "هم‌اکنون";
+    try {
+      return new Date(dateStr).toLocaleDateString("fa-IR");
+    } catch {
+      return "امروز";
+    }
+  };
 
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
@@ -184,8 +197,8 @@ export default function TechNewsHubPage() {
               </div>
 
               <div className="p-6 pt-0 flex items-center justify-between border-t border-[var(--card-border)] mt-4">
-                <span className="text-[10px] font-mono text-[var(--text-secondary)] font-bold">
-                  📅 {new Date(item.published_at).toLocaleDateString("fa-IR")}
+                <span className="text-[10px] font-mono text-[var(--text-secondary)] font-bold" suppressHydrationWarning>
+                  📅 {formatDate(item.published_at)}
                 </span>
                 <span className="text-xs font-black text-[var(--accent-blue)] group-hover:underline flex items-center gap-1">
                   <span>مطالعه کامل خبر</span>
@@ -212,8 +225,8 @@ export default function TechNewsHubPage() {
                 <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black text-xs">
                   {activeModalNews.source_name}
                 </span>
-                <span className="text-xs text-[var(--text-secondary)] font-mono font-bold">
-                  📅 انتشار: {new Date(activeModalNews.published_at).toLocaleDateString("fa-IR")}
+                <span className="text-xs text-[var(--text-secondary)] font-mono font-bold" suppressHydrationWarning>
+                  📅 انتشار: {formatDate(activeModalNews.published_at)}
                 </span>
               </div>
 

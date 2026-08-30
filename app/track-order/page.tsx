@@ -1,3 +1,4 @@
+// File Path: app/track-order/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -219,7 +220,7 @@ function TrackOrderContent() {
                 </div>
               </div>
 
-              {/* بارکد پستی ۲۴ رقمی */}
+              {/* بارکد پستی ۲۴ رقمی و لینک استعلام پست */}
               {trackCode ? (
                 <div className="p-5 rounded-3xl bg-blue-500/10 border border-blue-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="space-y-1">

@@ -1,3 +1,4 @@
+// File Path: components/AdminBanners.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -73,20 +74,49 @@ export default function AdminBanners() {
     setIsActive(true);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // فشرده‌سازی خودکار تصویر بنر قبل از ذخیره
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1600;
+          const MAX_HEIGHT = 900;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/webp", 0.85);
+          resolve(compressedDataUrl);
+        };
+      };
+    });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("حجم تصویر نباید بیشتر از ۵ مگابایت باشد.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setImageUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      const optimizedUrl = await compressImage(file);
+      setImageUrl(optimizedUrl);
     }
   };
 
@@ -156,7 +186,7 @@ export default function AdminBanners() {
             <span>🖼️</span> مدیریت اسلایدر صفحه اصلی (تا ۱۰ اسلاید متحرک)
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            طراحی، تغییر اسلایدها و بارگذاری تصویر از گوشی و سیستم با انیمیشن روان
+            طراحی، تغییر اسلایدها و بارگذاری تصویر بهینه از گوشی و سیستم با انیمیشن روان
           </p>
         </div>
         <button
@@ -298,7 +328,7 @@ export default function AdminBanners() {
 
             {imageUrl && (
               <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
-                <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش لایو بنر:</span>
+                <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش زنده بنر:</span>
                 <div
                   className="w-full h-44 rounded-2xl bg-cover bg-center border border-[var(--card-border)] p-6 flex items-center shadow-inner relative overflow-hidden"
                   style={{

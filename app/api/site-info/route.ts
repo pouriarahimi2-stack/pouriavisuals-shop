@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       working_hours: body.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
       logo_url: body.logo_url || body.logoUrl || null,
       footer_logo_url: body.footer_logo_url || body.footerLogoUrl || null,
+      favicon_url: body.favicon_url || null,
       description: body.description || body.footer_text || "",
       footer_text: body.footer_text || body.description || "",
       allow_google_index: isAllowed,

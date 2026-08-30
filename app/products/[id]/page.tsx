@@ -1,3 +1,4 @@
+// File Path: app/products/[id]/page.tsx
 "use client";
 
 import React, { useState, useEffect, use } from "react";
@@ -251,7 +252,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             {product.variants && product.variants.length > 0 && (
               <div className="space-y-2 pt-2">
                 <span className="text-xs font-bold text-[var(--text-secondary)] block">
-                  انتخاب رنگ و مدل: <strong className="text-[var(--text-primary)]">{selectedVariant?.name}</strong>
+                  انتخاب رنگ و مدل: <strong className="text-[var(--text-primary)]">{selectedVariant?.name} {selectedVariant?.modelType ? `(${selectedVariant.modelType})` : ""}</strong>
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map((v) => (
@@ -272,6 +273,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         className="w-3.5 h-3.5 rounded-full border border-black/20"
                       />
                       <span>{v.name}</span>
+                      {v.modelType && <span className="text-[10px] opacity-75 font-mono">[{v.modelType}]</span>}
                     </button>
                   ))}
                 </div>

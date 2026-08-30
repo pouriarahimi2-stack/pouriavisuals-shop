@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     if (process.env.GEMINI_API_KEY) {
       try {
-        const prompt = `به عنوان مهندس ارشد سخت‌افزار، کالبدشکافی لایه‌به‌لایه ۶ لایه‌ای (Exploded View Teardown) برای محصول «${title}» تولید کن.
+        const prompt = `به عنوان مهندس ارشد سخت‌افزار، کالبدشکافی لایه‌به‌لایه‌ ۶ لایه‌ای (Exploded View Teardown) برای محصول «${title}» تولید کن.
 خروجی فقط یک JSON با ساختار معتبر زیر باشد:
 {
   "productId": "${productId}",

@@ -57,7 +57,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [freeShippingThreshold] = useState<number>(2000000);
 
-  // بارگذاری امن داده‌ها از LocalStorage در مرحله کلاینت
+  // بارگذاری داده‌ها از LocalStorage در مرحله کلاینت
   useEffect(() => {
     try {
       const localCart = localStorage.getItem(CART_STORAGE_KEY);

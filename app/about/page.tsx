@@ -1,3 +1,4 @@
+// File Path: app/about/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -27,7 +28,6 @@ export default function AboutPage() {
 
   const storeName = siteInfo?.storeName || siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
   const aboutText =
-    siteInfo?.aboutText ||
     siteInfo?.description ||
     siteInfo?.footer_text ||
     `مجموعه ${storeName} مرجع تخصصی تامین، کالیبراسیون و مشاوره تجهیزات پیشرفته تصویر، مانیتورهای تدوین رنگ ۵K و ۴K، کارت‌های کپچر و ابزارهای حرفه‌ای استودیو در ایران است.\n\nتعهد ما ارائه کالاهای ۱۰۰٪ اورجینال با گارانتی اصالت طلایی، تضمین بهترین قیمت بازار و ارسال سریع پیشتاز به سراسر کشور با بسته‌بندی ضدضربه استودیویی است.`;

@@ -108,7 +108,7 @@ export default function PageBuilder() {
 
     if (result) {
       soundEngine.playSuccess();
-      setStatusMessage({ type: "success", text: "⚡ صفحه فرود با موفقیت در دیتابیس ذخیره و منتشر شد." });
+      setStatusMessage({ type: "success", text: "⚡ صفحه با موفقیت در دیتابیس ذخیره و منتشر شد." });
       setSelectedPage(result);
       fetchPages();
     } else {
@@ -134,10 +134,10 @@ export default function PageBuilder() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🏗️</span> صفحه‌ساز ماژولار و لندینگ‌پیس (Page Builder Engine)
+            <span>🏗️</span> صفحه‌ساز ماژولار و ساخت لندینگ‌پیج
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ساخت صفحات فرود اختصاصی با ۱۰ بلاک پیشرفته (Hero, Products, FAQ, CTA, Video, Features)
+            ویرایش صفحات موجود یا ساخت صفحات جدید بدون کدنویسی (Hero, Products, FAQ, CTA, Video, Features)
           </p>
         </div>
         <button

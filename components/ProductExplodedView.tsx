@@ -159,7 +159,7 @@ export default function ProductExplodedView({
         ) : (
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
             
-            {/* بوم سه‌بعدی تعاملی با رفع کامل مشکل اسکرول در تاچ */}
+            {/* بوم سه‌بعدی تعاملی */}
             <div
               ref={containerRef}
               onPointerDown={handlePointerDown}

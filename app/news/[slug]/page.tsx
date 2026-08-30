@@ -1,3 +1,4 @@
+// File Path: app/news/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect, use } from "react";

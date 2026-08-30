@@ -1,3 +1,4 @@
+// File Path: components/AdminBlogManager.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -563,7 +564,7 @@ export default function AdminBlogManager() {
         </div>
       </div>
 
-      {/* مودال هوش مصنوعی تولید مقالات رنک ۱ گوگل */}
+      {/* مدال هوش مصنوعی تولید مقالات رنک ۱ گوگل */}
       {isAiModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
           <div className="max-w-xl w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-5 text-xs shadow-2xl text-[var(--text-primary)]">

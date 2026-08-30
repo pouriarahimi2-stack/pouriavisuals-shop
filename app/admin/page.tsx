@@ -59,6 +59,7 @@ export default function AdminPage() {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [newFullName, setNewFullName] = useState("");
+  const [newRole, setNewRole] = useState<AdminRole>("superadmin");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -102,6 +103,7 @@ export default function AdminPage() {
           setCurrentUser(user);
           setNewUsername(user.username || "");
           setNewFullName(user.full_name || "");
+          setNewRole(user.role || "superadmin");
 
           if (user.role === "content_editor") {
             setActiveTab("blogs");
@@ -115,6 +117,9 @@ export default function AdminPage() {
               const parsed = JSON.parse(localUser);
               setIsAuthenticated(true);
               setCurrentUser(parsed);
+              setNewUsername(parsed.username || "");
+              setNewFullName(parsed.full_name || "");
+              setNewRole(parsed.role || "superadmin");
             } catch {
               setIsAuthenticated(false);
               router.replace("/admin/login");
@@ -220,20 +225,26 @@ export default function AdminPage() {
         targetId,
         newUsername,
         newPassword || undefined,
-        newFullName || undefined
+        newFullName || undefined,
+        newRole
       );
 
       if (res && res.success) {
         soundEngine.playSuccess();
-        setPasswordMsg({ type: "success", text: "✨ مشخصات و کلمه عبور با موفقیت به‌روزرسانی شد." });
+        setPasswordMsg({ type: "success", text: "✨ مشخصات، سطح دسترسی و کلمه عبور با موفقیت در دیتابیس ثبت شد." });
         if (currentUser) {
-          const updatedUser = { ...currentUser, username: newUsername, full_name: newFullName || currentUser.full_name };
+          const updatedUser: AdminUser = {
+            ...currentUser,
+            username: newUsername,
+            full_name: newFullName || currentUser.full_name,
+            role: newRole,
+          };
           setCurrentUser(updatedUser);
           localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(updatedUser));
         }
         setTimeout(() => setShowPasswordModal(false), 1800);
       } else {
-        setPasswordMsg({ type: "error", text: res?.message || "خطا در تغییر مشخصات." });
+        setPasswordMsg({ type: "error", text: res?.message || "خطا در ذخیره‌سازی مشخصات." });
       }
     } catch {
       setPasswordMsg({ type: "error", text: "خطا در برقراری ارتباط." });
@@ -262,7 +273,7 @@ export default function AdminPage() {
 
       if (res && res.success) {
         soundEngine.playSuccess();
-        setAdminCreateMsg({ type: "success", text: "🎉 ادمین جدید با موفقیت ایجاد گردید." });
+        setAdminCreateMsg({ type: "success", text: "🎉 ادمین جدید با موفقیت در دیتابیس ایجاد گردید." });
         setNewAdminUsername("");
         setNewAdminPassword("");
         setNewAdminFullName("");
@@ -366,7 +377,7 @@ export default function AdminPage() {
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
                     currentMode === "none"
-                      ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"
+                      ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse"
                       : currentMode === "timed"
                       ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-ping"
                       : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
@@ -412,7 +423,7 @@ export default function AdminPage() {
             className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-blue-500 border border-[var(--card-border)] text-[var(--text-primary)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
           >
             <span>🔐</span>
-            <span>تغییر رمز</span>
+            <span>تغییر مشخصات و رمز</span>
           </button>
 
           <button
@@ -614,7 +625,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* مدال تغییر رمز عبور */}
+      {/* مدال تغییر مشخصات و رمز عبور */}
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans">
           <div className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-7 space-y-5 shadow-2xl text-[var(--text-primary)]">
@@ -651,7 +662,7 @@ export default function AdminPage() {
 
             <form onSubmit={handleUpdatePassword} className="space-y-4 text-xs">
               <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام نمایشی:</label>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی:</label>
                 <input
                   type="text"
                   value={newFullName}
@@ -670,6 +681,19 @@ export default function AdminPage() {
                   onChange={(e) => setNewUsername(e.target.value)}
                   className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-mono font-bold focus:border-blue-500 transition text-xs"
                 />
+              </div>
+
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">سطح دسترسی (Role):</label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as AdminRole)}
+                  className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] outline-none font-bold focus:border-blue-500 transition text-xs cursor-pointer"
+                >
+                  <option value="superadmin">👑 مدیر کل سیستم (دسترسی کامل)</option>
+                  <option value="product_manager">📦 مدیر انبار و کالا</option>
+                  <option value="content_editor">✍️ ویراستار مقالات سئو</option>
+                </select>
               </div>
 
               <div>

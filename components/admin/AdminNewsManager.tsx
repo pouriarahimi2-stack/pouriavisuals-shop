@@ -1,3 +1,4 @@
+// File Path: components/admin/AdminNewsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -78,7 +79,7 @@ export default function AdminNewsManager() {
       const data = await res.json();
       if (data.success) {
         soundEngine.playSuccess();
-        setStatusMsg("⚡ همگام‌سازی ترندهای جهانی و پاکسازی اخبار قدیمی‌تر از ۷ روز انجام شد.");
+        setStatusMsg("⚡ همگام‌سازی ترندهای جهانی و ترجمه اخبار با موفقیت انجام شد.");
         fetchNews();
       }
     } catch {
@@ -136,7 +137,7 @@ export default function AdminNewsManager() {
             <span>📡</span> مرکز مدیریت جدیدترین اخبار حوزه تکنولوژی
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پایش خودکار هر ۶ ساعت، پاکسازی هفتگی خودکار و دسته‌بندی هوشمند بر اساس رفتار کاربر
+            پایش خودکار هر ۶ ساعت از منابع جهانی، ترجمه به فارسی، پاکسازی خودکار و ویرایش دستی
           </p>
         </div>
 
@@ -147,7 +148,7 @@ export default function AdminNewsManager() {
             className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg disabled:opacity-50 flex items-center gap-1.5"
           >
             <span>🔄</span>
-            <span>{syncing ? "در حال دریافت ترندها..." : "پایش فوری اخبار جهان"}</span>
+            <span>{syncing ? "در حال دریافت و ترجمه..." : "پایش فوری اخبار جهان"}</span>
           </button>
           <button
             onClick={handleCreateNew}

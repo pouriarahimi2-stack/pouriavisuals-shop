@@ -7,14 +7,14 @@ import { newsService, TechNewsItem } from "@/services/newsService";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function TechRadarFeed() {
-  const [news, setNews] = useState<TechNewsItem[]>([]);
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [newsList, setNewsList] = useState<TechNewsItem[]>([]);
+  const [startIndex, setStartIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const loadTopNews = async () => {
     try {
       const items = await newsService.getPersonalizedNews();
-      setNews(items.slice(0, 6));
+      setNewsList(items || []);
     } finally {
       setLoading(false);
     }
@@ -24,7 +24,7 @@ export default function TechRadarFeed() {
     loadTopNews();
 
     const handleNewsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setNews(e.detail.slice(0, 6));
+      if (e.detail && Array.isArray(e.detail)) setNewsList(e.detail);
       else loadTopNews();
     };
 
@@ -32,57 +32,61 @@ export default function TechRadarFeed() {
     return () => window.removeEventListener("news_updated", handleNewsUpdate);
   }, []);
 
+  // چرخش ۳ تایی اخبار با ترجمه فارسی هر ۵.۵ ثانیه
   useEffect(() => {
-    if (news.length <= 1) return;
+    if (newsList.length <= 3) return;
     const interval = setInterval(() => {
-      setActiveIdx((prev) => (prev + 1) % news.length);
-    }, 4500);
+      setStartIndex((prev) => (prev + 3 >= newsList.length ? 0 : prev + 3));
+    }, 5500);
     return () => clearInterval(interval);
-  }, [news.length]);
+  }, [newsList.length]);
 
-  if (loading && news.length === 0) return null;
-  if (news.length === 0) return null;
+  if (loading && newsList.length === 0) return null;
+  if (newsList.length === 0) return null;
 
-  const currentNews = news[activeIdx] || news[0];
+  const visibleNews = newsList.slice(startIndex, startIndex + 3);
+  if (visibleNews.length < 3 && newsList.length >= 3) {
+    visibleNews.push(...newsList.slice(0, 3 - visibleNews.length));
+  }
 
   return (
-    <section className="w-full max-w-7xl mx-auto font-sans select-none px-1 my-1" dir="rtl">
-      <div className="group relative flex items-center justify-between p-2 px-3 rounded-2xl bg-[var(--modal-bg)]/90 border border-[var(--card-border)] hover:border-[var(--accent-blue)] shadow-sm hover:shadow-md transition-all duration-300 backdrop-blur-md">
-        
-        <Link
-          href={`/news/${currentNews.slug}`}
-          onClick={() => soundEngine.playClick()}
-          className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden"
-        >
-          <div className="w-9 h-9 rounded-xl overflow-hidden bg-[var(--input-bg)] border border-[var(--card-border)] shrink-0">
-            <img
-              src={currentNews.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=150"}
-              alt={currentNews.title}
-              className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-            />
-          </div>
+    <section className="w-full max-w-7xl mx-auto font-sans select-none px-2 my-2" dir="rtl">
+      {/* کادر جمع‌وجور و هم‌اندازه با نوار جستجو جهت نمایش ۳ خبر تکنولوژی */}
+      <div className="flex flex-col sm:flex-row items-center justify-between p-2 px-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] shadow-sm transition-all duration-300 gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-black text-[10px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+            جدیدترین اخبار تکنولوژی
+          </span>
+        </div>
 
-          <div className="flex items-center gap-2 min-w-0 truncate">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-black text-[9px] shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-              خبر داغ
-            </span>
-            <span className="text-[10px] font-mono text-[var(--accent-blue)] font-bold shrink-0 hidden sm:inline">
-              [{currentNews.source_name}]
-            </span>
-            <h4 className="text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition truncate">
-              {currentNews.title}
-            </h4>
-          </div>
-        </Link>
+        {/* گرید ۳تایی اخبار با تصاویر بندانگشتی و تیترهای فارسی */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 w-full">
+          {visibleNews.map((item, idx) => (
+            <Link
+              key={`${item.id}-${idx}`}
+              href={`/news/${item.slug}`}
+              onClick={() => soundEngine.playClick()}
+              className="flex items-center gap-2 p-1 px-2 rounded-xl bg-[var(--input-bg)] hover:bg-[var(--accent-blue)]/10 transition border border-transparent hover:border-[var(--card-border)] overflow-hidden group min-w-0"
+            >
+              <img
+                src={item.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=100"}
+                alt={item.title}
+                className="w-7 h-7 rounded-lg object-cover shrink-0"
+              />
+              <h4 className="text-[11px] font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition truncate">
+                {item.title}
+              </h4>
+            </Link>
+          ))}
+        </div>
 
         <Link
           href="/news"
           onClick={() => soundEngine.playClick()}
-          className="px-2.5 py-1 rounded-xl bg-[var(--input-bg)] hover:bg-[var(--accent-blue)] hover:text-white border border-[var(--card-border)] text-[10px] font-black text-[var(--text-secondary)] transition shrink-0 mr-2 flex items-center gap-1"
+          className="text-[10px] font-black text-[var(--accent-blue)] hover:underline shrink-0 px-2"
         >
-          <span>مرکز اخبار</span>
-          <span>←</span>
+          آرشیو اخبار ←
         </Link>
       </div>
     </section>

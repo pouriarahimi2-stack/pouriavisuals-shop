@@ -1,3 +1,4 @@
+// File Path: components/AdminSiteInfo.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -13,6 +14,7 @@ export default function AdminSiteInfo() {
   const [workingHours, setWorkingHours] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [footerLogoUrl, setFooterLogoUrl] = useState("");
+  const [faviconUrl, setFaviconUrl] = useState("");
 
   const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
@@ -32,6 +34,7 @@ export default function AdminSiteInfo() {
 
   const headerLogoFileRef = useRef<HTMLInputElement>(null);
   const footerLogoFileRef = useRef<HTMLInputElement>(null);
+  const faviconFileRef = useRef<HTMLInputElement>(null);
 
   const populateForm = (data: SiteInfo) => {
     setSiteName(data.site_name || data.siteName || data.storeName || "");
@@ -42,6 +45,7 @@ export default function AdminSiteInfo() {
     setWorkingHours(data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
     setLogoUrl(data.logo_url || data.logoUrl || "");
     setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
+    setFaviconUrl(data.favicon_url || "");
 
     const mode = data.maintenance_mode || (data.allow_google_index === false ? "indefinite" : "none");
     setMaintenanceMode(mode);
@@ -74,7 +78,7 @@ export default function AdminSiteInfo() {
     };
   }, []);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isFooter: boolean) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: "header" | "footer" | "favicon") => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 4 * 1024 * 1024) {
@@ -84,11 +88,9 @@ export default function AdminSiteInfo() {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === "string") {
-          if (isFooter) {
-            setFooterLogoUrl(reader.result);
-          } else {
-            setLogoUrl(reader.result);
-          }
+          if (target === "footer") setFooterLogoUrl(reader.result);
+          else if (target === "favicon") setFaviconUrl(reader.result);
+          else setLogoUrl(reader.result);
         }
       };
       reader.readAsDataURL(file);
@@ -120,6 +122,7 @@ export default function AdminSiteInfo() {
       logoUrl: logoUrl.trim(),
       footer_logo_url: footerLogoUrl.trim(),
       footerLogoUrl: footerLogoUrl.trim(),
+      favicon_url: faviconUrl.trim(),
       allow_google_index: maintenanceMode === "none",
       allowGoogleIndex: maintenanceMode === "none",
       maintenance_mode: maintenanceMode,
@@ -171,7 +174,7 @@ export default function AdminSiteInfo() {
             <span>⚙️</span> تنظیمات کلان سایت، سئو، هویت برند و درگاه‌ها
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پیکربندی هویت تجاری، لوگوهای هدر و فوتر، وضعیت تعمیرات زمان‌دار یا نامحدود و ایندکس گوگل
+            پیکربندی هویت تجاری، لوگوهای هدر و فوتر، فاوآیکون، وضعیت تعمیرات زمان‌دار یا نامحدود و ایندکس گوگل
           </p>
         </div>
         <button
@@ -290,46 +293,70 @@ export default function AdminSiteInfo() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-8 shadow-xl text-xs">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <input type="file" ref={headerLogoFileRef} onChange={(e) => handleFileUpload(e, false)} accept="image/*" className="hidden" />
-          <input type="file" ref={footerLogoFileRef} onChange={(e) => handleFileUpload(e, true)} accept="image/*" className="hidden" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <input type="file" ref={headerLogoFileRef} onChange={(e) => handleFileUpload(e, "header")} accept="image/*" className="hidden" />
+          <input type="file" ref={footerLogoFileRef} onChange={(e) => handleFileUpload(e, "footer")} accept="image/*" className="hidden" />
+          <input type="file" ref={faviconFileRef} onChange={(e) => handleFileUpload(e, "favicon")} accept="image/*" className="hidden" />
 
+          {/* لوگوی هدر */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-[var(--text-primary)]">🖼️ لوگوی اصلی هدر بالای سایت</h3>
             <div className="flex items-center gap-4 p-4 bg-[var(--input-bg)] rounded-2xl border border-[var(--card-border)]">
-              <div className="w-20 h-20 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+              <div className="w-16 h-16 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                 {logoUrl ? <img src={logoUrl} alt="Header Logo" className="w-full h-full object-contain p-1" /> : <span className="text-2xl">🏢</span>}
               </div>
               <div className="space-y-2 flex-1">
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => headerLogoFileRef.current?.click()} className="px-3.5 py-2 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">
+                  <button type="button" onClick={() => headerLogoFileRef.current?.click()} className="px-3 py-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">
                     📁 آپلود از دستگاه
                   </button>
                   {logoUrl && (
-                    <button type="button" onClick={() => setLogoUrl("")} className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
+                    <button type="button" onClick={() => setLogoUrl("")} className="px-3 py-1.5 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
                   )}
                 </div>
-                <input type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="یا درج لینک تصویر لوگو..." className="w-full p-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />
+                <input type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="یا درج لینک تصویر لوگو..." className="w-full p-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />
               </div>
             </div>
           </div>
 
+          {/* لوگوی فوتر */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-[var(--text-primary)]">⚓ آیکون / لوگوی اختصاصی فوتر</h3>
             <div className="flex items-center gap-4 p-4 bg-[var(--input-bg)] rounded-2xl border border-[var(--card-border)]">
-              <div className="w-20 h-20 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+              <div className="w-16 h-16 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                 {footerLogoUrl ? <img src={footerLogoUrl} alt="Footer Logo" className="w-full h-full object-contain p-1" /> : <span className="text-2xl">⚓</span>}
               </div>
               <div className="space-y-2 flex-1">
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => footerLogoFileRef.current?.click()} className="px-3.5 py-2 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">
+                  <button type="button" onClick={() => footerLogoFileRef.current?.click()} className="px-3 py-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">
                     📁 آپلود از دستگاه
                   </button>
                   {footerLogoUrl && (
-                    <button type="button" onClick={() => setFooterLogoUrl("")} className="px-3 py-2 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
+                    <button type="button" onClick={() => setFooterLogoUrl("")} className="px-3 py-1.5 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
                   )}
                 </div>
-                <input type="text" value={footerLogoUrl} onChange={(e) => setFooterLogoUrl(e.target.value)} placeholder="یا درج لینک تصویر فوتر..." className="w-full p-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />
+                <input type="text" value={footerLogoUrl} onChange={(e) => setFooterLogoUrl(e.target.value)} placeholder="یا درج لینک تصویر فوتر..." className="w-full p-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* فاوآیکون مرورگر */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-[var(--text-primary)]">🌐 فاوآیکون تب مرورگر (Favicon)</h3>
+            <div className="flex items-center gap-4 p-4 bg-[var(--input-bg)] rounded-2xl border border-[var(--card-border)]">
+              <div className="w-16 h-16 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                {faviconUrl ? <img src={faviconUrl} alt="Favicon" className="w-full h-full object-contain p-1" /> : <span className="text-2xl">🌐</span>}
+              </div>
+              <div className="space-y-2 flex-1">
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => faviconFileRef.current?.click()} className="px-3 py-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-xl text-xs font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">
+                    📁 آپلود از دستگاه
+                  </button>
+                  {faviconUrl && (
+                    <button type="button" onClick={() => setFaviconUrl("")} className="px-3 py-1.5 bg-rose-500/15 text-rose-500 rounded-xl text-xs font-bold cursor-pointer">حذف ✕</button>
+                  )}
+                </div>
+                <input type="text" value={faviconUrl} onChange={(e) => setFaviconUrl(e.target.value)} placeholder="یا درج لینک فاوآیکون..." className="w-full p-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl text-xs font-mono text-[var(--text-primary)] outline-none" />
               </div>
             </div>
           </div>

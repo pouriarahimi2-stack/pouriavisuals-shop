@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
     });
   }
 
-  // ۲. گیت امنیتی پنل مدیریت (محافظت در برابر لوپ ریدایرکت و بررسی توکن معتبر)
+  // ۲. گیت امنیتی پنل مدیریت (بررسی امضای رمزنگاری‌شده توکن و جلوگیری از دسترسی غیرمجاز)
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
     const sessionToken =
       request.cookies.get('admin_session_token')?.value ||
@@ -26,7 +26,6 @@ export function middleware(request: NextRequest) {
     let isAuthenticated = false;
 
     if (sessionToken) {
-      // اعتبارسنجی امضای رمزنگاری‌شده توکن سشن
       const payload = verifyPayload(sessionToken);
       if (payload && payload.username) {
         isAuthenticated = true;

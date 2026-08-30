@@ -1,3 +1,4 @@
+// File Path: lib/adminContracts.ts
 export type AdminRole = 
   | 'superadmin'
   | 'super_admin' 
@@ -18,6 +19,7 @@ export interface AdminUser {
 export interface StandardProductVariant {
   id: string;
   name: string;
+  modelType?: string;
   colorHex?: string;
   priceDelta?: number;
   stock?: number;
@@ -26,6 +28,8 @@ export interface StandardProductVariant {
 export interface StandardMarketBenchmark {
   storeName: string;
   price: number;
+  minPrice?: number;
+  maxPrice?: number;
   warranty: string;
   isOurStore?: boolean;
   deliveryTime?: string;

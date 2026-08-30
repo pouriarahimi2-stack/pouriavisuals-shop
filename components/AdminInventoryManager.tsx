@@ -1,3 +1,4 @@
+// File Path: components/AdminInventoryManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";

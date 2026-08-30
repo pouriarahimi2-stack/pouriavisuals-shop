@@ -1,3 +1,4 @@
+// File Path: app/news/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -86,7 +87,7 @@ export default function TechNewsHubPage() {
             جدیدترین اخبار حوزه تکنولوژی و سخت‌افزار
           </h1>
           <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed">
-            بررسی جامع جدیدترین مانیتورها، چیپست‌ها، هوش مصنوعی و گجت‌های روز با الگوریتم پیشنهاد هوشمند و پاکسازی اتوماتیک هفتگی
+            بررسی جامع جدیدترین مانیتورها، چیپست‌ها، هوش مصنوعی و گجت‌های روز با ترجمه به فارسی و الگوریتم پیشنهاد هوشمند
           </p>
         </div>
 
@@ -196,7 +197,7 @@ export default function TechNewsHubPage() {
         </div>
       )}
 
-      {/* مودال مطالعه خبر */}
+      {/* مدال مطالعه خبر */}
       {activeModalNews && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-2xl animate-fadeIn font-sans"

@@ -1,3 +1,4 @@
+// File Path: app/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -87,7 +88,7 @@ export default function HomePage() {
     };
   }, []);
 
-  // چرخش خودکار اسلایدر هر ۶ ثانیه
+  // چرخش خودکار اسلایدر بنرها هر ۶ ثانیه
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -213,10 +214,10 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ۲. تیکر پایش اخبار تکنولوژی */}
+        {/* ۲. تیکر پایش اخبار تکنولوژی زیر هدر */}
         <TechRadarFeed />
 
-        {/* ۳. ویترین محصولات */}
+        {/* ۳. ویترین اصلی محصولات - تمرکز کامل وب‌سایت */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
             <div>
@@ -334,18 +335,18 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ۴. مجله تخصصی */}
-        <section className="p-6 sm:p-8 rounded-[2.5rem] space-y-6 my-10 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
-          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+        {/* ۴. کادر کوچک و شکیل مجله تخصصی و مقالات سئو دقیقاً پیش از فوتر */}
+        <section className="p-5 sm:p-7 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <div>
-              <h3 className="text-base sm:text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
-                <span>📚</span> مجله تخصصی و راهنمای خرید سخت‌افزار
+              <h3 className="text-sm sm:text-base font-black text-[var(--text-primary)] flex items-center gap-2">
+                <span>📚</span> مجله و مقالات تخصصی سئو
               </h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">جدیدترین تحلیل‌های فنی و مقایسه نمایشگرها</p>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">جدیدترین تحلیل‌های سخت‌افزاری و راهنمای خرید</p>
             </div>
             <Link
               href="/blog"
-              className="px-4 py-2 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-bold hover:bg-[var(--accent-blue)] hover:text-white transition shadow-sm"
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-bold hover:bg-[var(--accent-blue)] hover:text-white transition shadow-sm"
             >
               مشاهده همه مقالات ←
             </Link>
@@ -763,13 +764,13 @@ function HomeBlogSection() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {posts.map((post) => (
         <article
           key={post.id || post.title}
-          className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between hover:border-[var(--accent-blue)] transition duration-300"
+          className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5 flex flex-col justify-between hover:border-[var(--accent-blue)] transition duration-300 shadow-sm"
         >
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] font-bold">
               <span>📅 {post.createdAt || "امروز"}</span>
               <span className="text-[var(--accent-blue)] font-black">{post.category || "مقاله تخصصی"}</span>
@@ -778,14 +779,14 @@ function HomeBlogSection() {
               {post.title}
             </h4>
             <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
-              {post.metaDescription || (post.content ? post.content.replace(/<[^>]*>?/gm, "").substring(0, 90) + "..." : "")}
+              {post.metaDescription || (post.content ? post.content.replace(/<[^>]*>?/gm, "").substring(0, 80) + "..." : "")}
             </p>
           </div>
           <Link
             href={`/blog/${post.id}`}
-            className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]"
+            className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-1.5 border-t border-[var(--card-border)]"
           >
-            مطالعه کامل مقاله ←
+            مطالعه مقاله ←
           </Link>
         </article>
       ))}

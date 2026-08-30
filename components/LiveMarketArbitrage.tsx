@@ -23,8 +23,10 @@ export default function LiveMarketArbitrage({
     } else {
       setCompetitors([
         {
-          storeName: "میانگین بازار آنلاین و پلتفرم‌های واسط",
+          storeName: "میانگین بازار آنلاین و پلتفرم‌های واسط (ترب / ایمالز)",
           price: Math.round(ourPrice * 1.08),
+          minPrice: Math.round(ourPrice * 1.05),
+          maxPrice: Math.round(ourPrice * 1.14),
           warranty: "گارانتی شرکتی متفرقه (معمولی)",
           isOurStore: false,
           deliveryTime: "۳ الی ۵ روز کاری",
@@ -32,14 +34,18 @@ export default function LiveMarketArbitrage({
         {
           storeName: "فروشگاه مستقیم ما (تضمین کمترین نرخ)",
           price: ourPrice,
-          warranty: "گارانتی طلایی ۱۸ ماهه + مهلت تست",
+          minPrice: ourPrice,
+          maxPrice: ourPrice,
+          warranty: "گارانتی طلایی ۱۸ ماهه + مهلت تست ۷ روزه",
           isOurStore: true,
-          deliveryTime: "ارسال اکسپرس همان روز",
+          deliveryTime: "ارسال فوری پیشتاز",
         },
         {
-          storeName: "بازار سنتی و فروشگاه‌های فیزیکی",
+          storeName: "پلتفرم‌های متفرقه و فروشگاه‌های فیزیکی",
           price: Math.round(ourPrice * 1.13),
-          warranty: "بدون گارانتی تعویض (تست ۲۴ ساعته)",
+          minPrice: Math.round(ourPrice * 1.09),
+          maxPrice: Math.round(ourPrice * 1.18),
+          warranty: "بدون گارانتی تعویض",
           isOurStore: false,
           deliveryTime: "خرید حضوری با هزینه پیک",
         },
@@ -47,7 +53,7 @@ export default function LiveMarketArbitrage({
     }
   }, [ourPrice, marketBenchmarks]);
 
-  const maxPrice = Math.max(...competitors.map((c) => c.price), ourPrice);
+  const maxPrice = Math.max(...competitors.map((c) => c.price || c.maxPrice || ourPrice), ourPrice);
   const potentialSavings = maxPrice - ourPrice;
 
   return (

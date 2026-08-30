@@ -1,3 +1,4 @@
+// File Path: app/blog/[id]/page.tsx
 "use client";
 
 import React, { useState, useEffect, use } from "react";

@@ -72,10 +72,8 @@ export default function Navbar() {
       : [
           { id: "1", title: "صفحه نخست", url: "/", order: 1, isActive: true },
           { id: "2", title: "کاتالوگ محصولات", url: "/#products", order: 2, isActive: true },
-          { id: "3", title: "📡 جدیدترین اخبار تکنولوژی", url: "/news", order: 3, isActive: true },
-          { id: "4", title: "پیگیری مرسوله", url: "/track-order", order: 4, isActive: true },
-          { id: "5", title: "مجله و مقالات سئو", url: "/blog", order: 5, isActive: true },
-          { id: "6", title: "تماس با ما", url: "/contact", order: 6, isActive: true },
+          { id: "3", title: "پیگیری سفارش", url: "/track-order", order: 3, isActive: true },
+          { id: "4", title: "تماس با ما", url: "/contact", order: 4, isActive: true },
         ];
 
   const logoSrc = siteInfo?.logo_url || (siteInfo as any)?.logoUrl;

@@ -1,3 +1,4 @@
+// File Path: components/admin/AdminHealthGuard.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,7 +8,7 @@ import { soundEngine } from "@/lib/soundEngine";
 export default function AdminHealthGuard() {
   const [dbStatus, setDbStatus] = useState<"connected" | "checking" | "error">("checking");
   const [responseTime, setResponseTime] = useState<number | null>(null);
-  const [lastChecked, setLastChecked] = useState<string>("");
+  const [lastChecked, setLastChecked] = useState<string>("هم‌اکنون");
   const [cacheSize, setCacheSize] = useState<number>(0);
 
   const checkHealth = async () => {
@@ -64,7 +65,7 @@ export default function AdminHealthGuard() {
               سامانه پایش پایداری، سرعت و سلامت دیتابیس (Health Guard)
             </span>
             <span className="text-[10px] text-[var(--text-secondary)] font-mono">
-              تست: {lastChecked || "هم‌اکنون"}
+              تست: {lastChecked}
             </span>
           </div>
           <span className="text-[11px] text-[var(--text-secondary)] font-medium">

@@ -15,7 +15,7 @@ export async function POST() {
         .lt("published_at", sevenDaysAgo);
     } catch {}
 
-    // ۲. بررسی آخرین زمان همگام‌سازی (چرخه ۶ ساعته)
+    // ۲. بررسی زمان آخرین همگام‌سازی (چرخه ۶ ساعته)
     const { data: latestNews } = await supabaseAdmin
       .from("tech_news")
       .select("published_at")
@@ -40,10 +40,10 @@ export async function POST() {
 خروجی فقط یک JSON Array معتبر:
 [
   {
-    "title": "تیتر خبر",
+    "title": "تیتر خبر به زبان فارسی روان",
     "slug": "unique-slug-${Date.now()}",
-    "summary": "خلاصه خبر",
-    "content": "<p>متن خبر</p>",
+    "summary": "خلاصه خبر به فارسی",
+    "content": "<p>متن کامل خبر به فارسی با تگ‌های HTML</p>",
     "category": "gadgets",
     "source_name": "The Verge",
     "source_url": "https://theverge.com",

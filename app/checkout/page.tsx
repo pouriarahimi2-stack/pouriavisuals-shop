@@ -1,3 +1,4 @@
+// File Path: app/checkout/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -215,7 +216,7 @@ export default function CheckoutPage() {
             </div>
 
             <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره موبایل (جهت پیامک رهگیری) *</label>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره موبایل (جهت دریافت پیامک رهگیری) *</label>
               <input
                 type="tel"
                 required

@@ -12,7 +12,6 @@ import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
-// الگوریتم رسمی و بدون نقص اعتبارسنجی کد پستی ۱۰ رقمی ایران
 export function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
   const cleanCode = postalCode
@@ -48,7 +47,7 @@ export function isValidIranianPostalCode(postalCode: string): { valid: boolean; 
 export default function Header() {
   const router = useRouter();
   const cartContext = useCart();
-  const { totalItems, toggleCart, addToCart, isCartOpen, setIsCartOpen } = cartContext;
+  const { totalItems, toggleCart, addToCart } = cartContext;
 
   const [mounted, setMounted] = useState(false);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
@@ -198,17 +197,13 @@ export default function Header() {
     }, 1500);
   };
 
-  const navLinks =
-    menuItems.length > 0
-      ? menuItems.map((m) => ({ title: m.title || m.label || "پیوند", href: m.url || m.href || "/" }))
-      : [
-          { title: "صفحه نخست", href: "/" },
-          { title: "کاتالوگ محصولات", href: "/#products" },
-          { title: "📡 اخبار تکنولوژی", href: "/news" },
-          { title: "پیگیری سفارش", href: "/track-order" },
-          { title: "مجله تخصصی سئو", href: "/blog" },
-          { title: "تماس با ما", href: "/contact" },
-        ];
+  // گزینه‌های مینیمال و پاکسازی‌شده نوار ناوبری اصلی هدر
+  const navLinks = [
+    { title: "صفحه نخست", href: "/" },
+    { title: "کاتالوگ محصولات", href: "/#products" },
+    { title: "پیگیری سفارش", href: "/track-order" },
+    { title: "تماس با ما", href: "/contact" },
+  ];
 
   const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
@@ -216,17 +211,16 @@ export default function Header() {
 
   return (
     <header className="sticky top-2 sm:top-4 z-40 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
-      {/* نوار اعلانات متحرک بالای هدر */}
       {siteInfo?.header_announcement && (
         <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate">
           {siteInfo.header_announcement}
         </div>
       )}
 
-      {/* کپسول سراسری و یکپارچه هدر */}
-      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-3 transition-colors duration-300">
+      {/* نوار اصلی و کامل کپسول هدر - تمام دکمه‌ها و عناصر در کادر یکپارچه قرار دارند */}
+      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
         
-        {/* ۱. بخش راست: منوی همبرگری + لوگو و نام برند + دسته‌بندی */}
+        {/* ۱. لوگو و نام رسمی برند */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
             onClick={() => {
@@ -239,17 +233,17 @@ export default function Header() {
             ☰
           </button>
 
-          <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-gradient-to-tr from-blue-600 to-indigo-600 p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
+          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
               {logoUrl ? (
                 <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
               ) : (
-                <span className="text-white text-base sm:text-lg font-black">⚡</span>
+                <span className="text-[var(--accent-blue)] text-lg sm:text-xl font-black">⚡</span>
               )}
             </div>
             <div className="flex flex-col text-right">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[110px] sm:max-w-[160px]" suppressHydrationWarning>
+                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[120px] sm:max-w-[160px]" suppressHydrationWarning>
                   {storeName}
                 </span>
                 <span
@@ -258,11 +252,11 @@ export default function Header() {
                       ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse"
                       : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"
                   }`}
-                  title={isOnline ? "سامانه آنلاین و فعال" : "در حال تعمیرات"}
+                  title={isOnline ? "سامانه آنلاین" : "حالت تعمیرات"}
                 />
               </div>
-              <span className="text-[8px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[110px] sm:max-w-[160px]" suppressHydrationWarning>
-                {siteInfo?.tagline || "مرجع تخصصی مانیتور و تصویر"}
+              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]" suppressHydrationWarning>
+                {siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر"}
               </span>
             </div>
           </Link>
@@ -318,8 +312,8 @@ export default function Header() {
           </div>
         </div>
 
-        {/* ۲. بخش وسط: پیوندهای ناوبری اصلی دسکتاپ */}
-        <nav className="hidden xl:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
+        {/* ۲. منوی مینیمال ناوبری در دسکتاپ */}
+        <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
               key={idx}
@@ -331,14 +325,14 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* ۳. بخش چپ: جستجو + تم شب/روز + دکمه سبد خرید */}
+        {/* ۳. جستجوی زنده، دکمه تم و دکمه آیکونی سبد خرید در داخل کادر اصلی هدر */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <div className="relative hidden lg:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-36 xl:w-44 shadow-sm h-9">
+          <div className="relative hidden xl:block" ref={searchContainerRef}>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
               <span className="text-xs opacity-70">🔍</span>
               <input
                 type="text"
-                placeholder="جستجو..."
+                placeholder="جستجوی کالا..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
@@ -385,21 +379,22 @@ export default function Header() {
             )}
           </div>
 
+          {/* دکمه لایت‌مود و دارک‌مود در داخل کادر هدر */}
           <button
             onClick={toggleDarkMode}
-            className="w-9 h-9 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
-            title="تغییر تم"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
+            title="تغییر تم (دارک / لایت)"
           >
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید (فقط آیکون کپسولی) */}
+          {/* دکمه سبد خرید آیکونی با نشانگر تعداد در داخل کادر هدر */}
           <button
             onClick={() => {
               soundEngine.playClick();
               toggleCart();
             }}
-            className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white transition-all shadow-md shadow-blue-500/25 cursor-pointer flex items-center justify-center shrink-0"
+            className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white transition-all shadow-md shadow-blue-500/25 cursor-pointer flex items-center justify-center shrink-0"
             title="مشاهده سبد خرید"
             aria-label="سبد خرید"
           >
@@ -407,7 +402,7 @@ export default function Header() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
             {totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse">
+              <span className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse">
                 {totalItems}
               </span>
             )}

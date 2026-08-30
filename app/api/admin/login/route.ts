@@ -118,3 +118,32 @@ export async function POST(req: NextRequest) {
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
       });
+
+      response.cookies.set("pv_admin_session", sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+      });
+
+      return response;
+    }
+
+    // ثبت تلاش ناموفق
+    try {
+      authSecurity.recordFailedAttempt(clientIp);
+    } catch {}
+
+    return NextResponse.json(
+      { success: false, message: "نام کاربری یا کلمه عبور وارد شده نادرست است." },
+      { status: 401 }
+    );
+  } catch (error: any) {
+    console.error("Login Route Error:", error);
+    return NextResponse.json(
+      { success: false, message: "خطا در پردازش درخواست ورود." },
+      { status: 500 }
+    );
+  }
+}

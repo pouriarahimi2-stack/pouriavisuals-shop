@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
 import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
 
@@ -23,18 +22,16 @@ export default function StyleFontManager() {
   const fetchStyles = async () => {
     try {
       setFontsList(fontEngine.getAllFonts());
-      const { data } = await supabase
-        .from("site_styles")
-        .select("*")
-        .eq("id", "default_theme")
-        .maybeSingle();
-
-      if (data) {
-        setPrimaryColor(data.primary_color || "#0071e3");
-        setSecondaryColor(data.secondary_color || "#4f46e5");
-        setSelectedFont(data.font_family || "Vazirmatn");
-        setBorderRadius(data.border_radius || "1.5rem");
-        setCustomCss(data.custom_css || "");
+      const res = await fetch("/api/styles", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setPrimaryColor(json.data.primary_color || "#0071e3");
+          setSecondaryColor(json.data.secondary_color || "#4f46e5");
+          setSelectedFont(json.data.font_family || "Vazirmatn");
+          setBorderRadius(json.data.border_radius || "1.5rem");
+          setCustomCss(json.data.custom_css || "");
+        }
       }
     } catch (e) {
       console.error("Error fetching site styles:", e);
@@ -43,17 +40,6 @@ export default function StyleFontManager() {
 
   useEffect(() => {
     fetchStyles();
-
-    const styleChannel = supabase
-      .channel("style-realtime-channel-v2026")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_styles" }, () => {
-        fetchStyles();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(styleChannel);
-    };
   }, []);
 
   const handleFontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,32 +79,34 @@ export default function StyleFontManager() {
     e.preventDefault();
     soundEngine.playClick();
     setSaving(true);
+    setStatusMessage(null);
 
     const payload = {
-      id: "default_theme",
       primary_color: primaryColor,
       secondary_color: secondaryColor,
       font_family: selectedFont,
       border_radius: borderRadius,
       custom_css: customCss,
-      updated_at: new Date().toISOString(),
     };
 
     try {
-      const { error } = await supabase
-        .from("site_styles")
-        .upsert(payload, { onConflict: "id" });
+      const res = await fetch("/api/styles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      if (error) throw error;
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "خطا در ذخیره دیتابیس");
 
       soundEngine.playSuccess();
       setStatusMessage({ type: "success", text: "⚡ هویت بصری و فونت با موفقیت در دیتابیس ذخیره و در سراسر سایت اعمال شد." });
 
       document.documentElement.style.setProperty("--accent-blue", primaryColor);
       fontEngine.applyFontToTarget(selectedFont, "body");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error updating styles:", err);
-      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی استایل‌ها در دیتابیس." });
+      setStatusMessage({ type: "error", text: err.message || "خطا در ذخیره‌سازی استایل‌ها در دیتابیس." });
     } finally {
       setSaving(false);
       setTimeout(() => setStatusMessage(null), 3500);
@@ -200,7 +188,7 @@ export default function StyleFontManager() {
               <option value={600}>600 - نیمه‌ضخیم (SemiBold)</option>
               <option value={700}>700 - ضخیم (Bold)</option>
               <option value={800}>800 - خیلی ضخیم (ExtraBold)</option>
-              <option value={900}>900 - فوق ضخیم (Black)</option>
+              <option value={900}>900 - توپر (Black)</option>
             </select>
           </div>
 

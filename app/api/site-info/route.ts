@@ -13,7 +13,10 @@ export async function GET() {
       .limit(1)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      console.warn("site_info query fallback:", error.message);
+    }
+
     return NextResponse.json({ success: true, data: data || null });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
@@ -26,15 +29,8 @@ export async function POST(req: NextRequest) {
     const isAllowed = body.maintenance_mode === "none" && body.allow_google_index !== false;
     const sName = body.site_name || body.siteName || body.storeName || "آکسون | Axon";
 
-    const { data: existingRecords } = await supabaseAdmin
-      .from("site_info")
-      .select("id")
-      .limit(1);
-
-    const existingId = existingRecords && existingRecords.length > 0 ? existingRecords[0].id : 1;
-
     const payload: Record<string, any> = {
-      id: existingId,
+      id: 1,
       site_name: sName,
       store_name: sName,
       tagline: body.tagline || "",
@@ -68,7 +64,19 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase upsert fallback execution:", error);
+      // تلاش مجدد بدون فیلدهای غیرالزامی در صورت خطای ساختار
+      delete payload.active_font_id;
+      const { data: retryData, error: retryError } = await supabaseAdmin
+        .from("site_info")
+        .upsert(payload, { onConflict: "id" })
+        .select()
+        .single();
+
+      if (retryError) throw retryError;
+      return NextResponse.json({ success: true, data: retryData });
+    }
 
     return NextResponse.json({
       success: true,

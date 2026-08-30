@@ -93,7 +93,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     }
 
     const cleanPostal = postalCode.trim().replace(/\D/g, "");
-    if (cleanPostal.length !== 10) {
+    if (cleanPostal && cleanPostal.length !== 10) {
       setFormError("کد پستی ۱۰ رقمی ایران باید دقیقاً ۱۰ رقم عددی باشد.");
       return;
     }
@@ -116,12 +116,12 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         name: fullName,
         phone: cleanPhone,
         address: `${address.trim()}${notes.trim() ? ` (توضیحات: ${notes.trim()})` : ""}`,
-        postalCode: cleanPostal,
+        postalCode: cleanPostal || undefined,
       },
       customer_name: fullName,
       phone: cleanPhone,
       address: address.trim(),
-      postal_code: cleanPostal,
+      postal_code: cleanPostal || null,
       items: items,
       total_amount: basePrice,
       discount_amount: discountAmount,
@@ -286,10 +286,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               />
             </div>
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد پستی ۱۰ رقمی ایران *</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد پستی ۱۰ رقمی ایران (اختیاری)</label>
               <input
                 type="text"
-                required
                 maxLength={10}
                 placeholder="کد ۱۰ رقمی بدون خط تیره"
                 value={postalCode}

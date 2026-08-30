@@ -1,4 +1,4 @@
-// tailwind.config.js
+// File Path: tailwind.config.js
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'class',

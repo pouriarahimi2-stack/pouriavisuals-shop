@@ -69,7 +69,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  // ثبت و بازیابی موقعیت کاربر (Path Memory)
+  // ثبت و بازیابی بلادرنگ موقعیت کاربر (User Path Memory)
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -89,7 +89,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // تایمر معکوس زنده حالت تعمیرات زمان‌دار
+  // شمارنده معکوس حالت تعمیرات زمان‌دار
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
@@ -124,7 +124,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // صفحه شیشه‌ای حالت تعمیرات
+  // نمایش صفحه شیشه‌ای تعمیرات در صورت فعال بودن
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
@@ -203,12 +203,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
               <span className="text-slate-400 font-bold block">✉️ ایمیل پاسخگویی ۲۴ ساعته:</span>
               <span className="font-mono text-slate-200 text-xs truncate block" dir="ltr">{email}</span>
             </div>
-          </div>
-
-          <div className="pt-2 flex items-center justify-center gap-2 text-[11px] text-slate-500 font-mono">
-            <span>سیستم پایش بلادرنگ Supabase WebSocket</span>
-            <span>•</span>
-            <span className="text-emerald-500 font-bold">Auto-Resume Active ✓</span>
           </div>
         </div>
       </div>

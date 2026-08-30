@@ -1,3 +1,4 @@
+// File Path: lib/supabase.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hooaobrxgwakqqibcfdy.supabase.co";
@@ -16,7 +17,7 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
   realtime: {
     params: {
       apikey: supabaseAnonKey,
-      eventsPerSecond: 40,
+      eventsPerSecond: 50,
     },
   },
   global: {

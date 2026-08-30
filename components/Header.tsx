@@ -197,7 +197,7 @@ export default function Header() {
     }, 1500);
   };
 
-  // گزینه‌های مینیمال و پاکسازی‌شده نوار ناوبری اصلی هدر
+  // عنوان‌های مینیمال و تمیز هدر سایت
   const navLinks = [
     { title: "صفحه نخست", href: "/" },
     { title: "کاتالوگ محصولات", href: "/#products" },
@@ -217,10 +217,10 @@ export default function Header() {
         </div>
       )}
 
-      {/* نوار اصلی و کامل کپسول هدر - تمام دکمه‌ها و عناصر در کادر یکپارچه قرار دارند */}
+      {/* نوار اصلی کپسولی هدر - دربرگیرنده تمامی دکمه‌ها و لوگو در یک کادر واحد */}
       <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
         
-        {/* ۱. لوگو و نام رسمی برند */}
+        {/* لوگو و نام برند */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
             onClick={() => {
@@ -312,7 +312,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* ۲. منوی مینیمال ناوبری در دسکتاپ */}
+        {/* ناوبری مینیمال دسکتاپ */}
         <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
@@ -325,7 +325,7 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* ۳. جستجوی زنده، دکمه تم و دکمه آیکونی سبد خرید در داخل کادر اصلی هدر */}
+        {/* دکمه‌های تم و سبد خرید درون کادر هدر */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative hidden xl:block" ref={searchContainerRef}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
@@ -379,7 +379,7 @@ export default function Header() {
             )}
           </div>
 
-          {/* دکمه لایت‌مود و دارک‌مود در داخل کادر هدر */}
+          {/* دکمه لایت‌مود و دارک‌مود */}
           <button
             onClick={toggleDarkMode}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
@@ -388,7 +388,7 @@ export default function Header() {
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید آیکونی با نشانگر تعداد در داخل کادر هدر */}
+          {/* دکمه سبد خرید آیکونی */}
           <button
             onClick={() => {
               soundEngine.playClick();

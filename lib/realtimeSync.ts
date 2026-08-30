@@ -1,10 +1,6 @@
+// File Path: lib/realtimeSync.ts
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
-
-/**
- * معماری یکپارچه Master Realtime Singleton
- * جلوگیری از نشت اتصالات وب‌سوکت، توزیع رویدادهای زنده استاندارد به سراسر کلاینت
- */
 
 export interface RealtimeEventPayload<T = any> {
   eventType: "INSERT" | "UPDATE" | "DELETE" | "SYNC";
@@ -56,6 +52,7 @@ class MasterRealtimeEngine {
       "menu_items",
       "categories",
       "product_reviews",
+      "admin_users",
     ];
 
     tables.forEach((tableName) => {
@@ -73,12 +70,10 @@ class MasterRealtimeEngine {
             timestamp: Date.now(),
           };
 
-          // ۱. انتشار رویداد استاندارد بر اساس نام جدول
           window.dispatchEvent(
             new CustomEvent(`${tableName}_updated`, { detail: customPayload })
           );
 
-          // ۲. انتشار سازگاری برای لیسنرهای قدیمی
           if (tableName === "site_info") {
             window.dispatchEvent(
               new CustomEvent("site_info_updated", { detail: payload.new || payload })
@@ -100,9 +95,6 @@ class MasterRealtimeEngine {
       if (status === "SUBSCRIBED") {
         this.isSubscribed = true;
         this.reconnectAttempts = 0;
-        if (process.env.NODE_ENV !== "production") {
-          console.log("⚡ [Master Realtime] WebSocket connection active and listening to 13 database tables.");
-        }
       } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
         this.isSubscribed = false;
         this.handleReconnect();
@@ -121,7 +113,7 @@ class MasterRealtimeEngine {
   private handleReconnect() {
     if (this.reconnectAttempts < 5) {
       this.reconnectAttempts += 1;
-      const delay = Math.min(5000, this.reconnectAttempts * 1000);
+      const delay = Math.min(4000, this.reconnectAttempts * 1000);
       setTimeout(() => {
         this.init();
       }, delay);

@@ -1,6 +1,7 @@
+// File Path: lib/session.ts
 import { createHmac, timingSafeEqual } from "crypto";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || "pv_admin_super_secret_session_key_2026_apple_store_secure";
+const SESSION_SECRET = process.env.SESSION_SECRET || "axon_admin_super_secret_session_key_2026_secure_engine";
 
 export function signPayload(payload: any): string {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");

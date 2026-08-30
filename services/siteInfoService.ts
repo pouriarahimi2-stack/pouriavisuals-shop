@@ -23,18 +23,14 @@ export interface SiteInfo {
   maintenance_mode?: MaintenanceMode;
   maintenance_until?: string;
   maintenance_duration_minutes?: number;
-  maintenance_title?: string;
-  maintenance_message?: string;
   instagram?: string;
   telegram?: string;
   whatsapp?: string;
   youtube?: string;
   header_announcement?: string;
-  announcement_enabled?: boolean;
   free_shipping_threshold?: number;
   description?: string;
   footer_text?: string;
-  aboutText?: string;
   custom_css?: string;
   active_font_id?: string;
   updated_at?: string;
@@ -62,8 +58,7 @@ export const siteInfoService = {
       email: "info@axoncore.ir",
       address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
       working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-      header_announcement: "⚡ ارسال رایگان خریدهای بالای ۲ میلیون تومان | گارانتی تعویض طلایی ۱۸ ماهه",
-      announcement_enabled: true,
+      header_announcement: "⚡ ارسال رایگان خریدهای بالای ۲ میلیون تومان | گارانتی اصالت طلایی ۱۸ ماهه",
       free_shipping_threshold: 2000000,
     };
   },
@@ -86,14 +81,15 @@ export const siteInfoService = {
             siteName: data.site_name || data.store_name || "آکسون | Axon",
             storeName: data.site_name || data.store_name || "آکسون | Axon",
             tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال و استودیو",
-            phone: data.phone || "",
-            email: data.email || "",
-            address: data.address || "",
+            phone: data.phone || "۰۲۱-۸۸۸۸۸۸۸۸",
+            email: data.email || "info@axoncore.ir",
+            address: data.address || "تهران، خیابان ولیعصر، تقاطع میرداماد",
             working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
             logo_url: data.logo_url || "",
             logoUrl: data.logo_url || "",
             footer_logo_url: data.footer_logo_url || "",
             footerLogoUrl: data.footer_logo_url || "",
+            favicon_url: data.favicon_url || "",
             allow_google_index: isAllowed,
             allowGoogleIndex: isAllowed,
             maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
@@ -143,6 +139,7 @@ export const siteInfoService = {
         working_hours: payload.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
         logo_url: payload.logo_url || payload.logoUrl || "",
         footer_logo_url: payload.footer_logo_url || payload.footerLogoUrl || "",
+        favicon_url: payload.favicon_url || "",
         allow_google_index: isAllowed,
         maintenance_mode: payload.maintenance_mode || (isAllowed ? "none" : "indefinite"),
         maintenance_until: payload.maintenance_until || null,
@@ -152,6 +149,7 @@ export const siteInfoService = {
         footer_text: payload.footer_text || payload.description || "",
         description: payload.description || payload.footer_text || "",
         custom_css: payload.custom_css || "",
+        active_font_id: payload.active_font_id || "Vazirmatn",
         instagram: payload.instagram || "",
         telegram: payload.telegram || "",
         whatsapp: payload.whatsapp || "",

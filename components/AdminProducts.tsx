@@ -25,7 +25,6 @@ export default function AdminProducts() {
   const [description, setDescription] = useState("");
   const [highlights, setHighlights] = useState<string[]>([""]);
 
-  // قیمت‌گذاری با جداسازی ۳ رقمی ارقام
   const [priceRaw, setPriceRaw] = useState<number | "">("");
   const [discountPriceRaw, setDiscountPriceRaw] = useState<number | "">("");
   const [stock, setStock] = useState<number | "">(10);
@@ -44,7 +43,6 @@ export default function AdminProducts() {
     { key: "درگاه‌های اتصال", value: "یک تاندربولت ۳ و ۳ عدد USB-C" },
   ]);
 
-  // سامانه پایش و تحلیل هوشمند قیمت رقبای بازار (ترب، ایمالز، دیجی‌کالا، باسلام و دیوار)
   const [marketBenchmarks, setMarketBenchmarks] = useState<MarketBenchmark[]>([
     { storeName: "متوسط ترب و ایمالز", price: 0, minPrice: 0, maxPrice: 0, warranty: "گارانتی متفرقه", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
     { storeName: "دیجی‌کالا / باسلام", price: 0, minPrice: 0, maxPrice: 0, warranty: "گارانتی شرکتی", isOurStore: false, deliveryTime: "۲ الی ۴ روز" },
@@ -123,9 +121,10 @@ export default function AdminProducts() {
     if (p.market_comparison && p.market_comparison.length > 0) {
       setMarketBenchmarks(p.market_comparison);
     } else {
+      const base = Number(p.price || 0);
       setMarketBenchmarks([
-        { storeName: "متوسط ترب و ایمالز", price: Number(p.price || 0) + 1500000, minPrice: Number(p.price || 0) + 1000000, maxPrice: Number(p.price || 0) + 2500000, warranty: "گارانتی معمولی", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
-        { storeName: "دیجی‌کالا / باسلام", price: Number(p.price || 0) + 2000000, minPrice: Number(p.price || 0) + 1800000, maxPrice: Number(p.price || 0) + 3000000, warranty: "گارانتی شرکتی", isOurStore: false, deliveryTime: "۲ الی ۴ روز" },
+        { storeName: "متوسط ترب و ایمالز", price: base + 1500000, minPrice: base + 1000000, maxPrice: base + 2500000, warranty: "گارانتی معمولی", isOurStore: false, deliveryTime: "۳ الی ۵ روز" },
+        { storeName: "دیجی‌کالا / باسلام", price: base + 2000000, minPrice: base + 1800000, maxPrice: base + 3000000, warranty: "گارانتی شرکتی", isOurStore: false, deliveryTime: "۲ الی ۴ روز" },
         { storeName: "فروشگاه مستقیم ما (تضمین کمترین نرخ)", price: Number(p.discountPrice || p.price || 0), minPrice: Number(p.discountPrice || p.price || 0), maxPrice: Number(p.discountPrice || p.price || 0), warranty: p.warranty || "گارانتی طلایی ۱۸ ماهه", isOurStore: true, deliveryTime: "ارسال فوری پیشتاز" },
       ]);
     }
@@ -458,7 +457,6 @@ export default function AdminProducts() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* لیست محصولات */}
         <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
           <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
             📦 کاتالوگ کالاها ({products.length})
@@ -486,7 +484,6 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* فرم ۷ تب تنظیمات کالا */}
         <div className="lg:col-span-3">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
             <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] scrollbar-none">

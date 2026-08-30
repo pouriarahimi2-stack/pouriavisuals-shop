@@ -85,7 +85,6 @@ export default function ProductCard({ product }: { product: any }) {
       className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
       dir="rtl"
     >
-      {/* باکس تصویر محصول */}
       <div className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-3.5 flex items-center justify-center p-3 border border-[var(--card-border)]">
         <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center">
           <img
@@ -94,7 +93,7 @@ export default function ProductCard({ product }: { product: any }) {
             className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
           />
         </Link>
-        
+
         {discountPercent > 0 && (
           <span className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black shadow-lg">
             {discountPercent}٪- تخفیف
@@ -114,7 +113,6 @@ export default function ProductCard({ product }: { product: any }) {
         )}
       </div>
 
-      {/* اطلاعات و تیتر کالا */}
       <div className="flex flex-col flex-grow space-y-2 mb-3">
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Pro"}</span>
@@ -124,7 +122,7 @@ export default function ProductCard({ product }: { product: any }) {
         </div>
 
         <Link href={`/products/${product.id}`} className="hover:text-[var(--accent-blue)] transition-colors">
-          <h3 
+          <h3
             className="font-black text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
             style={{ direction: "rtl", textAlign: "right" }}
           >
@@ -137,7 +135,6 @@ export default function ProductCard({ product }: { product: any }) {
         </p>
       </div>
 
-      {/* قیمت و دکمه‌های خرید سریع */}
       <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
         <div className="flex items-center justify-between">
           <div className="flex flex-col">

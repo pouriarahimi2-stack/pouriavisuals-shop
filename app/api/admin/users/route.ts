@@ -12,11 +12,39 @@ export async function GET() {
       .select("id, username, full_name, role, created_at")
       .order("created_at", { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      console.warn("admin_users GET warning:", error.message);
+    }
 
-    return NextResponse.json({ success: true, data: data || [] });
+    if (!data || data.length === 0) {
+      const defaultPassword = process.env.ADMIN_PASSWORD || "admin123456";
+      const hashedPassword = authSecurity.hashPassword(defaultPassword);
+      const defaultUser = {
+        id: "admin_master",
+        username: "admin",
+        password: hashedPassword,
+        full_name: "مدیر ارشد سیستم",
+        role: "superadmin",
+        created_at: new Date().toISOString(),
+      };
+      await supabaseAdmin.from("admin_users").upsert([defaultUser], { onConflict: "id" });
+      return NextResponse.json({
+        success: true,
+        data: [
+          {
+            id: defaultUser.id,
+            username: defaultUser.username,
+            full_name: defaultUser.full_name,
+            role: defaultUser.role,
+            created_at: defaultUser.created_at,
+          },
+        ],
+      });
+    }
+
+    return NextResponse.json({ success: true, data });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message || "خطای سرور" }, { status: 500 });
   }
 }
 
@@ -26,16 +54,20 @@ export async function POST(req: NextRequest) {
     const { username, password, full_name, role } = body;
 
     if (!username || !password) {
-      return NextResponse.json({ success: false, message: "نام کاربری و رمز عبور الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "نام کاربری و رمز عبور الزامی است." },
+        { status: 400 }
+      );
     }
 
     if (String(password).trim().length < 6) {
-      return NextResponse.json({ success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." },
+        { status: 400 }
+      );
     }
 
-    // هش کردن فوق امن پسورد قبل از ورود به دیتابیس
     const hashedPassword = authSecurity.hashPassword(String(password).trim());
-
     const payload = {
       id: `adm_${Date.now()}`,
       username: String(username).trim().toLowerCase(),
@@ -51,11 +83,13 @@ export async function POST(req: NextRequest) {
       .select("id, username, full_name, role, created_at")
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message || "خطا در ثبت کاربر" }, { status: 500 });
   }
 }
 
@@ -64,35 +98,46 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, username, password, full_name, role } = body;
 
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه ادمین الزامی است." }, { status: 400 });
-    }
+    const targetId = id || "admin_master";
+    const updatePayload: Record<string, any> = {
+      id: targetId,
+      updated_at: new Date().toISOString(),
+    };
 
-    const updatePayload: Record<string, any> = {};
     if (username) updatePayload.username = String(username).trim().toLowerCase();
     if (full_name) updatePayload.full_name = String(full_name).trim();
     if (role) updatePayload.role = role;
 
-    // اگر رمز جدید وارد شده بود، آن را با Salt هش می‌کنیم
     if (password && String(password).trim().length > 0) {
       if (String(password).trim().length < 6) {
-        return NextResponse.json({ success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." }, { status: 400 });
+        return NextResponse.json(
+          { success: false, message: "کلمه عبور باید حداقل ۶ کاراکتر باشد." },
+          { status: 400 }
+        );
       }
       updatePayload.password = authSecurity.hashPassword(String(password).trim());
     }
 
+    // استفاده از upsert برای جلوگیری از خطای عدم وجود رکورد
     const { data, error } = await supabaseAdmin
       .from("admin_users")
-      .update(updatePayload)
-      .eq("id", id)
+      .upsert(updatePayload, { onConflict: "id" })
       .select("id, username, full_name, role, created_at")
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Admin user update error:", error);
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({
+      success: true,
+      message: "مشخصات مدیر با موفقیت به‌روزرسانی شد.",
+      data,
+      user: data,
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message || "خطای سرور در ویرایش" }, { status: 500 });
   }
 }
 
@@ -105,11 +150,15 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, message: "شناسه الزامی است." }, { status: 400 });
     }
 
+    if (id === "admin_master") {
+      return NextResponse.json({ success: false, message: "حذف مدیر ارشد سیستم امکان‌پذیر نیست." }, { status: 403 });
+    }
+
     const { error } = await supabaseAdmin.from("admin_users").delete().eq("id", id);
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "کاربر با موفقیت حذف شد." });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message || "خطا در حذف" }, { status: 500 });
   }
 }

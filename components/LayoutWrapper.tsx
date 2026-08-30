@@ -69,7 +69,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  // ثبت و بازیابی بلادرنگ موقعیت کاربر در حافظه سیستم (User Path Memory)
+  // سیستم ذخیره و بازیابی هوشمند موقعیت کاربر (Path Memory)
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -89,7 +89,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // تایمر شمارش معکوس حالت تعمیرات زمان‌دار
+  // تایمر معکوس بازگشایی خودکار سایت
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);
@@ -124,7 +124,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // نمایش صفحه شیشه‌ای تعمیرات با امکان بازیابی موقعیت کاربر
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
@@ -140,7 +139,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />
 
         <div className="max-w-2xl w-full rounded-[3rem] bg-slate-900/90 border border-slate-800 p-8 sm:p-14 text-center space-y-8 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.95)] backdrop-blur-3xl relative z-10 animate-fadeIn">
-          
           <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black shadow-lg">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -155,11 +153,11 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
             <div className="w-20 h-20 mx-auto rounded-3xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-3xl shadow-2xl shadow-blue-500/20 animate-bounce">
               ⚡
             </div>
-            
+
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-snug">
               {isTimed ? `فروشگاه ${storeName} به زودی بازمی‌گردد` : `فروشگاه ${storeName} در حال به‌روزرسانی است`}
             </h1>
-            
+
             <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed font-medium">
               {isTimed
                 ? "به منظور افزایش سرعت پردازش و اضافه شدن امکانات جدید، وب‌سایت طبق زمان‌سنج زیر به طور خودکار بازگشایی خواهد شد."

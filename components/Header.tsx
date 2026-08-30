@@ -7,12 +7,10 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { productService, Product } from "@/services/productService";
-import { menuService, MenuItem } from "@/services/menuService";
 import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 
-// الگوریتم رسمی و بدون نقص اعتبارسنجی کد پستی ۱۰ رقمی ایران
 export function isValidIranianPostalCode(postalCode: string): { valid: boolean; message?: string } {
   if (!postalCode) return { valid: false, message: "کد پستی ۱۰ رقمی الزامی است." };
   const cleanCode = postalCode
@@ -52,7 +50,6 @@ export default function Header() {
 
   const [mounted, setMounted] = useState(false);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -84,15 +81,13 @@ export default function Header() {
 
     const initHeaderData = async () => {
       try {
-        const [info, prods, menus, cats] = await Promise.all([
+        const [info, prods, cats] = await Promise.all([
           siteInfoService.getSiteInfo(),
           productService.getAll(),
-          menuService.getAll(),
           categoryService.getAll(),
         ]);
         if (info) setSiteInfo(info);
         if (prods) setAllProducts(prods);
-        if (menus) setMenuItems(menus);
         if (cats) setCategories(cats);
       } catch (e) {
         console.error("Header data load warning:", e);
@@ -108,10 +103,6 @@ export default function Header() {
       if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
       else productService.getAll().then((prods) => prods && setAllProducts(prods));
     };
-    const handleMenuUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setMenuItems(e.detail);
-      else menuService.getAll().then((menus) => menus && setMenuItems(menus));
-    };
     const handleCategoriesUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
       else categoryService.getAll().then((cats) => cats && setCategories(cats));
@@ -119,7 +110,6 @@ export default function Header() {
 
     window.addEventListener("site_info_updated", handleSiteInfoUpdate);
     window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("menu_updated", handleMenuUpdate);
     window.addEventListener("categories_updated", handleCategoriesUpdate);
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -135,7 +125,6 @@ export default function Header() {
     return () => {
       window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
       window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("menu_updated", handleMenuUpdate);
       window.removeEventListener("categories_updated", handleCategoriesUpdate);
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -177,6 +166,7 @@ export default function Header() {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("category_selected", { detail: catName }));
     }
+    router.push("/#products");
   };
 
   const handleQuickAddFromSearch = (e: React.MouseEvent, product: Product) => {
@@ -202,7 +192,6 @@ export default function Header() {
     }, 1500);
   };
 
-  // گزینه‌های مینیمال و پاکسازی‌شده نوار ناوبری اصلی هدر
   const navLinks = [
     { title: "صفحه نخست", href: "/" },
     { title: "کاتالوگ محصولات", href: "/#products" },
@@ -212,7 +201,7 @@ export default function Header() {
 
   const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-  const isOnline = siteInfo?.maintenance_mode === "none";
+  const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
 
   return (
     <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
@@ -222,10 +211,10 @@ export default function Header() {
         </div>
       )}
 
-      {/* نوار اصلی و کامل کپسول هدر - تمام المان‌ها و دکمه‌ها ۱۰۰٪ داخل این کادر یکپارچه قرار دارند */}
+      {/* نوار کپسولی یکپارچه هدر با ساختار Flex بدون شکست */}
       <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
         
-        {/* ۱. لوگو و نام رسمی برند */}
+        {/* ۱. بخش لوگو، نام سایت و دراپ‌داون دسته‌بندی */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
           <button
             onClick={() => {
@@ -233,7 +222,7 @@ export default function Header() {
               setMobileMenuOpen(!mobileMenuOpen);
             }}
             className="lg:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer shrink-0"
-            aria-label="Toggle Navigation Menu"
+            aria-label="منوی موبایل"
           >
             ☰
           </button>
@@ -317,7 +306,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* ۲. منوی مینیمال ناوبری در دسکتاپ */}
+        {/* ۲. منوی ناوبری ۴تایی */}
         <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
           {navLinks.map((link, idx) => (
             <Link
@@ -330,7 +319,7 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* ۳. جستجوی زنده، دکمه تم و دکمه آیکونی سبد خرید در داخل کادر اصلی هدر */}
+        {/* ۳. جستجو، دکمه تم و دکمه سبد خرید در داخل کپسول */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative hidden xl:block" ref={searchContainerRef}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
@@ -384,16 +373,17 @@ export default function Header() {
             )}
           </div>
 
-          {/* دکمه لایت‌مود و دارک‌مود */}
+          {/* دکمه تغییر تم (لایت / دارک) */}
           <button
             onClick={toggleDarkMode}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0"
             title="تغییر تم (دارک / لایت)"
+            aria-label="تغییر تم"
           >
             {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
-          {/* دکمه سبد خرید آیکونی کاملاً ادغام‌شده داخل کادر هدر */}
+          {/* دکمه سبد خرید آیکونی با بج تعداد */}
           <button
             onClick={() => {
               soundEngine.playClick();
@@ -415,7 +405,7 @@ export default function Header() {
         </div>
       </div>
 
-      {/* منوی ریسپانسیو موبایل */}
+      {/* منوی بازشونده موبایل */}
       {mobileMenuOpen && (
         <div className="lg:hidden mt-2 p-3.5 bg-[var(--modal-bg)] rounded-2xl border border-[var(--card-border)] shadow-2xl space-y-1.5 animate-fadeIn">
           <div className="flex flex-col space-y-1 text-xs font-bold">

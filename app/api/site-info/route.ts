@@ -17,9 +17,25 @@ export async function GET() {
       console.warn("site_info GET warning:", error.message);
     }
 
-    return NextResponse.json({ success: true, data: data || null });
+    return NextResponse.json({
+      success: true,
+      data: data || {
+        id: 1,
+        site_name: "آکسون | Axon",
+        store_name: "آکسون | Axon",
+        tagline: "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
+        allow_google_index: true,
+        maintenance_mode: "none",
+        phone: "۰۲۱-۸۸۸۸۸۸۸۸",
+        email: "info@axoncore.ir",
+        address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
+        working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+        header_announcement: "⚡ ارسال رایگان خریدهای بالای ۲ میلیون تومان | گارانتی اصالت طلایی ۱۸ ماهه",
+        free_shipping_threshold: 2000000,
+      },
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -58,16 +74,14 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    // تلاش اول: ذخیره کامل داده‌ها با تمام فیلدها
     let { data, error } = await supabaseAdmin
       .from("site_info")
       .upsert(payload, { onConflict: "id" })
       .select()
       .maybeSingle();
 
-    // در صورت وجود خطای ساختار دیتابیس، فیلدهای پایه با تضمین عدم بروز خطای ۵۰۰ ثبت می‌شوند
     if (error) {
-      console.warn("Primary upsert fallback execution:", error.message);
+      console.warn("Primary site_info upsert warning, attempting safe fallback:", error.message);
 
       const safePayload = {
         id: 1,
@@ -80,6 +94,8 @@ export async function POST(req: NextRequest) {
         logo_url: body.logo_url || body.logoUrl || null,
         footer_logo_url: body.footer_logo_url || body.footerLogoUrl || null,
         description: body.description || body.footer_text || "",
+        allow_google_index: isAllowed,
+        maintenance_mode: body.maintenance_mode || "none",
         updated_at: new Date().toISOString(),
       };
 
@@ -94,13 +110,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "تنظیمات با موفقیت در دیتابیس ذخیره شد.",
+      message: "تنظیمات با موفقیت در پایگاه داده ثبت گردید.",
       data: data || payload,
     });
   } catch (err: any) {
-    console.error("API Site-Info Save Error:", err);
+    console.error("API Site-Info Save Fatal Error:", err);
     return NextResponse.json(
-      { success: false, message: err?.message || "خطا در ذخیره‌سازی در دیتابیس" },
+      { success: false, message: err?.message || "خطا در ذخیره‌سازی اطلاعات سایت" },
       { status: 500 }
     );
   }

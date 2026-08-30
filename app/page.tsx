@@ -51,7 +51,7 @@ export default function HomePage() {
       setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
       if (info) setSiteInfo(info);
     } catch (e) {
-      console.error("Home page realtime fetch error:", e);
+      console.error("Home page fetch error:", e);
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,6 @@ export default function HomePage() {
     };
   }, []);
 
-  // چرخش خودکار اسلایدر بنرها هر ۶ ثانیه
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -214,10 +213,10 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ۲. تیکر جمع‌وجور اخبار تکنولوژی زیر هدر */}
+        {/* ۲. تیکر جمع‌وجور اخبار تکنولوژی */}
         <TechRadarFeed />
 
-        {/* ۳. ویترین اصلی کاتالوگ محصولات - تمرکز اساسی سایت */}
+        {/* ۳. ویترین اصلی کاتالوگ محصولات */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
             <div>
@@ -335,7 +334,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ۴. کادر جمع‌وجور مجله تخصصی سئو دقیقاً پیش از فوتر */}
+        {/* ۴. مجله تخصصی سئو قبل از فوتر */}
         <section className="p-5 sm:p-7 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <div>
@@ -460,7 +459,7 @@ function HomeProductCard({
           </span>
         </div>
 
-        <h4 
+        <h4
           className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
           style={{ direction: "rtl", textAlign: "right" }}
         >

@@ -40,7 +40,7 @@ export default function AdminSiteInfo() {
     setWorkingHours(data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
     setLogoUrl(data.logo_url || data.logoUrl || "");
     setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
-    setFaviconUrl(data.favicon_url || "");
+    setFaviconUrl(data.favicon_url || data.faviconUrl || "");
     setMaintenanceMode(data.maintenance_mode || (data.allow_google_index === false ? "indefinite" : "none"));
     setAnnouncement(data.header_announcement || "");
     setFreeShippingThreshold(Number(data.free_shipping_threshold || 2000000));
@@ -117,6 +117,7 @@ export default function AdminSiteInfo() {
       footer_logo_url: footerLogoUrl.trim(),
       footerLogoUrl: footerLogoUrl.trim(),
       favicon_url: faviconUrl.trim(),
+      faviconUrl: faviconUrl.trim(),
       allow_google_index: maintenanceMode === "none",
       allowGoogleIndex: maintenanceMode === "none",
       maintenance_mode: maintenanceMode,

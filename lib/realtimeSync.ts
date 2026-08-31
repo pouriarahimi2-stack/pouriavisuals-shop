@@ -1,13 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
-
-export interface RealtimeEventPayload<T = any> {
-  eventType: "INSERT" | "UPDATE" | "DELETE" | "SYNC";
-  table: string;
-  newRecord: T | null;
-  oldRecord: T | null;
-  timestamp: number;
-}
+import { productService } from "@/services/productService";
+import { siteInfoService } from "@/services/siteInfoService";
+import { bannerService } from "@/services/bannerService";
+import { orderService } from "@/services/orderService";
 
 class MasterRealtimeEngine {
   private static instance: MasterRealtimeEngine;
@@ -42,38 +38,40 @@ class MasterRealtimeEngine {
       this.channel.on(
         "postgres_changes",
         { event: "*", schema: "public", table: tableName },
-        (payload: any) => {
-          const customPayload: RealtimeEventPayload = {
-            eventType: payload.eventType,
-            table: tableName,
-            newRecord: payload.new || null,
-            oldRecord: payload.old || null,
-            timestamp: Date.now(),
-          };
+        async (payload: any) => {
+          // دیسپچ رویداد سراسری
+          window.dispatchEvent(new CustomEvent(`${tableName}_updated`, { detail: payload.new || payload }));
 
-          window.dispatchEvent(new CustomEvent(`${tableName}_updated`, { detail: customPayload }));
-
-          if (tableName === "site_info") {
-            const info = payload.new || payload;
-            window.dispatchEvent(new CustomEvent("site_info_updated", { detail: info }));
-            if (info?.favicon_url && typeof document !== "undefined") {
+          if (tableName === "products") {
+            const all = await productService.getAll();
+            window.dispatchEvent(new CustomEvent("products_updated", { detail: all }));
+          } else if (tableName === "site_info") {
+            const latest = await siteInfoService.getSiteInfo();
+            window.dispatchEvent(new CustomEvent("site_info_updated", { detail: latest }));
+            if (latest?.favicon_url && typeof document !== "undefined") {
               let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
               if (!link) {
                 link = document.createElement("link");
                 link.rel = "icon";
                 document.head.appendChild(link);
               }
-              link.href = info.favicon_url;
+              link.href = latest.favicon_url;
             }
-          } else if (tableName === "products") {
-            window.dispatchEvent(new CustomEvent("products_realtime_mutation", { detail: customPayload }));
+          } else if (tableName === "banners") {
+            const allBanners = await bannerService.getAll();
+            window.dispatchEvent(new CustomEvent("banners_updated", { detail: allBanners }));
+          } else if (tableName === "orders") {
+            const allOrders = await orderService.getAll();
+            window.dispatchEvent(new CustomEvent("orders_updated", { detail: allOrders }));
           }
         }
       );
     });
 
     this.channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") this.isSubscribed = true;
+      if (status === "SUBSCRIBED") {
+        this.isSubscribed = true;
+      }
     });
 
     return () => {

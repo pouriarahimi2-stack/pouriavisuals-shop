@@ -1,4 +1,3 @@
-// File Path: services/bannerService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface Banner {
@@ -15,6 +14,7 @@ export interface Banner {
   buttonText?: string;
   is_active?: boolean;
   created_at?: string;
+  updated_at?: string;
 }
 
 const LOCAL_BANNERS_KEY = "axon_banners_cache_v2026";
@@ -67,6 +67,60 @@ export const bannerService = {
   async getActive(): Promise<Banner[]> {
     const all = await this.getAll();
     return all.filter((b) => b.is_active !== false);
+  },
+
+  async saveBanner(bannerData: Partial<Banner>): Promise<Banner | null> {
+    try {
+      const id = bannerData.id || `banner_${Date.now()}`;
+      const payload: any = {
+        id,
+        title: bannerData.title?.trim() || "پیشنهاد ویژه",
+        subtitle: bannerData.subtitle?.trim() || null,
+        badge: bannerData.badge?.trim() || bannerData.badge_text?.trim() || null,
+        badge_text: bannerData.badge?.trim() || bannerData.badge_text?.trim() || null,
+        image: bannerData.image || bannerData.image_url || "/placeholder.png",
+        image_url: bannerData.image || bannerData.image_url || "/placeholder.png",
+        link: bannerData.link || bannerData.link_url || "/products",
+        link_url: bannerData.link || bannerData.link_url || "/products",
+        button_text: bannerData.button_text || bannerData.buttonText || "مشاهده و بررسی کالا",
+        is_active: bannerData.is_active !== false,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (supabase) {
+        await supabase.from("banners").upsert(payload, { onConflict: "id" });
+      }
+
+      if (typeof window !== "undefined") {
+        const all = await this.getAll();
+        const updated = [payload, ...all.filter((b) => b.id !== id)];
+        localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("banners_updated", { detail: updated }));
+      }
+
+      return payload;
+    } catch (e) {
+      console.error("bannerService.saveBanner error:", e);
+      return null;
+    }
+  },
+
+  async deleteBanner(id: string): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("banners").delete().eq("id", id);
+      }
+      if (typeof window !== "undefined") {
+        const all = await this.getAll();
+        const updated = all.filter((b) => b.id !== id);
+        localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("banners_updated", { detail: updated }));
+      }
+      return true;
+    } catch (e) {
+      console.error("bannerService.deleteBanner error:", e);
+      return false;
+    }
   },
 };
 

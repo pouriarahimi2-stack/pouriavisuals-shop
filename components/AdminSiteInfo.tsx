@@ -12,7 +12,6 @@ export default function AdminSiteInfo() {
   const [address, setAddress] = useState("");
   const [workingHours, setWorkingHours] = useState("");
   
-  // ۳ فیلد کاملاً مستقل برای ۳ لوگو
   const [logoUrl, setLogoUrl] = useState("");
   const [footerLogoUrl, setFooterLogoUrl] = useState("");
   const [faviconUrl, setFaviconUrl] = useState("");
@@ -138,7 +137,7 @@ export default function AdminSiteInfo() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "⚡ تنظیمات، ۳ لوگوی مجزا و وضعیت سایت با موفقیت در دیتابیس ذخیره و بلادرنگ اعمال شدند." });
+        setStatusMessage({ type: "success", text: "⚡ ۳ لوگوی مجزا و وضعیت سایت با موفقیت در دیتابیس ذخیره شدند." });
       } else {
         throw new Error(json.message || "خطا در ثبت");
       }
@@ -153,7 +152,7 @@ export default function AdminSiteInfo() {
   return (
     <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <input type="file" ref={headerLogoRef} onChange={(e) => handleFileUpload(e, "header")} accept="image/*" className="hidden" />
-      <input type="file" ref={footerLogoRef做到} onChange={(e) => handleFileUpload(e, "footer")} accept="image/*" className="hidden" />
+      <input type="file" ref={footerLogoRef} onChange={(e) => handleFileUpload(e, "footer")} accept="image/*" className="hidden" />
       <input type="file" ref={faviconRef} onChange={(e) => handleFileUpload(e, "favicon")} accept="image/*" className="hidden" />
 
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -174,7 +173,7 @@ export default function AdminSiteInfo() {
         </div>
       )}
 
-      {/* بخش تفکیک‌شده ۳ لوگو با استایل تمیز و بدون تداخل */}
+      {/* بخش تفکیک‌شده ۳ لوگو */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <h3 className="text-sm font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">🖼️ مدیریت ۳ نشان و لوگوی مستقل سایت</h3>
         
@@ -204,7 +203,7 @@ export default function AdminSiteInfo() {
               {footerLogoUrl ? <img src={footerLogoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚓</span>}
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => footerLogoRef做到.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس</button>
+              <button type="button" onClick={() => footerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس</button>
               {footerLogoUrl && <button type="button" onClick={() => setFooterLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
             </div>
           </div>
@@ -226,7 +225,6 @@ export default function AdminSiteInfo() {
         </div>
       </div>
 
-      {/* اطلاعات فروشگاه */}
       <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

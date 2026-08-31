@@ -133,7 +133,6 @@ export default function HomePage() {
 
         <TechRadarFeed />
 
-        {/* ویترین اصلی محصولات - بدون دکمه‌های تکراری و هدایت مستقیم کلیک به صفحه حرفه‌ای کالا */}
         <section id="products" className="space-y-6">
           <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4 px-1">
             <div>
@@ -159,12 +158,6 @@ export default function HomePage() {
                 isCompared={compareList.some((item) => item.id === product.id)}
                 onToggleCompare={toggleCompare}
                 onAddToCart={addToCart}
-                onQuickBuy={(p: Product) => {
-                  soundEngine.playAddToCart();
-                  userBehavior.trackProductView(p.id, p.category);
-                  addToCart({ id: p.id, title: p.title || p.name, name: p.title || p.name, price: Number(p.discountPrice || p.discount_price || p.price || 0), image: p.images?.[0] || p.image || "/placeholder.png", stock: p.stock ?? 10, quantity: 1 });
-                  router.push("/checkout");
-                }}
               />
             ))}
           </div>
@@ -178,7 +171,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* مجله سئو قبل از فوتر */}
         <section className="p-5 sm:p-7 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <div>
@@ -197,7 +189,7 @@ export default function HomePage() {
   );
 }
 
-function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart, onQuickBuy }: any) {
+function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart }: any) {
   const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
   const displayImage = images[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500";
   const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
@@ -223,12 +215,9 @@ function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart, on
         </div>
       </Link>
 
-      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--card-border)]">
-        <button onClick={() => { soundEngine.playAddToCart(); onAddToCart({ id: product.id, name: productName, title: productName, price: currentPrice, image: displayImage, stock: product.stock ?? 10 }); }} disabled={!isAvailable} className="py-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] font-bold text-xs cursor-pointer border border-[var(--card-border)] disabled:opacity-40 shadow-sm">
-          🛒 سبد خرید
-        </button>
-        <button onClick={() => onQuickBuy(product)} disabled={!isAvailable} className="py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-md disabled:opacity-40">
-          ⚡ خرید سریع
+      <div className="pt-2 border-t border-[var(--card-border)]">
+        <button onClick={() => { soundEngine.playAddToCart(); onAddToCart({ id: product.id, name: productName, title: productName, price: currentPrice, image: displayImage, stock: product.stock ?? 10 }); }} disabled={!isAvailable} className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 active:scale-95 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-40">
+          <span>🛒</span><span>افزودن به سبد خرید</span>
         </button>
       </div>
     </div>

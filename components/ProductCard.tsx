@@ -89,8 +89,8 @@ export default function ProductCard({ product }: { product: any }) {
 
         <Link href={`/products/${product.id}`} className="hover:text-[var(--accent-blue)] transition-colors">
           <h3
-            className="font-black text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2"
-            style={{ direction: "rtl", textAlign: "right" }}
+            className="font-black text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2 text-right"
+            dir="rtl"
           >
             {title}
           </h3>
@@ -106,11 +106,11 @@ export default function ProductCard({ product }: { product: any }) {
           <div className="flex flex-col">
             {discountPrice && discountPrice < price && (
               <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>
-                {mounted ? price.toLocaleString("fa-IR") : price}
+                {price.toLocaleString("fa-IR")}
               </span>
             )}
             <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
-              {mounted ? currentPrice.toLocaleString("fa-IR") : currentPrice}{" "}
+              {currentPrice.toLocaleString("fa-IR")}{" "}
               <span className="text-xs font-bold font-sans">تومان</span>
             </span>
           </div>

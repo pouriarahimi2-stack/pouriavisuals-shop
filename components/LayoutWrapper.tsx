@@ -1,4 +1,3 @@
-// File Path: components/LayoutWrapper.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -6,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
-import { initRealtimeSync } from "@/lib/realtimeSync";
+import { initRealtimeSync, realtimeEngine } from "@/lib/realtimeSync";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { fontEngine } from "@/lib/fontEngine";
 
@@ -69,7 +68,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  // سیستم ذخیره و بازیابی هوشمند موقعیت کاربر (Path Memory)
   useEffect(() => {
     if (!mounted || isAdmin || typeof window === "undefined") return;
 
@@ -89,7 +87,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     prevModeRef.current = maintenanceMode;
   }, [maintenanceMode, mounted, isAdmin, router]);
 
-  // تایمر معکوس بازگشایی خودکار سایت
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
       setTimeLeft(null);

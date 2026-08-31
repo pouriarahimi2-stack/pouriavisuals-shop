@@ -30,9 +30,9 @@ export default function ProductExplodedView({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const [explosionDistance, setExplosionDistance] = useState<number>(65);
-  const [rotationX, setRotationX] = useState<number>(16);
-  const [rotationY, setRotationY] = useState<number>(-24);
+  const [explosionDistance, setExplosionDistance] = useState<number>(55);
+  const [rotationX, setRotationX] = useState<number>(18);
+  const [rotationY, setRotationY] = useState<number>(-32);
   const [selectedComp, setSelectedComp] = useState<HardwareComponent | null>(null);
   const [autoRotate, setAutoRotate] = useState<boolean>(false);
 
@@ -43,12 +43,13 @@ export default function ProductExplodedView({
   const titleLower = (productTitle || "").toLowerCase();
   const isWatch = titleLower.includes("watch") || titleLower.includes("ساعت");
   const isMacBook = titleLower.includes("macbook") || titleLower.includes("مک‌بوک");
+  const isDisplay = titleLower.includes("display") || titleLower.includes("مانیتور") || titleLower.includes("xdr");
 
   const components: HardwareComponent[] = isWatch ? [
     {
       id: "w-1",
       name: "Flat Sapphire Crystal Front Lens with Raised Edge",
-      nameFa: "شیشه تخت یاقوت کبود با لبه‌های محافظ برجسته تیتانیومی",
+      nameFa: "شیشه یاقوت کبود تخت با لبه محافظ برجسته تیتانیوم",
       category: "optics",
       depthIndex: 1,
       renderType: "display",
@@ -157,7 +158,7 @@ export default function ProductExplodedView({
       category: "logicboard",
       depthIndex: 3,
       renderType: "chipset",
-      accentText: "M4 Max (128GB RAM)",
+      accentText: "Apple M4 Max Die",
       role: "رندر بی‌درنگ ویدیوهای 8K ProRes، پردازش گرافیکی با ۴۰ هسته GPU و پهنای باند ۵۴۶GB/s",
       specifications: { "ترانزیستور": "بیش از ۹۰ میلیارد", "رم یکپارچه": "128GB Unified Memory", "سرعت حافظه": "546 GB/s" },
       engineeringHighlight: "دو فن سانتریفیوژ بی صدا با تیغه‌های آیرودینامیک نامتقارن",
@@ -288,13 +289,13 @@ export default function ProductExplodedView({
     setSelectedComp(components[0]);
     setExplosionDistance(0);
     soundEngine.playExplodeShift(1.2);
-    const timer = setTimeout(() => setExplosionDistance(65), 120);
+    const timer = setTimeout(() => setExplosionDistance(55), 120);
     return () => clearTimeout(timer);
   }, [isOpen, productTitle]);
 
   useEffect(() => {
     if (!autoRotate) return;
-    const interval = setInterval(() => setRotationY((prev) => (prev + 0.35) % 360), 30);
+    const interval = setInterval(() => setRotationY((prev) => (prev + 0.4) % 360), 30);
     return () => clearInterval(interval);
   }, [autoRotate]);
 
@@ -309,7 +310,7 @@ export default function ProductExplodedView({
     const deltaX = e.clientX - lastMousePosRef.current.x;
     const deltaY = e.clientY - lastMousePosRef.current.y;
     setRotationY((prev) => prev + deltaX * 0.4);
-    setRotationX((prev) => Math.max(-40, Math.min(60, prev - deltaY * 0.4)));
+    setRotationX((prev) => Math.max(-45, Math.min(65, prev - deltaY * 0.4)));
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
   };
 
@@ -360,7 +361,7 @@ export default function ProductExplodedView({
           </div>
         </header>
 
-        {/* بوم رندر سه‌بعدی فیت‌شده با صفحه */}
+        {/* بوم رندر سه‌بعدی با زاویه پرسپکتیو استاندارد */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
           
           <div
@@ -369,23 +370,23 @@ export default function ProductExplodedView({
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
-            className="md:col-span-8 h-[340px] md:h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden bg-radial from-blue-950/30 via-slate-950 to-slate-950 border-b md:border-b-0 md:border-l border-slate-800/80 touch-none"
+            className="md:col-span-8 h-[360px] md:h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden bg-radial from-blue-950/30 via-slate-950 to-slate-950 border-b md:border-b-0 md:border-l border-slate-800/80 touch-none"
           >
             <div className="absolute top-4 right-4 z-20 bg-slate-950/80 border border-slate-800 px-3.5 py-1.5 rounded-xl text-[10px] font-mono text-slate-400 backdrop-blur-md">
               🖱️ درگ کنید تا زاویه تغییر کند (X: {Math.round(rotationX)}°, Y: {Math.round(rotationY)}°)
             </div>
 
             <div
-              className="relative w-64 h-80 sm:w-72 sm:h-96 md:w-80 md:h-[380px] transition-transform duration-100 ease-out"
+              className="relative w-64 h-80 sm:w-72 sm:h-96 md:w-80 md:h-[380px] transition-transform duration-75 ease-out"
               style={{
-                perspective: "1400px",
+                perspective: "1600px",
                 transformStyle: "preserve-3d",
                 transform: `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`,
               }}
             >
               {components.map((comp) => {
                 const isSelected = selectedComp?.id === comp.id;
-                const offsetFactor = (comp.depthIndex - 3.5) * (explosionDistance * 2.8);
+                const offsetFactor = (comp.depthIndex - 3.5) * (explosionDistance * 2.6);
 
                 return (
                   <div
@@ -395,13 +396,13 @@ export default function ProductExplodedView({
                       soundEngine.playExplodeShift(comp.depthIndex * 0.3);
                       setSelectedComp(comp);
                     }}
-                    className={`absolute inset-0 rounded-[2.2rem] transition-all duration-500 cursor-pointer flex flex-col justify-between overflow-hidden select-none ${
+                    className={`absolute inset-0 rounded-[2.2rem] transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden select-none ${
                       isSelected
                         ? "ring-4 ring-blue-500 shadow-[0_0_50px_rgba(59,130,246,0.85)] scale-105"
                         : "hover:ring-2 hover:ring-blue-400 hover:scale-[1.02]"
                     }`}
                     style={{
-                      transform: `translateZ(${offsetFactor}px) translateY(${(comp.depthIndex - 3.5) * 6}px)`,
+                      transform: `translateZ(${offsetFactor}px) translateY(${(comp.depthIndex - 3.5) * 5}px)`,
                       transformStyle: "preserve-3d",
                     }}
                   >
@@ -522,7 +523,7 @@ export default function ProductExplodedView({
             </div>
           </div>
 
-          {/* سایدبار اطلاعات مهندسی */}
+          {/* سایدبار تحلیل مهندسی لایه‌ها */}
           <div className="md:col-span-4 p-4 sm:p-6 space-y-4 overflow-y-auto bg-slate-950/70 flex flex-col justify-between text-xs">
             {selectedComp ? (
               <div className="space-y-3.5">

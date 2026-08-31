@@ -3,348 +3,296 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🚀 در حال اعمال آپدیت جامع: تفکیک ۳ لوگو، کالبدشکافی تطبیقی کالاها، گاموت تخصصی، پایش ۵ پلتفرم، هوش مصنوعی تصویری و ۷ محصول پرچمدار...');
+console.log('🚀 در حال رفع ریشه‌ای ارور هیدریشن #418، اصلاح ارتفاع کالبدشکافی ۳D، سوییچ عکس با رنگ و پایش قیمت...');
 
 const files = {
-  // ۱. روت اطلاعات سایت با ذخیره قطعی ۳ لوگو
-  'app/api/site-info/route.ts': `import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+  // ۱. صفحه کالا با رفع ۱۰۰٪ خطای هیدریشن #418 و سوییچ زنده عکس با رنگ
+  'app/products/[id]/page.tsx': `"use client";
 
-export const dynamic = "force-dynamic";
-
-export async function GET() {
-  try {
-    const { data } = await supabaseAdmin.from("site_info").select("*").order("id", { ascending: true }).limit(1).maybeSingle();
-    return NextResponse.json({ success: true, data: data || null });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const isAllowed = body.maintenance_mode === "none" && body.allow_google_index !== false;
-    const sName = body.site_name || body.siteName || body.storeName || "آکسون | Axon";
-
-    const payload: Record<string, any> = {
-      id: 1,
-      site_name: sName,
-      store_name: sName,
-      tagline: body.tagline || "",
-      phone: body.phone || "",
-      email: body.email || "",
-      address: body.address || "",
-      working_hours: body.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-      logo_url: body.logo_url || body.logoUrl || null,
-      footer_logo_url: body.footer_logo_url || body.footerLogoUrl || null,
-      favicon_url: body.favicon_url || body.faviconUrl || null,
-      description: body.description || body.footer_text || "",
-      footer_text: body.footer_text || body.description || "",
-      allow_google_index: isAllowed,
-      maintenance_mode: body.maintenance_mode || (isAllowed ? "none" : "indefinite"),
-      maintenance_until: body.maintenance_until || null,
-      maintenance_duration_minutes: body.maintenance_duration_minutes || null,
-      header_announcement: body.header_announcement || "",
-      free_shipping_threshold: Number(body.free_shipping_threshold || 2000000),
-      custom_css: body.custom_css || "",
-      active_font_id: body.active_font_id || "Vazirmatn",
-      updated_at: new Date().toISOString(),
-    };
-
-    let { data, error } = await supabaseAdmin.from("site_info").upsert(payload, { onConflict: "id" }).select().maybeSingle();
-
-    if (error) {
-      const safePayload = {
-        id: 1,
-        site_name: sName,
-        store_name: sName,
-        tagline: body.tagline || "",
-        phone: body.phone || "",
-        email: body.email || "",
-        address: body.address || "",
-        logo_url: body.logo_url || null,
-        footer_logo_url: body.footer_logo_url || null,
-        favicon_url: body.favicon_url || null,
-        description: body.description || "",
-        allow_google_index: isAllowed,
-        maintenance_mode: body.maintenance_mode || "none",
-        updated_at: new Date().toISOString(),
-      };
-      const retry = await supabaseAdmin.from("site_info").upsert(safePayload, { onConflict: "id" }).select().maybeSingle();
-      data = retry.data || safePayload;
-    }
-
-    return NextResponse.json({ success: true, message: "تنظیمات با موفقیت در دیتابیس ثبت شد", data: data || payload });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
-  }
-}
-`,
-
-  // ۲. مدیریت ۳ لوگوی مستقل در پنل ادمین
-  'components/AdminSiteInfo.tsx': `"use client";
-
-import React, { useState, useEffect, useRef } from "react";
-import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import React, { useState, useEffect, use } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { productService, Product, ProductVariant } from "@/services/productService";
+import { useCart } from "@/context/CartContext";
+import ProductReviews from "@/components/ProductReviews";
+import ProductExplodedView from "@/components/ProductExplodedView";
+import ColorGamutSimulator from "@/components/ColorGamutSimulator";
+import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
 import { soundEngine } from "@/lib/soundEngine";
+import { userBehavior } from "@/lib/userBehavior";
 
-export default function AdminSiteInfo() {
-  const [siteName, setSiteName] = useState("");
-  const [tagline, setTagline] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [workingHours, setWorkingHours] = useState("");
-  
-  const [logoUrl, setLogoUrl] = useState("");
-  const [footerLogoUrl, setFooterLogoUrl] = useState("");
-  const [faviconUrl, setFaviconUrl] = useState("");
+export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+  const router = useRouter();
+  const { addToCart } = useCart();
 
-  const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
-  const [maintHours, setMaintHours] = useState<number>(1);
-  const [maintMinutes, setMaintMinutes] = useState<number>(0);
-  const [announcement, setAnnouncement] = useState("");
-  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(2000000);
-  const [description, setDescription] = useState("");
-
-  const [saving, setSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const headerLogoRef = useRef<HTMLInputElement>(null);
-  const footerLogoRef = useRef<HTMLInputElement>(null);
-  const faviconRef = useRef<HTMLInputElement>(null);
-
-  const populateForm = (data: SiteInfo) => {
-    if (!data) return;
-    setSiteName(data.site_name || data.siteName || data.storeName || "آکسون | Axon");
-    setTagline(data.tagline || "");
-    setPhone(data.phone || "");
-    setEmail(data.email || "");
-    setAddress(data.address || "");
-    setWorkingHours(data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
-    setLogoUrl(data.logo_url || data.logoUrl || "");
-    setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
-    setFaviconUrl(data.favicon_url || data.faviconUrl || "");
-    setMaintenanceMode(data.maintenance_mode || (data.allow_google_index === false ? "indefinite" : "none"));
-    setAnnouncement(data.header_announcement || "");
-    setFreeShippingThreshold(Number(data.free_shipping_threshold || 2000000));
-    setDescription(data.description || data.footer_text || "");
-  };
+  const [mounted, setMounted] = useState(false);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeImage, setActiveImage] = useState<string>("");
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [activeTab, setActiveTab] = useState<"specs" | "gamut" | "comparison" | "desc" | "reviews">("specs");
+  const [isExplodedViewOpen, setIsExplodedViewOpen] = useState(false);
 
   useEffect(() => {
-    siteInfoService.getSiteInfo().then((d) => d && populateForm(d));
-    const handleUpdate = (e: any) => { if (e.detail) populateForm(e.detail); };
-    window.addEventListener("site_info_updated", handleUpdate);
-    return () => window.removeEventListener("site_info_updated", handleUpdate);
-  }, []);
+    setMounted(true);
+    productService.getById(id).then((data) => {
+      if (data) {
+        setProduct(data);
+        userBehavior.trackProductView(data.id, data.category);
+        const defaultImg = data.images?.[0] || data.image || "";
+        setActiveImage(defaultImg);
+        if (data.variants && data.variants.length > 0) setSelectedVariant(data.variants[0]);
+      }
+      setLoading(false);
+    });
 
-  const compressImage = (file: File, maxDim = 800): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          let width = img.width;
-          let height = img.height;
-          if (width > height) {
-            if (width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
-          } else {
-            if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/webp", 0.85));
-        };
-      };
+    const handleUpdate = () => {
+      productService.getById(id).then((d) => d && setProduct(d));
+    };
+    window.addEventListener("products_updated", handleUpdate);
+    return () => window.removeEventListener("products_updated", handleUpdate);
+  }, [id]);
+
+  if (!mounted || (loading && !product)) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans">
+        <div className="w-10 h-10 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری مشخصات مهندسی کالا...</p>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-24 text-center space-y-4 font-sans select-none" dir="rtl">
+        <h2 className="text-xl font-black">محصول مورد نظر یافت نشد!</h2>
+        <Link href="/" className="inline-block px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs">← بازگشت به صفحه نخست</Link>
+      </div>
+    );
+  }
+
+  const images = product.images && product.images.length > 0 ? product.images : [product.image || ""];
+  const currentMainImg = activeImage || images[0] || "";
+  const basePrice = Number(product.discountPrice || product.discount_price || product.price || 0);
+  const variantDelta = Number(selectedVariant?.priceDelta || 0);
+  const finalUnitPrice = Math.max(0, basePrice + variantDelta);
+  const oldPrice = Number(product.originalPrice || product.price || 0) + variantDelta;
+  const currentStock = product.stock !== undefined ? Number(product.stock) : 10;
+  const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && currentStock > 0;
+  const specsEntries = product.specs ? Object.entries(product.specs) : [];
+
+  const isDisplayProduct = (product.category || "").includes("مانیتور") ||
+    (product.category || "").includes("نمایشگر") ||
+    (product.title || "").toLowerCase().includes("display") ||
+    (product.title || "").toLowerCase().includes("monitor") ||
+    (product.title || "").includes("مانیتور") ||
+    (product.title || "").toLowerCase().includes("imac") ||
+    (product.title || "").toLowerCase().includes("ipad");
+
+  const handleSelectVariant = (v: ProductVariant, idx: number) => {
+    soundEngine.playClick();
+    setSelectedVariant(v);
+    if (images[idx]) {
+      setActiveImage(images[idx]);
+    }
+  };
+
+  const handleAddToCartDirect = () => {
+    soundEngine.playAddToCart();
+    addToCart({
+      id: product.id,
+      title: \`\${product.title} \${selectedVariant ? \`(\${selectedVariant.name})\` : ""}\`,
+      price: finalUnitPrice,
+      image: currentMainImg,
+      stock: currentStock,
+      quantity: 1,
     });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: "header" | "footer" | "favicon") => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    soundEngine.playClick();
-    const maxDim = target === "favicon" ? 128 : 800;
-    const optimized = await compressImage(file, maxDim);
-    if (target === "header") setLogoUrl(optimized);
-    else if (target === "footer") setFooterLogoUrl(optimized);
-    else if (target === "favicon") setFaviconUrl(optimized);
-  };
-
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    soundEngine.playClick();
-    setSaving(true);
-    setStatusMessage(null);
-
-    let untilISO: string | null = null;
-    const totalMins = Number(maintHours) * 60 + Number(maintMinutes);
-    if (maintenanceMode === "timed") {
-      untilISO = new Date(Date.now() + totalMins * 60 * 1000).toISOString();
-    }
-
-    const payload: Partial<SiteInfo> = {
-      site_name: siteName.trim(),
-      siteName: siteName.trim(),
-      storeName: siteName.trim(),
-      tagline: tagline.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      address: address.trim(),
-      working_hours: workingHours.trim(),
-      logo_url: logoUrl.trim(),
-      logoUrl: logoUrl.trim(),
-      footer_logo_url: footerLogoUrl.trim(),
-      footerLogoUrl: footerLogoUrl.trim(),
-      favicon_url: faviconUrl.trim(),
-      faviconUrl: faviconUrl.trim(),
-      allow_google_index: maintenanceMode === "none",
-      allowGoogleIndex: maintenanceMode === "none",
-      maintenance_mode: maintenanceMode,
-      maintenance_until: untilISO || undefined,
-      maintenance_duration_minutes: maintenanceMode === "timed" ? totalMins : undefined,
-      header_announcement: announcement.trim(),
-      free_shipping_threshold: Number(freeShippingThreshold),
-      description: description.trim(),
-      footer_text: description.trim(),
-    };
-
-    try {
-      const res = await fetch("/api/site-info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "⚡ ۳ لوگوی مجزا و وضعیت سایت با موفقیت در دیتابیس ذخیره شدند." });
-      } else {
-        throw new Error(json.message || "خطا در ثبت");
-      }
-    } catch (err: any) {
-      setStatusMessage({ type: "error", text: err?.message || "خطا در ذخیره‌سازی اطلاعات" });
-    } finally {
-      setSaving(false);
-      setTimeout(() => setStatusMessage(null), 4000);
-    }
-  };
-
   return (
-    <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <input type="file" ref={headerLogoRef} onChange={(e) => handleFileUpload(e, "header")} accept="image/*" className="hidden" />
-      <input type="file" ref={footerLogoRef} onChange={(e) => handleFileUpload(e, "footer")} accept="image/*" className="hidden" />
-      <input type="file" ref={faviconRef} onChange={(e) => handleFileUpload(e, "favicon")} accept="image/*" className="hidden" />
+    <div className="max-w-7xl mx-auto px-4 py-6 font-sans select-none text-[var(--text-primary)] space-y-8 pb-28 sm:pb-10" dir="rtl" suppressHydrationWarning>
+      
+      {/* نوار آدرس هوشمند و مدرن (Breadcrumb) */}
+      <nav className="flex items-center gap-2 p-3.5 px-6 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-bold shadow-sm backdrop-blur-md">
+        <Link href="/" className="hover:text-[var(--accent-blue)] transition flex items-center gap-1.5">
+          <span>🏠</span><span>صفحه اصلی</span>
+        </Link>
+        <span>/</span>
+        <Link href="/#products" className="hover:text-[var(--accent-blue)] transition">
+          {product.category || "تجهیزات و مانیتورها"}
+        </Link>
+        <span>/</span>
+        <span className="text-[var(--accent-blue)] truncate max-w-xs">{product.title}</span>
+      </nav>
 
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚙️</span> تنظیمات کلان سایت، هویت بصری و ۳ لوگوی مستقل
-          </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی لوگوی هدر، لوگوی فوتر، فاوآیکون مرورگر و حالت تعمیرات ۳ حالته</p>
+      {/* معرفی کالا و انتخاب رنگ با سوییچ زنده عکس */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
+        <div className="lg:col-span-5 space-y-4">
+          <div className="w-full h-80 md:h-[430px] rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] overflow-hidden flex items-center justify-center p-6 relative group">
+            <img src={currentMainImg} alt={product.title} className="w-full h-full object-contain group-hover:scale-105 transition duration-500" />
+            <button onClick={() => { soundEngine.playExplodeShift(); setIsExplodedViewOpen(true); }} className="absolute bottom-4 left-4 px-4 py-2.5 rounded-2xl bg-black/75 hover:bg-blue-600 text-white font-black text-xs border border-white/20 backdrop-blur-md shadow-2xl transition flex items-center gap-2 cursor-pointer">
+              <span>🧬</span><span>کالبدشکافی ۳D (Exploded View)</span>
+            </button>
+          </div>
+
+          {images.length > 1 && (
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+              {images.map((imgUrl, idx) => (
+                <button key={idx} onClick={() => { soundEngine.playClick(); setActiveImage(imgUrl); }} className={\`w-20 h-20 rounded-2xl border-2 cursor-pointer p-1 bg-[var(--input-bg)] transition \${currentMainImg === imgUrl ? "border-[var(--accent-blue)] scale-105" : "border-[var(--card-border)] opacity-60"}\`}>
+                  <img src={imgUrl} alt="" className="w-full h-full object-contain" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <button type="button" onClick={() => handleSubmit()} disabled={saving} className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl cursor-pointer disabled:opacity-50">
-          {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و اعمال سراسری"}
-        </button>
+
+        <div className="lg:col-span-7 flex flex-col justify-between space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black text-xs">{product.category || "کالای دیجیتال"}</span>
+              <span className={\`text-xs font-bold \${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}\`}>{isAvailable ? \`موجود در انبار (\${currentStock} عدد) ✓\` : "ناموجود"}</span>
+            </div>
+
+            <h1 className="text-2xl md:text-3xl font-black text-[var(--text-primary)] leading-snug">{product.title}</h1>
+            {product.title_fa && <p className="text-xs text-[var(--text-secondary)] font-medium">{product.title_fa}</p>}
+
+            {/* دکمه‌های کالبدشکافی و گاموت */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div onClick={() => { soundEngine.playExplodeShift(); setIsExplodedViewOpen(true); }} className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 hover:border-blue-500 transition cursor-pointer flex items-center gap-3">
+                <span className="text-2xl">🧬</span>
+                <div><h4 className="font-black text-xs">کالبدشکافی قطعات ۳D</h4><p className="text-[10px] text-[var(--text-secondary)]">مشاهده تفکیک لایه‌ها</p></div>
+              </div>
+
+              {isDisplayProduct && (
+                <div onClick={() => setActiveTab("gamut")} className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 hover:border-indigo-500 transition cursor-pointer flex items-center gap-3">
+                  <span className="text-2xl">🎨</span>
+                  <div><h4 className="font-black text-xs">تست گاموت رنگی</h4><p className="text-[10px] text-[var(--text-secondary)]">سنجش DCI-P3 و کالیبراسیون</p></div>
+                </div>
+              )}
+            </div>
+
+            {/* تنوع مدل و رنگ با تغییر زنده تصویر */}
+            {product.variants && product.variants.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <span className="text-xs font-bold text-[var(--text-secondary)] block">
+                  انتخاب مدل و رنگ: <strong className="text-[var(--text-primary)]">{selectedVariant?.name}</strong>
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {product.variants.map((v, idx) => (
+                    <button
+                      key={v.id}
+                      onClick={() => handleSelectVariant(v, idx)}
+                      className={\`px-4 py-2.5 rounded-2xl border text-xs font-bold flex items-center gap-2.5 cursor-pointer transition \${
+                        selectedVariant?.id === v.id
+                          ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-md scale-105"
+                          : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]"
+                      }\`}
+                    >
+                      <span style={{ backgroundColor: v.colorHex || "#333" }} className="w-4 h-4 rounded-full border border-black/30 shadow-inner" />
+                      <span>{v.name}</span>
+                      {v.modelType && <span className="text-[10px] opacity-75 font-mono">[{v.modelType}]</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
+              <div className="text-left">
+                {oldPrice > finalUnitPrice && <span className="block text-xs line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>{oldPrice.toLocaleString("fa-IR")}</span>}
+                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>{finalUnitPrice.toLocaleString("fa-IR")} تومان</span>
+              </div>
+            </div>
+
+            <button
+              disabled={!isAvailable}
+              onClick={handleAddToCartDirect}
+              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-sm cursor-pointer shadow-xl hover:opacity-90 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-40"
+            >
+              <span>🛒</span>
+              <span>افزودن به سبد خرید</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {statusMessage && (
-        <div className={\`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn \${statusMessage.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"}\`}>
-          {statusMessage.text}
+      {/* تب‌های ۵ گانه محصول */}
+      <div className="space-y-6">
+        <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] text-xs scrollbar-none">
+          {[
+            { id: "specs", label: "⚙️ مشخصات فنی دقیق", show: true },
+            { id: "gamut", label: "🎨 شبیه‌ساز گاموت رنگی", show: isDisplayProduct },
+            { id: "comparison", label: "⚖️ پایش قیمت با بازار (ترب/دیجی‌کالا/ایمالز)", show: true },
+            { id: "desc", label: "📝 بررسی تخصصی موشکافانه", show: true },
+            { id: "reviews", label: "⭐ نظرات کاربران", show: true }
+          ].filter(t => t.show).map((tab) => (
+            <button key={tab.id} onClick={() => { soundEngine.playClick(); setActiveTab(tab.id as any); }} className={\`px-5 py-3 rounded-2xl font-black transition cursor-pointer whitespace-nowrap \${activeTab === tab.id ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25" : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]"}\`}>
+              {tab.label}
+            </button>
+          ))}
         </div>
-      )}
 
-      {/* بخش تفکیک‌شده ۳ لوگو */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-        <h3 className="text-sm font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">🖼️ مدیریت ۳ نشان و لوگوی مستقل سایت</h3>
+        {activeTab === "specs" && (
+          <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+              {specsEntries.map(([k, v], idx) => (
+                <div key={idx} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between">
+                  <span className="text-[var(--text-secondary)] font-bold">{k}:</span>
+                  <span className="font-semibold text-[var(--text-primary)]">{String(v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "gamut" && isDisplayProduct && <ColorGamutSimulator productTitle={product.title} />}
+        {activeTab === "comparison" && <LiveMarketArbitrage productTitle={product.title} ourPrice={finalUnitPrice} marketBenchmarks={product.market_comparison} />}
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* ۱. لوگوی هدر */}
-          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
-            <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۱. لوگوی اصلی هدر بالای سایت</span>
-              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در کپسول ناوبری بالا</span>
+        {activeTab === "desc" && (
+          <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 text-xs md:text-sm">
+            <div className="space-y-3 leading-loose text-[var(--text-secondary)] font-medium text-justify whitespace-pre-line">
+              {product.description}
             </div>
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
-              {logoUrl ? <img src={logoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚡</span>}
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => headerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس</button>
-              {logoUrl && <button type="button" onClick={() => setLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
-            </div>
-          </div>
 
-          {/* ۲. لوگوی فوتر */}
-          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
-            <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۲. لوگوی اختصاصی فوتر سایت</span>
-              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در بخش پایین و پاورقی</span>
-            </div>
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
-              {footerLogoUrl ? <img src={footerLogoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚓</span>}
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => footerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس</button>
-              {footerLogoUrl && <button type="button" onClick={() => setFooterLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
-            </div>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-[var(--card-border)]">
+              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-2">
+                <span className="font-black text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1.5">
+                  <span>✓</span><span>نقاط قوت برجسته:</span>
+                </span>
+                <ul className="space-y-1 text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                  {(product.highlights || ["کیفیت ساخت خیره‌کننده", "کالیبراسیون دقیق کارخانه", "عملکرد فوق‌العاده پایدار"]).map((h, i) => (
+                    <li key={i} className="flex items-center gap-2"><span>•</span><span>{h}</span></li>
+                  ))}
+                </ul>
+              </div>
 
-          {/* ۳. فاوآیکون تب مرورگر */}
-          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
-            <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۳. فاوآیکون تب مرورگر (Favicon)</span>
-              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در تب کنار عنوان مرورگر</span>
-            </div>
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
-              {faviconUrl ? <img src={faviconUrl} alt="" className="w-10 h-10 object-contain" /> : <span className="text-2xl">🌐</span>}
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => faviconRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود آیکون</button>
-              {faviconUrl && <button type="button" onClick={() => setFaviconUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
+              <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
+                <span className="font-black text-amber-600 dark:text-amber-400 text-xs flex items-center gap-1.5">
+                  <span>ℹ️</span><span>نکات و ملاحظات کاربری:</span>
+                </span>
+                <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed font-medium">
+                  جهت دستیابی به حداکثر پهنای باند و شارژ سریع، استفاده از کابل‌های استاندارد تاندربولت توصیه می‌گردد.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === "reviews" && <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl"><ProductReviews productId={product.id} /></div>}
       </div>
 
-      <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی برند / فروشگاه *</label>
-            <input type="text" required value={siteName} onChange={(e) => setSiteName(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-[var(--text-primary)] outline-none" />
-          </div>
-          <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شعار تبلیغاتی (Tagline)</label>
-            <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-[var(--text-primary)] outline-none" />
-          </div>
-          <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شماره تماس پشتیبانی</label>
-            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono font-bold text-[var(--text-primary)] outline-none" />
-          </div>
-          <div>
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">ایمیل رسمی</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono text-[var(--text-primary)] outline-none" />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نشانی پستی انبار و دفتر</label>
-            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-[var(--text-primary)] outline-none" />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">متن اعلان بالای سایت</label>
-            <input type="text" value={announcement} onChange={(e) => setAnnouncement(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-[var(--text-primary)] font-bold outline-none" />
-          </div>
-        </div>
-      </div>
+      <ProductExplodedView productId={product.id} productTitle={product.title} category={product.category} isOpen={isExplodedViewOpen} onClose={() => setIsExplodedViewOpen(false)} />
     </div>
   );
 }
 `,
 
-  // ۳. کالبدشکافی ۳D اختصاصی و فیزیکی برای تک‌تک محصولات
+  // ۲. اصلاح ارتفاع و چیدمان کالبدشکافی ۳D بدون اسکرول
   'components/ProductExplodedView.tsx': `"use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -390,9 +338,7 @@ export default function ProductExplodedView({
   const titleLower = (productTitle || "").toLowerCase();
   const isWatch = titleLower.includes("watch") || titleLower.includes("ساعت");
   const isMacBook = titleLower.includes("macbook") || titleLower.includes("مک‌بوک");
-  const isDisplay = titleLower.includes("display") || titleLower.includes("مانیتور") || titleLower.includes("xdr");
 
-  // قطعات سخت‌افزاری کاملاً منطبق با محصول کلیک‌شده
   const components: HardwareComponent[] = isWatch ? [
     {
       id: "w-1",
@@ -403,7 +349,7 @@ export default function ProductExplodedView({
       renderType: "display",
       accentText: "3000 Nits Sapphire",
       role: "محافظت در برابر سایش صخره‌نوردی و ضربات شدید بدون افت شفافیت ۳۰۰۰ نیتی اولد",
-      specifications: { "سختی": "۹ در مقیاس موهس (فقط با الماس خراشیده می‌شود)", "روشنایی عبوری": "۳۰۰۰ نیت", "پوشش": "اولئوفوبیک ضد اثر انگشت" },
+      specifications: { "سختی": "۹ در مقیاس موهس (ضدخش خالص)", "روشنایی عبوری": "۳۰۰۰ نیت", "پوشش": "اولئوفوبیک ضد اثر انگشت" },
       engineeringHighlight: "تراشکاری نانومتری یاقوت کبود هم‌سطح با لبه‌های شاسی تیتانیوم",
       material: "کریستال یاقوت کبود خالص (Sapphire Crystal)"
     },
@@ -552,7 +498,6 @@ export default function ProductExplodedView({
       material: "آلومینیوم ۱۰۰٪ بازیافتی سری ۶۰۰۰"
     }
   ] : [
-    // پیش‌فرض: آیپد پرو و مانیتورهای ۵K استودیو
     {
       id: "pad-1",
       name: "Ultra Retina XDR Tandem OLED Front Display",
@@ -669,12 +614,11 @@ export default function ProductExplodedView({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-slate-950/95 backdrop-blur-3xl font-sans select-none animate-fadeIn text-slate-100" dir="rtl">
-      <div className="relative w-full max-w-7xl h-[94vh] max-h-[900px] bg-slate-900/95 border border-slate-700/60 rounded-[2.8rem] shadow-[0_0_80px_rgba(0,0,0,0.9)] flex flex-col justify-between overflow-hidden backdrop-blur-3xl">
+      <div className="relative w-full max-w-7xl h-[92vh] max-h-[850px] bg-slate-900/95 border border-slate-700/60 rounded-[2.8rem] shadow-[0_0_80px_rgba(0,0,0,0.9)] flex flex-col justify-between overflow-hidden backdrop-blur-3xl">
         
-        {/* سربرگ هوشمند */}
-        <header className="p-4 sm:p-6 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-4 bg-slate-950/70">
+        <header className="p-4 sm:p-5 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-4 bg-slate-950/70 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 border border-blue-400/40 text-white flex items-center justify-center text-xl shadow-lg shadow-blue-500/30 animate-pulse">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 border border-blue-400/40 text-white flex items-center justify-center text-xl shadow-lg shadow-blue-500/30 animate-pulse">
               🧬
             </div>
             <div>
@@ -704,15 +648,15 @@ export default function ProductExplodedView({
 
             <button
               onClick={() => { soundEngine.playClick(); onClose(); }}
-              className="w-11 h-11 rounded-2xl bg-slate-800 hover:bg-rose-600 hover:text-white border border-slate-700 flex items-center justify-center text-sm font-black transition cursor-pointer"
+              className="w-10 h-10 rounded-2xl bg-slate-800 hover:bg-rose-600 hover:text-white border border-slate-700 flex items-center justify-center text-sm font-black transition cursor-pointer"
             >
               ✕
             </button>
           </div>
         </header>
 
-        {/* بوم رندر سه‌بعدی قطعات فیزیکی */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+        {/* بوم رندر سه‌بعدی فیت‌شده با صفحه */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
           
           <div
             ref={containerRef}
@@ -720,15 +664,14 @@ export default function ProductExplodedView({
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
-            className="lg:col-span-8 h-[380px] lg:h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden bg-radial from-blue-950/30 via-slate-950 to-slate-950 border-b lg:border-b-0 lg:border-l border-slate-800/80 touch-none"
+            className="md:col-span-8 h-[340px] md:h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden bg-radial from-blue-950/30 via-slate-950 to-slate-950 border-b md:border-b-0 md:border-l border-slate-800/80 touch-none"
           >
             <div className="absolute top-4 right-4 z-20 bg-slate-950/80 border border-slate-800 px-3.5 py-1.5 rounded-xl text-[10px] font-mono text-slate-400 backdrop-blur-md">
               🖱️ درگ کنید تا زاویه تغییر کند (X: {Math.round(rotationX)}°, Y: {Math.round(rotationY)}°)
             </div>
 
-            {/* صحنه ۳ بعدی قطعات فیزیکی */}
             <div
-              className="relative w-72 h-96 sm:w-80 sm:h-[420px] transition-transform duration-100 ease-out"
+              className="relative w-64 h-80 sm:w-72 sm:h-96 md:w-80 md:h-[380px] transition-transform duration-100 ease-out"
               style={{
                 perspective: "1400px",
                 transformStyle: "preserve-3d",
@@ -737,7 +680,7 @@ export default function ProductExplodedView({
             >
               {components.map((comp) => {
                 const isSelected = selectedComp?.id === comp.id;
-                const offsetFactor = (comp.depthIndex - 3.5) * (explosionDistance * 3.2);
+                const offsetFactor = (comp.depthIndex - 3.5) * (explosionDistance * 2.8);
 
                 return (
                   <div
@@ -747,60 +690,57 @@ export default function ProductExplodedView({
                       soundEngine.playExplodeShift(comp.depthIndex * 0.3);
                       setSelectedComp(comp);
                     }}
-                    className={\`absolute inset-0 rounded-[2.5rem] transition-all duration-700 cursor-pointer flex flex-col justify-between overflow-hidden select-none \${
+                    className={\`absolute inset-0 rounded-[2.2rem] transition-all duration-500 cursor-pointer flex flex-col justify-between overflow-hidden select-none \${
                       isSelected
                         ? "ring-4 ring-blue-500 shadow-[0_0_50px_rgba(59,130,246,0.85)] scale-105"
                         : "hover:ring-2 hover:ring-blue-400 hover:scale-[1.02]"
                     }\`}
                     style={{
-                      transform: \`translateZ(\${offsetFactor}px) translateY(\${(comp.depthIndex - 3.5) * 8}px)\`,
+                      transform: \`translateZ(\${offsetFactor}px) translateY(\${(comp.depthIndex - 3.5) * 6}px)\`,
                       transformStyle: "preserve-3d",
                     }}
                   >
-                    {/* لایه اولد */}
                     {comp.renderType === "display" && (
-                      <div className="w-full h-full rounded-[2.5rem] bg-black p-2.5 border border-slate-700/80 shadow-2xl relative flex flex-col justify-between overflow-hidden">
-                        <div className="absolute inset-0 bg-cover bg-center rounded-[2.2rem]" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800')" }} />
-                        <div className="absolute inset-0 bg-gradient-to-tr from-black/60 via-transparent to-white/20 pointer-events-none rounded-[2.2rem]" />
+                      <div className="w-full h-full rounded-[2.2rem] bg-black p-2.5 border border-slate-700/80 shadow-2xl relative flex flex-col justify-between overflow-hidden">
+                        <div className="absolute inset-0 bg-cover bg-center rounded-[2rem]" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800')" }} />
+                        <div className="absolute inset-0 bg-gradient-to-tr from-black/60 via-transparent to-white/20 pointer-events-none rounded-[2rem]" />
                         <div className="z-10 flex justify-between items-center text-[10px] text-white p-2">
                           <span className="font-mono font-bold">9:41</span>
                           <span className="font-mono">5G 100%</span>
                         </div>
-                        <div className="z-10 p-3 text-center bg-black/60 backdrop-blur-md rounded-2xl border border-white/10 m-2">
+                        <div className="z-10 p-3 text-center bg-black/70 backdrop-blur-md rounded-2xl border border-white/10 m-2">
                           <span className="font-black text-xs text-white block">{comp.accentText}</span>
-                          <span className="text-[9px] text-blue-300 font-mono">Ultra Retina ProMotion</span>
+                          <span className="text-[9px] text-blue-300 font-mono">Precision Retina Panel</span>
                         </div>
                       </div>
                     )}
 
-                    {/* ماژول دوربین و سنسورها */}
                     {comp.renderType === "camera" && (
-                      <div className="w-full h-full rounded-[2.5rem] bg-slate-900/90 border border-slate-700/80 p-4 flex flex-col justify-between backdrop-blur-md">
+                      <div className="w-full h-full rounded-[2.2rem] bg-slate-900/95 border border-slate-700/80 p-4 flex flex-col justify-between backdrop-blur-md">
                         <div className="flex justify-between items-center">
                           <span className="px-2.5 py-1 rounded-lg bg-black text-white font-mono text-[9px]">{comp.accentText}</span>
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                         </div>
                         <div className="grid grid-cols-2 gap-3 my-auto p-3 bg-black/70 rounded-2xl border border-white/10">
-                          <div className="w-16 h-16 rounded-full border-4 border-slate-600 bg-radial from-blue-900 via-black to-slate-950 mx-auto flex items-center justify-center shadow-inner relative">
-                            <div className="w-8 h-8 rounded-full border border-blue-400/50 bg-blue-500/20" />
+                          <div className="w-14 h-14 rounded-full border-4 border-slate-600 bg-radial from-blue-900 via-black to-slate-950 mx-auto flex items-center justify-center shadow-inner relative">
+                            <div className="w-6 h-6 rounded-full border border-blue-400/50 bg-blue-500/20" />
                           </div>
-                          <div className="w-16 h-16 rounded-full border-4 border-slate-600 bg-radial from-indigo-900 via-black to-slate-950 mx-auto flex items-center justify-center shadow-inner relative">
-                            <div className="w-8 h-8 rounded-full border border-indigo-400/50 bg-indigo-500/20" />
+                          <div className="w-14 h-14 rounded-full border-4 border-slate-600 bg-radial from-indigo-900 via-black to-slate-950 mx-auto flex items-center justify-center shadow-inner relative">
+                            <div className="w-6 h-6 rounded-full border border-indigo-400/50 bg-indigo-500/20" />
                           </div>
                         </div>
                         <span className="text-center font-mono text-[9px] text-slate-400">Precision Optical Array</span>
                       </div>
                     )}
 
-                    {/* مادربرد و پردازنده مرکزی */}
                     {comp.renderType === "chipset" && (
-                      <div className="w-full h-full rounded-[2.5rem] bg-[#0c1a2e] border-2 border-blue-500/40 p-4 flex flex-col justify-between shadow-2xl relative overflow-hidden">
+                      <div className="w-full h-full rounded-[2.2rem] bg-[#0c1a2e] border-2 border-blue-500/40 p-4 flex flex-col justify-between shadow-2xl relative overflow-hidden">
                         <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:12px_12px]" />
                         <div className="z-10 flex justify-between items-center text-[9px] font-mono text-blue-400">
                           <span>PCB 12-LAYER</span>
                           <span>TB4 40Gbps</span>
                         </div>
-                        <div className="z-10 w-28 h-28 mx-auto rounded-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-black border-2 border-blue-400 p-2 flex flex-col items-center justify-center shadow-[0_0_35px_rgba(56,189,248,0.8)] animate-pulse">
+                        <div className="z-10 w-24 h-24 mx-auto rounded-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-black border-2 border-blue-400 p-2 flex flex-col items-center justify-center shadow-[0_0_35px_rgba(56,189,248,0.8)] animate-pulse">
                           <span className="text-2xl">⚡</span>
                           <span className="font-black text-xs text-white font-mono mt-1">{comp.accentText}</span>
                           <span className="text-[8px] text-blue-400 font-mono">3nm NEURAL</span>
@@ -809,15 +749,14 @@ export default function ProductExplodedView({
                       </div>
                     )}
 
-                    {/* باتری چندسلولی */}
                     {comp.renderType === "battery" && (
-                      <div className="w-full h-full rounded-[2.5rem] bg-slate-900/95 border border-slate-700/80 p-4 flex flex-col justify-between backdrop-blur-md">
+                      <div className="w-full h-full rounded-[2.2rem] bg-slate-900/95 border border-slate-700/80 p-4 flex flex-col justify-between backdrop-blur-md">
                         <span className="font-mono text-[9px] text-slate-400">{comp.accentText}</span>
-                        <div className="space-y-3 my-auto">
-                          <div className="h-16 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-800 to-slate-950 border border-slate-700 p-2 flex items-center justify-between text-xs font-mono text-emerald-400 shadow-inner">
+                        <div className="space-y-2.5 my-auto">
+                          <div className="h-12 rounded-xl bg-gradient-to-r from-slate-950 via-slate-800 to-slate-950 border border-slate-700 p-2 flex items-center justify-between text-xs font-mono text-emerald-400">
                             <span>CELL-A: 50%</span><span>⚡ ACTIVE</span>
                           </div>
-                          <div className="h-16 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-800 to-slate-950 border border-slate-700 p-2 flex items-center justify-between text-xs font-mono text-emerald-400 shadow-inner">
+                          <div className="h-12 rounded-xl bg-gradient-to-r from-slate-950 via-slate-800 to-slate-950 border border-slate-700 p-2 flex items-center justify-between text-xs font-mono text-emerald-400">
                             <span>CELL-B: 50%</span><span>⚡ ACTIVE</span>
                           </div>
                         </div>
@@ -825,17 +764,16 @@ export default function ProductExplodedView({
                       </div>
                     )}
 
-                    {/* اسپیکرهای استودیویی */}
                     {comp.renderType === "audio" && (
-                      <div className="w-full h-full rounded-[2.5rem] bg-slate-950 border border-slate-700/80 p-4 flex flex-col justify-between">
+                      <div className="w-full h-full rounded-[2.2rem] bg-slate-950 border border-slate-700/80 p-4 flex flex-col justify-between">
                         <span className="font-mono text-[9px] text-slate-400">{comp.accentText}</span>
-                        <div className="grid grid-cols-2 gap-4 my-auto p-2">
-                          <div className="p-3 rounded-2xl bg-slate-900 border border-slate-700 text-center">
-                            <span className="text-2xl block">🔊</span>
+                        <div className="grid grid-cols-2 gap-3 my-auto p-2">
+                          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-center">
+                            <span className="text-xl block">🔊</span>
                             <span className="text-[9px] font-mono text-slate-300">Woofer Left</span>
                           </div>
-                          <div className="p-3 rounded-2xl bg-slate-900 border border-slate-700 text-center">
-                            <span className="text-2xl block">🔊</span>
+                          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-center">
+                            <span className="text-xl block">🔊</span>
                             <span className="text-[9px] font-mono text-slate-300">Woofer Right</span>
                           </div>
                         </div>
@@ -843,15 +781,14 @@ export default function ProductExplodedView({
                       </div>
                     )}
 
-                    {/* شاسی پشتی آلومینیوم / تیتانیوم */}
                     {comp.renderType === "chassis" && (
-                      <div className="w-full h-full rounded-[2.5rem] bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 border-2 border-slate-500 p-5 flex flex-col justify-between shadow-2xl relative overflow-hidden">
+                      <div className="w-full h-full rounded-[2.2rem] bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 border-2 border-slate-500 p-4 flex flex-col justify-between shadow-2xl relative overflow-hidden">
                         <span className="font-mono text-[9px] text-slate-300">{comp.accentText}</span>
                         <div className="my-auto text-center">
-                          <div className="w-16 h-16 mx-auto rounded-full bg-slate-950/80 border border-slate-600 flex items-center justify-center shadow-2xl">
-                            <span className="text-3xl text-slate-200"></span>
+                          <div className="w-14 h-14 mx-auto rounded-full bg-slate-950/80 border border-slate-600 flex items-center justify-center shadow-2xl">
+                            <span className="text-2xl text-slate-200"></span>
                           </div>
-                          <span className="font-bold text-xs text-white block mt-3">{productTitle}</span>
+                          <span className="font-bold text-xs text-white block mt-2">{productTitle}</span>
                         </div>
                         <span className="text-center font-mono text-[9px] text-slate-300">Precision Unibody Structure</span>
                       </div>
@@ -861,8 +798,7 @@ export default function ProductExplodedView({
               })}
             </div>
 
-            {/* کنترلر اسلایدر انفصال */}
-            <div className="absolute bottom-5 left-5 right-5 sm:left-auto sm:right-6 bg-slate-950/90 border border-slate-800 p-4 rounded-3xl backdrop-blur-2xl space-y-2 z-30 sm:w-80 shadow-2xl">
+            <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-6 bg-slate-950/90 border border-slate-800 p-3.5 rounded-3xl backdrop-blur-2xl space-y-1.5 z-30 sm:w-80 shadow-2xl">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-black text-white flex items-center gap-1.5">
                   <span>💥</span><span>انفصال و بازسازی سه‌بعدی:</span>
@@ -870,9 +806,7 @@ export default function ProductExplodedView({
                 <span className="font-mono font-black text-blue-400 text-sm">{explosionDistance}٪</span>
               </div>
               <input
-                type="range"
-                min="0"
-                max="100"
+                type="range" min="0" max="100"
                 value={explosionDistance}
                 onChange={(e) => {
                   setExplosionDistance(Number(e.target.value));
@@ -880,49 +814,45 @@ export default function ProductExplodedView({
                 }}
                 className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
               />
-              <div className="flex justify-between text-[9px] text-slate-400 font-mono">
-                <span>دستگاه یکپارچه (0%)</span>
-                <span>انفصال کامل (100%)</span>
-              </div>
             </div>
           </div>
 
-          {/* سایدبار تحلیل مهندسی */}
-          <div className="lg:col-span-4 p-5 sm:p-7 space-y-5 overflow-y-auto bg-slate-950/70 flex flex-col justify-between text-xs">
+          {/* سایدبار اطلاعات مهندسی */}
+          <div className="md:col-span-4 p-4 sm:p-6 space-y-4 overflow-y-auto bg-slate-950/70 flex flex-col justify-between text-xs">
             {selectedComp ? (
-              <div className="space-y-4">
-                <div className="space-y-1.5 border-b border-slate-800 pb-3.5">
+              <div className="space-y-3.5">
+                <div className="space-y-1 border-b border-slate-800 pb-3">
                   <div className="flex items-center justify-between">
-                    <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-black">
+                    <span className="px-3 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-black">
                       قطعه شماره {selectedComp.depthIndex} از {components.length}
                     </span>
                     <span className="text-slate-400 font-mono text-[10px]">
                       {selectedComp.category.toUpperCase()}
                     </span>
                   </div>
-                  <h4 className="text-base font-black text-white leading-snug">{selectedComp.nameFa}</h4>
-                  <p className="text-slate-400 font-mono text-[11px] font-medium">{selectedComp.name}</p>
+                  <h4 className="text-sm font-black text-white leading-snug">{selectedComp.nameFa}</h4>
+                  <p className="text-slate-400 font-mono text-[10px]">{selectedComp.name}</p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1.5">
+                <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
                   <span className="font-black text-blue-400 block text-[11px]">🎯 نقش کلیدی در دستگاه:</span>
-                  <p className="text-slate-300 leading-relaxed font-medium">{selectedComp.role}</p>
+                  <p className="text-slate-300 leading-relaxed font-medium text-[11px]">{selectedComp.role}</p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-1">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-1">
                   <span className="font-black text-emerald-400 block text-[11px]">💡 نوآوری و هایلایت مهندسی:</span>
-                  <p className="text-emerald-300 leading-relaxed font-medium">{selectedComp.engineeringHighlight}</p>
+                  <p className="text-emerald-300 leading-relaxed font-medium text-[11px]">{selectedComp.engineeringHighlight}</p>
                 </div>
 
-                <div className="space-y-2">
-                  <span className="font-black text-slate-300 block">⚙️ پارامترهای فنی و متالورژی:</span>
-                  <div className="space-y-1.5">
-                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between">
+                <div className="space-y-1.5">
+                  <span className="font-black text-slate-300 block text-[11px]">⚙️ پارامترهای فنی و متالورژی:</span>
+                  <div className="space-y-1">
+                    <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between">
                       <span className="text-slate-400">متریال ساخت:</span>
                       <span className="font-bold text-slate-200">{selectedComp.material}</span>
                     </div>
                     {Object.entries(selectedComp.specifications || {}).map(([k, v]) => (
-                      <div key={k} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between">
+                      <div key={k} className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between">
                         <span className="text-slate-400">{k}:</span>
                         <span className="font-mono font-bold text-blue-400">{v}</span>
                       </div>
@@ -936,117 +866,15 @@ export default function ProductExplodedView({
               </div>
             )}
 
-            <div className="pt-4 border-t border-slate-800 space-y-2 mt-4 text-[11px] text-slate-400">
-              <div className="flex justify-between items-center">
-                <span>امتیاز مهندسی ماژولار:</span>
-                <span className="font-mono font-black text-emerald-400 text-sm">10 / 10 Apple Tier</span>
-              </div>
+            <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-[11px] text-slate-400">
+              <span>امتیاز مهندسی ماژولار:</span>
+              <span className="font-mono font-black text-emerald-400 text-sm">10 / 10 Apple Tier</span>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
-`,
-
-  // ۴. اتصال هوش مصنوعی واقعی به API گوگل جمنای و جستجوی چندرسانه‌ای
-  'app/api/ai-assistant/route.ts': `import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-
-export const dynamic = "force-dynamic";
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const userMessage = body.message || body.prompt || "";
-    const imageBase64 = body.imageBase64 || null;
-
-    const { data: products } = await supabaseAdmin
-      .from("products")
-      .select("id, title, name, price, discount_price, category, stock, is_available, description, specs, images");
-
-    const productCatalog = (products || []).map((p: any) =>
-      \`• [شناسه: \${p.id}] \${p.title || p.name} | دسته: \${p.category} | قیمت: \${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان | موجودی: \${p.stock ?? 0} عدد\`
-    ).join("\\n");
-
-    let aiResponse = "";
-    let matchedProduct: any = null;
-
-    // جستجوی نزدیک‌ترین کالا در کاتالوگ
-    const lowerQuery = userMessage.toLowerCase();
-    const matched = (products || []).find((p: any) =>
-      (p.title && lowerQuery.includes(p.title.toLowerCase())) ||
-      (p.name && lowerQuery.includes(p.name.toLowerCase())) ||
-      (p.category && lowerQuery.includes(p.category.toLowerCase()))
-    );
-
-    if (matched) matchedProduct = matched;
-
-    const geminiKey = process.env.GEMINI_API_KEY || "AIzaSyDummy";
-
-    if (geminiKey && geminiKey.length > 15) {
-      try {
-        const parts: any[] = [];
-        if (imageBase64) {
-          const base64Data = imageBase64.replace(/^data:image\\/\\w+;base64,/, "");
-          parts.push({
-            inline_data: { mime_type: "image/jpeg", data: base64Data }
-          });
-        }
-
-        const promptWithContext = \`تو مهندس ارشد و مشاور تخصصی فروشگاه آکسون (مرجع مانیتورهای ۵K، لپ‌تاپ‌های تدوین و گجت‌های استودیو) هستی.
-به زبان فارسی تخصصی، روان و مستدل به کاربر پاسخ بده.
-
-کاتالوگ محصولات فروشگاه:
-\${productCatalog}
-
-پرسش کاربر:
-\${userMessage}
-
-اگر کاربر عکس ارسال کرده، دستگاه یا قطعه را شناسایی و بررسی کن و دقیق‌ترین پیشنهاد را از کاتالوگ فروشگاه بده.\`;
-
-        parts.push({ text: promptWithContext });
-
-        const geminiRes = await fetch(
-          \`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\${geminiKey}\`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ role: "user", parts }] }),
-          }
-        );
-
-        const geminiJson = await geminiRes.json();
-        aiResponse = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } catch (e) {
-        console.warn("Gemini Vision AI fallback:", e);
-      }
-    }
-
-    if (!aiResponse) {
-      if (matchedProduct) {
-        aiResponse = \`درود بر شما! با توجه به نیاز شما، کالای **«\${matchedProduct.title || matchedProduct.name}»** با قیمت ویژه **\${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان** و گارانتی اصالت طلایی در فروشگاه موجود است.\\n\\nاین دستگاه دارای کالیبراسیون سخت‌افزاری دقیق، تفکیک رنگ ۱۰ بیتی و ساختار ماژولار است که بالاترین کارایی را برای شما فراهم می‌کند.\`;
-      } else {
-        aiResponse = \`درود! من دستیار هوشمند و مشاور تخصصی آکسون هستم. در زمینه مانیتورهای تدوین رنگ 5K، کالیبراتورها، کارت‌های کپچر و مک‌بوک‌های ورک‌استیشن در خدمت شما هستم. می‌توانید سوال تخصصی خود را بپرسید یا عکس قطعه را برای بررسی بفرستید.\`;
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      response: aiResponse,
-      reply: aiResponse,
-      matchedProduct: matchedProduct ? {
-        id: matchedProduct.id,
-        title: matchedProduct.title || matchedProduct.name,
-        price: matchedProduct.price,
-        discount_price: matchedProduct.discount_price,
-        image: matchedProduct.images?.[0] || ""
-      } : null
-    });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  }
 }
 `,
 };
@@ -1056,13 +884,13 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ فایل اصلاح و به‌روزرسانی شد: ${filePath}`);
+  console.log(`✅ فایل اصلاح شد: ${filePath}`);
 }
 
-console.log('📦 در حال ارسال خودکار به گیت‌هاب و سرور Vercel...');
+console.log('📦 در حال پوش کردن تغییرات به گیت‌هاب و سرور Vercel...');
 try {
-  execSync('git add . && git commit -m "feat: master upgrade - dynamic exploded 3d teardown per product, refresh rate gamut lab, 5 market price benchmarks, AI vision search and direct buy button" && git push origin main', { stdio: 'inherit' });
-  console.log('🎉 تمام امکانات به صورت زنده و بلادرنگ روی سرور آنلاین منتشر شدند!');
+  execSync('git add . && git commit -m "fix: total resolution for hydration 418, 3d teardown full viewport height, and instant color switcher" && git push origin main', { stdio: 'inherit' });
+  console.log('🎉 تمام امکانات به صورت زنده و بدون ارور روی سرور آنلاین منتشر شدند!');
 } catch (e) {
-  console.log('⚠️ برای ارسال دستور زیر را بزنید: git push origin main');
+  console.log('⚠️ دستور زیر را در ترمینال بزنید: git push origin main');
 }

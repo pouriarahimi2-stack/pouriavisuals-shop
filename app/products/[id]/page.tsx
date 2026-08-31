@@ -18,14 +18,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const { addToCart } = useCart();
 
-  const [product, setProduct] = useState<Product | null>(() => productService.getProductSync(id));
-  const [loading, setLoading] = useState(!product);
+  const [mounted, setMounted] = useState(false);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [activeTab, setActiveTab] = useState<"specs" | "gamut" | "comparison" | "desc" | "reviews">("specs");
   const [isExplodedViewOpen, setIsExplodedViewOpen] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     productService.getById(id).then((data) => {
       if (data) {
         setProduct(data);
@@ -44,11 +46,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return () => window.removeEventListener("products_updated", handleUpdate);
   }, [id]);
 
-  if (loading && !product) {
+  if (!mounted || (loading && !product)) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans">
         <div className="w-10 h-10 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری مشخصات کالا...</p>
+        <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری مشخصات مهندسی کالا...</p>
       </div>
     );
   }
@@ -72,7 +74,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && currentStock > 0;
   const specsEntries = product.specs ? Object.entries(product.specs) : [];
 
-  // شرط نمایش گاموت رنگی: فقط برای مانیتور و نمایشگرها
   const isDisplayProduct = (product.category || "").includes("مانیتور") ||
     (product.category || "").includes("نمایشگر") ||
     (product.title || "").toLowerCase().includes("display") ||
@@ -81,7 +82,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     (product.title || "").toLowerCase().includes("imac") ||
     (product.title || "").toLowerCase().includes("ipad");
 
-  // انتخاب رنگ و تغییر اتوماتیک تصویر محصول
   const handleSelectVariant = (v: ProductVariant, idx: number) => {
     soundEngine.playClick();
     setSelectedVariant(v);
@@ -103,21 +103,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 font-sans select-none text-[var(--text-primary)] space-y-8 pb-28 sm:pb-10" dir="rtl">
+    <div className="max-w-7xl mx-auto px-4 py-6 font-sans select-none text-[var(--text-primary)] space-y-8 pb-28 sm:pb-10" dir="rtl" suppressHydrationWarning>
       
-      {/* نوار آدرس هوشمند (Breadcrumbs) */}
+      {/* نوار آدرس هوشمند و مدرن (Breadcrumb) */}
       <nav className="flex items-center gap-2 p-3.5 px-6 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-bold shadow-sm backdrop-blur-md">
         <Link href="/" className="hover:text-[var(--accent-blue)] transition flex items-center gap-1.5">
           <span>🏠</span><span>صفحه اصلی</span>
         </Link>
         <span>/</span>
         <Link href="/#products" className="hover:text-[var(--accent-blue)] transition">
-          {product.category || "کاتالوگ محصولات"}
+          {product.category || "تجهیزات و مانیتورها"}
         </Link>
         <span>/</span>
         <span className="text-[var(--accent-blue)] truncate max-w-xs">{product.title}</span>
       </nav>
 
+      {/* معرفی کالا و انتخاب رنگ با سوییچ زنده عکس */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
         <div className="lg:col-span-5 space-y-4">
           <div className="w-full h-80 md:h-[430px] rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] overflow-hidden flex items-center justify-center p-6 relative group">
@@ -148,11 +149,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             <h1 className="text-2xl md:text-3xl font-black text-[var(--text-primary)] leading-snug">{product.title}</h1>
             {product.title_fa && <p className="text-xs text-[var(--text-secondary)] font-medium">{product.title_fa}</p>}
 
-            {/* بنرهای کالبدشکافی و گاموت رنگی */}
+            {/* دکمه‌های کالبدشکافی و گاموت */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div onClick={() => { soundEngine.playExplodeShift(); setIsExplodedViewOpen(true); }} className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 hover:border-blue-500 transition cursor-pointer flex items-center gap-3">
                 <span className="text-2xl">🧬</span>
-                <div><h4 className="font-black text-xs">کالبدشکافی قطعات ۳D</h4><p className="text-[10px] text-[var(--text-secondary)]">مشاهده تفکیک لایه‌های فیزیکی</p></div>
+                <div><h4 className="font-black text-xs">کالبدشکافی قطعات ۳D</h4><p className="text-[10px] text-[var(--text-secondary)]">مشاهده تفکیک لایه‌ها</p></div>
               </div>
 
               {isDisplayProduct && (
@@ -163,7 +164,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               )}
             </div>
 
-            {/* انتخاب رنگ و تغییر زنده تصویر */}
+            {/* تنوع مدل و رنگ با تغییر زنده تصویر */}
             {product.variants && product.variants.length > 0 && (
               <div className="space-y-2 pt-2">
                 <span className="text-xs font-bold text-[var(--text-secondary)] block">
@@ -194,15 +195,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
               <div className="text-left">
-                {oldPrice > finalUnitPrice && <span className="block text-xs line-through text-[var(--text-secondary)] font-mono">{oldPrice.toLocaleString("fa-IR")}</span>}
-                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">{finalUnitPrice.toLocaleString("fa-IR")} تومان</span>
+                {oldPrice > finalUnitPrice && <span className="block text-xs line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>{oldPrice.toLocaleString("fa-IR")}</span>}
+                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>{finalUnitPrice.toLocaleString("fa-IR")} تومان</span>
               </div>
             </div>
 
             <button
               disabled={!isAvailable}
               onClick={handleAddToCartDirect}
-              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-sm cursor-pointer shadow-xl hover:opacity-90 active:scale-95 transition flex items-center justify-center gap-2"
+              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-sm cursor-pointer shadow-xl hover:opacity-90 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-40"
             >
               <span>🛒</span>
               <span>افزودن به سبد خرید</span>
@@ -211,13 +212,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* ۵ تب تخصصی و جامع کالا */}
+      {/* تب‌های ۵ گانه محصول */}
       <div className="space-y-6">
         <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] text-xs scrollbar-none">
           {[
             { id: "specs", label: "⚙️ مشخصات فنی دقیق", show: true },
             { id: "gamut", label: "🎨 شبیه‌ساز گاموت رنگی", show: isDisplayProduct },
-            { id: "comparison", label: "⚖️ پایش قیمت با بازار (ترب/ایمالز)", show: true },
+            { id: "comparison", label: "⚖️ پایش قیمت با بازار (ترب/دیجی‌کالا/ایمالز)", show: true },
             { id: "desc", label: "📝 بررسی تخصصی موشکافانه", show: true },
             { id: "reviews", label: "⭐ نظرات کاربران", show: true }
           ].filter(t => t.show).map((tab) => (
@@ -249,14 +250,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.description}
             </div>
 
-            {/* کارت‌های نقاط قوت و ضعف موشکافانه */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-[var(--card-border)]">
               <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-2">
                 <span className="font-black text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1.5">
                   <span>✓</span><span>نقاط قوت برجسته:</span>
                 </span>
                 <ul className="space-y-1 text-xs text-emerald-700 dark:text-emerald-300 font-medium">
-                  {(product.highlights || ["کیفیت ساخت خیره‌کننده", "کالیبراسیون دقیق کارخانه", "عملکرد پایدار در بار کاری سنگین"]).map((h, i) => (
+                  {(product.highlights || ["کیفیت ساخت خیره‌کننده", "کالیبراسیون دقیق کارخانه", "عملکرد فوق‌العاده پایدار"]).map((h, i) => (
                     <li key={i} className="flex items-center gap-2"><span>•</span><span>{h}</span></li>
                   ))}
                 </ul>
@@ -267,7 +267,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <span>ℹ️</span><span>نکات و ملاحظات کاربری:</span>
                 </span>
                 <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed font-medium">
-                  جهت دستیابی به حداکثر پهنای باند و شارژ سریع، استفاده از کابل‌های دارای تاییدیه تاندربولت توصیه می‌گردد.
+                  جهت دستیابی به حداکثر پهنای باند و شارژ سریع، استفاده از کابل‌های استاندارد تاندربولت توصیه می‌گردد.
                 </p>
               </div>
             </div>

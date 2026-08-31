@@ -3,7 +3,6 @@ import { RealtimeChannel } from "@supabase/supabase-js";
 import { productService } from "@/services/productService";
 import { siteInfoService } from "@/services/siteInfoService";
 import { bannerService } from "@/services/bannerService";
-import { newsService } from "@/services/newsService";
 
 export function applyFaviconToDOM(url?: string) {
   if (typeof document === "undefined" || !url) return;
@@ -11,9 +10,20 @@ export function applyFaviconToDOM(url?: string) {
     let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
     if (!link) {
       link = document.createElement("link");
-      link.rel = "icon";
       document.head.appendChild(link);
     }
+    
+    if (url.includes("image/gif") || url.endsWith(".gif")) {
+      link.type = "image/gif";
+    } else if (url.includes("image/svg") || url.endsWith(".svg")) {
+      link.type = "image/svg+xml";
+    } else if (url.includes("image/png") || url.endsWith(".png")) {
+      link.type = "image/png";
+    } else {
+      link.type = "image/x-icon";
+    }
+
+    link.rel = "icon";
     link.href = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
   } catch {}
 }
@@ -137,9 +147,6 @@ class MasterRealtimeEngine {
             } else if (tableName === "banners") {
               const allBanners = await bannerService.getAll();
               window.dispatchEvent(new CustomEvent("banners_updated", { detail: allBanners }));
-            } else if (tableName === "tech_news") {
-              const allNews = await newsService.getAll();
-              window.dispatchEvent(new CustomEvent("news_updated", { detail: allNews }));
             }
           }
         );

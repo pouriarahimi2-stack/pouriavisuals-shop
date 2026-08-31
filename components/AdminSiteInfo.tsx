@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
 import { applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
@@ -51,44 +51,24 @@ export default function AdminSiteInfo() {
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
-  const compressImage = (file: File, maxDim = 800): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          let width = img.width;
-          let height = img.height;
-          if (width > height) {
-            if (width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
-          } else {
-            if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/webp", 0.85));
-        };
-      };
-    });
-  };
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: "header" | "footer" | "favicon") => {
     const file = e.target.files?.[0];
     if (!file) return;
     soundEngine.playClick();
-    const maxDim = target === "favicon" ? 128 : 800;
-    const optimized = await compressImage(file, maxDim);
-    if (target === "header") setLogoUrl(optimized);
-    else if (target === "footer") setFooterLogoUrl(optimized);
-    else if (target === "favicon") {
-      setFaviconUrl(optimized);
-      applyFaviconToDOM(optimized);
-    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const resultBase64 = event.target?.result as string;
+      if (target === "header") {
+        setLogoUrl(resultBase64);
+      } else if (target === "footer") {
+        setFooterLogoUrl(resultBase64);
+      } else if (target === "favicon") {
+        setFaviconUrl(resultBase64);
+        applyFaviconToDOM(resultBase64);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -124,7 +104,7 @@ export default function AdminSiteInfo() {
         soundEngine.playSuccess();
         if (saved.favicon_url) applyFaviconToDOM(saved.favicon_url);
         if (saved.tagline || saved.site_name) applyTitleToDOM(saved.tagline, saved.site_name);
-        setStatusMessage({ type: "success", text: "⚡ ۳ نشان اختصاصی، فاوآیکون تب و تنظیمات با موفقیت ذخیره و فوراً اعمال شدند." });
+        setStatusMessage({ type: "success", text: "⚡ ۳ نشان متحرک، فاوآیکون تب و تنظیمات با موفقیت ذخیره و فوراً اعمال شدند." });
       } else {
         throw new Error("خطا در ثبت پایگاه داده");
       }
@@ -138,16 +118,16 @@ export default function AdminSiteInfo() {
 
   return (
     <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <input type="file" ref={headerLogoRef} onChange={(e) => handleFileUpload(e, "header")} accept="image/*" className="hidden" />
-      <input type="file" ref={footerLogoRef} onChange={(e) => handleFileUpload(e, "footer")} accept="image/*" className="hidden" />
-      <input type="file" ref={faviconRef} onChange={(e) => handleFileUpload(e, "favicon")} accept="image/*" className="hidden" />
+      <input type="file" ref={headerLogoRef} onChange={(e) => handleFileUpload(e, "header")} accept="image/*,.gif,.svg,.webp,.apng" className="hidden" />
+      <input type="file" ref={footerLogoRef} onChange={(e) => handleFileUpload(e, "footer")} accept="image/*,.gif,.svg,.webp,.apng" className="hidden" />
+      <input type="file" ref={faviconRef} onChange={(e) => handleFileUpload(e, "favicon")} accept="image/*,.gif,.svg,.ico,.webp,.apng" className="hidden" />
 
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚙️</span> تنظیمات کلان سایت، هویت بصری و ۳ لوگوی مستقل
+            <span>⚙️</span> تنظیمات کلان سایت، هویت بصری و ۳ لوگوی متحرک (GIF / SVG / PNG)
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی لوگوی هدر، لوگوی فوتر و فاوآیکون تب مرورگر با اعمال زنده بدون رفرش</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی لوگوی هدر، لوگوی فوتر و فاوآیکون متحرک تب مرورگر با حفظ کامل فریم‌های انیمیشن</p>
         </div>
         <button type="button" onClick={() => handleSubmit()} disabled={saving} className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl cursor-pointer disabled:opacity-50">
           {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و اعمال سراسری"}
@@ -160,22 +140,22 @@ export default function AdminSiteInfo() {
         </div>
       )}
 
-      {/* بخش تفکیک‌شده ۳ لوگو */}
+      {/* بخش تفکیک‌شده ۳ لوگوی متحرک */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-        <h3 className="text-sm font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">🖼️ مدیریت ۳ نشان و لوگوی مستقل سایت</h3>
+        <h3 className="text-sm font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">🖼️ مدیریت ۳ نشان و لوگوی مستقل و متحرک سایت</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* ۱. لوگوی هدر */}
           <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
             <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۱. لوگوی اصلی هدر بالای سایت</span>
-              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در کپسول ناوبری بالا</span>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۱. لوگوی اصلی هدر بالای سایت (متحرک / ثابت)</span>
+              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش زنده در کپسول ناوبری بالا</span>
             </div>
             <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
               {logoUrl ? <img src={logoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚡</span>}
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => headerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس</button>
+              <button type="button" onClick={() => headerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس / GIF</button>
               {logoUrl && <button type="button" onClick={() => setLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
             </div>
           </div>
@@ -183,29 +163,29 @@ export default function AdminSiteInfo() {
           {/* ۲. لوگوی فوتر */}
           <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
             <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۲. لوگوی اختصاصی فوتر سایت</span>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۲. لوگوی اختصاصی فوتر سایت (متحرک / ثابت)</span>
               <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در بخش پایین و پاورقی</span>
             </div>
             <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
               {footerLogoUrl ? <img src={footerLogoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚓</span>}
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => footerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس</button>
+              <button type="button" onClick={() => footerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس / GIF</button>
               {footerLogoUrl && <button type="button" onClick={() => setFooterLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
             </div>
           </div>
 
-          {/* ۳. فاوآیکون تب مرورگر */}
+          {/* ۳. فاوآیکون متحرک تب مرورگر */}
           <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
             <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۳. فاوآیکون تب مرورگر (Favicon)</span>
-              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در تب کنار عنوان مرورگر</span>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۳. فاوآیکون تب مرورگر (Favicon متحرک / GIF)</span>
+              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">پخش مستقیم انیمیشن در تب مرورگر</span>
             </div>
             <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
               {faviconUrl ? <img src={faviconUrl} alt="" className="w-10 h-10 object-contain" /> : <span className="text-2xl">🌐</span>}
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => faviconRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود آیکون</button>
+              <button type="button" onClick={() => faviconRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود GIF / آیکون</button>
               {faviconUrl && <button type="button" onClick={() => { setFaviconUrl(""); applyFaviconToDOM("/favicon.ico"); }} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
             </div>
           </div>

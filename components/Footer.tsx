@@ -23,9 +23,17 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           <div className="space-y-4">
             <div className="w-full max-w-[180px] h-20 rounded-2xl border border-[var(--card-border)] bg-white/5 p-2 shadow-inner flex items-center justify-center overflow-hidden">
-              {footerLogo ? <img src={footerLogo} alt={siteName} className="w-full h-full object-contain" /> : <div className="w-full h-full rounded-xl bg-[var(--accent-blue)] flex items-center justify-center text-white font-black text-xl">⚓</div>}
+              {footerLogo ? (
+                <img src={footerLogo} alt={siteName} className="w-full h-full object-contain" />
+              ) : (
+                <div className="w-full h-full rounded-xl bg-[var(--accent-blue)] flex items-center justify-center text-white font-black text-xl">
+                  ⚓
+                </div>
+              )}
             </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">{info?.description || info?.tagline || "مرجع تخصصی مانیتور و تجهیزات تصویر"}</p>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
+              {info?.description || info?.tagline || "مرجع تخصصی مانیتور و تجهیزات تصویر"}
+            </p>
           </div>
 
           <div className="space-y-3">

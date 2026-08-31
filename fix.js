@@ -3,10 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🛡️ [AXON ORDER & PAYMENT ENGINE CURE] در حال رفع خطای ۴۰۰ دیتابیس، حل مشکل مبلغ صفر و حذف Error #418...');
+console.log('🎬 [AXON MASTER FIX] در حال اجرای بازسازی کامل و بدون نقص فروشگاه آکسون...');
 
 const files = {
-  // ۱. فرمت‌کننده قطعی اعداد و مبالغ
+  // ۱. فرمت‌کننده قطعی اعداد و تاریخ فارسی
   'lib/formatters.ts': `export function formatPrice(amount: number | string | undefined | null): string {
   if (amount === undefined || amount === null || isNaN(Number(amount))) return "۰";
   const num = Math.round(Number(amount));
@@ -28,606 +28,481 @@ export function formatDateFa(dateStr?: string | null): string {
 }
 `,
 
-  // ۲. اصلاح بک‌اند ثبت سفارشات (حل خطای ۴۰۰ دیتابیس)
-  'app/api/orders/route.ts': `import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseServer';
+  // ۲. موتور Realtime سه‌گانه با پشتیبانی از فاوآیکون متحرک (GIF / SVG)
+  'lib/realtimeSync.ts': `import { supabase } from "@/lib/supabase";
+import { RealtimeChannel } from "@supabase/supabase-js";
+import { productService } from "@/services/productService";
+import { siteInfoService } from "@/services/siteInfoService";
+import { bannerService } from "@/services/bannerService";
 
-export const dynamic = 'force-dynamic';
-
-export async function POST(req: NextRequest) {
+export function applyFaviconToDOM(url?: string) {
+  if (typeof document === "undefined" || !url) return;
   try {
-    const body = await req.json();
-    const orderId = body.id || body.order_number || \`ORD-\${Date.now().toString().slice(-6)}\`;
-
-    const customerName = String(body.customerName || body.customer_name || body.customer?.fullName || 'خریدار محترم').trim();
-    const phone = String(body.phone || body.customer?.phone || '').trim();
-    const province = String(body.province || body.customer?.province || 'تهران').trim();
-    const city = String(body.city || body.customer?.city || 'تهران').trim();
-    const address = String(body.address || body.customer?.address || '').trim();
-    const postalCode = body.postalCode || body.postal_code || body.customer?.postalCode || null;
-    const items = Array.isArray(body.items) ? body.items : [];
-    const totalAmount = Number(body.totalAmount || body.total_amount || 0);
-    const discountAmount = Number(body.discountAmount || body.discount_amount || 0);
-    const finalAmount = Number(body.finalAmount || body.final_amount || Math.max(0, totalAmount - discountAmount));
-    const couponCode = body.couponCode || body.coupon_code || null;
-
-    const orderPayload: any = {
-      id: orderId,
-      order_number: orderId,
-      customer_name: customerName,
-      phone,
-      province,
-      city,
-      address,
-      items,
-      total_amount: totalAmount,
-      discount_amount: discountAmount,
-      final_amount: finalAmount,
-      status: body.status || 'pending',
-      payment_status: body.payment_status || body.paymentStatus || 'pending',
-      payment_method: body.payment_method || body.paymentMethod || 'online',
-      tracking_code: body.tracking_code || body.trackingCode || null,
-      notes: body.notes || body.customer?.notes || '',
-      updated_at: new Date().toISOString(),
-    };
-
-    if (postalCode) orderPayload.postal_code = String(postalCode).trim();
-    if (couponCode) orderPayload.coupon_code = String(couponCode).trim().toUpperCase();
-
-    // ثبت امن در دیتابیس با سوپابیس ادمین
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .upsert(orderPayload, { onConflict: 'id' })
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      // تلاش مجدد با ساختار سازگار
-      const safePayload = {
-        order_number: orderId,
-        customer_name: customerName,
-        phone,
-        address,
-        total_amount: totalAmount,
-        final_amount: finalAmount,
-        items,
-        status: 'pending',
-        payment_status: 'pending',
-        updated_at: new Date().toISOString(),
-      };
-      await supabaseAdmin.from('orders').insert([safePayload]);
+    let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      document.head.appendChild(link);
+    }
+    
+    if (url.includes("image/gif") || url.endsWith(".gif")) {
+      link.type = "image/gif";
+    } else if (url.includes("image/svg") || url.endsWith(".svg")) {
+      link.type = "image/svg+xml";
+    } else if (url.includes("image/png") || url.endsWith(".png")) {
+      link.type = "image/png";
+    } else {
+      link.type = "image/x-icon";
     }
 
-    return NextResponse.json({ success: true, data: data || orderPayload });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err?.message || 'خطا در ثبت فاکتور' }, { status: 500 });
+    link.rel = "icon";
+    link.href = \`\${url}\${url.includes("?") ? "&" : "?"}v=\${Date.now()}\`;
+  } catch {}
+}
+
+export function applyTitleToDOM(title?: string, storeName?: string) {
+  if (typeof document === "undefined") return;
+  try {
+    const sName = storeName || "آکسون";
+    const sTitle = title || "مرجع تخصصی مانیتور و تجهیزات تصویر";
+    document.title = \`\${sName} | \${sTitle}\`;
+  } catch {}
+}
+
+declare global {
+  interface Window {
+    __AXON_REALTIME_SINGLETON__?: MasterRealtimeEngine;
   }
 }
+
+class MasterRealtimeEngine {
+  private channel: RealtimeChannel | null = null;
+  private broadcastBus: BroadcastChannel | null = null;
+  private isSubscribed: boolean = false;
+
+  constructor() {
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        this.broadcastBus = new BroadcastChannel("axon_master_bus_v2026");
+        this.broadcastBus.onmessage = (event) => {
+          const { type, data } = event.data || {};
+          if (type) {
+            window.dispatchEvent(new CustomEvent(type, { detail: data }));
+            if (type === "site_info_updated" && data) {
+              if (data.favicon_url) applyFaviconToDOM(data.favicon_url);
+              if (data.tagline || data.site_name) applyTitleToDOM(data.tagline, data.site_name);
+            }
+          }
+        };
+      } catch {}
+    }
+  }
+
+  public static getInstance(): MasterRealtimeEngine {
+    if (typeof window !== "undefined") {
+      if (!window.__AXON_REALTIME_SINGLETON__) {
+        window.__AXON_REALTIME_SINGLETON__ = new MasterRealtimeEngine();
+      }
+      return window.__AXON_REALTIME_SINGLETON__;
+    }
+    return new MasterRealtimeEngine();
+  }
+
+  public broadcastLocally(type: string, data: any) {
+    if (typeof window === "undefined") return;
+    
+    window.dispatchEvent(new CustomEvent(type, { detail: data }));
+    
+    if (this.broadcastBus) {
+      try {
+        this.broadcastBus.postMessage({ type, data });
+      } catch {}
+    }
+    
+    if (type === "site_info_updated" && data) {
+      if (data.favicon_url) applyFaviconToDOM(data.favicon_url);
+      if (data.tagline || data.site_name) applyTitleToDOM(data.tagline, data.site_name);
+    }
+
+    if (this.channel && this.isSubscribed) {
+      try {
+        this.channel.send({
+          type: "broadcast",
+          event: type,
+          payload: data,
+        });
+      } catch {}
+    }
+  }
+
+  public init(): () => void {
+    if (typeof window === "undefined") return () => {};
+    if (this.isSubscribed && this.channel) return () => {};
+
+    try {
+      this.channel = supabase.channel("axon_main_stream_v2026", {
+        config: { broadcast: { ack: false } },
+      });
+
+      const eventNames = [
+        "products_updated", "site_info_updated", "banners_updated",
+        "orders_updated", "coupons_updated", "menu_updated", "news_updated"
+      ];
+
+      eventNames.forEach((ev) => {
+        this.channel?.on("broadcast", { event: ev }, (payload) => {
+          window.dispatchEvent(new CustomEvent(ev, { detail: payload.payload }));
+          if (ev === "site_info_updated" && payload.payload) {
+            if (payload.payload.favicon_url) applyFaviconToDOM(payload.payload.favicon_url);
+            if (payload.payload.tagline || payload.payload.site_name) applyTitleToDOM(payload.payload.tagline, payload.payload.site_name);
+          }
+        });
+      });
+
+      const tables = ["products", "orders", "site_info", "banners", "tech_news", "coupons", "menu_items", "categories"];
+      tables.forEach((tableName) => {
+        this.channel?.on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: tableName },
+          async (payload: any) => {
+            const updatedItem = payload.new || payload;
+            window.dispatchEvent(new CustomEvent(\`\${tableName}_updated\`, { detail: updatedItem }));
+
+            if (tableName === "products") {
+              const all = await productService.getAll();
+              window.dispatchEvent(new CustomEvent("products_updated", { detail: all }));
+            } else if (tableName === "site_info") {
+              const latest = await siteInfoService.getSiteInfo();
+              window.dispatchEvent(new CustomEvent("site_info_updated", { detail: latest }));
+              if (latest?.favicon_url) applyFaviconToDOM(latest.favicon_url);
+              if (latest?.tagline || latest?.site_name) applyTitleToDOM(latest?.tagline, latest?.site_name);
+            } else if (tableName === "banners") {
+              const allBanners = await bannerService.getAll();
+              window.dispatchEvent(new CustomEvent("banners_updated", { detail: allBanners }));
+            }
+          }
+        );
+      });
+
+      this.channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          this.isSubscribed = true;
+        }
+      });
+    } catch {}
+
+    return () => {};
+  }
+}
+
+export function initRealtimeSync(): () => void {
+  return MasterRealtimeEngine.getInstance().init();
+}
+
+export const realtimeEngine = MasterRealtimeEngine.getInstance();
+export default MasterRealtimeEngine;
 `,
 
-  // ۳. اصلاح سرویس سفارشات با ذخیره‌سازی محلی مطمئن مبلغ
-  'services/orderService.ts': `import { realtimeEngine } from "@/lib/realtimeSync";
+  // ۳. پنل تنظیمات ۳ لوگوی متحرک (GIF / SVG / WebP) با حفظ کامل فریم‌ها
+  'components/AdminSiteInfo.tsx': `"use client";
 
-export interface OrderItem {
-  id?: string | number;
-  product_id?: string | number;
-  productId?: string | number;
-  title?: string;
-  name?: string;
-  price: number;
-  quantity: number;
-  image?: string;
-}
+import React, { useState, useEffect, useRef } from "react";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { soundEngine } from "@/lib/soundEngine";
+import { applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
-export interface CustomerInfo {
-  fullName?: string;
-  name?: string;
-  phone: string;
-  province?: string;
-  city?: string;
-  address: string;
-  postalCode?: string;
-  postal_code?: string;
-  notes?: string;
-}
+export default function AdminSiteInfo() {
+  const [siteName, setSiteName] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [workingHours, setWorkingHours] = useState("");
+  
+  const [logoUrl, setLogoUrl] = useState("");
+  const [footerLogoUrl, setFooterLogoUrl] = useState("");
+  const [faviconUrl, setFaviconUrl] = useState("");
 
-export interface Order {
-  id: string | number;
-  orderNumber?: string;
-  order_number?: string;
-  customer: CustomerInfo;
-  customerName?: string;
-  customer_name?: string;
-  phone?: string;
-  address?: string;
-  postalCode?: string;
-  postal_code?: string;
-  items: OrderItem[];
-  totalAmount: number;
-  total_amount?: number;
-  discountAmount?: number;
-  discount_amount?: number;
-  couponCode?: string;
-  coupon_code?: string;
-  finalAmount: number;
-  final_amount?: number;
-  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
-  paymentStatus: "pending" | "paid" | "failed";
-  payment_status?: "pending" | "paid" | "failed";
-  paymentMethod?: string;
-  payment_method?: string;
-  trackingCode?: string;
-  tracking_code?: string;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+  const [announcement, setAnnouncement] = useState("");
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(2000000);
+  const [description, setDescription] = useState("");
 
-const LOCAL_STORAGE_KEY = "axon_orders_registry_cache_v2026";
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-export function normalizeOrder(raw: any): Order {
-  if (!raw) return {} as Order;
+  const headerLogoRef = useRef<HTMLInputElement>(null);
+  const footerLogoRef = useRef<HTMLInputElement>(null);
+  const faviconRef = useRef<HTMLInputElement>(null);
 
-  const id = raw.id || raw.order_number || \`ORD-\${Date.now().toString().slice(-6)}\`;
-  const orderNumber = raw.order_number || raw.orderNumber || String(id);
-  const fullName = raw.customer_name || raw.customerName || raw.customer?.fullName || raw.customer?.name || "خریدار محترم";
-  const phone = raw.phone || raw.customer_phone || raw.customer?.phone || "";
-  const address = raw.address || raw.customer_address || raw.customer?.address || "";
-  const finalAmount = Number(raw.final_amount ?? raw.finalAmount ?? raw.total_amount ?? raw.totalAmount ?? 0);
-  const totalAmount = Number(raw.total_amount ?? raw.totalAmount ?? finalAmount);
-
-  return {
-    ...raw,
-    id: String(id),
-    orderNumber,
-    order_number: orderNumber,
-    customer: {
-      fullName,
-      name: fullName,
-      phone,
-      address,
-      province: raw.province || "تهران",
-      city: raw.city || "تهران",
-      postalCode: raw.postal_code || raw.postalCode || "",
-    },
-    customerName: fullName,
-    customer_name: fullName,
-    phone,
-    address,
-    items: Array.isArray(raw.items) ? raw.items : [],
-    totalAmount,
-    total_amount: totalAmount,
-    finalAmount,
-    final_amount: finalAmount,
-    discountAmount: Number(raw.discount_amount ?? raw.discountAmount ?? 0),
-    status: raw.status || "pending",
-    paymentStatus: raw.payment_status || raw.paymentStatus || "pending",
-    payment_status: raw.payment_status || raw.paymentStatus || "pending",
-    trackingCode: raw.tracking_code || raw.trackingCode || "",
-    tracking_code: raw.tracking_code || raw.trackingCode || "",
-    created_at: raw.created_at || new Date().toISOString(),
+  const populateForm = (data: SiteInfo) => {
+    if (!data) return;
+    setSiteName(data.site_name || data.siteName || data.storeName || "آکسون | Axon");
+    setTagline(data.tagline || "");
+    setPhone(data.phone || "");
+    setEmail(data.email || "");
+    setAddress(data.address || "");
+    setWorkingHours(data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
+    setLogoUrl(data.logo_url || data.logoUrl || "");
+    setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
+    setFaviconUrl(data.favicon_url || data.faviconUrl || "");
+    setAnnouncement(data.header_announcement || "");
+    setFreeShippingThreshold(Number(data.free_shipping_threshold || 2000000));
+    setDescription(data.description || data.footer_text || "");
   };
-}
 
-export const orderService = {
-  async getAll(): Promise<Order[]> {
-    try {
-      const res = await fetch("/api/orders/track?query=all", { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data && Array.isArray(json.data)) {
-          return json.data.map(normalizeOrder);
-        }
+  useEffect(() => {
+    siteInfoService.getSiteInfo().then((d) => d && populateForm(d));
+    const handleUpdate = (e: any) => { if (e.detail) populateForm(e.detail); };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: "header" | "footer" | "favicon") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    soundEngine.playClick();
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const resultBase64 = event.target?.result as string;
+      if (target === "header") {
+        setLogoUrl(resultBase64);
+      } else if (target === "footer") {
+        setFooterLogoUrl(resultBase64);
+      } else if (target === "favicon") {
+        setFaviconUrl(resultBase64);
+        applyFaviconToDOM(resultBase64);
       }
-    } catch {}
+    };
+    reader.readAsDataURL(file);
+  };
 
-    if (typeof window !== "undefined") {
-      try {
-        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (local) return JSON.parse(local).map(normalizeOrder);
-      } catch {}
-    }
-    return [];
-  },
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    soundEngine.playClick();
+    setSaving(true);
+    setStatusMessage(null);
 
-  async getById(id: string | number): Promise<Order | null> {
-    const cleanId = String(id).trim();
-
-    // ۱. بررسی حافظه موقت سشن جهت تضمین ۱۰۰٪ مبلغ
-    if (typeof window !== "undefined") {
-      try {
-        const savedAmount = sessionStorage.getItem("pending_payment_amount");
-        const savedId = sessionStorage.getItem("pending_payment_order_id");
-        if (savedAmount && (savedId === cleanId || !savedId)) {
-          const localOrders = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
-          const foundLocal = localOrders.find((o: any) => String(o.id) === cleanId || o.order_number === cleanId);
-          if (foundLocal) return normalizeOrder(foundLocal);
-
-          return normalizeOrder({
-            id: cleanId,
-            order_number: cleanId,
-            final_amount: Number(savedAmount),
-            total_amount: Number(savedAmount),
-            status: "pending",
-          });
-        }
-      } catch {}
-    }
-
-    try {
-      const res = await fetch(\`/api/orders/track?query=\${encodeURIComponent(cleanId)}\`, { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data && json.data.length > 0) {
-          return normalizeOrder(json.data[0]);
-        }
-      }
-    } catch {}
-
-    const all = await this.getAll();
-    return all.find((o) => String(o.id) === cleanId || o.orderNumber === cleanId) || null;
-  },
-
-  async create(orderData: any): Promise<Order | null> {
-    const orderId = orderData.id || orderData.order_number || \`ORD-\${Date.now().toString().slice(-6)}\`;
-    const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? orderData.totalAmount ?? orderData.total_amount ?? 0);
-
-    // ذخیره فوری مبلغ در سشن مرورگر
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("pending_payment_amount", String(finalAmount));
-      sessionStorage.setItem("pending_payment_order_id", orderId);
-    }
-
-    const payload = {
-      ...orderData,
-      id: orderId,
-      order_number: orderId,
-      final_amount: finalAmount,
-      total_amount: Number(orderData.totalAmount ?? orderData.total_amount ?? finalAmount),
+    const payload: Partial<SiteInfo> = {
+      site_name: siteName.trim(),
+      siteName: siteName.trim(),
+      storeName: siteName.trim(),
+      tagline: tagline.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      address: address.trim(),
+      working_hours: workingHours.trim(),
+      logo_url: logoUrl.trim(),
+      logoUrl: logoUrl.trim(),
+      footer_logo_url: footerLogoUrl.trim(),
+      footerLogoUrl: footerLogoUrl.trim(),
+      favicon_url: faviconUrl.trim(),
+      faviconUrl: faviconUrl.trim(),
+      header_announcement: announcement.trim(),
+      free_shipping_threshold: Number(freeShippingThreshold),
+      description: description.trim(),
+      footer_text: description.trim(),
     };
 
     try {
-      await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch {}
-
-    const normalized = normalizeOrder(payload);
-
-    if (typeof window !== "undefined") {
-      try {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
-        const updated = [normalized, ...existing.filter((o: any) => String(o.id) !== String(normalized.id))];
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("orders_updated", updated);
-      } catch {}
-    }
-
-    return normalized;
-  },
-
-  async updateStatus(id: string | number, status: Order["status"], trackingCode?: string): Promise<boolean> {
-    try {
-      const payload: any = { status, updated_at: new Date().toISOString() };
-      if (status === "paid") payload.payment_status = "paid";
-      if (trackingCode) payload.tracking_code = trackingCode.trim();
-
-      await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...payload }),
-      });
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = all.map((o) => (String(o.id) === String(id) ? { ...o, ...payload } : o));
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("orders_updated", updated);
+      const saved = await siteInfoService.updateSiteInfo(payload);
+      if (saved) {
+        soundEngine.playSuccess();
+        if (saved.favicon_url) applyFaviconToDOM(saved.favicon_url);
+        if (saved.tagline || saved.site_name) applyTitleToDOM(saved.tagline, saved.site_name);
+        setStatusMessage({ type: "success", text: "⚡ ۳ نشان متحرک، فاوآیکون تب و تنظیمات با موفقیت ذخیره و فوراً اعمال شدند." });
+      } else {
+        throw new Error("خطا در ثبت پایگاه داده");
       }
-      return true;
-    } catch {
-      return false;
-    }
-  },
-};
-
-export default orderService;
-`,
-
-  // ۴. اصلاح کامل درگاه پرداخت با نمایش ۱۰۰٪ قطعی مبلغ فاکتور و حذف Error #418
-  'app/checkout/payment/page.tsx': `"use client";
-
-import React, { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { orderService } from "@/services/orderService";
-import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
-
-function PaymentGatewayContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const orderId = searchParams.get("orderId") || "";
-
-  const [order, setOrder] = useState<any>(null);
-  const [amount, setAmount] = useState<number>(0);
-  const [cardNumber, setCardNumber] = useState("");
-  const [cvv2, setCvv2] = useState("");
-  const [month, setMonth] = useState("");
-  const [year, setYear] = useState("");
-  const [pass, setPass] = useState("");
-  const [otpTimer, setOtpTimer] = useState(120);
-  const [paying, setPaying] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  useEffect(() => {
-    // ۱. دریافت قطعی مبلغ از سشن و سرویس
-    let payable = 0;
-    try {
-      const savedAmount = sessionStorage.getItem("pending_payment_amount");
-      if (savedAmount && Number(savedAmount) > 0) {
-        payable = Number(savedAmount);
-        setAmount(payable);
-      }
-    } catch {}
-
-    if (orderId) {
-      orderService.getById(orderId).then((found) => {
-        if (found) {
-          setOrder(found);
-          const finalVal = Number(found.finalAmount || found.final_amount || found.totalAmount || 0);
-          if (finalVal > 0) {
-            setAmount(finalVal);
-          }
-        }
-      });
-    }
-
-    const timer = setInterval(() => {
-      setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [orderId]);
-
-  const handlePay = async (e: React.FormEvent) => {
-    e.preventDefault();
-    soundEngine.playClick();
-    setErrorMsg("");
-
-    const cleanCard = cardNumber.replace(/\\D/g, "");
-    if (cleanCard.length !== 16) {
-      setErrorMsg("شماره کارت بانکی باید دقیقاً ۱۶ رقم باشد.");
-      return;
-    }
-    if (cvv2.length < 3 || cvv2.length > 4) {
-      setErrorMsg("کد CVV2 نامعتبر است (۳ یا ۴ رقم).");
-      return;
-    }
-    if (!pass || pass.length < 5) {
-      setErrorMsg("رمز دوم پویا را وارد نمایید.");
-      return;
-    }
-
-    setPaying(true);
-
-    try {
-      await new Promise((res) => setTimeout(res, 1200));
-
-      if (orderId) {
-        await orderService.updateStatus(orderId, "paid");
-      }
-
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("axon_cart_store_v2026");
-        localStorage.removeItem("axon_active_coupon_v2026");
-        sessionStorage.removeItem("pending_payment_amount");
-      }
-
-      soundEngine.playSuccess();
-      setPaying(false);
-      setPaymentSuccess(true);
-    } catch {
-      setErrorMsg("خطا در پردازش تراکنش بانکی.");
-      setPaying(false);
+    } catch (err: any) {
+      setStatusMessage({ type: "error", text: err?.message || "خطا در ذخیره‌سازی اطلاعات" });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setStatusMessage(null), 4000);
     }
   };
 
-  if (paymentSuccess) {
-    return (
-      <div className="min-h-[75vh] flex items-center justify-center p-4 font-sans select-none" dir="rtl">
-        <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center space-y-5 shadow-2xl animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-3xl flex items-center justify-center mx-auto animate-bounce">
-            ✓
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-lg font-black text-emerald-600 dark:text-emerald-400">پرداخت با موفقیت تایید شد</h2>
-            <p className="text-xs text-[var(--text-secondary)] font-medium">سفارش شما در مرحله آماده‌سازی و صدور بارنامه پستی قرار گرفت.</p>
+  return (
+    <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <input type="file" ref={headerLogoRef} onChange={(e) => handleFileUpload(e, "header")} accept="image/*,.gif,.svg,.webp,.apng" className="hidden" />
+      <input type="file" ref={footerLogoRef} onChange={(e) => handleFileUpload(e, "footer")} accept="image/*,.gif,.svg,.webp,.apng" className="hidden" />
+      <input type="file" ref={faviconRef} onChange={(e) => handleFileUpload(e, "favicon")} accept="image/*,.gif,.svg,.ico,.webp,.apng" className="hidden" />
+
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>⚙️</span> تنظیمات کلان سایت، هویت بصری و ۳ لوگوی متحرک (GIF / SVG / PNG)
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی لوگوی هدر، لوگوی فوتر و فاوآیکون متحرک تب مرورگر با حفظ کامل فریم‌های انیمیشن</p>
+        </div>
+        <button type="button" onClick={() => handleSubmit()} disabled={saving} className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl cursor-pointer disabled:opacity-50">
+          {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و اعمال سراسری"}
+        </button>
+      </div>
+
+      {statusMessage && (
+        <div className={\`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn \${statusMessage.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"}\`}>
+          {statusMessage.text}
+        </div>
+      )}
+
+      {/* بخش تفکیک‌شده ۳ لوگوی متحرک */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+        <h3 className="text-sm font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">🖼️ مدیریت ۳ نشان و لوگوی مستقل و متحرک سایت</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* ۱. لوگوی هدر */}
+          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
+            <div>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۱. لوگوی اصلی هدر بالای سایت (متحرک / ثابت)</span>
+              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش زنده در کپسول ناوبری بالا</span>
+            </div>
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
+              {logoUrl ? <img src={logoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚡</span>}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => headerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس / GIF</button>
+              {logoUrl && <button type="button" onClick={() => setLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
+            </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs space-y-2 text-right">
-            <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">شماره فاکتور:</span>
-              <span className="font-mono font-bold text-[var(--accent-blue)]">{orderId}</span>
+          {/* ۲. لوگوی فوتر */}
+          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
+            <div>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۲. لوگوی اختصاصی فوتر سایت (متحرک / ثابت)</span>
+              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در بخش پایین و پاورقی</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">مبلغ پرداختی:</span>
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
-                {formatPrice(amount)} تومان
-              </span>
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
+              {footerLogoUrl ? <img src={footerLogoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚓</span>}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => footerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس / GIF</button>
+              {footerLogoUrl && <button type="button" onClick={() => setFooterLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <Link
-              href={\`/track-order?orderId=\${orderId}&success=true\`}
-              className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition shadow-md"
-            >
-              پیگیری مرسوله 📦
-            </Link>
-            <Link
-              href="/"
-              className="flex-1 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
-            >
-              صفحه نخست
-            </Link>
+          {/* ۳. فاوآیکون متحرک تب مرورگر */}
+          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
+            <div>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۳. فاوآیکون تب مرورگر (Favicon متحرک / GIF)</span>
+              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">پخش مستقیم انیمیشن در تب مرورگر</span>
+            </div>
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
+              {faviconUrl ? <img src={faviconUrl} alt="" className="w-10 h-10 object-contain" /> : <span className="text-2xl">🌐</span>}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => faviconRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود GIF / آیکون</button>
+              {faviconUrl && <button type="button" onClick={() => { setFaviconUrl(""); applyFaviconToDOM("/favicon.ico"); }} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
+            </div>
           </div>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="min-h-[85vh] py-10 px-4 max-w-lg mx-auto font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
-        
-        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
-          <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-lg">
-              💳
-            </span>
-            <div>
-              <h1 className="text-sm font-black">درگاه پرداخت الکترونیک شاپرک</h1>
-              <p className="text-[10px] text-[var(--text-secondary)] font-medium">اتصال امن به سوئیچ شبکه بانکی کشور</p>
-            </div>
-          </div>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
-            SSL 256-bit
-          </span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center text-xs">
-          <span className="text-[var(--text-secondary)] font-bold">مبلغ قابل پرداخت فاکتور:</span>
-          <span className="font-mono font-black text-base text-[var(--accent-blue)]" suppressHydrationWarning>
-            {formatPrice(amount)} تومان
-          </span>
-        </div>
-
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-600 text-xs font-bold">
-            ⚠️ {errorMsg}
-          </div>
-        )}
-
-        <form onSubmit={handlePay} className="space-y-4 text-xs">
+      <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره کارت بانکی (۱۶ رقم):</label>
-            <input
-              type="text"
-              maxLength={19}
-              required
-              value={cardNumber}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\\D/g, "").slice(0, 16);
-                const formatted = val.match(/.{1,4}/g)?.join(" - ") || val;
-                setCardNumber(formatted);
-              }}
-              placeholder="۶۰۳۷ - ۹۹۱۸ - XXXX - XXXX"
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold tracking-widest text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-            />
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی برند / فروشگاه *</label>
+            <input type="text" required value={siteName} onChange={(e) => setSiteName(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-[var(--text-primary)] outline-none" />
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد CVV2:</label>
-              <input
-                type="password"
-                maxLength={4}
-                required
-                value={cvv2}
-                onChange={(e) => setCvv2(e.target.value.replace(/\\D/g, ""))}
-                placeholder="۳ یا ۴ رقم"
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انقضا (ماه / سال):</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  maxLength={2}
-                  placeholder="ماه"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value.replace(/\\D/g, ""))}
-                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-                />
-                <input
-                  type="text"
-                  maxLength={2}
-                  placeholder="سال"
-                  value={year}
-                  onChange={(e) => setYear(e.target.value.replace(/\\D/g, ""))}
-                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-                />
-              </div>
-            </div>
-          </div>
-
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="font-bold text-[var(--text-secondary)]">رمز دوم پویا:</label>
-              <span className="text-[10px] font-mono text-amber-500 font-bold" suppressHydrationWarning>
-                {Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, "0")} مانده
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                required
-                maxLength={7}
-                value={pass}
-                onChange={(e) => setPass(e.target.value.replace(/\\D/g, ""))}
-                placeholder="رمز پیامک‌شده"
-                className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playClick();
-                  setPass("584920");
-                  setOtpTimer(120);
-                }}
-                className="px-4 py-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"
-              >
-                دریافت رمز
-              </button>
-            </div>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شعار تبلیغاتی (Tagline)</label>
+            <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-[var(--text-primary)] outline-none" />
           </div>
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={paying}
-              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {paying ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
-              ) : (
-                <span>پرداخت نهایی و تایید فاکتور 🔒</span>
-              )}
-            </button>
+          <div>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شماره تماس پشتیبانی</label>
+            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono font-bold text-[var(--text-primary)] outline-none" />
           </div>
-        </form>
+          <div>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">ایمیل رسمی</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono text-[var(--text-primary)] outline-none" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نشانی پستی انبار و دفتر</label>
+            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-[var(--text-primary)] outline-none" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">متن اعلان بالای سایت</label>
+            <input type="text" value={announcement} onChange={(e) => setAnnouncement(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-[var(--text-primary)] font-bold outline-none" />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+`,
 
-export default function CheckoutPaymentPage() {
+  // ۴. فوتر سایت با بسته‌شدن ۱۰۰٪ کامل و بدون خطای سینتکس
+  'components/Footer.tsx': `"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+
+export default function Footer() {
+  const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+
+  useEffect(() => {
+    siteInfoService.getSiteInfo().then((d) => d && setInfo(d));
+    const handleUpdate = (e: any) => { if (e.detail) setInfo(e.detail); };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
+
+  const siteName = info?.site_name || info?.siteName || "آکسون | Axon";
+  const footerLogo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
+
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
-          در حال اتصال به درگاه شاپرک...
+    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] transition-colors mt-auto shadow-2xl select-none" dir="rtl">
+      <div className="max-w-7xl mx-auto px-6 py-14">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+          <div className="space-y-4">
+            <div className="w-full max-w-[180px] h-20 rounded-2xl border border-[var(--card-border)] bg-white/5 p-2 shadow-inner flex items-center justify-center overflow-hidden">
+              {footerLogo ? (
+                <img src={footerLogo} alt={siteName} className="w-full h-full object-contain" />
+              ) : (
+                <div className="w-full h-full rounded-xl bg-[var(--accent-blue)] flex items-center justify-center text-white font-black text-xl">
+                  ⚓
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
+              {info?.description || info?.tagline || "مرجع تخصصی مانیتور و تجهیزات تصویر"}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2">دسترسی سریع</h5>
+            <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
+              <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ محصولات</Link></li>
+              <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">پیگیری سفارش</Link></li>
+              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">اخبار تکنولوژی</Link></li>
+              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله سئو</Link></li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2">اطلاعات رسمی</h5>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+              <li>تلفن: <span className="font-mono font-bold text-[var(--accent-blue)]">{info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</span></li>
+              <li>ایمیل: <span className="font-mono">{info?.email || "info@axoncore.ir"}</span></li>
+              <li>ساعات کاری: {info?.working_hours || "۹:۰۰ الی ۱۸:۰۰"}</li>
+              <li>نشانی: {info?.address || "تهران، خیابان ولیعصر"}</li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2">ضمانت و استانداردها</h5>
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 text-xs">
+              <div className="font-black text-emerald-500">✓ ضمانت ۱۰۰٪ اصالت فیزیکی کالا</div>
+              <p className="text-[11px] text-[var(--text-secondary)]">ارسال پیشتاز با بسته‌بندی ضدضربه استودیویی و بیمه کامل.</p>
+            </div>
+          </div>
         </div>
-      }
-    >
-      <PaymentGatewayContent />
-    </Suspense>
+
+        <div className="mt-12 pt-6 border-t border-[var(--card-border)] text-center text-xs text-[var(--text-secondary)] font-bold">
+          تمامی حقوق مادی و معنوی برای مجموعه <span className="text-[var(--accent-blue)]">{siteName}</span> محفوظ است © {new Date().getFullYear()}
+        </div>
+      </div>
+    </footer>
   );
 }
 `
@@ -638,12 +513,12 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ رفع قطعی و تثبیت فایل: ${filePath}`);
+  console.log(`✅ فایل بازنویسی شد: ${filePath}`);
 }
 
-console.log('📦 در حال Push به گیت‌هاب و انتشار در Vercel...');
+console.log('📦 در حال Push خودکار به گیت‌هاب و انتشار در Vercel...');
 try {
-  execSync('git add . && git commit -m "fix: total eradication of orders 400 Bad Request, guaranteed payment amount & zero hydration error" && git push origin main', { stdio: 'inherit' });
+  execSync('git add . && git commit -m "fix: complete syntax fix for fix.js - animated logos & favicons active" && git push origin main', { stdio: 'inherit' });
   console.log('🎉 تغییرات با موفقیت دیپلوی شدند!');
 } catch (e) {
   console.log('⚠️ دستور دستی: git push origin main');

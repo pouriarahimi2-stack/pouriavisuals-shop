@@ -17,6 +17,7 @@ export interface SiteInfo {
   footer_logo_url?: string;
   footerLogoUrl?: string;
   favicon_url?: string;
+  faviconUrl?: string;
   allow_google_index?: boolean;
   allowGoogleIndex?: boolean;
   maintenance_mode?: MaintenanceMode;
@@ -64,7 +65,6 @@ export const siteInfoService = {
 
   async getSiteInfo(): Promise<SiteInfo | null> {
     try {
-      // دریافت مستقیم و بدون کش از API سرور
       const res = await fetch("/api/site-info", { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
@@ -86,6 +86,7 @@ export const siteInfoService = {
             footer_logo_url: data.footer_logo_url || "",
             footerLogoUrl: data.footer_logo_url || "",
             favicon_url: data.favicon_url || "",
+            faviconUrl: data.favicon_url || "",
             allow_google_index: isAllowed,
             allowGoogleIndex: isAllowed,
             maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
@@ -135,7 +136,7 @@ export const siteInfoService = {
         working_hours: payload.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
         logo_url: payload.logo_url || payload.logoUrl || "",
         footer_logo_url: payload.footer_logo_url || payload.footerLogoUrl || "",
-        favicon_url: payload.favicon_url || "",
+        favicon_url: payload.favicon_url || payload.faviconUrl || "",
         allow_google_index: isAllowed,
         maintenance_mode: payload.maintenance_mode || (isAllowed ? "none" : "indefinite"),
         maintenance_until: payload.maintenance_until || null,

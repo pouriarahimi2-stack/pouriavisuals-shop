@@ -3,6 +3,10 @@ import { RealtimeChannel } from "@supabase/supabase-js";
 import { productService } from "@/services/productService";
 import { siteInfoService } from "@/services/siteInfoService";
 import { bannerService } from "@/services/bannerService";
+import { orderService } from "@/services/orderService";
+import { couponService } from "@/services/couponService";
+import { menuService } from "@/services/menuService";
+import { categoryService } from "@/services/categoryService";
 
 export function applyFaviconToDOM(url?: string) {
   if (typeof document === "undefined" || !url) return;
@@ -58,21 +62,21 @@ class MasterRealtimeEngine {
   public broadcastLocally(type: string, data: any) {
     if (typeof window === "undefined") return;
     
-    // ۱. دیسپچ در پنجره جاری
+    // ۱. انتشار در پنجره جاری
     window.dispatchEvent(new CustomEvent(type, { detail: data }));
     
-    // ۲. ارسال به تمام تب‌های دیگر در همان مرورگر در ۱ میلی‌ثانیه
+    // ۲. ارسال به تمام تب‌های دیگر در همان مرورگر در ۰ میلی‌ثانیه
     if (this.broadcastBus) {
       this.broadcastBus.postMessage({ type, data });
     }
     
-    // ۳. اعمال بلادرنگ فاوآیکون و تایتل
+    // ۳. اعمال فوری فاوآیکون و تایتل
     if (type === "site_info_updated" && data) {
       if (data.favicon_url) applyFaviconToDOM(data.favicon_url);
       if (data.tagline || data.site_name) applyTitleToDOM(data.tagline, data.site_name);
     }
 
-    // ۴. ارسال به سایر کاربران آنلاین از طریق سوکت سوپابیس
+    // ۴. ارسال به سایر مرورگرها از طریق سوکت سوپابیس
     if (this.channel) {
       this.channel.send({
         type: "broadcast",
@@ -130,6 +134,18 @@ class MasterRealtimeEngine {
           } else if (tableName === "banners") {
             const allBanners = await bannerService.getAll();
             window.dispatchEvent(new CustomEvent("banners_updated", { detail: allBanners }));
+          } else if (tableName === "orders") {
+            const allOrders = await orderService.getAll();
+            window.dispatchEvent(new CustomEvent("orders_updated", { detail: allOrders }));
+          } else if (tableName === "coupons") {
+            const allCoupons = await couponService.getAll();
+            window.dispatchEvent(new CustomEvent("coupons_updated", { detail: allCoupons }));
+          } else if (tableName === "menu_items") {
+            const allMenu = await menuService.getAll();
+            window.dispatchEvent(new CustomEvent("menu_updated", { detail: allMenu }));
+          } else if (tableName === "categories") {
+            const allCats = await categoryService.getAll();
+            window.dispatchEvent(new CustomEvent("categories_updated", { detail: allCats }));
           }
         }
       );

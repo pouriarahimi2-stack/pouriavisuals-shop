@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { realtimeEngine } from "@/lib/realtimeSync";
 
 export interface Banner {
   id: string;
@@ -95,7 +96,7 @@ export const bannerService = {
         const all = await this.getAll();
         const updated = [payload, ...all.filter((b) => b.id !== id)];
         localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("banners_updated", { detail: updated }));
+        realtimeEngine.broadcastLocally("banners_updated", updated);
       }
 
       return payload;
@@ -114,7 +115,7 @@ export const bannerService = {
         const all = await this.getAll();
         const updated = all.filter((b) => b.id !== id);
         localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("banners_updated", { detail: updated }));
+        realtimeEngine.broadcastLocally("banners_updated", updated);
       }
       return true;
     } catch (e) {

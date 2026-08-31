@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { realtimeEngine } from "@/lib/realtimeSync";
 
 export interface ProductVariant {
   id: string;
@@ -510,7 +511,7 @@ export const productService = {
         const all = await this.getAll();
         const updated = [normalized, ...all.filter((p) => p.id !== normalized.id)];
         localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("products_updated", { detail: updated }));
+        realtimeEngine.broadcastLocally("products_updated", updated);
       }
 
       return normalized;
@@ -530,7 +531,7 @@ export const productService = {
         const all = await this.getAll();
         const updated = all.filter((p) => p.id !== id);
         localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("products_updated", { detail: updated }));
+        realtimeEngine.broadcastLocally("products_updated", updated);
       }
       return true;
     } catch (e) {

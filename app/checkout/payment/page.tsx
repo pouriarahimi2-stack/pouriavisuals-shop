@@ -1,12 +1,11 @@
-// File Path: app/checkout/payment/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { orderService } from "@/services/orderService";
-import { smsService } from "@/services/smsService";
 import { soundEngine } from "@/lib/soundEngine";
+import { formatPrice } from "@/lib/formatters";
 
 function PaymentGatewayContent() {
   const router = useRouter();
@@ -14,7 +13,7 @@ function PaymentGatewayContent() {
   const orderId = searchParams.get("orderId") || "";
 
   const [order, setOrder] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [amount, setAmount] = useState<number>(0);
   const [cardNumber, setCardNumber] = useState("");
   const [cvv2, setCvv2] = useState("");
   const [month, setMonth] = useState("");
@@ -26,31 +25,27 @@ function PaymentGatewayContent() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    async function loadOrder() {
-      if (!orderId) {
-        setLoading(false);
-        return;
+    // ۱. دریافت قطعی مبلغ از سشن و سرویس
+    let payable = 0;
+    try {
+      const savedAmount = sessionStorage.getItem("pending_payment_amount");
+      if (savedAmount && Number(savedAmount) > 0) {
+        payable = Number(savedAmount);
+        setAmount(payable);
       }
+    } catch {}
 
-      let found: any = null;
-      try {
-        found = await orderService.getById(orderId);
-      } catch {}
-
-      if (!found) {
-        try {
-          const local = JSON.parse(localStorage.getItem("axon_orders_registry_cache_v2026") || "[]");
-          found = local.find((o: any) => String(o.id) === String(orderId) || o.orderNumber === orderId);
-        } catch {
-          found = null;
+    if (orderId) {
+      orderService.getById(orderId).then((found) => {
+        if (found) {
+          setOrder(found);
+          const finalVal = Number(found.finalAmount || found.final_amount || found.totalAmount || 0);
+          if (finalVal > 0) {
+            setAmount(finalVal);
+          }
         }
-      }
-
-      setOrder(found);
-      setLoading(false);
+      });
     }
-
-    loadOrder();
 
     const timer = setInterval(() => {
       setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
@@ -74,7 +69,7 @@ function PaymentGatewayContent() {
       return;
     }
     if (!pass || pass.length < 5) {
-      setErrorMsg("رمز دوم پویا را به طور کامل وارد نمایید.");
+      setErrorMsg("رمز دوم پویا را وارد نمایید.");
       return;
     }
 
@@ -85,37 +80,22 @@ function PaymentGatewayContent() {
 
       if (orderId) {
         await orderService.updateStatus(orderId, "paid");
-
-        const targetPhone = order?.customer?.phone || order?.phone;
-        const targetName = order?.customer?.fullName || order?.customer_name || "مشتری گرامی";
-        if (targetPhone) {
-          await smsService.sendTrackingCode(targetPhone, targetName, `پرداخت فاکتور ${orderId} با موفقیت تایید شد.`);
-        }
       }
 
       if (typeof window !== "undefined") {
         localStorage.removeItem("axon_cart_store_v2026");
         localStorage.removeItem("axon_active_coupon_v2026");
+        sessionStorage.removeItem("pending_payment_amount");
       }
 
       soundEngine.playSuccess();
       setPaying(false);
       setPaymentSuccess(true);
-    } catch (err) {
-      console.error("Payment error:", err);
+    } catch {
       setErrorMsg("خطا در پردازش تراکنش بانکی.");
       setPaying(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3 font-sans text-xs font-bold text-[var(--text-secondary)]">
-        <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin" />
-        در حال اتصال امن به درگاه شاپرک...
-      </div>
-    );
-  }
 
   if (paymentSuccess) {
     return (
@@ -136,8 +116,8 @@ function PaymentGatewayContent() {
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">مبلغ پرداختی:</span>
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                {Number(order?.finalAmount || order?.totalAmount || order?.total_amount || 0).toLocaleString("fa-IR")} تومان
+              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
+                {formatPrice(amount)} تومان
               </span>
             </div>
           </div>
@@ -161,8 +141,6 @@ function PaymentGatewayContent() {
     );
   }
 
-  const payableAmount = Number(order?.finalAmount || order?.totalAmount || order?.total_amount || 0);
-
   return (
     <div className="min-h-[85vh] py-10 px-4 max-w-lg mx-auto font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
@@ -184,8 +162,8 @@ function PaymentGatewayContent() {
 
         <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center text-xs">
           <span className="text-[var(--text-secondary)] font-bold">مبلغ قابل پرداخت فاکتور:</span>
-          <span className="font-mono font-black text-base text-[var(--accent-blue)]">
-            {payableAmount.toLocaleString("fa-IR")} تومان
+          <span className="font-mono font-black text-base text-[var(--accent-blue)]" suppressHydrationWarning>
+            {formatPrice(amount)} تومان
           </span>
         </div>
 
@@ -253,7 +231,7 @@ function PaymentGatewayContent() {
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="font-bold text-[var(--text-secondary)]">رمز دوم پویا:</label>
-              <span className="text-[10px] font-mono text-amber-500 font-bold">
+              <span className="text-[10px] font-mono text-amber-500 font-bold" suppressHydrationWarning>
                 {Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, "0")} مانده
               </span>
             </div>
@@ -305,7 +283,6 @@ export default function CheckoutPaymentPage() {
     <Suspense
       fallback={
         <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
-          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin mb-3" />
           در حال اتصال به درگاه شاپرک...
         </div>
       }

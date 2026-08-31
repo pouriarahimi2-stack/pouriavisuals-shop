@@ -1,5 +1,4 @@
-// File Path: services/orderService.ts
-import { supabase } from "@/lib/supabase";
+import { realtimeEngine } from "@/lib/realtimeSync";
 
 export interface OrderItem {
   id?: string | number;
@@ -10,7 +9,6 @@ export interface OrderItem {
   price: number;
   quantity: number;
   image?: string;
-  image_url?: string;
 }
 
 export interface CustomerInfo {
@@ -43,8 +41,6 @@ export interface Order {
   discount_amount?: number;
   couponCode?: string;
   coupon_code?: string;
-  shippingFee?: number;
-  shipping_fee?: number;
   finalAmount: number;
   final_amount?: number;
   status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
@@ -64,289 +60,168 @@ const LOCAL_STORAGE_KEY = "axon_orders_registry_cache_v2026";
 export function normalizeOrder(raw: any): Order {
   if (!raw) return {} as Order;
 
-  const id = raw.id || `ORD-${Date.now().toString().slice(-6)}`;
-  const orderNumber = raw.order_number || raw.orderNumber || (typeof id === "string" ? id : `ORD-${id}`);
-
-  const fullName =
-    raw.customer_name ||
-    raw.customerName ||
-    raw.customer?.fullName ||
-    raw.customer?.name ||
-    raw.fullName ||
-    (raw.first_name ? `${raw.first_name || ""} ${raw.last_name || ""}`.trim() : "خریدار محترم");
-
+  const id = raw.id || raw.order_number || `ORD-${Date.now().toString().slice(-6)}`;
+  const orderNumber = raw.order_number || raw.orderNumber || String(id);
+  const fullName = raw.customer_name || raw.customerName || raw.customer?.fullName || raw.customer?.name || "خریدار محترم";
   const phone = raw.phone || raw.customer_phone || raw.customer?.phone || "";
-  const province = raw.province || raw.customer_province || raw.customer?.province || "تهران";
-  const city = raw.city || raw.customer_city || raw.customer?.city || "تهران";
   const address = raw.address || raw.customer_address || raw.customer?.address || "";
-  const postalCode = raw.postal_code || raw.postalCode || raw.customer?.postalCode || raw.customer?.postal_code || "";
-  const notes = raw.notes || raw.customer?.notes || "";
-
-  const customer: CustomerInfo = {
-    fullName,
-    name: fullName,
-    phone,
-    province,
-    city,
-    address,
-    postalCode,
-    postal_code: postalCode,
-    notes,
-  };
-
-  const items: OrderItem[] = Array.isArray(raw.items)
-    ? raw.items.map((item: any) => ({
-        ...item,
-        productId: item.productId || item.product_id || item.id,
-        product_id: item.product_id || item.productId || item.id,
-        name: item.name || item.title || "کالای دیجیتال",
-        title: item.title || item.name || "کالای دیجیتال",
-        price: Number(item.price) || 0,
-        quantity: Number(item.quantity) || 1,
-        image: item.image || item.image_url || "/placeholder.png",
-        image_url: item.image || item.image_url || "/placeholder.png",
-      }))
-    : [];
-
-  const finalAmount = Number(
-    raw.final_amount ?? raw.finalAmount ?? raw.total_amount ?? raw.totalAmount ?? 0
-  );
+  const finalAmount = Number(raw.final_amount ?? raw.finalAmount ?? raw.total_amount ?? raw.totalAmount ?? 0);
   const totalAmount = Number(raw.total_amount ?? raw.totalAmount ?? finalAmount);
-  const discountAmount = Number(raw.discount_amount ?? raw.discountAmount ?? 0);
-  const couponCode = raw.coupon_code || raw.couponCode || "";
-  const trackingCode = raw.tracking_code || raw.trackingCode || "";
-  const paymentStatus = raw.payment_status || raw.paymentStatus || "pending";
-  const status = raw.status || "pending";
 
   return {
     ...raw,
-    id,
+    id: String(id),
     orderNumber,
     order_number: orderNumber,
-    customer,
+    customer: {
+      fullName,
+      name: fullName,
+      phone,
+      address,
+      province: raw.province || "تهران",
+      city: raw.city || "تهران",
+      postalCode: raw.postal_code || raw.postalCode || "",
+    },
     customerName: fullName,
     customer_name: fullName,
     phone,
     address,
-    postalCode,
-    postal_code: postalCode,
-    items,
+    items: Array.isArray(raw.items) ? raw.items : [],
     totalAmount,
     total_amount: totalAmount,
-    discountAmount,
-    discount_amount: discountAmount,
-    couponCode,
-    coupon_code: couponCode,
-    shippingFee: Number(raw.shipping_fee ?? raw.shippingFee ?? 0),
-    shipping_fee: Number(raw.shipping_fee ?? raw.shippingFee ?? 0),
     finalAmount,
     final_amount: finalAmount,
-    status,
-    paymentStatus,
-    payment_status: paymentStatus,
-    paymentMethod: raw.payment_method || raw.paymentMethod || "online",
-    payment_method: raw.payment_method || raw.paymentMethod || "online",
-    trackingCode,
-    tracking_code: trackingCode,
-    notes,
+    discountAmount: Number(raw.discount_amount ?? raw.discountAmount ?? 0),
+    status: raw.status || "pending",
+    paymentStatus: raw.payment_status || raw.paymentStatus || "pending",
+    payment_status: raw.payment_status || raw.paymentStatus || "pending",
+    trackingCode: raw.tracking_code || raw.trackingCode || "",
+    tracking_code: raw.tracking_code || raw.trackingCode || "",
     created_at: raw.created_at || new Date().toISOString(),
-    updated_at: raw.updated_at || new Date().toISOString(),
   };
 }
 
 export const orderService = {
   async getAll(): Promise<Order[]> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data) {
-          const normalized = data.map(normalizeOrder);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(normalized));
-          }
-          return normalized;
+      const res = await fetch("/api/orders/track?query=all", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data)) {
+          return json.data.map(normalizeOrder);
         }
       }
+    } catch {}
 
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (cached) return JSON.parse(cached).map(normalizeOrder);
-      }
-      return [];
-    } catch (err) {
-      console.error("orderService.getAll error:", err);
-      return [];
+    if (typeof window !== "undefined") {
+      try {
+        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (local) return JSON.parse(local).map(normalizeOrder);
+      } catch {}
     }
+    return [];
   },
 
   async getById(id: string | number): Promise<Order | null> {
-    try {
-      const cleanId = String(id).trim();
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .or(`id.eq.${cleanId},order_number.eq.${cleanId}`)
-          .maybeSingle();
+    const cleanId = String(id).trim();
 
-        if (!error && data) {
-          return normalizeOrder(data);
+    // ۱. بررسی حافظه موقت سشن جهت تضمین ۱۰۰٪ مبلغ
+    if (typeof window !== "undefined") {
+      try {
+        const savedAmount = sessionStorage.getItem("pending_payment_amount");
+        const savedId = sessionStorage.getItem("pending_payment_order_id");
+        if (savedAmount && (savedId === cleanId || !savedId)) {
+          const localOrders = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+          const foundLocal = localOrders.find((o: any) => String(o.id) === cleanId || o.order_number === cleanId);
+          if (foundLocal) return normalizeOrder(foundLocal);
+
+          return normalizeOrder({
+            id: cleanId,
+            order_number: cleanId,
+            final_amount: Number(savedAmount),
+            total_amount: Number(savedAmount),
+            status: "pending",
+          });
+        }
+      } catch {}
+    }
+
+    try {
+      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(cleanId)}`, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && json.data.length > 0) {
+          return normalizeOrder(json.data[0]);
         }
       }
+    } catch {}
 
-      const all = await this.getAll();
-      return all.find((o) => String(o.id) === cleanId || o.orderNumber === cleanId) || null;
-    } catch (err) {
-      console.error("orderService.getById error:", err);
-      return null;
-    }
+    const all = await this.getAll();
+    return all.find((o) => String(o.id) === cleanId || o.orderNumber === cleanId) || null;
   },
 
-  async trackOrder(queryStr: string): Promise<Order[]> {
-    try {
-      const clean = queryStr.trim();
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .or(`order_number.eq.${clean},id.eq.${clean},phone.eq.${clean},tracking_code.eq.${clean}`)
-          .order("created_at", { ascending: false });
+  async create(orderData: any): Promise<Order | null> {
+    const orderId = orderData.id || orderData.order_number || `ORD-${Date.now().toString().slice(-6)}`;
+    const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? orderData.totalAmount ?? orderData.total_amount ?? 0);
 
-        if (!error && data && data.length > 0) {
-          return data.map(normalizeOrder);
-        }
-      }
-
-      const all = await this.getAll();
-      return all.filter(
-        (o) =>
-          String(o.id) === clean ||
-          o.orderNumber === clean ||
-          o.customer?.phone === clean ||
-          o.phone === clean ||
-          o.trackingCode === clean
-      );
-    } catch (err) {
-      console.error("orderService.trackOrder error:", err);
-      return [];
+    // ذخیره فوری مبلغ در سشن مرورگر
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("pending_payment_amount", String(finalAmount));
+      sessionStorage.setItem("pending_payment_order_id", orderId);
     }
+
+    const payload = {
+      ...orderData,
+      id: orderId,
+      order_number: orderId,
+      final_amount: finalAmount,
+      total_amount: Number(orderData.totalAmount ?? orderData.total_amount ?? finalAmount),
+    };
+
+    try {
+      await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {}
+
+    const normalized = normalizeOrder(payload);
+
+    if (typeof window !== "undefined") {
+      try {
+        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+        const updated = [normalized, ...existing.filter((o: any) => String(o.id) !== String(normalized.id))];
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+        realtimeEngine.broadcastLocally("orders_updated", updated);
+      } catch {}
+    }
+
+    return normalized;
   },
 
-  async create(orderData: Partial<Order> | any): Promise<Order | null> {
+  async updateStatus(id: string | number, status: Order["status"], trackingCode?: string): Promise<boolean> {
     try {
-      const orderId = orderData.id || `ORD-${Date.now().toString().slice(-6)}`;
-      const orderNumber = orderData.orderNumber || orderData.order_number || orderId;
+      const payload: any = { status, updated_at: new Date().toISOString() };
+      if (status === "paid") payload.payment_status = "paid";
+      if (trackingCode) payload.tracking_code = trackingCode.trim();
 
-      const customerObj = orderData.customer || {};
-      const customerName = (
-        customerObj.fullName ||
-        customerObj.name ||
-        orderData.customer_name ||
-        orderData.customerName ||
-        "خریدار محترم"
-      ).trim();
-
-      const phone = (customerObj.phone || orderData.phone || orderData.customer_phone || "").trim();
-      const address = (customerObj.address || orderData.address || orderData.customer_address || "").trim();
-      const province = customerObj.province || orderData.province || "تهران";
-      const city = customerObj.city || orderData.city || "تهران";
-      const postalCode = (customerObj.postalCode || customerObj.postal_code || orderData.postalCode || orderData.postal_code || "").trim();
-      const notes = customerObj.notes || orderData.notes || "";
-
-      const items = Array.isArray(orderData.items) ? orderData.items : [];
-      const totalAmount = Number(orderData.totalAmount ?? orderData.total_amount ?? 0);
-      const discountAmount = Number(orderData.discountAmount ?? orderData.discount_amount ?? 0);
-      const finalAmount = Number(orderData.finalAmount ?? orderData.final_amount ?? Math.max(0, totalAmount - discountAmount));
-
-      const dbPayload: any = {
-        id: orderId,
-        order_number: orderNumber,
-        customer_name: customerName,
-        phone,
-        province,
-        city,
-        address,
-        postal_code: postalCode,
-        items,
-        total_amount: totalAmount,
-        discount_amount: discountAmount,
-        final_amount: finalAmount,
-        coupon_code: orderData.couponCode || orderData.coupon_code || null,
-        status: orderData.status || "pending",
-        payment_status: orderData.paymentStatus || orderData.payment_status || "pending",
-        payment_method: orderData.paymentMethod || orderData.payment_method || "online",
-        tracking_code: orderData.trackingCode || orderData.tracking_code || null,
-        notes,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (supabase) {
-        await supabase.from("orders").upsert(dbPayload, { onConflict: "id" });
-      }
-
-      const normalized = normalizeOrder(dbPayload);
+      await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...payload }),
+      });
 
       if (typeof window !== "undefined") {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
-        const updated = [normalized, ...existing.filter((o: any) => o.id !== normalized.id)];
+        const all = await this.getAll();
+        const updated = all.map((o) => (String(o.id) === String(id) ? { ...o, ...payload } : o));
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-        sessionStorage.setItem("pending_payment_amount", String(finalAmount));
-        sessionStorage.setItem("pending_payment_order_id", orderId);
-        window.dispatchEvent(new CustomEvent("orders_updated", { detail: normalized }));
+        realtimeEngine.broadcastLocally("orders_updated", updated);
       }
-
-      return normalized;
-    } catch (err) {
-      console.error("orderService.create error:", err);
-      return null;
-    }
-  },
-
-  async updateStatus(
-    id: string | number,
-    status: Order["status"],
-    trackingCode?: string
-  ): Promise<boolean> {
-    try {
-      const payload: any = {
-        status,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (status === "paid") {
-        payload.payment_status = "paid";
-      }
-
-      if (trackingCode !== undefined) {
-        payload.tracking_code = trackingCode.trim() || null;
-      }
-
-      if (supabase) {
-        await supabase.from("orders").update(payload).eq("id", id);
-      }
-
-      if (typeof window !== "undefined") {
-        const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
-        const updated = existing.map((o: any) =>
-          String(o.id) === String(id) ? { ...o, ...payload } : o
-        );
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent("orders_updated", { detail: { id, ...payload } }));
-      }
-
       return true;
-    } catch (err) {
-      console.error("orderService.updateStatus error:", err);
+    } catch {
       return false;
     }
-  },
-
-  async updateOrderStatus(id: string | number, status: Order["status"]): Promise<boolean> {
-    return this.updateStatus(id, status);
   },
 };
 

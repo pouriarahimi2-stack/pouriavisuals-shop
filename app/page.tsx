@@ -6,26 +6,23 @@ import { bannerService, Banner } from "@/services/bannerService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import AIAssistantChat from "@/components/AIAssistantChat";
 import TechRadarFeed from "@/components/TechRadarFeed";
 import ProductComparisonModal from "@/components/ProductComparisonModal";
 import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
+import { formatPrice } from "@/lib/formatters";
 
 export default function HomePage() {
-  const router = useRouter();
   const { addToCart } = useCart();
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => productService.getAllSync());
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const [compareList, setCompareList] = useState<Product[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
@@ -38,11 +35,7 @@ export default function HomePage() {
       setProducts(prods || []);
       setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
       if (info) setSiteInfo(info);
-    } catch (e) {
-      console.error("Home page fetch error:", e);
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -208,10 +201,10 @@ function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart }: 
 
       <Link href={`/products/${product.id}`} className="space-y-2 cursor-pointer block">
         <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full font-bold text-[10px]">{product.category || "کالای دیجیتال"}</span>
-        <h4 className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2">{productName}</h4>
+        <h4 className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2 text-right">{productName}</h4>
         <div className="flex items-center gap-2 pt-1">
-          <span className="font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 font-mono">{currentPrice.toLocaleString("fa-IR")} تومان</span>
-          {oldPrice > currentPrice && <span className="text-[11px] line-through text-[var(--text-secondary)] font-mono">{oldPrice.toLocaleString("fa-IR")}</span>}
+          <span className="font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>{formatPrice(currentPrice)} تومان</span>
+          {oldPrice > currentPrice && <span className="text-[11px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>{formatPrice(oldPrice)}</span>}
         </div>
       </Link>
 

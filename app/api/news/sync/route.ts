@@ -5,13 +5,15 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
-    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    // ۱. پاکسازی کامل جدول اخبار جهت حذف تمامی رکوردهای تکراری پیشین
     try {
-      await supabaseAdmin.from("tech_news").delete().lt("published_at", threeDaysAgo);
+      await supabaseAdmin.from("tech_news").delete().neq("id", "-1");
     } catch {}
 
-    const newsItems = [
+    // ۲. تعریف ۶ خبر پرچمدار و کاملاً یکتا
+    const uniqueNewsList = [
       {
+        id: "news-tandem-oled-2026",
         title: "انقلاب پنل‌های تاندم اولد ۲۴۰ هرتز در مانیتورهای ۵K استودیو",
         slug: "tandem-oled-5k-studio-displays-2026",
         summary: "نسل جدید نمایشگرهای تدوین با دو لایه ساطع‌کننده ارگانیک و روشنایی پایدار ۲۰۰۰ نیت بدون خطر برن‌این.",
@@ -24,6 +26,7 @@ export async function POST() {
         is_published: true,
       },
       {
+        id: "news-thunderbolt-5-capture",
         title: "معماری تاندربولت ۵ و کارت‌های کپچر ۱۲ بیتی بدون فشرده‌سازی",
         slug: "thunderbolt-5-ultra-capture-cards-8k",
         summary: "پهنای باند ۱۲۰ گیگابیت بر ثانیه برای ضبط همزمان تصاویر 8K 60fps RAW با تاخیر صفر میلی‌ثانیه.",
@@ -36,9 +39,10 @@ export async function POST() {
         is_published: true,
       },
       {
+        id: "news-ai-neural-color",
         title: "کالیبراسیون هوش مصنوعی در چیپست‌های پردازش عصبی تصویر",
         slug: "ai-neural-color-engine-hardware-calibration",
-        summary: "موتورهای عصبی کالیبراسیون سخت‌افزاری با خطای رنگی کمتر از ۰.۲ Delta E در نرم‌افزارهای DaVinci Resolve.",
+        summary: "موتورهای عصبی کالیبراسیون سخت‌افزاری با خطای رنگی کمتر از ۰.۲ Delta E در DaVinci Resolve.",
         content: "<p>الگوریتم‌های عصبی با رصد لحظه‌ای دمای پنل و شرایط نوری محیط، جدول رنگ ۳D LUT را در کسری از میلی‌ثانیه کالیبره نگه می‌دارند.</p>",
         category: "ai",
         source_name: "The Verge",
@@ -48,6 +52,7 @@ export async function POST() {
         is_published: true,
       },
       {
+        id: "news-mini-led-32-zones",
         title: "معرفی نمایشگرهای ۳۲ اینچ Mini-LED با ۵۰۰۰ منطقه نوردهی موضعی",
         slug: "mini-led-32-inch-local-dimming-5000-zones",
         summary: "تولید سیاهی عمیق مطلق در سطح OLED همراه با اوج روشنایی ۳۰۰۰ نیت در تدوین محتوای HDR سینمایی.",
@@ -60,6 +65,7 @@ export async function POST() {
         is_published: true,
       },
       {
+        id: "news-gan-240w-power",
         title: "استاندارد شارژ سریع ۲۴۰ وات GaN برای استودیوهای سیار تدوین",
         slug: "gan-240w-ultra-power-delivery-studio",
         summary: "تغذیه پایدار همزمان لپ‌تاپ‌های ورک‌استیشن M4 Max و چند مانیتور اکسترنال با آداپتورهای نیترید گالیوم فشرده.",
@@ -72,6 +78,7 @@ export async function POST() {
         is_published: true,
       },
       {
+        id: "news-ai-neural-gpu-render",
         title: "ادغام موتورهای رندرینگ هوش مصنوعی با شتاب‌دهنده‌های سخت‌افزاری",
         slug: "ai-neural-rendering-gpu-acceleration-2026",
         summary: "رندر بی‌درنگ پروژه‌های سنگین ویدیو و سه‌بعدی با یک‌سوم مصرف انرژی متداول.",
@@ -85,11 +92,11 @@ export async function POST() {
       },
     ];
 
-    for (const art of newsItems) {
+    for (const art of uniqueNewsList) {
       await supabaseAdmin.from("tech_news").upsert(art, { onConflict: "slug" });
     }
 
-    return NextResponse.json({ success: true, count: newsItems.length, message: "اخبار با موفقیت همگام‌سازی شد" });
+    return NextResponse.json({ success: true, count: uniqueNewsList.length, message: "تمامی اخبار تکراری حذف و دیتابیس نوسازی شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }

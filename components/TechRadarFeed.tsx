@@ -5,51 +5,15 @@ import Link from "next/link";
 import { newsService, TechNewsItem } from "@/services/newsService";
 import { soundEngine } from "@/lib/soundEngine";
 
-const DEFAULT_NEWS_FALLBACK: TechNewsItem[] = [
-  {
-    id: "news-tandem-oled-2026",
-    title: "انقلاب پنل‌های تاندم اولد ۲۴۰ هرتز در مانیتورهای ۵K استودیو",
-    slug: "tandem-oled-5k-studio-displays-2026",
-    summary: "نسل جدید نمایشگرهای تدوین با دو لایه ساطع‌کننده ارگانیک و روشنایی پایدار ۲۰۰۰ نیت بدون خطر برن‌این.",
-    content: "",
-    category: "hardware",
-    source_name: "DisplayMate",
-    image_url: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1200",
-    published_at: new Date().toISOString(),
-  },
-  {
-    id: "news-thunderbolt-5-capture",
-    title: "معماری تاندربولت ۵ و کارت‌های کپچر ۱۲ بیتی بدون فشرده‌سازی",
-    slug: "thunderbolt-5-ultra-capture-cards-8k",
-    summary: "پهنای باند ۱۲۰ گیگابیت بر ثانیه برای ضبط همزمان تصاویر 8K 60fps RAW با تاخیر صفر میلی‌ثانیه.",
-    content: "",
-    category: "gadgets",
-    source_name: "AnandTech",
-    image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200",
-    published_at: new Date().toISOString(),
-  },
-  {
-    id: "news-ai-neural-color",
-    title: "کالیبراسیون هوش مصنوعی در چیپست‌های پردازش عصبی تصویر",
-    slug: "ai-neural-color-engine-hardware-calibration",
-    summary: "موتورهای عصبی کالیبراسیون سخت‌افزاری با خطای رنگی کمتر از ۰.۲ Delta E.",
-    content: "",
-    category: "ai",
-    source_name: "The Verge",
-    image_url: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-    published_at: new Date().toISOString(),
-  }
-];
-
 export default function TechRadarFeed() {
-  const [newsList, setNewsList] = useState<TechNewsItem[]>(DEFAULT_NEWS_FALLBACK);
+  const [newsList, setNewsList] = useState<TechNewsItem[]>([]);
   const [startIndex, setStartIndex] = useState(0);
 
   const loadUniqueNews = async () => {
     try {
-      const data = await newsService.getPersonalizedNews();
+      const data = await newsService.getAll();
       const uniqueMap = new Map();
-      (data && data.length > 0 ? data : DEFAULT_NEWS_FALLBACK).forEach((item) => {
+      (data || []).forEach((item) => {
         const key = item.slug || item.title;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, item);
@@ -78,6 +42,7 @@ export default function TechRadarFeed() {
     return () => clearInterval(interval);
   }, [newsList.length]);
 
+  if (newsList.length === 0) return null;
   const visibleNews = newsList.slice(startIndex, startIndex + 3);
 
   return (

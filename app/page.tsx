@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { productService, Product } from "@/services/productService";
+import { productService, Product, FLAGSHIP_7_PRODUCTS } from "@/services/productService";
 import { bannerService, Banner } from "@/services/bannerService";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
@@ -15,9 +15,10 @@ import { formatPrice } from "@/lib/formatters";
 export default function HomePage() {
   const { addToCart } = useCart();
 
-  const [products, setProducts] = useState<Product[]>(() => productService.getAllSync());
+  // استیت اولیه پایدار و ۱۰۰٪ یکسان با SSR سرور
+  const [products, setProducts] = useState<Product[]>(FLAGSHIP_7_PRODUCTS);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
@@ -32,7 +33,7 @@ export default function HomePage() {
         siteInfoService.getSiteInfo(),
       ]);
 
-      setProducts(prods || []);
+      if (prods && prods.length > 0) setProducts(prods);
       setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
       if (info) setSiteInfo(info);
     } catch {}

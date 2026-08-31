@@ -27,16 +27,21 @@ export function applyTitleToDOM(title?: string, storeName?: string) {
   } catch {}
 }
 
+declare global {
+  interface Window {
+    __AXON_REALTIME_SINGLETON__?: MasterRealtimeEngine;
+  }
+}
+
 class MasterRealtimeEngine {
-  private static instance: MasterRealtimeEngine;
   private channel: RealtimeChannel | null = null;
   private broadcastBus: BroadcastChannel | null = null;
   private isSubscribed: boolean = false;
 
-  private constructor() {
+  constructor() {
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
       try {
-        this.broadcastBus = new BroadcastChannel("axon_master_stream_v2026");
+        this.broadcastBus = new BroadcastChannel("axon_master_bus_v2026");
         this.broadcastBus.onmessage = (event) => {
           const { type, data } = event.data || {};
           if (type) {
@@ -52,10 +57,13 @@ class MasterRealtimeEngine {
   }
 
   public static getInstance(): MasterRealtimeEngine {
-    if (!MasterRealtimeEngine.instance) {
-      MasterRealtimeEngine.instance = new MasterRealtimeEngine();
+    if (typeof window !== "undefined") {
+      if (!window.__AXON_REALTIME_SINGLETON__) {
+        window.__AXON_REALTIME_SINGLETON__ = new MasterRealtimeEngine();
+      }
+      return window.__AXON_REALTIME_SINGLETON__;
     }
-    return MasterRealtimeEngine.instance;
+    return new MasterRealtimeEngine();
   }
 
   public broadcastLocally(type: string, data: any) {
@@ -74,12 +82,14 @@ class MasterRealtimeEngine {
       if (data.tagline || data.site_name) applyTitleToDOM(data.tagline, data.site_name);
     }
 
-    if (this.channel) {
-      this.channel.send({
-        type: "broadcast",
-        event: type,
-        payload: data,
-      }).catch(() => {});
+    if (this.channel && this.isSubscribed) {
+      try {
+        this.channel.send({
+          type: "broadcast",
+          event: type,
+          payload: data,
+        });
+      } catch {}
     }
   }
 
@@ -88,7 +98,7 @@ class MasterRealtimeEngine {
     if (this.isSubscribed && this.channel) return () => {};
 
     try {
-      this.channel = supabase.channel("axon_global_stream_v2026", {
+      this.channel = supabase.channel("axon_main_stream_v2026", {
         config: { broadcast: { ack: false } },
       });
 
@@ -142,13 +152,7 @@ class MasterRealtimeEngine {
       });
     } catch {}
 
-    return () => {
-      if (this.channel) {
-        supabase.removeChannel(this.channel);
-        this.channel = null;
-        this.isSubscribed = false;
-      }
-    };
+    return () => {};
   }
 }
 

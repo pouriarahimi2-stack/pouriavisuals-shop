@@ -9,18 +9,17 @@ import { productService, Product } from "@/services/productService";
 import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
+import { formatPrice } from "@/lib/formatters";
 
 export default function Header() {
   const router = useRouter();
   const cartContext = useCart();
   const { totalItems, toggleCart, addToCart } = cartContext;
 
-  const [mounted, setMounted] = useState(false);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -32,7 +31,6 @@ export default function Header() {
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMounted(true);
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
@@ -51,14 +49,14 @@ export default function Header() {
         if (info) setSiteInfo(info);
         if (prods) setAllProducts(prods);
         if (cats) setCategories(cats);
-      } catch (e) {
-        console.error("Header load error:", e);
-      }
+      } catch {}
     };
 
     initHeaderData();
 
-    const handleSiteInfoUpdate = (e: any) => { if (e.detail) setSiteInfo(e.detail); };
+    const handleSiteInfoUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
     const handleProductsUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
       else productService.getAll().then((prods) => prods && setAllProducts(prods));
@@ -113,7 +111,6 @@ export default function Header() {
   const handleSelectCategory = (catName: string) => {
     soundEngine.playClick();
     setIsCategoryOpen(false);
-    setMobileMenuOpen(false);
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("category_selected", { detail: catName }));
     }
@@ -152,8 +149,8 @@ export default function Header() {
 
   return (
     <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
-      {mounted && siteInfo?.header_announcement && (
-        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate">
+      {siteInfo?.header_announcement && (
+        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate" suppressHydrationWarning>
           {siteInfo.header_announcement}
         </div>
       )}
@@ -234,7 +231,7 @@ export default function Header() {
                         <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 border border-[var(--card-border)] shrink-0" />
                         <div className="flex-1 min-w-0 text-right">
                           <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
-                          <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400">{Number(p.discountPrice || p.price || 0).toLocaleString("fa-IR")} ت</span>
+                          <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>{formatPrice(p.discountPrice || p.price || 0)} ت</span>
                         </div>
                       </Link>
                       <button type="button" onClick={(e) => handleQuickAddFromSearch(e, p)} className="px-2 py-1 rounded-lg text-[10px] font-black bg-[var(--accent-blue)] text-white cursor-pointer shadow-md">
@@ -247,15 +244,15 @@ export default function Header() {
             )}
           </div>
 
-          <button onClick={toggleDarkMode} className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0" title="تغییر تم">
-            {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
+          <button onClick={toggleDarkMode} className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0" title="تغییر تم" suppressHydrationWarning>
+            {isDarkMode ? "🌙" : "☀️"}
           </button>
 
           <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white transition-all shadow-md shadow-blue-500/25 cursor-pointer flex items-center justify-center shrink-0" title="سبد خرید">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-            {mounted && totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse">
-                {totalItems}
+            {totalItems > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse" suppressHydrationWarning>
+                {formatPrice(totalItems)}
               </span>
             )}
           </button>

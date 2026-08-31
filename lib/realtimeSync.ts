@@ -73,23 +73,19 @@ class MasterRealtimeEngine {
   public broadcastLocally(type: string, data: any) {
     if (typeof window === "undefined") return;
     
-    // ۱. انتشار در تب جاری
     window.dispatchEvent(new CustomEvent(type, { detail: data }));
     
-    // ۲. ارسال به تمام تب‌های دیگر در همان مرورگر در ۰ میلی‌ثانیه
     if (this.broadcastBus) {
       try {
         this.broadcastBus.postMessage({ type, data });
       } catch {}
     }
     
-    // ۳. تغییر فوری فاوآیکون و تایتل
     if (type === "site_info_updated" && data) {
       if (data.favicon_url) applyFaviconToDOM(data.favicon_url);
       if (data.tagline || data.site_name) applyTitleToDOM(data.tagline, data.site_name);
     }
 
-    // ۴. ارسال به سایر کاربران از طریق سوکت سوپابیس
     if (this.channel) {
       this.channel.send({
         type: "broadcast",

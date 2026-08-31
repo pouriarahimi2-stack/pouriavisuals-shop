@@ -126,38 +126,38 @@ export const siteInfoService = {
 
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      const isAllowed =
-        payload.allow_google_index !== undefined
-          ? payload.allow_google_index
-          : payload.maintenance_mode === "none";
+      const current = this.getSiteInfoSync();
+      const maintMode = payload.maintenance_mode !== undefined 
+        ? payload.maintenance_mode 
+        : (current.maintenance_mode || "none");
 
-      const sName = payload.site_name || payload.siteName || payload.storeName || "آکسون | Axon";
+      const isAllowed = payload.allow_google_index !== undefined
+        ? payload.allow_google_index
+        : (maintMode === "none");
+
+      const sName = payload.site_name || payload.siteName || payload.storeName || current.site_name || "آکسون | Axon";
 
       const dbPayload: any = {
         site_name: sName,
         store_name: sName,
-        tagline: payload.tagline || "",
-        phone: payload.phone || "",
-        email: payload.email || "",
-        address: payload.address || "",
-        working_hours: payload.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-        logo_url: payload.logo_url || payload.logoUrl || "",
-        footer_logo_url: payload.footer_logo_url || payload.footerLogoUrl || "",
-        favicon_url: payload.favicon_url || payload.faviconUrl || "",
+        tagline: payload.tagline !== undefined ? payload.tagline : current.tagline,
+        phone: payload.phone !== undefined ? payload.phone : current.phone,
+        email: payload.email !== undefined ? payload.email : current.email,
+        address: payload.address !== undefined ? payload.address : current.address,
+        working_hours: payload.working_hours !== undefined ? payload.working_hours : current.working_hours,
+        logo_url: payload.logo_url || payload.logoUrl || current.logo_url || "",
+        footer_logo_url: payload.footer_logo_url || payload.footerLogoUrl || current.footer_logo_url || "",
+        favicon_url: payload.favicon_url || payload.faviconUrl || current.favicon_url || "",
         allow_google_index: isAllowed,
-        maintenance_mode: payload.maintenance_mode || (isAllowed ? "none" : "indefinite"),
-        maintenance_until: payload.maintenance_until || null,
-        maintenance_duration_minutes: payload.maintenance_duration_minutes || null,
-        header_announcement: payload.header_announcement || "",
-        free_shipping_threshold: Number(payload.free_shipping_threshold || 2000000),
-        footer_text: payload.footer_text || payload.description || "",
-        description: payload.description || payload.footer_text || "",
-        custom_css: payload.custom_css || "",
-        active_font_id: payload.active_font_id || "Vazirmatn",
-        instagram: payload.instagram || "",
-        telegram: payload.telegram || "",
-        whatsapp: payload.whatsapp || "",
-        youtube: payload.youtube || "",
+        maintenance_mode: maintMode,
+        maintenance_until: payload.maintenance_until !== undefined ? payload.maintenance_until : current.maintenance_until,
+        maintenance_duration_minutes: payload.maintenance_duration_minutes !== undefined ? payload.maintenance_duration_minutes : current.maintenance_duration_minutes,
+        header_announcement: payload.header_announcement !== undefined ? payload.header_announcement : current.header_announcement,
+        free_shipping_threshold: Number(payload.free_shipping_threshold || current.free_shipping_threshold || 2000000),
+        footer_text: payload.footer_text || payload.description || current.footer_text || "",
+        description: payload.description || payload.footer_text || current.description || "",
+        custom_css: payload.custom_css !== undefined ? payload.custom_css : current.custom_css,
+        active_font_id: payload.active_font_id || current.active_font_id || "Vazirmatn",
         updated_at: new Date().toISOString(),
       };
 

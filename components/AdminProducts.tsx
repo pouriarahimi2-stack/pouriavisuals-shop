@@ -50,7 +50,6 @@ export default function AdminProducts() {
 
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [explodedPreviewOpen, setExplodedPreviewOpen] = useState(false);
@@ -247,10 +246,9 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* شبکه منظم ۱۲ ستونه بدون به‌هم‌ریختگی کاتالوگ و فرم */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* کاتالوگ سمت راست با عرض مناسب */}
+        {/* کاتالوگ سمت راست */}
         <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
           <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3 flex justify-between items-center">
             <span>📦 کاتالوگ کالاها ({products.length})</span>
@@ -279,7 +277,7 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* فرم ادیتور سمت چپ با تب‌های منظم Wrap شده */}
+        {/* فرم ادیتور سمت چپ */}
         <div className="lg:col-span-8">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
             

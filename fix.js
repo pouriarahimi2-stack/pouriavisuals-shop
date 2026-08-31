@@ -3,10 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🛡️ [AXON TOTAL SYSTEM RESTORATION] در حال بازسازی ۱۰۰٪ کامل و یکپارچه کل وب‌سایت...');
+console.log('🛡️ [AXON CRITICAL ARCHITECTURE FIX] در حال رفع قطعی قفل ناخواسته تعمیرات، خطای هیدریشن و همگام‌سازی Realtime...');
 
 const files = {
-  // ۱. فرمت‌کننده قطعی اعداد و تاریخ فارسی (حذف ۱۰۰٪ خطای هیدریشن)
+  // ۱. فرمت‌کننده قطعی اعداد و تاریخ (بدون خطای هیدریشن)
   'lib/formatters.ts': `export function formatPrice(amount: number | string | undefined | null): string {
   if (amount === undefined || amount === null || isNaN(Number(amount))) return "۰";
   const num = Math.round(Number(amount));
@@ -28,734 +28,7 @@ export function formatDateFa(dateStr?: string | null): string {
 }
 `,
 
-  // ۲. موتور Realtime سه‌گانه با تزریق‌کننده زنده فاوآیکون و تایتل به DOM
-  'lib/realtimeSync.ts': `import { supabase } from "@/lib/supabase";
-import { RealtimeChannel } from "@supabase/supabase-js";
-import { productService } from "@/services/productService";
-import { siteInfoService } from "@/services/siteInfoService";
-import { bannerService } from "@/services/bannerService";
-import { newsService } from "@/services/newsService";
-import { menuService } from "@/services/menuService";
-import { categoryService } from "@/services/categoryService";
-import { couponService } from "@/services/couponService";
-import { orderService } from "@/services/orderService";
-
-export function applyFaviconToDOM(url?: string) {
-  if (typeof document === "undefined" || !url) return;
-  try {
-    let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "icon";
-      document.head.appendChild(link);
-    }
-    link.href = \`\${url}\${url.includes("?") ? "&" : "?"}v=\${Date.now()}\`;
-  } catch {}
-}
-
-export function applyTitleToDOM(title?: string, storeName?: string) {
-  if (typeof document === "undefined") return;
-  try {
-    const sName = storeName || "آکسون";
-    const sTitle = title || "مرجع تخصصی مانیتور و تجهیزات تصویر";
-    document.title = \`\${sName} | \${sTitle}\`;
-  } catch {}
-}
-
-declare global {
-  interface Window {
-    __AXON_SINGLETON_REALTIME__?: MasterRealtimeEngine;
-  }
-}
-
-class MasterRealtimeEngine {
-  private channel: RealtimeChannel | null = null;
-  private broadcastBus: BroadcastChannel | null = null;
-  private isSubscribed: boolean = false;
-
-  constructor() {
-    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-      try {
-        this.broadcastBus = new BroadcastChannel("axon_master_stream_channel");
-        this.broadcastBus.onmessage = (event) => {
-          const { type, data } = event.data || {};
-          if (type) {
-            window.dispatchEvent(new CustomEvent(type, { detail: data }));
-            if (type === "site_info_updated" && data) {
-              if (data.favicon_url) applyFaviconToDOM(data.favicon_url);
-              if (data.tagline || data.site_name) applyTitleToDOM(data.tagline, data.site_name);
-            }
-          }
-        };
-      } catch {}
-    }
-  }
-
-  public static getInstance(): MasterRealtimeEngine {
-    if (typeof window !== "undefined") {
-      if (!window.__AXON_SINGLETON_REALTIME__) {
-        window.__AXON_SINGLETON_REALTIME__ = new MasterRealtimeEngine();
-      }
-      return window.__AXON_SINGLETON_REALTIME__;
-    }
-    return new MasterRealtimeEngine();
-  }
-
-  public broadcastLocally(type: string, data: any) {
-    if (typeof window === "undefined") return;
-    
-    window.dispatchEvent(new CustomEvent(type, { detail: data }));
-    
-    if (this.broadcastBus) {
-      try {
-        this.broadcastBus.postMessage({ type, data });
-      } catch {}
-    }
-    
-    if (type === "site_info_updated" && data) {
-      if (data.favicon_url) applyFaviconToDOM(data.favicon_url);
-      if (data.tagline || data.site_name) applyTitleToDOM(data.tagline, data.site_name);
-    }
-
-    if (this.channel) {
-      this.channel.send({
-        type: "broadcast",
-        event: type,
-        payload: data,
-      }).catch(() => {});
-    }
-  }
-
-  public init(): () => void {
-    if (typeof window === "undefined") return () => {};
-    if (this.isSubscribed && this.channel) return () => {};
-
-    try {
-      this.channel = supabase.channel("axon_global_realtime_v2", {
-        config: { broadcast: { ack: false } },
-      });
-
-      const eventNames = [
-        "products_updated", "site_info_updated", "banners_updated",
-        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
-        "categories_updated", "contact_messages_updated", "posts_updated"
-      ];
-
-      eventNames.forEach((ev) => {
-        this.channel?.on("broadcast", { event: ev }, (payload) => {
-          window.dispatchEvent(new CustomEvent(ev, { detail: payload.payload }));
-          if (ev === "site_info_updated" && payload.payload) {
-            if (payload.payload.favicon_url) applyFaviconToDOM(payload.payload.favicon_url);
-            if (payload.payload.tagline || payload.payload.site_name) applyTitleToDOM(payload.payload.tagline, payload.payload.site_name);
-          }
-        });
-      });
-
-      const tables = [
-        "products", "orders", "site_info", "banners", "tech_news",
-        "coupons", "contact_messages", "posts", "site_pages", "menu_items", "categories"
-      ];
-
-      tables.forEach((tableName) => {
-        this.channel?.on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: tableName },
-          async (payload: any) => {
-            const updatedItem = payload.new || payload;
-            window.dispatchEvent(new CustomEvent(\`\${tableName}_updated\`, { detail: updatedItem }));
-
-            if (tableName === "products") {
-              const all = await productService.getAll();
-              window.dispatchEvent(new CustomEvent("products_updated", { detail: all }));
-            } else if (tableName === "site_info") {
-              const latest = await siteInfoService.getSiteInfo();
-              window.dispatchEvent(new CustomEvent("site_info_updated", { detail: latest }));
-              if (latest?.favicon_url) applyFaviconToDOM(latest.favicon_url);
-              if (latest?.tagline || latest?.site_name) applyTitleToDOM(latest?.tagline, latest?.site_name);
-            } else if (tableName === "banners") {
-              const allBanners = await bannerService.getAll();
-              window.dispatchEvent(new CustomEvent("banners_updated", { detail: allBanners }));
-            } else if (tableName === "tech_news") {
-              const allNews = await newsService.getAll();
-              window.dispatchEvent(new CustomEvent("news_updated", { detail: allNews }));
-            }
-          }
-        );
-      });
-
-      this.channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          this.isSubscribed = true;
-        }
-      });
-    } catch {}
-
-    return () => {
-      if (this.channel) {
-        supabase.removeChannel(this.channel);
-        this.channel = null;
-        this.isSubscribed = false;
-      }
-    };
-  }
-}
-
-export function initRealtimeSync(): () => void {
-  return MasterRealtimeEngine.getInstance().init();
-}
-
-export const realtimeEngine = MasterRealtimeEngine.getInstance();
-export default MasterRealtimeEngine;
-`,
-
-  // ۳. سرویس کاتالوگ محصولات با ۷ پرچمدار و CRUD دیتابیس
-  'services/productService.ts': `import { supabase } from "@/lib/supabase";
-import { realtimeEngine } from "@/lib/realtimeSync";
-
-export interface ProductVariant {
-  id: string;
-  name: string;
-  colorHex?: string;
-  modelType?: string;
-  priceDelta?: number;
-  stock?: number;
-}
-
-export interface MarketBenchmark {
-  storeName: string;
-  price?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  warranty: string;
-  isOurStore?: boolean;
-  deliveryTime?: string;
-  logo?: string;
-}
-
-export interface Product {
-  id: string;
-  title: string;
-  name?: string;
-  title_fa?: string;
-  sku?: string;
-  brand?: string;
-  price: number;
-  discountPrice?: number;
-  discount_price?: number;
-  originalPrice?: number;
-  stock: number;
-  category: string;
-  category_id?: string;
-  category_name?: string;
-  description: string;
-  short_description?: string;
-  highlights?: string[];
-  image: string;
-  image_url?: string;
-  images: string[];
-  variants?: ProductVariant[];
-  specs: Record<string, string>;
-  warranty?: string;
-  badge?: string;
-  isAvailable: boolean;
-  is_available?: boolean;
-  is_featured?: boolean;
-  market_comparison?: MarketBenchmark[];
-  meta_title?: string;
-  meta_description?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-const LOCAL_PRODUCTS_CACHE = "axon_products_registry_cache_v2026";
-
-export const FLAGSHIP_7_PRODUCTS: Product[] = [
-  {
-    id: "prod-macbook-pro-m5-max",
-    title: "MacBook Pro 16\\" (Apple M4 Max, 128GB RAM, 2TB SSD)",
-    name: "MacBook Pro 16\\" (Apple M4 Max, 128GB RAM, 2TB SSD)",
-    title_fa: "مک‌بوک پرو ۱۶ اینچ اپل با تراشه M4 Max، حافظه رم ۱۲۸ گیگابایت و حافظه ۲ ترابایت",
-    brand: "Apple",
-    category: "لپ‌تاپ و ورک‌استیشن",
-    price: 310000000,
-    discountPrice: 208500000,
-    discount_price: 208500000,
-    originalPrice: 310000000,
-    stock: 8,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی آکسون + مهلت تست ۷ روزه",
-    badge: "⚡ ابرقدرت پردازش ۲۰۲۶",
-    image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-    images: [
-      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-      "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800"
-    ],
-    description: "ورک‌استیشن پرتابل ۱۶ اینچ با صفحه Liquid Retina XDR، پردازشگر ۱۶ هسته‌ای M4 Max با ۴۰ هسته گرافیکی، پهنای باند حافظه ۵۴۶ گیگابایت بر ثانیه و شارژدهی باتری تا ۲۲ ساعت.",
-    highlights: [
-      "تراشه ۳ نانومتری M4 Max با ۴۰ هسته GPU",
-      "رم یکپارچه ۱۲۸ گیگابایت (546 GB/s)",
-      "صفحه نمایش ۱۲۰ هرتز Liquid Retina XDR",
-      "خروجی همزمان ۴ مانیتور 6K"
-    ],
-    specs: {
-      "پردازنده مرکزی": "Apple M4 Max (16-Core CPU, 40-Core GPU)",
-      "حافظه رم یکپارچه": "128GB Unified Memory",
-      "حافظه پرسرعت": "2TB NVMe SSD (7.4 GB/s)",
-      "نمایشگر": "16.2 Inch Liquid Retina XDR (120Hz ProMotion)",
-      "روشنایی پیک": "1600 Nits در حالت HDR",
-      "پورت‌ها": "3x Thunderbolt 4 + HDMI 2.1 + SDXC + MagSafe 3"
-    },
-    variants: [
-      { id: "v1", name: "مشکی فضایی مات (Space Black)", modelType: "تراشه M4 Max (128GB/2TB)", colorHex: "#1f242d", priceDelta: 0, stock: 5 },
-      { id: "v2", name: "نقره‌ای کلاسیک (Silver)", modelType: "تراشه M4 Max (128GB/2TB)", colorHex: "#e5e7eb", priceDelta: 0, stock: 3 }
-    ],
-    market_comparison: [
-      { storeName: "ترب (Torob)", minPrice: 218000000, maxPrice: 226000000, warranty: "گارانتی شرکتی معمولی", isOurStore: false, logo: "🔍" },
-      { storeName: "دیجی‌کالا (Digikala)", minPrice: 222000000, maxPrice: 229000000, warranty: "گارانتی متفرقه", isOurStore: false, logo: "🛍️" },
-      { storeName: "ایمالز (Emalls)", minPrice: 219000000, maxPrice: 225000000, warranty: "گارانتی معمولی", isOurStore: false, logo: "📊" },
-      { storeName: "باسلام (Basalam)", minPrice: 216000000, maxPrice: 224000000, warranty: "بدون ضمانت تعویض", isOurStore: false, logo: "🛒" },
-      { storeName: "دیوار / بازار فیزیکی", minPrice: 215000000, maxPrice: 230000000, warranty: "خرید حضوری", isOurStore: false, logo: "🏷️" }
-    ]
-  },
-  {
-    id: "prod-apple-watch-ultra-3",
-    title: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS + Cellular)",
-    name: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS + Cellular)",
-    title_fa: "ساعت هوشمند بدنه تیتانیومی ۴۹ میلی‌متری با روشنایی ۳۰۰۰ نیت و GPS دوفرکانسه",
-    brand: "Apple",
-    category: "ساعت هوشمند و گجت",
-    price: 58500000,
-    discountPrice: 55800000,
-    discount_price: 55800000,
-    originalPrice: 58500000,
-    stock: 12,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی تعویض طلایی شرکتی",
-    badge: "🏔️ مقاوم‌ترین ساعت هوشمند",
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800",
-    images: [
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800",
-      "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=800"
-    ],
-    description: "ساعت هوشمند پرچمدار با بدنه تیتانیوم گرید هوافضا، شیشه یاقوت کبود، روشنایی نمایشگر تا ۳۰۰۰ نیت، مقاومت در برابر آب تا عمق ۱۰۰ متر و پردازنده دوهسته‌ای S9 SiP.",
-    highlights: [
-      "روشنایی خیره‌کننده ۳۰۰۰ نیت",
-      "بدنه تیتانیوم ۴۹ میلی‌متری گرید ۵",
-      "عمق‌سنج خودکار غواصی تا ۴۰ متر",
-      "شارژدهی باتری تا ۷۲ ساعت"
-    ],
-    specs: {
-      "جنس بدنه": "Titanium Grade 5 (هوافضا)",
-      "شیشه محافظ": "Sapphire Crystal تخت",
-      "روشنایی": "3000 Nits Always-On OLED",
-      "مقاومت در آب": "100 متر (استاندارد غواصی EN13319)",
-      "حسگرها": "ECG نوار قلب، اکسیژن خون، عمق‌سنج، آژیر 86dB"
-    },
-    variants: [
-      { id: "w1", name: "بند تیتانیوم میلانس", modelType: "49mm GPS+Cellular", colorHex: "#d1d5db", priceDelta: 0, stock: 6 },
-      { id: "w2", name: "بند اوشن آبی تیره", modelType: "49mm GPS+Cellular", colorHex: "#1e3a8a", priceDelta: 0, stock: 6 }
-    ],
-    market_comparison: [
-      { storeName: "ترب (Torob)", minPrice: 57900000, maxPrice: 62000000, warranty: "گارانتی شرکتی", isOurStore: false, logo: "🔍" },
-      { storeName: "دیجی‌کالا (Digikala)", minPrice: 59200000, maxPrice: 63500000, warranty: "گارانتی متفرقه", isOurStore: false, logo: "🛍️" },
-      { storeName: "ایمالز (Emalls)", minPrice: 58200000, maxPrice: 61800000, warranty: "گارانتی معمولی", isOurStore: false, logo: "📊" }
-    ]
-  },
-  {
-    id: "prod-ipad-pro-13-m5",
-    title: "iPad Pro 13\\" (Apple M4, Tandem OLED, 256GB Wi-Fi)",
-    name: "iPad Pro 13\\" (Apple M4, Tandem OLED, 256GB Wi-Fi)",
-    title_fa: "تبلت ۱۳ اینچ آیپد پرو با نمایشگر انقلابی Tandem OLED و تراشه ۳ نانومتری M4",
-    brand: "Apple",
-    category: "تبلت و نمایشگر همراه",
-    price: 98500000,
-    discountPrice: 94900000,
-    discount_price: 94900000,
-    originalPrice: 98500000,
-    stock: 9,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی",
-    badge: "🎨 باریک‌ترین محصول اپل",
-    image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800",
-    images: [
-      "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800",
-      "https://images.unsplash.com/photo-1561154464-82e9adf32764?w=800"
-    ],
-    description: "باریک‌ترین دستگاه تاریخ اپل با ضخامت ۵.۱ میلی‌متر، نمایشگر فوق‌پیشرفته Ultra Retina XDR با دو لایه اولد تاندم و قدرت پردازش خارق‌العاده چیپست M4.",
-    highlights: [
-      "فناوری نمایشگر Tandem OLED (۱۶۰۰ نیت)",
-      "ضخامت شگفت‌انگیز ۵.۱ میلی‌متر",
-      "تراشه فوق‌سریع Apple M4",
-      "پشتیبانی از قلم Apple Pencil Pro"
-    ],
-    specs: {
-      "نمایشگر": "13.0 Inch Ultra Retina XDR Tandem OLED",
-      "روشنایی": "1600 Nits Peak HDR (1000 Nits مداوم)",
-      "پردازنده": "Apple M4 (9-Core CPU, 10-Core GPU)",
-      "ضخامت بدنه": "5.1 میلی‌متر (آلومینیوم ۱۰۰٪ بازیافتی)"
-    },
-    variants: [
-      { id: "ip1", name: "مشکی فضایی (Space Black)", modelType: "256GB Wi-Fi", colorHex: "#111827", priceDelta: 0, stock: 5 },
-      { id: "ip2", name: "نقره‌ای (Silver)", modelType: "256GB Wi-Fi", colorHex: "#e5e7eb", priceDelta: 0, stock: 4 }
-    ],
-    market_comparison: [
-      { storeName: "ترب (Torob)", minPrice: 97800000, maxPrice: 104000000, warranty: "شرکتی", isOurStore: false, logo: "🔍" },
-      { storeName: "دیجی‌کالا (Digikala)", minPrice: 99500000, maxPrice: 106000000, warranty: "متفرقه", isOurStore: false, logo: "🛍️" },
-      { storeName: "ایمالز (Emalls)", minPrice: 98100000, maxPrice: 103500000, warranty: "معمولی", isOurStore: false, logo: "📊" }
-    ]
-  },
-  {
-    id: "prod-studio-display-5k",
-    title: "Apple Studio Display 27\\" 5K Retina (Nano-Texture Glass)",
-    name: "Apple Studio Display 27\\" 5K Retina (Nano-Texture Glass)",
-    title_fa: "نمایشگر ۲۷ اینچ ۵K رتینا با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری",
-    brand: "Apple",
-    category: "مانیتور و استودیو",
-    price: 135000000,
-    discountPrice: 128500000,
-    discount_price: 128500000,
-    originalPrice: 135000000,
-    stock: 6,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی آکسون",
-    badge: "🖥️ مرجع تدوین رنگ",
-    image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
-    images: [
-      "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
-      "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800"
-    ],
-    description: "نمایشگر استودیویی ۲۷ اینچ با تفکیک رنگ ۱۰ بیتی، پوشش کامل گاموت DCI-P3، روشنایی ۶۰۰ نیت، درگاه تاندربولت ۳ با توان شارژ ۹۶ وات، دوربین ۱۲ مگاپیکسل با Center Stage و سیستم صوتی ۶ درایور استودیو.",
-    highlights: [
-      "پنل 5K رتینا (5120x2880 پیکسل)",
-      "پوشش ۹۹.۲٪ گاموت رنگی DCI-P3",
-      "شیشه نانوتکستچر ضد انعکاس نور محیط",
-      "۶ اسپیکر استودیویی با Spatial Audio"
-    ],
-    specs: {
-      "رزولوشن": "5120 در 2880 پیکسل (218 PPI)",
-      "روشنایی": "600 نیت پایدار",
-      "پوشش رنگ": "100% sRGB و 99.2% DCI-P3",
-      "درگاه‌ها": "1x Thunderbolt 3 + 3x USB-C (10Gbps)",
-      "کالیبراسیون": "سخت‌افزاری با Delta E < 0.4",
-      "توان شارژ": "96 وات به لپ‌تاپ"
-    },
-    variants: [
-      { id: "sd1", name: "شیشه مات نانوتکستچر", modelType: "پایه با تنظیم شیب", colorHex: "#4b5563", priceDelta: 0, stock: 4 },
-      { id: "sd2", name: "شیشه استاندارد براق", modelType: "پایه با تنظیم شیب و ارتفاع", colorHex: "#e5e7eb", priceDelta: 12000000, stock: 2 }
-    ],
-    market_comparison: [
-      { storeName: "ترب (Torob)", minPrice: 136000000, maxPrice: 144000000, warranty: "شرکتی", isOurStore: false, logo: "🔍" },
-      { storeName: "دیجی‌کالا (Digikala)", minPrice: 139000000, maxPrice: 147000000, warranty: "متفرقه", isOurStore: false, logo: "🛍️" },
-      { storeName: "ایمالز (Emalls)", minPrice: 137000000, maxPrice: 143000000, warranty: "معمولی", isOurStore: false, logo: "📊" }
-    ]
-  },
-  {
-    id: "prod-pro-display-xdr-6k",
-    title: "Apple Pro Display XDR 32\\" 6K Retina (HDR 1600 Nits)",
-    name: "Apple Pro Display XDR 32\\" 6K Retina (HDR 1600 Nits)",
-    title_fa: "مانیتور ۳۲ اینچ ۶K مرجع هالیوود با کنتراست ۱,۰۰۰,۰۰۰:۱ و روشنایی ۱۶۰۰ نیت",
-    brand: "Apple",
-    category: "مانیتور و استودیو",
-    price: 295000000,
-    discountPrice: 279000000,
-    discount_price: 279000000,
-    originalPrice: 295000000,
-    stock: 4,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی تعویض طلایی",
-    badge: "💎 استاندارد سینمایی 6K",
-    image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800",
-    images: ["https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800"],
-    description: "نمایشگر ۶K رفرانس استودیو با ماتریس نوردهی موضعی ۵۷۶ زون، کنتراست بی‌نهایت ۱,۰۰۰,۰۰۰:۱، پوشش ۱۰۰٪ فضای رنگی سینمایی و زاویه دید فوق عریض با فیلتر پولاریزه نوری.",
-    highlights: [
-      "رزولوشن 6K با ۲۰.۴ میلیون پیکسل",
-      "روشنایی پیک ۱۶۰۰ نیت و مداوم ۱۰۰۰ نیت",
-      "کنتراست ۱,۰۰۰,۰۰۰:۱ با آرایه ۲D LED",
-      "پشتیبانی کامل از HDR10 و Dolby Vision"
-    ],
-    specs: {
-      "رزولوشن": "6016 در 3384 پیکسل (218 PPI)",
-      "روشنایی پیک": "1600 نیت",
-      "کنتراست": "1,000,000:1",
-      "تعداد زون‌ها": "576 ناحیه مستقل نوردهی",
-      "کالیبراسیون": "جدول کالیبراسیون سخت‌افزاری 3D LUT"
-    }
-  },
-  {
-    id: "prod-decklink-8k-pro",
-    title: "Blackmagic DeckLink 8K Pro Capture & Playback Card",
-    name: "Blackmagic DeckLink 8K Pro",
-    title_fa: "کارت کپچر و پلی‌بک استودیویی 8K با درگاه چهارگانه 12G-SDI و پردازش ۱۲ بیتی",
-    brand: "Blackmagic Design",
-    category: "تجهیزات تدوین و کپچر",
-    price: 68000000,
-    discountPrice: 63500000,
-    discount_price: 63500000,
-    originalPrice: 68000000,
-    stock: 5,
-    isAvailable: true,
-    is_available: true,
-    is_featured: false,
-    warranty: "۲ سال گارانتی معتبر شرکتی",
-    badge: "🎬 پخش زنده 8K",
-    image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800",
-    images: ["https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800"],
-    description: "کارت کپچر سینمایی PCIe با پشتیبانی از استریم‌های 8K DCI تا ۶۰ فریم در ثانیه با عمق رنگ ۱۲ بیت RGB 4:4:4 و ۶۴ کانال صوتی استودیویی.",
-    highlights: [
-      "پشتیبانی از فرمت‌های SD تا 8K DCI",
-      "چهار پورت دوطرفه 12G-SDI",
-      "پشتیبانی کامل از DaVinci Resolve",
-      "رابط PCIe Gen3 x8 با تاخیر صفر"
-    ],
-    specs: {
-      "رزولوشن کپچر": "8K DCI 60p بدون فشرده‌سازی",
-      "عمق رنگ": "12-Bit RGB 4:4:4",
-      "پورت‌ها": "4x 12G-SDI Bidirectional",
-      "صدا": "64 Channels Embedded Audio"
-    }
-  },
-  {
-    id: "prod-calibrite-colorchecker",
-    title: "Calibrite ColorChecker Display Plus Colorimeter",
-    name: "Calibrite ColorChecker Display Plus",
-    title_fa: "دستگاه کالیبراتور سخت‌افزاری مانیتورهای اولد و مینی‌ال‌ای‌دی تا ۲۰۰۰ نیت",
-    brand: "Calibrite",
-    category: "کالیبراسیون و ابزار رنگ",
-    price: 29500000,
-    discountPrice: 27800000,
-    discount_price: 27800000,
-    originalPrice: 29500000,
-    stock: 7,
-    isAvailable: true,
-    is_available: true,
-    is_featured: false,
-    warranty: "۱ سال گارانتی تعویض کالیبرایت",
-    badge: "🎯 دقت رنگ ۱۰۰٪",
-    image: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800",
-    images: ["https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800"],
-    description: "حسگر کالیبراسیون فوق‌دقیق اپتیکال برای کالیبره کردن نمایشگرهای HDR، OLED و Mini-LED تا روشنایی ۲۰۰۰ نیت با پروفایل‌سازی خودکار 3D LUT.",
-    highlights: [
-      "سنجش شدت نور تا ۲۰۰۰ نیت",
-      "فیلتر اپتیکال شیشه‌ای مادام‌العمر",
-      "سازگار با ویندوز، مک و مانیتورهای تدوین"
-    ],
-    specs: {
-      "دامنه روشنایی": "0.05 تا 2000 cd/m2",
-      "دقت سنجش": "Delta E < 0.2",
-      "اتصال": "USB-C با آداپتور Type-A",
-      "پشتیبانی": "Calibrite PROFILER & DaVinci"
-    }
-  }
-];
-
-export function normalizeProduct(p: any): Product {
-  if (!p) return FLAGSHIP_7_PRODUCTS[0];
-  const price = Number(p.price || 0);
-  const discountPrice =
-    p.discountPrice !== undefined && p.discountPrice !== null
-      ? Number(p.discountPrice)
-      : p.discount_price !== undefined && p.discount_price !== null
-      ? Number(p.discount_price)
-      : undefined;
-
-  const images = Array.isArray(p.images) && p.images.length > 0
-    ? p.images
-    : [p.image || p.image_url || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"];
-
-  const stock = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 10;
-  const isAvailable = p.is_available !== false && p.isAvailable !== false && stock > 0;
-
-  return {
-    ...p,
-    id: String(p.id),
-    title: p.title || p.name || "کالای دیجیتال استودیویی",
-    name: p.name || p.title || "کالای دیجیتال استودیویی",
-    title_fa: p.title_fa || "",
-    sku: p.sku || \`SKU-\${String(p.id).slice(-6)}\`,
-    brand: p.brand || "Apple",
-    price,
-    discountPrice,
-    discount_price: discountPrice,
-    originalPrice: p.originalPrice ? Number(p.originalPrice) : price,
-    stock,
-    category: p.category || p.category_name || "تجهیزات تخصصی",
-    description: p.description || "تجهیزات تخصصی اورجینال با گارانتی اصالت طلایی آکسون",
-    short_description: p.short_description || "",
-    highlights: Array.isArray(p.highlights) ? p.highlights : [],
-    image: images[0],
-    image_url: images[0],
-    images,
-    variants: Array.isArray(p.variants) ? p.variants : [],
-    specs: p.specs && typeof p.specs === "object" ? p.specs : {},
-    warranty: p.warranty || "۱۸ ماه گارانتی اصالت طلایی آکسون",
-    badge: p.badge || "",
-    isAvailable,
-    is_available: isAvailable,
-    is_featured: Boolean(p.is_featured),
-    market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
-    created_at: p.created_at || new Date().toISOString(),
-    updated_at: p.updated_at || new Date().toISOString(),
-  };
-}
-
-export const productService = {
-  getProductSync(id: string): Product | null {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(LOCAL_PRODUCTS_CACHE);
-        if (cached) {
-          const list: Product[] = JSON.parse(cached);
-          const found = list.find((p) => p.id === id);
-          if (found) return normalizeProduct(found);
-        }
-      } catch {}
-    }
-    const defaultItem = FLAGSHIP_7_PRODUCTS.find((p) => p.id === id);
-    return defaultItem ? normalizeProduct(defaultItem) : null;
-  },
-
-  getAllSync(): Product[] {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(LOCAL_PRODUCTS_CACHE);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length >= 7) {
-            return parsed.map(normalizeProduct);
-          }
-        }
-      } catch {}
-    }
-    return FLAGSHIP_7_PRODUCTS.map(normalizeProduct);
-  },
-
-  async getAll(): Promise<Product[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data && data.length >= 7) {
-          const normalized = data.map(normalizeProduct);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(normalized));
-          }
-          return normalized;
-        }
-      }
-      return this.getAllSync();
-    } catch {
-      return this.getAllSync();
-    }
-  },
-
-  async getById(id: string): Promise<Product | null> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .eq("id", id)
-          .maybeSingle();
-
-        if (!error && data) {
-          return normalizeProduct(data);
-        }
-      }
-      return this.getProductSync(id);
-    } catch {
-      return this.getProductSync(id);
-    }
-  },
-
-  async saveProduct(productData: Partial<Product>): Promise<Product | null> {
-    try {
-      const id = productData.id || \`prod_\${Date.now()}\`;
-      const normalized = normalizeProduct({ ...productData, id });
-
-      const dbPayload: any = {
-        id: normalized.id,
-        title: normalized.title,
-        name: normalized.title,
-        title_fa: normalized.title_fa || null,
-        sku: normalized.sku || null,
-        brand: normalized.brand || "Apple",
-        price: normalized.price,
-        discount_price: normalized.discountPrice || null,
-        stock: normalized.stock,
-        category: normalized.category,
-        description: normalized.description,
-        short_description: normalized.short_description || null,
-        highlights: normalized.highlights || [],
-        image: normalized.image,
-        image_url: normalized.image,
-        images: normalized.images,
-        variants: normalized.variants || [],
-        specs: normalized.specs || {},
-        warranty: normalized.warranty || null,
-        badge: normalized.badge || null,
-        is_available: normalized.is_available,
-        is_featured: normalized.is_featured,
-        market_comparison: normalized.market_comparison || [],
-        meta_title: normalized.meta_title || normalized.title,
-        meta_description: normalized.meta_description || normalized.short_description || null,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (supabase) {
-        await supabase.from("products").upsert(dbPayload, { onConflict: "id" });
-      }
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = [normalized, ...all.filter((p) => p.id !== normalized.id)];
-        localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("products_updated", updated);
-      }
-
-      return normalized;
-    } catch (e) {
-      console.error("productService.saveProduct error:", e);
-      return null;
-    }
-  },
-
-  async deleteProduct(id: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("products").delete().eq("id", id);
-      }
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = all.filter((p) => p.id !== id);
-        localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("products_updated", updated);
-      }
-      return true;
-    } catch (e) {
-      console.error("productService.deleteProduct error:", e);
-      return false;
-    }
-  },
-};
-
-export default productService;
-`,
-
-  // ۴. سرویس تنظیمات سایت با ۳ لوگوی مستقل و ثبت فاوآیکون در DOM
+  // ۲. اصلاح سرویس تنظیمات سایت (جلوگیری از قفل شدن ناخواسته در حالت تعمیرات)
   'services/siteInfoService.ts': `import { supabase } from "@/lib/supabase";
 import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
@@ -884,38 +157,38 @@ export const siteInfoService = {
 
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      const isAllowed =
-        payload.allow_google_index !== undefined
-          ? payload.allow_google_index
-          : payload.maintenance_mode === "none";
+      const current = this.getSiteInfoSync();
+      const maintMode = payload.maintenance_mode !== undefined 
+        ? payload.maintenance_mode 
+        : (current.maintenance_mode || "none");
 
-      const sName = payload.site_name || payload.siteName || payload.storeName || "آکسون | Axon";
+      const isAllowed = payload.allow_google_index !== undefined
+        ? payload.allow_google_index
+        : (maintMode === "none");
+
+      const sName = payload.site_name || payload.siteName || payload.storeName || current.site_name || "آکسون | Axon";
 
       const dbPayload: any = {
         site_name: sName,
         store_name: sName,
-        tagline: payload.tagline || "",
-        phone: payload.phone || "",
-        email: payload.email || "",
-        address: payload.address || "",
-        working_hours: payload.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-        logo_url: payload.logo_url || payload.logoUrl || "",
-        footer_logo_url: payload.footer_logo_url || payload.footerLogoUrl || "",
-        favicon_url: payload.favicon_url || payload.faviconUrl || "",
+        tagline: payload.tagline !== undefined ? payload.tagline : current.tagline,
+        phone: payload.phone !== undefined ? payload.phone : current.phone,
+        email: payload.email !== undefined ? payload.email : current.email,
+        address: payload.address !== undefined ? payload.address : current.address,
+        working_hours: payload.working_hours !== undefined ? payload.working_hours : current.working_hours,
+        logo_url: payload.logo_url || payload.logoUrl || current.logo_url || "",
+        footer_logo_url: payload.footer_logo_url || payload.footerLogoUrl || current.footer_logo_url || "",
+        favicon_url: payload.favicon_url || payload.faviconUrl || current.favicon_url || "",
         allow_google_index: isAllowed,
-        maintenance_mode: payload.maintenance_mode || (isAllowed ? "none" : "indefinite"),
-        maintenance_until: payload.maintenance_until || null,
-        maintenance_duration_minutes: payload.maintenance_duration_minutes || null,
-        header_announcement: payload.header_announcement || "",
-        free_shipping_threshold: Number(payload.free_shipping_threshold || 2000000),
-        footer_text: payload.footer_text || payload.description || "",
-        description: payload.description || payload.footer_text || "",
-        custom_css: payload.custom_css || "",
-        active_font_id: payload.active_font_id || "Vazirmatn",
-        instagram: payload.instagram || "",
-        telegram: payload.telegram || "",
-        whatsapp: payload.whatsapp || "",
-        youtube: payload.youtube || "",
+        maintenance_mode: maintMode,
+        maintenance_until: payload.maintenance_until !== undefined ? payload.maintenance_until : current.maintenance_until,
+        maintenance_duration_minutes: payload.maintenance_duration_minutes !== undefined ? payload.maintenance_duration_minutes : current.maintenance_duration_minutes,
+        header_announcement: payload.header_announcement !== undefined ? payload.header_announcement : current.header_announcement,
+        free_shipping_threshold: Number(payload.free_shipping_threshold || current.free_shipping_threshold || 2000000),
+        footer_text: payload.footer_text || payload.description || current.footer_text || "",
+        description: payload.description || payload.footer_text || current.description || "",
+        custom_css: payload.custom_css !== undefined ? payload.custom_css : current.custom_css,
+        active_font_id: payload.active_font_id || current.active_font_id || "Vazirmatn",
         updated_at: new Date().toISOString(),
       };
 
@@ -943,506 +216,806 @@ export const siteInfoService = {
 export default siteInfoService;
 `,
 
-  // ۵. اصلاح هدر کپسولی با ساختار DOM پایدار
-  'components/Header.tsx': `"use client";
+  // ۳. اصلاح API سرور site-info برای حفظ وضعیت دیتابیس
+  'app/api/site-info/route.ts': `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  try {
+    const { data } = await supabaseAdmin
+      .from("site_info")
+      .select("*")
+      .order("id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    return NextResponse.json({ success: true, data: data || null });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    
+    // خواندن رکورد قبلی جهت جلوگیری از رونویسی ناخواسته وضعیت تعمیرات
+    const { data: existing } = await supabaseAdmin
+      .from("site_info")
+      .select("*")
+      .order("id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const maintMode = body.maintenance_mode !== undefined 
+      ? body.maintenance_mode 
+      : (existing?.maintenance_mode || "none");
+
+    const isAllowed = body.allow_google_index !== undefined
+      ? body.allow_google_index
+      : (maintMode === "none");
+
+    const sName = body.site_name || body.siteName || body.storeName || existing?.site_name || "آکسون | Axon";
+
+    const payload: Record<string, any> = {
+      id: existing?.id || 1,
+      site_name: sName,
+      store_name: sName,
+      tagline: body.tagline !== undefined ? body.tagline : (existing?.tagline || ""),
+      phone: body.phone !== undefined ? body.phone : (existing?.phone || ""),
+      email: body.email !== undefined ? body.email : (existing?.email || ""),
+      address: body.address !== undefined ? body.address : (existing?.address || ""),
+      working_hours: body.working_hours !== undefined ? body.working_hours : (existing?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"),
+      logo_url: body.logo_url || body.logoUrl || existing?.logo_url || null,
+      footer_logo_url: body.footer_logo_url || body.footerLogoUrl || existing?.footer_logo_url || null,
+      favicon_url: body.favicon_url || body.faviconUrl || existing?.favicon_url || null,
+      description: body.description || body.footer_text || existing?.description || "",
+      footer_text: body.footer_text || body.description || existing?.footer_text || "",
+      allow_google_index: isAllowed,
+      maintenance_mode: maintMode,
+      maintenance_until: body.maintenance_until !== undefined ? body.maintenance_until : (existing?.maintenance_until || null),
+      maintenance_duration_minutes: body.maintenance_duration_minutes !== undefined ? body.maintenance_duration_minutes : (existing?.maintenance_duration_minutes || null),
+      header_announcement: body.header_announcement !== undefined ? body.header_announcement : (existing?.header_announcement || ""),
+      free_shipping_threshold: Number(body.free_shipping_threshold || existing?.free_shipping_threshold || 2000000),
+      custom_css: body.custom_css !== undefined ? body.custom_css : (existing?.custom_css || ""),
+      active_font_id: body.active_font_id || existing?.active_font_id || "Vazirmatn",
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from("site_info")
+      .upsert(payload, { onConflict: "id" })
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, message: "تنظیمات با موفقیت ثبت شد", data: data || payload });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
+  }
+}
+`,
+
+  // ۴. اصلاح LayoutWrapper برای حل قطعی Hydration Error #418 در صفحه تعمیرات
+  'components/LayoutWrapper.tsx': `"use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { productService, Product } from "@/services/productService";
-import { categoryService, Category } from "@/services/categoryService";
-import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
-import { formatPrice } from "@/lib/formatters";
+import { usePathname, useRouter } from "next/navigation";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import CartDrawer from "@/components/CartDrawer";
+import { initRealtimeSync } from "@/lib/realtimeSync";
+import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { fontEngine } from "@/lib/fontEngine";
 
-export default function Header() {
+export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const router = useRouter();
-  const cartContext = useCart();
-  const { totalItems, toggleCart, addToCart } = cartContext;
+  const isAdmin = pathname?.startsWith("/admin");
 
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [mounted, setMounted] = useState(false);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
+  const [maintenanceUntil, setMaintenanceUntil] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
+  const prevModeRef = useRef<MaintenanceMode>("none");
 
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const updateMaintenanceState = (info: SiteInfo | null) => {
+    if (!info) return;
+    setSiteInfo(info);
+
+    if (info.active_font_id) {
+      fontEngine.applyFontToTarget(info.active_font_id, "body");
+    }
+
+    const mode: MaintenanceMode = info.maintenance_mode || (info.allow_google_index === false ? "indefinite" : "none");
+    const until = info.maintenance_until || null;
+
+    if (mode === "timed" && until) {
+      const diff = new Date(until).getTime() - Date.now();
+      if (diff <= 0) {
+        setMaintenanceMode("none");
+        setMaintenanceUntil(null);
+        return;
+      }
+    }
+
+    setMaintenanceMode(mode);
+    setMaintenanceUntil(until);
+  };
 
   useEffect(() => {
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      const isDark = savedTheme !== "light";
-      setIsDarkMode(isDark);
-      if (isDark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-    } catch {}
+    setMounted(true);
 
-    const initHeaderData = async () => {
-      try {
-        const [info, prods, cats] = await Promise.all([
-          siteInfoService.getSiteInfo(),
-          productService.getAll(),
-          categoryService.getAll(),
-        ]);
-        if (info) setSiteInfo(info);
-        if (prods) setAllProducts(prods);
-        if (cats) setCategories(cats);
-      } catch {}
-    };
+    siteInfoService.getSiteInfo().then((data) => {
+      if (data) updateMaintenanceState(data);
+    });
 
-    initHeaderData();
+    const cleanup = initRealtimeSync();
 
-    const handleSiteInfoUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
+    const handleUpdate = (e: any) => {
+      if (e.detail) updateMaintenanceState(e.detail);
     };
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
-      else productService.getAll().then((prods) => prods && setAllProducts(prods));
-    };
-    const handleCategoriesUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
-      else categoryService.getAll().then((cats) => cats && setCategories(cats));
-    };
-
-    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
-    window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("categories_updated", handleCategoriesUpdate);
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) setIsCategoryOpen(false);
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) setIsSearchFocused(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("site_info_updated", handleUpdate);
 
     return () => {
-      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("categories_updated", handleCategoriesUpdate);
-      document.removeEventListener("mousedown", handleClickOutside);
+      if (typeof cleanup === "function") cleanup();
+      window.removeEventListener("site_info_updated", handleUpdate);
     };
   }, []);
 
   useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults([]); return; }
-    const q = searchQuery.toLowerCase().trim();
-    userBehavior.trackSearch(q);
-    const matches = allProducts.filter((p) =>
-      (p.title || p.name || "").toLowerCase().includes(q) ||
-      (p.category || "").toLowerCase().includes(q)
+    if (!mounted || isAdmin || typeof window === "undefined") return;
+
+    if (maintenanceMode !== "none") {
+      const currentPath = window.location.pathname + window.location.search;
+      if (!currentPath.startsWith("/admin")) {
+        localStorage.setItem("axon_user_last_position", currentPath);
+      }
+    } else if (prevModeRef.current !== "none" && maintenanceMode === "none") {
+      const savedPath = localStorage.getItem("axon_user_last_position");
+      if (savedPath && savedPath !== window.location.pathname) {
+        localStorage.removeItem("axon_user_last_position");
+        router.replace(savedPath);
+      }
+    }
+
+    prevModeRef.current = maintenanceMode;
+  }, [maintenanceMode, mounted, isAdmin, router]);
+
+  useEffect(() => {
+    if (maintenanceMode !== "timed" || !maintenanceUntil) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const calcTime = () => {
+      const diff = new Date(maintenanceUntil).getTime() - Date.now();
+      if (diff <= 0) {
+        setMaintenanceMode("none");
+        setTimeLeft(null);
+        siteInfoService.updateSiteInfo({ maintenance_mode: "none", allow_google_index: true });
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ hours, minutes, seconds });
+    };
+
+    calcTime();
+    const timer = setInterval(calcTime, 1000);
+    return () => clearInterval(timer);
+  }, [maintenanceMode, maintenanceUntil]);
+
+  if (isAdmin) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        {children}
+      </div>
     );
-    setSearchResults(matches.slice(0, 5));
-  }, [searchQuery, allProducts]);
+  }
 
-  const toggleDarkMode = () => {
-    soundEngine.playClick();
-    const nextMode = !isDarkMode;
-    setIsDarkMode(nextMode);
-    if (nextMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  };
+  // نمایش صفحه تعمیرات به صورت عایق‌شده و بدون خطای هیدریشن
+  if (mounted && maintenanceMode !== "none") {
+    const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
+    const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+    const email = siteInfo?.email || "support@axoncore.ir";
+    const isTimed = maintenanceMode === "timed";
 
-  const handleSelectCategory = (catName: string) => {
-    soundEngine.playClick();
-    setIsCategoryOpen(false);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("category_selected", { detail: catName }));
-    }
-    router.push("/#products");
-  };
+    return (
+      <div
+        dir="rtl"
+        className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-[#07090e] text-slate-100 font-sans select-none relative overflow-hidden"
+        suppressHydrationWarning
+      >
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />
 
-  const handleQuickAddFromSearch = (e: React.MouseEvent, product: Product) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    addToCart({
-      id: product.id,
-      title: product.title || product.name || "کالای دیجیتال",
-      name: product.title || product.name || "کالای دیجیتال",
-      price: Number(product.discountPrice ?? product.price ?? 0),
-      discountPrice: product.discountPrice ? Number(product.discountPrice) : undefined,
-      image: product.images?.[0] || product.image || "/placeholder.png",
-      stock: Number(product.stock ?? 10),
-      category: product.category || "عمومی",
-      quantity: 1,
-    });
-    setAddedItemMap((prev) => ({ ...prev, [product.id]: true }));
-    setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
-  };
-
-  const navLinks = [
-    { title: "صفحه نخست", href: "/" },
-    { title: "کاتالوگ محصولات", href: "/#products" },
-    { title: "پیگیری سفارش", href: "/track-order" },
-    { title: "تماس با ما", href: "/contact" },
-  ];
-
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
-  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-  const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
-
-  return (
-    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
-      {siteInfo?.header_announcement && (
-        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate" suppressHydrationWarning>
-          {siteInfo.header_announcement}
-        </div>
-      )}
-
-      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-          
-          <div className="relative" ref={categoryDropdownRef}>
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setIsCategoryOpen(!isCategoryOpen);
-              }}
-              className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] flex items-center justify-center text-sm transition cursor-pointer shadow-sm"
-              title="دسته‌بندی‌های محصولات"
-              aria-label="دسته‌بندی‌ها"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-
-            {isCategoryOpen && (
-              <div className="absolute top-12 right-0 w-64 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
-                <button
-                  onClick={() => handleSelectCategory("all")}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-black text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                >
-                  <span>📦 تمامی محصولات و تجهیزات</span>
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id || cat.name}
-                    onClick={() => handleSelectCategory(cat.name)}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                  >
-                    <span>🏷️ {cat.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+        <div className="max-w-2xl w-full rounded-[3rem] bg-slate-900/90 border border-slate-800 p-8 sm:p-14 text-center space-y-8 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.95)] backdrop-blur-3xl relative z-10 animate-fadeIn">
+          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black shadow-lg">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+            <span>
+              {isTimed ? "به‌روزرسانی زمان‌دار و ارتقای سرورها" : "عملیات ارتقای اساسی زیرساخت سرورها"}
+            </span>
           </div>
 
-          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
-              {logoUrl ? <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" /> : <span className="text-[var(--accent-blue)] text-lg sm:text-xl font-black">⚡</span>}
+          <div className="space-y-4">
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-3xl shadow-2xl shadow-blue-500/20 animate-bounce">
+              ⚡
             </div>
-            <div className="flex flex-col text-right">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[120px] sm:max-w-[160px]">{storeName}</span>
-                <span className={\`w-2 h-2 rounded-full shrink-0 transition-all duration-500 \${isOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"}\`} title={isOnline ? "سامانه آنلاین" : "حالت تعمیرات"} />
-              </div>
-              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]">{siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر"}</span>
-            </div>
-          </Link>
-        </div>
 
-        <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
-          {navLinks.map((link, idx) => (
-            <Link key={idx} href={link.href} className="px-3.5 py-1.5 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap">
-              {link.title}
-            </Link>
-          ))}
-        </nav>
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-snug">
+              {isTimed ? \`فروشگاه \${storeName} به زودی بازمی‌گردد\` : \`فروشگاه \${storeName} در حال به‌روزرسانی است\`}
+            </h1>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <div className="relative hidden xl:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
-              <span className="text-xs opacity-70">🔍</span>
-              <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] font-bold placeholder-slate-400" />
+            <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed font-medium">
+              {isTimed
+                ? "به منظور افزایش سرعت پردازش و اضافه شدن امکانات جدید، وب‌سایت طبق زمان‌سنج زیر به طور خودکار بازگشایی خواهد شد."
+                : "به منظور ارتقای جامع زیرساخت، دسترسی به سایت موقتاً محدود شده است. به محض اتمام کار، صفحه به صورت خودکار فعال خواهد شد."}
+            </p>
+
+            <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 text-[11px] text-blue-300 font-bold max-w-md mx-auto flex items-center justify-center gap-2">
+              <span>🔒</span>
+              <span>سبد خرید و موقعیت شما در حافظه سیستم ذخیره شده و پس از بازگشایی مجدداً فعال می‌شود.</span>
             </div>
-            {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-12 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72">
-                <div className="max-h-60 overflow-y-auto space-y-1">
-                  {searchResults.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
-                      <Link href={\`/products/\${p.id}\`} onClick={() => { soundEngine.playClick(); setIsSearchFocused(false); }} className="flex items-center gap-2 flex-1 min-w-0">
-                        <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 border border-[var(--card-border)] shrink-0" />
-                        <div className="flex-1 min-w-0 text-right">
-                          <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
-                          <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>{formatPrice(p.discountPrice || p.price || 0)} ت</span>
-                        </div>
-                      </Link>
-                      <button type="button" onClick={(e) => handleQuickAddFromSearch(e, p)} className="px-2 py-1 rounded-lg text-[10px] font-black bg-[var(--accent-blue)] text-white cursor-pointer shadow-md">
-                        {addedItemMap[p.id] ? "✓" : "+"}
-                      </button>
-                    </div>
-                  ))}
+          </div>
+
+          {isTimed && timeLeft && (
+            <div className="p-6 rounded-3xl bg-slate-950/80 border border-slate-800/90 space-y-3">
+              <span className="text-[11px] font-black text-slate-400 block">زمان بازگشایی خودکار وب‌سایت:</span>
+              <div className="flex items-center justify-center gap-3 font-mono text-white">
+                <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 min-w-[70px]">
+                  <span className="text-2xl sm:text-3xl font-black text-blue-400">{String(timeLeft.seconds).padStart(2, "0")}</span>
+                  <span className="text-[9px] text-slate-400 block font-sans font-bold mt-1">ثانیه</span>
+                </div>
+                <span className="text-2xl font-black text-slate-600">:</span>
+                <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 min-w-[70px]">
+                  <span className="text-2xl sm:text-3xl font-black text-blue-400">{String(timeLeft.minutes).padStart(2, "0")}</span>
+                  <span className="text-[9px] text-slate-400 block font-sans font-bold mt-1">دقیقه</span>
+                </div>
+                <span className="text-2xl font-black text-slate-600">:</span>
+                <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 min-w-[70px]">
+                  <span className="text-2xl sm:text-3xl font-black text-blue-400">{String(timeLeft.hours).padStart(2, "0")}</span>
+                  <span className="text-[9px] text-slate-400 block font-sans font-bold mt-1">ساعت</span>
                 </div>
               </div>
-            )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 rounded-3xl bg-slate-950/60 border border-slate-800 text-xs text-right">
+            <div className="space-y-1">
+              <span className="text-slate-400 font-bold block">📞 تلفن پشتیبانی:</span>
+              <span className="font-mono font-black text-blue-400 text-sm" dir="ltr">{phone}</span>
+            </div>
+            <div className="space-y-1">
+              <span className="text-slate-400 font-bold block">✉️ ایمیل پاسخگویی ۲۴ ساعته:</span>
+              <span className="font-mono text-slate-200 text-xs truncate block" dir="ltr">{email}</span>
+            </div>
           </div>
-
-          <button onClick={toggleDarkMode} className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0" title="تغییر تم" suppressHydrationWarning>
-            {isDarkMode ? "🌙" : "☀️"}
-          </button>
-
-          <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white transition-all shadow-md shadow-blue-500/25 cursor-pointer flex items-center justify-center shrink-0" title="سبد خرید">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-            {totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse" suppressHydrationWarning>
-                {formatPrice(totalItems)}
-              </span>
-            )}
-          </button>
         </div>
       </div>
-    </header>
+    );
+  }
+
+  return (
+    <>
+      <Header />
+      <main className="flex-1 w-full">{children}</main>
+      <Footer />
+      <CartDrawer />
+    </>
   );
 }
 `,
 
-  // ۶. اصلاح صفحه اصلی با هیدریشن ۱۰۰٪ پایدار
-  'app/page.tsx': `"use client";
+  // ۵. اصلاح کامل تب‌های ادمین محصولات بدون بریدگی متنی
+  'components/AdminProducts.tsx': `"use client";
 
-import React, { useState, useEffect } from "react";
-import { productService, Product } from "@/services/productService";
-import { bannerService, Banner } from "@/services/bannerService";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { useCart } from "@/context/CartContext";
-import Link from "next/link";
-import AIAssistantChat from "@/components/AIAssistantChat";
-import TechRadarFeed from "@/components/TechRadarFeed";
-import ProductComparisonModal from "@/components/ProductComparisonModal";
+import React, { useState, useEffect, useRef } from "react";
+import { productService, Product, ProductVariant, MarketBenchmark } from "@/services/productService";
+import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
+import ProductExplodedView from "@/components/ProductExplodedView";
 import { formatPrice } from "@/lib/formatters";
 
-export default function HomePage() {
-  const { addToCart } = useCart();
+export default function AdminProducts() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [activeFormTab, setActiveFormTab] = useState<
+    "general" | "pricing" | "gallery" | "variants" | "specs" | "comparison" | "seo"
+  >("general");
 
-  const [products, setProducts] = useState<Product[]>(() => productService.getAllSync());
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [title, setTitle] = useState("");
+  const [titleFa, setTitleFa] = useState("");
+  const [sku, setSku] = useState("");
+  const [brand, setBrand] = useState("Apple");
+  const [category, setCategory] = useState("کالای دیجیتال");
+  const [badge, setBadge] = useState("");
+  const [shortDesc, setShortDesc] = useState("");
+  const [description, setDescription] = useState("");
+  const [highlights, setHighlights] = useState<string[]>([""]);
 
-  const [compareList, setCompareList] = useState<Product[]>([]);
-  const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [priceRaw, setPriceRaw] = useState<number | "">("");
+  const [discountPriceRaw, setDiscountPriceRaw] = useState<number | "">("");
+  const [stock, setStock] = useState<number | "">(10);
+  const [warranty, setWarranty] = useState("۱۸ ماه گارانتی معتبر شرکتی + ۷ روز ضمانت بازگشت وجه");
+  const [isAvailable, setIsAvailable] = useState(true);
+  const [isFeatured, setIsFeatured] = useState(false);
+
+  const [imageUrls, setImageUrls] = useState<string[]>([""]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [specs, setSpecs] = useState<Array<{ key: string; value: string }>>([
+    { key: "ابعاد نمایشگر", value: "۲۷ اینچ 5K Retina" },
+    { key: "شدت روشنایی", value: "۶۰۰ نیت (Nit)" },
+    { key: "پوشش رنگ", value: "۱۰۰٪ sRGB و DCI-P3" },
+  ]);
+
+  const [marketBenchmarks, setMarketBenchmarks] = useState<MarketBenchmark[]>([
+    { storeName: "ترب (Torob)", price: 0, minPrice: 0, maxPrice: 0, warranty: "گارانتی معمولی", isOurStore: false, deliveryTime: "۳ روز" },
+    { storeName: "دیجی‌کالا (Digikala)", price: 0, minPrice: 0, maxPrice: 0, warranty: "گارانتی شرکتی", isOurStore: false, deliveryTime: "۲ روز" },
+    { storeName: "فروشگاه مستقیم ما (تضمین کمترین نرخ)", price: 0, minPrice: 0, maxPrice: 0, warranty: "گارانتی طلایی ۱۸ ماهه", isOurStore: true, deliveryTime: "ارسال فوری پیشتاز" },
+  ]);
+
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [explodedPreviewOpen, setExplodedPreviewOpen] = useState(false);
 
   const loadData = async () => {
-    try {
-      const [prods, bans, info] = await Promise.all([
-        productService.getAll(),
-        bannerService.getAll(),
-        siteInfoService.getSiteInfo(),
-      ]);
-
-      setProducts(prods || []);
-      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
-      if (info) setSiteInfo(info);
-    } catch {}
+    const [prods, cats] = await Promise.all([
+      productService.getAll(),
+      categoryService.getAll(),
+    ]);
+    setProducts(prods || []);
+    setCategories(cats || []);
   };
 
   useEffect(() => {
     loadData();
 
-    const handleCategoryChange = (e: any) => setSelectedCategory(e.detail || "all");
     const handleProductsUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
       else loadData();
     };
-    const handleBannersUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setBanners(e.detail);
-      else loadData();
+    const handleCategoriesUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
     };
-    const handleSiteUpdate = (e: any) => { if (e.detail) setSiteInfo(e.detail); };
 
-    window.addEventListener("category_selected", handleCategoryChange);
     window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("banners_updated", handleBannersUpdate);
-    window.addEventListener("site_info_updated", handleSiteUpdate);
+    window.addEventListener("categories_updated", handleCategoriesUpdate);
 
     return () => {
-      window.removeEventListener("category_selected", handleCategoryChange);
       window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("banners_updated", handleBannersUpdate);
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
+      window.removeEventListener("categories_updated", handleCategoriesUpdate);
     };
   }, []);
 
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentSlideIndex((prev) => (prev + 1) % banners.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [banners.length]);
-
-  const toggleCompare = (p: Product) => {
+  const handleSelectProduct = (p: Product) => {
     soundEngine.playClick();
-    if (compareList.some((item) => item.id === p.id)) {
-      setCompareList(compareList.filter((item) => item.id !== p.id));
-    } else {
-      if (compareList.length >= 4) {
-        alert("حداکثر ۴ محصول را می‌توانید به طور همزمان مقایسه نمایید.");
-        return;
-      }
-      setCompareList([...compareList, p]);
+    setSelectedProduct(p);
+    setTitle(p.title || p.name || "");
+    setTitleFa(p.title_fa || "");
+    setSku(p.sku || \`SKU-\${p.id.slice(-6)}\`);
+    setBrand(p.brand || "Apple");
+    setCategory(p.category || "کالای دیجیتال");
+    setBadge(p.badge || "");
+    setShortDesc(p.short_description || "");
+    setDescription(p.description || "");
+    setHighlights(p.highlights && p.highlights.length > 0 ? p.highlights : [""]);
+
+    setPriceRaw(p.price || "");
+    setDiscountPriceRaw(p.discountPrice || p.discount_price || "");
+    setStock(p.stock !== undefined ? p.stock : 10);
+    setWarranty(p.warranty || "۱۸ ماه گارانتی معتبر شرکتی");
+    setIsAvailable(p.isAvailable !== false && p.is_available !== false);
+    setIsFeatured(Boolean(p.is_featured));
+
+    setImageUrls(p.images && p.images.length > 0 ? p.images : [p.image || ""]);
+    setVariants(p.variants || []);
+
+    if (p.specs && typeof p.specs === "object") {
+      const parsed = Object.entries(p.specs).map(([key, value]) => ({ key, value: String(value) }));
+      setSpecs(parsed.length > 0 ? parsed : [{ key: "", value: "" }]);
     }
+
+    if (p.market_comparison && p.market_comparison.length > 0) {
+      setMarketBenchmarks(p.market_comparison);
+    }
+
+    setMetaTitle(p.meta_title || p.title);
+    setMetaDescription(p.meta_description || p.description?.slice(0, 140) || "");
   };
 
-  const filteredProducts = products.filter((product) => {
-    if (selectedCategory === "all") return true;
-    const cat = (product.category || (product as any).category_name || "").toLowerCase();
-    const target = selectedCategory.toLowerCase();
-    return cat === target || cat.includes(target) || target.includes(cat);
-  });
+  const handleCreateNew = () => {
+    soundEngine.playClick();
+    setSelectedProduct(null);
+    setTitle("");
+    setTitleFa("");
+    setSku(\`SKU-\${Date.now().toString().slice(-6)}\`);
+    setBrand("Apple");
+    setCategory(categories[0]?.name || "کالای دیجیتال");
+    setBadge("");
+    setShortDesc("");
+    setDescription("");
+    setHighlights(["کیفیت ساخت فوق‌العاده", "کالیبراسیون دقیق کارخانه"]);
+    setPriceRaw("");
+    setDiscountPriceRaw("");
+    setStock(10);
+    setWarranty("۱۸ ماه گارانتی اصالت طلایی آکسون");
+    setIsAvailable(true);
+    setIsFeatured(false);
+    setImageUrls([""]);
+    setVariants([]);
+    setSpecs([
+      { key: "رزولوشن تصویر", value: "5K Retina" },
+      { key: "درگاه‌های اتصال", value: "Thunderbolt 4 + USB-C" },
+    ]);
+    setActiveFormTab("general");
+  };
 
-  const activeBanner = banners[currentSlideIndex] || banners[0];
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || priceRaw === "") {
+      setStatusMessage({ type: "error", text: "عنوان کالا و قیمت پایه الزامی هستند." });
+      return;
+    }
+
+    soundEngine.playClick();
+    setSaving(true);
+
+    const specsMap: Record<string, string> = {};
+    specs.forEach((s) => {
+      if (s.key.trim() && s.value.trim()) {
+        specsMap[s.key.trim()] = s.value.trim();
+      }
+    });
+
+    const validImages = imageUrls.map((u) => u.trim()).filter(Boolean);
+    const validHighlights = highlights.map((h) => h.trim()).filter(Boolean);
+
+    const payload: Partial<Product> = {
+      id: selectedProduct?.id,
+      title: title.trim(),
+      name: title.trim(),
+      title_fa: titleFa.trim() || undefined,
+      sku: sku.trim() || undefined,
+      brand: brand.trim() || "Apple",
+      category,
+      price: Number(priceRaw),
+      discountPrice: discountPriceRaw !== "" ? Number(discountPriceRaw) : undefined,
+      stock: stock !== "" ? Number(stock) : 10,
+      badge: badge.trim() || undefined,
+      short_description: shortDesc.trim() || undefined,
+      description: description.trim(),
+      highlights: validHighlights,
+      warranty: warranty.trim(),
+      images: validImages.length > 0 ? validImages : ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"],
+      image: validImages[0] || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
+      variants: variants.filter((v) => v.name.trim().length > 0),
+      specs: specsMap,
+      market_comparison: marketBenchmarks,
+      meta_title: metaTitle.trim() || title.trim(),
+      meta_description: metaDescription.trim() || shortDesc.trim() || description.slice(0, 140),
+      isAvailable,
+      is_available: isAvailable,
+      is_featured: isFeatured,
+    };
+
+    const result = await productService.saveProduct(payload);
+    setSaving(false);
+
+    if (result) {
+      soundEngine.playSuccess();
+      setStatusMessage({ type: "success", text: "⚡ کالا با موفقیت ذخیره و در ویترین منتشر شد." });
+      loadData();
+      if (!selectedProduct) setSelectedProduct(result);
+    } else {
+      setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی محصول." });
+    }
+    setTimeout(() => setStatusMessage(null), 3500);
+  };
 
   return (
-    <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-10 mt-3 sm:mt-5">
-        {banners.length > 0 && (
-          <section className="relative overflow-hidden rounded-[2.5rem] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl group">
-            <div
-              className="min-h-[380px] sm:min-h-[480px] p-6 sm:p-14 flex items-center bg-cover bg-center transition-all duration-700 relative"
-              style={{
-                backgroundImage: \`linear-gradient(to left, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.35)), url(\${activeBanner?.image || (activeBanner as any)?.image_url || ""})\`,
-              }}
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>💎</span> مرکز جامع مدیریت کاتالوگ کالا و مشخصات مهندسی
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            تولید مشخصات هوشمند، تنوع رنگ، مشخصات متالورژی، مقایسه قیمت بازار و کالبدشکافی ۳D
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {selectedProduct && (
+            <button
+              type="button"
+              onClick={() => setExplodedPreviewOpen(true)}
+              className="px-5 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black text-xs transition cursor-pointer flex items-center gap-1.5"
             >
-              <div className="max-w-2xl space-y-4 z-10 text-white animate-fadeIn">
-                {activeBanner?.badge && (
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/20 text-white border border-white/30 text-xs font-black backdrop-blur-md shadow-sm">
-                    {activeBanner.badge}
+              <span>🧬</span>
+              <span>تست نمای انفجاری ۳D</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleCreateNew}
+            className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer"
+          >
+            + محصول جدید
+          </button>
+        </div>
+      </div>
+
+      {statusMessage && (
+        <div className={\`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn \${statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}\`}>
+          {statusMessage.text}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* کاتالوگ سمت راست */}
+        <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
+          <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3 flex justify-between items-center">
+            <span>📦 کاتالوگ کالاها ({products.length})</span>
+            <span className="text-[10px] text-[var(--accent-blue)] font-bold">کلیک جهت ویرایش</span>
+          </h3>
+          <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
+            {products.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => handleSelectProduct(p)}
+                className={\`p-3 rounded-2xl border transition cursor-pointer flex items-center gap-3 \${
+                  selectedProduct?.id === p.id
+                    ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-sm"
+                    : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                }\`}
+              >
+                <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-12 h-12 object-contain rounded-xl bg-white/5 p-1 border border-[var(--card-border)] shrink-0" />
+                <div className="overflow-hidden flex-1 space-y-1">
+                  <h4 className="text-xs font-black truncate">{p.title || p.name}</h4>
+                  <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400 font-bold block" suppressHydrationWarning>
+                    {formatPrice(p.discountPrice || p.price || 0)} تومان
                   </span>
-                )}
-                <h1 className="text-2xl sm:text-5xl font-black leading-tight tracking-tight drop-shadow-md">{activeBanner?.title}</h1>
-                {activeBanner?.subtitle && <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl font-medium">{activeBanner.subtitle}</p>}
-                <div className="pt-2 flex items-center gap-3">
-                  <Link href={activeBanner?.link || (activeBanner as any)?.link_url || "/products"} className="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-white text-gray-900 font-black text-xs hover:bg-slate-100 transition shadow-2xl hover:scale-105 active:scale-95 cursor-pointer">
-                    <span>{activeBanner?.button_text || "مشاهده و بررسی کالا"}</span><span>←</span>
-                  </Link>
                 </div>
               </div>
-            </div>
-          </section>
-        )}
-
-        <TechRadarFeed />
-
-        <section id="products" className="space-y-6">
-          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4 px-1">
-            <div>
-              <h3 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
-                <span>📦</span> کاتالوگ تجهیزات تخصصی و مانیتورها
-              </h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-                {selectedCategory === "all" ? "تمامی کالاهای اورجینال با تست سلامت فیزیکی و گارانتی اصالت طلایی" : \`فیلتر فعال: \${selectedCategory}\`}
-              </p>
-            </div>
-            {selectedCategory !== "all" && (
-              <button onClick={() => setSelectedCategory("all")} className="text-xs font-bold text-[var(--accent-blue)] hover:underline cursor-pointer">
-                مشاهده همه کالاها ({products.length})
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <HomeProductCard
-                key={product.id}
-                product={product}
-                isCompared={compareList.some((item) => item.id === product.id)}
-                onToggleCompare={toggleCompare}
-                onAddToCart={addToCart}
-              />
             ))}
           </div>
-        </section>
-
-        {compareList.length > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-[var(--card-border)] p-3 px-6 rounded-full shadow-2xl flex items-center gap-4 animate-fadeIn">
-            <span className="text-xs font-black text-[var(--text-primary)] flex items-center gap-2"><span>⚖️</span><span>{compareList.length} کالا آماده مقایسه</span></span>
-            <button onClick={() => { soundEngine.playClick(); setIsCompareOpen(true); }} className="px-4 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md cursor-pointer hover:opacity-90 transition">مشاهده جدول مقایسه 🚀</button>
-            <button onClick={() => { soundEngine.playClick(); setCompareList([]); }} className="text-xs text-rose-500 font-bold hover:underline cursor-pointer">لغو</button>
-          </div>
-        )}
-
-        <section className="p-5 sm:p-7 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
-          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-            <div>
-              <h3 className="text-sm sm:text-base font-black text-[var(--text-primary)] flex items-center gap-2"><span>📚</span> مجله و مقالات تخصصی سئو</h3>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">جدیدترین تحلیل‌های سخت‌افزاری و راهنمای خرید</p>
-            </div>
-            <Link href="/blog" className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-bold hover:bg-[var(--accent-blue)] hover:text-white transition shadow-sm">مشاهده همه مقالات ←</Link>
-          </div>
-          <HomeBlogSection />
-        </section>
-      </div>
-
-      <ProductComparisonModal products={compareList} isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))} />
-      <AIAssistantChat />
-    </div>
-  );
-}
-
-function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart }: any) {
-  const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
-  const displayImage = images[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500";
-  const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
-  const productName = product.title || product.name || "محصول دیجیتال";
-  const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
-  const oldPrice = Number(product.originalPrice ?? product.price ?? 0);
-
-  return (
-    <div className="rounded-[2.2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 sm:p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] hover:shadow-2xl transition duration-300 group shadow-sm select-none">
-      <Link href={\`/products/\${product.id}\`} className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center cursor-pointer border border-[var(--card-border)]">
-        <img src={displayImage} alt={productName} className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-500" />
-        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleCompare(product); }} className={\`absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition cursor-pointer \${isCompared ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md" : "bg-black/60 text-white border-white/20"}\`}>
-          {isCompared ? "✓ در مقایسه" : "⚖️ مقایسه"}
-        </button>
-      </Link>
-
-      <Link href={\`/products/\${product.id}\`} className="space-y-2 cursor-pointer block">
-        <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full font-bold text-[10px]">{product.category || "کالای دیجیتال"}</span>
-        <h4 className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2 text-right">{productName}</h4>
-        <div className="flex items-center gap-2 pt-1">
-          <span className="font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>{formatPrice(currentPrice)} تومان</span>
-          {oldPrice > currentPrice && <span className="text-[11px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>{formatPrice(oldPrice)}</span>}
         </div>
-      </Link>
 
-      <div className="pt-2 border-t border-[var(--card-border)]">
-        <button onClick={() => { soundEngine.playAddToCart(); onAddToCart({ id: product.id, name: productName, title: productName, price: currentPrice, image: displayImage, stock: product.stock ?? 10 }); }} disabled={!isAvailable} className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 active:scale-95 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-40">
-          <span>🛒</span><span>افزودن به سبد خرید</span>
-        </button>
+        {/* فرم ادیتور سمت چپ */}
+        <div className="lg:col-span-8">
+          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
+            
+            {/* تب‌های منظم و بدون بریدگی */}
+            <div className="flex flex-wrap items-center gap-2 pb-4 border-b border-[var(--card-border)]">
+              {[
+                { id: "general", label: "اطلاعات پایه", icon: "📝" },
+                { id: "pricing", label: "قیمت و انبار", icon: "💰" },
+                { id: "gallery", label: "گالری تصاویر", icon: "🖼️" },
+                { id: "variants", label: "تنوع و رنگ‌ها", icon: "🎨" },
+                { id: "specs", label: "مشخصات فنی", icon: "⚙️" },
+                { id: "comparison", label: "مقایسه قیمت بازار", icon: "📊" },
+                { id: "seo", label: "سئو و تگ‌ها", icon: "🌐" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setActiveFormTab(tab.id as any);
+                  }}
+                  className={\`px-4 py-2.5 rounded-2xl font-black text-xs transition cursor-pointer flex items-center gap-1.5 \${
+                    activeFormTab === tab.id
+                      ? "bg-[var(--accent-blue)] text-white shadow-md scale-105"
+                      : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--card-border)]"
+                  }\`}
+                >
+                  <span>{tab.icon}</span><span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {activeFormTab === "general" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان اصلی کالا *</label>
+                    <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]" />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان فارسی / مدل دقیق</label>
+                    <input type="text" value={titleFa} onChange={(e) => setTitleFa(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none" />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی فروشگاه</label>
+                    <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] cursor-pointer outline-none">
+                      {categories.map((c) => <option key={c.id || c.name} value={c.name}>{c.name}</option>)}
+                      <option value="کالای دیجیتال">کالای دیجیتال</option>
+                      <option value="لپ‌تاپ و ورک‌استیشن">لپ‌تاپ و ورک‌استیشن</option>
+                      <option value="مانیتور و استودیو">مانیتور و استودیو</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">توضیحات تخصصی و معرفی کالا</label>
+                  <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium leading-relaxed outline-none" />
+                </div>
+              </div>
+            )}
+
+            {activeFormTab === "pricing" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">قیمت پایه (تومان) *</label>
+                    <input
+                      type="number"
+                      required
+                      value={priceRaw}
+                      onChange={(e) => setPriceRaw(e.target.value ? Number(e.target.value) : "")}
+                      className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-[var(--text-primary)] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">قیمت با تخفیف (تومان)</label>
+                    <input
+                      type="number"
+                      value={discountPriceRaw}
+                      onChange={(e) => setDiscountPriceRaw(e.target.value ? Number(e.target.value) : "")}
+                      className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-emerald-600 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">موجودی در انبار</label>
+                    <input
+                      type="number"
+                      value={stock}
+                      onChange={(e) => setStock(e.target.value ? Number(e.target.value) : "")}
+                      className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-[var(--text-primary)] outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">شرایط گارانتی و خدمات پس از فروش</label>
+                  <input type="text" value={warranty} onChange={(e) => setWarranty(e.target.value)} className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none" />
+                </div>
+              </div>
+            )}
+
+            {activeFormTab === "gallery" && (
+              <div className="space-y-3">
+                <input type="file" ref={fileInputRef} accept="image/*" multiple className="hidden" />
+                <button type="button" onClick={() => setImageUrls([...imageUrls, ""])} className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">
+                  + افزودن لینک عکس
+                </button>
+                {imageUrls.map((url, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input type="text" value={url} onChange={(e) => {
+                      const arr = [...imageUrls];
+                      arr[idx] = e.target.value;
+                      setImageUrls(arr);
+                    }} placeholder="https://..." className="flex-1 p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs text-[var(--text-primary)] outline-none" />
+                    <button type="button" onClick={() => setImageUrls(imageUrls.filter((_, i) => i !== idx))} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeFormTab === "variants" && (
+              <div className="space-y-3">
+                <button type="button" onClick={() => setVariants([...variants, { id: \`var_\${Date.now()}\`, name: "رنگ جدید", colorHex: "#000000" }])} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">
+                  + افزودن رنگ و مدل کالا
+                </button>
+                {variants.map((v, idx) => (
+                  <div key={idx} className="flex flex-wrap gap-2 items-center p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                    <input type="text" value={v.name} onChange={(e) => {
+                      const arr = [...variants];
+                      arr[idx].name = e.target.value;
+                      setVariants(arr);
+                    }} placeholder="نام رنگ" className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs flex-1" />
+                    <input type="color" value={v.colorHex || "#000"} onChange={(e) => {
+                      const arr = [...variants];
+                      arr[idx].colorHex = e.target.value;
+                      setVariants(arr);
+                    }} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent" />
+                    <button type="button" onClick={() => setVariants(variants.filter((_, i) => i !== idx))} className="p-2 px-3 rounded-xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer">🗑️</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeFormTab === "specs" && (
+              <div className="space-y-3">
+                <button type="button" onClick={() => setSpecs([...specs, { key: "", value: "" }])} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer">
+                  + افزودن مشخصه فنی
+                </button>
+                {specs.map((s, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input type="text" value={s.key} onChange={(e) => {
+                      const arr = [...specs];
+                      arr[idx].key = e.target.value;
+                      setSpecs(arr);
+                    }} placeholder="پارامتر" className="w-1/3 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs" />
+                    <input type="text" value={s.value} onChange={(e) => {
+                      const arr = [...specs];
+                      arr[idx].value = e.target.value;
+                      setSpecs(arr);
+                    }} placeholder="مقدار" className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs" />
+                    <button type="button" onClick={() => setSpecs(specs.filter((_, i) => i !== idx))} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeFormTab === "comparison" && (
+              <div className="space-y-3">
+                <span className="font-bold text-[var(--text-secondary)] block">پلتفرم‌های مقایسه قیمت بازار (ترب، ایمالز، دیجی‌کالا):</span>
+                {marketBenchmarks.map((bm, idx) => (
+                  <div key={idx} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+                    <span className="font-bold text-xs">{bm.storeName}</span>
+                    <input type="number" value={bm.minPrice || bm.price} onChange={(e) => {
+                      const arr = [...marketBenchmarks];
+                      arr[idx].minPrice = Number(e.target.value);
+                      setMarketBenchmarks(arr);
+                    }} placeholder="کف قیمت" className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs" />
+                    <input type="number" value={bm.maxPrice || bm.price} onChange={(e) => {
+                      const arr = [...marketBenchmarks];
+                      arr[idx].maxPrice = Number(e.target.value);
+                      setMarketBenchmarks(arr);
+                    }} placeholder="سقف قیمت" className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeFormTab === "seo" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان سئو گوگل (Meta Title)</label>
+                  <input type="text" value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none" />
+                </div>
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">توضیحات متای گوگل (Meta Description)</label>
+                  <input type="text" value={metaDescription} onChange={(e) => setMetaDescription(e.target.value)} className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium outline-none" />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4 border-t border-[var(--card-border)]">
+              <button type="submit" disabled={saving} className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-lg hover:opacity-90 disabled:opacity-50">
+                {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار کالا"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-  );
-}
 
-function HomeBlogSection() {
-  const [posts, setPosts] = useState<any[]>([]);
-  useEffect(() => {
-    fetch("/api/blogs").then((r) => r.json()).then((d) => setPosts((d.data || d.posts || []).slice(0, 3))).catch(() => {});
-  }, []);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {posts.map((post) => (
-        <article key={post.id || post.title} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5 flex flex-col justify-between hover:border-[var(--accent-blue)] transition duration-300 shadow-sm">
-          <h4 className="font-black text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
-          <Link href={\`/blog/\${post.id}\`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-1.5 border-t border-[var(--card-border)]">مطالعه مقاله ←</Link>
-        </article>
-      ))}
+      {selectedProduct && (
+        <ProductExplodedView
+          productId={selectedProduct.id}
+          productTitle={selectedProduct.title}
+          category={selectedProduct.category}
+          isOpen={explodedPreviewOpen}
+          onClose={() => setExplodedPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1454,13 +1027,13 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ بازسازی ۱۰۰٪ و تثبیت فایل: ${filePath}`);
+  console.log(`✅ بازنویسی ۱۰۰٪: ${filePath}`);
 }
 
 console.log('📦 در حال Push به گیت‌هاب و انتشار در Vercel...');
 try {
-  execSync('git add . && git commit -m "fix: master definitive system hardening - full realtime broadcast, zero hydration error #418, 3D exploded view alignment" && git push origin main', { stdio: 'inherit' });
-  console.log('🎉 تمام اجزا و زیرسیستم‌ها با موفقیت ۱۰۰٪ بازسازی و دیپلوی شدند!');
+  execSync('git add . && git commit -m "fix: total resolution of accidental maintenance lock, permanent hydration fix & clean admin tabs" && git push origin main', { stdio: 'inherit' });
+  console.log('🎉 تغییرات با موفقیت دیپلوی شدند!');
 } catch (e) {
-  console.log('⚠️ در صورت نیاز دستور زیر را اجرا فرمایید: git push origin main');
+  console.log('⚠️ دستور دستی: git push origin main');
 }

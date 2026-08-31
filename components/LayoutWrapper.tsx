@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
-import { initRealtimeSync, realtimeEngine } from "@/lib/realtimeSync";
+import { initRealtimeSync } from "@/lib/realtimeSync";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { fontEngine } from "@/lib/fontEngine";
 
@@ -30,9 +30,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       fontEngine.applyFontToTarget(info.active_font_id, "body");
     }
 
-    const mode: MaintenanceMode =
-      info.maintenance_mode ||
-      (info.allow_google_index === false || info.allowGoogleIndex === false ? "indefinite" : "none");
+    const mode: MaintenanceMode = info.maintenance_mode || (info.allow_google_index === false ? "indefinite" : "none");
     const until = info.maintenance_until || null;
 
     if (mode === "timed" && until) {
@@ -121,6 +119,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
+  // نمایش صفحه تعمیرات به صورت عایق‌شده و بدون خطای هیدریشن
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
@@ -131,6 +130,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       <div
         dir="rtl"
         className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-[#07090e] text-slate-100 font-sans select-none relative overflow-hidden"
+        suppressHydrationWarning
       >
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />

@@ -1,4 +1,3 @@
-// File Path: app/api/news/sync/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
@@ -6,142 +5,92 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
-    // ۱. پاکسازی خودکار اخبار قدیمی‌تر از ۷ روز
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     try {
-      await supabaseAdmin
-        .from("tech_news")
-        .delete()
-        .lt("published_at", sevenDaysAgo);
+      await supabaseAdmin.from("tech_news").delete().lt("published_at", threeDaysAgo);
     } catch {}
 
-    // ۲. بررسی زمان آخرین همگام‌سازی (چرخه ۶ ساعته)
-    const { data: latestNews } = await supabaseAdmin
-      .from("tech_news")
-      .select("published_at")
-      .order("published_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    let shouldFetchNew = true;
-    if (latestNews?.published_at) {
-      const lastSyncTime = new Date(latestNews.published_at).getTime();
-      const sixHoursInMs = 6 * 60 * 60 * 1000;
-      if (Date.now() - lastSyncTime < sixHoursInMs) {
-        shouldFetchNew = false;
-      }
-    }
-
-    let generatedArticles: any[] = [];
-
-    if (shouldFetchNew && process.env.GEMINI_API_KEY) {
-      try {
-        const prompt = `به عنوان سردبیر ارشد فناوری، ۳ خبر داغ مانیتور، سخت‌افزار و هوش مصنوعی ۲۰۲۶ تولید کن.
-خروجی فقط یک JSON Array معتبر:
-[
-  {
-    "title": "تیتر خبر به زبان فارسی روان",
-    "slug": "unique-slug-${Date.now()}",
-    "summary": "خلاصه خبر به فارسی",
-    "content": "<p>متن کامل خبر به فارسی با تگ‌های HTML</p>",
-    "category": "gadgets",
-    "source_name": "The Verge",
-    "source_url": "https://theverge.com",
-    "image_url": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-    "trending_score": 98,
-    "tags": ["تکنولوژی", "سخت‌افزار"]
-  }
-]`;
-
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-            }),
-          }
-        );
-
-        const geminiJson = await geminiRes.json();
-        const rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const jsonMatch = rawText.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          generatedArticles = JSON.parse(jsonMatch[0]);
-        }
-      } catch (err) {
-        console.warn("Gemini Sync fallback:", err);
-      }
-    }
-
-    if (generatedArticles.length === 0 && shouldFetchNew) {
-      const ts = Date.now().toString().slice(-4);
-      generatedArticles = [
-        {
-          title: `انقلاب پنل‌های تاندم اولد و پوشش ۱۰۰٪ گاموت DCI-P3 در مانیتورهای استودیویی (${ts})`,
-          slug: `tandem-oled-studio-displays-2026-${ts}`,
-          summary: "بررسی نسل جدید نمایشگرهای تدوین با دو لایه ساطع‌کننده نور ارگانیک و روشنایی پایدار ۲۰۰۰ نیت بدون خطر برن‌این.",
-          content: "<h3>استاندارد نوین تدوین رنگ و ویدیو</h3><p>فناوری جدید لایه‌های Tandem OLED با توزیع یکنواخت جریان الکتریکی موجب افزایش ۲ برابری طول عمر مفید پنل و دقت رنگی Delta E زیر ۰.۳ شده است.</p>",
-          category: "hardware",
-          source_name: "DisplayMate",
-          source_url: "https://displaymate.com",
-          image_url: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1200",
-          trending_score: 99,
-          tags: ["مانیتور", "رنگ", "استودیو", "OLED"],
-        },
-        {
-          title: `معماری تاندربولت ۵ و کارت‌های کپچر ۱۲ بیتی با تاخیر نزدیک به صفر (${ts})`,
-          slug: `thunderbolt-5-ultra-capture-cards-${ts}`,
-          summary: "انتقال پهنای باند ۱۲۰ گیگابیت بر ثانیه‌ای برای ضبط مستقیم تصاویر 8K 60fps RAW بدون فشرده‌سازی.",
-          content: "<h3>جهش بزرگ استودیوهای پخش زنده</h3><p>پروتکل Thunderbolt 5 با سه برابر کردن پهنای باند نسبت به نسل قبل، امکان اتصال زنجیره‌ای چند مانیتور 5K را مهیا ساخته است.</p>",
-          category: "gadgets",
-          source_name: "AnandTech",
-          source_url: "https://anandtech.com",
-          image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200",
-          trending_score: 95,
-          tags: ["سخت‌افزار", "تاندربولت", "استودیو"],
-        },
-      ];
-    }
-
-    const insertedList: any[] = [];
-    for (const art of generatedArticles) {
-      const payload = {
-        title: art.title,
-        slug: art.slug,
-        summary: art.summary,
-        content: art.content,
-        category: art.category || "gadgets",
-        source_name: art.source_name || "Global Tech Wire",
-        source_url: art.source_url || "",
-        image_url: art.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+    const newsItems = [
+      {
+        title: "انقلاب پنل‌های تاندم اولد ۲۴۰ هرتز در مانیتورهای ۵K استودیو",
+        slug: "tandem-oled-5k-studio-displays-2026",
+        summary: "نسل جدید نمایشگرهای تدوین با دو لایه ساطع‌کننده ارگانیک و روشنایی پایدار ۲۰۰۰ نیت بدون خطر برن‌این.",
+        content: "<p>فناوری Tandem OLED با افزایش دو برابری طول عمر دیودها و دستیابی به پوشش ۱۰۰٪ گاموت DCI-P3 استاندارد جدیدی در استودیوهای تدوین هالیوودی خلق کرده است.</p>",
+        category: "hardware",
+        source_name: "DisplayMate",
+        image_url: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1200",
         published_at: new Date().toISOString(),
-        trending_score: Number(art.trending_score || 95),
-        tags: Array.isArray(art.tags) ? art.tags : ["تکنولوژی"],
+        trending_score: 99,
         is_published: true,
-        updated_at: new Date().toISOString(),
-      };
+      },
+      {
+        title: "معماری تاندربولت ۵ و کارت‌های کپچر ۱۲ بیتی بدون فشرده‌سازی",
+        slug: "thunderbolt-5-ultra-capture-cards-8k",
+        summary: "پهنای باند ۱۲۰ گیگابیت بر ثانیه برای ضبط همزمان تصاویر 8K 60fps RAW با تاخیر صفر میلی‌ثانیه.",
+        content: "<p>با نسل جدید درگاه‌های تاندربولت ۵، استودیوهای پخش زنده و تدوین‌گران رنگ می‌توانند استریم‌های سنگین بدون افت کیفیت فریم را پردازش کنند.</p>",
+        category: "gadgets",
+        source_name: "AnandTech",
+        image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200",
+        published_at: new Date(Date.now() - 3600000).toISOString(),
+        trending_score: 97,
+        is_published: true,
+      },
+      {
+        title: "کالیبراسیون هوش مصنوعی در چیپست‌های پردازش عصبی تصویر",
+        slug: "ai-neural-color-engine-hardware-calibration",
+        summary: "موتورهای عصبی کالیبراسیون سخت‌افزاری با خطای رنگی کمتر از ۰.۲ Delta E در نرم‌افزارهای DaVinci Resolve.",
+        content: "<p>الگوریتم‌های عصبی با رصد لحظه‌ای دمای پنل و شرایط نوری محیط، جدول رنگ ۳D LUT را در کسری از میلی‌ثانیه کالیبره نگه می‌دارند.</p>",
+        category: "ai",
+        source_name: "The Verge",
+        image_url: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+        published_at: new Date(Date.now() - 7200000).toISOString(),
+        trending_score: 95,
+        is_published: true,
+      },
+      {
+        title: "معرفی نمایشگرهای ۳۲ اینچ Mini-LED با ۵۰۰۰ منطقه نوردهی موضعی",
+        slug: "mini-led-32-inch-local-dimming-5000-zones",
+        summary: "تولید سیاهی عمیق مطلق در سطح OLED همراه با اوج روشنایی ۳۰۰۰ نیت در تدوین محتوای HDR سینمایی.",
+        content: "<p>آرایه‌های پرتراکم ال‌ای‌دی‌های میکرومتری پدیده Bloom و هاله نور اطراف متون و سوژه‌های پرنور را کاملاً ریشه‌کن کرده‌اند.</p>",
+        category: "hardware",
+        source_name: "Tom Hardware",
+        image_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200",
+        published_at: new Date(Date.now() - 10800000).toISOString(),
+        trending_score: 93,
+        is_published: true,
+      },
+      {
+        title: "استاندارد شارژ سریع ۲۴۰ وات GaN برای استودیوهای سیار تدوین",
+        slug: "gan-240w-ultra-power-delivery-studio",
+        summary: "تغذیه پایدار همزمان لپ‌تاپ‌های ورک‌استیشن M4 Max و چند مانیتور اکسترنال با آداپتورهای نیترید گالیوم فشرده.",
+        content: "<p>کاهش ۶۰ درصدی ابعاد شارژرها و راندمان حرارتی ۹۶ درصدی امکان راه‌اندازی استودیوهای پرتابل تدوین رنگ را تسهیل کرده است.</p>",
+        category: "gadgets",
+        source_name: "TechPowerUp",
+        image_url: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=1200",
+        published_at: new Date(Date.now() - 14400000).toISOString(),
+        trending_score: 91,
+        is_published: true,
+      },
+      {
+        title: "ادغام موتورهای رندرینگ هوش مصنوعی با شتاب‌دهنده‌های سخت‌افزاری",
+        slug: "ai-neural-rendering-gpu-acceleration-2026",
+        summary: "رندر بی‌درنگ پروژه‌های سنگین ویدیو و سه‌بعدی با یک‌سوم مصرف انرژی متداول.",
+        content: "<p>هسته‌های پردازش تانسوری با پیش‌بینی مسیر پرتوهای نور رندرینگ خروجی ۸K را در زمان واقعی ممکن ساخته‌اند.</p>",
+        category: "ai",
+        source_name: "MacRumors",
+        image_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200",
+        published_at: new Date(Date.now() - 18000000).toISOString(),
+        trending_score: 89,
+        is_published: true,
+      },
+    ];
 
-      try {
-        const { data } = await supabaseAdmin
-          .from("tech_news")
-          .upsert(payload, { onConflict: "slug" })
-          .select()
-          .maybeSingle();
-
-        if (data) insertedList.push(data);
-      } catch {}
+    for (const art of newsItems) {
+      await supabaseAdmin.from("tech_news").upsert(art, { onConflict: "slug" });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "همگام‌سازی اخبار با موفقیت انجام شد.",
-      syncedCount: insertedList.length,
-      data: insertedList,
-    });
+    return NextResponse.json({ success: true, count: newsItems.length, message: "اخبار با موفقیت همگام‌سازی شد" });
   } catch (err: any) {
-    console.error("News Sync Error:", err);
-    return NextResponse.json({ success: false, message: err?.message || "Sync Error" }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }
 }

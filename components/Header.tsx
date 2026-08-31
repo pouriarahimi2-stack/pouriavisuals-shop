@@ -19,7 +19,6 @@ export default function Header() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("all");
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -113,7 +112,6 @@ export default function Header() {
 
   const handleSelectCategory = (catName: string) => {
     soundEngine.playClick();
-    setSelectedCategory(catName);
     setIsCategoryOpen(false);
     setMobileMenuOpen(false);
     if (typeof window !== "undefined") {
@@ -162,9 +160,42 @@ export default function Header() {
 
       <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-          <button onClick={() => { soundEngine.playClick(); setMobileMenuOpen(!mobileMenuOpen); }} className="lg:hidden p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs cursor-pointer shrink-0" aria-label="منوی ناوبری">
-            ☰
-          </button>
+          
+          <div className="relative" ref={categoryDropdownRef}>
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setIsCategoryOpen(!isCategoryOpen);
+              }}
+              className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] flex items-center justify-center text-sm transition cursor-pointer shadow-sm"
+              title="دسته‌بندی‌های محصولات"
+              aria-label="دسته‌بندی‌ها"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            {isCategoryOpen && (
+              <div className="absolute top-12 right-0 w-64 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
+                <button
+                  onClick={() => handleSelectCategory("all")}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-black text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
+                >
+                  <span>📦 تمامی محصولات و تجهیزات</span>
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id || cat.name}
+                    onClick={() => handleSelectCategory(cat.name)}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
+                  >
+                    <span>🏷️ {cat.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <Link href="/" className="flex items-center gap-2.5 group shrink-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
@@ -178,24 +209,6 @@ export default function Header() {
               <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]">{siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر"}</span>
             </div>
           </Link>
-
-          <div className="relative hidden md:block" ref={categoryDropdownRef}>
-            <button onClick={() => { soundEngine.playClick(); setIsCategoryOpen(!isCategoryOpen); }} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all duration-200 border cursor-pointer ${isCategoryOpen || selectedCategory !== "all" ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)]"}`}>
-              <span>☰</span><span>دسته‌بندی‌ها</span><span className="text-[9px] opacity-80">▾</span>
-            </button>
-            {isCategoryOpen && (
-              <div className="absolute top-12 right-0 w-60 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
-                <button onClick={() => handleSelectCategory("all")} className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-black transition cursor-pointer ${selectedCategory === "all" ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-[var(--text-primary)] hover:bg-[var(--input-bg)]"}`}>
-                  <span>📦 تمامی کالاها</span>{selectedCategory === "all" && <span>✓</span>}
-                </button>
-                {categories.map((cat) => (
-                  <button key={cat.id || cat.name} onClick={() => handleSelectCategory(cat.name)} className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold transition cursor-pointer ${selectedCategory === cat.name ? "bg-[var(--accent-blue)] text-white shadow-sm font-black" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"}`}>
-                    <span>🏷️ {cat.name}</span>{selectedCategory === cat.name && <span>✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">

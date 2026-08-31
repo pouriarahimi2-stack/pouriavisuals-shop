@@ -22,7 +22,6 @@ export default function HomePage() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
 
   const [compareList, setCompareList] = useState<Product[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
@@ -36,17 +35,7 @@ export default function HomePage() {
         siteInfoService.getSiteInfo(),
       ]);
 
-      const topCat = userBehavior.getTopInterestCategory();
-      let sortedProducts = prods || [];
-      if (topCat !== "all") {
-        sortedProducts = [...sortedProducts].sort((a, b) => {
-          const aMatch = (a.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
-          const bMatch = (b.category || "").toLowerCase().includes(topCat.toLowerCase()) ? 1 : 0;
-          return bMatch - aMatch;
-        });
-      }
-
-      setProducts(sortedProducts);
+      setProducts(prods || []);
       setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
       if (info) setSiteInfo(info);
     } catch (e) {
@@ -104,10 +93,6 @@ export default function HomePage() {
     }
   };
 
-  const categoriesList = Array.from(
-    new Set(products.map((p) => p.category || (p as any).category_name || "کالای دیجیتال"))
-  ).filter(Boolean);
-
   const filteredProducts = products.filter((product) => {
     if (selectedCategory === "all") return true;
     const cat = (product.category || (product as any).category_name || "").toLowerCase();
@@ -148,22 +133,22 @@ export default function HomePage() {
 
         <TechRadarFeed />
 
+        {/* ویترین اصلی محصولات - بدون دکمه‌های تکراری و هدایت مستقیم کلیک به صفحه حرفه‌ای کالا */}
         <section id="products" className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
+          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4 px-1">
             <div>
-              <h3 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]"><span>📦</span> محصولات ویژه‌ی فروشگاه</h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">{selectedCategory === "all" ? "تمامی کالاهای موجود با تست سلامت فیزیکی و گارانتی اصالت معتبر" : `نمایش دسته‌بندی: ${selectedCategory}`}</p>
+              <h3 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
+                <span>📦</span> کاتالوگ تجهیزات تخصصی و مانیتورها
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+                {selectedCategory === "all" ? "تمامی کالاهای اورجینال با تست سلامت فیزیکی و گارانتی اصالت طلایی" : `فیلتر فعال: ${selectedCategory}`}
+              </p>
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-none text-xs">
-              <button onClick={() => { soundEngine.playClick(); setSelectedCategory("all"); }} className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${selectedCategory === "all" ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"}`}>
-                همه ({products.length})
+            {selectedCategory !== "all" && (
+              <button onClick={() => setSelectedCategory("all")} className="text-xs font-bold text-[var(--accent-blue)] hover:underline cursor-pointer">
+                مشاهده همه کالاها ({products.length})
               </button>
-              {categoriesList.map((cat) => (
-                <button key={cat} onClick={() => { soundEngine.playClick(); setSelectedCategory(cat); }} className={`px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${selectedCategory === cat ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"}`}>
-                  {cat}
-                </button>
-              ))}
-            </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -174,8 +159,7 @@ export default function HomePage() {
                 isCompared={compareList.some((item) => item.id === product.id)}
                 onToggleCompare={toggleCompare}
                 onAddToCart={addToCart}
-                onOpenDetails={(p) => { soundEngine.playClick(); userBehavior.trackProductView(p.id, p.category); setSelectedProductForModal(p); }}
-                onQuickBuy={(p) => {
+                onQuickBuy={(p: Product) => {
                   soundEngine.playAddToCart();
                   userBehavior.trackProductView(p.id, p.category);
                   addToCart({ id: p.id, title: p.title || p.name, name: p.title || p.name, price: Number(p.discountPrice || p.discount_price || p.price || 0), image: p.images?.[0] || p.image || "/placeholder.png", stock: p.stock ?? 10, quantity: 1 });
@@ -194,6 +178,7 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* مجله سئو قبل از فوتر */}
         <section className="p-5 sm:p-7 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <div>
@@ -206,14 +191,13 @@ export default function HomePage() {
         </section>
       </div>
 
-      {selectedProductForModal && <ProductDetailsModal product={selectedProductForModal} onClose={() => setSelectedProductForModal(null)} onAddToCart={addToCart} />}
       <ProductComparisonModal products={compareList} isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))} />
       <AIAssistantChat />
     </div>
   );
 }
 
-function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart, onOpenDetails, onQuickBuy }: any) {
+function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart, onQuickBuy }: any) {
   const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
   const displayImage = images[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500";
   const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
@@ -223,21 +207,21 @@ function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart, on
 
   return (
     <div className="rounded-[2.2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 sm:p-5 flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] hover:shadow-2xl transition duration-300 group shadow-sm select-none">
-      <div onClick={() => onOpenDetails(product)} className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center cursor-pointer border border-[var(--card-border)]">
+      <Link href={`/products/${product.id}`} className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center cursor-pointer border border-[var(--card-border)]">
         <img src={displayImage} alt={productName} className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-500" />
-        <button onClick={(e) => { e.stopPropagation(); onToggleCompare(product); }} className={`absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition cursor-pointer ${isCompared ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md" : "bg-black/60 text-white border-white/20"}`}>
+        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleCompare(product); }} className={`absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition cursor-pointer ${isCompared ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md" : "bg-black/60 text-white border-white/20"}`}>
           {isCompared ? "✓ در مقایسه" : "⚖️ مقایسه"}
         </button>
-      </div>
+      </Link>
 
-      <div className="space-y-2 cursor-pointer" onClick={() => onOpenDetails(product)}>
+      <Link href={`/products/${product.id}`} className="space-y-2 cursor-pointer block">
         <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full font-bold text-[10px]">{product.category || "کالای دیجیتال"}</span>
         <h4 className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2">{productName}</h4>
         <div className="flex items-center gap-2 pt-1">
           <span className="font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 font-mono">{currentPrice.toLocaleString("fa-IR")} تومان</span>
           {oldPrice > currentPrice && <span className="text-[11px] line-through text-[var(--text-secondary)] font-mono">{oldPrice.toLocaleString("fa-IR")}</span>}
         </div>
-      </div>
+      </Link>
 
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--card-border)]">
         <button onClick={() => { soundEngine.playAddToCart(); onAddToCart({ id: product.id, name: productName, title: productName, price: currentPrice, image: displayImage, stock: product.stock ?? 10 }); }} disabled={!isAvailable} className="py-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] font-bold text-xs cursor-pointer border border-[var(--card-border)] disabled:opacity-40 shadow-sm">
@@ -246,36 +230,6 @@ function HomeProductCard({ product, isCompared, onToggleCompare, onAddToCart, on
         <button onClick={() => onQuickBuy(product)} disabled={!isAvailable} className="py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 transition shadow-md disabled:opacity-40">
           ⚡ خرید سریع
         </button>
-      </div>
-    </div>
-  );
-}
-
-function ProductDetailsModal({ product, onClose, onAddToCart }: any) {
-  const images = product.images && product.images.length > 0 ? product.images : [product.image || product.image_url || ""];
-  const [activeImage, setActiveImage] = useState(images[0]);
-  const [quantity, setQuantity] = useState(1);
-  const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && (product.stock === undefined || Number(product.stock) > 0);
-  const productName = product.title || product.name || "";
-  const currentPrice = Number(product.discountPrice ?? product.discount_price ?? product.price ?? 0);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
-      <div className="w-full max-w-3xl max-h-[90vh] bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-8 text-[var(--text-primary)] overflow-y-auto shadow-2xl relative space-y-6">
-        <button onClick={() => { soundEngine.playClick(); onClose(); }} className="absolute top-6 left-6 w-9 h-9 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold transition cursor-pointer z-10">✕</button>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-          <div className="w-full h-64 rounded-3xl overflow-hidden bg-[var(--input-bg)] flex items-center justify-center border border-[var(--card-border)] p-4">
-            <img src={activeImage || product.image || ""} alt={productName} className="w-full h-full object-contain" />
-          </div>
-          <div className="space-y-4">
-            <h2 className="text-xl font-black">{productName}</h2>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{product.description}</p>
-            <div className="text-xl font-black text-emerald-600 font-mono">{currentPrice.toLocaleString("fa-IR")} تومان</div>
-            <button onClick={() => { soundEngine.playAddToCart(); onAddToCart({ id: product.id, name: productName, title: productName, price: currentPrice, image: activeImage || product.image, stock: product.stock ?? 10, quantity }); onClose(); }} disabled={!isAvailable} className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 shadow-lg">
-              افزودن به سبد خرید 🛒
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

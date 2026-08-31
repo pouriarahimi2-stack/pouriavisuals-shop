@@ -24,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
         <meta name="enamad" content="27424534" />
+        <link id="axon-dynamic-favicon" rel="icon" href="/favicon.ico" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
 export type MaintenanceMode = "none" | "timed" | "indefinite";
 
@@ -43,7 +44,11 @@ export const siteInfoService = {
     if (typeof window !== "undefined") {
       try {
         const local = localStorage.getItem(LOCAL_STORAGE_SITE_INFO);
-        if (local) return JSON.parse(local);
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed.favicon_url) applyFaviconToDOM(parsed.favicon_url);
+          return parsed;
+        }
       } catch {}
     }
     return {
@@ -107,6 +112,8 @@ export const siteInfoService = {
 
           if (typeof window !== "undefined") {
             localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
+            if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
+            if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
           }
           return mapped;
         }
@@ -165,7 +172,7 @@ export const siteInfoService = {
 
       if (typeof window !== "undefined") {
         localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
-        window.dispatchEvent(new CustomEvent("site_info_updated", { detail: finalData }));
+        realtimeEngine.broadcastLocally("site_info_updated", finalData);
       }
 
       return finalData;

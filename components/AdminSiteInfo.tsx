@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
+import { applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
 export default function AdminSiteInfo() {
   const [siteName, setSiteName] = useState("");
@@ -16,9 +17,6 @@ export default function AdminSiteInfo() {
   const [footerLogoUrl, setFooterLogoUrl] = useState("");
   const [faviconUrl, setFaviconUrl] = useState("");
 
-  const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
-  const [maintHours, setMaintHours] = useState<number>(1);
-  const [maintMinutes, setMaintMinutes] = useState<number>(0);
   const [announcement, setAnnouncement] = useState("");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(2000000);
   const [description, setDescription] = useState("");
@@ -41,7 +39,6 @@ export default function AdminSiteInfo() {
     setLogoUrl(data.logo_url || data.logoUrl || "");
     setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
     setFaviconUrl(data.favicon_url || data.faviconUrl || "");
-    setMaintenanceMode(data.maintenance_mode || (data.allow_google_index === false ? "indefinite" : "none"));
     setAnnouncement(data.header_announcement || "");
     setFreeShippingThreshold(Number(data.free_shipping_threshold || 2000000));
     setDescription(data.description || data.footer_text || "");
@@ -88,7 +85,10 @@ export default function AdminSiteInfo() {
     const optimized = await compressImage(file, maxDim);
     if (target === "header") setLogoUrl(optimized);
     else if (target === "footer") setFooterLogoUrl(optimized);
-    else if (target === "favicon") setFaviconUrl(optimized);
+    else if (target === "favicon") {
+      setFaviconUrl(optimized);
+      applyFaviconToDOM(optimized);
+    }
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -96,12 +96,6 @@ export default function AdminSiteInfo() {
     soundEngine.playClick();
     setSaving(true);
     setStatusMessage(null);
-
-    let untilISO: string | null = null;
-    const totalMins = Number(maintHours) * 60 + Number(maintMinutes);
-    if (maintenanceMode === "timed") {
-      untilISO = new Date(Date.now() + totalMins * 60 * 1000).toISOString();
-    }
 
     const payload: Partial<SiteInfo> = {
       site_name: siteName.trim(),
@@ -118,11 +112,6 @@ export default function AdminSiteInfo() {
       footerLogoUrl: footerLogoUrl.trim(),
       favicon_url: faviconUrl.trim(),
       faviconUrl: faviconUrl.trim(),
-      allow_google_index: maintenanceMode === "none",
-      allowGoogleIndex: maintenanceMode === "none",
-      maintenance_mode: maintenanceMode,
-      maintenance_until: untilISO || undefined,
-      maintenance_duration_minutes: maintenanceMode === "timed" ? totalMins : undefined,
       header_announcement: announcement.trim(),
       free_shipping_threshold: Number(freeShippingThreshold),
       description: description.trim(),
@@ -130,17 +119,14 @@ export default function AdminSiteInfo() {
     };
 
     try {
-      const res = await fetch("/api/site-info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
+      const saved = await siteInfoService.updateSiteInfo(payload);
+      if (saved) {
         soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "⚡ ۳ لوگوی مجزا و وضعیت سایت با موفقیت در دیتابیس ذخیره شدند." });
+        if (saved.favicon_url) applyFaviconToDOM(saved.favicon_url);
+        if (saved.tagline || saved.site_name) applyTitleToDOM(saved.tagline, saved.site_name);
+        setStatusMessage({ type: "success", text: "⚡ ۳ نشان اختصاصی، فاوآیکون تب و تنظیمات با موفقیت ذخیره و فوراً اعمال شدند." });
       } else {
-        throw new Error(json.message || "خطا در ثبت");
+        throw new Error("خطا در ثبت پایگاه داده");
       }
     } catch (err: any) {
       setStatusMessage({ type: "error", text: err?.message || "خطا در ذخیره‌سازی اطلاعات" });
@@ -161,7 +147,7 @@ export default function AdminSiteInfo() {
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>⚙️</span> تنظیمات کلان سایت، هویت بصری و ۳ لوگوی مستقل
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی لوگوی هدر، لوگوی فوتر، فاوآیکون مرورگر و حالت تعمیرات ۳ حالته</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی لوگوی هدر، لوگوی فوتر و فاوآیکون تب مرورگر با اعمال زنده بدون رفرش</p>
         </div>
         <button type="button" onClick={() => handleSubmit()} disabled={saving} className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl cursor-pointer disabled:opacity-50">
           {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و اعمال سراسری"}
@@ -220,7 +206,7 @@ export default function AdminSiteInfo() {
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => faviconRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود آیکون</button>
-              {faviconUrl && <button type="button" onClick={() => setFaviconUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
+              {faviconUrl && <button type="button" onClick={() => { setFaviconUrl(""); applyFaviconToDOM("/favicon.ico"); }} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
             </div>
           </div>
         </div>

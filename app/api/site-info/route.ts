@@ -22,7 +22,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
-    // خواندن رکورد قبلی جهت جلوگیری از رونویسی ناخواسته وضعیت تعمیرات
     const { data: existing } = await supabaseAdmin
       .from("site_info")
       .select("*")
@@ -49,9 +48,9 @@ export async function POST(req: NextRequest) {
       email: body.email !== undefined ? body.email : (existing?.email || ""),
       address: body.address !== undefined ? body.address : (existing?.address || ""),
       working_hours: body.working_hours !== undefined ? body.working_hours : (existing?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"),
-      logo_url: body.logo_url || body.logoUrl || existing?.logo_url || null,
-      footer_logo_url: body.footer_logo_url || body.footerLogoUrl || existing?.footer_logo_url || null,
-      favicon_url: body.favicon_url || body.faviconUrl || existing?.favicon_url || null,
+      logo_url: body.logo_url !== undefined ? body.logo_url : (existing?.logo_url || null),
+      footer_logo_url: body.footer_logo_url !== undefined ? body.footer_logo_url : (existing?.footer_logo_url || null),
+      favicon_url: body.favicon_url !== undefined ? body.favicon_url : (existing?.favicon_url || null),
       description: body.description || body.footer_text || existing?.description || "",
       footer_text: body.footer_text || body.description || existing?.footer_text || "",
       allow_google_index: isAllowed,

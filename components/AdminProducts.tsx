@@ -277,7 +277,7 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* فرم ادیتور سمت چپ */}
+        {/* فرم ادیتور سمت چپ با تب‌های منظم Wrap شده */}
         <div className="lg:col-span-8">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
             

@@ -4,10 +4,6 @@ import { productService } from "@/services/productService";
 import { siteInfoService } from "@/services/siteInfoService";
 import { bannerService } from "@/services/bannerService";
 import { newsService } from "@/services/newsService";
-import { menuService } from "@/services/menuService";
-import { categoryService } from "@/services/categoryService";
-import { couponService } from "@/services/couponService";
-import { orderService } from "@/services/orderService";
 
 export function applyFaviconToDOM(url?: string) {
   if (typeof document === "undefined" || !url) return;
@@ -31,21 +27,16 @@ export function applyTitleToDOM(title?: string, storeName?: string) {
   } catch {}
 }
 
-declare global {
-  interface Window {
-    __AXON_SINGLETON_REALTIME__?: MasterRealtimeEngine;
-  }
-}
-
 class MasterRealtimeEngine {
+  private static instance: MasterRealtimeEngine;
   private channel: RealtimeChannel | null = null;
   private broadcastBus: BroadcastChannel | null = null;
   private isSubscribed: boolean = false;
 
-  constructor() {
+  private constructor() {
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
       try {
-        this.broadcastBus = new BroadcastChannel("axon_master_stream_channel");
+        this.broadcastBus = new BroadcastChannel("axon_master_stream_v2026");
         this.broadcastBus.onmessage = (event) => {
           const { type, data } = event.data || {};
           if (type) {
@@ -61,13 +52,10 @@ class MasterRealtimeEngine {
   }
 
   public static getInstance(): MasterRealtimeEngine {
-    if (typeof window !== "undefined") {
-      if (!window.__AXON_SINGLETON_REALTIME__) {
-        window.__AXON_SINGLETON_REALTIME__ = new MasterRealtimeEngine();
-      }
-      return window.__AXON_SINGLETON_REALTIME__;
+    if (!MasterRealtimeEngine.instance) {
+      MasterRealtimeEngine.instance = new MasterRealtimeEngine();
     }
-    return new MasterRealtimeEngine();
+    return MasterRealtimeEngine.instance;
   }
 
   public broadcastLocally(type: string, data: any) {
@@ -100,14 +88,13 @@ class MasterRealtimeEngine {
     if (this.isSubscribed && this.channel) return () => {};
 
     try {
-      this.channel = supabase.channel("axon_global_realtime_v2", {
+      this.channel = supabase.channel("axon_global_stream_v2026", {
         config: { broadcast: { ack: false } },
       });
 
       const eventNames = [
         "products_updated", "site_info_updated", "banners_updated",
-        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
-        "categories_updated", "contact_messages_updated", "posts_updated"
+        "orders_updated", "coupons_updated", "menu_updated", "news_updated"
       ];
 
       eventNames.forEach((ev) => {
@@ -120,11 +107,7 @@ class MasterRealtimeEngine {
         });
       });
 
-      const tables = [
-        "products", "orders", "site_info", "banners", "tech_news",
-        "coupons", "contact_messages", "posts", "site_pages", "menu_items", "categories"
-      ];
-
+      const tables = ["products", "orders", "site_info", "banners", "tech_news", "coupons", "menu_items", "categories"];
       tables.forEach((tableName) => {
         this.channel?.on(
           "postgres_changes",

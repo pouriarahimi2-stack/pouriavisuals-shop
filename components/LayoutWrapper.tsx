@@ -119,7 +119,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // نمایش صفحه تعمیرات به صورت عایق‌شده و بدون خطای هیدریشن
   if (mounted && maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";

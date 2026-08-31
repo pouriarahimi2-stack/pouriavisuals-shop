@@ -23,7 +23,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [activeImage, setActiveImage] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState<"specs" | "gamut" | "comparison" | "desc" | "shipping" | "reviews">("specs");
+  const [activeTab, setActiveTab] = useState<"specs" | "gamut" | "comparison" | "desc" | "reviews">("specs");
   const [isExplodedViewOpen, setIsExplodedViewOpen] = useState(false);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="max-w-3xl mx-auto px-4 py-24 text-center space-y-4 font-sans select-none" dir="rtl">
         <h2 className="text-xl font-black">محصول مورد نظر یافت نشد!</h2>
-        <Link href="/products" className="inline-block px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs">← بازگشت به کاتالوگ</Link>
+        <Link href="/" className="inline-block px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs">← بازگشت به صفحه نخست</Link>
       </div>
     );
   }
@@ -80,15 +80,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-[var(--text-primary)] space-y-10 pb-28 sm:pb-10" dir="rtl">
-      <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-bold">
-        <Link href="/" className="hover:text-[var(--accent-blue)] transition">صفحه نخست</Link>
+    <div className="max-w-7xl mx-auto px-4 py-6 font-sans select-none text-[var(--text-primary)] space-y-8 pb-28 sm:pb-10" dir="rtl">
+      
+      {/* نوار آدرس و موقعیت هوشمند (Breadcrumb) */}
+      <nav className="flex items-center gap-2 p-3 px-5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-bold shadow-sm backdrop-blur-md">
+        <Link href="/" className="hover:text-[var(--accent-blue)] transition flex items-center gap-1.5">
+          <span>🏠</span><span>صفحه اصلی</span>
+        </Link>
         <span>/</span>
-        <Link href="/products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ</Link>
+        <Link href="/#products" className="hover:text-[var(--accent-blue)] transition">
+          {product.category || "تجهیزات و مانیتورها"}
+        </Link>
         <span>/</span>
-        <span className="text-[var(--text-primary)] truncate max-w-xs">{product.title}</span>
-      </div>
+        <span className="text-[var(--accent-blue)] truncate max-w-xs">{product.title}</span>
+      </nav>
 
+      {/* معرفی و خرید کالا */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
         <div className="lg:col-span-5 space-y-4">
           <div className="w-full h-80 md:h-[430px] rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] overflow-hidden flex items-center justify-center p-6 relative group">
@@ -117,6 +124,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             <h1 className="text-2xl md:text-3xl font-black text-[var(--text-primary)] leading-snug">{product.title}</h1>
+            {product.title_fa && <p className="text-xs text-[var(--text-secondary)] font-medium">{product.title_fa}</p>}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div onClick={() => { soundEngine.playExplodeShift(); setIsExplodedViewOpen(true); }} className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 hover:border-blue-500 transition cursor-pointer flex items-center gap-3">
@@ -147,7 +155,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-5">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
+              <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی فاکتور:</span>
               <div className="text-left">
                 {oldPrice > finalUnitPrice && <span className="block text-xs line-through text-[var(--text-secondary)] font-mono">{oldPrice.toLocaleString("fa-IR")}</span>}
                 <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">{finalUnitPrice.toLocaleString("fa-IR")} تومان</span>
@@ -162,10 +170,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {/* ۵ تب تعاملی پیشرفته کالا */}
       <div className="space-y-6">
         <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] text-xs scrollbar-none">
-          {[{ id: "specs", label: "⚙️ مشخصات فنی دقیق" }, { id: "gamut", label: "🎨 شبیه‌ساز گاموت رنگی" }, { id: "comparison", label: "⚖️ پایش قیمت با بازار" }, { id: "desc", label: "📝 بررسی تخصصی" }, { id: "reviews", label: "⭐ نظرات کاربران" }].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-5 py-3 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${activeTab === tab.id ? "bg-[var(--accent-blue)] text-white shadow-lg" : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]"}`}>
+          {[
+            { id: "specs", label: "⚙️ مشخصات فنی دقیق" },
+            { id: "gamut", label: "🎨 شبیه‌ساز گاموت رنگی" },
+            { id: "comparison", label: "⚖️ پایش قیمت با بازار" },
+            { id: "desc", label: "📝 بررسی تخصصی" },
+            { id: "reviews", label: "⭐ نظرات کاربران" }
+          ].map((tab) => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-5 py-3 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${activeTab === tab.id ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25" : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]"}`}>
               {tab.label}
             </button>
           ))}
@@ -184,7 +199,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         )}
         {activeTab === "gamut" && <ColorGamutSimulator productTitle={product.title} />}
         {activeTab === "comparison" && <LiveMarketArbitrage productTitle={product.title} ourPrice={finalUnitPrice} marketBenchmarks={product.market_comparison} />}
-        {activeTab === "desc" && <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl text-xs leading-loose whitespace-pre-line">{product.description}</div>}
+        {activeTab === "desc" && <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl text-xs md:text-sm leading-loose whitespace-pre-line font-medium text-justify">{product.description}</div>}
         {activeTab === "reviews" && <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl"><ProductReviews productId={product.id} /></div>}
       </div>
 

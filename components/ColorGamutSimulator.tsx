@@ -1,16 +1,11 @@
-// File Path: components/ColorGamutSimulator.tsx
 "use client";
 
 import React, { useState } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 
-interface ColorGamutSimulatorProps {
-  productTitle: string;
-}
-
-export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulatorProps) {
+export default function ColorGamutSimulator({ productTitle }: { productTitle: string }) {
   const [selectedGamut, setSelectedGamut] = useState<"srgb" | "p3" | "rec2020" | "adobe">("p3");
-  const [testPattern, setTestPattern] = useState<"gradient" | "skin" | "neon" | "hdr">("gradient");
+  const [testPattern, setTestPattern] = useState<"gradient" | "skin" | "neon" | "hdr">("skin");
   const [gammaCorrection, setGammaCorrection] = useState<number>(2.2);
 
   const gamuts = {
@@ -49,20 +44,14 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
   };
 
   const testImages = {
-    gradient: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=1000&auto=format&fit=crop&q=80",
     skin: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1000&auto=format&fit=crop&q=80",
+    gradient: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=1000&auto=format&fit=crop&q=80",
     neon: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=1000&auto=format&fit=crop&q=80",
     hdr: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1000&auto=format&fit=crop&q=80",
   };
 
-  const handleGamutChange = (key: "srgb" | "p3" | "rec2020" | "adobe") => {
-    soundEngine.playClick();
-    setSelectedGamut(key);
-  };
-
   return (
     <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-xl shadow-lg shadow-blue-500/25">
@@ -90,11 +79,11 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
           return (
             <button
               key={key}
-              onClick={() => handleGamutChange(key)}
+              onClick={() => { soundEngine.playClick(); setSelectedGamut(key); }}
               className={`p-3.5 rounded-2xl border text-right transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
                 isSelected
-                  ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-xl shadow-blue-500/25 scale-[1.02]"
-                  : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-blue)]"
+                  ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-xl scale-[1.02]"
+                  : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
             >
               <div className="flex justify-between items-center">
@@ -113,10 +102,10 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
         <div className="lg:col-span-8 relative h-72 sm:h-96 rounded-3xl overflow-hidden bg-black border border-[var(--card-border)] shadow-inner flex items-center justify-center group">
           <img
             src={testImages[testPattern]}
-            alt="Color Gamut Test Pattern"
-            className="w-full h-full object-cover transition-all duration-700"
+            alt="Color Test Pattern"
+            className="w-full h-full object-cover transition-all duration-500"
             style={{
-              filter: `${gamuts[selectedGamut].filterStyle} contrast(${gammaCorrection / 2.2 * 100}%)`,
+              filter: `${gamuts[selectedGamut].filterStyle} contrast(${(gammaCorrection / 2.2) * 100}%)`,
             }}
           />
 
@@ -126,17 +115,14 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
 
           <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 flex items-center gap-1.5 bg-black/75 backdrop-blur-md p-1.5 rounded-2xl border border-white/15">
             {[
-              { id: "gradient", label: "طیف گرادیانت" },
               { id: "skin", label: "تن پوست (Skin Tone)" },
+              { id: "gradient", label: "طیف گرادیانت" },
               { id: "neon", label: "نور نئون و کنتراست" },
               { id: "hdr", label: "منظره HDR" },
             ].map((t) => (
               <button
                 key={t.id}
-                onClick={() => {
-                  soundEngine.playClick();
-                  setTestPattern(t.id as any);
-                }}
+                onClick={() => { soundEngine.playClick(); setTestPattern(t.id as any); }}
                 className={`px-3 py-1.5 rounded-xl text-[10px] font-black transition cursor-pointer ${
                   testPattern === t.id ? "bg-[var(--accent-blue)] text-white shadow-md" : "text-slate-300 hover:text-white"
                 }`}
@@ -149,12 +135,8 @@ export default function ColorGamutSimulator({ productTitle }: ColorGamutSimulato
 
         <div className="lg:col-span-4 space-y-4 text-xs">
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-            <span className="font-black text-[var(--accent-blue)] block text-xs">
-              📊 تحلیل مهندسی پروفایل انتخابی:
-            </span>
-            <p className="text-[var(--text-secondary)] leading-relaxed font-medium">
-              {gamuts[selectedGamut].description}
-            </p>
+            <span className="font-black text-[var(--accent-blue)] block text-xs">📊 تحلیل مهندسی پروفایل انتخابی:</span>
+            <p className="text-[var(--text-secondary)] leading-relaxed font-medium">{gamuts[selectedGamut].description}</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">

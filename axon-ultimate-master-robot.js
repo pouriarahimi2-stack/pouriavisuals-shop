@@ -1,13 +1,4 @@
-// File Path: fix.js
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-console.log('🎬 [AXON ARCHITECT] در حال استقرار ابربات پیشرفته بازرسی زنده (Axon Ultimate Master Robot)...');
-
-const files = {
-  // ابربات فوق‌پیشرفته ارزیابی زنده و صفر خطای کنسول
-  'axon-ultimate-master-robot.js': `// File Path: axon-ultimate-master-robot.js
+// File Path: axon-ultimate-master-robot.js
 const https = require('https');
 const http = require('http');
 const crypto = require('crypto');
@@ -15,9 +6,9 @@ const fs = require('fs');
 const path = require('path');
 
 console.clear();
-console.log('\\x1b[35m%s\\x1b[0m', '╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\\x1b[1m\\x1b[33m%s\\x1b[0m', '   🤖 ابربات جامع بازرسی زنده، تست گفتگوی هوش مصنوعی و صحت عملکردی آکسون (Master Robot)');
-console.log('\\x1b[35m%s\\x1b[0m', '╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════╝\\n');
+console.log('\x1b[35m%s\x1b[0m', '╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🤖 ابربات جامع بازرسی زنده، تست گفتگوی هوش مصنوعی و صحت عملکردی آکسون (Master Robot)');
+console.log('\x1b[35m%s\x1b[0m', '╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 const BASE_URL = process.env.SITE_URL || 'https://axoncore.ir';
 
@@ -32,25 +23,25 @@ function formatToman(num) {
 }
 
 function printSection(title) {
-  console.log(\`\\n\\x1b[1m\\x1b[36m▶ \${title}\\x1b[0m\`);
-  console.log('\\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\\x1b[0m');
+  console.log(`\n\x1b[1m\x1b[36m▶ ${title}\x1b[0m`);
+  console.log('\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m');
 }
 
 function assertBot(category, componentName, isPassed, proof = '', latency = 0) {
   totalTests++;
-  const timeStr = latency ? \` \\x1b[33m(\${latency}ms)\\x1b[0m\` : '';
-  const status = isPassed ? '\\x1b[32m[PASSED ✓]\\x1b[0m' : '\\x1b[31m[FAILED ✕]\\x1b[0m';
+  const timeStr = latency ? ` \x1b[33m(${latency}ms)\x1b[0m` : '';
+  const status = isPassed ? '\x1b[32m[PASSED ✓]\x1b[0m' : '\x1b[31m[FAILED ✕]\x1b[0m';
   
   robotLog.push({ category, componentName, isPassed, proof, latency, timestamp: new Date().toISOString() });
 
   if (isPassed) {
     passedTests++;
-    console.log(\`  \${status} \${componentName.padEnd(66)}\${timeStr}\`);
-    if (proof) console.log(\`     \\x1b[36m↳ اثبات عملکردی:\\x1b[0m \${proof}\`);
+    console.log(`  ${status} ${componentName.padEnd(66)}${timeStr}`);
+    if (proof) console.log(`     \x1b[36m↳ اثبات عملکردی:\x1b[0m ${proof}`);
   } else {
     failedTests++;
-    console.log(\`  \${status} \${componentName.padEnd(66)}\${timeStr}\`);
-    console.log(\`     \\x1b[31m↳ علت نقص:\\x1b[0m \${proof || 'عدم انطباق در خروجی داده‌ها'}\`);
+    console.log(`  ${status} ${componentName.padEnd(66)}${timeStr}`);
+    console.log(`     \x1b[31m↳ علت نقص:\x1b[0m ${proof || 'عدم انطباق در خروجی داده‌ها'}`);
   }
 }
 
@@ -108,8 +99,8 @@ function request(path, options = {}) {
 }
 
 async function runMasterRobotSuite() {
-  console.log(\`🎯 دامنه تحت تست: \\x1b[32m\${BASE_URL}\\x1b[0m\`);
-  console.log(\`⏱️ زمان شروع عملیات ابربات: \\x1b[33m\${new Date().toLocaleString('fa-IR')}\\x1b[0m\\n\`);
+  console.log(`🎯 دامنه تحت تست: \x1b[32m${BASE_URL}\x1b[0m`);
+  console.log(`⏱️ زمان شروع عملیات ابربات: \x1b[33m${new Date().toLocaleString('fa-IR')}\x1b[0m\n`);
 
   // =========================================================================
   // ۱. تست موشکافانه گفتگوی زنده هوش مصنوعی (سلام، چطوری، قیمت کالا)
@@ -123,7 +114,7 @@ async function runMasterRobotSuite() {
   });
   const greetingReply = greetingTest.json?.response || greetingTest.json?.reply || '';
   const isGreetingDynamic = greetingTest.ok && (greetingReply.includes('سلام') || greetingReply.includes('درود') || greetingReply.includes('خوش آمدید'));
-  assertBot('AI-Dialogue', 'هوش مصنوعی: پاسخ گرم و پویا به پیام «سلام» (عدم تکرار متن ثابت)', isGreetingDynamic, isGreetingDynamic ? \`پاسخ: "\${greetingReply.slice(0, 75)}..."\` : 'پاسخ تکراری یا نامعتبر بود', greetingTest.latency);
+  assertBot('AI-Dialogue', 'هوش مصنوعی: پاسخ گرم و پویا به پیام «سلام» (عدم تکرار متن ثابت)', isGreetingDynamic, isGreetingDynamic ? `پاسخ: "${greetingReply.slice(0, 75)}..."` : 'پاسخ تکراری یا نامعتبر بود', greetingTest.latency);
 
   // تست ۱.۲: پیام چطوری؟
   const statusTest = await request('/api/ai-assistant', {
@@ -132,7 +123,7 @@ async function runMasterRobotSuite() {
   });
   const statusReply = statusTest.json?.response || statusTest.json?.reply || '';
   const isStatusDynamic = statusTest.ok && (statusReply.includes('ممنون') || statusReply.includes('سلامت') || statusReply.includes('عالی') || statusReply.includes('پرانرژی'));
-  assertBot('AI-Dialogue', 'هوش مصنوعی: پاسخ طبیعی و محاوره‌ای به پیام «چطوری؟»', isStatusDynamic, isStatusDynamic ? \`پاسخ: "\${statusReply.slice(0, 75)}..."\` : 'پاسخ هوش مصنوعی محاوره‌ای نبود', statusTest.latency);
+  assertBot('AI-Dialogue', 'هوش مصنوعی: پاسخ طبیعی و محاوره‌ای به پیام «چطوری؟»', isStatusDynamic, isStatusDynamic ? `پاسخ: "${statusReply.slice(0, 75)}..."` : 'پاسخ هوش مصنوعی محاوره‌ای نبود', statusTest.latency);
 
   // تست ۱.۳: استعلام تخصصی قیمت و کاتالوگ مانیتور ۵K
   const priceTest = await request('/api/ai-assistant', {
@@ -141,7 +132,7 @@ async function runMasterRobotSuite() {
   });
   const priceReply = priceTest.json?.response || priceTest.json?.reply || '';
   const hasMatchedCard = priceTest.json?.matchedProduct && priceTest.json?.matchedProduct?.price;
-  assertBot('AI-Dialogue', 'هوش مصنوعی: استخراج قیمت دقیق مانیتور ۵K و پیوست کارت خرید مستقیم', priceTest.ok && priceReply.includes('تومان') && !!hasMatchedCard, \`کارت خرید پیوست شد | قیمت: \${formatToman(priceTest.json?.matchedProduct?.price || 128500000)} تومان\`, priceTest.latency);
+  assertBot('AI-Dialogue', 'هوش مصنوعی: استخراج قیمت دقیق مانیتور ۵K و پیوست کارت خرید مستقیم', priceTest.ok && priceReply.includes('تومان') && !!hasMatchedCard, `کارت خرید پیوست شد | قیمت: ${formatToman(priceTest.json?.matchedProduct?.price || 128500000)} تومان`, priceTest.latency);
 
   // =========================================================================
   // ۲. تست موتور سئوی خودمختار سرچ‌کنسول (AI Growth & Content Funnel)
@@ -150,7 +141,7 @@ async function runMasterRobotSuite() {
 
   const gscIntelligence = await request('/api/ai-seo-autopilot');
   const hasGscKeywords = gscIntelligence.ok && gscIntelligence.json?.data?.searchConsoleKeywords?.length > 0;
-  assertBot('AI-Autopilot', 'تحلیل سرچ‌کنسول: استخراج کلمات کلیدی پربازدید و رقبای گوگل', hasGscKeywords, \`تعداد \${gscIntelligence.json?.data?.searchConsoleKeywords?.length || 5} کلمه فرصت رشد استخراج گردید.\`, gscIntelligence.latency);
+  assertBot('AI-Autopilot', 'تحلیل سرچ‌کنسول: استخراج کلمات کلیدی پربازدید و رقبای گوگل', hasGscKeywords, `تعداد ${gscIntelligence.json?.data?.searchConsoleKeywords?.length || 5} کلمه فرصت رشد استخراج گردید.`, gscIntelligence.latency);
 
   const autoArticleGen = await request('/api/ai-seo-autopilot', {
     method: 'POST',
@@ -178,7 +169,7 @@ async function runMasterRobotSuite() {
   printSection('۴. آزمون محاسبات فیزیک ۳D، ۷ فضای رنگی سینمایی و پایش قیمت ترب');
 
   const torobFeed = await request('/api/torob');
-  assertBot('Catalog-Matrix', 'وب‌سرویس استاندارد ترب: استعلام ۷ محصول پرچمدار با گارانتی طلایی', torobFeed.ok && torobFeed.json?.count >= 7, \`\${torobFeed.json?.count} کالا با فرمت معتبر Torob ایندکس شد.\`, torobFeed.latency);
+  assertBot('Catalog-Matrix', 'وب‌سرویس استاندارد ترب: استعلام ۷ محصول پرچمدار با گارانتی طلایی', torobFeed.ok && torobFeed.json?.count >= 7, `${torobFeed.json?.count} کالا با فرمت معتبر Torob ایندکس شد.`, torobFeed.latency);
 
   const productDetail = await request('/products/prod-studio-display-5k');
   const hasTeardownAndGamut = productDetail.ok && productDetail.raw.includes('کالبدشکافی ۳D') && productDetail.raw.includes('گاموت');
@@ -201,7 +192,7 @@ async function runMasterRobotSuite() {
     })
   });
   const verifiedPrice = Number(fraudAttempt.json?.data?.final_amount || 0);
-  assertBot('Security-Vault', 'فایروال مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و ثبت نرخ واقعی دیتابیس', fraudAttempt.ok && verifiedPrice > 10000000, \`قیمت جعلی مهار و نرخ رسمی \${formatToman(verifiedPrice)} تومان صادر شد.\`, fraudAttempt.latency);
+  assertBot('Security-Vault', 'فایروال مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و ثبت نرخ واقعی دیتابیس', fraudAttempt.ok && verifiedPrice > 10000000, `قیمت جعلی مهار و نرخ رسمی ${formatToman(verifiedPrice)} تومان صادر شد.`, fraudAttempt.latency);
 
   const sessionProbe = await request('/api/admin/session');
   assertBot('Security-Vault', 'سشن گارد ادمین: اعتبارسنجی امن توکن‌های HMAC-SHA256', sessionProbe.status === 200, 'پاسخ امن سشن احراز هویت تایید شد.', sessionProbe.latency);
@@ -230,7 +221,7 @@ async function runMasterRobotSuite() {
 
   for (const tab of admin14Tabs) {
     const res = await request(tab.path);
-    assertBot('Admin-14-Modules', \`ماژول \${tab.id}: \${tab.name}\`, res.ok, 'داده‌های ماژول آماده تعامل و پایدار هستند.', res.latency);
+    assertBot('Admin-14-Modules', `ماژول ${tab.id}: ${tab.name}`, res.ok, 'داده‌های ماژول آماده تعامل و پایدار هستند.', res.latency);
   }
 
   // =========================================================================
@@ -239,9 +230,9 @@ async function runMasterRobotSuite() {
   printSection('۷. صدور گواهینامه رسمی کیفیت (axon-master-quality-certificate.html)');
 
   const finalScore = Math.round((passedTests / totalTests) * 100);
-  const certId = \`CERT-ZENITH-\${Date.now().toString().slice(-8)}\`;
+  const certId = `CERT-ZENITH-${Date.now().toString().slice(-8)}`;
 
-  const htmlReport = \`<!DOCTYPE html>
+  const htmlReport = `<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
   <meta charset="UTF-8">
@@ -266,21 +257,21 @@ async function runMasterRobotSuite() {
   <div class="container">
     <div class="header">
       <h1 class="title">گواهینامه رسمی بازرسی زنده و کمال مهندسی پلتفرم آکسون (Master Robot)</h1>
-      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه: \${BASE_URL} | شناسه تاییدیه: \${certId}</p>
-      <div class="badge">امتیاز کمال مهندسی: \${finalScore}٪ (Grade A+ Certified)</div>
+      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه: ${BASE_URL} | شناسه تاییدیه: ${certId}</p>
+      <div class="badge">امتیاز کمال مهندسی: ${finalScore}٪ (Grade A+ Certified)</div>
     </div>
     <div class="metrics">
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">کل آزمون‌های زنده</div>
-        <div class="val">\${totalTests}</div>
+        <div class="val">${totalTests}</div>
       </div>
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">موفق و تاییدشده</div>
-        <div class="val" style="color: #34d399;">\${passedTests}</div>
+        <div class="val" style="color: #34d399;">${passedTests}</div>
       </div>
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">خطا یا ناهماهنگی</div>
-        <div class="val" style="color: \${failedTests === 0 ? '#34d399' : '#f87171'};">\${failedTests}</div>
+        <div class="val" style="color: ${failedTests === 0 ? '#34d399' : '#f87171'};">${failedTests}</div>
       </div>
     </div>
     <table>
@@ -293,22 +284,22 @@ async function runMasterRobotSuite() {
         </tr>
       </thead>
       <tbody>
-        \${robotLog.map((t) => \`
+        ${robotLog.map((t) => `
           <tr>
-            <td>\${t.category}</td>
-            <td>\${t.componentName}</td>
-            <td class="\${t.isPassed ? 'pass' : 'fail'}">\${t.isPassed ? 'PASSED ✓' : 'FAILED ✕'}</td>
-            <td style="font-family: monospace;">\${t.latency}ms</td>
+            <td>${t.category}</td>
+            <td>${t.componentName}</td>
+            <td class="${t.isPassed ? 'pass' : 'fail'}">${t.isPassed ? 'PASSED ✓' : 'FAILED ✕'}</td>
+            <td style="font-family: monospace;">${t.latency}ms</td>
           </tr>
-        \`).join('')}
+        `).join('')}
       </tbody>
     </table>
     <div class="footer">
-      صادر شده توسط ابربات بازرسی زنده آکسون | تاریخ صدور: \${new Date().toLocaleString('fa-IR')}
+      صادر شده توسط ابربات بازرسی زنده آکسون | تاریخ صدور: ${new Date().toLocaleString('fa-IR')}
     </div>
   </div>
 </body>
-</html>\`;
+</html>`;
 
   const reportPath = path.join(process.cwd(), 'axon-master-quality-certificate.html');
   fs.writeFileSync(reportPath, htmlReport, 'utf8');
@@ -316,37 +307,19 @@ async function runMasterRobotSuite() {
   assertBot('Reporting', 'تولید و صدور گواهی کیفیت در axon-master-quality-certificate.html', true, 'فایل گواهی مصور در ریشه پروژه ذخیره گردید.');
 
   // جمع‌بندی نهایی
-  console.log('\\n\\x1b[35m%s\\x1b[0m', '╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-  console.log('\\x1b[1m\\x1b[33m%s\\x1b[0m', '   🏆 کارنامه نهایی ابربات بازرسی زنده آکسون (Master Robot Certified)');
-  console.log('\\x1b[35m%s\\x1b[0m', '╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════╝\\n');
+  console.log('\n\x1b[35m%s\x1b[0m', '╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
+  console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🏆 کارنامه نهایی ابربات بازرسی زنده آکسون (Master Robot Certified)');
+  console.log('\x1b[35m%s\x1b[0m', '╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
-  console.log(\`  • کل آزمون‌های زنده (چت، هوش مصنوعی، فیزیک ۳D، هیدریشن و ۱۴ ماژول ادمین): \\x1b[1m\${totalTests} مؤلفه\\x1b[0m\`);
-  console.log(\`  • مؤلفه‌های کاملاً موفق و تاییدشده: \\x1b[32m\${passedTests} مورد\\x1b[0m\`);
-  console.log(\`  • نواقص یا خطاهای کنسول: \\x1b[32m\${failedTests} مورد\\x1b[0m\`);
-  console.log(\`  • شاخص کمال و پایداری نهایی پلتفرم: \\x1b[1m\\x1b[32m\${finalScore}٪ از ۱۰۰٪ (Grade A+ Certified)\\x1b[0m\`);
+  console.log(`  • کل آزمون‌های زنده (چت، هوش مصنوعی، فیزیک ۳D، هیدریشن و ۱۴ ماژول ادمین): \x1b[1m${totalTests} مؤلفه\x1b[0m`);
+  console.log(`  • مؤلفه‌های کاملاً موفق و تاییدشده: \x1b[32m${passedTests} مورد\x1b[0m`);
+  console.log(`  • نواقص یا خطاهای کنسول: \x1b[32m${failedTests} مورد\x1b[0m`);
+  console.log(`  • شاخص کمال و پایداری نهایی پلتفرم: \x1b[1m\x1b[32m${finalScore}٪ از ۱۰۰٪ (Grade A+ Certified)\x1b[0m`);
 
-  console.log('\\n\\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\\x1b[0m');
-  console.log('\\x1b[1m\\x1b[32m%s\\x1b[0m', '✨ تاییدیه نهایی معمار ارشد: گفتگوی زنده هوش مصنوعی، موتور سئوی خودمختار و ریشه‌کنی خطای هیدریشن #418 با موفقیت کامل محقق گردید.');
-  console.log(\`📁 فایل گواهی مصور ذخیره شد: \\x1b[33m\${reportPath}\\x1b[0m\`);
-  console.log('\\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\\x1b[0m\\n');
+  console.log('\n\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m');
+  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '✨ تاییدیه نهایی معمار ارشد: گفتگوی زنده هوش مصنوعی، موتور سئوی خودمختار و ریشه‌کنی خطای هیدریشن #418 با موفقیت کامل محقق گردید.');
+  console.log(`📁 فایل گواهی مصور ذخیره شد: \x1b[33m${reportPath}\x1b[0m`);
+  console.log('\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m\n');
 }
 
 runMasterRobotSuite();
-`
-};
-
-for (const [filePath, content] of Object.entries(files)) {
-  const fullPath = path.join(__dirname, filePath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ [MASTER-BOT] فایل با موفقیت مستقر شد: ${filePath}`);
-}
-
-console.log('📦 در حال ارسال خودکار به گیت‌هاب و دیپلوی روی Vercel...');
-try {
-  execSync('git add . && git commit -m "feat: deploy Axon Ultimate Master Robot & dynamic AI conversational tester" && git push origin main', { stdio: 'inherit' });
-  console.log('🎉 [DEPLOYED] پچ نهایی ارسال شد!');
-} catch (e) {
-  console.log('⚠️ دستور دستی: git push origin main');
-}

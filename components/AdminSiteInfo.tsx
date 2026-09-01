@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { siteInfoService, SiteInfo, DEFAULT_SITE_INFO } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
 import { applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
@@ -20,6 +20,7 @@ export default function AdminSiteInfo() {
   const [announcement, setAnnouncement] = useState("");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(2000000);
   const [description, setDescription] = useState("");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -42,6 +43,7 @@ export default function AdminSiteInfo() {
     setAnnouncement(data.header_announcement || "");
     setFreeShippingThreshold(Number(data.free_shipping_threshold || 2000000));
     setDescription(data.description || data.footer_text || "");
+    setGeminiApiKey((data as any).gemini_api_key || "");
   };
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function AdminSiteInfo() {
     setSaving(true);
     setStatusMessage(null);
 
-    const payload: Partial<SiteInfo> = {
+    const payload: any = {
       site_name: siteName.trim(),
       siteName: siteName.trim(),
       storeName: siteName.trim(),
@@ -96,6 +98,7 @@ export default function AdminSiteInfo() {
       free_shipping_threshold: Number(freeShippingThreshold),
       description: description.trim(),
       footer_text: description.trim(),
+      gemini_api_key: geminiApiKey.trim(),
     };
 
     try {
@@ -104,7 +107,7 @@ export default function AdminSiteInfo() {
         soundEngine.playSuccess();
         if (saved.favicon_url) applyFaviconToDOM(saved.favicon_url);
         if (saved.tagline || saved.site_name) applyTitleToDOM(saved.tagline, saved.site_name);
-        setStatusMessage({ type: "success", text: "⚡ ۳ نشان متحرک، فاوآیکون تب و تنظیمات با موفقیت ذخیره و فوراً اعمال شدند." });
+        setStatusMessage({ type: "success", text: "⚡ تنظیمات سایت و کلید Gemini Pro با موفقیت ذخیره و فوراً فعال شدند." });
       } else {
         throw new Error("خطا در ثبت پایگاه داده");
       }
@@ -125,9 +128,9 @@ export default function AdminSiteInfo() {
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚙️</span> تنظیمات کلان سایت، هویت بصری و ۳ لوگوی متحرک (GIF / SVG / PNG)
+            <span>⚙️</span> تنظیمات کلان سایت، اتصال Gemini Pro و ۳ لوگوی متحرک (GIF / SVG)
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">پیکربندی لوگوی هدر، لوگوی فوتر و فاوآیکون متحرک تب مرورگر با حفظ کامل فریم‌های انیمیشن</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">اتصال زنده هوش مصنوعی به اکانت پرو و مدیریت ۳ نشان مستقل با حفظ فریم‌های متحرک</p>
         </div>
         <button type="button" onClick={() => handleSubmit()} disabled={saving} className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl cursor-pointer disabled:opacity-50">
           {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و اعمال سراسری"}
@@ -140,15 +143,30 @@ export default function AdminSiteInfo() {
         </div>
       )}
 
+      {/* اتصال مستقیم کلید Gemini Pro */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🤖</span>
+          <h3 className="text-sm font-black text-[var(--text-primary)]">اتصال زنده کلید هوش مصنوعی Google Gemini Pro</h3>
+        </div>
+        <p className="text-xs text-[var(--text-secondary)]">کلید دریافتی از گوگل را در کادر زیر وارد فرمایید تا تمام مدل‌های چت، بینایی و سئوی سایت با هوش کامل اختصاصی شما فعال شوند:</p>
+        <input
+          type="password"
+          value={geminiApiKey}
+          onChange={(e) => setGeminiApiKey(e.target.value)}
+          placeholder="AIzaSy..."
+          className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+        />
+      </div>
+
       {/* بخش تفکیک‌شده ۳ لوگوی متحرک */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
         <h3 className="text-sm font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">🖼️ مدیریت ۳ نشان و لوگوی مستقل و متحرک سایت</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* ۱. لوگوی هدر */}
           <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
             <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۱. لوگوی اصلی هدر بالای سایت (متحرک / ثابت)</span>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۱. لوگوی اصلی هدر بالای سایت</span>
               <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش زنده در کپسول ناوبری بالا</span>
             </div>
             <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
@@ -160,10 +178,9 @@ export default function AdminSiteInfo() {
             </div>
           </div>
 
-          {/* ۲. لوگوی فوتر */}
           <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
             <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۲. لوگوی اختصاصی فوتر سایت (متحرک / ثابت)</span>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۲. لوگوی اختصاصی فوتر سایت</span>
               <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در بخش پایین و پاورقی</span>
             </div>
             <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
@@ -175,10 +192,9 @@ export default function AdminSiteInfo() {
             </div>
           </div>
 
-          {/* ۳. فاوآیکون متحرک تب مرورگر */}
           <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
             <div>
-              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۳. فاوآیکون تب مرورگر (Favicon متحرک / GIF)</span>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۳. فاوآیکون تب مرورگر (Favicon متحرک)</span>
               <span className="text-[10px] text-[var(--text-secondary)] block mb-3">پخش مستقیم انیمیشن در تب مرورگر</span>
             </div>
             <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">

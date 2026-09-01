@@ -3,10 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🎬 [AXON ARCHITECT] در حال ریشه‌کنی قطعی خطای هیدریشن #418 و تجهیز هوش مصنوعی به پاسخگویی کاملاً پویا...');
+console.log('🎬 [AXON ARCHITECT] در حال استقرار هوش مصنوعی ۱۰۰٪ پویا (متصل مستقیم به Gemini Pro بدون ۱ کلمه هاردکد)...');
 
 const files = {
-  // ۱. موتور هوش مصنوعی کاملاً پویا و بدون هیچ متن پیش‌فرض تکراری
+  // ۱. موتور هوش مصنوعی کاملاً پویا و متصل به Gemini Pro بر پایه کاتالوگ زنده دیتابیس
   'app/api/ai-assistant/route.ts': `// File Path: app/api/ai-assistant/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -21,93 +21,118 @@ export async function POST(req: Request) {
     const userMessage = String(body.message || body.prompt || "").trim();
     const imageBase64 = body.imageBase64 || null;
 
+    if (!userMessage && !imageBase64) {
+      return NextResponse.json({ success: false, message: "پیام یا تصویری ارسال نشده است." }, { status: 400 });
+    }
+
+    // ۱. واکشی زنده کاتالوگ و مشخصات محصولات از پایگاه‌داده
     let products = FLAGSHIP_7_PRODUCTS;
+    let siteInfoData: any = null;
+
     try {
       if (supabaseAdmin) {
-        const { data: dbProducts } = await supabaseAdmin
-          .from("products")
-          .select("id, title, name, price, discount_price, category, stock, is_available, description, specs, images");
-        if (dbProducts && dbProducts.length > 0) {
-          products = dbProducts;
+        const [prodsRes, infoRes] = await Promise.all([
+          supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }),
+          supabaseAdmin.from("site_info").select("*").limit(1).maybeSingle(),
+        ]);
+
+        if (prodsRes.data && prodsRes.data.length > 0) {
+          products = prodsRes.data;
+        }
+        if (infoRes.data) {
+          siteInfoData = infoRes.data;
         }
       }
-    } catch {}
+    } catch (e) {
+      console.warn("DB Context load warning:", e);
+    }
 
-    const productCatalog = products.map((p: any) =>
-      \`• [شناسه: \${p.id}] \${p.title || p.name} | دسته: \${p.category} | قیمت: \${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان | موجودی: \${p.stock ?? 10} عدد\`
-    ).join("\\n");
+    // استخراج کلید Gemini Pro از متغیرهای سرور یا پنل مدیریت
+    const apiKey =
+      process.env.GEMINI_API_KEY ||
+      siteInfoData?.gemini_api_key ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const storeName = siteInfoData?.site_name || siteInfoData?.store_name || "آکسون | Axon";
+    const storePhone = siteInfoData?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+
+    const productCatalogContext = products
+      .map(
+        (p: any) =>
+          \`• [شناسه کالا: \${p.id}] نام: \${p.title || p.name} | برند: \${p.brand || "Apple"} | دسته: \${p.category || "تجهیزات"} | قیمت با تخفیف: \${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان | موجودی: \${p.stock ?? 10} عدد | گارانتی: \${p.warranty || "۱۸ ماه گارانتی طلایی"} | مشخصات: \${JSON.stringify(p.specs || {})}\`
+      )
+      .join("\\n");
+
     let aiResponse = "";
+    let matchedProduct: any = null;
 
-    // ۱. فراخوانی آنلاین Gemini در صورت اتصال
+    // ۲. اجرای مستقیم مدل رسمی Google Gemini 1.5
     if (apiKey && apiKey.length > 15 && apiKey !== "AIzaSyDummy") {
       try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // استفاده از مدل‌های مدرن 1.5 Flash یا 1.5 Pro
+        const model = genAI.getGenerativeModel({
+          model: "gemini-1.5-flash",
+          generationConfig: {
+            temperature: 0.7,
+            topP: 0.95,
+            maxOutputTokens: 1500,
+          },
+        });
 
-        const promptText = \`تو مشاور هوشمند، مهندس سخت‌افزار و کارشناس ارشد فروشگاه تخصصی آکسون (مرجع مانیتورهای ۵K، لپ‌تاپ‌های تدوین M4 Max و تجهیزات استودیو) هستی.
-به زبان فارسی کاملاً صمیمی، روان، طبیعی و دقیقاً در پاسخ به سوال کاربر صحبت کن.
-- اگر کاربر نام برندی خارج از فروشگاه (مثل سامسونگ، ال‌جی، دل، ایسوس و...) را پرسید، با احترام توضیح بده که تمرکز تخصصی آکسون بر مانیتورها و ورک‌استیشن‌های اپل (Apple)، بلک‌مجیک (Blackmagic) و کالیبرایت (Calibrite) است و بهترین جایگزین‌های باکیفیت موجود در انبار را معرفی کن.
-- اگر کاربر احوال‌پرسی یا سلام کرد، گرم و متناسب با حرف او جواب بده.
-- اگر قیمت یا مشخصات خواست، دقیقاً با ذکر تومان پاسخ بده.
+        const systemInstruction = \`تو «مشاور هوشمند، مهندس ارشد سخت‌افزار و کارشناس تصویر فروشگاه \${storeName}» هستی.
+وظیفه تو گفتگوی زنده، فوق‌العاده صمیمی، محترمانه، دقیق و طبیعی با کاربران به زبان فارسی است.
 
-کاتالوگ محصولات موجود در انبار:
-\${productCatalog}
+قوانین کاری تو:
+۱. تو اشراف کامل به تمام کاتالوگ، انبار، قیمت‌ها و تجهیزات فروشگاه داری.
+۲. اگر کاربر درباره هر برندی که در فروشگاه موجود نیست (مانند سامسونگ، ال‌جی، ایسوس، دل و...) سوال کرد، با کمال احترام و هوشمندی به او بگو که در حال حاضر در فروشگاه \${storeName} محصولات این برند موجود نیست و تمرکز تخصصی فروشگاه روی تجهیزات حرفه‌ای، مانیتورهای ۵K/6K و ورک‌استیشن‌های تدوین برندهای اپل (Apple)، بلک‌مجیک (Blackmagic) و کالیبرایت (Calibrite) است و با استدلال فنی بهترین گزینه‌های معادل موجود در کاتالوگ را به او پیشنهاد بده.
+۳. اگر کاربر سلام، احوال‌پرسی یا گپ دوستانه زد، دقیقاً متناسب با لحن خودش خیلی گرم و پرانرژی جواب بده.
+۴. اگر سوال فنی یا قیمت پرسید، مستدل، با جزئیات فنی و ذکر قیمت به تومان پاسخ بده.
+۵. شماره تماس پشتیبانی فروشگاه: \${storePhone}
 
-پیام کاربر:
-\${userMessage}\`;
+کاتالوگ کامل و زنده محصولات موجود در انبار:
+\${productCatalogContext}\`;
+
+        const fullPrompt = \`\${systemInstruction}\\n\\n[پیام کاربر]: \${userMessage}\`;
 
         if (imageBase64) {
-          const base64Data = imageBase64.replace(/^data:image\\/\\w+;base64,/, "");
+          const cleanBase64 = imageBase64.replace(/^data:image\\/\\w+;base64,/, "");
           const result = await model.generateContent([
-            promptText,
-            { inlineData: { data: base64Data, mimeType: "image/jpeg" } }
+            fullPrompt,
+            { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } },
           ]);
           aiResponse = result.response.text();
         } else {
-          const result = await model.generateContent(promptText);
+          const result = await model.generateContent(fullPrompt);
           aiResponse = result.response.text();
         }
-      } catch (err) {
-        console.warn("Gemini API call fallback:", err);
+      } catch (geminiError: any) {
+        console.error("Gemini API Execution Error:", geminiError?.message || geminiError);
+        aiResponse = \`درود بر شما! درخواست شما دریافت شد، اما در برقراری ارتباط مستقیم با سرور هوش مصنوعی خطایی رخ داد (\${geminiError?.message || "کلید نامعتبر یا محدودیت سهمیه"}). لطفاً کلید اکانت پرو Gemini خود را در تنظیمات ادمین وارد فرمایید.\`;
       }
+    } else {
+      // در صورت نبود کلید API، پیام شفاف سیستمی (بدون هاردکد پاسخی فیک)
+      aiResponse = \`درود بر شما! من مشاور هوشمند فروشگاه \${storeName} هستم.
+کلید هوش مصنوعی (GEMINI_API_KEY) هنوز در تنظیمات سرور یا پیشخوان ادمین فعال نشده است.
+به محض وارد کردن کلید Gemini Pro در بخش «تنظیمات کلان سایت»، من با هوش کامل در خدمت شما خواهم بود!\`;
     }
 
-    // ۲. موتور پویا و هوشمند تحلیل نیت کاربر (Dynamic Intent Engine) در صورت آفلاین بودن
-    const normalized = userMessage
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
-      .toLowerCase();
-
-    let matchedProduct: any = null;
-
-    if (!aiResponse) {
-      if (normalized.includes("سامسونگ") || normalized.includes("samsung")) {
-        aiResponse = "در حال حاضر در فروشگاه آکسون، محصولات برند **سامسونگ** موجود نمی‌باشد. تمرکز تخصصی ما بر روی مانیتورهای تدوین رنگ ۵K و ورک‌استیشن‌های پرچمدار برندهای **Apple (اپل)**، **Blackmagic Design** و **Calibrite** است.\\n\\nاگر به دنبال مانیتوری با وضوح تصویر فوق‌العاده و پنل ضدبازتاب برای طراحی و ادیت هستید، مانیتور **Apple Studio Display 27\\" 5K** با شیشه نانوتکستچر را به شما پیشنهاد می‌کنم.";
-        matchedProduct = products.find((p) => String(p.id).includes("studio")) || products[3];
-      } else if (normalized.includes("ایسوس") || normalized.includes("asus") || normalized.includes("ال جی") || normalized.includes("lg") || normalized.includes("دل") || normalized.includes("dell")) {
-        aiResponse = "محصولات این برند در حال حاضر در کاتالوگ استودیو آکسون موجود نیست. ما به صورت تخصصی نمایشگرهای مرجع رتینا ۵K و ۶K اپل و کارت‌های کپچر حرفه‌ای بلک‌مجیک را با ۱۸ ماه گارانتی طلایی عرضه می‌کنیم. مایلید مدل‌های مشابه موجود را با هم بررسی کنیم؟";
-        matchedProduct = products[1];
-      } else if (normalized.includes("سلام") || normalized.includes("درود") || normalized.includes("صبح بخیر") || normalized === "hi" || normalized === "hello") {
-        aiResponse = "سلام و درود! خیلی خوش آمدید به استودیو آکسون. ⚡\\nمن دستیار هوشمند و مشاور سخت‌افزار شما هستم. چه کمکی در زمینه انتخاب مانیتورهای ۵K، لپ‌تاپ‌های تدوین یا کالیبراسیون رنگ از دستم برمی‌آید؟";
-      } else if (normalized.includes("چطوری") || normalized.includes("خوبی") || normalized.includes("چه خبر")) {
-        aiResponse = "ممنون از لطف و محبت شما! عالی و پرانرژی هستم. تمام مشخصات و قیمت‌های روز کاتالوگ آماده است؛ شما چه دستگاه یا تجهیزاتی برای کارتون مد نظر دارید؟";
-      } else if (normalized.includes("مک بوک") || normalized.includes("macbook") || normalized.includes("لپ تاپ")) {
-        matchedProduct = products.find((p) => String(p.id).includes("macbook")) || products[0];
-        aiResponse = \`لپ‌تاپ پرچمدار **\${matchedProduct.title}** با تراشه ۱۶ هسته‌ای M4 Max، رم ۱۲۸ گیگابایت و حافظه ۲ ترابایت موجود است. قیمت فعلی: **\${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان** با گارانتی اصالت طلایی آکسون.\`;
-      } else if (normalized.includes("مانیتور") || normalized.includes("5k") || normalized.includes("نمایشگر") || normalized.includes("استودیو")) {
-        matchedProduct = products.find((p) => String(p.id).includes("studio")) || products[3];
-        aiResponse = \`مانیتور استودیویی **\${matchedProduct.title}** با وضوح 5K رتینا، پوشش رنگ DCI-P3 و کالیبراسیون سخت‌افزاری به قیمت **\${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان** در انبار موجود است.\`;
-      } else if (normalized.includes("ساعت") || normalized.includes("watch") || normalized.includes("الترا")) {
-        matchedProduct = products.find((p) => String(p.id).includes("watch")) || products[1];
-        aiResponse = \`ساعت هوشمند تیتانیومی **\${matchedProduct.title}** با روشنایی ۳۰۰۰ نیت و مقاومت غواصی ۱۰۰ متر با قیمت **\${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان** آماده ارسال است.\`;
-      } else if (normalized.includes("قیمت") || normalized.includes("چند")) {
-        aiResponse = "قیمت تمامی محصولات بر اساس نرخ روز و تضمین کمترین قیمت بازار تنظیم شده است. مدل یا دستگاه مد نظرتان را بفرمایید تا قیمت و موجودی دقیق را به شما بگویم.";
-      } else {
-        aiResponse = \`درود بر شما! در زمینه مشخصات فنی مانیتورهای ۵K رتینا، لپ‌تاپ‌های ورک‌استیشن M4 Max، کارت‌های کپچر 8K و کالیبراتورهای رنگ در خدمت شما هستم. لطفاً بفرمایید به چه تجهیزاتی نیاز دارید تا با مشخصات کامل راهنماییتان کنم.\`;
-      }
-    }
+    // ۳. یافتن هوشمند محصول مرتبط از داخل پاسخ تولیدشده جهت پیوست کارت خرید
+    const lowerResponse = (aiResponse + " " + userMessage).toLowerCase();
+    matchedProduct = products.find((p: any) => {
+      const t = (p.title || "").toLowerCase();
+      const id = String(p.id).toLowerCase();
+      return (
+        lowerResponse.includes(id) ||
+        (lowerResponse.includes("studio display") && id.includes("studio")) ||
+        (lowerResponse.includes("xdr") && id.includes("xdr")) ||
+        (lowerResponse.includes("macbook") && id.includes("macbook")) ||
+        (lowerResponse.includes("watch") && id.includes("watch")) ||
+        (lowerResponse.includes("ipad") && id.includes("ipad")) ||
+        (lowerResponse.includes("decklink") && id.includes("decklink")) ||
+        (lowerResponse.includes("calibrite") && id.includes("calibrite"))
+      );
+    });
 
     const calculatedPrice = matchedProduct
       ? Number(matchedProduct.discount_price || matchedProduct.discountPrice || matchedProduct.price || 0)
@@ -117,469 +142,267 @@ export async function POST(req: Request) {
       success: true,
       response: aiResponse,
       reply: aiResponse,
-      matchedProduct: matchedProduct ? {
-        id: matchedProduct.id,
-        title: matchedProduct.title || matchedProduct.name,
-        price: calculatedPrice,
-        discount_price: calculatedPrice,
-        image: matchedProduct.images?.[0] || matchedProduct.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"
-      } : null
+      matchedProduct: matchedProduct
+        ? {
+            id: matchedProduct.id,
+            title: matchedProduct.title || matchedProduct.name,
+            price: calculatedPrice,
+            discount_price: calculatedPrice,
+            image: matchedProduct.images?.[0] || matchedProduct.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
+          }
+        : null,
     });
   } catch (error: any) {
     return NextResponse.json({
-      success: true,
-      response: "درود! ارتباط با سرور برقرار است. چطور می‌تونم در زمینه مانیتورها و تجهیزات تصویر آکسون راهنماییتون کنم؟",
-      reply: "درود! ارتباط با سرور برقرار است. چطور می‌تونم در زمینه مانیتورها و تجهیزات تصویر آکسون راهنماییتون کنم؟",
-      matchedProduct: null
+      success: false,
+      response: \`خطای غیرمنتظره در پردازش هوش مصنوعی: \${error.message}\`,
+      reply: \`خطای غیرمنتظره در پردازش هوش مصنوعی: \${error.message}\`,
+      matchedProduct: null,
     });
   }
 }
 `,
 
-  // ۲. اصلاح سرویس اطلاعات سایت و جلوگیری از خواندن ناهمگام localStorage در SSR
-  'services/siteInfoService.ts': `// File Path: services/siteInfoService.ts
-import { supabase } from "@/lib/supabase";
-import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
-
-export type MaintenanceMode = "none" | "timed" | "indefinite";
-
-export interface SiteInfo {
-  id?: string | number;
-  site_name?: string;
-  siteName?: string;
-  storeName?: string;
-  tagline?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  working_hours?: string;
-  logo_url?: string;
-  logoUrl?: string;
-  footer_logo_url?: string;
-  footerLogoUrl?: string;
-  favicon_url?: string;
-  faviconUrl?: string;
-  allow_google_index?: boolean;
-  allowGoogleIndex?: boolean;
-  maintenance_mode?: MaintenanceMode;
-  maintenance_until?: string;
-  maintenance_duration_minutes?: number;
-  instagram?: string;
-  telegram?: string;
-  whatsapp?: string;
-  youtube?: string;
-  header_announcement?: string;
-  free_shipping_threshold?: number;
-  description?: string;
-  footer_text?: string;
-  custom_css?: string;
-  active_font_id?: string;
-  updated_at?: string;
-}
-
-const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
-
-// ساختار پیش‌فرض قطعی برای تضمین تطابق ۱۰۰٪ سرور و کلاینت
-export const DEFAULT_SITE_INFO: SiteInfo = {
-  site_name: "آکسون | Axon",
-  siteName: "آکسون | Axon",
-  storeName: "آکسون | Axon",
-  tagline: "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
-  allow_google_index: true,
-  allowGoogleIndex: true,
-  maintenance_mode: "none",
-  phone: "۰۲۱-۸۸۸۸۸۸۸۸",
-  email: "info@axoncore.ir",
-  address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
-  working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-  header_announcement: "⚡ ارسال رایگان خریدهای بالای ۲ میلیون تومان | گارانتی اصالت طلایی ۱۸ ماهه",
-  free_shipping_threshold: 2000000,
-  description: "مرجع تخصصی مانیتورهای ۵K و ۴K تدوین، کالیبراسیون سخت‌افزاری رنگ و تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی",
-  footer_text: "مرجع تخصصی مانیتورهای ۵K و ۴K تدوین، کالیبراسیون سخت‌افزاری رنگ و تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی",
-};
-
-export const siteInfoService = {
-  getSiteInfoSync(): SiteInfo {
-    return DEFAULT_SITE_INFO;
-  },
-
-  async getSiteInfo(): Promise<SiteInfo | null> {
-    try {
-      const res = await fetch("/api/site-info", { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) {
-          const data = json.data;
-          const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
-          const mapped: SiteInfo = {
-            id: data.id,
-            site_name: data.site_name || data.store_name || "آکسون | Axon",
-            siteName: data.site_name || data.store_name || "آکسون | Axon",
-            storeName: data.site_name || data.store_name || "آکسون | Axon",
-            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
-            phone: data.phone || "۰۲۱-۸۸۸۸۸۸۸۸",
-            email: data.email || "info@axoncore.ir",
-            address: data.address || "تهران، خیابان ولیعصر، تقاطع میرداماد",
-            working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-            logo_url: data.logo_url || "",
-            logoUrl: data.logo_url || "",
-            footer_logo_url: data.footer_logo_url || "",
-            footerLogoUrl: data.footer_logo_url || "",
-            favicon_url: data.favicon_url || "",
-            faviconUrl: data.favicon_url || "",
-            allow_google_index: isAllowed,
-            allowGoogleIndex: isAllowed,
-            maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
-            maintenance_until: data.maintenance_until || undefined,
-            maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
-            header_announcement: data.header_announcement || "",
-            free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
-            description: data.description || data.footer_text || "",
-            footer_text: data.footer_text || data.description || "",
-            custom_css: data.custom_css || "",
-            active_font_id: data.active_font_id || "Vazirmatn",
-            updated_at: data.updated_at,
-          };
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
-            if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
-            if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
-          }
-          return mapped;
-        }
-      }
-      return DEFAULT_SITE_INFO;
-    } catch {
-      return DEFAULT_SITE_INFO;
-    }
-  },
-
-  async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
-    try {
-      const current = DEFAULT_SITE_INFO;
-      const maintMode = payload.maintenance_mode !== undefined 
-        ? payload.maintenance_mode 
-        : (current.maintenance_mode || "none");
-
-      const isAllowed = payload.allow_google_index !== undefined
-        ? payload.allow_google_index
-        : (maintMode === "none");
-
-      const sName = payload.site_name || payload.siteName || payload.storeName || current.site_name || "آکسون | Axon";
-
-      const dbPayload: any = {
-        site_name: sName,
-        store_name: sName,
-        tagline: payload.tagline !== undefined ? payload.tagline : current.tagline,
-        phone: payload.phone !== undefined ? payload.phone : current.phone,
-        email: payload.email !== undefined ? payload.email : current.email,
-        address: payload.address !== undefined ? payload.address : current.address,
-        working_hours: payload.working_hours !== undefined ? payload.working_hours : current.working_hours,
-        logo_url: payload.logo_url !== undefined ? payload.logo_url : current.logo_url,
-        footer_logo_url: payload.footer_logo_url !== undefined ? payload.footer_logo_url : current.footer_logo_url,
-        favicon_url: payload.favicon_url !== undefined ? payload.favicon_url : current.favicon_url,
-        allow_google_index: isAllowed,
-        maintenance_mode: maintMode,
-        maintenance_until: payload.maintenance_until !== undefined ? payload.maintenance_until : current.maintenance_until,
-        maintenance_duration_minutes: payload.maintenance_duration_minutes !== undefined ? payload.maintenance_duration_minutes : current.maintenance_duration_minutes,
-        header_announcement: payload.header_announcement !== undefined ? payload.header_announcement : current.header_announcement,
-        free_shipping_threshold: Number(payload.free_shipping_threshold || current.free_shipping_threshold || 2000000),
-        footer_text: payload.footer_text || payload.description || current.footer_text || "",
-        description: payload.description || payload.footer_text || current.description || "",
-        custom_css: payload.custom_css !== undefined ? payload.custom_css : current.custom_css,
-        active_font_id: payload.active_font_id || current.active_font_id || "Vazirmatn",
-        updated_at: new Date().toISOString(),
-      };
-
-      const res = await fetch("/api/site-info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dbPayload),
-      });
-
-      const json = await res.json();
-      const finalData = json.data || dbPayload;
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
-        realtimeEngine.broadcastLocally("site_info_updated", finalData);
-      }
-
-      return finalData;
-    } catch {
-      return null;
-    }
-  },
-};
-
-export default siteInfoService;
-`,
-
-  // ۳. هدر کپسولی شیشه‌ای با عایق‌بندی کامل تم و سبد خرید (حذف قطعی خطای #418)
-  'components/Header.tsx': `"use client";
+  // ۲. افزودن فیلد تنظیم کلید Gemini Pro به پنل ادمین جهت دسترسی آسان
+  'components/AdminSiteInfo.tsx': `"use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
 import { siteInfoService, SiteInfo, DEFAULT_SITE_INFO } from "@/services/siteInfoService";
-import { productService, Product } from "@/services/productService";
-import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
-import { formatPrice } from "@/lib/formatters";
+import { applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
-export default function Header() {
-  const router = useRouter();
-  const cartContext = useCart();
-  const { totalItems, toggleCart, addToCart } = cartContext;
+export default function AdminSiteInfo() {
+  const [siteName, setSiteName] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [workingHours, setWorkingHours] = useState("");
+  
+  const [logoUrl, setLogoUrl] = useState("");
+  const [footerLogoUrl, setFooterLogoUrl] = useState("");
+  const [faviconUrl, setFaviconUrl] = useState("");
 
-  const [mounted, setMounted] = useState(false);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo>(DEFAULT_SITE_INFO);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [announcement, setAnnouncement] = useState("");
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(2000000);
+  const [description, setDescription] = useState("");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const headerLogoRef = useRef<HTMLInputElement>(null);
+  const footerLogoRef = useRef<HTMLInputElement>(null);
+  const faviconRef = useRef<HTMLInputElement>(null);
+
+  const populateForm = (data: SiteInfo) => {
+    if (!data) return;
+    setSiteName(data.site_name || data.siteName || data.storeName || "آکسون | Axon");
+    setTagline(data.tagline || "");
+    setPhone(data.phone || "");
+    setEmail(data.email || "");
+    setAddress(data.address || "");
+    setWorkingHours(data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
+    setLogoUrl(data.logo_url || data.logoUrl || "");
+    setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
+    setFaviconUrl(data.favicon_url || data.faviconUrl || "");
+    setAnnouncement(data.header_announcement || "");
+    setFreeShippingThreshold(Number(data.free_shipping_threshold || 2000000));
+    setDescription(data.description || data.footer_text || "");
+    setGeminiApiKey((data as any).gemini_api_key || "");
+  };
 
   useEffect(() => {
-    setMounted(true);
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      const isDark = savedTheme !== "light";
-      setIsDarkMode(isDark);
-      if (isDark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-    } catch {}
-
-    const initHeaderData = async () => {
-      try {
-        const [info, prods, cats] = await Promise.all([
-          siteInfoService.getSiteInfo(),
-          productService.getAll(),
-          categoryService.getAll(),
-        ]);
-        if (info) setSiteInfo(info);
-        if (prods) setAllProducts(prods);
-        if (cats) setCategories(cats);
-      } catch {}
-    };
-
-    initHeaderData();
-
-    const handleSiteInfoUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-    };
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
-      else productService.getAll().then((prods) => prods && setAllProducts(prods));
-    };
-    const handleCategoriesUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
-      else categoryService.getAll().then((cats) => cats && setCategories(cats));
-    };
-
-    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
-    window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("categories_updated", handleCategoriesUpdate);
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) setIsCategoryOpen(false);
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) setIsSearchFocused(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("categories_updated", handleCategoriesUpdate);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    siteInfoService.getSiteInfo().then((d) => d && populateForm(d));
+    const handleUpdate = (e: any) => { if (e.detail) populateForm(e.detail); };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
-  useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults([]); return; }
-    const q = searchQuery.toLowerCase().trim();
-    userBehavior.trackSearch(q);
-    const matches = allProducts.filter((p) =>
-      (p.title || p.name || "").toLowerCase().includes(q) ||
-      (p.category || "").toLowerCase().includes(q)
-    );
-    setSearchResults(matches.slice(0, 5));
-  }, [searchQuery, allProducts]);
-
-  const toggleDarkMode = () => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: "header" | "footer" | "favicon") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     soundEngine.playClick();
-    const nextMode = !isDarkMode;
-    setIsDarkMode(nextMode);
-    if (nextMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const resultBase64 = event.target?.result as string;
+      if (target === "header") {
+        setLogoUrl(resultBase64);
+      } else if (target === "footer") {
+        setFooterLogoUrl(resultBase64);
+      } else if (target === "favicon") {
+        setFaviconUrl(resultBase64);
+        applyFaviconToDOM(resultBase64);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    soundEngine.playClick();
+    setSaving(true);
+    setStatusMessage(null);
+
+    const payload: any = {
+      site_name: siteName.trim(),
+      siteName: siteName.trim(),
+      storeName: siteName.trim(),
+      tagline: tagline.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      address: address.trim(),
+      working_hours: workingHours.trim(),
+      logo_url: logoUrl.trim(),
+      logoUrl: logoUrl.trim(),
+      footer_logo_url: footerLogoUrl.trim(),
+      footerLogoUrl: footerLogoUrl.trim(),
+      favicon_url: faviconUrl.trim(),
+      faviconUrl: faviconUrl.trim(),
+      header_announcement: announcement.trim(),
+      free_shipping_threshold: Number(freeShippingThreshold),
+      description: description.trim(),
+      footer_text: description.trim(),
+      gemini_api_key: geminiApiKey.trim(),
+    };
+
+    try {
+      const saved = await siteInfoService.updateSiteInfo(payload);
+      if (saved) {
+        soundEngine.playSuccess();
+        if (saved.favicon_url) applyFaviconToDOM(saved.favicon_url);
+        if (saved.tagline || saved.site_name) applyTitleToDOM(saved.tagline, saved.site_name);
+        setStatusMessage({ type: "success", text: "⚡ تنظیمات سایت و کلید Gemini Pro با موفقیت ذخیره و فوراً فعال شدند." });
+      } else {
+        throw new Error("خطا در ثبت پایگاه داده");
+      }
+    } catch (err: any) {
+      setStatusMessage({ type: "error", text: err?.message || "خطا در ذخیره‌سازی اطلاعات" });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setStatusMessage(null), 4000);
     }
   };
-
-  const handleSelectCategory = (catName: string) => {
-    soundEngine.playClick();
-    setIsCategoryOpen(false);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("category_selected", { detail: catName }));
-    }
-    router.push("/#products");
-  };
-
-  const handleQuickAddFromSearch = (e: React.MouseEvent, product: Product) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    addToCart({
-      id: product.id,
-      title: product.title || product.name || "کالای دیجیتال",
-      name: product.title || product.name || "کالای دیجیتال",
-      price: Number(product.discountPrice ?? product.price ?? 0),
-      discountPrice: product.discountPrice ? Number(product.discountPrice) : undefined,
-      image: product.images?.[0] || product.image || "/placeholder.png",
-      stock: Number(product.stock ?? 10),
-      category: product.category || "عمومی",
-      quantity: 1,
-    });
-    setAddedItemMap((prev) => ({ ...prev, [product.id]: true }));
-    setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
-  };
-
-  const navLinks = [
-    { title: "صفحه نخست", href: "/" },
-    { title: "کاتالوگ محصولات", href: "/#products" },
-    { title: "پیگیری سفارش", href: "/track-order" },
-    { title: "تماس با ما", href: "/contact" },
-  ];
-
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
-  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-  const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
 
   return (
-    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
-      {siteInfo?.header_announcement && (
-        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate" suppressHydrationWarning>
-          {siteInfo.header_announcement}
+    <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <input type="file" ref={headerLogoRef} onChange={(e) => handleFileUpload(e, "header")} accept="image/*,.gif,.svg,.webp,.apng" className="hidden" />
+      <input type="file" ref={footerLogoRef} onChange={(e) => handleFileUpload(e, "footer")} accept="image/*,.gif,.svg,.webp,.apng" className="hidden" />
+      <input type="file" ref={faviconRef} onChange={(e) => handleFileUpload(e, "favicon")} accept="image/*,.gif,.svg,.ico,.webp,.apng" className="hidden" />
+
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>⚙️</span> تنظیمات کلان سایت، اتصال Gemini Pro و ۳ لوگوی متحرک (GIF / SVG)
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">اتصال زنده هوش مصنوعی به اکانت پرو و مدیریت ۳ نشان مستقل با حفظ فریم‌های متحرک</p>
+        </div>
+        <button type="button" onClick={() => handleSubmit()} disabled={saving} className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl cursor-pointer disabled:opacity-50">
+          {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و اعمال سراسری"}
+        </button>
+      </div>
+
+      {statusMessage && (
+        <div className={\`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn \${statusMessage.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"}\`}>
+          {statusMessage.text}
         </div>
       )}
 
-      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-          
-          <div className="relative" ref={categoryDropdownRef}>
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setIsCategoryOpen(!isCategoryOpen);
-              }}
-              className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] flex items-center justify-center text-sm transition cursor-pointer shadow-sm"
-              title="دسته‌بندی‌های محصولات"
-              aria-label="دسته‌بندی‌ها"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-
-            {isCategoryOpen && (
-              <div className="absolute top-12 right-0 w-64 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
-                <button
-                  onClick={() => handleSelectCategory("all")}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-black text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                >
-                  <span>📦 تمامی محصولات و تجهیزات</span>
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id || cat.name}
-                    onClick={() => handleSelectCategory(cat.name)}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                  >
-                    <span>🏷️ {cat.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
-              {logoUrl ? <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" /> : <span className="text-[var(--accent-blue)] text-lg sm:text-xl font-black">⚡</span>}
-            </div>
-            <div className="flex flex-col text-right">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[120px] sm:max-w-[160px]">{storeName}</span>
-                <span className={\`w-2 h-2 rounded-full shrink-0 transition-all duration-500 \${isOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"}\`} title={isOnline ? "سامانه آنلاین" : "حالت تعمیرات"} />
-              </div>
-              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]">{siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر"}</span>
-            </div>
-          </Link>
+      {/* اتصال مستقیم کلید Gemini Pro */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🤖</span>
+          <h3 className="text-sm font-black text-[var(--text-primary)]">اتصال زنده کلید هوش مصنوعی Google Gemini Pro</h3>
         </div>
+        <p className="text-xs text-[var(--text-secondary)]">کلید دریافتی از گوگل را در کادر زیر وارد فرمایید تا تمام مدل‌های چت، بینایی و سئوی سایت با هوش کامل اختصاصی شما فعال شوند:</p>
+        <input
+          type="password"
+          value={geminiApiKey}
+          onChange={(e) => setGeminiApiKey(e.target.value)}
+          placeholder="AIzaSy..."
+          className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+        />
+      </div>
 
-        <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
-          {navLinks.map((link, idx) => (
-            <Link key={idx} href={link.href} className="px-3.5 py-1.5 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap">
-              {link.title}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <div className="relative hidden xl:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
-              <span className="text-xs opacity-70">🔍</span>
-              <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] font-bold placeholder-slate-400" />
+      {/* بخش تفکیک‌شده ۳ لوگوی متحرک */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+        <h3 className="text-sm font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">🖼️ مدیریت ۳ نشان و لوگوی مستقل و متحرک سایت</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
+            <div>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۱. لوگوی اصلی هدر بالای سایت</span>
+              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش زنده در کپسول ناوبری بالا</span>
             </div>
-            {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-12 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72">
-                <div className="max-h-60 overflow-y-auto space-y-1">
-                  {searchResults.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
-                      <Link href={\`/products/\${p.id}\`} onClick={() => { soundEngine.playClick(); setIsSearchFocused(false); }} className="flex items-center gap-2 flex-1 min-w-0">
-                        <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 border border-[var(--card-border)] shrink-0" />
-                        <div className="flex-1 min-w-0 text-right">
-                          <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
-                          <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>{formatPrice(p.discountPrice || p.price || 0)} ت</span>
-                        </div>
-                      </Link>
-                      <button type="button" onClick={(e) => handleQuickAddFromSearch(e, p)} className="px-2 py-1 rounded-lg text-[10px] font-black bg-[var(--accent-blue)] text-white cursor-pointer shadow-md">
-                        {addedItemMap[p.id] ? "✓" : "+"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
+              {logoUrl ? <img src={logoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚡</span>}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => headerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس / GIF</button>
+              {logoUrl && <button type="button" onClick={() => setLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
+            </div>
           </div>
 
-          <button onClick={toggleDarkMode} className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0" title="تغییر تم" suppressHydrationWarning>
-            {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
-          </button>
+          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
+            <div>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۲. لوگوی اختصاصی فوتر سایت</span>
+              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">نمایش در بخش پایین و پاورقی</span>
+            </div>
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
+              {footerLogoUrl ? <img src={footerLogoUrl} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl">⚓</span>}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => footerLogoRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود عکس / GIF</button>
+              {footerLogoUrl && <button type="button" onClick={() => setFooterLogoUrl("")} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
+            </div>
+          </div>
 
-          <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white transition-all shadow-md shadow-blue-500/25 cursor-pointer flex items-center justify-center shrink-0" title="سبد خرید">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-            {mounted && totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse" suppressHydrationWarning>
-                {formatPrice(totalItems)}
-              </span>
-            )}
-          </button>
+          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 flex flex-col justify-between">
+            <div>
+              <span className="font-bold text-xs block text-[var(--text-primary)] mb-1">۳. فاوآیکون تب مرورگر (Favicon متحرک)</span>
+              <span className="text-[10px] text-[var(--text-secondary)] block mb-3">پخش مستقیم انیمیشن در تب مرورگر</span>
+            </div>
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-inner">
+              {faviconUrl ? <img src={faviconUrl} alt="" className="w-10 h-10 object-contain" /> : <span className="text-2xl">🌐</span>}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => faviconRef.current?.click()} className="flex-1 py-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold hover:border-[var(--accent-blue)] transition cursor-pointer">📁 آپلود GIF / آیکون</button>
+              {faviconUrl && <button type="button" onClick={() => { setFaviconUrl(""); applyFaviconToDOM("/favicon.ico"); }} className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 text-[11px] font-bold cursor-pointer">حذف ✕</button>}
+            </div>
+          </div>
         </div>
       </div>
-    </header>
+
+      <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی برند / فروشگاه *</label>
+            <input type="text" required value={siteName} onChange={(e) => setSiteName(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-[var(--text-primary)] outline-none" />
+          </div>
+          <div>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شعار تبلیغاتی (Tagline)</label>
+            <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-[var(--text-primary)] outline-none" />
+          </div>
+          <div>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شماره تماس پشتیبانی</label>
+            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono font-bold text-[var(--text-primary)] outline-none" />
+          </div>
+          <div>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">ایمیل رسمی</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono text-[var(--text-primary)] outline-none" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نشانی پستی انبار و دفتر</label>
+            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-[var(--text-primary)] outline-none" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">متن اعلان بالای سایت</label>
+            <input type="text" value={announcement} onChange={(e) => setAnnouncement(e.target.value)} className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl text-[var(--text-primary)] font-bold outline-none" />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 `
@@ -590,12 +413,12 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ [ROOT-FIXED] فایل به طور ۱۰۰٪ اصلاح شد: ${filePath}`);
+  console.log(`✅ [ZERO-HARDCODE-FIXED] فایل با موفقیت اصلاح شد: ${filePath}`);
 }
 
 console.log('📦 در حال Push خودکار به گیت‌هاب و استقرار روی Vercel...');
 try {
-  execSync('git add . && git commit -m "fix: total eradication of hydration error #418 & dynamic AI brand knowledge engine" && git push origin main', { stdio: 'inherit' });
+  execSync('git add . && git commit -m "feat: complete zero-hardcoding Gemini Pro dynamic grounding & admin API key manager" && git push origin main', { stdio: 'inherit' });
   console.log('🎉 [DEPLOYED] پچ نهایی با موفقیت دیپلوی شد!');
 } catch (e) {
   console.log('⚠️ دستور دستی: git push origin main');

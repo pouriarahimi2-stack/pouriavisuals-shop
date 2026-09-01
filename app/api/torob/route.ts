@@ -1,6 +1,7 @@
 // File Path: app/api/torob/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productService";
 
 export const dynamic = "force-dynamic";
 
@@ -8,30 +9,44 @@ export async function GET() {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
 
-    const { data: dbProducts, error } = await supabaseAdmin
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false });
+    let productsList: any[] = [];
 
-    if (error) throw error;
+    try {
+      if (supabaseAdmin) {
+        const { data: dbProducts, error } = await supabaseAdmin
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-    const products = (dbProducts || []).map((p: any) => {
+        if (!error && dbProducts && dbProducts.length > 0) {
+          productsList = dbProducts;
+        }
+      }
+    } catch {}
+
+    // در صورت خالی بودن دیتابیس، استفاده قطعی از ۷ کالای پرچمدار
+    if (productsList.length === 0) {
+      productsList = FLAGSHIP_7_PRODUCTS;
+    }
+
+    const formattedProducts = productsList.map((p: any) => {
       const price = Number(p.price || 0);
-      const discountPrice = p.discount_price ? Number(p.discount_price) : undefined;
-      const isAvailable = p.is_available !== false && (p.stock === undefined || Number(p.stock) > 0);
+      const discountPrice = p.discount_price || p.discountPrice ? Number(p.discount_price || p.discountPrice) : undefined;
+      const finalPayablePrice = discountPrice && discountPrice > 0 ? discountPrice : price;
+      const isAvailable = p.is_available !== false && p.isAvailable !== false && (p.stock === undefined || Number(p.stock) > 0);
 
       const images = Array.isArray(p.images) && p.images.length > 0
         ? p.images
-        : [p.image_url || p.image || `${baseUrl}/placeholder.png`];
+        : [p.image_url || p.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"];
 
       return {
         page_unique_id: String(p.id),
-        title: p.title || p.name || "کالای دیجیتال استودیویی",
+        title: p.title || p.name || "کالای دیجیتال تخصصی آکسون",
         subtitle: p.title_fa || p.short_description || "",
-        price: discountPrice || price,
-        old_price: discountPrice ? price : undefined,
+        price: finalPayablePrice,
+        old_price: discountPrice && discountPrice < price ? price : undefined,
         availability: isAvailable ? "instock" : "outofstock",
-        category: p.category || "تجهیزات تخصصی",
+        category: p.category || p.category_name || "تجهیزات تخصصی",
         image_links: images,
         page_url: `${baseUrl}/products/${p.id}`,
       };
@@ -39,8 +54,8 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        count: products.length,
-        products: products,
+        count: formattedProducts.length,
+        products: formattedProducts,
       },
       {
         status: 200,

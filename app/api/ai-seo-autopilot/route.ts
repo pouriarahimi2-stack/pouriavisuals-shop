@@ -37,43 +37,47 @@ export async function POST(req: NextRequest) {
     const selectedProduct = FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === String(targetProductId)) || FLAGSHIP_7_PRODUCTS[1];
     const keyword = targetKeyword || "راهنمای تخصصی خرید مانیتور تدوین و کالیبراسیون ۵K در سال ۲۰۲۶";
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    let siteInfoData: any = null;
+    try {
+      if (supabaseAdmin) {
+        const { data } = await supabaseAdmin.from("site_info").select("*").limit(1).maybeSingle();
+        siteInfoData = data;
+      }
+    } catch {}
+
+    const apiKey =
+      siteInfoData?.gemini_api_key ||
+      process.env.GEMINI_API_KEY ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+
     let generatedHtml = "";
     let articleTitle = keyword;
 
-    if (apiKey && apiKey.length > 15) {
-      try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    if (apiKey && apiKey.length > 15 && apiKey !== "AIzaSyDummy") {
+      const candidateModels = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash", "gemini-pro"];
+      const genAI = new GoogleGenerativeAI(apiKey);
 
-        const prompt = `تو متخصص ارشد سئو رنک ۱ گوگل و مهندس سخت‌افزار استودیو هستی.
-یک مقاله جامع، عمیق و ۲۵۰۰ کلمه‌ای به زبان فارسی برای عنوان «${keyword}» بنویس.
-این مقاله باید:
-۱. تمام سرفصل‌های رقبای صفحه اول گوگل را پوشش داده و تحلیل فنی برتری ارائه دهد.
-۲. محصول «${selectedProduct.title}» با قیمت ویژه «${Number(selectedProduct.discountPrice || selectedProduct.price).toLocaleString('fa-IR')} تومان» را به عنوان بهترین گزینه بازار معرفی کند.
-۳. دارای جدول مقایسه فنی کامل و باکس خرید مستقیم با لینک به /products/${selectedProduct.id} باشد.
-خروجی فقط شامل کدهای معتبر HTML با تگ‌های h2, h3, p, ul, table و استایل‌های شیک باشد.`;
+      const prompt = `به عنوان متخصص ارشد سئو رنک ۱ گوگل و مهندس سخت‌افزار، یک مقاله جامع و ۲۵۰۰ کلمه‌ای به زبان فارسی برای موضوع «${keyword}» بنویس.
+این مقاله باید مستقیماً محصول «${selectedProduct.title}» با قیمت «${selectedProduct.price.toLocaleString('fa-IR')} تومان» را به عنوان بهترین گزینه بازار معرفی کرده و لینک خرید مستقیم به /products/${selectedProduct.id} را به همراه جدول مقایسه فنی ارائه دهد.
+خروجی فقط شامل کدهای معتبر HTML با تگ‌های h2, h3, p, ul, table باشد.`;
 
-        const result = await model.generateContent(prompt);
-        generatedHtml = result.response.text();
-      } catch (aiErr) {
-        console.warn("AI Generation fallback:", aiErr);
+      for (const mName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: mName });
+          const result = await model.generateContent(prompt);
+          generatedHtml = result.response.text();
+          if (generatedHtml) break;
+        } catch {}
       }
     }
 
     if (!generatedHtml) {
       generatedHtml = `<h2>راهنمای جامع و بررسی موشکافانه مانیتورهای ۵K استودیو</h2>
-<p>در فرایند تدوین رنگ و کالرگریدینگ در نرم‌افزارهای DaVinci Resolve و Premiere Pro، نمایشگر استاندارد نقشی حیاتی دارد. محصول <strong>${selectedProduct.title}</strong> استاندارد مرجع استودیوهای هالیوودی است.</p>
-<h3>مزایای رقابتی ${selectedProduct.title}</h3>
-<ul>
-  <li>کالیبراسیون سخت‌افزاری کارخانه با خطای کمتر از ۰.۴ Delta E</li>
-  <li>پوشش کامل ۹۹.۴٪ فضای رنگی سینمایی Display P3</li>
-  <li>درگاه پرسرعت تاندربولت با پهنای باند ۴۰ گیگابیت بر ثانیه</li>
-</ul>
+<p>در دنیای مدرن تولید محتوای ویدیویی، محصول <strong>${selectedProduct.title}</strong> مرجع تخصصی تدوینگران به شمار می‌رود.</p>
 <div style="background: rgba(0,113,227,0.08); border: 2px solid #0071e3; padding: 24px; border-radius: 24px; margin: 25px 0; text-align: center;">
-  <h4 style="color: #0071e3; font-size: 18px; margin-top: 0;">💎 پیشنهاد ویژه خرید مستقیم از فروشگاه آکسون</h4>
-  <p style="font-size: 14px; margin-bottom: 15px;">قیمت رسمی با گارانتی اصالت طلایی: <strong>${Number(selectedProduct.discountPrice || selectedProduct.price).toLocaleString('fa-IR')} تومان</strong></p>
-  <a href="/products/${selectedProduct.id}" style="display: inline-block; background: #0071e3; color: white; padding: 12px 30px; border-radius: 14px; font-weight: bold; text-decoration: none; box-shadow: 0 10px 25px rgba(0,113,227,0.4);">مشاهده مشخصات و خرید آنلاین ←</a>
+  <h4>پیشنهاد خرید مستقیم از فروشگاه آکسون</h4>
+  <p>قیمت ویژه: ${Number(selectedProduct.discountPrice || selectedProduct.price).toLocaleString('fa-IR')} تومان</p>
+  <a href="/products/${selectedProduct.id}" style="display: inline-block; background: #0071e3; color: white; padding: 12px 30px; border-radius: 14px; font-weight: bold; text-decoration: none;">مشاهده مشخصات و خرید آنلاین ←</a>
 </div>`;
     }
 
@@ -97,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "مقاله سئو رنک ۱ با موفقیت نگارش، لینک‌دهی و در سایت منتشر گردید.",
+      message: "مقاله سئو با موفقیت نگارش و منتشر گردید.",
       data: postPayload,
     });
   } catch (err: any) {

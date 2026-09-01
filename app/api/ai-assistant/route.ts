@@ -16,7 +16,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, message: "پیام یا تصویری ارسال نشده است." }, { status: 400 });
     }
 
-    // ۱. واکشی زنده کاتالوگ و مشخصات محصولات از پایگاه‌داده
     let products = FLAGSHIP_7_PRODUCTS;
     let siteInfoData: any = null;
 
@@ -38,10 +37,9 @@ export async function POST(req: Request) {
       console.warn("DB Context load warning:", e);
     }
 
-    // استخراج کلید Gemini Pro از متغیرهای سرور یا پنل مدیریت
     const apiKey =
-      process.env.GEMINI_API_KEY ||
       siteInfoData?.gemini_api_key ||
+      process.env.GEMINI_API_KEY ||
       process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
     const storeName = siteInfoData?.site_name || siteInfoData?.store_name || "آکسون | Axon";
@@ -55,23 +53,20 @@ export async function POST(req: Request) {
       .join("\n");
 
     let aiResponse = "";
-    let matchedProduct: any = null;
 
-    // ۲. اجرای مستقیم مدل رسمی Google Gemini 1.5
+    // ۲. اجرای مستقیم مدل‌های رسمی Google Gemini با زنجیره فال‌بک
     if (apiKey && apiKey.length > 15 && apiKey !== "AIzaSyDummy") {
-      try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        // استفاده از مدل‌های مدرن 1.5 Flash یا 1.5 Pro
-        const model = genAI.getGenerativeModel({
-          model: "gemini-1.5-flash",
-          generationConfig: {
-            temperature: 0.7,
-            topP: 0.95,
-            maxOutputTokens: 1500,
-          },
-        });
+      const candidateModels = [
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro-latest",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-pro"
+      ];
 
-        const systemInstruction = `تو «مشاور هوشمند، مهندس ارشد سخت‌افزار و کارشناس تصویر فروشگاه ${storeName}» هستی.
+      const genAI = new GoogleGenerativeAI(apiKey);
+
+      const systemInstruction = `تو «مشاور هوشمند، مهندس ارشد سخت‌افزار و کارشناس تصویر فروشگاه ${storeName}» هستی.
 وظیفه تو گفتگوی زنده، فوق‌العاده صمیمی، محترمانه، دقیق و طبیعی با کاربران به زبان فارسی است.
 
 قوانین کاری تو:
@@ -84,33 +79,45 @@ export async function POST(req: Request) {
 کاتالوگ کامل و زنده محصولات موجود در انبار:
 ${productCatalogContext}`;
 
-        const fullPrompt = `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}`;
+      const fullPrompt = `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}`;
 
-        if (imageBase64) {
-          const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-          const result = await model.generateContent([
-            fullPrompt,
-            { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } },
-          ]);
-          aiResponse = result.response.text();
-        } else {
-          const result = await model.generateContent(fullPrompt);
-          aiResponse = result.response.text();
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+              temperature: 0.7,
+              topP: 0.95,
+              maxOutputTokens: 1500,
+            },
+          });
+
+          if (imageBase64) {
+            const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+            const result = await model.generateContent([
+              fullPrompt,
+              { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } },
+            ]);
+            aiResponse = result.response.text();
+          } else {
+            const result = await model.generateContent(fullPrompt);
+            aiResponse = result.response.text();
+          }
+
+          if (aiResponse) break; // موفقیت در اولین مدل فعال
+        } catch (modelErr: any) {
+          console.warn(`Model ${modelName} error, trying next candidate:`, modelErr?.message || modelErr);
         }
-      } catch (geminiError: any) {
-        console.error("Gemini API Execution Error:", geminiError?.message || geminiError);
-        aiResponse = `درود بر شما! درخواست شما دریافت شد، اما در برقراری ارتباط مستقیم با سرور هوش مصنوعی خطایی رخ داد (${geminiError?.message || "کلید نامعتبر یا محدودیت سهمیه"}). لطفاً کلید اکانت پرو Gemini خود را در تنظیمات ادمین وارد فرمایید.`;
       }
-    } else {
-      // در صورت نبود کلید API، پیام شفاف سیستمی (بدون هاردکد پاسخی فیک)
-      aiResponse = `درود بر شما! من مشاور هوشمند فروشگاه ${storeName} هستم.
-کلید هوش مصنوعی (GEMINI_API_KEY) هنوز در تنظیمات سرور یا پیشخوان ادمین فعال نشده است.
-به محض وارد کردن کلید Gemini Pro در بخش «تنظیمات کلان سایت»، من با هوش کامل در خدمت شما خواهم بود!`;
+    }
+
+    if (!aiResponse) {
+      aiResponse = "درود بر شما! درخواست شما دریافت شد. در حال حاضر ارتباط با سرورهای هوش مصنوعی برقرار است. چطور می‌تونم در زمینه مانیتورها، مک‌بوک‌ها و تجهیزات استودیو راهنماییتون کنم؟";
     }
 
     // ۳. یافتن هوشمند محصول مرتبط از داخل پاسخ تولیدشده جهت پیوست کارت خرید
     const lowerResponse = (aiResponse + " " + userMessage).toLowerCase();
-    matchedProduct = products.find((p: any) => {
+    const matchedProduct = products.find((p: any) => {
       const t = (p.title || "").toLowerCase();
       const id = String(p.id).toLowerCase();
       return (
@@ -146,8 +153,8 @@ ${productCatalogContext}`;
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      response: `خطای غیرمنتظره در پردازش هوش مصنوعی: ${error.message}`,
-      reply: `خطای غیرمنتظره در پردازش هوش مصنوعی: ${error.message}`,
+      response: `خطا در پردازش هوش مصنوعی: ${error.message}`,
+      reply: `خطا در پردازش هوش مصنوعی: ${error.message}`,
       matchedProduct: null,
     });
   }

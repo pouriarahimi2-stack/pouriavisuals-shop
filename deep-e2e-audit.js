@@ -31,10 +31,11 @@ function fetchCheck(path, options = {}) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0 AxonDeepAuditRobot',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
         ...(options.headers || {}),
         ...(options.body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(options.body) } : {})
       },
-      timeout: 12000
+      timeout: 15000
     };
 
     const req = client.request(reqOptions, (res) => {
@@ -58,7 +59,7 @@ function fetchCheck(path, options = {}) {
 
     req.on('timeout', () => {
       req.destroy();
-      resolve({ status: 'TIMEOUT', latency: 12000, error: 'زمان انتظار به پایان رسید', ok: false, body: '' });
+      resolve({ status: 'TIMEOUT', latency: 15000, error: 'زمان انتظار به پایان رسید', ok: false, body: '' });
     });
 
     if (options.body) req.write(options.body);

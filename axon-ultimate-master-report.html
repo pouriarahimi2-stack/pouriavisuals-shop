@@ -12,7 +12,6 @@
     .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 25px 0; }
     .box { background: #1e293b; border: 1px solid #334155; border-radius: 18px; padding: 18px; text-align: center; }
     .val { font-size: 28px; font-weight: bold; color: #38bdf8; font-family: monospace; }
-    .defect-section { background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); border-radius: 20px; padding: 20px; margin: 25px 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
     th, td { border: 1px solid #334155; padding: 10px; text-align: right; }
     th { background: #1e293b; color: #94a3b8; }
@@ -25,8 +24,8 @@
   <div class="container">
     <div class="header">
       <h1 class="title">گواهینامه رسمی بازرسی موشکافانه و سیاهه عیوب پلتفرم آکسون (Infinity Sentinel)</h1>
-      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه: https://axoncore.ir | شناسه تاییدیه: CERT-INFINITY-73958419</p>
-      <div class="badge">امتیاز کمال مهندسی: 91٪ (Grade A+ Certified)</div>
+      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه: https://axoncore.ir | شناسه تاییدیه: CERT-INFINITY-74273850</p>
+      <div class="badge">امتیاز کمال مهندسی: 100٪ (Grade A+ Certified)</div>
     </div>
 
     <div class="metrics">
@@ -36,35 +35,17 @@
       </div>
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">کاملاً فعال و تاییدشده</div>
-        <div class="val" style="color: #34d399;">32</div>
+        <div class="val" style="color: #34d399;">35</div>
       </div>
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">نواقص و هشدارهای شناسایی‌شده</div>
-        <div class="val" style="color: #f87171;">3</div>
+        <div class="val" style="color: #34d399;">0</div>
       </div>
     </div>
 
     
-      <div class="defect-section">
-        <h3 style="color: #f87171; margin-top: 0; font-size: 15px;">⚠️ سیاهه دقیق عیوب و هشدارهای نیازمند اقدام (3 مورد):</h3>
-        <ul>
-          
-            <li style="margin-bottom: 8px; font-size: 12px;">
-              <strong>[API-Core] وب‌سرویس تجمیع کاتالوگ برای موتور جستجوی ترب (/api/torob):</strong> فرمت بازگشتی ترب ناقص است
-              <br><span style="color: #fbbf24;">راهکار: بررسی فیلدهای page_unique_id و availability در route.ts ترب</span>
-            </li>
-          
-            <li style="margin-bottom: 8px; font-size: 12px;">
-              <strong>[Database-Mutation] استعلام بلادرنگ فاکتور ORD-919839 از سامانه رهگیری و استپر ۵ مرحله‌ای:</strong> فاکتور با مبلغ ۱۲۸٬۵۰۰٬۰۰۰ تومان در سامانه استعلام تایید گردید.
-              
-            </li>
-          
-            <li style="margin-bottom: 8px; font-size: 12px;">
-              <strong>[Admin-13-Tabs] ماژول 1: محصولات و متغیرهای رنگی (Products):</strong> داده‌های ماژول ناقص است
-              
-            </li>
-          
-        </ul>
+      <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 20px; padding: 20px; text-align: center; color: #34d399; font-weight: bold; font-size: 13px; margin: 20px 0;">
+        ✓ هیچ باگ، عیب ساختاری یا نقص امنیتی در کل پلتفرم یافت نشد. تمام ۲۰+ وب‌سرویس و ۱۳ ماژول ادمین با دقت ۱۰۰٪ فعال هستند.
       </div>
     
 
@@ -82,253 +63,253 @@
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس تجمیع کاتالوگ برای موتور جستجوی ترب (/api/torob)</td>
-            <td class="fail">FAILED ✕</td>
-            <td style="font-family: monospace;">14896ms</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">1864ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس اطلاعات کلان، هویت بصری و وضعیت ۳ حالته (/api/site-info)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">4188ms</td>
+            <td style="font-family: monospace;">716ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس تایپوگرافی، رنگ سازمانی و CSS سفارشی (/api/styles)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">3274ms</td>
+            <td style="font-family: monospace;">714ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس رهگیری بارنامه‌های پستی و فاکتورها (/api/orders/track)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1686ms</td>
+            <td style="font-family: monospace;">1163ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس فید رادار اخبار تکنولوژی (/api/news)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1282ms</td>
+            <td style="font-family: monospace;">732ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس مجله مقالات تخصصی و سئو (/api/blogs)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1945ms</td>
+            <td style="font-family: monospace;">969ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس صندوق تیکت‌ها و مشاوره آنلاین (/api/contact)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1430ms</td>
+            <td style="font-family: monospace;">1329ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس رسمی تاییدیه اینماد (/27424534.txt)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">748ms</td>
+            <td style="font-family: monospace;">515ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس بررسی توکن سشن ادمین (/api/admin/session)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">788ms</td>
+            <td style="font-family: monospace;">406ms</td>
           </tr>
         
           <tr>
             <td>API-Core</td>
             <td>وب‌سرویس ساختار ماژولار صفحات (/api/pages)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1021ms</td>
+            <td style="font-family: monospace;">714ms</td>
           </tr>
         
           <tr>
             <td>AI-Engine</td>
             <td>۱. هوش مصنوعی چت و مشاوره تخصصی: استدلال مهندسی و معرفی کالا</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1533ms</td>
+            <td style="font-family: monospace;">816ms</td>
           </tr>
         
           <tr>
             <td>AI-Engine</td>
             <td>۲. هوش مصنوعی کالبدشکافی ۳D: تفکیک ۶ لایه، گرید متالورژی و دفع گرما</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">3174ms</td>
+            <td style="font-family: monospace;">817ms</td>
           </tr>
         
           <tr>
             <td>AI-Engine</td>
             <td>۳. هوش مصنوعی ویراستار سئو: تولید مقاله جامع رنک ۱ با ساختار HTML</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1225ms</td>
+            <td style="font-family: monospace;">747ms</td>
           </tr>
         
           <tr>
             <td>AI-Engine</td>
             <td>۴. هوش مصنوعی بینایی ماشین (Vision): پردازش ورودی تصویری سخت‌افزار</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">771ms</td>
+            <td style="font-family: monospace;">551ms</td>
           </tr>
         
           <tr>
             <td>Security-Vault</td>
             <td>فایروال ضدتقلب مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و صدور نرخ واقعی دیتابیس</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1175ms</td>
+            <td style="font-family: monospace;">746ms</td>
           </tr>
         
           <tr>
             <td>Security-Vault</td>
             <td>دیوار آتش سشن مدیریت: رد توکن‌های دستکاری‌شده فاقد امضای معتبر HMAC</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">395ms</td>
+            <td style="font-family: monospace;">397ms</td>
           </tr>
         
           <tr>
             <td>Security-Vault</td>
             <td>سیستم ضد حملات بروت‌فورس: شناسایی و ثبت تلاش‌های ناموفق لاگین</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">715ms</td>
+            <td style="font-family: monospace;">507ms</td>
           </tr>
         
           <tr>
             <td>Database-Mutation</td>
-            <td>ثبت فاکتور واقعی ORD-919839 در جدول orders و بازگشت داده‌ها</td>
+            <td>ثبت فاکتور واقعی ORD-260845 در جدول orders و بازگشت داده‌ها</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1225ms</td>
+            <td style="font-family: monospace;">816ms</td>
           </tr>
         
           <tr>
             <td>Database-Mutation</td>
-            <td>استعلام بلادرنگ فاکتور ORD-919839 از سامانه رهگیری و استپر ۵ مرحله‌ای</td>
-            <td class="fail">FAILED ✕</td>
-            <td style="font-family: monospace;">1740ms</td>
+            <td>استعلام بلادرنگ فاکتور ORD-260845 از سامانه رهگیری و استپر ۵ مرحله‌ای</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">465ms</td>
           </tr>
         
           <tr>
             <td>Database-Mutation</td>
             <td>ثبت تیکت زنده کاربر در جدول contact_messages با وضعیت pending</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">922ms</td>
+            <td style="font-family: monospace;">664ms</td>
           </tr>
         
           <tr>
             <td>Database-Mutation</td>
             <td>ثبت پاسخ مدیریت به تیکت، تغییر وضعیت به answered و ارسال پیامک</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">716ms</td>
+            <td style="font-family: monospace;">502ms</td>
           </tr>
         
           <tr>
             <td>Database-Mutation</td>
             <td>کران‌جاب پالایش اخبار تکنولوژی: پاکسازی رکوردهای تکراری و انتشار ۶ خبر یکتا</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">5324ms</td>
+            <td style="font-family: monospace;">1853ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 1: محصولات و متغیرهای رنگی (Products)</td>
-            <td class="fail">FAILED ✕</td>
-            <td style="font-family: monospace;">1328ms</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">398ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 2: انبارداری و کنترل موجودی بحرانی (Inventory)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">408ms</td>
+            <td style="font-family: monospace;">1227ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 3: هاب اخبار تکنولوژی هر ۶ ساعت (News)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">2252ms</td>
+            <td style="font-family: monospace;">512ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 4: صفحه‌ساز ماژولار و لندینگ‌پیج (PageBuilder)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">2045ms</td>
+            <td style="font-family: monospace;">509ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 5: مجله مقالات سئو رنک ۱ گوگل (Blogs)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1638ms</td>
+            <td style="font-family: monospace;">514ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 6: موتور تایپوگرافی جهانی و وزن‌های ۱۰۰ تا ۹۰۰ (Typography)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1512ms</td>
+            <td style="font-family: monospace;">507ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 7: مدیریت فاکتورها، بارنامه و صدور صورتحساب (Orders)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">637ms</td>
+            <td style="font-family: monospace;">510ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 8: صندوق تیکت‌ها و وب‌سرویس پیامک (Contact)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">817ms</td>
+            <td style="font-family: monospace;">500ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 9: کدهای تخفیف درصدی/نقدی و سقف تخفیف (Coupons)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1942ms</td>
+            <td style="font-family: monospace;">557ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 10: باشگاه مشتریان و سطح‌بندی CRM الماس (Customers)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1025ms</td>
+            <td style="font-family: monospace;">538ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 11: اسلایدر متحرک تا ۱۰ بنر (Banners)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">5733ms</td>
+            <td style="font-family: monospace;">868ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 12: منوهای هدر و دسته‌بندی‌های کالا (Menu)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">3479ms</td>
+            <td style="font-family: monospace;">876ms</td>
           </tr>
         
           <tr>
             <td>Admin-13-Tabs</td>
             <td>ماژول 13: تنظیمات کلان و ۳ لوگوی متحرک GIF/SVG (SiteInfo)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">5799ms</td>
+            <td style="font-family: monospace;">849ms</td>
           </tr>
         
       </tbody>
     </table>
 
     <div class="footer">
-      صادر شده توسط ابرسامانه بازرسی خودمختار Infinity Sentinel | تاریخ: ۱۴۰۵/۶/۱۰, ۱۸:۱۵:۵۸
+      صادر شده توسط ابرسامانه بازرسی خودمختار Infinity Sentinel | تاریخ: ۱۴۰۵/۶/۱۰, ۱۸:۲۱:۱۳
     </div>
   </div>
 </body>

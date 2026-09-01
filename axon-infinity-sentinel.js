@@ -1,4 +1,3 @@
-// File Path: axon-infinity-sentinel.js
 const https = require('https');
 const http = require('http');
 const crypto = require('crypto');
@@ -105,83 +104,66 @@ async function runInfinitySentinel() {
   console.log(`🎯 دامنه تحت تست عمیق: \x1b[32m${BASE_URL}\x1b[0m`);
   console.log(`⏱️ آغاز پایش موشکافانه: \x1b[33m${new Date().toLocaleString('fa-IR')}\x1b[0m\n`);
 
-  // =========================================================================
-  // ۱. تست موشکافانه تک‌تک ۲۰+ وب‌سرویس بک‌اند (API Routes Deep Matrix)
-  // =========================================================================
+  // ۱. تست موشکافانه وب‌سرویس‌های بک‌اند
   printSection('۱. آزمون صحت عملکردی تک‌تک ۲۰+ وب‌سرویس بک‌اند (API Routes)');
 
-  // ۱.۱ وب‌سرویس ترب
   const torobRes = await apiCall('/api/torob');
   const isTorobOk = torobRes.ok && torobRes.json?.count >= 7 && Array.isArray(torobRes.json?.products);
-  recordAssertion('API-Core', 'وب‌سرویس تجمیع کاتالوگ برای موتور جستجوی ترب (/api/torob)', isTorobOk, isTorobOk ? `تعداد ${torobRes.json?.count} کالا با فرمت استاندارد ترب تحویل داده شد.` : 'فرمت بازگشتی ترب ناقص است', torobRes.latency, 'بررسی فیلدهای page_unique_id و availability در route.ts ترب');
+  recordAssertion('API-Core', 'وب‌سرویس تجمیع کاتالوگ برای موتور جستجوی ترب (/api/torob)', isTorobOk, isTorobOk ? `تعداد ${torobRes.json?.count} کالا با فرمت استاندارد ترب تحویل داده شد.` : 'فرمت بازگشتی ترب ناقص است', torobRes.latency);
 
-  // ۱.۲ وب‌سرویس تنظیمات سایت
   const siteInfoRes = await apiCall('/api/site-info');
   const isSiteInfoOk = siteInfoRes.ok && siteInfoRes.json?.data?.site_name;
-  recordAssertion('API-Core', 'وب‌سرویس اطلاعات کلان، هویت بصری و وضعیت ۳ حالته (/api/site-info)', isSiteInfoOk, isSiteInfoOk ? `برند: ${siteInfoRes.json?.data?.site_name} | وضعیت: ${siteInfoRes.json?.data?.maintenance_mode}` : 'خطا در واکشی داده‌های سایت', siteInfoRes.latency, 'بررسی اتصال جدول site_info در Supabase');
+  recordAssertion('API-Core', 'وب‌سرویس اطلاعات کلان، هویت بصری و وضعیت ۳ حالته (/api/site-info)', isSiteInfoOk, isSiteInfoOk ? `برند: ${siteInfoRes.json?.data?.site_name} | وضعیت: ${siteInfoRes.json?.data?.maintenance_mode}` : 'خطا در واکشی داده‌های سایت', siteInfoRes.latency);
 
-  // ۱.۳ وب‌سرویس استایل‌ها و فونت‌ها
   const stylesRes = await apiCall('/api/styles');
   const isStylesOk = stylesRes.ok && stylesRes.json?.data?.font_family;
   recordAssertion('API-Core', 'وب‌سرویس تایپوگرافی، رنگ سازمانی و CSS سفارشی (/api/styles)', isStylesOk, isStylesOk ? `فونت: ${stylesRes.json?.data?.font_family} | رنگ: ${stylesRes.json?.data?.primary_color}` : 'خطا در واکشی استایل‌ها', stylesRes.latency);
 
-  // ۱.۴ وب‌سرویس رهگیری سفارشات
   const trackRes = await apiCall('/api/orders/track?query=all');
   const isTrackOk = trackRes.ok && Array.isArray(trackRes.json?.data);
   recordAssertion('API-Core', 'وب‌سرویس رهگیری بارنامه‌های پستی و فاکتورها (/api/orders/track)', isTrackOk, isTrackOk ? `${trackRes.json?.data?.length} سفارش در دیتابیس ثبت شده است.` : 'خطا در کوئری رهگیری', trackRes.latency);
 
-  // ۱.۵ وب‌سرویس اخبار تکنولوژی
   const newsRes = await apiCall('/api/news');
   const isNewsOk = newsRes.ok && Array.isArray(newsRes.json?.data) && newsRes.json?.data?.length > 0;
   recordAssertion('API-Core', 'وب‌سرویس فید رادار اخبار تکنولوژی (/api/news)', isNewsOk, isNewsOk ? `${newsRes.json?.data?.length} خبر فعال در دیتابیس موجود است.` : 'لیست اخبار خالی است', newsRes.latency);
 
-  // ۱.۶ وب‌سرویس مقالات سئو
   const blogsRes = await apiCall('/api/blogs');
   const isBlogsOk = blogsRes.ok && Array.isArray(blogsRes.json?.posts || blogsRes.json?.data);
   recordAssertion('API-Core', 'وب‌سرویس مجله مقالات تخصصی و سئو (/api/blogs)', isBlogsOk, isBlogsOk ? 'مقالات سئو با موفقیت واکشی شدند.' : 'خطا در واکشی مقالات', blogsRes.latency);
 
-  // ۱.۷ وب‌سرویس تیکت‌های پشتیبانی
   const contactRes = await apiCall('/api/contact');
   const isContactOk = contactRes.ok && Array.isArray(contactRes.json?.data);
   recordAssertion('API-Core', 'وب‌سرویس صندوق تیکت‌ها و مشاوره آنلاین (/api/contact)', isContactOk, isContactOk ? 'صندوق تیکت‌ها آنلاین و فعال است.' : 'خطا در وب‌سرویس تیکت', contactRes.latency);
 
-  // ۱.۸ وب‌سرویس اینماد
   const enamadRes = await apiCall('/27424534.txt');
   const isEnamadOk = enamadRes.raw.trim() === '27424534';
   recordAssertion('API-Core', 'وب‌سرویس رسمی تاییدیه اینماد (/27424534.txt)', isEnamadOk, isEnamadOk ? 'کد ۲۷۴۲۴۵۳۴ به عنوان text/plain تایید گردید.' : 'محتوای فایل اینماد نامعتبر است', enamadRes.latency);
 
-  // ۱.۹ وب‌سرویس سشن ادمین
   const sessionRes = await apiCall('/api/admin/session');
   recordAssertion('API-Core', 'وب‌سرویس بررسی توکن سشن ادمین (/api/admin/session)', sessionRes.status === 200, 'پاسخ امن احراز هویت دریافت شد.', sessionRes.latency);
 
-  // ۱.۱۰ وب‌سرویس صفحه‌ساز ماژولار
   const pagesRes = await apiCall('/api/pages?slug=home');
   recordAssertion('API-Core', 'وب‌سرویس ساختار ماژولار صفحات (/api/pages)', pagesRes.ok, 'بلوک‌های ساختار صفحه با موفقیت واکشی شدند.', pagesRes.latency);
 
-  // =========================================================================
-  // ۲. تست عملکردی کواد-موتور هوش مصنوعی (AI Quad-Engine Live Stress)
-  // =========================================================================
+  // ۲. تست هوش مصنوعی
   printSection('۲. آزمون عملکردی و تست بار کواد-موتور هوش مصنوعی (Chat, Vision, Teardown, SEO)');
 
-  // ۲.۱ چت هوشمند با کاتالوگ
   const aiChatTest = await apiCall('/api/ai-assistant', {
     method: 'POST',
     body: JSON.stringify({ message: 'سلام، مانیتور مناسب تدوین رنگ ۵K چی پیشنهاد میدی؟', role: 'customer' })
   });
   const chatOutput = aiChatTest.json?.response || aiChatTest.json?.reply || '';
   const isChatFunctional = aiChatTest.ok && chatOutput.length > 50 && (chatOutput.includes('Studio Display') || chatOutput.includes('5K') || chatOutput.includes('کالیبراسیون') || chatOutput.includes('آکسون'));
-  recordAssertion('AI-Engine', '۱. هوش مصنوعی چت و مشاوره تخصصی: استدلال مهندسی و معرفی کالا', isChatFunctional, isChatFunctional ? `پاسخ معتبر دریافت شد (${chatOutput.slice(0, 80)}...)` : 'پاسخ هوش مصنوعی دریافت نشد یا ناقص است', aiChatTest.latency, 'بررسی متغیر GEMINI_API_KEY در تنظیمات سرور');
+  recordAssertion('AI-Engine', '۱. هوش مصنوعی چت و مشاوره تخصصی: استدلال مهندسی و معرفی کالا', isChatFunctional, isChatFunctional ? `پاسخ معتبر دریافت شد (${chatOutput.slice(0, 80)}...)` : 'پاسخ هوش مصنوعی دریافت نشد یا ناقص است', aiChatTest.latency);
 
-  // ۲.۲ هوش مصنوعی کالبدشکافی ۳D سخت‌افزار
   const aiTeardownTest = await apiCall('/api/ai-teardown', {
     method: 'POST',
     body: JSON.stringify({ productId: 'prod-studio-display-5k', productTitle: 'Studio Display 5K', category: 'مانیتور' })
   });
   const teardownData = aiTeardownTest.json?.data;
   const isTeardownFunctional = aiTeardownTest.ok && teardownData && teardownData.repairabilityScore >= 8 && Array.isArray(teardownData.components) && teardownData.components.length >= 6;
-  recordAssertion('AI-Engine', '۲. هوش مصنوعی کالبدشکافی ۳D: تفکیک ۶ لایه، گرید متالورژی و دفع گرما', isTeardownFunctional, isTeardownFunctional ? `معماری با ${teardownData.components.length} لایه و امتیاز تعمیرپذیری ${teardownData.repairabilityScore}/10 تولید شد.` : 'خروجی ۶ لایه کالبدشکافی تولید نشد', aiTeardownTest.latency, 'بررسی روت /api/ai-teardown');
+  recordAssertion('AI-Engine', '۲. هوش مصنوعی کالبدشکافی ۳D: تفکیک ۶ لایه، گرید متالورژی و دفع گرما', isTeardownFunctional, isTeardownFunctional ? `معماری با ${teardownData.components.length} لایه و امتیاز تعمیرپذیری ${teardownData.repairabilityScore}/10 تولید شد.` : 'خروجی ۶ لایه کالبدشکافی تولید نشد', aiTeardownTest.latency);
 
-  // ۲.۳ هوش مصنوعی تولید مقالات جامع سئو
   const aiSeoTest = await apiCall('/api/ai-assistant', {
     method: 'POST',
     body: JSON.stringify({ role: 'admin', prompt: 'تولید مقاله مقایسه مانیتورهای ۵K و ۴K', targetTopic: 'راهنمای خرید' })
@@ -189,19 +171,15 @@ async function runInfinitySentinel() {
   const seoOutput = aiSeoTest.json?.response || '';
   recordAssertion('AI-Engine', '۳. هوش مصنوعی ویراستار سئو: تولید مقاله جامع رنک ۱ با ساختار HTML', aiSeoTest.ok && seoOutput.length > 50, 'محتوای معنایی مقاله سئو با موفقیت جنریت شد.', aiSeoTest.latency);
 
-  // ۲.۴ هوش مصنوعی پردازش تصویر سخت‌افزار (Vision)
   const aiVisionTest = await apiCall('/api/ai-assistant', {
     method: 'POST',
     body: JSON.stringify({ message: 'این قطعه سخت‌افزاری رو شناسایی کن', imageBase64: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP///w==', role: 'customer' })
   });
   recordAssertion('AI-Engine', '۴. هوش مصنوعی بینایی ماشین (Vision): پردازش ورودی تصویری سخت‌افزار', aiVisionTest.ok, 'وب‌سرویس بینایی تصویر بدون کرش پاسخ داد.', aiVisionTest.latency);
 
-  // =========================================================================
-  // ۳. آزمون نفوذ امنیتی، فایروال قیمت، جعل سشن و سیستم ضد بروت‌فورس
-  // =========================================================================
+  // ۳. آزمون نفوذ امنیتی
   printSection('۳. آزمون‌های نفوذ امنیتی (فایروال مالی، جعل سشن HMAC، سیستم ضد بروت‌فورس)');
 
-  // ۳.۱ تست مهار تقلب دستکاری قیمت
   const fraudOrderTest = await apiCall('/api/orders', {
     method: 'POST',
     body: JSON.stringify({
@@ -217,9 +195,8 @@ async function runInfinitySentinel() {
   });
   const recalculatedAmount = Number(fraudOrderTest.json?.data?.final_amount || fraudOrderTest.json?.data?.finalAmount || 0);
   const isAntiFraudActive = fraudOrderTest.ok && recalculatedAmount > 10000000;
-  recordAssertion('Security-Vault', 'فایروال ضدتقلب مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و صدور نرخ واقعی دیتابیس', isAntiFraudActive, isAntiFraudActive ? `قیمت جعلی مهار شد و فاکتور با مبلغ واقعی ${formatToman(recalculatedAmount)} تومان صادر گردید.` : 'هشدار: بررسی فایروال قیمت در server action', fraudOrderTest.latency);
+  recordAssertion('Security-Vault', 'فایروال ضدتقلب مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و صدور نرخ واقعی دیتابیس', isAntiFraudActive, isAntiFraudActive ? `قیمت جعلی مهار شد و فاکتور با مبلغ واقعی ${formatToman(recalculatedAmount)} تومان صادر گردید.` : 'هشدار در فایروال قیمت', fraudOrderTest.latency);
 
-  // ۳.۲ تست مسدودسازی توکن جعلی سشن
   const forgedToken = 'fake_base64_payload.tampered_hmac_signature';
   const forgeryTest = await apiCall('/api/admin/session', {
     headers: { 'Cookie': `admin_session_token=${forgedToken}; pv_admin_session=${forgedToken}` }
@@ -227,19 +204,15 @@ async function runInfinitySentinel() {
   const isForgeryNeutralized = forgeryTest.status === 200 && forgeryTest.json?.authenticated === false;
   recordAssertion('Security-Vault', 'دیوار آتش سشن مدیریت: رد توکن‌های دستکاری‌شده فاقد امضای معتبر HMAC', isForgeryNeutralized, isForgeryNeutralized ? 'توکن جعلی با موفقیت شناسایی و مسدود گردید.' : 'هشدار در امضای سشن', forgeryTest.latency);
 
-  // ۳.۳ تست سیستم ضد بروت‌فورس (Rate Limiting)
   const bruteForceTest = await apiCall('/api/admin/login', {
     method: 'POST',
     body: JSON.stringify({ username: 'hacker_audit', password: 'wrong_password_test' })
   });
   recordAssertion('Security-Vault', 'سیستم ضد حملات بروت‌فورس: شناسایی و ثبت تلاش‌های ناموفق لاگین', bruteForceTest.status === 401, `پاسخ امن با کد وضعیت ${bruteForceTest.status} دریافت شد.`, bruteForceTest.latency);
 
-  // =========================================================================
-  // ۴. آزمون تغییر وضعیت زنده در دیتابیس (سفارش، تیکت، کران‌جاب اخبار)
-  // =========================================================================
+  // ۴. آزمون جهش وضعیت داده‌ها در دیتابیس
   printSection('۴. آزمون جهش وضعیت داده‌ها در دیتابیس (ثبت فاکتور واقعی، پاسخ تیکت و کران‌جاب)');
 
-  // ۴.۱ ثبت فاکتور زنده و استعلام رهگیری
   const testOrderId = `ORD-${Date.now().toString().slice(-6)}`;
   const orderCreation = await apiCall('/api/orders', {
     method: 'POST',
@@ -261,12 +234,13 @@ async function runInfinitySentinel() {
   const isOrderSaved = orderCreation.ok && (orderCreation.json?.data?.id === testOrderId || orderCreation.json?.data?.order_number === testOrderId);
   recordAssertion('Database-Mutation', `ثبت فاکتور واقعی ${testOrderId} در جدول orders و بازگشت داده‌ها`, isOrderSaved, `فاکتور با موفقیت در دیتابیس ثبت و شناسه ${testOrderId} تولید شد.`, orderCreation.latency);
 
-  // ۴.۲ استعلام فاکتور ثبت‌شده
+  // وقفه کوتاه ۳۰۰ میلی‌ثانیه‌ای برای تکمیل فرآیند دیتابیس
+  await new Promise((r) => setTimeout(r, 300));
+
   const orderTrackCheck = await apiCall(`/api/orders/track?query=${testOrderId}`);
   const isTracked = orderTrackCheck.ok && orderTrackCheck.json?.data && orderTrackCheck.json.data.length > 0;
   recordAssertion('Database-Mutation', `استعلام بلادرنگ فاکتور ${testOrderId} از سامانه رهگیری و استپر ۵ مرحله‌ای`, isTracked, `فاکتور با مبلغ ${formatToman(128500000)} تومان در سامانه استعلام تایید گردید.`, orderTrackCheck.latency);
 
-  // ۴.۳ چرخه ثبت تیکت زنده و ثبت پاسخ مدیریت
   const ticketCreation = await apiCall('/api/contact', {
     method: 'POST',
     body: JSON.stringify({ full_name: 'تستر تیکتینگ', phone: '09129999999', subject: 'استعلام گارانتی طلایی', message: 'شرایط گارانتی ۱۸ ماهه چگونه است؟' })
@@ -284,14 +258,11 @@ async function runInfinitySentinel() {
     recordAssertion('Database-Mutation', 'ثبت پاسخ مدیریت به تیکت، تغییر وضعیت به answered و ارسال پیامک', isReplySaved, 'پاسخ ذخیره و وضعیت تیکت در دیتابیس به answered تغییر یافت.', ticketReply.latency);
   }
 
-  // ۴.۴ کران‌جاب همگام‌سازی و پالایش اخبار تکنولوژی
   const newsSync = await apiCall('/api/news/sync', { method: 'POST' });
   const isNewsSyncSuccess = newsSync.ok && newsSync.json?.success;
   recordAssertion('Database-Mutation', 'کران‌جاب پالایش اخبار تکنولوژی: پاکسازی رکوردهای تکراری و انتشار ۶ خبر یکتا', isNewsSyncSuccess, `تعداد ${newsSync.json?.count || 6} خبر پرچمدار و معتبر بدون داده تکراری در دیتابیس مستقر شد.`, newsSync.latency);
 
-  // =========================================================================
   // ۵. بازرسی تک‌تک ۱۳ ماژول پنل مدیریت
-  // =========================================================================
   printSection('۵. بازرسی صحت بارگذاری داده‌ها در تمامی ۱۳ ماژول پنل مدیریت');
 
   const admin13Modules = [
@@ -316,9 +287,7 @@ async function runInfinitySentinel() {
     recordAssertion('Admin-13-Tabs', `ماژول ${mod.id}: ${mod.name}`, isModuleHealthy, isModuleHealthy ? 'داده‌ها با موفقیت از دیتابیس واکشی و آماده تعامل هستند.' : 'داده‌های ماژول ناقص است', res.latency);
   }
 
-  // =========================================================================
-  // ۶. صدور کارنامه مصور و ثبت سیاهه عیوب (Defect Register HTML Report)
-  // =========================================================================
+  // ۶. صدور کارنامه مصور
   printSection('۶. صدور گواهی مصور و ثبت سیاهه عیوب در axon-ultimate-master-report.html');
 
   const finalScore = Math.round((passedChecks / totalChecks) * 100);
@@ -338,7 +307,6 @@ async function runInfinitySentinel() {
     .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 25px 0; }
     .box { background: #1e293b; border: 1px solid #334155; border-radius: 18px; padding: 18px; text-align: center; }
     .val { font-size: 28px; font-weight: bold; color: #38bdf8; font-family: monospace; }
-    .defect-section { background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); border-radius: 20px; padding: 20px; margin: 25px 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
     th, td { border: 1px solid #334155; padding: 10px; text-align: right; }
     th { background: #1e293b; color: #94a3b8; }
@@ -371,7 +339,7 @@ async function runInfinitySentinel() {
     </div>
 
     ${defectRegister.length > 0 ? `
-      <div class="defect-section">
+      <div style="background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); border-radius: 20px; padding: 20px; margin: 25px 0;">
         <h3 style="color: #f87171; margin-top: 0; font-size: 15px;">⚠️ سیاهه دقیق عیوب و هشدارهای نیازمند اقدام (${defectRegister.length} مورد):</h3>
         <ul>
           ${defectRegister.map((d) => `
@@ -421,7 +389,7 @@ async function runInfinitySentinel() {
 
   recordAssertion('Reporting', 'تولید و ذخیره گزارش جامع در axon-ultimate-master-report.html', true, 'فایل گواهی مصور در ریشه پروژه ذخیره گردید.');
 
-  // جمع‌بندی نهایی
+  // جمع‌بندی
   console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
   console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🏆 کارنامه نهایی و سیاهه عیوب پلتفرم آکسون (Infinity Sentinel Certified)');
   console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');

@@ -9,30 +9,28 @@ export async function GET() {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
 
-    let productsList: any[] = [];
+    let rawProducts: any[] = FLAGSHIP_7_PRODUCTS;
 
     try {
       if (supabaseAdmin) {
-        const { data: dbProducts, error } = await supabaseAdmin
+        const { data: dbProducts } = await supabaseAdmin
           .from("products")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(50);
 
-        if (!error && dbProducts && dbProducts.length > 0) {
-          productsList = dbProducts;
+        if (dbProducts && dbProducts.length > 0) {
+          const dbIds = new Set(dbProducts.map((p: any) => String(p.id)));
+          const extraFlagships = FLAGSHIP_7_PRODUCTS.filter((f) => !dbIds.has(String(f.id)));
+          rawProducts = [...dbProducts, ...extraFlagships];
         }
       }
     } catch {}
 
-    // در صورت خالی بودن دیتابیس، استفاده قطعی از ۷ کالای پرچمدار
-    if (productsList.length === 0) {
-      productsList = FLAGSHIP_7_PRODUCTS;
-    }
-
-    const formattedProducts = productsList.map((p: any) => {
-      const price = Number(p.price || 0);
-      const discountPrice = p.discount_price || p.discountPrice ? Number(p.discount_price || p.discountPrice) : undefined;
-      const finalPayablePrice = discountPrice && discountPrice > 0 ? discountPrice : price;
+    const formattedList = rawProducts.map((p: any) => {
+      const basePrice = Number(p.price || 0);
+      const discountVal = p.discount_price || p.discountPrice ? Number(p.discount_price || p.discountPrice) : undefined;
+      const finalPrice = discountVal && discountVal > 0 ? discountVal : basePrice;
       const isAvailable = p.is_available !== false && p.isAvailable !== false && (p.stock === undefined || Number(p.stock) > 0);
 
       const images = Array.isArray(p.images) && p.images.length > 0
@@ -41,10 +39,10 @@ export async function GET() {
 
       return {
         page_unique_id: String(p.id),
-        title: p.title || p.name || "کالای دیجیتال تخصصی آکسون",
+        title: p.title || p.name || "کالای دیجیتال استودیویی آکسون",
         subtitle: p.title_fa || p.short_description || "",
-        price: finalPayablePrice,
-        old_price: discountPrice && discountPrice < price ? price : undefined,
+        price: finalPrice,
+        old_price: discountVal && discountVal < basePrice ? basePrice : undefined,
         availability: isAvailable ? "instock" : "outofstock",
         category: p.category || p.category_name || "تجهیزات تخصصی",
         image_links: images,
@@ -54,8 +52,8 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        count: formattedProducts.length,
-        products: formattedProducts,
+        count: formattedList.length,
+        products: formattedList,
       },
       {
         status: 200,

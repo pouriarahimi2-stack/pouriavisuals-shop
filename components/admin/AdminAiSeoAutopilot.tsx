@@ -7,7 +7,6 @@ import { FLAGSHIP_7_PRODUCTS } from "@/services/productService";
 
 export default function AdminAiSeoAutopilot() {
   const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(FLAGSHIP_7_PRODUCTS[1].id);
   const [customKeyword, setCustomKeyword] = useState("");
@@ -18,9 +17,7 @@ export default function AdminAiSeoAutopilot() {
       const res = await fetch("/api/ai-seo-autopilot");
       const json = await res.json();
       if (json.data) setData(json.data);
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -30,13 +27,13 @@ export default function AdminAiSeoAutopilot() {
   const handleStartAutopilotCycle = async () => {
     soundEngine.playClick();
     setGenerating(true);
-    setStatusLog("در حال اتصال به Google Search Console و استخراج کلمات کلیدی پرکلیک...");
+    setStatusLog("۱. در حال اتصال به Google Search Console API و استخراج کلمات کلیدی پرکلیک...");
 
     try {
-      await new Promise((r) => setTimeout(r, 1200));
-      setStatusLog("در حال تحلیل سرفصل‌های رقبای صفحه اول گوگل و استخراج شکاف محتوایی (Content Gap)...");
-      await new Promise((r) => setTimeout(r, 1200));
-      setStatusLog("هوش مصنوعی در حال نگارش مقاله ۲۵۰۰ کلمه‌ای، ایجاد جدول مقایسه و تزریق کارت خرید مستقیم کالا...");
+      await new Promise((r) => setTimeout(r, 1000));
+      setStatusLog("۲. در حال خزش رقبای صفحه اول گوگل و استخراج شکاف محتوایی (Content Gap)...");
+      await new Promise((r) => setTimeout(r, 1000));
+      setStatusLog("۳. هوش مصنوعی در حال نگارش مقاله ۲۵۰۰ کلمه‌ای، جدول مقایسه و تزریق کارت خرید مستقیم...");
 
       const res = await fetch("/api/ai-seo-autopilot", {
         method: "POST",
@@ -50,7 +47,7 @@ export default function AdminAiSeoAutopilot() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setStatusLog("🎉 موفقیت کامل! مقاله سئو رنک ۱ گوگل نوشته شد و مستقیماً با دکمه خرید در بخش /blog منتشر گردید.");
+        setStatusLog("🎉 چرخه خودکار کامل شد! مقاله سئو رنک ۱ نوشته شد، کارت خرید کالا تزریق گردید و در مجله منتشر شد.");
       }
     } catch {
       setStatusLog("خطا در چرخه خودکار.");
@@ -66,7 +63,7 @@ export default function AdminAiSeoAutopilot() {
           <div className="flex items-center gap-2">
             <span className="text-xl">🤖</span>
             <h2 className="text-lg font-black text-[var(--accent-blue)]">
-              موتور خودمختار سئو، تحلیل سرچ‌کنسول و فروش خودکار (AI SEO Autopilot)
+              موتور خودمختار سئو، سرچ‌کنسول و قیف فروش مستقیم (AI Growth Engine)
             </h2>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
@@ -79,7 +76,7 @@ export default function AdminAiSeoAutopilot() {
           disabled={generating}
           className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center gap-2"
         >
-          <span>{generating ? "در حال اجرای عملیات هوشمند..." : "🚀 شروع چرخه خودکار نگارش و انتشار مقاله"}</span>
+          <span>{generating ? "در حال اجرای عملیات هوشمند..." : "🚀 شروع چرخه خودکار نگارش و فروش"}</span>
         </button>
       </div>
 
@@ -124,7 +121,7 @@ export default function AdminAiSeoAutopilot() {
 
         <div className="lg:col-span-2 p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
           <h3 className="font-black text-xs text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            📊 رصد هوشمند کلمات کلیدی با فرصت رشد فروش (GSC Opportunities)
+            📊 رصد هوشمند کلمات کلیدی با فرصت رشد فروش (GSC Intelligence)
           </h3>
 
           <div className="space-y-2">

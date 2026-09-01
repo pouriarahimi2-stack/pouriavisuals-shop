@@ -3,10 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🎬 [AXON ARCHITECT] در حال رفع تداخل امنیتی گیت‌هاب و ایمن‌سازی کامل پایپ‌لاین هوش مصنوعی...');
+console.log('🎬 [AXON ARCHITECT] در حال رفع محدودیت سهمیه مدل و اتصال هوشمند به Gemini 1.5 Flash / 2.0...');
 
 const files = {
-  // ۱. وب‌سرویس تست زنده کلید بدون ذخیره مستقیم در کدهای گیت
+  // ۱. وب‌سرویس تست زنده با سوئیچ خودکار در صورت محدودیت سهمیه مدل
   'app/api/test-ai/route.ts': `// File Path: app/api/test-ai/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -22,44 +22,53 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "کادر کلید API خالی است." }, { status: 400 });
     }
 
-    // ۱. استعلام خودکار لیست مدل‌های فعال اختصاصی اکانت شما از سرور گوگل
-    let selectedModel = "gemini-1.5-flash-latest";
-    try {
-      const listRes = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models?key=\${cleanKey}\`, {
-        headers: { "x-goog-api-key": cleanKey }
-      });
-      const listData = await listRes.json();
+    // مدل‌های دارای سهمیه رایگان و فعال گوگل به ترتیب اولویت
+    const candidateModels = [
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash-8b",
+      "gemini-pro"
+    ];
 
-      if (listData.models && Array.isArray(listData.models)) {
-        const supported = listData.models.filter((m: any) =>
-          m.supportedGenerationMethods?.includes("generateContent")
-        );
-        if (supported.length > 0) {
-          const preferred = supported.find((m: any) => m.name.includes("1.5-pro") || m.name.includes("1.5-flash") || m.name.includes("gemini-2.0") || m.name.includes("gemini-pro"));
-          selectedModel = preferred ? preferred.name.replace("models/", "") : supported[0].name.replace("models/", "");
+    let reply = "";
+    let activeModelName = "";
+    let lastErrorMsg = "";
+
+    for (const mName of candidateModels) {
+      try {
+        const testRes = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/\${mName}:generateContent?key=\${cleanKey}\`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": cleanKey,
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "سلام! یک کلمه بگو: آماده‌ام" }] }],
+          }),
+        });
+
+        const testJson = await testRes.json();
+
+        if (testJson.error) {
+          lastErrorMsg = testJson.error.message || "";
+          continue; // در صورت سهمیه نداشتن یک مدل، فوراً مدل بعدی تست شود
         }
+
+        const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (generatedText) {
+          reply = generatedText.trim();
+          activeModelName = mName;
+          break; // موفقیت!
+        }
+      } catch (err: any) {
+        lastErrorMsg = err?.message || "";
+        continue;
       }
-    } catch (e) {
-      console.warn("Auto-discovery fallback to default models:", e);
     }
 
-    // ۲. ارسال درخواست تستی به گوگل
-    const testRes = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/\${selectedModel}:generateContent?key=\${cleanKey}\`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": cleanKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: "سلام! یک پاسخ کوتاه بگو: آماده‌ام برای پاسخگویی در فروشگاه آکسون." }] }],
-      }),
-    });
-
-    const testJson = await testRes.json();
-    const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (generatedText) {
-      // ذخیره امن کلید فعال در دیتابیس
+    if (reply) {
+      // ذخیره امن کلید تاییدشده در دیتابیس
       try {
         if (supabaseAdmin) {
           await supabaseAdmin.from("site_info").upsert({ id: 1, gemini_api_key: cleanKey }, { onConflict: "id" });
@@ -68,20 +77,22 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: \`✓ اتصال با موفقیت برقرار شد! پاسخ زنده هوش مصنوعی: "\${generatedText.trim()}" (مدل متصل: \${selectedModel})\`,
-        activeModel: selectedModel,
+        message: \`✓ اتصال ۱۰۰٪ برقرار شد! پاسخ زنده هوش مصنوعی: "\${reply}" (مدل فعال: \${activeModelName})\`,
+        activeModel: activeModelName,
       });
     }
 
-    const errDetail = testJson.error?.message || "خطا در برقراری ارتباط با گوگل";
-    return NextResponse.json({ success: false, message: \`پاسخ سرور گوگل: \${errDetail}\` }, { status: 400 });
+    return NextResponse.json({
+      success: false,
+      message: \`خطای گوگل: \${lastErrorMsg || "لطفاً اتصال اینترنت سرور یا کلید را بررسی فرمایید."}\`
+    }, { status: 400 });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: \`خطای اعتبارسنجی: \${err.message}\` }, { status: 500 });
+    return NextResponse.json({ success: false, message: \`خطای سرور: \${err.message}\` }, { status: 500 });
   }
 }
 `,
 
-  // ۲. بک‌اند هوش مصنوعی با استخراج امن کلید از دیتابیس و بدون هاردکد در گیت
+  // ۲. بک‌اند هوش مصنوعی چت با پایداری کامل در برابر سهمیه مدل‌ها
   'app/api/ai-assistant/route.ts': `// File Path: app/api/ai-assistant/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -118,7 +129,6 @@ export async function POST(req: Request) {
       }
     } catch (e) {}
 
-    // استخراج امن کلید از دیتابیس پنل ادمین یا متغیرهای سرور
     const apiKey =
       siteInfoData?.gemini_api_key ||
       process.env.GEMINI_API_KEY ||
@@ -148,7 +158,14 @@ export async function POST(req: Request) {
     const cleanKey = apiKey ? String(apiKey).trim() : "";
 
     if (cleanKey && cleanKey.length > 15) {
-      const candidateModels = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-pro"];
+      // مدل‌های دارای سهمیه باز و پرسرعت گوگل
+      const candidateModels = [
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash-8b",
+        "gemini-pro"
+      ];
 
       for (const modelName of candidateModels) {
         try {
@@ -171,18 +188,24 @@ export async function POST(req: Request) {
           });
 
           const geminiJson = await geminiRes.json();
+
+          if (geminiJson.error) {
+            continue; // در صورت خطای سهمیه، سوئیچ آنی به مدل بعدی
+          }
+
           const replyText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
           if (replyText) {
             aiResponse = replyText;
             break;
           }
-        } catch (e) {}
+        } catch (e) {
+          continue;
+        }
       }
     }
 
     if (!aiResponse) {
-      aiResponse = \`درود بر شما! من مشاور تخصصی تجهیزات تصویر و مانیتورهای استودیو آکسون هستم.
-لطفاً کلید اختصاصی Gemini API خود را در پنل ادمین (بخش اطلاعات سایت) وارد فرمایید تا هوش مصنوعی با تمام ظرفیت پاسخگوی شما باشد.\`;
+      aiResponse = \`درود بر شما! من مشاور هوشمند فروشگاه \${storeName} هستم. چطور می‌توانم در انتخاب مانیتورهای ۵K، لپ‌تاپ‌های تدوین یا تجهیزات تصویر کمکتان کنم؟\`;
     }
 
     // پیوست هوشمند کارت خرید
@@ -236,20 +259,13 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ [SECURED] فایل ایمن‌سازی شد: ${filePath}`);
+  console.log(`✅ [UPDATED] فایل اصلاح شد: ${filePath}`);
 }
 
-console.log('📦 در حال بازنویسی کامیت بلاک‌شده و ارسال امن به گیت‌هاب...');
+console.log('📦 در حال Push به گیت‌هاب و استقرار روی Vercel...');
 try {
-  // ریست کردن کامیت دارای سکرت و ایجاد کامیت پاک
-  execSync('git reset --soft HEAD~1', { stdio: 'inherit' });
-  execSync('git add . && git commit -m "fix: secure dynamic API key injection without hardcoded secret" && git push origin main', { stdio: 'inherit' });
-  console.log('🎉 [SUCCESS] کدهای امن با موفقیت به گیت‌هاب ارسال و روی Vercel مستقر شدند!');
+  execSync('git add . && git commit -m "fix: auto-switch to high-quota gemini-1.5-flash-latest and gemini-2.0-flash" && git push origin main', { stdio: 'inherit' });
+  console.log('🎉 [SUCCESS] تغییرات دیپلوی شد!');
 } catch (e) {
-  try {
-    execSync('git add . && git commit -m "fix: secure dynamic API key injection" && git push origin main', { stdio: 'inherit' });
-    console.log('🎉 [SUCCESS] استقرار با موفقیت انجام شد!');
-  } catch (err) {
-    console.log('⚠️ دستور دستی: git push origin main');
-  }
+  console.log('⚠️ دستور دستی: git push origin main');
 }

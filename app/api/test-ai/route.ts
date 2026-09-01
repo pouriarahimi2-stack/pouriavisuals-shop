@@ -13,44 +13,53 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "کادر کلید API خالی است." }, { status: 400 });
     }
 
-    // ۱. استعلام خودکار لیست مدل‌های فعال اختصاصی اکانت شما از سرور گوگل
-    let selectedModel = "gemini-1.5-flash-latest";
-    try {
-      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`, {
-        headers: { "x-goog-api-key": cleanKey }
-      });
-      const listData = await listRes.json();
+    // مدل‌های دارای سهمیه رایگان و فعال گوگل به ترتیب اولویت
+    const candidateModels = [
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash-8b",
+      "gemini-pro"
+    ];
 
-      if (listData.models && Array.isArray(listData.models)) {
-        const supported = listData.models.filter((m: any) =>
-          m.supportedGenerationMethods?.includes("generateContent")
-        );
-        if (supported.length > 0) {
-          const preferred = supported.find((m: any) => m.name.includes("1.5-pro") || m.name.includes("1.5-flash") || m.name.includes("gemini-2.0") || m.name.includes("gemini-pro"));
-          selectedModel = preferred ? preferred.name.replace("models/", "") : supported[0].name.replace("models/", "");
+    let reply = "";
+    let activeModelName = "";
+    let lastErrorMsg = "";
+
+    for (const mName of candidateModels) {
+      try {
+        const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${cleanKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": cleanKey,
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "سلام! یک کلمه بگو: آماده‌ام" }] }],
+          }),
+        });
+
+        const testJson = await testRes.json();
+
+        if (testJson.error) {
+          lastErrorMsg = testJson.error.message || "";
+          continue; // در صورت سهمیه نداشتن یک مدل، فوراً مدل بعدی تست شود
         }
+
+        const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (generatedText) {
+          reply = generatedText.trim();
+          activeModelName = mName;
+          break; // موفقیت!
+        }
+      } catch (err: any) {
+        lastErrorMsg = err?.message || "";
+        continue;
       }
-    } catch (e) {
-      console.warn("Auto-discovery fallback to default models:", e);
     }
 
-    // ۲. ارسال درخواست تستی به گوگل
-    const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${cleanKey}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": cleanKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: "سلام! یک پاسخ کوتاه بگو: آماده‌ام برای پاسخگویی در فروشگاه آکسون." }] }],
-      }),
-    });
-
-    const testJson = await testRes.json();
-    const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (generatedText) {
-      // ذخیره امن کلید فعال در دیتابیس
+    if (reply) {
+      // ذخیره امن کلید تاییدشده در دیتابیس
       try {
         if (supabaseAdmin) {
           await supabaseAdmin.from("site_info").upsert({ id: 1, gemini_api_key: cleanKey }, { onConflict: "id" });
@@ -59,14 +68,16 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `✓ اتصال با موفقیت برقرار شد! پاسخ زنده هوش مصنوعی: "${generatedText.trim()}" (مدل متصل: ${selectedModel})`,
-        activeModel: selectedModel,
+        message: `✓ اتصال ۱۰۰٪ برقرار شد! پاسخ زنده هوش مصنوعی: "${reply}" (مدل فعال: ${activeModelName})`,
+        activeModel: activeModelName,
       });
     }
 
-    const errDetail = testJson.error?.message || "خطا در برقراری ارتباط با گوگل";
-    return NextResponse.json({ success: false, message: `پاسخ سرور گوگل: ${errDetail}` }, { status: 400 });
+    return NextResponse.json({
+      success: false,
+      message: `خطای گوگل: ${lastErrorMsg || "لطفاً اتصال اینترنت سرور یا کلید را بررسی فرمایید."}`
+    }, { status: 400 });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: `خطای اعتبارسنجی: ${err.message}` }, { status: 500 });
+    return NextResponse.json({ success: false, message: `خطای سرور: ${err.message}` }, { status: 500 });
   }
 }

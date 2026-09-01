@@ -34,7 +34,6 @@ export async function POST(req: Request) {
       }
     } catch (e) {}
 
-    // استخراج امن کلید از دیتابیس پنل ادمین یا متغیرهای سرور
     const apiKey =
       siteInfoData?.gemini_api_key ||
       process.env.GEMINI_API_KEY ||
@@ -64,7 +63,14 @@ ${productCatalogContext}`;
     const cleanKey = apiKey ? String(apiKey).trim() : "";
 
     if (cleanKey && cleanKey.length > 15) {
-      const candidateModels = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-pro"];
+      // مدل‌های دارای سهمیه باز و پرسرعت گوگل
+      const candidateModels = [
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash-8b",
+        "gemini-pro"
+      ];
 
       for (const modelName of candidateModels) {
         try {
@@ -87,18 +93,24 @@ ${productCatalogContext}`;
           });
 
           const geminiJson = await geminiRes.json();
+
+          if (geminiJson.error) {
+            continue; // در صورت خطای سهمیه، سوئیچ آنی به مدل بعدی
+          }
+
           const replyText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
           if (replyText) {
             aiResponse = replyText;
             break;
           }
-        } catch (e) {}
+        } catch (e) {
+          continue;
+        }
       }
     }
 
     if (!aiResponse) {
-      aiResponse = `درود بر شما! من مشاور تخصصی تجهیزات تصویر و مانیتورهای استودیو آکسون هستم.
-لطفاً کلید اختصاصی Gemini API خود را در پنل ادمین (بخش اطلاعات سایت) وارد فرمایید تا هوش مصنوعی با تمام ظرفیت پاسخگوی شما باشد.`;
+      aiResponse = `درود بر شما! من مشاور هوشمند فروشگاه ${storeName} هستم. چطور می‌توانم در انتخاب مانیتورهای ۵K، لپ‌تاپ‌های تدوین یا تجهیزات تصویر کمکتان کنم؟`;
     }
 
     // پیوست هوشمند کارت خرید

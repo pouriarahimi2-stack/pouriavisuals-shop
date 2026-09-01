@@ -13,53 +13,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "کادر کلید API خالی است." }, { status: 400 });
     }
 
-    // مدل‌های دارای سهمیه رایگان و فعال گوگل به ترتیب اولویت
-    const candidateModels = [
-      "gemini-1.5-flash-latest",
-      "gemini-1.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash-8b",
-      "gemini-pro"
-    ];
+    // ۱. استعلام مستقیم لیست مدل‌های معتبر فعال روی اکانت شما
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`, {
+      headers: { "x-goog-api-key": cleanKey }
+    });
 
-    let reply = "";
-    let activeModelName = "";
-    let lastErrorMsg = "";
+    const listData = await listRes.json();
 
-    for (const mName of candidateModels) {
-      try {
-        const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${cleanKey}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": cleanKey,
-          },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: "سلام! یک کلمه بگو: آماده‌ام" }] }],
-          }),
-        });
-
-        const testJson = await testRes.json();
-
-        if (testJson.error) {
-          lastErrorMsg = testJson.error.message || "";
-          continue; // در صورت سهمیه نداشتن یک مدل، فوراً مدل بعدی تست شود
-        }
-
-        const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (generatedText) {
-          reply = generatedText.trim();
-          activeModelName = mName;
-          break; // موفقیت!
-        }
-      } catch (err: any) {
-        lastErrorMsg = err?.message || "";
-        continue;
-      }
+    if (listData.error) {
+      return NextResponse.json({ success: false, message: `خطای اعتبارسنجی گوگل: ${listData.error.message}` }, { status: 400 });
     }
 
+    const availableModels = listData.models?.filter((m: any) =>
+      m.supportedGenerationMethods?.includes("generateContent")
+    ) || [];
+
+    if (availableModels.length === 0) {
+      return NextResponse.json({ success: false, message: "هیچ مدلی برای این کلید یافت نشد. لطفاً دسترسی‌های پروژه در Google AI Studio را بررسی کنید." }, { status: 400 });
+    }
+
+    // انتخاب بهترین مدل فعال از روی لیست واقعی اکانت
+    const preferredModel = availableModels.find((m: any) => m.name.includes("1.5-flash") || m.name.includes("2.0-flash") || m.name.includes("1.5-pro") || m.name.includes("gemini-pro")) || availableModels[0];
+    const targetModelPath = preferredModel.name; // مثل models/gemini-1.5-flash
+
+    // ۲. ارسال پیام تستی به مدل تاییدشده
+    const generateRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${targetModelPath}:generateContent?key=${cleanKey}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": cleanKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: "سلام! یک پاسخ کوتاه بگو: آماده‌ام" }] }],
+      }),
+    });
+
+    const genJson = await generateRes.json();
+
+    if (genJson.error) {
+      return NextResponse.json({ success: false, message: `خطای مدل: ${genJson.error.message}` }, { status: 400 });
+    }
+
+    const reply = genJson.candidates?.[0]?.content?.parts?.[0]?.text;
+
     if (reply) {
-      // ذخیره امن کلید تاییدشده در دیتابیس
       try {
         if (supabaseAdmin) {
           await supabaseAdmin.from("site_info").upsert({ id: 1, gemini_api_key: cleanKey }, { onConflict: "id" });
@@ -68,15 +65,12 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `✓ اتصال ۱۰۰٪ برقرار شد! پاسخ زنده هوش مصنوعی: "${reply}" (مدل فعال: ${activeModelName})`,
-        activeModel: activeModelName,
+        message: `✓ اتصال ۱۰۰٪ برقرار شد! پاسخ هوش مصنوعی: "${reply.trim()}" (مدل فعال: ${targetModelPath.replace("models/", "")})`,
+        activeModel: targetModelPath.replace("models/", ""),
       });
     }
 
-    return NextResponse.json({
-      success: false,
-      message: `خطای گوگل: ${lastErrorMsg || "لطفاً اتصال اینترنت سرور یا کلید را بررسی فرمایید."}`
-    }, { status: 400 });
+    return NextResponse.json({ success: false, message: "پاسخی از مدل دریافت نشد." }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: `خطای سرور: ${err.message}` }, { status: 500 });
   }

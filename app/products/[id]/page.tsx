@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useEffect, useRef, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { productService, Product, ProductVariant, FLAGSHIP_7_PRODUCTS } from "@/services/productService";
@@ -18,8 +18,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const id = resolvedParams?.id || "prod-studio-display-5k";
   const router = useRouter();
   const { addToCart } = useCart();
+  const tabsContentRef = useRef<HTMLDivElement>(null);
 
-  // دریافت آنی محصول از حافظه محلی یا آرایه ۷ محصول پرچمدار در لحظه SSR
   const initialProduct = productService.getProductSync(id) || FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || FLAGSHIP_7_PRODUCTS[3];
   
   const [product, setProduct] = useState<Product>(initialProduct);
@@ -62,20 +62,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const isAvailable = (product as any).is_available !== false && product.isAvailable !== false && currentStock > 0;
   const specsEntries = product.specs ? Object.entries(product.specs) : [];
 
-  const isDisplayProduct = (product.category || "").includes("مانیتور") ||
-    (product.category || "").includes("نمایشگر") ||
-    (product.category || "").includes("استودیو") ||
-    (product.title || "").toLowerCase().includes("display") ||
-    (product.title || "").toLowerCase().includes("monitor") ||
-    (product.title || "").includes("مانیتور") ||
-    (product.title || "").toLowerCase().includes("imac") ||
-    (product.title || "").toLowerCase().includes("ipad");
-
-  const handleSelectVariant = (v: ProductVariant, idx: number) => {
+  const handleTabChange = (tabId: "specs" | "gamut" | "comparison" | "desc" | "reviews") => {
     soundEngine.playClick();
-    setSelectedVariant(v);
-    if (images[idx]) {
-      setActiveImage(images[idx]);
+    setActiveTab(tabId);
+    if (window.innerWidth < 768 && tabsContentRef.current) {
+      tabsContentRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
@@ -88,47 +79,43 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       price: finalUnitPrice,
       image: currentMainImg,
       stock: currentStock,
-      category: product.category || "عمومی",
+      category: product.category || "تکنولوژی",
       quantity: 1,
     });
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 font-sans select-none text-[var(--text-primary)] space-y-8 pb-28 sm:pb-10" dir="rtl">
+    <div className="max-w-7xl mx-auto px-4 py-6 font-sans select-none text-[var(--text-primary)] space-y-6 pb-28 sm:pb-10" dir="rtl">
       
-      {/* نوار آدرس هوشمند و مدرن (Breadcrumb) */}
-      <nav className="flex items-center gap-2 p-3.5 px-6 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-bold shadow-sm backdrop-blur-md">
-        <Link href="/" className="hover:text-[var(--accent-blue)] transition flex items-center gap-1.5">
-          <span>🏠</span><span>صفحه اصلی</span>
-        </Link>
+      {/* نوار مسیر ناوبری مینیمال */}
+      <nav className="flex items-center gap-2 p-3 px-5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-bold shadow-sm backdrop-blur-md">
+        <Link href="/" className="hover:text-[var(--accent-blue)] transition">صفحه اصلی</Link>
         <span>/</span>
-        <Link href="/#products" className="hover:text-[var(--accent-blue)] transition">
-          {product.category || "تجهیزات و مانیتورها"}
-        </Link>
+        <Link href="/#products" className="hover:text-[var(--accent-blue)] transition">{product.category || "محصولات"}</Link>
         <span>/</span>
-        <span className="text-[var(--accent-blue)] truncate max-w-xs">{product.title}</span>
+        <span className="text-[var(--accent-blue)] truncate max-w-[140px] sm:max-w-xs">{product.title}</span>
       </nav>
 
-      {/* معرفی کالا و انتخاب رنگ با سوییچ زنده عکس */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
+      {/* کارت اصلی کالا */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-5 sm:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
         <div className="lg:col-span-5 space-y-4">
-          <div className="w-full h-80 md:h-[430px] rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] overflow-hidden flex items-center justify-center p-6 relative group">
+          <div className="w-full h-72 sm:h-96 md:h-[420px] rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] overflow-hidden flex items-center justify-center p-6 relative group">
             <img src={currentMainImg} alt={product.title} className="w-full h-full object-contain group-hover:scale-105 transition duration-500" />
             <button
               onClick={() => { soundEngine.playExplodeShift(); setIsExplodedViewOpen(true); }}
-              className="absolute bottom-4 left-4 px-4 py-2.5 rounded-2xl bg-black/75 hover:bg-blue-600 text-white font-black text-xs border border-white/20 backdrop-blur-md shadow-2xl transition flex items-center gap-2 cursor-pointer"
+              className="absolute bottom-3 left-3 px-3.5 py-2 rounded-2xl bg-black/75 hover:bg-blue-600 text-white font-black text-[11px] border border-white/20 backdrop-blur-md shadow-2xl transition flex items-center gap-1.5 cursor-pointer"
             >
-              <span>🧬</span><span>کالبدشکافی ۳D سخت‌افزار (Exploded View)</span>
+              <span>🧬</span><span>کالبدشکافی ۳D</span>
             </button>
           </div>
 
           {images.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
               {images.map((imgUrl, idx) => (
                 <button
                   key={idx}
                   onClick={() => { soundEngine.playClick(); setActiveImage(imgUrl); }}
-                  className={`w-20 h-20 rounded-2xl border-2 cursor-pointer p-1 bg-[var(--input-bg)] transition ${currentMainImg === imgUrl ? "border-[var(--accent-blue)] scale-105" : "border-[var(--card-border)] opacity-60"}`}
+                  className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 cursor-pointer p-1 bg-[var(--input-bg)] transition shrink-0 ${currentMainImg === imgUrl ? "border-[var(--accent-blue)] scale-105" : "border-[var(--card-border)] opacity-60"}`}
                 >
                   <img src={imgUrl} alt="" className="w-full h-full object-contain" />
                 </button>
@@ -140,64 +127,35 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         <div className="lg:col-span-7 flex flex-col justify-between space-y-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black text-xs">
-                {product.category || "کالای دیجیتال"}
+              <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black text-[11px]">
+                {product.brand || "تکنولوژی"}
               </span>
               <span className={`text-xs font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
                 {isAvailable ? `موجود در انبار (${currentStock} عدد) ✓` : "ناموجود"}
               </span>
             </div>
 
-            <h1 className="text-2xl md:text-3xl font-black text-[var(--text-primary)] leading-snug">{product.title}</h1>
-            {product.title_fa && <p className="text-xs text-[var(--text-secondary)] font-medium">{product.title_fa}</p>}
+            <h1 className="text-xl sm:text-3xl font-black text-[var(--text-primary)] leading-snug">{product.title}</h1>
 
-            {/* دکمه‌های کالبدشکافی ۳D و شبیه‌ساز گاموت */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div
-                onClick={() => { soundEngine.playExplodeShift(); setIsExplodedViewOpen(true); }}
-                className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 hover:border-blue-500 transition cursor-pointer flex items-center gap-3"
-              >
-                <span className="text-2xl">🧬</span>
-                <div>
-                  <h4 className="font-black text-xs">کالبدشکافی ۳D سخت‌افزار</h4>
-                  <p className="text-[10px] text-[var(--text-secondary)]">مشاهده تفکیک ۶ لایه فیزیکی</p>
-                </div>
-              </div>
-
-              {isDisplayProduct && (
-                <div
-                  onClick={() => { soundEngine.playClick(); setActiveTab("gamut"); }}
-                  className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 hover:border-indigo-500 transition cursor-pointer flex items-center gap-3"
-                >
-                  <span className="text-2xl">🎨</span>
-                  <div>
-                    <h4 className="font-black text-xs">شبیه‌ساز ۷ گاموت رنگی</h4>
-                    <p className="text-[10px] text-[var(--text-secondary)]">تست DCI-P3، sRGB و رفرش‌ریت</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* تنوع مدل و رنگ با تغییر زنده تصویر */}
+            {/* متغیرها و رنگ‌ها */}
             {product.variants && product.variants.length > 0 && (
-              <div className="space-y-2 pt-2">
+              <div className="space-y-2 pt-1">
                 <span className="text-xs font-bold text-[var(--text-secondary)] block">
-                  انتخاب مدل و رنگ: <strong className="text-[var(--text-primary)]">{selectedVariant?.name}</strong>
+                  رنگ و مدل: <strong className="text-[var(--text-primary)]">{selectedVariant?.name}</strong>
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map((v, idx) => (
                     <button
                       key={v.id}
-                      onClick={() => handleSelectVariant(v, idx)}
-                      className={`px-4 py-2.5 rounded-2xl border text-xs font-bold flex items-center gap-2.5 cursor-pointer transition ${
+                      onClick={() => { soundEngine.playClick(); setSelectedVariant(v); if (images[idx]) setActiveImage(images[idx]); }}
+                      className={`px-3.5 py-2 rounded-2xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition ${
                         selectedVariant?.id === v.id
-                          ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-md scale-105"
-                          : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]"
+                          ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-md"
+                          : "border-[var(--card-border)] bg-[var(--input-bg)]"
                       }`}
                     >
-                      <span style={{ backgroundColor: v.colorHex || "#333" }} className="w-4 h-4 rounded-full border border-black/30 shadow-inner" />
+                      <span style={{ backgroundColor: v.colorHex || "#333" }} className="w-3.5 h-3.5 rounded-full border border-black/30" />
                       <span>{v.name}</span>
-                      {v.modelType && <span className="text-[10px] opacity-75 font-mono">[{v.modelType}]</span>}
                     </button>
                   ))}
                 </div>
@@ -205,7 +163,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
-          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-5">
+          <div className="p-5 sm:p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
               <div className="text-left">
@@ -214,54 +172,49 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     {formatPrice(oldPrice)}
                   </span>
                 )}
-                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
+                <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
                   {formatPrice(finalUnitPrice)} تومان
                 </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <button
                 disabled={!isAvailable}
                 onClick={handleAddToCartDirect}
-                className="py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-xl hover:opacity-90 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-40"
+                className="py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-xl hover:opacity-90 active:scale-95 transition flex items-center justify-center gap-1.5 disabled:opacity-40"
               >
-                <span>🛒</span>
-                <span>افزودن به سبد خرید</span>
+                <span>🛒</span><span>افزودن به سبد خرید</span>
               </button>
               <button
                 disabled={!isAvailable}
-                onClick={() => {
-                  handleAddToCartDirect();
-                  router.push("/checkout");
-                }}
-                className="py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs cursor-pointer shadow-xl active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-40"
+                onClick={() => { handleAddToCartDirect(); router.push("/checkout"); }}
+                className="py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs cursor-pointer shadow-xl active:scale-95 transition flex items-center justify-center gap-1.5 disabled:opacity-40"
               >
-                <span>⚡</span>
-                <span>خرید فوری و ثبت سفارش</span>
+                <span>⚡</span><span>خرید فوری</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* تب‌های ۵ گانه محصول */}
-      <div className="space-y-6">
-        <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[var(--card-border)] text-xs scrollbar-none">
+      {/* کنترلر مدرن اپل در موبایل و دسکتاپ (iOS Segmented Control) */}
+      <div ref={tabsContentRef} className="space-y-6 pt-2">
+        <div className="p-1.5 rounded-2xl sm:rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 text-xs">
           {[
-            { id: "specs", label: "⚙️ مشخصات فنی دقیق", show: true },
-            { id: "gamut", label: "🎨 شبیه‌ساز ۷ گاموت رنگی", show: isDisplayProduct },
-            { id: "comparison", label: "⚖️ پایش قیمت با بازار (ترب/دیجی‌کالا/ایمالز)", show: true },
-            { id: "desc", label: "📝 بررسی تخصصی موشکافانه", show: true },
-            { id: "reviews", label: "⭐ نظرات کاربران", show: true }
-          ].filter(t => t.show).map((tab) => (
+            { id: "specs", label: "⚙️ مشخصات فنی" },
+            { id: "gamut", label: "🎨 گاموت رنگی" },
+            { id: "comparison", label: "⚖️ پایش قیمت بازار" },
+            { id: "desc", label: "📝 نقد و بررسی" },
+            { id: "reviews", label: "⭐ نظرات کاربران" },
+          ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => { soundEngine.playClick(); setActiveTab(tab.id as any); }}
-              className={`px-5 py-3 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
+              onClick={() => handleTabChange(tab.id as any)}
+              className={`py-2.5 px-4 rounded-xl sm:rounded-2xl font-black text-[11px] sm:text-xs transition-all cursor-pointer text-center ${
                 activeTab === tab.id
-                  ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25"
-                  : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]"
+                  ? "bg-[var(--accent-blue)] text-white shadow-md scale-[1.02]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
               }`}
             >
               {tab.label}
@@ -270,10 +223,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {activeTab === "specs" && (
-          <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+          <div className="p-5 sm:p-8 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               {specsEntries.map(([k, v], idx) => (
-                <div key={idx} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between">
+                <div key={idx} className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center">
                   <span className="text-[var(--text-secondary)] font-bold">{k}:</span>
                   <span className="font-semibold text-[var(--text-primary)]">{String(v)}</span>
                 </div>
@@ -282,47 +235,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {activeTab === "gamut" && isDisplayProduct && <ColorGamutSimulator productTitle={product.title} />}
+        {activeTab === "gamut" && <ColorGamutSimulator productTitle={product.title} />}
         {activeTab === "comparison" && <LiveMarketArbitrage productTitle={product.title} ourPrice={finalUnitPrice} marketBenchmarks={product.market_comparison} />}
         
         {activeTab === "desc" && (
-          <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 text-xs md:text-sm">
-            <div className="space-y-3 leading-loose text-[var(--text-secondary)] font-medium text-justify whitespace-pre-line">
-              {product.description}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-[var(--card-border)]">
-              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-2">
-                <span className="font-black text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1.5">
-                  <span>✓</span><span>نقاط قوت برجسته:</span>
-                </span>
-                <ul className="space-y-1 text-xs text-emerald-700 dark:text-emerald-300 font-medium">
-                  {(product.highlights || ["کیفیت ساخت خیره‌کننده", "کالیبراسیون دقیق کارخانه", "عملکرد فوق‌العاده پایدار"]).map((h, i) => (
-                    <li key={i} className="flex items-center gap-2"><span>•</span><span>{h}</span></li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
-                <span className="font-black text-amber-600 dark:text-amber-400 text-xs flex items-center gap-1.5">
-                  <span>ℹ️</span><span>نکات و ملاحظات کاربری:</span>
-                </span>
-                <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed font-medium">
-                  جهت دستیابی به حداکثر پهنای باند و شارژ سریع، استفاده از کابل‌های استاندارد تاندربولت توصیه می‌گردد.
-                </p>
-              </div>
-            </div>
+          <div className="p-5 sm:p-8 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs sm:text-sm leading-loose text-[var(--text-secondary)] text-justify">
+            <p className="whitespace-pre-line font-medium">{product.description}</p>
           </div>
         )}
 
         {activeTab === "reviews" && (
-          <div className="p-6 md:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+          <div className="p-5 sm:p-8 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
             <ProductReviews productId={product.id} />
           </div>
         )}
       </div>
 
-      {/* مدال کالبدشکافی ۳D سخت‌افزار */}
       <ProductExplodedView
         productId={product.id}
         productTitle={product.title}

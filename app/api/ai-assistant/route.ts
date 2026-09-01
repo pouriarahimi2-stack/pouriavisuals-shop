@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const imageBase64 = body.imageBase64 || null;
 
     if (!userMessage && !imageBase64) {
-      return NextResponse.json({ success: false, message: "پیام یا تصویری ارسال نشده است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "پیامی ارسال نشده است." }, { status: 400 });
     }
 
     let products = FLAGSHIP_7_PRODUCTS;
@@ -25,12 +25,8 @@ export async function POST(req: Request) {
           supabaseAdmin.from("site_info").select("*").limit(1).maybeSingle(),
         ]);
 
-        if (prodsRes.data && prodsRes.data.length > 0) {
-          products = prodsRes.data;
-        }
-        if (infoRes.data) {
-          siteInfoData = infoRes.data;
-        }
+        if (prodsRes.data && prodsRes.data.length > 0) products = prodsRes.data;
+        if (infoRes.data) siteInfoData = infoRes.data;
       }
     } catch (e) {}
 
@@ -45,16 +41,18 @@ export async function POST(req: Request) {
     const productCatalogContext = products
       .map(
         (p: any) =>
-          `• [شناسه کالا: ${p.id}] نام: ${p.title || p.name} | برند: ${p.brand || "Apple"} | دسته: ${p.category || "تجهیزات"} | قیمت: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 10} عدد | مشخصات: ${JSON.stringify(p.specs || {})}`
+          `• [شناسه: ${p.id}] نام: ${p.title || p.name} | برند: ${p.brand || "Apple"} | دسته: ${p.category || "تکنولوژی"} | قیمت: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 10} عدد | مشخصات: ${JSON.stringify(p.specs || {})}`
       )
       .join("\n");
 
-    const systemInstruction = `تو «مشاور هوشمند و مهندس ارشد سخت‌افزار استودیو ${storeName}» هستی.
-به زبان فارسی کاملاً روان، صمیمی، حرفه‌ای و دقیقاً متناسب با سوال کاربر پاسخ بده.
-- اگر کاربر نام برندی که در فروشگاه موجود نیست (مانند سامسونگ، ال‌جی، ایسوس، دل و...) را پرسید، با کمال احترام و هوشمندی به او بگو که در حال حاضر در فروشگاه ${storeName} محصولات این برند موجود نیست و تمرکز تخصصی ما روی تجهیزات حرفه‌ای، مانیتورهای ۵K/6K و ورک‌استیشن‌های تدوین برندهای اپل (Apple)، بلک‌مجیک (Blackmagic) و کالیبرایت (Calibrite) است و بهترین گزینه‌های معادل موجود را با استدلال فنی پیشنهاد بده.
-- اگر کاربر سلام یا احوال‌پرسی کرد، گرم و پرانرژی جواب بده.
-- اگر قیمت یا مشخصات خواست، با قیمت دقیق به تومان پاسخ بده.
-شماره پشتیبانی: ${storePhone}
+    const systemInstruction = `تو مشاور هوشمند و مهندس ارشد فناوری در فروشگاه پیشرفته تکنولوژی ${storeName} هستی.
+وظیفه تو گفتگوی فوق‌العاده صمیمی، محاوره‌ای، روان و کاملاً تخصصی با کاربران در تمامی حوزه‌های تکنولوژی، سخت‌افزار، گجت‌ها، هوش مصنوعی، لپ‌تاپ‌ها و لوازم دیجیتال است.
+
+قوانین گفتگو:
+۱. در خصوص هر حوزه از تکنولوژی که کاربر سوال کرد، با اطلاعات به‌روز و جذاب پاسخ بده.
+۲. اگر کاربر درباره محصول یا برندی پرسید که در کاتالوگ نیست، با احترام توضیح بده و بهترین گزینه‌های پیشرفته معادل موجود در فروشگاه را معرفی کن.
+۳. متن پاسخ‌هایت باید بدون تگ‌های نامناسب و به زبان فارسی شیوا و امروزی باشد.
+۴. شماره پشتیبانی استودیو: ${storePhone}
 
 کاتالوگ محصولات موجود در انبار:
 ${productCatalogContext}`;
@@ -63,70 +61,50 @@ ${productCatalogContext}`;
     const cleanKey = apiKey ? String(apiKey).trim() : "";
 
     if (cleanKey && cleanKey.length > 15) {
-      // مدل‌های دارای سهمیه باز و پرسرعت گوگل
-      const candidateModels = [
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash-8b",
-        "gemini-pro"
-      ];
+      try {
+        // استعلام مدل فعال از گوگل
+        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`, {
+          headers: { "x-goog-api-key": cleanKey }
+        });
+        const listData = await listRes.json();
+        const available = listData.models?.filter((m: any) => m.supportedGenerationMethods?.includes("generateContent")) || [];
+        
+        const preferred = available.find((m: any) => m.name.includes("1.5-flash") || m.name.includes("2.0-flash") || m.name.includes("1.5-pro") || m.name.includes("gemini-pro")) || available[0];
+        const targetModel = preferred ? preferred.name : "models/gemini-1.5-flash";
 
-      for (const modelName of candidateModels) {
-        try {
-          const parts: any[] = [{ text: `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}` }];
-          if (imageBase64) {
-            const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-            parts.push({ inlineData: { mimeType: "image/jpeg", data: cleanBase64 } });
-          }
-
-          const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": cleanKey,
-            },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
-            }),
-          });
-
-          const geminiJson = await geminiRes.json();
-
-          if (geminiJson.error) {
-            continue; // در صورت خطای سهمیه، سوئیچ آنی به مدل بعدی
-          }
-
-          const replyText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (replyText) {
-            aiResponse = replyText;
-            break;
-          }
-        } catch (e) {
-          continue;
+        const parts: any[] = [{ text: `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}` }];
+        if (imageBase64) {
+          const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+          parts.push({ inlineData: { mimeType: "image/jpeg", data: cleanBase64 } });
         }
+
+        const genRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${targetModel}:generateContent?key=${cleanKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": cleanKey },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
+          }),
+        });
+
+        const genJson = await genRes.json();
+        const text = genJson.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) aiResponse = text;
+      } catch (err) {
+        console.warn("Gemini execution error:", err);
       }
     }
 
     if (!aiResponse) {
-      aiResponse = `درود بر شما! من مشاور هوشمند فروشگاه ${storeName} هستم. چطور می‌توانم در انتخاب مانیتورهای ۵K، لپ‌تاپ‌های تدوین یا تجهیزات تصویر کمکتان کنم؟`;
+      aiResponse = `سلام و درود! من دستیار هوشمند و مشاور تکنولوژی فروشگاه ${storeName} هستم. چطور می‌توانم در زمینه گجت‌ها، سخت‌افزارها و انتخاب بهترین دستگاه راهنماییتان کنم؟`;
     }
 
-    // پیوست هوشمند کارت خرید
+    // یافتن محصول مرتبط
     const lowerResp = (aiResponse + " " + userMessage).toLowerCase();
     const matchedProduct = products.find((p: any) => {
       const id = String(p.id).toLowerCase();
-      return (
-        lowerResp.includes(id) ||
-        (lowerResp.includes("studio display") && id.includes("studio")) ||
-        (lowerResp.includes("xdr") && id.includes("xdr")) ||
-        (lowerResp.includes("macbook") && id.includes("macbook")) ||
-        (lowerResp.includes("watch") && id.includes("watch")) ||
-        (lowerResp.includes("ipad") && id.includes("ipad")) ||
-        (lowerResp.includes("decklink") && id.includes("decklink")) ||
-        (lowerResp.includes("calibrite") && id.includes("calibrite"))
-      );
+      const t = (p.title || "").toLowerCase();
+      return lowerResp.includes(id) || (t.length > 5 && lowerResp.includes(t.slice(0, 15)));
     });
 
     const calculatedPrice = matchedProduct

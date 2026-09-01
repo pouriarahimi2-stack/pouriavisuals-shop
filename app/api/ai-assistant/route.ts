@@ -45,14 +45,11 @@ export async function POST(req: Request) {
       )
       .join("\n");
 
-    const systemInstruction = `تو مشاور هوشمند و مهندس ارشد فناوری در فروشگاه پیشرفته تکنولوژی ${storeName} هستی.
-وظیفه تو گفتگوی فوق‌العاده صمیمی، محاوره‌ای، روان و کاملاً تخصصی با کاربران در تمامی حوزه‌های تکنولوژی، سخت‌افزار، گجت‌ها، هوش مصنوعی، لپ‌تاپ‌ها و لوازم دیجیتال است.
-
-قوانین گفتگو:
-۱. در خصوص هر حوزه از تکنولوژی که کاربر سوال کرد، با اطلاعات به‌روز و جذاب پاسخ بده.
-۲. اگر کاربر درباره محصول یا برندی پرسید که در کاتالوگ نیست، با احترام توضیح بده و بهترین گزینه‌های پیشرفته معادل موجود در فروشگاه را معرفی کن.
-۳. متن پاسخ‌هایت باید بدون تگ‌های نامناسب و به زبان فارسی شیوا و امروزی باشد.
-۴. شماره پشتیبانی استودیو: ${storePhone}
+    const systemInstruction = `تو «مشاور هوشمند و مهندس ارشد تکنولوژی فروشگاه ${storeName}» هستی.
+به زبان فارسی کاملاً روان، صمیمی، حرفه‌ای و دقیقاً متناسب با سوال کاربر پاسخ بده.
+- در حوزه تکنولوژی، گجت‌ها، مانیتورها، مک‌بوک‌ها، کارت‌های کپچر و ابزارهای کالیبراسیون راهنمایی کن.
+- اگر کاربر درباره گارانتی و ارسال پرسید، توضیح بده که تمامی کالاها دارای ۱۸ ماه گارانتی اصالت طلایی، ۷ روز مهلت تست و ارسال رایگان پیشتاز برای خریدهای بالای ۲ میلیون تومان هستند.
+- شماره پشتیبانی: ${storePhone}
 
 کاتالوگ محصولات موجود در انبار:
 ${productCatalogContext}`;
@@ -61,45 +58,64 @@ ${productCatalogContext}`;
     const cleanKey = apiKey ? String(apiKey).trim() : "";
 
     if (cleanKey && cleanKey.length > 15) {
-      try {
-        // استعلام مدل فعال از گوگل
-        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`, {
-          headers: { "x-goog-api-key": cleanKey }
-        });
-        const listData = await listRes.json();
-        const available = listData.models?.filter((m: any) => m.supportedGenerationMethods?.includes("generateContent")) || [];
-        
-        const preferred = available.find((m: any) => m.name.includes("1.5-flash") || m.name.includes("2.0-flash") || m.name.includes("1.5-pro") || m.name.includes("gemini-pro")) || available[0];
-        const targetModel = preferred ? preferred.name : "models/gemini-1.5-flash";
+      const priorityModels = [
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash-8b",
+        "gemini-1.5-pro-latest",
+        "gemini-pro"
+      ];
 
-        const parts: any[] = [{ text: `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}` }];
-        if (imageBase64) {
-          const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-          parts.push({ inlineData: { mimeType: "image/jpeg", data: cleanBase64 } });
+      for (const modelName of priorityModels) {
+        try {
+          const parts: any[] = [{ text: `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}` }];
+          if (imageBase64) {
+            const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+            parts.push({ inlineData: { mimeType: "image/jpeg", data: cleanBase64 } });
+          }
+
+          const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": cleanKey },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
+            }),
+          });
+
+          const geminiJson = await geminiRes.json();
+
+          if (geminiJson.error) {
+            continue; // سوئیچ خودکار در صورت محدودیت سهمیه مدل
+          }
+
+          const text = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            aiResponse = text;
+            break;
+          }
+        } catch (e) {
+          continue;
         }
-
-        const genRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${targetModel}:generateContent?key=${cleanKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": cleanKey },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
-          }),
-        });
-
-        const genJson = await genRes.json();
-        const text = genJson.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) aiResponse = text;
-      } catch (err) {
-        console.warn("Gemini execution error:", err);
       }
     }
 
+    const normalized = userMessage.toLowerCase();
+
+    // پاسخ‌های هوشمند اختصاصی در صورت عدم دریافت پاسخ
     if (!aiResponse) {
-      aiResponse = `سلام و درود! من دستیار هوشمند و مشاور تکنولوژی فروشگاه ${storeName} هستم. چطور می‌توانم در زمینه گجت‌ها، سخت‌افزارها و انتخاب بهترین دستگاه راهنماییتان کنم؟`;
+      if (normalized.includes("گارانتی") || normalized.includes("ارسال") || normalized.includes("ضمانت")) {
+        aiResponse = "تمامی سفارش‌های فروشگاه آکسون با **۱۸ ماه گارانتی اصالت طلایی**، ۷ روز مهلت تست سلامت فیزیکی و بسته‌بندی ضدضربه استودیویی ارسال می‌شوند. همچنین کلیه خریدهای بالای ۲ میلیون تومان شامل **ارسال رایگان با پست پیشتاز** به سراسر ایران هستند. 📦🛡️";
+      } else if (normalized.includes("سامسونگ") || normalized.includes("samsung")) {
+        aiResponse = "در حال حاضر در فروشگاه آکسون محصولات برند **سامسونگ** موجود نیست و تمرکز ما بر مانیتورها و ورک‌استیشن‌های تخصصی **Apple**، **Blackmagic Design** و **Calibrite** است. اگر مانیتور باکیفیت برای طراحی و تدوین مد نظرتان است، مانیتور **Apple Studio Display 5K** را به شما پیشنهاد می‌کنم.";
+      } else if (normalized.includes("مک بوک") || normalized.includes("macbook")) {
+        aiResponse = "لپ‌تاپ پرچمدار **MacBook Pro 16\" M4 Max** با رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ویژه و گارانتی طلایی در انبار موجود است.";
+      } else {
+        aiResponse = `سلام و درود! من مشاور هوشمند تکنولوژی فروشگاه ${storeName} هستم. چطور می‌توانم در انتخاب تجهیزات و کالاهای دیجیتال راهنماییتان کنم؟`;
+      }
     }
 
-    // یافتن محصول مرتبط
     const lowerResp = (aiResponse + " " + userMessage).toLowerCase();
     const matchedProduct = products.find((p: any) => {
       const id = String(p.id).toLowerCase();

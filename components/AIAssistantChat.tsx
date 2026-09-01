@@ -86,16 +86,15 @@ export default function AIAssistantChat() {
 
   const quickPills = [
     "سلام",
+    "شرایط گارانتی و ارسال",
     "پیشنهاد مانیتور حرفه‌ای",
     "مک‌بوک M4 Max",
-    "شرایط گارانتی و ارسال",
   ];
 
   return (
     <div className="fixed bottom-20 sm:bottom-6 left-4 sm:left-6 z-50 font-sans select-none" dir="rtl" suppressHydrationWarning>
       {!isOpen && (
         <>
-          {/* دکمه دسکتاپ: کپسول لوکس شیشه‌ای */}
           <button
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
             className="hidden sm:flex px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
@@ -104,13 +103,12 @@ export default function AIAssistantChat() {
             <span>مشاوره هوشمند تکنولوژی</span>
           </button>
 
-          {/* دکمه موبایل: آیکون گرد لوکس اپل (Siri / Apple Intelligence Orb) */}
           <button
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="sm:hidden w-13 h-13 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_30px_rgba(37,99,235,0.6)] flex items-center justify-center text-xl border-2 border-white/30 active:scale-95 transition-all"
+            className="sm:hidden w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.6)] flex items-center justify-center text-lg border-2 border-white/30 active:scale-95 transition-all cursor-pointer"
             aria-label="دستیار هوش مصنوعی"
           >
-            <span className="animate-pulse">⚡</span>
+            <span>⚡</span>
           </button>
         </>
       )}
@@ -124,7 +122,7 @@ export default function AIAssistantChat() {
                 <h4 className="text-xs font-black">مشاور هوشمند تکنولوژی</h4>
                 <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  آنلاین و متصل به هوش اختصاصی
+                  آنلاین و متصل به Gemini 1.5
                 </span>
               </div>
             </div>

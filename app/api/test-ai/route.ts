@@ -13,48 +13,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "کادر کلید API خالی است." }, { status: 400 });
     }
 
-    // ۱. استعلام مستقیم لیست مدل‌های معتبر فعال روی اکانت شما
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`, {
-      headers: { "x-goog-api-key": cleanKey }
-    });
+    // اولویت قطعی با مدل‌های پرسرعت و دارای سهمیه باز روی تمام اکانت‌ها
+    const priorityModels = [
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash-8b",
+      "gemini-1.5-pro-latest",
+      "gemini-1.5-pro",
+      "gemini-pro"
+    ];
 
-    const listData = await listRes.json();
+    let reply = "";
+    let activeModelName = "";
+    let lastError = "";
 
-    if (listData.error) {
-      return NextResponse.json({ success: false, message: `خطای اعتبارسنجی گوگل: ${listData.error.message}` }, { status: 400 });
+    for (const mName of priorityModels) {
+      try {
+        const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${cleanKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": cleanKey,
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "سلام! یک پاسخ کوتاه بگو: آماده‌ام" }] }],
+          }),
+        });
+
+        const testJson = await testRes.json();
+
+        if (testJson.error) {
+          lastError = testJson.error.message || "";
+          continue; // در صورت سهمیه نداشتن این مدل خاص، بلافاصله مدل بعدی تست شود
+        }
+
+        const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (generatedText) {
+          reply = generatedText.trim();
+          activeModelName = mName;
+          break; // موفقیت قطعی!
+        }
+      } catch (err: any) {
+        lastError = err?.message || "";
+        continue;
+      }
     }
-
-    const availableModels = listData.models?.filter((m: any) =>
-      m.supportedGenerationMethods?.includes("generateContent")
-    ) || [];
-
-    if (availableModels.length === 0) {
-      return NextResponse.json({ success: false, message: "هیچ مدلی برای این کلید یافت نشد. لطفاً دسترسی‌های پروژه در Google AI Studio را بررسی کنید." }, { status: 400 });
-    }
-
-    // انتخاب بهترین مدل فعال از روی لیست واقعی اکانت
-    const preferredModel = availableModels.find((m: any) => m.name.includes("1.5-flash") || m.name.includes("2.0-flash") || m.name.includes("1.5-pro") || m.name.includes("gemini-pro")) || availableModels[0];
-    const targetModelPath = preferredModel.name; // مثل models/gemini-1.5-flash
-
-    // ۲. ارسال پیام تستی به مدل تاییدشده
-    const generateRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${targetModelPath}:generateContent?key=${cleanKey}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": cleanKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: "سلام! یک پاسخ کوتاه بگو: آماده‌ام" }] }],
-      }),
-    });
-
-    const genJson = await generateRes.json();
-
-    if (genJson.error) {
-      return NextResponse.json({ success: false, message: `خطای مدل: ${genJson.error.message}` }, { status: 400 });
-    }
-
-    const reply = genJson.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (reply) {
       try {
@@ -65,12 +69,15 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `✓ اتصال ۱۰۰٪ برقرار شد! پاسخ هوش مصنوعی: "${reply.trim()}" (مدل فعال: ${targetModelPath.replace("models/", "")})`,
-        activeModel: targetModelPath.replace("models/", ""),
+        message: `✓ اتصال ۱۰۰٪ برقرار شد! پاسخ هوش مصنوعی: "${reply}" (مدل فعال: ${activeModelName})`,
+        activeModel: activeModelName,
       });
     }
 
-    return NextResponse.json({ success: false, message: "پاسخی از مدل دریافت نشد." }, { status: 400 });
+    return NextResponse.json({
+      success: false,
+      message: `خطای گوگل: ${lastError || "کلید معتبر نیست یا سهمیه پروژه به اتمام رسیده است."}`
+    }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: `خطای سرور: ${err.message}` }, { status: 500 });
   }

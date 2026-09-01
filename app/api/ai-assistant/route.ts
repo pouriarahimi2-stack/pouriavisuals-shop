@@ -1,7 +1,6 @@
 // File Path: app/api/ai-assistant/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { FLAGSHIP_7_PRODUCTS } from "@/services/productService";
 
 export const dynamic = "force-dynamic";
@@ -33,10 +32,9 @@ export async function POST(req: Request) {
           siteInfoData = infoRes.data;
         }
       }
-    } catch (e) {
-      console.warn("DB Context load warning:", e);
-    }
+    } catch (e) {}
 
+    // استخراج امن کلید از دیتابیس پنل ادمین یا متغیرهای سرور
     const apiKey =
       siteInfoData?.gemini_api_key ||
       process.env.GEMINI_API_KEY ||
@@ -48,87 +46,74 @@ export async function POST(req: Request) {
     const productCatalogContext = products
       .map(
         (p: any) =>
-          `• [شناسه کالا: ${p.id}] نام: ${p.title || p.name} | برند: ${p.brand || "Apple"} | دسته: ${p.category || "تجهیزات"} | قیمت با تخفیف: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 10} عدد | گارانتی: ${p.warranty || "۱۸ ماه گارانتی طلایی"} | مشخصات: ${JSON.stringify(p.specs || {})}`
+          `• [شناسه کالا: ${p.id}] نام: ${p.title || p.name} | برند: ${p.brand || "Apple"} | دسته: ${p.category || "تجهیزات"} | قیمت: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان | موجودی: ${p.stock ?? 10} عدد | مشخصات: ${JSON.stringify(p.specs || {})}`
       )
       .join("\n");
 
-    let aiResponse = "";
+    const systemInstruction = `تو «مشاور هوشمند و مهندس ارشد سخت‌افزار استودیو ${storeName}» هستی.
+به زبان فارسی کاملاً روان، صمیمی، حرفه‌ای و دقیقاً متناسب با سوال کاربر پاسخ بده.
+- اگر کاربر نام برندی که در فروشگاه موجود نیست (مانند سامسونگ، ال‌جی، ایسوس، دل و...) را پرسید، با کمال احترام و هوشمندی به او بگو که در حال حاضر در فروشگاه ${storeName} محصولات این برند موجود نیست و تمرکز تخصصی ما روی تجهیزات حرفه‌ای، مانیتورهای ۵K/6K و ورک‌استیشن‌های تدوین برندهای اپل (Apple)، بلک‌مجیک (Blackmagic) و کالیبرایت (Calibrite) است و بهترین گزینه‌های معادل موجود را با استدلال فنی پیشنهاد بده.
+- اگر کاربر سلام یا احوال‌پرسی کرد، گرم و پرانرژی جواب بده.
+- اگر قیمت یا مشخصات خواست، با قیمت دقیق به تومان پاسخ بده.
+شماره پشتیبانی: ${storePhone}
 
-    // ۲. اجرای مستقیم مدل‌های رسمی Google Gemini با زنجیره فال‌بک
-    if (apiKey && apiKey.length > 15 && apiKey !== "AIzaSyDummy") {
-      const candidateModels = [
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro-latest",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-        "gemini-pro"
-      ];
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      const systemInstruction = `تو «مشاور هوشمند، مهندس ارشد سخت‌افزار و کارشناس تصویر فروشگاه ${storeName}» هستی.
-وظیفه تو گفتگوی زنده، فوق‌العاده صمیمی، محترمانه، دقیق و طبیعی با کاربران به زبان فارسی است.
-
-قوانین کاری تو:
-۱. تو اشراف کامل به تمام کاتالوگ، انبار، قیمت‌ها و تجهیزات فروشگاه داری.
-۲. اگر کاربر درباره هر برندی که در فروشگاه موجود نیست (مانند سامسونگ، ال‌جی، ایسوس، دل و...) سوال کرد، با کمال احترام و هوشمندی به او بگو که در حال حاضر در فروشگاه ${storeName} محصولات این برند موجود نیست و تمرکز تخصصی فروشگاه روی تجهیزات حرفه‌ای، مانیتورهای ۵K/6K و ورک‌استیشن‌های تدوین برندهای اپل (Apple)، بلک‌مجیک (Blackmagic) و کالیبرایت (Calibrite) است و با استدلال فنی بهترین گزینه‌های معادل موجود در کاتالوگ را به او پیشنهاد بده.
-۳. اگر کاربر سلام، احوال‌پرسی یا گپ دوستانه زد، دقیقاً متناسب با لحن خودش خیلی گرم و پرانرژی جواب بده.
-۴. اگر سوال فنی یا قیمت پرسید، مستدل، با جزئیات فنی و ذکر قیمت به تومان پاسخ بده.
-۵. شماره تماس پشتیبانی فروشگاه: ${storePhone}
-
-کاتالوگ کامل و زنده محصولات موجود در انبار:
+کاتالوگ محصولات موجود در انبار:
 ${productCatalogContext}`;
 
-      const fullPrompt = `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}`;
+    let aiResponse = "";
+    const cleanKey = apiKey ? String(apiKey).trim() : "";
+
+    if (cleanKey && cleanKey.length > 15) {
+      const candidateModels = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-pro"];
 
       for (const modelName of candidateModels) {
         try {
-          const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: {
-              temperature: 0.7,
-              topP: 0.95,
-              maxOutputTokens: 1500,
-            },
-          });
-
+          const parts: any[] = [{ text: `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}` }];
           if (imageBase64) {
             const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-            const result = await model.generateContent([
-              fullPrompt,
-              { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } },
-            ]);
-            aiResponse = result.response.text();
-          } else {
-            const result = await model.generateContent(fullPrompt);
-            aiResponse = result.response.text();
+            parts.push({ inlineData: { mimeType: "image/jpeg", data: cleanBase64 } });
           }
 
-          if (aiResponse) break; // موفقیت در اولین مدل فعال
-        } catch (modelErr: any) {
-          console.warn(`Model ${modelName} error, trying next candidate:`, modelErr?.message || modelErr);
-        }
+          const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": cleanKey,
+            },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
+            }),
+          });
+
+          const geminiJson = await geminiRes.json();
+          const replyText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (replyText) {
+            aiResponse = replyText;
+            break;
+          }
+        } catch (e) {}
       }
     }
 
     if (!aiResponse) {
-      aiResponse = "درود بر شما! درخواست شما دریافت شد. در حال حاضر ارتباط با سرورهای هوش مصنوعی برقرار است. چطور می‌تونم در زمینه مانیتورها، مک‌بوک‌ها و تجهیزات استودیو راهنماییتون کنم؟";
+      aiResponse = `درود بر شما! من مشاور تخصصی تجهیزات تصویر و مانیتورهای استودیو آکسون هستم.
+لطفاً کلید اختصاصی Gemini API خود را در پنل ادمین (بخش اطلاعات سایت) وارد فرمایید تا هوش مصنوعی با تمام ظرفیت پاسخگوی شما باشد.`;
     }
 
-    // ۳. یافتن هوشمند محصول مرتبط از داخل پاسخ تولیدشده جهت پیوست کارت خرید
-    const lowerResponse = (aiResponse + " " + userMessage).toLowerCase();
+    // پیوست هوشمند کارت خرید
+    const lowerResp = (aiResponse + " " + userMessage).toLowerCase();
     const matchedProduct = products.find((p: any) => {
-      const t = (p.title || "").toLowerCase();
       const id = String(p.id).toLowerCase();
       return (
-        lowerResponse.includes(id) ||
-        (lowerResponse.includes("studio display") && id.includes("studio")) ||
-        (lowerResponse.includes("xdr") && id.includes("xdr")) ||
-        (lowerResponse.includes("macbook") && id.includes("macbook")) ||
-        (lowerResponse.includes("watch") && id.includes("watch")) ||
-        (lowerResponse.includes("ipad") && id.includes("ipad")) ||
-        (lowerResponse.includes("decklink") && id.includes("decklink")) ||
-        (lowerResponse.includes("calibrite") && id.includes("calibrite"))
+        lowerResp.includes(id) ||
+        (lowerResp.includes("studio display") && id.includes("studio")) ||
+        (lowerResp.includes("xdr") && id.includes("xdr")) ||
+        (lowerResp.includes("macbook") && id.includes("macbook")) ||
+        (lowerResp.includes("watch") && id.includes("watch")) ||
+        (lowerResp.includes("ipad") && id.includes("ipad")) ||
+        (lowerResp.includes("decklink") && id.includes("decklink")) ||
+        (lowerResp.includes("calibrite") && id.includes("calibrite"))
       );
     });
 
@@ -153,8 +138,8 @@ ${productCatalogContext}`;
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      response: `خطا در پردازش هوش مصنوعی: ${error.message}`,
-      reply: `خطا در پردازش هوش مصنوعی: ${error.message}`,
+      response: `خطا در پردازش: ${error.message}`,
+      reply: `خطا در پردازش: ${error.message}`,
       matchedProduct: null,
     });
   }

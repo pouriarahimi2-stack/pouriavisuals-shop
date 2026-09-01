@@ -2,36 +2,27 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { newsService, TechNewsItem } from "@/services/newsService";
+import { newsService, TechNewsItem, STATIC_DEFAULT_NEWS } from "@/services/newsService";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function TechRadarFeed() {
-  const [newsList, setNewsList] = useState<TechNewsItem[]>([]);
+  const [newsList, setNewsList] = useState<TechNewsItem[]>(STATIC_DEFAULT_NEWS);
   const [startIndex, setStartIndex] = useState(0);
 
   const loadUniqueNews = async () => {
     try {
       const data = await newsService.getAll();
-      const uniqueMap = new Map();
-      (data || []).forEach((item) => {
-        const key = item.slug || item.title;
-        if (!uniqueMap.has(key)) {
-          uniqueMap.set(key, item);
-        }
-      });
-      setNewsList(Array.from(uniqueMap.values()));
+      if (data && data.length > 0) {
+        setNewsList(data);
+      }
     } catch {}
   };
 
   useEffect(() => {
     loadUniqueNews();
-
     const handleNewsUpdate = () => loadUniqueNews();
     window.addEventListener("news_updated", handleNewsUpdate);
-
-    return () => {
-      window.removeEventListener("news_updated", handleNewsUpdate);
-    };
+    return () => window.removeEventListener("news_updated", handleNewsUpdate);
   }, []);
 
   useEffect(() => {
@@ -42,11 +33,10 @@ export default function TechRadarFeed() {
     return () => clearInterval(interval);
   }, [newsList.length]);
 
-  if (newsList.length === 0) return null;
   const visibleNews = newsList.slice(startIndex, startIndex + 3);
 
   return (
-    <section className="w-full max-w-7xl mx-auto font-sans select-none px-2 my-2 overflow-hidden min-h-[48px]" dir="rtl">
+    <section className="w-full max-w-7xl mx-auto font-sans select-none px-2 my-2 overflow-hidden min-h-[48px]" dir="rtl" suppressHydrationWarning>
       <div className="flex flex-col sm:flex-row items-center justify-between p-2 px-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] shadow-sm transition-all duration-300 gap-2">
         <div className="flex items-center gap-2 shrink-0">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-black text-[10px]">

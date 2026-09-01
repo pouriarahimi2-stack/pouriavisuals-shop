@@ -14,8 +14,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const router = useRouter();
   const isAdmin = pathname?.startsWith("/admin");
 
-  const [mounted, setMounted] = useState(false);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
   const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
   const [maintenanceUntil, setMaintenanceUntil] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
@@ -47,14 +46,11 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   };
 
   useEffect(() => {
-    setMounted(true);
-
     siteInfoService.getSiteInfo().then((data) => {
       if (data) updateMaintenanceState(data);
     });
 
     const cleanup = initRealtimeSync();
-
     const handleUpdate = (e: any) => {
       if (e.detail) updateMaintenanceState(e.detail);
     };
@@ -67,7 +63,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   }, []);
 
   useEffect(() => {
-    if (!mounted || isAdmin || typeof window === "undefined") return;
+    if (isAdmin || typeof window === "undefined") return;
 
     if (maintenanceMode !== "none") {
       const currentPath = window.location.pathname + window.location.search;
@@ -83,7 +79,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     }
 
     prevModeRef.current = maintenanceMode;
-  }, [maintenanceMode, mounted, isAdmin, router]);
+  }, [maintenanceMode, isAdmin, router]);
 
   useEffect(() => {
     if (maintenanceMode !== "timed" || !maintenanceUntil) {
@@ -119,7 +115,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  if (mounted && maintenanceMode !== "none") {
+  if (maintenanceMode !== "none") {
     const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
     const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
     const email = siteInfo?.email || "support@axoncore.ir";

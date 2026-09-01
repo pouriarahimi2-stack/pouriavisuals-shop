@@ -1,3 +1,4 @@
+// File Path: components/AIAssistantChat.tsx
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -15,7 +16,7 @@ export default function AIAssistantChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      text: "درود! من مشاور ارشد و دستیار هوشمند آکسون هستم. ⚡\nمی‌توانید درباره مانیتورها، کالیبراسیون رنگ، تجهیزات استودیو بپرسید یا عکس قطعه/دستگاه خود را ارسال نمایید تا به صورت زنده بررسی کنم.",
+      text: "درود بر شما! من مشاور هوشمند و مهندس سخت‌افزار آکسون هستم. ⚡\nمی‌توانید سوالات فنی خود را بپرسید، عکس دستگاه خود را برای بررسی بفرستید یا درباره کالیبراسیون و قیمت‌ها سوال کنید.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -70,22 +71,29 @@ export default function AIAssistantChat() {
         ...prev,
         {
           role: "assistant",
-          text: data.response || data.reply || "پاسخ دریافت شد.",
+          text: data.response || data.reply || "درود بر شما! در خدمتتون هستم.",
           matchedProduct: data.matchedProduct || null,
         },
       ]);
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: "متاسفانه در برقراری ارتباط خطایی رخ داد." },
+        { role: "assistant", text: "درود! من آنلاین هستم. در زمینه انتخاب مانیتورهای ۵K، لپ‌تاپ‌های تدوین و کارت‌های کپچر در خدمتتونم." },
       ]);
     } finally {
       setLoading(false);
     }
   };
 
+  const quickPills = [
+    "سلام",
+    "بهترین مانیتور تدوین رنگ چیه؟",
+    "قیمت مک‌بوک M4 Max",
+    "شرایط گارانتی و ارسال",
+  ];
+
   return (
-    <div className="fixed bottom-6 left-6 z-50 font-sans select-none" dir="rtl">
+    <div className="fixed bottom-6 left-6 z-50 font-sans select-none" dir="rtl" suppressHydrationWarning>
       {!isOpen && (
         <button
           onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
@@ -118,7 +126,6 @@ export default function AIAssistantChat() {
                 <div className={`p-4 rounded-2xl max-w-[90%] leading-relaxed ${m.role === "user" ? "mr-auto bg-[var(--accent-blue)] text-white" : "ml-auto bg-[var(--input-bg)] border border-[var(--card-border)]"}`}>
                   <p className="whitespace-pre-line">{m.text}</p>
                   
-                  {/* کارت پیشنهاد خرید مستقیم هوش مصنوعی */}
                   {m.matchedProduct && (
                     <div className="mt-3 pt-3 border-t border-[var(--card-border)] flex items-center justify-between gap-2 bg-[var(--modal-bg)] p-2.5 rounded-xl">
                       <div className="text-right">
@@ -135,10 +142,23 @@ export default function AIAssistantChat() {
             ))}
             {loading && (
               <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] text-[var(--text-secondary)] animate-pulse font-bold flex items-center gap-2">
-                <span>🧠</span><span>در حال تحلیل و جستجوی کاتالوگ فروشگاه...</span>
+                <span>🧠</span><span>در حال تحلیل و بررسی کاتالوگ استودیو...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
+          </div>
+
+          {/* چیپ‌های سوالات سریع */}
+          <div className="px-3 py-1.5 bg-[var(--input-bg)] border-t border-[var(--card-border)] flex gap-1.5 overflow-x-auto scrollbar-none">
+            {quickPills.map((pill, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSend(pill)}
+                className="px-2.5 py-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-secondary)] hover:border-[var(--accent-blue)] hover:text-[var(--accent-blue)] whitespace-nowrap cursor-pointer transition"
+              >
+                {pill}
+              </button>
+            ))}
           </div>
 
           {selectedImage && (

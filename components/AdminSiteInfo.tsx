@@ -22,6 +22,9 @@ export default function AdminSiteInfo() {
   const [description, setDescription] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
 
+  const [testingKey, setTestingKey] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -43,7 +46,7 @@ export default function AdminSiteInfo() {
     setAnnouncement(data.header_announcement || "");
     setFreeShippingThreshold(Number(data.free_shipping_threshold || 2000000));
     setDescription(data.description || data.footer_text || "");
-    setGeminiApiKey((data as any).gemini_api_key || "");
+    setGeminiApiKey(data.gemini_api_key || (data as any).geminiApiKey || "");
   };
 
   useEffect(() => {
@@ -53,6 +56,36 @@ export default function AdminSiteInfo() {
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
+  const handleTestGeminiKey = async () => {
+    if (!geminiApiKey.trim()) {
+      setTestResult({ success: false, message: "ابتدا کلید API را در کادر وارد نمایید." });
+      return;
+    }
+
+    soundEngine.playClick();
+    setTestingKey(true);
+    setTestResult(null);
+
+    try {
+      const res = await fetch("/api/test-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: geminiApiKey.trim() }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setTestResult({ success: true, message: json.message });
+      } else {
+        setTestResult({ success: false, message: json.message });
+      }
+    } catch {
+      setTestResult({ success: false, message: "خطا در برقراری ارتباط با سرور تست." });
+    } finally {
+      setTestingKey(false);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: "header" | "footer" | "favicon") => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -61,11 +94,9 @@ export default function AdminSiteInfo() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const resultBase64 = event.target?.result as string;
-      if (target === "header") {
-        setLogoUrl(resultBase64);
-      } else if (target === "footer") {
-        setFooterLogoUrl(resultBase64);
-      } else if (target === "favicon") {
+      if (target === "header") setLogoUrl(resultBase64);
+      else if (target === "footer") setFooterLogoUrl(resultBase64);
+      else if (target === "favicon") {
         setFaviconUrl(resultBase64);
         applyFaviconToDOM(resultBase64);
       }
@@ -128,9 +159,9 @@ export default function AdminSiteInfo() {
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚙️</span> تنظیمات کلان سایت، اتصال Gemini Pro و ۳ لوگوی متحرک (GIF / SVG)
+            <span>⚙️</span> تنظیمات کلان سایت، اتصال Gemini Pro و ۳ لوگوی متحرک
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">اتصال زنده هوش مصنوعی به اکانت پرو و مدیریت ۳ نشان مستقل با حفظ فریم‌های متحرک</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">اتصال زنده هوش مصنوعی به اکانت پرو و تست بلادرنگ کلید API</p>
         </div>
         <button type="button" onClick={() => handleSubmit()} disabled={saving} className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl cursor-pointer disabled:opacity-50">
           {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و اعمال سراسری"}
@@ -143,20 +174,38 @@ export default function AdminSiteInfo() {
         </div>
       )}
 
-      {/* اتصال مستقیم کلید Gemini Pro */}
+      {/* اتصال و تست زنده کلید Gemini Pro */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🤖</span>
-          <h3 className="text-sm font-black text-[var(--text-primary)]">اتصال زنده کلید هوش مصنوعی Google Gemini Pro</h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🤖</span>
+            <h3 className="text-sm font-black text-[var(--text-primary)]">اتصال زنده کلید هوش مصنوعی Google Gemini Pro</h3>
+          </div>
+          <button
+            type="button"
+            onClick={handleTestGeminiKey}
+            disabled={testingKey}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md disabled:opacity-50"
+          >
+            <span>{testingKey ? "در حال تست اتصال به گوگل..." : "🧪 تست زنده اتصال کلید"}</span>
+          </button>
         </div>
-        <p className="text-xs text-[var(--text-secondary)]">کلید دریافتی از گوگل را در کادر زیر وارد فرمایید تا تمام مدل‌های چت، بینایی و سئوی سایت با هوش کامل اختصاصی شما فعال شوند:</p>
+
+        <p className="text-xs text-[var(--text-secondary)]">کلید دریافتی از Google AI Studio (شروع با AIzaSy...) را در کادر زیر وارد کنید و با دکمه تست، اتصال آن را بسنجید:</p>
         <input
-          type="password"
+          type="text"
           value={geminiApiKey}
           onChange={(e) => setGeminiApiKey(e.target.value)}
           placeholder="AIzaSy..."
           className="w-full p-3.5 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
         />
+
+        {testResult && (
+          <div className={`p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 animate-fadeIn ${testResult.success ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30" : "bg-rose-500/15 text-rose-500 border border-rose-500/30"}`}>
+            <span>{testResult.success ? "✓" : "⚠️"}</span>
+            <span>{testResult.message}</span>
+          </div>
+        )}
       </div>
 
       {/* بخش تفکیک‌شده ۳ لوگوی متحرک */}

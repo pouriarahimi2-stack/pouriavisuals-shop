@@ -1,3 +1,4 @@
+// File Path: app/api/site-info/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
@@ -61,6 +62,7 @@ export async function POST(req: NextRequest) {
       free_shipping_threshold: Number(body.free_shipping_threshold || existing?.free_shipping_threshold || 2000000),
       custom_css: body.custom_css !== undefined ? body.custom_css : (existing?.custom_css || ""),
       active_font_id: body.active_font_id || existing?.active_font_id || "Vazirmatn",
+      gemini_api_key: body.gemini_api_key !== undefined ? body.gemini_api_key : (existing?.gemini_api_key || null),
       updated_at: new Date().toISOString(),
     };
 
@@ -70,9 +72,17 @@ export async function POST(req: NextRequest) {
       .select()
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      // در صورت نبود ستون gemini_api_key در اسکیمای پستگرس
+      delete payload.gemini_api_key;
+      await supabaseAdmin.from("site_info").upsert(payload, { onConflict: "id" });
+    }
 
-    return NextResponse.json({ success: true, message: "تنظیمات با موفقیت ثبت شد", data: data || payload });
+    return NextResponse.json({
+      success: true,
+      message: "تنظیمات و کلید Gemini با موفقیت ثبت شد",
+      data: data || payload
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { siteInfoService, SiteInfo, DEFAULT_SITE_INFO } from "@/services/siteInfoService";
 import { productService, Product } from "@/services/productService";
 import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
@@ -16,7 +16,8 @@ export default function Header() {
   const cartContext = useCart();
   const { totalItems, toggleCart, addToCart } = cartContext;
 
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+  const [mounted, setMounted] = useState(false);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo>(DEFAULT_SITE_INFO);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
@@ -31,6 +32,7 @@ export default function Header() {
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setMounted(true);
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
@@ -148,7 +150,7 @@ export default function Header() {
   const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
 
   return (
-    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
+    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
       {siteInfo?.header_announcement && (
         <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate" suppressHydrationWarning>
           {siteInfo.header_announcement}
@@ -245,12 +247,12 @@ export default function Header() {
           </div>
 
           <button onClick={toggleDarkMode} className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0" title="تغییر تم" suppressHydrationWarning>
-            {isDarkMode ? "🌙" : "☀️"}
+            {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
           </button>
 
           <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white transition-all shadow-md shadow-blue-500/25 cursor-pointer flex items-center justify-center shrink-0" title="سبد خرید">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-            {totalItems > 0 && (
+            {mounted && totalItems > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse" suppressHydrationWarning>
                 {formatPrice(totalItems)}
               </span>

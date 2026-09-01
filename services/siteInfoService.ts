@@ -1,3 +1,4 @@
+// File Path: services/siteInfoService.ts
 import { supabase } from "@/lib/supabase";
 import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
@@ -39,33 +40,28 @@ export interface SiteInfo {
 
 const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
 
+// ساختار پیش‌فرض قطعی برای تضمین تطابق ۱۰۰٪ سرور و کلاینت
+export const DEFAULT_SITE_INFO: SiteInfo = {
+  site_name: "آکسون | Axon",
+  siteName: "آکسون | Axon",
+  storeName: "آکسون | Axon",
+  tagline: "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
+  allow_google_index: true,
+  allowGoogleIndex: true,
+  maintenance_mode: "none",
+  phone: "۰۲۱-۸۸۸۸۸۸۸۸",
+  email: "info@axoncore.ir",
+  address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
+  working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+  header_announcement: "⚡ ارسال رایگان خریدهای بالای ۲ میلیون تومان | گارانتی اصالت طلایی ۱۸ ماهه",
+  free_shipping_threshold: 2000000,
+  description: "مرجع تخصصی مانیتورهای ۵K و ۴K تدوین، کالیبراسیون سخت‌افزاری رنگ و تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی",
+  footer_text: "مرجع تخصصی مانیتورهای ۵K و ۴K تدوین، کالیبراسیون سخت‌افزاری رنگ و تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی",
+};
+
 export const siteInfoService = {
   getSiteInfoSync(): SiteInfo {
-    if (typeof window !== "undefined") {
-      try {
-        const local = localStorage.getItem(LOCAL_STORAGE_SITE_INFO);
-        if (local) {
-          const parsed = JSON.parse(local);
-          if (parsed.favicon_url) applyFaviconToDOM(parsed.favicon_url);
-          return parsed;
-        }
-      } catch {}
-    }
-    return {
-      site_name: "آکسون | Axon",
-      siteName: "آکسون | Axon",
-      storeName: "آکسون | Axon",
-      tagline: "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
-      allow_google_index: true,
-      allowGoogleIndex: true,
-      maintenance_mode: "none",
-      phone: "۰۲۱-۸۸۸۸۸۸۸۸",
-      email: "info@axoncore.ir",
-      address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
-      working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-      header_announcement: "⚡ ارسال رایگان خریدهای بالای ۲ میلیون تومان | گارانتی اصالت طلایی ۱۸ ماهه",
-      free_shipping_threshold: 2000000,
-    };
+    return DEFAULT_SITE_INFO;
   },
 
   async getSiteInfo(): Promise<SiteInfo | null> {
@@ -103,10 +99,6 @@ export const siteInfoService = {
             footer_text: data.footer_text || data.description || "",
             custom_css: data.custom_css || "",
             active_font_id: data.active_font_id || "Vazirmatn",
-            instagram: data.instagram || "",
-            telegram: data.telegram || "",
-            whatsapp: data.whatsapp || "",
-            youtube: data.youtube || "",
             updated_at: data.updated_at,
           };
 
@@ -118,15 +110,15 @@ export const siteInfoService = {
           return mapped;
         }
       }
-      return this.getSiteInfoSync();
+      return DEFAULT_SITE_INFO;
     } catch {
-      return this.getSiteInfoSync();
+      return DEFAULT_SITE_INFO;
     }
   },
 
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      const current = this.getSiteInfoSync();
+      const current = DEFAULT_SITE_INFO;
       const maintMode = payload.maintenance_mode !== undefined 
         ? payload.maintenance_mode 
         : (current.maintenance_mode || "none");

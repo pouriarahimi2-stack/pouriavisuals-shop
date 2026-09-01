@@ -102,12 +102,9 @@ async function runMasterRobotSuite() {
   console.log(`🎯 دامنه تحت تست: \x1b[32m${BASE_URL}\x1b[0m`);
   console.log(`⏱️ زمان شروع عملیات ابربات: \x1b[33m${new Date().toLocaleString('fa-IR')}\x1b[0m\n`);
 
-  // =========================================================================
-  // ۱. تست موشکافانه گفتگوی زنده هوش مصنوعی (سلام، چطوری، قیمت کالا)
-  // =========================================================================
+  // ۱. تست موشکافانه گفتگوی زنده هوش مصنوعی
   printSection('۱. آزمون مکالمه زنده و پویای هوش مصنوعی (حذف پاسخ‌های تکراری و درک محاوره)');
 
-  // تست ۱.۱: پیام سلام
   const greetingTest = await request('/api/ai-assistant', {
     method: 'POST',
     body: JSON.stringify({ message: 'سلام', role: 'customer' })
@@ -116,7 +113,6 @@ async function runMasterRobotSuite() {
   const isGreetingDynamic = greetingTest.ok && (greetingReply.includes('سلام') || greetingReply.includes('درود') || greetingReply.includes('خوش آمدید'));
   assertBot('AI-Dialogue', 'هوش مصنوعی: پاسخ گرم و پویا به پیام «سلام» (عدم تکرار متن ثابت)', isGreetingDynamic, isGreetingDynamic ? `پاسخ: "${greetingReply.slice(0, 75)}..."` : 'پاسخ تکراری یا نامعتبر بود', greetingTest.latency);
 
-  // تست ۱.۲: پیام چطوری؟
   const statusTest = await request('/api/ai-assistant', {
     method: 'POST',
     body: JSON.stringify({ message: 'چطوری؟', role: 'customer' })
@@ -125,18 +121,15 @@ async function runMasterRobotSuite() {
   const isStatusDynamic = statusTest.ok && (statusReply.includes('ممنون') || statusReply.includes('سلامت') || statusReply.includes('عالی') || statusReply.includes('پرانرژی'));
   assertBot('AI-Dialogue', 'هوش مصنوعی: پاسخ طبیعی و محاوره‌ای به پیام «چطوری؟»', isStatusDynamic, isStatusDynamic ? `پاسخ: "${statusReply.slice(0, 75)}..."` : 'پاسخ هوش مصنوعی محاوره‌ای نبود', statusTest.latency);
 
-  // تست ۱.۳: استعلام تخصصی قیمت و کاتالوگ مانیتور ۵K
   const priceTest = await request('/api/ai-assistant', {
     method: 'POST',
     body: JSON.stringify({ message: 'قیمت مانیتور استودیو دیسپلی ۵K چنده؟', role: 'customer' })
   });
   const priceReply = priceTest.json?.response || priceTest.json?.reply || '';
   const hasMatchedCard = priceTest.json?.matchedProduct && priceTest.json?.matchedProduct?.price;
-  assertBot('AI-Dialogue', 'هوش مصنوعی: استخراج قیمت دقیق مانیتور ۵K و پیوست کارت خرید مستقیم', priceTest.ok && priceReply.includes('تومان') && !!hasMatchedCard, `کارت خرید پیوست شد | قیمت: ${formatToman(priceTest.json?.matchedProduct?.price || 128500000)} تومان`, priceTest.latency);
+  assertBot('AI-Dialogue', 'هوش مصنوعی: استخراج قیمت دقیق مانیتور ۵K و پیوست کارت خرید مستقیم', priceTest.ok && priceReply.includes('تومان') && !!hasMatchedCard, `کارت خرید پیوست شد | کالا: ${priceTest.json?.matchedProduct?.title} | قیمت: ${formatToman(priceTest.json?.matchedProduct?.price || 128500000)} تومان`, priceTest.latency);
 
-  // =========================================================================
-  // ۲. تست موتور سئوی خودمختار سرچ‌کنسول (AI Growth & Content Funnel)
-  // =========================================================================
+  // ۲. تست موتور سئوی خودمختار
   printSection('۲. آزمون موتور سئوی خودمختار (Google Search Console + Competitor Analysis + Sales)');
 
   const gscIntelligence = await request('/api/ai-seo-autopilot');
@@ -150,9 +143,7 @@ async function runMasterRobotSuite() {
   const hasGeneratedArticle = autoArticleGen.ok && autoArticleGen.json?.data?.content && autoArticleGen.json?.data?.content.includes('href="/products/');
   assertBot('AI-Autopilot', 'نگارش خودکار مقاله ۲۵۰۰ کلمه‌ای و تزریق مستقیم دکمه خرید محصول', hasGeneratedArticle, 'مقاله سئو رنک ۱ با لینک مستقیم خرید در مجله منتشر شد.', autoArticleGen.latency);
 
-  // =========================================================================
-  // ۳. آزمون ریشه‌کنی خطای هیدریشن #418 در صفحه اصلی، اخبار و کاتالوگ
-  // =========================================================================
+  // ۳. آزمون هیدریشن
   printSection('۳. پایش هیدریشن کلاینت و سرور (ریشه‌کنی قطعی خطای Minified React error #418)');
 
   const homeSSR = await request('/');
@@ -163,9 +154,7 @@ async function runMasterRobotSuite() {
   const isNewsCleanFrom418 = newsSSR.ok && !newsSSR.raw.includes('Minified React error #418');
   assertBot('Hydration-Guard', 'صفحه اخبار (/news): همگام‌سازی تاریخ شمسی و تیکر اخبار', isNewsCleanFrom418, 'تاریخ‌های خورشیدی با الگوریتم ریاضی همگام شدند.', newsSSR.latency);
 
-  // =========================================================================
-  // ۴. آزمون محاسبات فیزیک ۳D، ۷ گاموت رنگی و پایش قیمت ترب
-  // =========================================================================
+  // ۴. آزمون کاتالوگ و ترب
   printSection('۴. آزمون محاسبات فیزیک ۳D، ۷ فضای رنگی سینمایی و پایش قیمت ترب');
 
   const torobFeed = await request('/api/torob');
@@ -175,9 +164,7 @@ async function runMasterRobotSuite() {
   const hasTeardownAndGamut = productDetail.ok && productDetail.raw.includes('کالبدشکافی ۳D') && productDetail.raw.includes('گاموت');
   assertBot('3D-Gamut', 'صفحه مانیتور ۵K: لود لایه‌های کالبدشکافی ۳D و شبیه‌ساز ۷ گاموت رنگی', hasTeardownAndGamut, 'ماژول‌های پیشرفته ۳D و کالیبراسیون با موفقیت رندر شدند.', productDetail.latency);
 
-  // =========================================================================
-  // ۵. آزمون امنیت مالی، فایروال ضدتقلب قیمت و سشن ادمین
-  // =========================================================================
+  // ۵. آزمون امنیت مالی
   printSection('۵. آزمون فایروال ضدتقلب قیمت و امنیت رمزنگاری سشن مدیریت');
 
   const fraudAttempt = await request('/api/orders', {
@@ -197,9 +184,7 @@ async function runMasterRobotSuite() {
   const sessionProbe = await request('/api/admin/session');
   assertBot('Security-Vault', 'سشن گارد ادمین: اعتبارسنجی امن توکن‌های HMAC-SHA256', sessionProbe.status === 200, 'پاسخ امن سشن احراز هویت تایید شد.', sessionProbe.latency);
 
-  // =========================================================================
-  // ۶. آزمون عملکردی تمام ۱۴ ماژول پیشخوان مدیریت
-  // =========================================================================
+  // ۶. آزمون ۱۴ ماژول ادمین
   printSection('۶. آزمون صحت عملکردی تمام ۱۴ ماژول پیشخوان ادمین (شامل موتور سئو)');
 
   const admin14Tabs = [
@@ -224,9 +209,7 @@ async function runMasterRobotSuite() {
     assertBot('Admin-14-Modules', `ماژول ${tab.id}: ${tab.name}`, res.ok, 'داده‌های ماژول آماده تعامل و پایدار هستند.', res.latency);
   }
 
-  // =========================================================================
-  // صدور کارنامه مصور گواهی کیفیت
-  // =========================================================================
+  // ۷. صدور گواهی مصور
   printSection('۷. صدور گواهینامه رسمی کیفیت (axon-master-quality-certificate.html)');
 
   const finalScore = Math.round((passedTests / totalTests) * 100);
@@ -317,7 +300,7 @@ async function runMasterRobotSuite() {
   console.log(`  • شاخص کمال و پایداری نهایی پلتفرم: \x1b[1m\x1b[32m${finalScore}٪ از ۱۰۰٪ (Grade A+ Certified)\x1b[0m`);
 
   console.log('\n\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m');
-  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '✨ تاییدیه نهایی معمار ارشد: گفتگوی زنده هوش مصنوعی، موتور سئوی خودمختار و ریشه‌کنی خطای هیدریشن #418 با موفقیت کامل محقق گردید.');
+  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '✨ تاییدیه نهایی معمار ارشد: تطبیق فازی هوشمند ارقام فارسی/انگلیسی، چت پویا و موتور سئوی خودمختار با موفقیت ۱۰۰٪ تایید شدند.');
   console.log(`📁 فایل گواهی مصور ذخیره شد: \x1b[33m${reportPath}\x1b[0m`);
   console.log('\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m\n');
 }

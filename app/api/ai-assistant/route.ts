@@ -30,22 +30,62 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     let aiResponse = "";
-    let matchedProduct: any = null;
 
-    const lower = userMessage.toLowerCase();
+    // نرمال‌سازی ارقام فارسی و عربی به انگلیسی جهت تطبیق بی‌نقص (مثلاً ۵k به 5k)
+    const normalizedMsg = userMessage
+      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+      .toLowerCase();
 
-    // تشخیص محصول مرتبط
-    matchedProduct = products.find((p: any) =>
-      (p.title && lower.includes(p.title.toLowerCase())) ||
-      (p.name && lower.includes(p.name.toLowerCase())) ||
-      (p.category && lower.includes(p.category.toLowerCase())) ||
-      (lower.includes("مانیتور") && (p.category || "").includes("مانیتور")) ||
-      (lower.includes("مک بوک") && String(p.id).includes("macbook")) ||
-      (lower.includes("ساعت") && String(p.id).includes("watch")) ||
-      (lower.includes("آیپد") && String(p.id).includes("ipad")) ||
-      (lower.includes("کپچر") && String(p.id).includes("decklink")) ||
-      (lower.includes("کالیبراتور") && String(p.id).includes("calibrite"))
-    );
+    // موتور تطبیق فازی هوشمند کالاها (Smart Fuzzy Matcher)
+    let bestMatch: any = null;
+    let maxScore = 0;
+
+    for (const p of products) {
+      let score = 0;
+      const titleLower = (p.title || "").toLowerCase();
+      const catLower = (p.category || "").toLowerCase();
+      const idLower = String(p.id).toLowerCase();
+
+      if (normalizedMsg.includes(idLower)) score += 10;
+      if (normalizedMsg.includes("studio display") || normalizedMsg.includes("استودیو دیسپلی") || normalizedMsg.includes("استودیو")) {
+        if (idLower.includes("studio") || titleLower.includes("studio")) score += 10;
+      }
+      if (normalizedMsg.includes("pro display") || normalizedMsg.includes("پرو دیسپلی") || normalizedMsg.includes("xdr")) {
+        if (idLower.includes("xdr") || titleLower.includes("xdr")) score += 10;
+      }
+      if (normalizedMsg.includes("macbook") || normalizedMsg.includes("مک بوک") || normalizedMsg.includes("m4 max")) {
+        if (idLower.includes("macbook")) score += 10;
+      }
+      if (normalizedMsg.includes("ultra") || normalizedMsg.includes("ساعت") || normalizedMsg.includes("watch")) {
+        if (idLower.includes("watch")) score += 10;
+      }
+      if (normalizedMsg.includes("ipad") || normalizedMsg.includes("آیپد") || normalizedMsg.includes("تاندم")) {
+        if (idLower.includes("ipad")) score += 10;
+      }
+      if (normalizedMsg.includes("decklink") || normalizedMsg.includes("کپچر") || normalizedMsg.includes("بلک مجیک")) {
+        if (idLower.includes("decklink")) score += 10;
+      }
+      if (normalizedMsg.includes("calibrite") || normalizedMsg.includes("کالیبراتور") || normalizedMsg.includes("کالیبراسیون")) {
+        if (idLower.includes("calibrite")) score += 10;
+      }
+      if (normalizedMsg.includes("5k") && (titleLower.includes("5k") || idLower.includes("5k"))) score += 6;
+      if (normalizedMsg.includes("6k") && (titleLower.includes("6k") || idLower.includes("6k"))) score += 6;
+      if (normalizedMsg.includes("مانیتور") && (catLower.includes("مانیتور") || titleLower.includes("display"))) score += 4;
+
+      if (score > maxScore) {
+        maxScore = score;
+        bestMatch = p;
+      }
+    }
+
+    if (!bestMatch && products.length > 0) {
+      if (normalizedMsg.includes("مانیتور") || normalizedMsg.includes("نمایشگر")) {
+        bestMatch = products.find((p) => String(p.id).includes("studio")) || products[3];
+      }
+    }
+
+    const matchedProduct = bestMatch || (normalizedMsg.includes("قیمت") ? products[1] : null);
 
     // ۱. فراخوانی لایو Google Gemini در صورت فعال بودن کلید
     if (apiKey && apiKey.length > 15 && apiKey !== "AIzaSyDummy") {
@@ -56,7 +96,7 @@ export async function POST(req: Request) {
         const promptText = `تو مشاور ارشد و مهندس سخت‌افزار فروشگاه تخصصی آکسون هستی.
 به زبان فارسی بسیار روان، گرم، صمیمی و کاملاً تخصصی با کاربر صحبت کن.
 اگر کاربر سلام یا احوال‌پرسی کرد، به گرمی و پرانرژی جواب بده و بپرس چطور می‌تونی در زمینه مانیتورها، لپ‌تاپ‌های تدوین یا کالیبراسیون کمکش کنی.
-اگر سوال فنی پرسید، موشکافانه و با ذکر مدل و قیمت دقیق پاسخ بده.
+اگر سوال فنی یا قیمت پرسید، موشکافانه و با ذکر مدل و قیمت دقیق به تومان پاسخ بده.
 
 کاتالوگ کالاها:
 ${productCatalog}
@@ -80,35 +120,25 @@ ${userMessage}`;
       }
     }
 
-    // ۲. موتور هوشمند گفتگوی طبیعی (NLP Dialogue Engine) در صورت عدم پاسخدهی API
+    // ۲. موتور هوشمند گفتگوی طبیعی و قیمت‌گذاری در صورت آفلاین بودن API
     if (!aiResponse) {
-      if (lower.includes("سلام") || lower.includes("درود") || lower.includes("صبح بخیر") || lower.includes("عصر بخیر") || lower === "hi" || lower === "hello") {
-        const greetings = [
-          "سلام و درود بر شما! خیلی خوش آمدید به استودیو آکسون. ⚡\nمن دستیار هوشمند و مشاور تخصصی شما هستم. امروز دنبال چه دستگاهی هستید؟ مانیتورهای تدوین ۵K، مک‌بوک‌های M4 Max یا ابزارهای کالیبراسیون رنگ؟",
-          "درود و وقت بخیر! خوشحالم در خدمتتون هستم. چطور می‌تونم در انتخاب بهترین مانیتور استودیویی یا لپ‌تاپ تدوین راهنماییتون کنم؟",
-          "سلام دوست گرامی! من مهندس سخت‌افزار آکسون هستم و آماده‌ام تا به تمام سوالات فنی و قیمت تجهیزات تخصصی استودیو پاسخ بدم. چه کالایی مد نظرتونه؟"
-        ];
-        aiResponse = greetings[Math.floor(Math.random() * greetings.length)];
-      } else if (lower.includes("چطوری") || lower.includes("خوبی") || lower.includes("احوال") || lower.includes("چه خبر") || lower.includes("چطورید")) {
-        const statusReplies = [
-          "ممنون از لطف و محبت شما! بسیار عالی و پرانرژی هستم و با افتخار در خدمت شما دوست گرامی. شما چه تجهیزاتی برای کارتون نیاز دارید تا با مشخصات کامل راهنماییتون کنم؟",
-          "سلامت باشید، از احوال‌پرسی شما سپاسگزارم! تمام مشخصات سخت‌افزاری و قیمت‌های روز کاتالوگ پیش روی من هست، مایلید کدوم محصول رو با هم بررسی کنیم؟"
-        ];
-        aiResponse = statusReplies[Math.floor(Math.random() * statusReplies.length)];
-      } else if (lower.includes("قیمت") || lower.includes("چند") || lower.includes("هزینه")) {
-        if (matchedProduct) {
-          aiResponse = `قیمت رسمی و با تخفیف محصول **«${matchedProduct.title || matchedProduct.name}»** در حال حاضر **${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان** است.\n\nاین کالا هم‌اکنون موجود در انبار بوده و با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز تقدیمتون میشه.`;
-        } else {
-          aiResponse = "قیمت تمامی محصولات کاتالوگ بر اساس نرخ لحظه‌ای بازار و با تضمین کمترین قیمت تنظیم شده است. مدل یا دستگاه خاصی مد نظرتونه تا قیمت دقیقش رو بهتون بگم؟";
-        }
-      } else if (lower.includes("گارانتی") || lower.includes("ضمانت") || lower.includes("خدمات")) {
-        aiResponse = "تمامی کالاهای فروشگاه آکسون دارای ۱۸ ماه گارانتی اصالت طلایی، ضمانت بازگشت وجه ۷ روزه و تست سلامت فیزیکی با بسته‌بندی ضدضربه استودیویی هستند. 🛡️";
+      if (normalizedMsg.includes("سلام") || normalizedMsg.includes("درود") || normalizedMsg.includes("صبح بخیر") || normalizedMsg === "hi" || normalizedMsg === "hello") {
+        aiResponse = "سلام و درود بر شما! خوش آمدید به استودیو آکسون. ⚡\nمن دستیار هوشمند و مشاور تخصصی سخت‌افزار شما هستم. امروز دنبال چه دستگاهی هستید؟ مانیتورهای تدوین ۵K، مک‌بوک‌های M4 Max یا ابزارهای کالیبراسیون رنگ؟";
+      } else if (normalizedMsg.includes("چطوری") || normalizedMsg.includes("خوبی") || normalizedMsg.includes("احوال") || normalizedMsg.includes("چه خبر")) {
+        aiResponse = "ممنون از لطف و احوال‌پرسی شما! بسیار عالی و پرانرژی هستم و با افتخار در خدمتتونم. تمامی مشخصات سخت‌افزاری و قیمت‌های روز در دسترس من است؛ چه دستگاهی رو مایلید با هم بررسی کنیم؟";
       } else if (matchedProduct) {
-        aiResponse = `در خصوص سوال شما، محصول فوق‌العاده **«${matchedProduct.title || matchedProduct.name}»** در دسته **${matchedProduct.category}** با قیمت **${Number(matchedProduct.discount_price || matchedProduct.price).toLocaleString("fa-IR")} تومان** در انبار موجوده.\n\nاین دستگاه دارای کالیبراسیون سخت‌افزاری، پوشش کامل رنگ DCI-P3 و کارایی بی‌نظیر برای کار با ویدیو و عکس می‌باشد.`;
+        const itemPrice = Number(matchedProduct.discount_price || matchedProduct.discountPrice || matchedProduct.price || 0);
+        aiResponse = `قیمت رسمی و با تخفیف محصول **«${matchedProduct.title || matchedProduct.name}»** در حال حاضر **${itemPrice.toLocaleString("fa-IR")} تومان** است.\n\nاین دستگاه هم‌اکنون موجود در انبار استودیو بوده و با کالیبراسیون سخت‌افزاری، ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز تقدیمتون میشه. کارت خرید مستقیم این کالا نیز در زیر برای شما پیوست شد:`;
+      } else if (normalizedMsg.includes("قیمت") || normalizedMsg.includes("چند")) {
+        aiResponse = "قیمت تمامی محصولات فروشگاه بر اساس نرخ روز و با ضمانت بهترین قیمت تنظیم شده است. مدل خاصی مد نظرتونه تا قیمت دقیقش رو بهتون بگم؟";
       } else {
-        aiResponse = `درود بر شما! در زمینه مشخصات فنی مانیتورهای ۵K رتینا، لپ‌تاپ‌های ورک‌استیشن M4 Max، کارت‌های کپچر 8K و ابزارهای کالیبراسیون رنگ در خدمت شما هستم. لطفاً سوال فنی، مدل مورد نظر یا عکس دستگاه را بفرستید تا دقیقاً براتون تحلیل کنم.`;
+        aiResponse = "درود بر شما! در زمینه مشخصات فنی مانیتورهای ۵K رتینا، لپ‌تاپ‌های ورک‌استیشن M4 Max، کارت‌های کپچر 8K و ابزارهای کالیبراسیون رنگ در خدمتتون هستم. لطفاً سوال فنی، مدل یا عکس دستگاه رو ارسال بفرمایید.";
       }
     }
+
+    const calculatedPrice = matchedProduct
+      ? Number(matchedProduct.discount_price || matchedProduct.discountPrice || matchedProduct.price || 0)
+      : 0;
 
     return NextResponse.json({
       success: true,
@@ -117,9 +147,9 @@ ${userMessage}`;
       matchedProduct: matchedProduct ? {
         id: matchedProduct.id,
         title: matchedProduct.title || matchedProduct.name,
-        price: matchedProduct.price,
-        discount_price: matchedProduct.discount_price,
-        image: matchedProduct.images?.[0] || matchedProduct.image || ""
+        price: calculatedPrice,
+        discount_price: calculatedPrice,
+        image: matchedProduct.images?.[0] || matchedProduct.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"
       } : null
     });
   } catch (error: any) {

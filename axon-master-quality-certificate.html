@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <title>گواهی رسمی کمال مهندسی و بازرسی زنده پلتفرم آکسون</title>
+  <style>
+    body { font-family: Tahoma, sans-serif; background: #07090e; color: #f8fafc; padding: 30px; margin: 0; direction: rtl; }
+    .container { max-width: 1000px; margin: 0 auto; background: #0f172a; border: 1px solid #334155; border-radius: 28px; padding: 35px; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
+    .header { text-align: center; border-bottom: 1px solid #334155; padding-bottom: 20px; margin-bottom: 25px; }
+    .title { font-size: 24px; font-weight: bold; color: #38bdf8; margin: 0; }
+    .badge { display: inline-block; padding: 6px 18px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #34d399; border-radius: 99px; font-weight: bold; font-size: 14px; margin-top: 10px; }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 25px 0; }
+    .box { background: #1e293b; border: 1px solid #334155; border-radius: 18px; padding: 18px; text-align: center; }
+    .val { font-size: 28px; font-weight: bold; color: #38bdf8; font-family: monospace; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+    th, td { border: 1px solid #334155; padding: 10px; text-align: right; }
+    th { background: #1e293b; color: #94a3b8; }
+    .pass { color: #34d399; font-weight: bold; }
+    .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #334155; padding-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 class="title">گواهینامه رسمی بازرسی زنده و کمال مهندسی پلتفرم آکسون (Master Robot)</h1>
+      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه: https://axoncore.ir | شناسه تاییدیه: CERT-ZENITH-77139566</p>
+      <div class="badge">امتیاز کمال مهندسی: 96٪ (Grade A+ Certified)</div>
+    </div>
+    <div class="metrics">
+      <div class="box">
+        <div style="color: #94a3b8; font-size: 12px;">کل آزمون‌های زنده</div>
+        <div class="val">25</div>
+      </div>
+      <div class="box">
+        <div style="color: #94a3b8; font-size: 12px;">موفق و تاییدشده</div>
+        <div class="val" style="color: #34d399;">24</div>
+      </div>
+      <div class="box">
+        <div style="color: #94a3b8; font-size: 12px;">خطا یا ناهماهنگی</div>
+        <div class="val" style="color: #f87171;">1</div>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>لایه سامانه</th>
+          <th>شرح آزمون عملکردی</th>
+          <th>نتیجه</th>
+          <th>زمان پاسخ (ms)</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td>AI-Dialogue</td>
+            <td>هوش مصنوعی: پاسخ گرم و پویا به پیام «سلام» (عدم تکرار متن ثابت)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">2197ms</td>
+          </tr>
+        
+          <tr>
+            <td>AI-Dialogue</td>
+            <td>هوش مصنوعی: پاسخ طبیعی و محاوره‌ای به پیام «چطوری؟»</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">899ms</td>
+          </tr>
+        
+          <tr>
+            <td>AI-Dialogue</td>
+            <td>هوش مصنوعی: استخراج قیمت دقیق مانیتور ۵K و پیوست کارت خرید مستقیم</td>
+            <td class="fail">FAILED ✕</td>
+            <td style="font-family: monospace;">859ms</td>
+          </tr>
+        
+          <tr>
+            <td>AI-Autopilot</td>
+            <td>تحلیل سرچ‌کنسول: استخراج کلمات کلیدی پربازدید و رقبای گوگل</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">403ms</td>
+          </tr>
+        
+          <tr>
+            <td>AI-Autopilot</td>
+            <td>نگارش خودکار مقاله ۲۵۰۰ کلمه‌ای و تزریق مستقیم دکمه خرید محصول</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">756ms</td>
+          </tr>
+        
+          <tr>
+            <td>Hydration-Guard</td>
+            <td>صفحه اصلی (/): رندر ۱۰۰٪ همگام SSR و کلاینت (صفر خطای هیدریشن)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">685ms</td>
+          </tr>
+        
+          <tr>
+            <td>Hydration-Guard</td>
+            <td>صفحه اخبار (/news): همگام‌سازی تاریخ شمسی و تیکر اخبار</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">1943ms</td>
+          </tr>
+        
+          <tr>
+            <td>Catalog-Matrix</td>
+            <td>وب‌سرویس استاندارد ترب: استعلام ۷ محصول پرچمدار با گارانتی طلایی</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">624ms</td>
+          </tr>
+        
+          <tr>
+            <td>3D-Gamut</td>
+            <td>صفحه مانیتور ۵K: لود لایه‌های کالبدشکافی ۳D و شبیه‌ساز ۷ گاموت رنگی</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">927ms</td>
+          </tr>
+        
+          <tr>
+            <td>Security-Vault</td>
+            <td>فایروال مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و ثبت نرخ واقعی دیتابیس</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">752ms</td>
+          </tr>
+        
+          <tr>
+            <td>Security-Vault</td>
+            <td>سشن گارد ادمین: اعتبارسنجی امن توکن‌های HMAC-SHA256</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">272ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 1: محصولات و متغیرهای رنگی (Products)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">136ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 2: انبارداری و هشدار موجودی بحرانی (Inventory)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">194ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 3: موتور سئوی خودمختار سرچ‌کنسول (AI Autopilot)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">407ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 4: هاب اخبار تکنولوژی هر ۶ ساعت (News)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">623ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 5: صفحه‌ساز ماژولار و لندینگ‌پیج (PageBuilder)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">379ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 6: مجله مقالات سئو رنک ۱ گوگل (Blogs)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">415ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 7: موتور تایپوگرافی و وزن‌های ۱۰۰ تا ۹۰۰ (Typography)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">377ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 8: مدیریت فاکتورها، بارنامه و صدور صورتحساب (Orders)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">573ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 9: صندوق تیکت‌ها و وب‌سرویس پیامک (Contact)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">565ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 10: کدهای تخفیف درصدی/نقدی و سقف تخفیف (Coupons)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">596ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 11: باشگاه مشتریان و سطح‌بندی CRM الماس (Customers)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">573ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 12: اسلایدر متحرک تا ۱۰ بنر (Banners)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">595ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 13: منوهای هدر و دسته‌بندی‌های کالا (Menu)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">589ms</td>
+          </tr>
+        
+          <tr>
+            <td>Admin-14-Modules</td>
+            <td>ماژول 14: تنظیمات کلان و ۳ لوگوی متحرک GIF/SVG (SiteInfo)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">602ms</td>
+          </tr>
+        
+      </tbody>
+    </table>
+    <div class="footer">
+      صادر شده توسط ابربات بازرسی زنده آکسون | تاریخ صدور: ۱۴۰۵/۶/۱۰, ۱۹:۰۸:۵۹
+    </div>
+  </div>
+</body>
+</html>

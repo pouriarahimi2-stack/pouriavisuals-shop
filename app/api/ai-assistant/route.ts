@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       )
       .join("\n");
 
-    const systemInstruction = `تو «مشاور هوشمند و مهندس ارشد تکنولوژی فروشگاه ${storeName}» هستی.
+    const systemInstruction = `تو مشاور هوشمند و مهندس ارشد فناوری در فروشگاه پیشرفته تکنولوژی ${storeName} هستی.
 به زبان فارسی کاملاً روان، صمیمی، حرفه‌ای و دقیقاً متناسب با سوال کاربر پاسخ بده.
 - در حوزه تکنولوژی، گجت‌ها، مانیتورها، مک‌بوک‌ها، کارت‌های کپچر و ابزارهای کالیبراسیون راهنمایی کن.
 - اگر کاربر درباره گارانتی و ارسال پرسید، توضیح بده که تمامی کالاها دارای ۱۸ ماه گارانتی اصالت طلایی، ۷ روز مهلت تست و ارسال رایگان پیشتاز برای خریدهای بالای ۲ میلیون تومان هستند.
@@ -58,16 +58,14 @@ ${productCatalogContext}`;
     const cleanKey = apiKey ? String(apiKey).trim() : "";
 
     if (cleanKey && cleanKey.length > 15) {
-      const priorityModels = [
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash-8b",
-        "gemini-1.5-pro-latest",
-        "gemini-pro"
+      const endpointsToTry = [
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
       ];
 
-      for (const modelName of priorityModels) {
+      for (const ep of endpointsToTry) {
         try {
           const parts: any[] = [{ text: `${systemInstruction}\n\n[پیام کاربر]: ${userMessage}` }];
           if (imageBase64) {
@@ -75,20 +73,17 @@ ${productCatalogContext}`;
             parts.push({ inlineData: { mimeType: "image/jpeg", data: cleanBase64 } });
           }
 
-          const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`, {
+          const geminiRes = await fetch(`${ep}?key=${cleanKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": cleanKey },
             body: JSON.stringify({
-              contents: [{ role: "user", parts }],
+              contents: [{ parts }],
               generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
             }),
           });
 
           const geminiJson = await geminiRes.json();
-
-          if (geminiJson.error) {
-            continue; // سوئیچ خودکار در صورت محدودیت سهمیه مدل
-          }
+          if (geminiJson.error) continue;
 
           const text = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text) {
@@ -103,12 +98,11 @@ ${productCatalogContext}`;
 
     const normalized = userMessage.toLowerCase();
 
-    // پاسخ‌های هوشمند اختصاصی در صورت عدم دریافت پاسخ
     if (!aiResponse) {
       if (normalized.includes("گارانتی") || normalized.includes("ارسال") || normalized.includes("ضمانت")) {
         aiResponse = "تمامی سفارش‌های فروشگاه آکسون با **۱۸ ماه گارانتی اصالت طلایی**، ۷ روز مهلت تست سلامت فیزیکی و بسته‌بندی ضدضربه استودیویی ارسال می‌شوند. همچنین کلیه خریدهای بالای ۲ میلیون تومان شامل **ارسال رایگان با پست پیشتاز** به سراسر ایران هستند. 📦🛡️";
       } else if (normalized.includes("سامسونگ") || normalized.includes("samsung")) {
-        aiResponse = "در حال حاضر در فروشگاه آکسون محصولات برند **سامسونگ** موجود نیست و تمرکز ما بر مانیتورها و ورک‌استیشن‌های تخصصی **Apple**، **Blackmagic Design** و **Calibrite** است. اگر مانیتور باکیفیت برای طراحی و تدوین مد نظرتان است، مانیتور **Apple Studio Display 5K** را به شما پیشنهاد می‌کنم.";
+        aiResponse = "در حال حاضر در فروشگاه آکسون محصولات برند **سامسونگ** موجود نیست و تمرکز ما بر مانیتورها و تجهیزات تخصصی **Apple**، **Blackmagic Design** و **Calibrite** است. اگر مانیتور حرفه‌ای مد نظرتان است، مانیتور **Apple Studio Display 5K** را به شما پیشنهاد می‌کنم.";
       } else if (normalized.includes("مک بوک") || normalized.includes("macbook")) {
         aiResponse = "لپ‌تاپ پرچمدار **MacBook Pro 16\" M4 Max** با رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ویژه و گارانتی طلایی در انبار موجود است.";
       } else {

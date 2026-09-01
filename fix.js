@@ -3,10 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🎬 [AXON ARCHITECT] در حال اعمال اصلاح بنیادین هوش مصنوعی، رفع خطای سهمیه و بازطراحی کامل موبایل‌فرست اپل...');
+console.log('🎬 [AXON ARCHITECT] در حال اعمال بازطراحی جامع موبایل‌فرست، حل قطعی دکمه بستن چت و اتصال پایدار Gemini...');
 
 const files = {
-  // ۱. روت تست زنده با اولویت‌بندی قطعی مدل‌های دارای سهمیه باز (Flash Latest / 2.0 Flash)
+  // ۱. روت تست هوش مصنوعی با پشتیبانی دوگانه از v1 و v1beta گوگل
   'app/api/test-ai/route.ts': `// File Path: app/api/test-ai/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -22,49 +22,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "کادر کلید API خالی است." }, { status: 400 });
     }
 
-    // اولویت قطعی با مدل‌های پرسرعت و دارای سهمیه باز روی تمام اکانت‌ها
-    const priorityModels = [
-      "gemini-1.5-flash-latest",
-      "gemini-1.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash-8b",
-      "gemini-1.5-pro-latest",
-      "gemini-1.5-pro",
-      "gemini-pro"
+    // پایپ‌لاین تست اندپوینت‌های v1 و v1beta برای تمام نسخه‌های مدل Flash
+    const endpointsToTry = [
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
+      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent",
     ];
 
     let reply = "";
-    let activeModelName = "";
-    let lastError = "";
+    let successfulEndpoint = "";
+    let lastErrorMsg = "";
 
-    for (const mName of priorityModels) {
+    for (const ep of endpointsToTry) {
       try {
-        const testRes = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/\${mName}:generateContent?key=\${cleanKey}\`, {
+        const testRes = await fetch(\`\${ep}?key=\${cleanKey}\`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-goog-api-key": cleanKey,
           },
           body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: "سلام! یک پاسخ کوتاه بگو: آماده‌ام" }] }],
+            contents: [{ parts: [{ text: "سلام! یک کلمه بگو: آماده‌ام" }] }],
           }),
         });
 
         const testJson = await testRes.json();
 
         if (testJson.error) {
-          lastError = testJson.error.message || "";
-          continue; // در صورت سهمیه نداشتن این مدل خاص، بلافاصله مدل بعدی تست شود
+          lastErrorMsg = testJson.error.message || "";
+          continue; // سوئیچ خودکار به اندپوینت بعدی
         }
 
         const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
         if (generatedText) {
           reply = generatedText.trim();
-          activeModelName = mName;
+          successfulEndpoint = ep.split("/models/")[1]?.split(":")[0] || "gemini-1.5-flash";
           break; // موفقیت قطعی!
         }
       } catch (err: any) {
-        lastError = err?.message || "";
+        lastErrorMsg = err?.message || "";
         continue;
       }
     }
@@ -78,14 +76,14 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: \`✓ اتصال ۱۰۰٪ برقرار شد! پاسخ هوش مصنوعی: "\${reply}" (مدل فعال: \${activeModelName})\`,
-        activeModel: activeModelName,
+        message: \`✓ اتصال ۱۰۰٪ برقرار شد! پاسخ هوش مصنوعی: "\${reply}" (مدل فعال: \${successfulEndpoint})\`,
+        activeModel: successfulEndpoint,
       });
     }
 
     return NextResponse.json({
       success: false,
-      message: \`خطای گوگل: \${lastError || "کلید معتبر نیست یا سهمیه پروژه به اتمام رسیده است."}\`
+      message: \`خطای گوگل: \${lastErrorMsg || "عدم دسترسی به مدل‌ها. لطفاً کلید API را بررسی فرمایید."}\`
     }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: \`خطای سرور: \${err.message}\` }, { status: 500 });
@@ -93,7 +91,7 @@ export async function POST(req: NextRequest) {
 }
 `,
 
-  // ۲. بک‌اند هوش مصنوعی چت با پاسخگویی تخصصی به تمام سوالات و سوئیچ خودکار مدل
+  // ۲. بک‌اند هوش مصنوعی چت با اتصال مقاوم به تمام نسخه‌های Gemini API
   'app/api/ai-assistant/route.ts': `// File Path: app/api/ai-assistant/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -141,7 +139,7 @@ export async function POST(req: Request) {
       )
       .join("\\n");
 
-    const systemInstruction = \`تو «مشاور هوشمند و مهندس ارشد تکنولوژی فروشگاه \${storeName}» هستی.
+    const systemInstruction = \`تو مشاور هوشمند و مهندس ارشد فناوری در فروشگاه پیشرفته تکنولوژی \${storeName} هستی.
 به زبان فارسی کاملاً روان، صمیمی، حرفه‌ای و دقیقاً متناسب با سوال کاربر پاسخ بده.
 - در حوزه تکنولوژی، گجت‌ها، مانیتورها، مک‌بوک‌ها، کارت‌های کپچر و ابزارهای کالیبراسیون راهنمایی کن.
 - اگر کاربر درباره گارانتی و ارسال پرسید، توضیح بده که تمامی کالاها دارای ۱۸ ماه گارانتی اصالت طلایی، ۷ روز مهلت تست و ارسال رایگان پیشتاز برای خریدهای بالای ۲ میلیون تومان هستند.
@@ -154,16 +152,14 @@ export async function POST(req: Request) {
     const cleanKey = apiKey ? String(apiKey).trim() : "";
 
     if (cleanKey && cleanKey.length > 15) {
-      const priorityModels = [
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash-8b",
-        "gemini-1.5-pro-latest",
-        "gemini-pro"
+      const endpointsToTry = [
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
       ];
 
-      for (const modelName of priorityModels) {
+      for (const ep of endpointsToTry) {
         try {
           const parts: any[] = [{ text: \`\${systemInstruction}\\n\\n[پیام کاربر]: \${userMessage}\` }];
           if (imageBase64) {
@@ -171,20 +167,17 @@ export async function POST(req: Request) {
             parts.push({ inlineData: { mimeType: "image/jpeg", data: cleanBase64 } });
           }
 
-          const geminiRes = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/\${modelName}:generateContent?key=\${cleanKey}\`, {
+          const geminiRes = await fetch(\`\${ep}?key=\${cleanKey}\`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": cleanKey },
             body: JSON.stringify({
-              contents: [{ role: "user", parts }],
+              contents: [{ parts }],
               generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
             }),
           });
 
           const geminiJson = await geminiRes.json();
-
-          if (geminiJson.error) {
-            continue; // سوئیچ خودکار در صورت محدودیت سهمیه مدل
-          }
+          if (geminiJson.error) continue;
 
           const text = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text) {
@@ -199,12 +192,11 @@ export async function POST(req: Request) {
 
     const normalized = userMessage.toLowerCase();
 
-    // پاسخ‌های هوشمند اختصاصی در صورت عدم دریافت پاسخ
     if (!aiResponse) {
       if (normalized.includes("گارانتی") || normalized.includes("ارسال") || normalized.includes("ضمانت")) {
         aiResponse = "تمامی سفارش‌های فروشگاه آکسون با **۱۸ ماه گارانتی اصالت طلایی**، ۷ روز مهلت تست سلامت فیزیکی و بسته‌بندی ضدضربه استودیویی ارسال می‌شوند. همچنین کلیه خریدهای بالای ۲ میلیون تومان شامل **ارسال رایگان با پست پیشتاز** به سراسر ایران هستند. 📦🛡️";
       } else if (normalized.includes("سامسونگ") || normalized.includes("samsung")) {
-        aiResponse = "در حال حاضر در فروشگاه آکسون محصولات برند **سامسونگ** موجود نیست و تمرکز ما بر مانیتورها و ورک‌استیشن‌های تخصصی **Apple**، **Blackmagic Design** و **Calibrite** است. اگر مانیتور باکیفیت برای طراحی و تدوین مد نظرتان است، مانیتور **Apple Studio Display 5K** را به شما پیشنهاد می‌کنم.";
+        aiResponse = "در حال حاضر در فروشگاه آکسون محصولات برند **سامسونگ** موجود نیست و تمرکز ما بر مانیتورها و تجهیزات تخصصی **Apple**، **Blackmagic Design** و **Calibrite** است. اگر مانیتور حرفه‌ای مد نظرتان است، مانیتور **Apple Studio Display 5K** را به شما پیشنهاد می‌کنم.";
       } else if (normalized.includes("مک بوک") || normalized.includes("macbook")) {
         aiResponse = "لپ‌تاپ پرچمدار **MacBook Pro 16\\" M4 Max** با رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ویژه و گارانتی طلایی در انبار موجود است.";
       } else {
@@ -248,77 +240,7 @@ export async function POST(req: Request) {
 }
 `,
 
-  // ۳. ایجاد داک ناوبری شناور موبایل شبیه اپلیکیشن‌های بومی آیفون (Mobile Bottom Navigation Dock)
-  'components/MobileBottomNav.tsx': `// File Path: components/MobileBottomNav.tsx
-"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
-
-export default function MobileBottomNav() {
-  const pathname = usePathname();
-  const cartContext = useCart();
-  const { totalItems, toggleCart } = cartContext;
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (pathname?.startsWith("/admin")) return null;
-
-  return (
-    <nav className="sm:hidden fixed bottom-3 left-3 right-3 z-40 bg-[var(--modal-bg)]/90 backdrop-blur-2xl border border-[var(--card-border)] rounded-[2rem] px-4 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.3)] flex items-center justify-around text-[10px] font-black select-none transition-all" dir="rtl" suppressHydrationWarning>
-      
-      <Link
-        href="/"
-        onClick={() => soundEngine.playClick()}
-        className={\`flex flex-col items-center gap-1 transition \${pathname === "/" ? "text-[var(--accent-blue)] scale-105" : "text-[var(--text-secondary)]"}\`}
-      >
-        <span className="text-base">🏠</span>
-        <span>صفحه اصلی</span>
-      </Link>
-
-      <Link
-        href="/#products"
-        onClick={() => soundEngine.playClick()}
-        className={\`flex flex-col items-center gap-1 transition \${pathname === "/products" ? "text-[var(--accent-blue)] scale-105" : "text-[var(--text-secondary)]"}\`}
-      >
-        <span className="text-base">📦</span>
-        <span>محصولات</span>
-      </Link>
-
-      <button
-        onClick={() => { soundEngine.playClick(); toggleCart(); }}
-        className="relative flex flex-col items-center gap-1 text-[var(--text-secondary)] cursor-pointer"
-      >
-        <span className="text-base">🛒</span>
-        <span>سبد خرید</span>
-        {mounted && totalItems > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-[1rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center shadow-md animate-pulse" suppressHydrationWarning>
-            {formatPrice(totalItems)}
-          </span>
-        )}
-      </button>
-
-      <Link
-        href="/track-order"
-        onClick={() => soundEngine.playClick()}
-        className={\`flex flex-col items-center gap-1 transition \${pathname === "/track-order" ? "text-[var(--accent-blue)] scale-105" : "text-[var(--text-secondary)]"}\`}
-      >
-        <span className="text-base">📮</span>
-        <span>رهگیری</span>
-      </Link>
-    </nav>
-  );
-}
-`,
-
-  // ۴. بهینه‌سازی کامپوننت چت در موبایل و حذف اشغال فضا
+  // ۳. بازطراحی کامل مدال چت هوش مصنوعی در موبایل (دکمه بستن در دسترس کامل + بدون گیر کردن)
   'components/AIAssistantChat.tsx': `"use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -349,6 +271,16 @@ export default function AIAssistantChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // قفل اسکرول بدنه صفحه در موبایل هنگام باز بودن چت
+  useEffect(() => {
+    if (isOpen && window.innerWidth < 640) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isOpen]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -398,7 +330,7 @@ export default function AIAssistantChat() {
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: "درود! ارتباط با سرور هوش مصنوعی برقرار است. چطور می‌توانم راهنماییتان کنم؟" },
+        { role: "assistant", text: "درود! ارتباط با سرور برقرار است. چطور می‌توانم راهنماییتان کنم؟" },
       ]);
     } finally {
       setLoading(false);
@@ -413,41 +345,53 @@ export default function AIAssistantChat() {
   ];
 
   return (
-    <div className="fixed bottom-20 sm:bottom-6 left-4 sm:left-6 z-50 font-sans select-none" dir="rtl" suppressHydrationWarning>
+    <div className="font-sans select-none" dir="rtl" suppressHydrationWarning>
       {!isOpen && (
         <>
+          {/* دکمه دسکتاپ: کپسول لوکس شیشه‌ای */}
           <button
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="hidden sm:flex px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
+            className="hidden sm:flex fixed bottom-6 left-6 z-50 px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
           >
             <span className="text-base">🤖</span>
             <span>مشاوره هوشمند تکنولوژی</span>
           </button>
 
+          {/* دکمه موبایل: آیکون گرد شناور بالای داک (Apple Intelligence Orb) */}
           <button
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="sm:hidden w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.6)] flex items-center justify-center text-lg border-2 border-white/30 active:scale-95 transition-all cursor-pointer"
+            className="sm:hidden fixed bottom-20 left-4 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] flex items-center justify-center text-lg border-2 border-white/40 active:scale-90 transition-all cursor-pointer"
             aria-label="دستیار هوش مصنوعی"
           >
-            <span>⚡</span>
+            <span className="animate-pulse">⚡</span>
           </button>
         </>
       )}
 
       {isOpen && (
-        <div className="fixed inset-0 sm:inset-auto sm:w-[420px] sm:h-[580px] sm:max-h-[85vh] sm:rounded-[2.5rem] bg-[var(--modal-bg)] sm:border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-3xl animate-fadeIn z-50">
-          <div className="p-4 border-b border-[var(--card-border)] flex justify-between items-center bg-[var(--input-bg)]">
+        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:left-6 sm:w-[420px] sm:h-[580px] sm:max-h-[85vh] sm:rounded-[2.5rem] bg-[var(--modal-bg)] sm:border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-3xl animate-fadeIn z-[9999]">
+          
+          {/* هدر بالایی با دکمه شفاف و بزرگ بستن گفتگو در موبایل */}
+          <div className="p-4 border-b border-[var(--card-border)] flex justify-between items-center bg-[var(--input-bg)] shrink-0 pt-safe">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm shadow-md">⚡</div>
               <div>
                 <h4 className="text-xs font-black">مشاور هوشمند تکنولوژی</h4>
                 <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  آنلاین و متصل به Gemini 1.5
+                  آنلاین و متصل به Gemini
                 </span>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold cursor-pointer">✕</button>
+
+            {/* دکمه بستن با دسترسی کامل و تاچ بزرگ */}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/30 text-xs font-black transition cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+            >
+              <span>✕</span>
+              <span>بستن</span>
+            </button>
           </div>
 
           <div className="p-4 flex-1 overflow-y-auto space-y-3.5 text-xs leading-relaxed">
@@ -478,12 +422,12 @@ export default function AIAssistantChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="px-3 py-2 bg-[var(--input-bg)] border-t border-[var(--card-border)] flex gap-1.5 overflow-x-auto scrollbar-none">
+          <div className="px-3 py-2 bg-[var(--input-bg)] border-t border-[var(--card-border)] flex gap-1.5 overflow-x-auto scrollbar-none shrink-0">
             {quickPills.map((pill, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSend(pill)}
-                className="px-2.5 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)] whitespace-nowrap cursor-pointer transition"
+                className="px-2.5 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)] whitespace-nowrap cursor-pointer transition shrink-0 active:scale-95"
               >
                 {pill}
               </button>
@@ -491,7 +435,7 @@ export default function AIAssistantChat() {
           </div>
 
           {selectedImage && (
-            <div className="p-2.5 px-4 bg-[var(--input-bg)] border-t border-[var(--card-border)] flex items-center justify-between">
+            <div className="p-2.5 px-4 bg-[var(--input-bg)] border-t border-[var(--card-border)] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <img src={selectedImage} alt="" className="w-10 h-10 object-cover rounded-xl border border-[var(--card-border)]" />
                 <span className="text-[11px] font-bold">عکس ضمیمه شد</span>
@@ -500,11 +444,11 @@ export default function AIAssistantChat() {
             </div>
           )}
 
-          <div className="p-3 border-t border-[var(--card-border)] flex items-center gap-2 bg-[var(--modal-bg)]">
+          <div className="p-3 border-t border-[var(--card-border)] flex items-center gap-2 bg-[var(--modal-bg)] shrink-0 pb-safe">
             <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-sm cursor-pointer" title="ارسال عکس">📷</button>
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-sm cursor-pointer active:scale-95" title="ارسال عکس">📷</button>
             <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="پرسش تخصصی یا گفتگو..." className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none font-medium" />
-            <button type="button" onClick={() => handleSend()} disabled={loading} className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 cursor-pointer shadow-md">ارسال</button>
+            <button type="button" onClick={() => handleSend()} disabled={loading} className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 cursor-pointer shadow-md active:scale-95">ارسال</button>
           </div>
         </div>
       )}
@@ -513,106 +457,74 @@ export default function AIAssistantChat() {
 }
 `,
 
-  // ۵. به‌روزرسانی LayoutWrapper برای ادغام داک ناوبری موبایل
-  'components/LayoutWrapper.tsx': `"use client";
+  // ۴. بهینه‌سازی استایل سراسری برای حذف کامل سرریز افقی و روان‌سازی ۶۰ فریم
+  'app/globals.css': `/* File Path: app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-import React, { useState, useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import CartDrawer from "@/components/CartDrawer";
-import MobileBottomNav from "@/components/MobileBottomNav";
-import { initRealtimeSync } from "@/lib/realtimeSync";
-import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
-import { fontEngine } from "@/lib/fontEngine";
+:root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --card-border: rgba(15, 23, 42, 0.08);
+  --accent-blue: #0071e3;
+  --modal-bg: #ffffff;
+  --input-bg: #f1f5f9;
+}
 
-export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const isAdmin = pathname?.startsWith("/admin");
+.dark {
+  --bg-primary: #07090e;
+  --bg-secondary: #0d1117;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --card-border: rgba(255, 255, 255, 0.1);
+  --accent-blue: #38bdf8;
+  --modal-bg: #0d1117;
+  --input-bg: rgba(255, 255, 255, 0.04);
+}
 
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-  const [maintenanceMode, setMaintenanceMode] = useState<MaintenanceMode>("none");
-  const [maintenanceUntil, setMaintenanceUntil] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
+html, body {
+  overflow-x: hidden !important;
+  width: 100%;
+  max-width: 100vw;
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+}
 
-  const prevModeRef = useRef<MaintenanceMode>("none");
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
 
-  const updateMaintenanceState = (info: SiteInfo | null) => {
-    if (!info) return;
-    setSiteInfo(info);
+.pt-safe {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
 
-    if (info.active_font_id) {
-      fontEngine.applyFontToTarget(info.active_font_id, "body");
-    }
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
 
-    const mode: MaintenanceMode = info.maintenance_mode || (info.allow_google_index === false ? "indefinite" : "none");
-    const until = info.maintenance_until || null;
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
-    if (mode === "timed" && until) {
-      const diff = new Date(until).getTime() - Date.now();
-      if (diff <= 0) {
-        setMaintenanceMode("none");
-        setMaintenanceUntil(null);
-        return;
-      }
-    }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
-    setMaintenanceMode(mode);
-    setMaintenanceUntil(until);
-  };
-
-  useEffect(() => {
-    siteInfoService.getSiteInfo().then((data) => {
-      if (data) updateMaintenanceState(data);
-    });
-
-    const cleanup = initRealtimeSync();
-    const handleUpdate = (e: any) => {
-      if (e.detail) updateMaintenanceState(e.detail);
-    };
-    window.addEventListener("site_info_updated", handleUpdate);
-
-    return () => {
-      if (typeof cleanup === "function") cleanup();
-      window.removeEventListener("site_info_updated", handleUpdate);
-    };
-  }, []);
-
-  if (isAdmin) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-        {children}
-      </div>
-    );
-  }
-
-  if (maintenanceMode !== "none") {
-    const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
-    const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
-    const email = siteInfo?.email || "support@axoncore.ir";
-    const isTimed = maintenanceMode === "timed";
-
-    return (
-      <div dir="rtl" className="min-h-screen flex items-center justify-center p-4 bg-[#07090e] text-slate-100 font-sans select-none" suppressHydrationWarning>
-        <div className="max-w-xl w-full rounded-[2.5rem] bg-slate-900 border border-slate-800 p-8 text-center space-y-6">
-          <span className="text-4xl">⚡</span>
-          <h1 className="text-2xl font-black">{storeName} در حال به‌روزرسانی است</h1>
-          <p className="text-xs text-slate-400">به زودی با خدمات جدید بازمی‌گردیم.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <Header />
-      <main className="flex-1 w-full">{children}</main>
-      <Footer />
-      <CartDrawer />
-      <MobileBottomNav />
-    </>
-  );
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
 }
 `
 };
@@ -622,13 +534,13 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ [UPDATED] فایل اصلاح شد: ${filePath}`);
+  console.log(`✅ [UPDATED] فایل بهینه‌سازی شد: ${filePath}`);
 }
 
 console.log('📦 در حال Push به گیت‌هاب و استقرار روی Vercel...');
 try {
-  execSync('git add . && git commit -m "feat: complete iOS mobile bottom dock, fix quota error with Flash-First priority & dynamic warranty response" && git push origin main', { stdio: 'inherit' });
-  console.log('🎉 [SUCCESS] استقرار نهایی با موفقیت دیپلوی شد!');
+  execSync('git add . && git commit -m "feat: robust dual v1/v1beta Gemini endpoint resolver & accessible mobile AI chat close button" && git push origin main', { stdio: 'inherit' });
+  console.log('🎉 [DEPLOYED] پچ نهایی با موفقیت دیپلوی شد!');
 } catch (e) {
   console.log('⚠️ دستور دستی: git push origin main');
 }

@@ -13,49 +13,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "کادر کلید API خالی است." }, { status: 400 });
     }
 
-    // اولویت قطعی با مدل‌های پرسرعت و دارای سهمیه باز روی تمام اکانت‌ها
-    const priorityModels = [
-      "gemini-1.5-flash-latest",
-      "gemini-1.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash-8b",
-      "gemini-1.5-pro-latest",
-      "gemini-1.5-pro",
-      "gemini-pro"
+    // پایپ‌لاین تست اندپوینت‌های v1 و v1beta برای تمام نسخه‌های مدل Flash
+    const endpointsToTry = [
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
+      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent",
     ];
 
     let reply = "";
-    let activeModelName = "";
-    let lastError = "";
+    let successfulEndpoint = "";
+    let lastErrorMsg = "";
 
-    for (const mName of priorityModels) {
+    for (const ep of endpointsToTry) {
       try {
-        const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${cleanKey}`, {
+        const testRes = await fetch(`${ep}?key=${cleanKey}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-goog-api-key": cleanKey,
           },
           body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: "سلام! یک پاسخ کوتاه بگو: آماده‌ام" }] }],
+            contents: [{ parts: [{ text: "سلام! یک کلمه بگو: آماده‌ام" }] }],
           }),
         });
 
         const testJson = await testRes.json();
 
         if (testJson.error) {
-          lastError = testJson.error.message || "";
-          continue; // در صورت سهمیه نداشتن این مدل خاص، بلافاصله مدل بعدی تست شود
+          lastErrorMsg = testJson.error.message || "";
+          continue; // سوئیچ خودکار به اندپوینت بعدی
         }
 
         const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
         if (generatedText) {
           reply = generatedText.trim();
-          activeModelName = mName;
+          successfulEndpoint = ep.split("/models/")[1]?.split(":")[0] || "gemini-1.5-flash";
           break; // موفقیت قطعی!
         }
       } catch (err: any) {
-        lastError = err?.message || "";
+        lastErrorMsg = err?.message || "";
         continue;
       }
     }
@@ -69,14 +67,14 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `✓ اتصال ۱۰۰٪ برقرار شد! پاسخ هوش مصنوعی: "${reply}" (مدل فعال: ${activeModelName})`,
-        activeModel: activeModelName,
+        message: `✓ اتصال ۱۰۰٪ برقرار شد! پاسخ هوش مصنوعی: "${reply}" (مدل فعال: ${successfulEndpoint})`,
+        activeModel: successfulEndpoint,
       });
     }
 
     return NextResponse.json({
       success: false,
-      message: `خطای گوگل: ${lastError || "کلید معتبر نیست یا سهمیه پروژه به اتمام رسیده است."}`
+      message: `خطای گوگل: ${lastErrorMsg || "عدم دسترسی به مدل‌ها. لطفاً کلید API را بررسی فرمایید."}`
     }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: `خطای سرور: ${err.message}` }, { status: 500 });

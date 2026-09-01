@@ -114,7 +114,8 @@ class MasterRealtimeEngine {
 
       const eventNames = [
         "products_updated", "site_info_updated", "banners_updated",
-        "orders_updated", "coupons_updated", "menu_updated", "news_updated"
+        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
+        "contact_messages_updated", "posts_updated"
       ];
 
       eventNames.forEach((ev) => {
@@ -127,7 +128,7 @@ class MasterRealtimeEngine {
         });
       });
 
-      const tables = ["products", "orders", "site_info", "banners", "tech_news", "coupons", "menu_items", "categories"];
+      const tables = ["products", "orders", "site_info", "banners", "tech_news", "coupons", "menu_items", "categories", "contact_messages", "posts"];
       tables.forEach((tableName) => {
         this.channel?.on(
           "postgres_changes",

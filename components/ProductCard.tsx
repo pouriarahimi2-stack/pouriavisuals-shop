@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
+import { formatPrice } from "@/lib/formatters";
 
 export default function ProductCard({ product }: { product: any }) {
   const { addToCart } = useCart();
@@ -106,11 +107,11 @@ export default function ProductCard({ product }: { product: any }) {
           <div className="flex flex-col">
             {discountPrice && discountPrice < price && (
               <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>
-                {price.toLocaleString("fa-IR")}
+                {formatPrice(price)}
               </span>
             )}
             <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
-              {currentPrice.toLocaleString("fa-IR")}{" "}
+              {formatPrice(currentPrice)}{" "}
               <span className="text-xs font-bold font-sans">تومان</span>
             </span>
           </div>

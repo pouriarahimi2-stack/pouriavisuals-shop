@@ -15,7 +15,6 @@ import { formatPrice } from "@/lib/formatters";
 export default function HomePage() {
   const { addToCart } = useCart();
 
-  // استیت اولیه پایدار و ۱۰۰٪ یکسان با SSR سرور
   const [products, setProducts] = useState<Product[]>(FLAGSHIP_7_PRODUCTS);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);

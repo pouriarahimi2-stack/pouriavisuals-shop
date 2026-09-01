@@ -8,7 +8,6 @@ import { userBehavior } from "@/lib/userBehavior";
 import { formatDateFa } from "@/lib/formatters";
 
 export default function TechNewsHubPage() {
-  // استیت اولیه همگام با سرور جهت جلوگیری از هرگونه خطای هیدریشن
   const [news, setNews] = useState<TechNewsItem[]>(STATIC_DEFAULT_NEWS);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -61,7 +60,7 @@ export default function TechNewsHubPage() {
   });
 
   return (
-    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
+    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl" suppressHydrationWarning>
       
       {/* سربرگ هاب اخبار */}
       <div className="p-8 sm:p-12 rounded-[2.5rem] bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 backdrop-blur-3xl">

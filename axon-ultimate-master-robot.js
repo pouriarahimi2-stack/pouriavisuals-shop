@@ -7,7 +7,7 @@ const path = require('path');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   👑 ابرسامانه نهایی بازرسی خط‌به‌خط، آزمون نفوذ و پایش زنده پلتفرم آکسون (Apex Quantum Sentinel v2026.3)');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   👑 ابرسامانه نهایی بازرسی خط‌به‌خط، آزمون نفوذ و پایش زنده پلتفرم آکسون (Apex Omni Sentinel v2026.4)');
 console.log('\x1b[35m%s\x1b[0m', '╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 const BASE_URL = process.env.SITE_URL || 'https://axoncore.ir';
@@ -57,7 +57,7 @@ function request(path, options = {}) {
       path: fullUrl.pathname + fullUrl.search,
       method: options.method || 'GET',
       headers: {
-        'User-Agent': 'Axon-Apex-Quantum-Sentinel/2026.3 (High-Precision Deep Inspector)',
+        'User-Agent': 'Axon-Apex-Omni-Sentinel/2026.4 (High-Precision Full Coverage Inspector)',
         'Accept': 'application/json, text/html, */*',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         ...(options.headers || {}),
@@ -98,7 +98,7 @@ function request(path, options = {}) {
   });
 }
 
-async function runApexInspection() {
+async function runApexOmniInspection() {
   console.log(`🎯 دامنه هدف آزمون عمیق: \x1b[32m${BASE_URL}\x1b[0m`);
   console.log(`⏱️ زمان شروع بازرسی خط‌به‌خط: \x1b[33m${new Date().toLocaleString('fa-IR')}\x1b[0m\n`);
 
@@ -130,7 +130,7 @@ async function runApexInspection() {
   assertBot('API-Core', 'تاییدیه رسمی نماد اعتماد الکترونیکی (/27424534.txt)', enamadCheck.raw.trim() === '27424534', 'کد امنیتی ۲۷۴۲۴۵۳۴ به عنوان text/plain تایید شد.', enamadCheck.latency);
 
   const robotsRes = await request('/robots.txt');
-  assertBot('API-Core', 'فایل کنترل خزنده‌های جستجوگر (/robots.txt)', robotsRes.ok && robotsRes.raw.includes('User-agent'), 'قوانین سئو با موفقیت بارگذاری شد.', robotsRes.latency);
+  assertBot('API-Core', 'فایل کنترل خزنده‌های جستجوگر (/robots.txt)', robotsRes.ok && robotsRes.raw.toLowerCase().includes('user-agent'), 'قوانین سئو با موفقیت بارگذاری شد.', robotsRes.latency);
 
   const sitemapRes = await request('/sitemap.xml');
   assertBot('API-Core', 'نقشه داینامیک سایت برای ایندکس گوگل (/sitemap.xml)', sitemapRes.ok, 'نقشه سایت فعال است.', sitemapRes.latency);
@@ -158,7 +158,7 @@ async function runApexInspection() {
   });
   const priceStudioReply = priceStudioTest.json?.response || priceStudioTest.json?.reply || '';
   const hasMatchedStudioCard = priceStudioTest.json?.matchedProduct && (priceStudioTest.json?.matchedProduct?.id?.includes('studio') || priceStudioTest.json?.matchedProduct?.price > 0);
-  assertBot('AI-Intelligence', '۳. هوش مصنوعی: استخراج نرخ مانیتور ۵K با تطبیق فازی و پیوست کارت خرید', priceStudioTest.ok && (priceStudioReply.includes('تومان') || priceStudioReply.includes('۱۲۸')) && !!hasMatchedStudioCard, `کارت متصل: ${priceStudioTest.json?.matchedProduct?.title} (${formatToman(priceStudioTest.json?.matchedProduct?.price || 128500000)} ت)`, priceStudioTest.latency);
+  assertBot('AI-Intelligence', '۳. هوش مصنوعی: استخراج نرخ مانیتور ۵K با تطبیق فازی و پیوست کارت خرید', priceStudioTest.ok && (priceStudioReply.includes('تومان') || priceStudioReply.includes('۱۲۸') || priceStudioReply.includes('128')) && !!hasMatchedStudioCard, `کارت متصل: ${priceStudioTest.json?.matchedProduct?.title} (${formatToman(priceStudioTest.json?.matchedProduct?.price || 128500000)} ت)`, priceStudioTest.latency);
 
   const nonStockBrandTest = await request('/api/ai-assistant', {
     method: 'POST',
@@ -343,7 +343,7 @@ async function runApexInspection() {
 <body>
   <div class="container">
     <div class="header">
-      <h1 class="title">گواهینامه رسمی بازرسی خط‌به‌خط و کمال مهندسی پلتفرم آکسون (Apex Quantum Robot)</h1>
+      <h1 class="title">گواهینامه رسمی بازرسی خط‌به‌خط و کمال مهندسی پلتفرم آکسون (Apex Omni Robot)</h1>
       <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه: ${BASE_URL} | شناسه تاییدیه: ${certId}</p>
       <div class="badge">امتیاز کمال مهندسی: ${finalScore}٪ (Grade A+ Certified)</div>
     </div>
@@ -382,7 +382,7 @@ async function runApexInspection() {
       </tbody>
     </table>
     <div class="footer">
-      صادر شده توسط ابرسامانه بازرسی Apex Quantum Sentinel | تاریخ صدور: ${new Date().toLocaleString('fa-IR')}
+      صادر شده توسط ابرسامانه بازرسی Apex Omni Sentinel | تاریخ صدور: ${new Date().toLocaleString('fa-IR')}
     </div>
   </div>
 </body>
@@ -395,7 +395,7 @@ async function runApexInspection() {
 
   // جمع‌بندی نهایی
   console.log('\n\x1b[35m%s\x1b[0m', '╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-  console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🏆 کارنامه نهایی پایش خط‌به‌خط پلتفرم آکسون (Apex Quantum Certified)');
+  console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🏆 کارنامه نهایی پایش خط‌به‌خط پلتفرم آکسون (Apex Omni Certified)');
   console.log('\x1b[35m%s\x1b[0m', '╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
   console.log(`  • کل آزمون‌های زنده، ساختاری، دیتابیس و ۱۴ ماژول ادمین: \x1b[1m${totalTests} مؤلفه تخصصی\x1b[0m`);
@@ -409,4 +409,4 @@ async function runApexInspection() {
   console.log('\x1b[90m───────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m\n');
 }
 
-runApexInspection();
+runApexOmniInspection();

@@ -7,7 +7,6 @@ export function formatPrice(amount: number | string | undefined | null): string 
   return parts.replace(/\d/g, (d) => farsiDigits[parseInt(d, 10)]);
 }
 
-// الگوریتم ریاضی و ۱۰۰٪ قطعی تبدیل تاریخ میلادی به خورشیدی (بدون وابستگی به ICU مرورگر/سرور)
 function gregorianToJalali(gy: number, gm: number, gd: number): [number, number, number] {
   const g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
   let gy2 = (gm > 2) ? (gy + 1) : gy;

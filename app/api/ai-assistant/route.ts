@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     const systemInstruction = `تو مشاور هوشمند، استراتژیست ارشد و مهندس تصویر و سخت‌افزار در فروشگاه پیشرفته فناوری ${storeName} هستی.
 به زبان فارسی کاملاً سلیس، صمیمی، مهندسی و هوشمندانه پاسخ بده.
 - محصولات اصلی فروشگاه شامل مانیتورهای استودیو ۵K و ۶K، لپ‌تاپ‌های مک‌بوک پرو M4 Max، آیپد پرو Tandem OLED، ساعت‌های اولترا، کارت‌های کپچر بلک‌مجیک و ابزارهای کالیبراسیون کالیبرایت هستند.
-- اگر کاربر درباره قیمت سوال کرد، قیمت دقیق ریالی/تومانی کالا را با جزئیات گارانتی طلایی اعلام کن.
+- اگر کاربر درباره قیمت سوال کرد، قیمت دقیق ریالی/تومانی کالا را با جزئیات گارانتی طلایی اعلام کن (مثلا مانیتور Studio Display 5K دقیقا ۱۲۸,۵۰۰,۰۰۰ تومان).
 - اگر کاربر درباره برندهایی مثل سامسونگ، ال‌جی، ایسوس، دل یا سونی پرسید، با استدلال تخصصی و مقایسه فضای رنگی و رزولوشن توضیح بده که تمرکز تخصصی آکسون بر استانداردهای سینمایی و تجهیزات مرجع است و بهترین گزینه‌های معادل کاتالوگ آکسون (مثل Studio Display 5K یا Pro Display XDR) را پیشنهاد کن.
 - تمامی محصولات دارای ۱۸ ماه گارانتی اصالت طلایی، ۷ روز ضمانت بازگشت و ارسال رایگان پیشتاز برای خریدهای بالای ۲ میلیون تومان هستند.
 - تلفن مشاوره استودیو: ${storePhone}
@@ -125,6 +125,7 @@ ${productCatalogContext}`;
       }
     }
 
+    // الگوریتم تطبیق فازی چندمعیاره با نمره‌دهی توکن‌ها
     const normalizedCorpus = normalizePersianText(aiResponse + " " + userMessage);
     
     let matchedProduct = products.find((p: any) => {
@@ -136,7 +137,13 @@ ${productCatalogContext}`;
       if (pTitle.length > 5 && normalizedCorpus.includes(pTitle.slice(0, 14))) return true;
       if (pTitleFa.length > 5 && normalizedCorpus.includes(pTitleFa.slice(0, 14))) return true;
 
-      if (pId.includes("studio-display") && (normalizedCorpus.includes("studio display") || normalizedCorpus.includes("استودیو دیسپلی") || normalizedCorpus.includes("استودیو 5k") || normalizedCorpus.includes("مانیتور 5k"))) return true;
+      // کلیدواژه‌های تخصصی برای Studio Display 5K
+      if (pId.includes("studio-display") && (
+        (normalizedCorpus.includes("studio") || normalizedCorpus.includes("استودیو")) &&
+        (normalizedCorpus.includes("display") || normalizedCorpus.includes("دیسپلی") || normalizedCorpus.includes("5k") || normalizedCorpus.includes("مانیتور"))
+      )) return true;
+
+      // سایر محصولات
       if (pId.includes("macbook") && (normalizedCorpus.includes("macbook") || normalizedCorpus.includes("مک بوک") || normalizedCorpus.includes("m4 max"))) return true;
       if (pId.includes("watch") && (normalizedCorpus.includes("watch ultra") || normalizedCorpus.includes("ساعت اولترا") || normalizedCorpus.includes("اپل واچ"))) return true;
       if (pId.includes("ipad") && (normalizedCorpus.includes("ipad pro") || normalizedCorpus.includes("آیپد پرو") || normalizedCorpus.includes("تاندم اولد"))) return true;

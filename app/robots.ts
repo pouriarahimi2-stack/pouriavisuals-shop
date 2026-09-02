@@ -18,9 +18,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
     if (data && (data.allow_google_index === false || data.maintenance_mode !== "none")) {
       allowIndex = false;
     }
-  } catch (err) {
-    console.warn("Robots database fallback query:", err);
-  }
+  } catch {}
 
   if (!allowIndex) {
     return {

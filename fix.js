@@ -3,446 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🎬 [AXON ARCHITECT] در حال رفع قطعی خطای کامپایل، بازطراحی کامل UI سبک Google Stitch، تعمیم حوزه تکنولوژی و پاکسازی دیتابیس...');
+console.log('🎬 [AXON ARCHITECT] در حال اجرای بازطراحی اصیل و فوق‌مدرن Google Stitch Bento UI، تعمیم کامل حوزه تکنولوژی، فهرست خودکار سئو و رفع خطای کامپایل...');
 
 const files = {
-  // ۱. کاتالوگ جامع تکنولوژی با رفع قطعی خطای سینتکس کوتیشن
-  'services/productService.ts': `// File Path: services/productService.ts
-import { supabase } from "@/lib/supabase";
-import { realtimeEngine } from "@/lib/realtimeSync";
-
-export interface ProductVariant {
-  id: string;
-  name: string;
-  colorHex?: string;
-  modelType?: string;
-  priceDelta?: number;
-  stock?: number;
-}
-
-export interface MarketBenchmark {
-  storeName: string;
-  price?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  warranty: string;
-  isOurStore?: boolean;
-  deliveryTime?: string;
-  logo?: string;
-}
-
-export interface Product {
-  id: string;
-  title: string;
-  name?: string;
-  title_fa?: string;
-  sku?: string;
-  brand?: string;
-  price: number;
-  discountPrice?: number;
-  discount_price?: number;
-  originalPrice?: number;
-  stock: number;
-  category: string;
-  category_id?: string;
-  category_name?: string;
-  description: string;
-  short_description?: string;
-  highlights?: string[];
-  image: string;
-  image_url?: string;
-  images: string[];
-  variants?: ProductVariant[];
-  specs: Record<string, string>;
-  warranty?: string;
-  badge?: string;
-  isAvailable: boolean;
-  is_available?: boolean;
-  is_featured?: boolean;
-  market_comparison?: MarketBenchmark[];
-  meta_title?: string;
-  meta_description?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-const LOCAL_PRODUCTS_CACHE = "axon_products_registry_cache_v2026";
-
-export const FLAGSHIP_7_PRODUCTS: Product[] = [
-  {
-    id: "prod-macbook-pro-m5-max",
-    title: "MacBook Pro 16 Inch (Apple M4 Max, 128GB RAM, 2TB SSD)",
-    name: "MacBook Pro 16 Inch (Apple M4 Max, 128GB RAM, 2TB SSD)",
-    title_fa: "لپ‌تاپ پرچمدار ۱۶ اینچ با تراشه M4 Max، حافظه رم ۱۲۸ گیگابایت و ۲ ترابایت SSD",
-    brand: "Apple",
-    category: "لپ‌تاپ و اولترابوک",
-    price: 310000000,
-    discountPrice: 208500000,
-    discount_price: 208500000,
-    originalPrice: 310000000,
-    stock: 8,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی آکسون + مهلت تست ۷ روزه",
-    badge: "⚡ ابرقدرت پردازش",
-    image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-    images: [
-      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-      "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800"
-    ],
-    description: "ورک‌استیشن پرتابل ۱۶ اینچ با صفحه Liquid Retina XDR، پردازشگر ۱۶ هسته‌ای M4 Max با ۴۰ هسته گرافیکی و پهنای باند حافظه ۵۴۶ گیگابایت بر ثانیه.",
-    highlights: [
-      "تراشه ۳ نانومتری با ۴۰ هسته گرافیکی",
-      "رم یکپارچه ۱۲۸ گیگابایت فوق‌سریع",
-      "صفحه نمایش ۱۲۰ هرتز Liquid Retina XDR",
-      "باتری با دوام تا ۲۲ ساعت کار مداوم"
-    ],
-    specs: {
-      "پردازنده مرکزی": "Apple M4 Max (16-Core CPU, 40-Core GPU)",
-      "حافظه رم": "128GB Unified Memory",
-      "حافظه ذخیره‌سازی": "2TB NVMe SSD",
-      "نمایشگر": "16.2 Inch Liquid Retina XDR (120Hz ProMotion)"
-    }
-  },
-  {
-    id: "prod-apple-watch-ultra-3",
-    title: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS)",
-    name: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS)",
-    title_fa: "ساعت هوشمند پرچمدار بدنه تیتانیوم ۴۹ میلی‌متری با روشنایی ۳۰۰۰ نیت",
-    brand: "Apple",
-    category: "گجت‌های هوشمند",
-    price: 58500000,
-    discountPrice: 55800000,
-    discount_price: 55800000,
-    originalPrice: 58500000,
-    stock: 12,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی تعویض طلایی شرکتی",
-    badge: "🏔️ مقاوم‌ترین ساعت هوشمند",
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800",
-    images: ["https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800"],
-    description: "ساعت هوشمند پرچمدار با بدنه تیتانیوم گرید هوافضا، شیشه یاقوت کبود، روشنایی نمایشگر ۳۰۰۰ نیت و مقاومت در برابر آب تا عمق ۱۰۰ متر.",
-    highlights: ["روشنایی خیره‌کننده ۳۰۰۰ نیت", "بدنه تیتانیوم گرید ۵", "عمق‌سنج خودکار و آژیر اضطراری"],
-    specs: { "جنس بدنه": "Titanium Grade 5", "روشنایی": "3000 Nits OLED", "مقاومت آب": "100 متر (WR100)" }
-  },
-  {
-    id: "prod-ipad-pro-13-m5",
-    title: "iPad Pro 13 Inch (Apple M4, Tandem OLED, 256GB)",
-    name: "iPad Pro 13 Inch (Apple M4, Tandem OLED, 256GB)",
-    title_fa: "تبلت پرچمدار ۱۳ اینچ با نمایشگر Tandem OLED و تراشه M4",
-    brand: "Apple",
-    category: "گجت‌های هوشمند",
-    price: 98500000,
-    discountPrice: 94900000,
-    discount_price: 94900000,
-    originalPrice: 98500000,
-    stock: 9,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی",
-    badge: "🎨 باریک‌ترین تبلت دنیا",
-    image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800",
-    images: ["https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800"],
-    description: "باریک‌ترین دستگاه تاریخ با ضخامت ۵.۱ میلی‌متر، نمایشگر Ultra Retina XDR با دو لایه اولد تاندم و قدرت پردازش تراشه M4.",
-    highlights: ["فناوری Tandem OLED", "ضخامت شگفت‌انگیز ۵.۱ میلی‌متر", "پردازنده پرقدرت M4"],
-    specs: { "نمایشگر": "13.0 Inch Tandem OLED", "روشنایی": "1600 Nits Peak", "ضخامت": "5.1 میلی‌متر" }
-  },
-  {
-    id: "prod-studio-display-5k",
-    title: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
-    name: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
-    title_fa: "نمایشگر ۲۷ اینچ ۵K رتینا با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری",
-    brand: "Apple",
-    category: "صوتی و تصویر",
-    price: 135000000,
-    discountPrice: 128500000,
-    discount_price: 128500000,
-    originalPrice: 135000000,
-    stock: 6,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی آکسون",
-    badge: "🖥️ وضوح شگفت‌انگیز 5K",
-    image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
-    images: ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"],
-    description: "نمایشگر حرفه‌ای ۲۷ اینچ با تفکیک رنگ ۱۰ بیتی، پوشش کامل گاموت DCI-P3، درگاه تاندربولت ۳ و سیستم صوتی ۶ درایور استودیو.",
-    highlights: ["پنل 5K رتینا با ۲۱۸ PPI", "پوشش ۹۹.۲٪ گاموت DCI-P3", "شیشه نانوتکستچر ضد انعکاس"],
-    specs: { "رزولوشن": "5120 در 2880 پیکسل", "روشنایی": "600 نیت پایدار", "پورت‌ها": "Thunderbolt 3 + USB-C" }
-  },
-  {
-    id: "prod-pro-display-xdr-6k",
-    title: "Apple Pro Display XDR 32 Inch 6K Retina (HDR 1600 Nits)",
-    name: "Apple Pro Display XDR 32 Inch 6K Retina (HDR 1600 Nits)",
-    title_fa: "نمایشگر پرچمدار ۳۲ اینچ ۶K با روشنایی ۱۶۰۰ نیت و کنتراست ۱,۰۰۰,۰۰۰:۱",
-    brand: "Apple",
-    category: "صوتی و تصویر",
-    price: 295000000,
-    discountPrice: 279000000,
-    discount_price: 279000000,
-    originalPrice: 295000000,
-    stock: 4,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی تعویض طلایی",
-    badge: "💎 استاندارد 6K HDR",
-    image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800",
-    images: ["https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800"],
-    description: "نمایشگر ۶K حرفه‌ای با ماتریس نوردهی موضعی ۵۷۶ زون، کنتراست ۱,۰۰۰,۰۰۰:۱ و پوشش ۱۰۰٪ فضای رنگی سینمایی.",
-    highlights: ["رزولوشن 6K با ۲۰.۴ میلیون پیکسل", "روشنایی ۱۶۰۰ نیت", "کنتراست بی‌نهایت ۱,۰۰۰,۰۰۰:۱"],
-    specs: { "رزولوشن": "6016 در 3384 پیکسل", "روشنایی پیک": "1600 نیت", "تعداد زون‌ها": "576 ناحیه مستقل" }
-  },
-  {
-    id: "prod-decklink-8k-pro",
-    title: "Blackmagic DeckLink 8K Pro Capture Card",
-    name: "Blackmagic DeckLink 8K Pro",
-    title_fa: "کارت کپچر و پردازش ویدیویی 8K با درگاه چهارگانه 12G-SDI",
-    brand: "Blackmagic Design",
-    category: "سخت‌افزار و پردازش",
-    price: 68000000,
-    discountPrice: 63500000,
-    discount_price: 63500000,
-    originalPrice: 68000000,
-    stock: 5,
-    isAvailable: true,
-    is_available: true,
-    is_featured: false,
-    warranty: "۲ سال گارانتی معتبر شرکتی",
-    badge: "🎬 پردازش 8K RAW",
-    image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800",
-    images: ["https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800"],
-    description: "کارت کپچر PCIe نسل جدید با پشتیبانی از استریم‌های 8K DCI تا ۶۰ فریم در ثانیه با عمق رنگ ۱۲ بیت RGB 4:4:4.",
-    highlights: ["پشتیبانی تا 8K DCI", "چهار پورت دوطرفه 12G-SDI", "رابط PCIe Gen3 x8 با تاخیر صفر"],
-    specs: { "رزولوشن کپچر": "8K DCI 60p", "عمق رنگ": "12-Bit RGB 4:4:4", "درگاه‌ها": "4x 12G-SDI" }
-  },
-  {
-    id: "prod-calibrite-colorchecker",
-    title: "Calibrite ColorChecker Display Plus Sensor",
-    name: "Calibrite ColorChecker Display Plus",
-    title_fa: "سنسور کالیبراسیون سخت‌افزاری نمایشگرها تا ۲۰۰۰ نیت",
-    brand: "Calibrite",
-    category: "هوش مصنوعی و دیجیتال",
-    price: 29500000,
-    discountPrice: 27800000,
-    discount_price: 27800000,
-    originalPrice: 29500000,
-    stock: 7,
-    isAvailable: true,
-    is_available: true,
-    is_featured: false,
-    warranty: "۱ سال گارانتی تعویض شرکتی",
-    badge: "🎯 دقت سنجش رنگ",
-    image: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800",
-    images: ["https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800"],
-    description: "حسگر کالیبراسیون اپتیکال برای سنجش دقیق نمایشگرهای HDR، OLED و Mini-LED تا روشنایی ۲۰۰۰ نیت.",
-    highlights: ["سنجش شدت نور تا ۲۰۰۰ نیت", "فیلتر اپتیکال شیشه‌ای", "سازگار با ویندوز و مک"],
-    specs: { "دامنه سنجش": "0.05 تا 2000 cd/m2", "دقت": "Delta E < 0.2", "اتصال": "USB-C" }
-  }
-];
-
-export function normalizeProduct(p: any): Product {
-  if (!p) return FLAGSHIP_7_PRODUCTS[0];
-  const price = Number(p.price || 0);
-  const discountPrice =
-    p.discountPrice !== undefined && p.discountPrice !== null
-      ? Number(p.discountPrice)
-      : p.discount_price !== undefined && p.discount_price !== null
-      ? Number(p.discount_price)
-      : undefined;
-
-  const images = Array.isArray(p.images) && p.images.length > 0
-    ? p.images
-    : [p.image || p.image_url || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"];
-
-  const stock = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 10;
-  const isAvailable = p.is_available !== false && p.isAvailable !== false && stock > 0;
-
-  return {
-    ...p,
-    id: String(p.id),
-    title: p.title || p.name || "کالای تکنولوژی",
-    name: p.name || p.title || "کالای تکنولوژی",
-    title_fa: p.title_fa || "",
-    sku: p.sku || \`SKU-\${String(p.id).slice(-6)}\`,
-    brand: p.brand || "Axon Tech",
-    price,
-    discountPrice,
-    discount_price: discountPrice,
-    originalPrice: p.originalPrice ? Number(p.originalPrice) : price,
-    stock,
-    category: p.category || p.category_name || "تکنولوژی",
-    description: p.description || "تجهیزات تخصصی و گجت‌های نوین با گارانتی اصالت طلایی آکسون",
-    short_description: p.short_description || "",
-    highlights: Array.isArray(p.highlights) ? p.highlights : [],
-    image: images[0],
-    image_url: images[0],
-    images,
-    variants: Array.isArray(p.variants) ? p.variants : [],
-    specs: p.specs && typeof p.specs === "object" ? p.specs : {},
-    warranty: p.warranty || "۱۸ ماه گارانتی اصالت طلایی آکسون",
-    badge: p.badge || "",
-    isAvailable,
-    is_available: isAvailable,
-    is_featured: Boolean(p.is_featured),
-    market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
-    created_at: p.created_at || new Date().toISOString(),
-    updated_at: p.updated_at || new Date().toISOString(),
-  };
-}
-
-export const productService = {
-  getProductSync(id: string): Product | null {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(LOCAL_PRODUCTS_CACHE);
-        if (cached) {
-          const list: Product[] = JSON.parse(cached);
-          const found = list.find((p) => p.id === id);
-          if (found) return normalizeProduct(found);
-        }
-      } catch {}
-    }
-    const defaultItem = FLAGSHIP_7_PRODUCTS.find((p) => p.id === id);
-    return defaultItem ? normalizeProduct(defaultItem) : null;
-  },
-
-  getAllSync(): Product[] {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(LOCAL_PRODUCTS_CACHE);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map(normalizeProduct);
-          }
-        }
-      } catch {}
-    }
-    return FLAGSHIP_7_PRODUCTS.map(normalizeProduct);
-  },
-
-  async getAll(): Promise<Product[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          const normalized = data.map(normalizeProduct);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(normalized));
-          }
-          return normalized;
-        }
-      }
-      return this.getAllSync();
-    } catch {
-      return this.getAllSync();
-    }
-  },
-
-  async getById(id: string): Promise<Product | null> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .eq("id", id)
-          .maybeSingle();
-
-        if (!error && data) {
-          return normalizeProduct(data);
-        }
-      }
-      return this.getProductSync(id);
-    } catch {
-      return this.getProductSync(id);
-    }
-  },
-
-  async saveProduct(productData: Partial<Product>): Promise<Product | null> {
-    try {
-      const id = productData.id || \`prod_\${Date.now()}\`;
-      const normalized = normalizeProduct({ ...productData, id });
-
-      const dbPayload: any = {
-        id: normalized.id,
-        title: normalized.title,
-        name: normalized.title,
-        title_fa: normalized.title_fa || null,
-        sku: normalized.sku || null,
-        brand: normalized.brand || "Axon Tech",
-        price: normalized.price,
-        discount_price: normalized.discountPrice || null,
-        stock: normalized.stock,
-        category: normalized.category,
-        description: normalized.description,
-        short_description: normalized.short_description || null,
-        highlights: normalized.highlights || [],
-        image: normalized.image,
-        image_url: normalized.image,
-        images: normalized.images,
-        variants: normalized.variants || [],
-        specs: normalized.specs || {},
-        warranty: normalized.warranty || null,
-        badge: normalized.badge || null,
-        is_available: normalized.is_available,
-        is_featured: normalized.is_featured,
-        market_comparison: normalized.market_comparison || [],
-        meta_title: normalized.meta_title || normalized.title,
-        meta_description: normalized.meta_description || normalized.short_description || null,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (supabase) {
-        await supabase.from("products").upsert(dbPayload, { onConflict: "id" });
-      }
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = [normalized, ...all.filter((p) => p.id !== normalized.id)];
-        localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("products_updated", updated);
-      }
-
-      return normalized;
-    } catch (e) {
-      console.error("productService.saveProduct error:", e);
-      return null;
-    }
-  },
-
-  async deleteProduct(id: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("products").delete().eq("id", id);
-      }
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = all.filter((p) => p.id !== id);
-        localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("products_updated", updated);
-      }
-      return true;
-    } catch (e) {
-      console.error("productService.deleteProduct error:", e);
-      return false;
-    }
-  },
-};
-
-export default productService;
-`,
-
-  // ۲. استایل‌های سراسری با هارمونی Google Stitch و افکت شیشه‌ای
+  // ۱. استایل‌های سراسری با متریال و توکن‌های اختصاصی Google Stitch Bento
   'app/globals.css': `/* File Path: app/globals.css */
 @tailwind base;
 @tailwind components;
@@ -459,19 +23,21 @@ export default productService;
   --modal-bg: #ffffff;
   --input-bg: #f1f5f9;
   --stitch-card: #ffffff;
+  --stitch-bento: rgba(255, 255, 255, 0.85);
 }
 
 .dark {
-  --bg-primary: #06090e;
-  --bg-secondary: #0c111a;
+  --bg-primary: #070a11;
+  --bg-secondary: #0d131f;
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --card-border: rgba(255, 255, 255, 0.08);
   --accent-blue: #38bdf8;
   --accent-glow: rgba(56, 189, 248, 0.2);
-  --modal-bg: #0c111a;
-  --input-bg: rgba(255, 255, 255, 0.03);
-  --stitch-card: #0f1726;
+  --modal-bg: #0d131f;
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --stitch-card: #0e1524;
+  --stitch-bento: rgba(14, 21, 36, 0.85);
 }
 
 html, body {
@@ -507,6 +73,22 @@ body {
   scrollbar-width: none;
 }
 
+/* کارت‌های بنتو استایل Google Stitch */
+.stitch-bento {
+  background: var(--stitch-bento);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 15px 35px -10px rgba(0,0,0,0.06);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stitch-bento:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 25px 50px -12px var(--accent-glow);
+  transform: translateY(-2px);
+}
+
 .stitch-card {
   background: var(--stitch-card);
   border: 1px solid var(--card-border);
@@ -517,6 +99,16 @@ body {
 .stitch-card:hover {
   border-color: var(--accent-blue);
   box-shadow: 0 20px 40px -15px var(--accent-glow);
+  transform: translateY(-3px);
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.animate-pulseGlow {
+  animation: pulseGlow 4s ease-in-out infinite;
 }
 
 @keyframes fadeIn {
@@ -529,50 +121,7 @@ body {
 }
 `,
 
-  // ۳. چیدمان و سئوی کلان تکنولوژی
-  'app/layout.tsx': `// File Path: app/layout.tsx
-import type { Metadata, Viewport } from 'next';
-import './globals.css';
-import { CartProvider } from '@/context/CartContext';
-import LayoutWrapper from '@/components/LayoutWrapper';
-
-export const metadata: Metadata = {
-  title: 'آکسون | مرجع جامع تکنولوژی، سخت‌افزار و گجت‌های هوشمند',
-  description: 'فروشگاه تخصصی و مرجع پیشرفته انواع گجت‌های نوین، سخت‌افزار، قطعات پردازشی، لپ‌تاپ و ابزارهای هوش مصنوعی با گارانتی اصالت طلایی',
-  other: { enamad: '27424534' },
-};
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#06090e' },
-  ],
-};
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <head>
-        <meta name="enamad" content="27424534" />
-        <link id="axon-dynamic-favicon" rel="icon" href="/favicon.ico" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
-      </head>
-      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased transition-colors min-h-screen flex flex-col justify-between" suppressHydrationWarning>
-        <CartProvider>
-          <LayoutWrapper>{children}</LayoutWrapper>
-        </CartProvider>
-      </body>
-    </html>
-  );
-}
-`,
-
-  // ۴. بازطراحی کامل صفحه نخست به سبک Google Stitch + Apple Glass
+  // ۲. بازطراحی کامل و خیره‌کننده صفحه اصلی به سبک Google Stitch Bento Grid
   'app/page.tsx': `// File Path: app/page.tsx
 "use client";
 
@@ -587,7 +136,6 @@ import TechRadarFeed from "@/components/TechRadarFeed";
 import ProductComparisonModal from "@/components/ProductComparisonModal";
 import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
 
 export default function HomePage() {
   const { addToCart } = useCart();
@@ -595,7 +143,6 @@ export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const [compareList, setCompareList] = useState<Product[]>([]);
@@ -642,14 +189,6 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentSlideIndex((prev) => (prev + 1) % banners.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [banners.length]);
-
   const toggleCompare = (p: Product) => {
     soundEngine.playClick();
     if (compareList.some((item) => item.id === p.id)) {
@@ -670,81 +209,120 @@ export default function HomePage() {
     return cat === target || cat.includes(target) || target.includes(cat);
   });
 
-  const activeBanner = banners[currentSlideIndex] || banners[0];
-
   const techCategories = [
-    { id: "all", name: "همه محصولات", icon: "⚡" },
-    { id: "گجت‌های هوشمند", name: "گجت‌های هوشمند", icon: "⌚" },
-    { id: "سخت‌افزار و پردازش", name: "سخت‌افزار و پردازش", icon: "💻" },
-    { id: "لپ‌تاپ و اولترابوک", name: "لپ‌تاپ و اولترابوک", icon: "🖥️" },
-    { id: "صوتی و تصویر", name: "صوتی و تصویر نوین", icon: "🎧" },
-    { id: "هوش مصنوعی و دیجیتال", name: "ابزارهای هوش مصنوعی", icon: "🤖" },
+    { id: "all", name: "همه محصولات", icon: "⚡", count: products.length },
+    { id: "گجت‌های هوشمند", name: "گجت‌های هوشمند", icon: "⌚", count: products.filter(p => p.category?.includes("گجت")).length || 2 },
+    { id: "سخت‌افزار و پردازش", name: "سخت‌افزار و پردازش", icon: "💻", count: products.filter(p => p.category?.includes("سخت‌افزار")).length || 1 },
+    { id: "لپ‌تاپ و اولترابوک", name: "لپ‌تاپ و اولترابوک", icon: "🖥️", count: products.filter(p => p.category?.includes("لپ‌تاپ")).length || 1 },
+    { id: "صوتی و تصویر", name: "صوتی و تصویر نوین", icon: "🎧", count: products.filter(p => p.category?.includes("صوتی")).length || 2 },
+    { id: "هوش مصنوعی و دیجیتال", name: "ابزارهای هوش مصنوعی", icon: "🤖", count: products.filter(p => p.category?.includes("هوش")).length || 1 },
   ];
 
   return (
-    <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-20 transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-10 mt-3 sm:mt-5">
+    <div className="min-h-screen relative font-sans overflow-x-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] select-none pb-24 transition-colors duration-300" dir="rtl">
+      
+      {/* نور پس‌زمینه آمبینت به سبک Google Stitch */}
+      <div className="absolute top-10 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none animate-pulseGlow" />
+      <div className="absolute top-40 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none animate-pulseGlow" />
+
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-8 mt-3 sm:mt-5 relative z-10">
         
-        {/* هیرو بنر ماژولار سبک Google Stitch با افکت شیشه‌ای */}
-        <section className="relative overflow-hidden rounded-[2.8rem] border border-[var(--card-border)] shadow-2xl bg-gradient-to-tr from-slate-950 via-slate-900 to-blue-950/40 p-6 sm:p-14 group">
-          <div className="max-w-3xl space-y-5 z-10 text-white animate-fadeIn">
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-400/30 text-xs font-black backdrop-blur-md shadow-sm">
-              <span>🚀</span>
-              <span>اکوسیستم یکپارچه فناوری و گجت‌های هوشمند</span>
-            </span>
-            <h1 className="text-2xl sm:text-5xl font-black leading-tight tracking-tight drop-shadow-md">
-              مرجع تخصصی خرید جدیدترین تجهیزات تکنولوژی و دیجیتال
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl font-medium">
-              تامین‌کننده پیشرفته‌ترین سخت‌افزارها، گجت‌های پوشیدنی، تجهیزات پردازشی و سیستم‌های هوشمند با ضمانت اصالت فیزیکی و ارسال سریع پیشتاز به سراسر کشور
-            </p>
+        {/* ۱. ماتریس بنتو هیرو Google Stitch (Bento Hero Showcase) */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+          
+          {/* بنتو تایل اصلی: کانون معرفی تکنولوژی */}
+          <div className="lg:col-span-8 stitch-bento rounded-[2.5rem] p-6 sm:p-10 flex flex-col justify-between space-y-6 relative overflow-hidden group bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950/60 text-white">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="px-3.5 py-1.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-400/30 text-[11px] font-black backdrop-blur-md flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                  <span>Google Stitch UI & Apple Glass Ecosystem</span>
+                </span>
+                <span className="px-3 py-1 rounded-full bg-white/10 text-slate-300 text-[10px] font-mono font-bold">
+                  v2026.5 Pro
+                </span>
+              </div>
+
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight drop-shadow-md">
+                مرجع جامع خرید پیشرفته‌ترین گجت‌ها، سخت‌افزار و تکنولوژی
+              </h1>
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl font-medium">
+                تامین تخصصی انواع سیستم‌های پردازشی، لپ‌تاپ‌های ورک‌استیشن، ساعت‌های هوشمند تیتانیومی، نمایشگرهای ۵K و تجهیزات استودیویی با ۱۸ ماه گارانتی اصالت طلایی.
+              </p>
+            </div>
+
             <div className="pt-2 flex flex-wrap items-center gap-3">
-              <Link href="/#products" className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs transition shadow-2xl hover:scale-105 active:scale-95 cursor-pointer">
-                <span>مشاهده کاتالوگ تکنولوژی</span><span>←</span>
+              <Link href="/#products" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer">
+                <span>کاوش در کاتالوگ تکنولوژی</span><span>←</span>
               </Link>
-              <Link href="/news" className="inline-flex items-center gap-2 px-6 py-4 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/20 backdrop-blur-md transition">
-                <span>📰 رادار اخبار تکنولوژی</span>
+              <Link href="/track-order" className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/20 backdrop-blur-md transition">
+                <span>📦 رهگیری سفارش با پست پیشتاز</span>
               </Link>
+            </div>
+          </div>
+
+          {/* بنتو تایل جانبی: کارت هوشمند دستیار فناوری */}
+          <div className="lg:col-span-4 stitch-bento rounded-[2.5rem] p-6 sm:p-8 flex flex-col justify-between space-y-4 bg-gradient-to-tr from-slate-900 to-indigo-950/40 text-white">
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/30">
+                🤖
+              </div>
+              <h3 className="text-base font-black text-white">مشاور هوش مصنوعی تکنولوژی</h3>
+              <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                پرسش‌های فنی، استعلام سازگاری قطعات و مقایسه دقیق مانیتورها و لپ‌تاپ‌ها را به صورت زنده بپرسید.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-white/10">
+              <div className="text-[11px] text-blue-400 font-bold">نمونه پرسش‌های آماده:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {["بهترین لپ‌تاپ امسال", "ساعت ضدضربه", "مانیتور ۵K"].map((q, i) => (
+                  <span key={i} className="px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-[10px] text-slate-300">
+                    {q}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ۴ ویژگی ماژولار Google Stitch */}
+        {/* ۲. تایل‌های ۴ گانه امکانات و ضمانت‌ها به سبک Google Stitch */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-          <div className="stitch-card p-4 sm:p-5 rounded-3xl space-y-1.5 text-center sm:text-right">
+          <div className="stitch-bento p-4 sm:p-5 rounded-3xl space-y-1.5 text-center sm:text-right">
             <span className="text-2xl block">🛡️</span>
             <strong className="text-xs sm:text-sm font-black text-[var(--text-primary)] block">گارانتی اصالت طلایی</strong>
-            <p className="text-[11px] text-[var(--text-secondary)] font-medium">تضمین ۱۰۰٪ اصالت کلیه کالاها</p>
+            <p className="text-[11px] text-[var(--text-secondary)] font-medium">تضمین ۱۰۰٪ اصالت و تست فیزیکی</p>
           </div>
-          <div className="stitch-card p-4 sm:p-5 rounded-3xl space-y-1.5 text-center sm:text-right">
+          <div className="stitch-bento p-4 sm:p-5 rounded-3xl space-y-1.5 text-center sm:text-right">
             <span className="text-2xl block">🚀</span>
             <strong className="text-xs sm:text-sm font-black text-[var(--text-primary)] block">ارسال اکسپرس پیشتاز</strong>
-            <p className="text-[11px] text-[var(--text-secondary)] font-medium">ارسال رایگان خریدهای بالای ۲ میلیون</p>
+            <p className="text-[11px] text-[var(--text-secondary)] font-medium">رایگان برای سفارش‌های بالای ۲ میلیون</p>
           </div>
-          <div className="stitch-card p-4 sm:p-5 rounded-3xl space-y-1.5 text-center sm:text-right">
-            <span className="text-2xl block">🤖</span>
-            <strong className="text-xs sm:text-sm font-black text-[var(--text-primary)] block">مشاوره هوش مصنوعی</strong>
-            <p className="text-[11px] text-[var(--text-secondary)] font-medium">راهنمای فنی ۲۴ ساعته انتخاب گجت</p>
+          <div className="stitch-bento p-4 sm:p-5 rounded-3xl space-y-1.5 text-center sm:text-right">
+            <span className="text-2xl block">⚡</span>
+            <strong className="text-xs sm:text-sm font-black text-[var(--text-primary)] block">پایش زنده قیمت‌ها</strong>
+            <p className="text-[11px] text-[var(--text-secondary)] font-medium">تضمین کمترین نرخ در بین ۵ پلتفرم</p>
           </div>
-          <div className="stitch-card p-4 sm:p-5 rounded-3xl space-y-1.5 text-center sm:text-right">
-            <span className="text-2xl block">⚖️</span>
-            <strong className="text-xs sm:text-sm font-black text-[var(--text-primary)] block">تضمین کمترین نرخ</strong>
-            <p className="text-[11px] text-[var(--text-secondary)] font-medium">پایش مستمر قیمت در بازار ایران</p>
+          <div className="stitch-bento p-4 sm:p-5 rounded-3xl space-y-1.5 text-center sm:text-right">
+            <span className="text-2xl block">🔄</span>
+            <strong className="text-xs sm:text-sm font-black text-[var(--text-primary)] block">۷ روز ضمانت بازگشت</strong>
+            <p className="text-[11px] text-[var(--text-secondary)] font-medium">مهلت تست کامل سخت‌افزاری</p>
           </div>
         </div>
 
-        {/* نوار اخبار تکنولوژی */}
+        {/* ۳. تیکر هوشمند اخبار روز تکنولوژی */}
         <TechRadarFeed />
 
-        {/* کاتالوگ محصولات با دسته‌بندی‌های نوین */}
+        {/* ۴. کاتالوگ محصولات با سوییچر کپسولی Google Stitch */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4 px-1">
             <div>
               <h3 className="text-lg sm:text-2xl font-black tracking-tight flex items-center gap-2 text-[var(--text-primary)]">
-                <span>📦</span> ویترین برترین محصولات حوزه تکنولوژی و دیجیتال
+                <span>📦</span> کاتالوگ تخصصی تجهیزات و گجت‌های هوشمند
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-                انتخاب دسته‌بندی دلخواه و مقایسه همزمان مشخصات سخت‌افزاری
+                کالاهای اورجینال با بسته‌بندی ضدضربه و ارسال فوری به سراسر ایران
               </p>
             </div>
 
@@ -777,17 +355,17 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* بخش مقالات سئو */}
-        <section className="p-6 sm:p-8 rounded-[2.5rem] space-y-4 my-8 border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-xl">
+        {/* ۵. بخش مجله سئو به سبک بنتو تایل */}
+        <section className="stitch-bento p-6 sm:p-8 rounded-[2.8rem] space-y-4 my-8">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <div>
               <h3 className="text-sm sm:text-base font-black text-[var(--text-primary)] flex items-center gap-2">
-                <span>📚</span> مجله و مقالات تحلیلی حوزه فناوری
+                <span>📚</span> مجله تخصصی و مقالات تحلیلی فناوری
               </h3>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">جدیدترین تحلیل‌های سخت‌افزاری و راهنمای خرید گجت‌ها</p>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-medium">بررسی موشکافانه سخت‌افزارها، تراشه‌ها و راهنمای خرید</p>
             </div>
             <Link href="/blog" className="px-4 py-2 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-bold hover:bg-[var(--accent-blue)] hover:text-white transition shadow-sm">
-              مشاهده همه مقالات ←
+              آرشیو مقالات مجله ←
             </Link>
           </div>
           <HomeBlogSection />
@@ -812,7 +390,7 @@ function HomeBlogSection() {
         <article key={post.id || post.title} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5 flex flex-col justify-between hover:border-[var(--accent-blue)] transition duration-300 shadow-sm">
           <h4 className="font-black text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
           <Link href={\`/blog/\${post.id}\`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-1.5 border-t border-[var(--card-border)]">
-            مطالعه مقاله ←
+            مطالعه کامل مقاله ←
           </Link>
         </article>
       ))}
@@ -821,277 +399,195 @@ function HomeBlogSection() {
 }
 `,
 
-  // ۵. هدر شیشه‌ای با متریال Google Stitch
-  'components/Header.tsx': `"use client";
+  // ۳. کارت محصول اصیل Google Stitch Bento با چیپ‌های مشخصات سخت‌افزاری
+  'components/ProductCard.tsx': `"use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
-import { siteInfoService, SiteInfo, DEFAULT_SITE_INFO } from "@/services/siteInfoService";
-import { productService, Product } from "@/services/productService";
-import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
 
-export default function Header() {
+export default function ProductCard({ product }: { product: any }) {
+  const { addToCart } = useCart();
   const router = useRouter();
-  const cartContext = useCart();
-  const { totalItems, toggleCart, addToCart } = cartContext;
-
   const [mounted, setMounted] = useState(false);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo>(DEFAULT_SITE_INFO);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
-
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      const isDark = savedTheme !== "light";
-      setIsDarkMode(isDark);
-      if (isDark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-    } catch {}
-
-    const initHeaderData = async () => {
-      try {
-        const [info, prods, cats] = await Promise.all([
-          siteInfoService.getSiteInfo(),
-          productService.getAll(),
-          categoryService.getAll(),
-        ]);
-        if (info) setSiteInfo(info);
-        if (prods) setAllProducts(prods);
-        if (cats) setCategories(cats);
-      } catch {}
-    };
-
-    initHeaderData();
-
-    const handleSiteInfoUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-    };
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
-      else productService.getAll().then((prods) => prods && setAllProducts(prods));
-    };
-    const handleCategoriesUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setCategories(e.detail);
-      else categoryService.getAll().then((cats) => cats && setCategories(cats));
-    };
-
-    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
-    window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("categories_updated", handleCategoriesUpdate);
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) setIsCategoryOpen(false);
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) setIsSearchFocused(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("categories_updated", handleCategoriesUpdate);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
   }, []);
 
-  useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults([]); return; }
-    const q = searchQuery.toLowerCase().trim();
-    userBehavior.trackSearch(q);
-    const matches = allProducts.filter((p) =>
-      (p.title || p.name || "").toLowerCase().includes(q) ||
-      (p.category || "").toLowerCase().includes(q)
-    );
-    setSearchResults(matches.slice(0, 5));
-  }, [searchQuery, allProducts]);
+  const title = product.title || product.title_fa || product.name || "کالای تکنولوژی";
+  const price = Number(product.price) || 0;
+  const discountPrice =
+    product.discountPrice !== undefined && product.discountPrice !== null
+      ? Number(product.discountPrice)
+      : product.discount_price !== undefined && product.discount_price !== null
+      ? Number(product.discount_price)
+      : undefined;
 
-  const toggleDarkMode = () => {
-    soundEngine.playClick();
-    const nextMode = !isDarkMode;
-    setIsDarkMode(nextMode);
-    if (nextMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  };
+  const currentPrice = discountPrice || price;
+  const stockCount = product.stock !== undefined && product.stock !== null ? Number(product.stock) : 10;
 
-  const handleSelectCategory = (catName: string) => {
-    soundEngine.playClick();
-    setIsCategoryOpen(false);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("category_selected", { detail: catName }));
-    }
-    router.push("/#products");
-  };
+  const images =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images
+      : [product.image_url || product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600"];
 
-  const handleQuickAddFromSearch = (e: React.MouseEvent, product: Product) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    addToCart({
-      id: product.id,
-      title: product.title || product.name || "کالای تکنولوژی",
-      name: product.title || product.name || "کالای تکنولوژی",
-      price: Number(product.discountPrice ?? product.price ?? 0),
-      discountPrice: product.discountPrice ? Number(product.discountPrice) : undefined,
-      image: product.images?.[0] || product.image || "/placeholder.png",
-      stock: Number(product.stock ?? 10),
-      category: product.category || "عمومی",
-      quantity: 1,
-    });
-    setAddedItemMap((prev) => ({ ...prev, [product.id]: true }));
-    setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
-  };
+  const mainImage = images[0];
+  const category = product.category || product.category_name || "تکنولوژی";
+  const isAvailable =
+    product.is_available !== false &&
+    product.isAvailable !== false &&
+    stockCount > 0;
 
-  const navLinks = [
-    { title: "صفحه نخست", href: "/" },
-    { title: "کاتالوگ محصولات", href: "/#products" },
-    { title: "اخبار تکنولوژی", href: "/news" },
-    { title: "مجله سئو", href: "/blog" },
-    { title: "پیگیری سفارش", href: "/track-order" },
-    { title: "تماس با ما", href: "/contact" },
-  ];
+  const discountPercent =
+    discountPrice && discountPrice < price
+      ? Math.round(((price - discountPrice) / price) * 100)
+      : 0;
 
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon Tech";
-  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-  const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
+  // استخراج ۲ مشخصه اول به صورت چیپ‌های فنی Stitch
+  const specChips = product.specs ? Object.entries(product.specs).slice(0, 2) : [];
 
   return (
-    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-2 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
-      {siteInfo?.header_announcement && (
-        <div className="mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-blue-600/15 border border-[var(--card-border)] text-center text-[10px] sm:text-[11px] font-bold text-[var(--text-primary)] backdrop-blur-md truncate" suppressHydrationWarning>
-          {siteInfo.header_announcement}
-        </div>
-      )}
+    <div
+      onClick={() => userBehavior.trackProductView(product.id, category)}
+      className="stitch-card rounded-[2.4rem] p-4 sm:p-5 flex flex-col justify-between group select-none relative"
+      dir="rtl"
+    >
+      {/* محفظه شیشه‌ای تصویر کالا */}
+      <div className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-3.5 flex items-center justify-center p-3 border border-[var(--card-border)]">
+        <Link href={\`/products/\${product.id}\`} className="w-full h-full flex items-center justify-center">
+          <img
+            src={mainImage}
+            alt={title}
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+          />
+        </Link>
 
-      <div className="w-full bg-[var(--modal-bg)]/95 backdrop-blur-2xl px-3 sm:px-5 py-2.5 rounded-[2rem] shadow-xl border border-[var(--card-border)] flex items-center justify-between gap-2 sm:gap-4 transition-colors duration-300">
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-          
-          <div className="relative" ref={categoryDropdownRef}>
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setIsCategoryOpen(!isCategoryOpen);
-              }}
-              className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] flex items-center justify-center text-sm transition cursor-pointer shadow-sm"
-              title="دسته‌بندی‌های تکنولوژی"
-              aria-label="دسته‌بندی‌ها"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
+        {discountPercent > 0 && (
+          <span className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black shadow-lg">
+            {discountPercent}٪- تخفیف
+          </span>
+        )}
 
-            {isCategoryOpen && (
-              <div className="absolute top-12 right-0 w-64 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1">
-                <button
-                  onClick={() => handleSelectCategory("all")}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-black text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                >
-                  <span>⚡ تمامی کالاهای حوزه تکنولوژی</span>
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id || cat.name}
-                    onClick={() => handleSelectCategory(cat.name)}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                  >
-                    <span>🏷️ {cat.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+        <span className="absolute top-3 left-3 bg-black/65 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+          {product.badge || category}
+        </span>
+
+        {!isAvailable && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
+            <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
+              ناموجود در انبار
+            </span>
           </div>
+        )}
+      </div>
 
-          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300">
-              {logoUrl ? <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" /> : <span className="text-[var(--accent-blue)] text-lg sm:text-xl font-black">⚡</span>}
-            </div>
-            <div className="flex flex-col text-right">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[120px] sm:max-w-[160px]">{storeName}</span>
-                <span className={\`w-2 h-2 rounded-full shrink-0 transition-all duration-500 \${isOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"}\`} title={isOnline ? "سامانه آنلاین" : "حالت تعمیرات"} />
-              </div>
-              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]">{siteInfo?.tagline || "مرجع تخصصی تکنولوژی و ابزارهای نوین"}</span>
-            </div>
+      <div className="flex flex-col flex-grow space-y-2 mb-3">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Tech"}</span>
+          <span className={\`font-bold \${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}\`}>
+            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
+          </span>
+        </div>
+
+        <Link href={\`/products/\${product.id}\`} className="hover:text-[var(--accent-blue)] transition-colors">
+          <h3
+            className="font-black text-xs sm:text-sm text-[var(--text-primary)] leading-snug line-clamp-2 text-right"
+            dir="rtl"
+          >
+            {title}
+          </h3>
+        </Link>
+
+        {/* چیپ‌های مشخصات سخت‌افزاری به سبک Google Stitch */}
+        {specChips.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {specChips.map(([k, v], i) => (
+              <span key={i} className="px-2 py-0.5 rounded-md bg-[var(--input-bg)] border border-[var(--card-border)] text-[9px] font-bold text-[var(--text-secondary)] truncate max-w-[120px]">
+                {String(v)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* قیمت و دکمه‌های دوقلوی سفارش */}
+      <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            {discountPrice && discountPrice < price && (
+              <span className="text-[10px] line-through text-[var(--text-secondary)] font-mono" suppressHydrationWarning>
+                {formatPrice(price)}
+              </span>
+            )}
+            <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 font-mono" suppressHydrationWarning>
+              {formatPrice(currentPrice)}{" "}
+              <span className="text-xs font-bold font-sans">تومان</span>
+            </span>
+          </div>
+          <Link href={\`/products/\${product.id}\`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline transition">
+            بررسی کالا ←
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)] shadow-inner">
-          {navLinks.map((link, idx) => (
-            <Link key={idx} href={link.href} className="px-3.5 py-1.5 rounded-xl text-xs font-black text-[var(--text-secondary)] hover:text-white hover:bg-[var(--accent-blue)] transition whitespace-nowrap">
-              {link.title}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <div className="relative hidden xl:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
-              <span className="text-xs opacity-70">🔍</span>
-              <input type="text" placeholder="جستجو در تکنولوژی..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] font-bold placeholder-slate-400" />
-            </div>
-            {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-12 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72">
-                <div className="max-h-60 overflow-y-auto space-y-1">
-                  {searchResults.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
-                      <Link href={\`/products/\${p.id}\`} onClick={() => { soundEngine.playClick(); setIsSearchFocused(false); }} className="flex items-center gap-2 flex-1 min-w-0">
-                        <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 border border-[var(--card-border)] shrink-0" />
-                        <div className="flex-1 min-w-0 text-right">
-                          <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
-                          <span className="font-mono font-black text-[10px] text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>{formatPrice(p.discountPrice || p.price || 0)} ت</span>
-                        </div>
-                      </Link>
-                      <button type="button" onClick={(e) => handleQuickAddFromSearch(e, p)} className="px-2 py-1 rounded-lg text-[10px] font-black bg-[var(--accent-blue)] text-white cursor-pointer shadow-md">
-                        {addedItemMap[p.id] ? "✓" : "+"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button onClick={toggleDarkMode} className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs hover:border-[var(--accent-blue)] transition cursor-pointer shadow-sm flex items-center justify-center shrink-0" title="تغییر تم" suppressHydrationWarning>
-            {mounted ? (isDarkMode ? "🌙" : "☀️") : "🌙"}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              soundEngine.playAddToCart();
+              userBehavior.trackProductView(product.id, category);
+              addToCart({
+                id: product.id,
+                title,
+                name: title,
+                price: currentPrice,
+                image: mainImage,
+                stock: stockCount,
+                quantity: 1,
+              });
+            }}
+            disabled={!isAvailable}
+            className="py-2.5 bg-[var(--input-bg)] text-[var(--text-primary)] text-xs font-black rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] cursor-pointer disabled:opacity-40 transition shadow-sm flex items-center justify-center gap-1"
+          >
+            <span>🛒</span>
+            <span>سبد خرید</span>
           </button>
-
-          <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white transition-all shadow-md shadow-blue-500/25 cursor-pointer flex items-center justify-center shrink-0" title="سبد خرید">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-            {mounted && totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center border-2 border-[var(--modal-bg)] shadow-md animate-pulse" suppressHydrationWarning>
-                {formatPrice(totalItems)}
-              </span>
-            )}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              soundEngine.playAddToCart();
+              userBehavior.trackProductView(product.id, category);
+              addToCart({
+                id: product.id,
+                title,
+                name: title,
+                price: currentPrice,
+                image: mainImage,
+                stock: stockCount,
+                quantity: 1,
+              });
+              router.push("/checkout");
+            }}
+            disabled={!isAvailable}
+            className="py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition flex items-center justify-center gap-1"
+          >
+            <span>⚡</span>
+            <span>خرید سریع</span>
           </button>
         </div>
       </div>
-    </header>
+    </div>
   );
 }
 `,
 
-  // ۶. فوتر ماژولار سبک Google Stitch
+  // ۴. فوتر ماژولار بنتو به سبک Google Stitch
   'components/Footer.tsx': `// File Path: components/Footer.tsx
 "use client";
 
@@ -1114,302 +610,60 @@ export default function Footer() {
 
   return (
     <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] transition-colors mt-auto shadow-2xl select-none" dir="rtl">
-      <div className="max-w-7xl mx-auto px-6 py-14">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-          <div className="space-y-4">
-            <div className="w-full max-w-[180px] h-20 rounded-2xl border border-[var(--card-border)] bg-white/5 p-2 shadow-inner flex items-center justify-center overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          <div className="stitch-bento p-6 rounded-3xl space-y-4">
+            <div className="w-full max-w-[160px] h-16 rounded-2xl border border-[var(--card-border)] bg-white/5 p-2 shadow-inner flex items-center justify-center overflow-hidden">
               {footerLogo ? (
                 <img src={footerLogo} alt={siteName} className="w-full h-full object-contain" />
               ) : (
-                <div className="w-full h-full rounded-xl bg-[var(--accent-blue)] flex items-center justify-center text-white font-black text-xl">
+                <div className="w-full h-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-xl">
                   ⚡
                 </div>
               )}
             </div>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
-              {info?.description || info?.tagline || "مرجع جامع تکنولوژی، گجت‌های هوشمند و سخت‌افزار نوین"}
+              {info?.description || info?.tagline || "مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار، لپ‌تاپ و ابزارهای هوش مصنوعی با گارانتی اصالت طلایی"}
             </p>
           </div>
 
-          <div className="space-y-3">
-            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2">دسترسی سریع</h5>
-            <ul className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
+          <div className="stitch-bento p-6 rounded-3xl space-y-3">
+            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2 text-[var(--accent-blue)]">🔗 دسترسی سریع</h5>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
               <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ محصولات</Link></li>
               <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">پیگیری سفارش</Link></li>
               <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">اخبار تکنولوژی</Link></li>
-              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله سئو</Link></li>
+              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله تخصصی سئو</Link></li>
             </ul>
           </div>
 
-          <div className="space-y-3">
-            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2">اطلاعات رسمی</h5>
+          <div className="stitch-bento p-6 rounded-3xl space-y-3">
+            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2 text-[var(--accent-blue)]">🏢 اطلاعات رسمی</h5>
             <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-              <li>تلفن: <span className="font-mono font-bold text-[var(--accent-blue)]">{info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</span></li>
+              <li>تلفن پشتیبانی: <span className="font-mono font-bold text-[var(--accent-blue)]">{info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</span></li>
               <li>ایمیل: <span className="font-mono">{info?.email || "info@axoncore.ir"}</span></li>
-              <li>ساعات کاری: {info?.working_hours || "۹:۰۰ الی ۱۸:۰۰"}</li>
+              <li>ساعات کاری: {info?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"}</li>
               <li>نشانی: {info?.address || "تهران، خیابان ولیعصر، تقاطع میرداماد"}</li>
             </ul>
           </div>
 
-          <div className="space-y-3">
-            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2">ضمانت و استانداردها</h5>
-            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 text-xs">
+          <div className="stitch-bento p-6 rounded-3xl space-y-3">
+            <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2 text-[var(--accent-blue)]">🛡️ ضمانت و استانداردها</h5>
+            <div className="space-y-2 text-xs">
               <div className="font-black text-emerald-500">✓ ضمانت ۱۰۰٪ اصالت فیزیکی کالا</div>
-              <p className="text-[11px] text-[var(--text-secondary)]">ارسال پیشتاز با بسته‌بندی ضدضربه و بیمه کامل به سراسر کشور.</p>
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">ارسال سریع پیشتاز با بسته‌بندی ضدضربه و بیمه کامل به سراسر ایران.</p>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 pt-6 border-t border-[var(--card-border)] text-center text-xs text-[var(--text-secondary)] font-bold">
+        <div className="mt-10 pt-6 border-t border-[var(--card-border)] text-center text-xs text-[var(--text-secondary)] font-bold">
           تمامی حقوق مادی و معنوی برای مجموعه <span className="text-[var(--accent-blue)]">{siteName}</span> محفوظ است © {new Date().getFullYear()}
         </div>
       </div>
     </footer>
   );
 }
-`,
-
-  // ۷. داک ناوبری شناور اپلیکیشن در پایین صفحه
-  'components/MobileBottomNav.tsx': `// File Path: components/MobileBottomNav.tsx
-"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
-
-export default function MobileBottomNav() {
-  const pathname = usePathname();
-  const cartContext = useCart();
-  const { totalItems, toggleCart } = cartContext;
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (pathname?.startsWith("/admin")) return null;
-
-  return (
-    <nav className="sm:hidden fixed bottom-3 left-3 right-3 z-40 bg-[var(--modal-bg)]/90 backdrop-blur-2xl border border-[var(--card-border)] rounded-[2rem] px-4 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.3)] flex items-center justify-around text-[10px] font-black select-none transition-all" dir="rtl" suppressHydrationWarning>
-      
-      <Link
-        href="/"
-        onClick={() => soundEngine.playClick()}
-        className={\`flex flex-col items-center gap-1 transition \${pathname === "/" ? "text-[var(--accent-blue)] scale-105" : "text-[var(--text-secondary)]"}\`}
-      >
-        <span className="text-base">🏠</span>
-        <span>صفحه اصلی</span>
-      </Link>
-
-      <Link
-        href="/#products"
-        onClick={() => soundEngine.playClick()}
-        className={\`flex flex-col items-center gap-1 transition \${pathname === "/products" ? "text-[var(--accent-blue)] scale-105" : "text-[var(--text-secondary)]"}\`}
-      >
-        <span className="text-base">📦</span>
-        <span>محصولات</span>
-      </Link>
-
-      <button
-        onClick={() => { soundEngine.playClick(); toggleCart(); }}
-        className="relative flex flex-col items-center gap-1 text-[var(--text-secondary)] cursor-pointer"
-      >
-        <span className="text-base">🛒</span>
-        <span>سبد خرید</span>
-        {mounted && totalItems > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-[1rem] px-1 rounded-full bg-rose-500 text-white font-mono font-black text-[9px] flex items-center justify-center shadow-md animate-pulse" suppressHydrationWarning>
-            {formatPrice(totalItems)}
-          </span>
-        )}
-      </button>
-
-      <Link
-        href="/track-order"
-        onClick={() => soundEngine.playClick()}
-        className={\`flex flex-col items-center gap-1 transition \${pathname === "/track-order" ? "text-[var(--accent-blue)] scale-105" : "text-[var(--text-secondary)]"}\`}
-      >
-        <span className="text-base">📮</span>
-        <span>رهگیری</span>
-      </Link>
-    </nav>
-  );
-}
-`,
-
-  // ۸. تنظیمات پیش‌فرض کلان با برند جامع آکسون
-  'services/siteInfoService.ts': `// File Path: services/siteInfoService.ts
-import { supabase } from "@/lib/supabase";
-import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
-
-export type MaintenanceMode = "none" | "timed" | "indefinite";
-
-export interface SiteInfo {
-  id?: string | number;
-  site_name?: string;
-  siteName?: string;
-  storeName?: string;
-  tagline?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  working_hours?: string;
-  logo_url?: string;
-  logoUrl?: string;
-  footer_logo_url?: string;
-  footerLogoUrl?: string;
-  favicon_url?: string;
-  faviconUrl?: string;
-  allow_google_index?: boolean;
-  allowGoogleIndex?: boolean;
-  maintenance_mode?: MaintenanceMode;
-  maintenance_until?: string;
-  maintenance_duration_minutes?: number;
-  instagram?: string;
-  telegram?: string;
-  whatsapp?: string;
-  youtube?: string;
-  header_announcement?: string;
-  free_shipping_threshold?: number;
-  description?: string;
-  footer_text?: string;
-  custom_css?: string;
-  active_font_id?: string;
-  gemini_api_key?: string;
-  updated_at?: string;
-}
-
-const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
-
-export const DEFAULT_SITE_INFO: SiteInfo = {
-  site_name: "آکسون | Axon Tech",
-  siteName: "آکسون | Axon Tech",
-  storeName: "آکسون | Axon Tech",
-  tagline: "مرجع جامع تکنولوژی، گجت‌های هوشمند و سخت‌افزار",
-  allow_google_index: true,
-  allowGoogleIndex: true,
-  maintenance_mode: "none",
-  phone: "۰۲۱-۸۸۸۸۸۸۸۸",
-  email: "info@axoncore.ir",
-  address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
-  working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-  header_announcement: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | ۱۸ ماه گارانتی اصالت طلایی",
-  free_shipping_threshold: 2000000,
-  description: "مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار، لپ‌تاپ و ابزارهای هوش مصنوعی با گارانتی اصالت طلایی",
-  footer_text: "مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار، لپ‌تاپ و ابزارهای هوش مصنوعی با گارانتی اصالت طلایی",
-};
-
-export const siteInfoService = {
-  getSiteInfoSync(): SiteInfo {
-    return DEFAULT_SITE_INFO;
-  },
-
-  async getSiteInfo(): Promise<SiteInfo | null> {
-    try {
-      const res = await fetch("/api/site-info", { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) {
-          const data = json.data;
-          const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
-          const mapped: SiteInfo = {
-            id: data.id,
-            site_name: data.site_name || data.store_name || "آکسون | Axon Tech",
-            siteName: data.site_name || data.store_name || "آکسون | Axon Tech",
-            storeName: data.site_name || data.store_name || "آکسون | Axon Tech",
-            tagline: data.tagline || "مرجع جامع تکنولوژی، گجت‌های هوشمند و سخت‌افزار",
-            phone: data.phone || "۰۲۱-۸۸۸۸۸۸۸۸",
-            email: data.email || "info@axoncore.ir",
-            address: data.address || "تهران، خیابان ولیعصر، تقاطع میرداماد",
-            working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-            logo_url: data.logo_url || "",
-            logoUrl: data.logo_url || "",
-            footer_logo_url: data.footer_logo_url || "",
-            footerLogoUrl: data.footer_logo_url || "",
-            favicon_url: data.favicon_url || "",
-            faviconUrl: data.favicon_url || "",
-            allow_google_index: isAllowed,
-            allowGoogleIndex: isAllowed,
-            maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
-            maintenance_until: data.maintenance_until || undefined,
-            maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
-            header_announcement: data.header_announcement || "",
-            free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
-            description: data.description || data.footer_text || "",
-            footer_text: data.footer_text || data.description || "",
-            custom_css: data.custom_css || "",
-            active_font_id: data.active_font_id || "Vazirmatn",
-            gemini_api_key: data.gemini_api_key || "",
-            updated_at: data.updated_at,
-          };
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
-            if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
-            if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
-          }
-          return mapped;
-        }
-      }
-      return DEFAULT_SITE_INFO;
-    } catch {
-      return DEFAULT_SITE_INFO;
-    }
-  },
-
-  async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
-    try {
-      const sName = payload.site_name || payload.siteName || payload.storeName || "آکسون | Axon Tech";
-
-      const dbPayload: any = {
-        site_name: sName,
-        store_name: sName,
-        tagline: payload.tagline,
-        phone: payload.phone,
-        email: payload.email,
-        address: payload.address,
-        working_hours: payload.working_hours,
-        logo_url: payload.logo_url,
-        footer_logo_url: payload.footer_logo_url,
-        favicon_url: payload.favicon_url,
-        allow_google_index: payload.allow_google_index,
-        maintenance_mode: payload.maintenance_mode,
-        maintenance_until: payload.maintenance_until,
-        maintenance_duration_minutes: payload.maintenance_duration_minutes,
-        header_announcement: payload.header_announcement,
-        free_shipping_threshold: payload.free_shipping_threshold,
-        footer_text: payload.footer_text,
-        description: payload.description,
-        custom_css: payload.custom_css,
-        active_font_id: payload.active_font_id,
-        gemini_api_key: payload.gemini_api_key,
-        updated_at: new Date().toISOString(),
-      };
-
-      const res = await fetch("/api/site-info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dbPayload),
-      });
-
-      const json = await res.json();
-      const finalData = json.data || dbPayload;
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
-        realtimeEngine.broadcastLocally("site_info_updated", finalData);
-      }
-
-      return finalData;
-    } catch {
-      return null;
-    }
-  },
-};
-
-export default siteInfoService;
 `
 };
 
@@ -1418,32 +672,13 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ [UPDATED] فایل بهینه‌سازی شد: ${filePath}`);
+  console.log(`✅ [STITCH UPDATED] فایل با موفقیت بازنویسی شد: ${filePath}`);
 }
 
-// عملیات پاکسازی مستقیم داده‌های تستی دیتابیس و حفظ انحصاری اکانت ادمین
-async function flushDatabaseDirectly() {
-  console.log('🧹 در حال پاکسازی کامل رکوردهای تستی دیتابیس و نگهداری انحصاری اکانت ادمین...');
-  try {
-    const { createClient } = require('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hooaobrxgwakqqibcfdy.supabase.co';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_4W6VSBnjKZzSUTQp13PUpG_hzW7qMeG';
-    const client = createClient(supabaseUrl, supabaseKey);
-
-    await client.from('orders').delete().neq('id', 'SYSTEM_PRESERVE');
-    await client.from('contact_messages').delete().neq('id', 'SYSTEM_PRESERVE');
-    console.log('✨ [CLEANED] دیتابیس با موفقیت تمیز شد و فقط اکانت مدیر باقی ماند.');
-  } catch (err) {
-    console.log('ℹ️ دستورات پاکسازی دیتابیس اجرا شد.');
-  }
+console.log('📦 در حال Push به گیت‌هاب و دیپلوی روی Vercel...');
+try {
+  execSync('git add . && git commit -m "feat: complete Google Stitch Bento Grid overhaul with glowing ambient mesh and tech chips" && git push origin main', { stdio: 'inherit' });
+  console.log('🎉 [DEPLOYED] استقرار نهایی با موفقیت ۱۰۰٪ کامل شد!');
+} catch (e) {
+  console.log('⚠️ دستور دستی: git push origin main');
 }
-
-flushDatabaseDirectly().then(() => {
-  console.log('📦 در حال Push به گیت‌هاب و دیپلوی روی Vercel...');
-  try {
-    execSync('git add . && git commit -m "fix: resolve string quotes & full Google Stitch broad tech overhaul" && git push origin main', { stdio: 'inherit' });
-    console.log('🎉 [DEPLOYED] استقرار با موفقیت ۱۰۰٪ کامل شد!');
-  } catch (e) {
-    console.log('⚠️ دستور دستی: git push origin main');
-  }
-});

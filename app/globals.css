@@ -62,7 +62,7 @@ body {
   scrollbar-width: none;
 }
 
-/* استایل ماژولار Google Stitch */
+/* متریال و کارت‌های ماژولار Google Stitch */
 .stitch-card {
   background: var(--stitch-card);
   border: 1px solid var(--card-border);

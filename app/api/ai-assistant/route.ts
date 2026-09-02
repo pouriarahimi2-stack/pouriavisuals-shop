@@ -5,6 +5,17 @@ import { FLAGSHIP_7_PRODUCTS } from "@/services/productService";
 
 export const dynamic = "force-dynamic";
 
+function normalizePersianText(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+    .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+    .replace(/[\u064A\u0649]/g, "ی")
+    .replace(/[\u0643]/g, "ک")
+    .toLowerCase()
+    .trim();
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -48,6 +59,7 @@ export async function POST(req: Request) {
     const systemInstruction = `تو مشاور هوشمند، استراتژیست ارشد و مهندس تصویر و سخت‌افزار در فروشگاه پیشرفته فناوری ${storeName} هستی.
 به زبان فارسی کاملاً سلیس، صمیمی، مهندسی و هوشمندانه پاسخ بده.
 - محصولات اصلی فروشگاه شامل مانیتورهای استودیو ۵K و ۶K، لپ‌تاپ‌های مک‌بوک پرو M4 Max، آیپد پرو Tandem OLED، ساعت‌های اولترا، کارت‌های کپچر بلک‌مجیک و ابزارهای کالیبراسیون کالیبرایت هستند.
+- اگر کاربر درباره قیمت سوال کرد، قیمت دقیق ریالی/تومانی کالا را با جزئیات گارانتی طلایی اعلام کن.
 - اگر کاربر درباره برندهایی مثل سامسونگ، ال‌جی، ایسوس، دل یا سونی پرسید، با استدلال تخصصی و مقایسه فضای رنگی و رزولوشن توضیح بده که تمرکز تخصصی آکسون بر استانداردهای سینمایی و تجهیزات مرجع است و بهترین گزینه‌های معادل کاتالوگ آکسون (مثل Studio Display 5K یا Pro Display XDR) را پیشنهاد کن.
 - تمامی محصولات دارای ۱۸ ماه گارانتی اصالت طلایی، ۷ روز ضمانت بازگشت و ارسال رایگان پیشتاز برای خریدهای بالای ۲ میلیون تومان هستند.
 - تلفن مشاوره استودیو: ${storePhone}
@@ -97,26 +109,47 @@ ${productCatalogContext}`;
       }
     }
 
-    const normalized = userMessage.toLowerCase();
+    const normalizedMsg = normalizePersianText(userMessage);
 
     if (!aiResponse) {
-      if (normalized.includes("گارانتی") || normalized.includes("ارسال") || normalized.includes("ضمانت")) {
+      if (normalizedMsg.includes("قیمت") && (normalizedMsg.includes("studio") || normalizedMsg.includes("استودیو") || normalizedMsg.includes("5k"))) {
+        aiResponse = "مانیتور **Apple Studio Display 27\" 5K Retina** با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری در حال حاضر با قیمت ویژه **۱۲۸,۵۰۰,۰۰۰ تومان** و ۱۸ ماه گارانتی اصالت طلایی آکسون در انبار موجود است. 🖥️✨";
+      } else if (normalizedMsg.includes("گارانتی") || normalizedMsg.includes("ارسال") || normalizedMsg.includes("ضمانت")) {
         aiResponse = "تمامی سفارش‌های فروشگاه آکسون با **۱۸ ماه گارانتی اصالت طلایی**، ۷ روز مهلت تست سلامت فیزیکی و بسته‌بندی ضدضربه استودیویی ارسال می‌شوند. همچنین کلیه خریدهای بالای ۲ میلیون تومان شامل **ارسال رایگان با پست پیشتاز** به سراسر ایران هستند. 📦🛡️";
-      } else if (normalized.includes("سامسونگ") || normalized.includes("samsung")) {
-        aiResponse = "در حال حاضر در فروشگاه آکسون محصولات برند **سامسونگ** موجود نیست و تمرکز ما بر مانیتورها و تجهیزات تخصصی **Apple**، **Blackmagic Design** و **Calibrite** است. اگر مانیتور حرفه‌ای مد نظرتان است، مانیتور **Apple Studio Display 5K** را به شما پیشنهاد می‌کنم.";
-      } else if (normalized.includes("مک بوک") || normalized.includes("macbook")) {
-        aiResponse = "لپ‌تاپ پرچمدار **MacBook Pro 16\" M4 Max** با رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ویژه و گارانتی طلایی در انبار موجود است.";
+      } else if (normalizedMsg.includes("سامسونگ") || normalizedMsg.includes("samsung") || normalizedMsg.includes("الجی") || normalizedMsg.includes("lg")) {
+        aiResponse = "در حال حاضر در فروشگاه آکسون محصولات برندهای متفرقه موجود نیست و تمرکز تخصصی ما بر مانیتورها و تجهیزات رفرنس **Apple**، **Blackmagic Design** و **Calibrite** است. اگر مانیتور حرفه‌ای مد نظرتان است، مانیتور **Apple Studio Display 5K** با پوشش ۹۹.۴٪ فضای رنگی P3 بهترین انتخاب است.";
+      } else if (normalizedMsg.includes("مک بوک") || normalizedMsg.includes("macbook")) {
+        aiResponse = "لپ‌تاپ پرچمدار **MacBook Pro 16\" M4 Max** با رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ۲۰۸,۵۰۰,۰۰۰ تومان و گارانتی طلایی در انبار موجود است.";
       } else {
         aiResponse = `سلام و درود! من مشاور هوشمند تکنولوژی فروشگاه ${storeName} هستم. چطور می‌توانم در انتخاب تجهیزات و کالاهای دیجیتال راهنماییتان کنم؟`;
       }
     }
 
-    const lowerResp = (aiResponse + " " + userMessage).toLowerCase();
-    const matchedProduct = products.find((p: any) => {
-      const id = String(p.id).toLowerCase();
-      const t = (p.title || "").toLowerCase();
-      return lowerResp.includes(id) || (t.length > 5 && lowerResp.includes(t.slice(0, 15)));
+    const normalizedCorpus = normalizePersianText(aiResponse + " " + userMessage);
+    
+    let matchedProduct = products.find((p: any) => {
+      const pId = normalizePersianText(String(p.id));
+      const pTitle = normalizePersianText(p.title || "");
+      const pTitleFa = normalizePersianText(p.title_fa || "");
+
+      if (normalizedCorpus.includes(pId)) return true;
+      if (pTitle.length > 5 && normalizedCorpus.includes(pTitle.slice(0, 14))) return true;
+      if (pTitleFa.length > 5 && normalizedCorpus.includes(pTitleFa.slice(0, 14))) return true;
+
+      if (pId.includes("studio-display") && (normalizedCorpus.includes("studio display") || normalizedCorpus.includes("استودیو دیسپلی") || normalizedCorpus.includes("استودیو 5k") || normalizedCorpus.includes("مانیتور 5k"))) return true;
+      if (pId.includes("macbook") && (normalizedCorpus.includes("macbook") || normalizedCorpus.includes("مک بوک") || normalizedCorpus.includes("m4 max"))) return true;
+      if (pId.includes("watch") && (normalizedCorpus.includes("watch ultra") || normalizedCorpus.includes("ساعت اولترا") || normalizedCorpus.includes("اپل واچ"))) return true;
+      if (pId.includes("ipad") && (normalizedCorpus.includes("ipad pro") || normalizedCorpus.includes("آیپد پرو") || normalizedCorpus.includes("تاندم اولد"))) return true;
+      if (pId.includes("xdr") && (normalizedCorpus.includes("pro display") || normalizedCorpus.includes("6k") || normalizedCorpus.includes("xdr"))) return true;
+      if (pId.includes("decklink") && (normalizedCorpus.includes("decklink") || normalizedCorpus.includes("کارت کپچر") || normalizedCorpus.includes("بلک مجیک"))) return true;
+      if (pId.includes("calibrite") && (normalizedCorpus.includes("calibrite") || normalizedCorpus.includes("کالیبرایت") || normalizedCorpus.includes("کالیبراتور"))) return true;
+
+      return false;
     });
+
+    if (!matchedProduct && (normalizedCorpus.includes("استودیو") || normalizedCorpus.includes("5k"))) {
+      matchedProduct = products.find((p) => String(p.id).includes("studio-display")) || products[3];
+    }
 
     const calculatedPrice = matchedProduct
       ? Number(matchedProduct.discount_price || matchedProduct.discountPrice || matchedProduct.price || 0)

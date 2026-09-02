@@ -17,7 +17,7 @@ export default function ProductCard({ product }: { product: any }) {
     setMounted(true);
   }, []);
 
-  const title = product.title || product.title_fa || product.name || "کالای تکنولوژی";
+  const title = product.title || product.title_fa || product.name || "کالای دیجیتال";
   const price = Number(product.price) || 0;
   const discountPrice =
     product.discountPrice !== undefined && product.discountPrice !== null
@@ -46,16 +46,12 @@ export default function ProductCard({ product }: { product: any }) {
       ? Math.round(((price - discountPrice) / price) * 100)
       : 0;
 
-  // استخراج ۲ مشخصه اول به صورت چیپ‌های فنی Stitch
-  const specChips = product.specs ? Object.entries(product.specs).slice(0, 2) : [];
-
   return (
     <div
       onClick={() => userBehavior.trackProductView(product.id, category)}
-      className="stitch-card rounded-[2.4rem] p-4 sm:p-5 flex flex-col justify-between group select-none relative"
+      className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
       dir="rtl"
     >
-      {/* محفظه شیشه‌ای تصویر کالا */}
       <div className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-3.5 flex items-center justify-center p-3 border border-[var(--card-border)]">
         <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center">
           <img
@@ -71,14 +67,14 @@ export default function ProductCard({ product }: { product: any }) {
           </span>
         )}
 
-        <span className="absolute top-3 left-3 bg-black/65 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+        <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">
           {product.badge || category}
         </span>
 
         {!isAvailable && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
             <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
-              ناموجود در انبار
+              ناموجود
             </span>
           </div>
         )}
@@ -86,7 +82,7 @@ export default function ProductCard({ product }: { product: any }) {
 
       <div className="flex flex-col flex-grow space-y-2 mb-3">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Tech"}</span>
+          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon"}</span>
           <span className={`font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
             {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
           </span>
@@ -101,19 +97,11 @@ export default function ProductCard({ product }: { product: any }) {
           </h3>
         </Link>
 
-        {/* چیپ‌های مشخصات سخت‌افزاری به سبک Google Stitch */}
-        {specChips.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-1">
-            {specChips.map(([k, v], i) => (
-              <span key={i} className="px-2 py-0.5 rounded-md bg-[var(--input-bg)] border border-[var(--card-border)] text-[9px] font-bold text-[var(--text-secondary)] truncate max-w-[120px]">
-                {String(v)}
-              </span>
-            ))}
-          </div>
-        )}
+        <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 font-medium leading-relaxed">
+          {product.short_description || product.description || "دارای گارانتی اصالت طلایی و ارسال سریع"}
+        </p>
       </div>
 
-      {/* قیمت و دکمه‌های دوقلوی سفارش */}
       <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
@@ -150,10 +138,9 @@ export default function ProductCard({ product }: { product: any }) {
               });
             }}
             disabled={!isAvailable}
-            className="py-2.5 bg-[var(--input-bg)] text-[var(--text-primary)] text-xs font-black rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] cursor-pointer disabled:opacity-40 transition shadow-sm flex items-center justify-center gap-1"
+            className="py-2.5 bg-[var(--input-bg)] text-[var(--text-primary)] text-xs font-black rounded-xl border border-[var(--card-border)] hover:border-[var(--accent-blue)] cursor-pointer disabled:opacity-40 transition shadow-sm"
           >
-            <span>🛒</span>
-            <span>سبد خرید</span>
+            🛒 سبد خرید
           </button>
           <button
             onClick={(e) => {
@@ -173,10 +160,9 @@ export default function ProductCard({ product }: { product: any }) {
               router.push("/checkout");
             }}
             disabled={!isAvailable}
-            className="py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition flex items-center justify-center gap-1"
+            className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition"
           >
-            <span>⚡</span>
-            <span>خرید سریع</span>
+            ⚡ خرید سریع
           </button>
         </div>
       </div>

@@ -5,8 +5,8 @@ import { CartProvider } from '@/context/CartContext';
 import LayoutWrapper from '@/components/LayoutWrapper';
 
 export const metadata: Metadata = {
-  title: 'آکسون | مرجع جامع تکنولوژی، سخت‌افزار و گجت‌های هوشمند',
-  description: 'فروشگاه تخصصی و مرجع پیشرفته انواع گجت‌های نوین، سخت‌افزار، قطعات پردازشی، لپ‌تاپ و ابزارهای هوش مصنوعی با گارانتی اصالت طلایی',
+  title: 'آکسون | مرجع تخصصی تکنولوژی و گجت‌های نوین',
+  description: 'فروشگاه تخصصی و مرجع پیشرفته تجهیزات دیجیتال، گجت‌های هوشمند و سخت‌افزار با گارانتی اصالت طلایی',
   other: { enamad: '27424534' },
 };
 
@@ -16,7 +16,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#06090e' },
+    { media: '(prefers-color-scheme: dark)', color: '#07090e' },
   ],
 };
 

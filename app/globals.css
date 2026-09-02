@@ -9,26 +9,20 @@
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --card-border: rgba(15, 23, 42, 0.08);
-  --accent-blue: #0284c7;
-  --accent-glow: rgba(2, 132, 199, 0.15);
+  --accent-blue: #0071e3;
   --modal-bg: #ffffff;
   --input-bg: #f1f5f9;
-  --stitch-card: #ffffff;
-  --stitch-bento: rgba(255, 255, 255, 0.85);
 }
 
 .dark {
-  --bg-primary: #070a11;
-  --bg-secondary: #0d131f;
+  --bg-primary: #07090e;
+  --bg-secondary: #0d1117;
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-  --card-border: rgba(255, 255, 255, 0.08);
+  --card-border: rgba(255, 255, 255, 0.1);
   --accent-blue: #38bdf8;
-  --accent-glow: rgba(56, 189, 248, 0.2);
-  --modal-bg: #0d131f;
+  --modal-bg: #0d1117;
   --input-bg: rgba(255, 255, 255, 0.04);
-  --stitch-card: #0e1524;
-  --stitch-bento: rgba(14, 21, 36, 0.85);
 }
 
 html, body {
@@ -64,49 +58,11 @@ body {
   scrollbar-width: none;
 }
 
-/* کارت‌های بنتو استایل Google Stitch */
-.stitch-bento {
-  background: var(--stitch-bento);
-  border: 1px solid var(--card-border);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 15px 35px -10px rgba(0,0,0,0.06);
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.stitch-bento:hover {
-  border-color: var(--accent-blue);
-  box-shadow: 0 25px 50px -12px var(--accent-glow);
-  transform: translateY(-2px);
-}
-
-.stitch-card {
-  background: var(--stitch-card);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.stitch-card:hover {
-  border-color: var(--accent-blue);
-  box-shadow: 0 20px 40px -15px var(--accent-glow);
-  transform: translateY(-3px);
-}
-
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.05); }
-}
-
-.animate-pulseGlow {
-  animation: pulseGlow 4s ease-in-out infinite;
-}
-
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.2s ease-out forwards;
 }

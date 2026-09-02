@@ -125,8 +125,8 @@ export default function Header() {
     soundEngine.playAddToCart();
     addToCart({
       id: product.id,
-      title: product.title || product.name || "کالای تکنولوژی",
-      name: product.title || product.name || "کالای تکنولوژی",
+      title: product.title || product.name || "کالای دیجیتال",
+      name: product.title || product.name || "کالای دیجیتال",
       price: Number(product.discountPrice ?? product.price ?? 0),
       discountPrice: product.discountPrice ? Number(product.discountPrice) : undefined,
       image: product.images?.[0] || product.image || "/placeholder.png",
@@ -147,7 +147,7 @@ export default function Header() {
     { title: "تماس با ما", href: "/contact" },
   ];
 
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon Tech";
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
   const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
 
@@ -169,7 +169,7 @@ export default function Header() {
                 setIsCategoryOpen(!isCategoryOpen);
               }}
               className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] flex items-center justify-center text-sm transition cursor-pointer shadow-sm"
-              title="دسته‌بندی‌های تکنولوژی"
+              title="دسته‌بندی‌های محصولات"
               aria-label="دسته‌بندی‌ها"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -183,7 +183,7 @@ export default function Header() {
                   onClick={() => handleSelectCategory("all")}
                   className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-black text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
                 >
-                  <span>⚡ تمامی کالاهای حوزه تکنولوژی</span>
+                  <span>📦 تمامی محصولات و تجهیزات</span>
                 </button>
                 {categories.map((cat) => (
                   <button
@@ -207,7 +207,7 @@ export default function Header() {
                 <span className="text-xs sm:text-sm font-black tracking-tight text-[var(--text-primary)] truncate max-w-[120px] sm:max-w-[160px]">{storeName}</span>
                 <span className={`w-2 h-2 rounded-full shrink-0 transition-all duration-500 ${isOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"}`} title={isOnline ? "سامانه آنلاین" : "حالت تعمیرات"} />
               </div>
-              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]">{siteInfo?.tagline || "مرجع تخصصی تکنولوژی و ابزارهای نوین"}</span>
+              <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] truncate max-w-[120px] sm:max-w-[160px]">{siteInfo?.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر"}</span>
             </div>
           </Link>
         </div>
@@ -224,7 +224,7 @@ export default function Header() {
           <div className="relative hidden xl:block" ref={searchContainerRef}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-40 shadow-sm h-9">
               <span className="text-xs opacity-70">🔍</span>
-              <input type="text" placeholder="جستجو در تکنولوژی..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] font-bold placeholder-slate-400" />
+              <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] font-bold placeholder-slate-400" />
             </div>
             {isSearchFocused && searchResults.length > 0 && (
               <div className="absolute top-12 left-0 p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl backdrop-blur-3xl z-50 animate-fadeIn space-y-1.5 w-72">

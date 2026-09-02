@@ -42,10 +42,10 @@ export interface SiteInfo {
 const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
 
 export const DEFAULT_SITE_INFO: SiteInfo = {
-  site_name: "آکسون | Axon",
-  siteName: "آکسون | Axon",
-  storeName: "آکسون | Axon",
-  tagline: "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
+  site_name: "آکسون | Axon Tech",
+  siteName: "آکسون | Axon Tech",
+  storeName: "آکسون | Axon Tech",
+  tagline: "مرجع جامع تکنولوژی، گجت‌های هوشمند و سخت‌افزار",
   allow_google_index: true,
   allowGoogleIndex: true,
   maintenance_mode: "none",
@@ -53,10 +53,10 @@ export const DEFAULT_SITE_INFO: SiteInfo = {
   email: "info@axoncore.ir",
   address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
   working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-  header_announcement: "⚡ ارسال رایگان خریدهای بالای ۲ میلیون تومان | گارانتی اصالت طلایی ۱۸ ماهه",
+  header_announcement: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | ۱۸ ماه گارانتی اصالت طلایی",
   free_shipping_threshold: 2000000,
-  description: "مرجع تخصصی مانیتورهای ۵K و ۴K تدوین، کالیبراسیون سخت‌افزاری رنگ و تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی",
-  footer_text: "مرجع تخصصی مانیتورهای ۵K و ۴K تدوین، کالیبراسیون سخت‌افزاری رنگ و تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی",
+  description: "مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار، لپ‌تاپ و ابزارهای هوش مصنوعی با گارانتی اصالت طلایی",
+  footer_text: "مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار، لپ‌تاپ و ابزارهای هوش مصنوعی با گارانتی اصالت طلایی",
 };
 
 export const siteInfoService = {
@@ -74,10 +74,10 @@ export const siteInfoService = {
           const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
           const mapped: SiteInfo = {
             id: data.id,
-            site_name: data.site_name || data.store_name || "آکسون | Axon",
-            siteName: data.site_name || data.store_name || "آکسون | Axon",
-            storeName: data.site_name || data.store_name || "آکسون | Axon",
-            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال، تصویر و استودیو",
+            site_name: data.site_name || data.store_name || "آکسون | Axon Tech",
+            siteName: data.site_name || data.store_name || "آکسون | Axon Tech",
+            storeName: data.site_name || data.store_name || "آکسون | Axon Tech",
+            tagline: data.tagline || "مرجع جامع تکنولوژی، گجت‌های هوشمند و سخت‌افزار",
             phone: data.phone || "۰۲۱-۸۸۸۸۸۸۸۸",
             email: data.email || "info@axoncore.ir",
             address: data.address || "تهران، خیابان ولیعصر، تقاطع میرداماد",
@@ -119,7 +119,7 @@ export const siteInfoService = {
 
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      const sName = payload.site_name || payload.siteName || payload.storeName || "آکسون | Axon";
+      const sName = payload.site_name || payload.siteName || payload.storeName || "آکسون | Axon Tech";
 
       const dbPayload: any = {
         site_name: sName,

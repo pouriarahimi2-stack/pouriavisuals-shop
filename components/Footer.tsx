@@ -1,3 +1,4 @@
+// File Path: components/Footer.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -14,7 +15,7 @@ export default function Footer() {
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
-  const siteName = info?.site_name || info?.siteName || "آکسون | Axon";
+  const siteName = info?.site_name || info?.siteName || "آکسون | Axon Tech";
   const footerLogo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
 
   return (
@@ -27,12 +28,12 @@ export default function Footer() {
                 <img src={footerLogo} alt={siteName} className="w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full rounded-xl bg-[var(--accent-blue)] flex items-center justify-center text-white font-black text-xl">
-                  ⚓
+                  ⚡
                 </div>
               )}
             </div>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
-              {info?.description || info?.tagline || "مرجع تخصصی مانیتور و تجهیزات تصویر"}
+              {info?.description || info?.tagline || "مرجع جامع تکنولوژی، گجت‌های هوشمند و سخت‌افزار نوین"}
             </p>
           </div>
 
@@ -52,7 +53,7 @@ export default function Footer() {
               <li>تلفن: <span className="font-mono font-bold text-[var(--accent-blue)]">{info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</span></li>
               <li>ایمیل: <span className="font-mono">{info?.email || "info@axoncore.ir"}</span></li>
               <li>ساعات کاری: {info?.working_hours || "۹:۰۰ الی ۱۸:۰۰"}</li>
-              <li>نشانی: {info?.address || "تهران، خیابان ولیعصر"}</li>
+              <li>نشانی: {info?.address || "تهران، خیابان ولیعصر، تقاطع میرداماد"}</li>
             </ul>
           </div>
 
@@ -60,7 +61,7 @@ export default function Footer() {
             <h5 className="font-black text-sm border-b border-[var(--card-border)] pb-2">ضمانت و استانداردها</h5>
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 text-xs">
               <div className="font-black text-emerald-500">✓ ضمانت ۱۰۰٪ اصالت فیزیکی کالا</div>
-              <p className="text-[11px] text-[var(--text-secondary)]">ارسال پیشتاز با بسته‌بندی ضدضربه استودیویی و بیمه کامل.</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">ارسال پیشتاز با بسته‌بندی ضدضربه و بیمه کامل به سراسر کشور.</p>
             </div>
           </div>
         </div>

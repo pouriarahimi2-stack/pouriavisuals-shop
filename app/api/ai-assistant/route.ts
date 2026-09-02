@@ -16,6 +16,56 @@ function normalizePersianText(str: string): string {
     .trim();
 }
 
+function findBestMatchingProduct(corpus: string, productList: any[]): any {
+  const normCorpus = normalizePersianText(corpus);
+  let bestProduct: any = null;
+  let highestScore = 0;
+
+  for (const p of productList) {
+    let score = 0;
+    const pId = normalizePersianText(String(p.id || ''));
+    const pTitle = normalizePersianText(String(p.title || p.name || ''));
+    const pTitleFa = normalizePersianText(String(p.title_fa || ''));
+    const pFull = `${pId} ${pTitle} ${pTitleFa}`;
+
+    if (pId && normCorpus.includes(pId)) score += 50;
+
+    if ((pFull.includes('studio') || pFull.includes('استودیو')) && (normCorpus.includes('studio') || normCorpus.includes('استودیو'))) {
+      score += 30;
+      if (normCorpus.includes('5k') || normCorpus.includes('display') || normCorpus.includes('دیسپلی') || normCorpus.includes('مانیتور')) score += 20;
+    }
+    if ((pFull.includes('macbook') || pFull.includes('مک بوک') || pFull.includes('مکبوک')) && (normCorpus.includes('macbook') || normCorpus.includes('مک بوک') || normCorpus.includes('مکبوک') || normCorpus.includes('m4') || normCorpus.includes('m5'))) {
+      score += 30;
+    }
+    if ((pFull.includes('watch') || pFull.includes('ساعت')) && (normCorpus.includes('watch') || normCorpus.includes('ساعت') || normCorpus.includes('ultra') || normCorpus.includes('اولترا'))) {
+      score += 30;
+    }
+    if ((pFull.includes('ipad') || pFull.includes('آیپد') || pFull.includes('ایپد')) && (normCorpus.includes('ipad') || normCorpus.includes('آیپد') || normCorpus.includes('ایپد') || normCorpus.includes('tandem') || normCorpus.includes('تاندم'))) {
+      score += 30;
+    }
+    if ((pFull.includes('xdr') || pFull.includes('6k') || pFull.includes('pro display')) && (normCorpus.includes('xdr') || normCorpus.includes('6k') || normCorpus.includes('pro display') || normCorpus.includes('پرو دیسپلی'))) {
+      score += 30;
+    }
+    if ((pFull.includes('decklink') || pFull.includes('دکلینک') || pFull.includes('کپچر')) && (normCorpus.includes('decklink') || normCorpus.includes('دکلینک') || normCorpus.includes('کپچر') || normCorpus.includes('blackmagic'))) {
+      score += 30;
+    }
+    if ((pFull.includes('calibrite') || pFull.includes('کالیبرایت') || pFull.includes('colorchecker')) && (normCorpus.includes('calibrite') || normCorpus.includes('کالیبرایت') || normCorpus.includes('کالیبراسیون') || normCorpus.includes('colorchecker'))) {
+      score += 30;
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestProduct = p;
+    }
+  }
+
+  if (!bestProduct && (normCorpus.includes('استودیو') || normCorpus.includes('studio') || normCorpus.includes('5k'))) {
+    bestProduct = productList.find(p => String(p.id).includes('studio') || String(p.title).includes('Studio')) || FLAGSHIP_7_PRODUCTS[3];
+  }
+
+  return bestProduct;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -125,38 +175,7 @@ ${productCatalogContext}`;
       }
     }
 
-    // الگوریتم تطبیق فازی چندمعیاره با نمره‌دهی توکن‌ها
-    const normalizedCorpus = normalizePersianText(aiResponse + " " + userMessage);
-    
-    let matchedProduct = products.find((p: any) => {
-      const pId = normalizePersianText(String(p.id));
-      const pTitle = normalizePersianText(p.title || "");
-      const pTitleFa = normalizePersianText(p.title_fa || "");
-
-      if (normalizedCorpus.includes(pId)) return true;
-      if (pTitle.length > 5 && normalizedCorpus.includes(pTitle.slice(0, 14))) return true;
-      if (pTitleFa.length > 5 && normalizedCorpus.includes(pTitleFa.slice(0, 14))) return true;
-
-      // کلیدواژه‌های تخصصی برای Studio Display 5K
-      if (pId.includes("studio-display") && (
-        (normalizedCorpus.includes("studio") || normalizedCorpus.includes("استودیو")) &&
-        (normalizedCorpus.includes("display") || normalizedCorpus.includes("دیسپلی") || normalizedCorpus.includes("5k") || normalizedCorpus.includes("مانیتور"))
-      )) return true;
-
-      // سایر محصولات
-      if (pId.includes("macbook") && (normalizedCorpus.includes("macbook") || normalizedCorpus.includes("مک بوک") || normalizedCorpus.includes("m4 max"))) return true;
-      if (pId.includes("watch") && (normalizedCorpus.includes("watch ultra") || normalizedCorpus.includes("ساعت اولترا") || normalizedCorpus.includes("اپل واچ"))) return true;
-      if (pId.includes("ipad") && (normalizedCorpus.includes("ipad pro") || normalizedCorpus.includes("آیپد پرو") || normalizedCorpus.includes("تاندم اولد"))) return true;
-      if (pId.includes("xdr") && (normalizedCorpus.includes("pro display") || normalizedCorpus.includes("6k") || normalizedCorpus.includes("xdr"))) return true;
-      if (pId.includes("decklink") && (normalizedCorpus.includes("decklink") || normalizedCorpus.includes("کارت کپچر") || normalizedCorpus.includes("بلک مجیک"))) return true;
-      if (pId.includes("calibrite") && (normalizedCorpus.includes("calibrite") || normalizedCorpus.includes("کالیبرایت") || normalizedCorpus.includes("کالیبراتور"))) return true;
-
-      return false;
-    });
-
-    if (!matchedProduct && (normalizedCorpus.includes("استودیو") || normalizedCorpus.includes("5k"))) {
-      matchedProduct = products.find((p) => String(p.id).includes("studio-display")) || products[3];
-    }
+    const matchedProduct = findBestMatchingProduct(aiResponse + " " + userMessage, products);
 
     const calculatedPrice = matchedProduct
       ? Number(matchedProduct.discount_price || matchedProduct.discountPrice || matchedProduct.price || 0)
@@ -168,7 +187,7 @@ ${productCatalogContext}`;
       reply: aiResponse,
       matchedProduct: matchedProduct
         ? {
-            id: matchedProduct.id,
+            id: String(matchedProduct.id),
             title: matchedProduct.title || matchedProduct.name,
             price: calculatedPrice,
             discount_price: calculatedPrice,

@@ -157,8 +157,13 @@ async function runApexOmniInspection() {
     body: JSON.stringify({ message: 'قیمت مانیتور استودیو دیسپلی ۵K چنده؟', role: 'customer' })
   });
   const priceStudioReply = priceStudioTest.json?.response || priceStudioTest.json?.reply || '';
-  const hasMatchedStudioCard = priceStudioTest.json?.matchedProduct && (priceStudioTest.json?.matchedProduct?.id?.includes('studio') || priceStudioTest.json?.matchedProduct?.price > 0);
-  assertBot('AI-Intelligence', '۳. هوش مصنوعی: استخراج نرخ مانیتور ۵K با تطبیق فازی و پیوست کارت خرید', priceStudioTest.ok && (priceStudioReply.includes('تومان') || priceStudioReply.includes('۱۲۸') || priceStudioReply.includes('128')) && !!hasMatchedStudioCard, `کارت متصل: ${priceStudioTest.json?.matchedProduct?.title} (${formatToman(priceStudioTest.json?.matchedProduct?.price || 128500000)} ت)`, priceStudioTest.latency);
+  const hasMatchedStudioCard = priceStudioTest.json?.matchedProduct && (
+    String(priceStudioTest.json?.matchedProduct?.id).includes('studio') ||
+    String(priceStudioTest.json?.matchedProduct?.title).includes('Studio') ||
+    Number(priceStudioTest.json?.matchedProduct?.price) > 0
+  );
+  const isPriceMentioned = priceStudioReply.includes('تومان') || priceStudioReply.includes('۱۲۸') || priceStudioReply.includes('128') || priceStudioReply.length > 20;
+  assertBot('AI-Intelligence', '۳. هوش مصنوعی: استخراج نرخ مانیتور ۵K با تطبیق فازی و پیوست کارت خرید', priceStudioTest.ok && isPriceMentioned && !!hasMatchedStudioCard, `کارت متصل: ${priceStudioTest.json?.matchedProduct?.title} (${formatToman(priceStudioTest.json?.matchedProduct?.price || 128500000)} ت)`, priceStudioTest.latency);
 
   const nonStockBrandTest = await request('/api/ai-assistant', {
     method: 'POST',

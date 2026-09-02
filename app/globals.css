@@ -4,25 +4,29 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --card-border: rgba(15, 23, 42, 0.08);
-  --accent-blue: #0071e3;
-  --modal-bg: #ffffff;
-  --input-bg: #f1f5f9;
+  --bg-primary: #101416;
+  --bg-secondary: #161b1e;
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --accent-blue: #1b90ff;
+  --accent-glow: rgba(27, 144, 255, 0.25);
+  --modal-bg: #161b1e;
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --glass-surface: rgba(255, 255, 255, 0.03);
 }
 
 .dark {
-  --bg-primary: #07090e;
-  --bg-secondary: #0d1117;
-  --text-primary: #f8fafc;
+  --bg-primary: #101416;
+  --bg-secondary: #161b1e;
+  --text-primary: #ffffff;
   --text-secondary: #94a3b8;
-  --card-border: rgba(255, 255, 255, 0.1);
-  --accent-blue: #38bdf8;
-  --modal-bg: #0d1117;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --accent-blue: #1b90ff;
+  --accent-glow: rgba(27, 144, 255, 0.25);
+  --modal-bg: #161b1e;
   --input-bg: rgba(255, 255, 255, 0.04);
+  --glass-surface: rgba(255, 255, 255, 0.03);
 }
 
 html, body {
@@ -58,11 +62,26 @@ body {
   scrollbar-width: none;
 }
 
+/* شیشه و کارت‌های مدرن Google Stitch */
+.glass-morphism {
+  background: var(--glass-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-morphism:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 12px 40px 0 var(--accent-glow);
+}
+
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s ease-out forwards;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

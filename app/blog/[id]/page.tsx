@@ -5,6 +5,7 @@ import React, { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { productService, Product } from "@/services/productService";
 import ProductCard from "@/components/ProductCard";
+import TableOfContents from "@/components/TableOfContents";
 
 interface BlogPost {
   id: string;
@@ -72,7 +73,7 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans space-y-3">
         <div className="w-10 h-10 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری تحلیل و مقاله تخصصی...</p>
+        <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری مقاله تخصصی...</p>
       </div>
     );
   }
@@ -95,7 +96,7 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
   const headerImage = post.imageUrl || post.image_url;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
+    <div className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
       
       <div
         className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 z-50 transition-all duration-150"
@@ -110,11 +111,11 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
         <span className="text-[var(--text-primary)] truncate max-w-xs">{post.title}</span>
       </div>
 
-      <article className="p-8 md:p-12 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-8 backdrop-blur-2xl">
+      <article className="p-6 md:p-12 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 backdrop-blur-2xl">
         <header className="space-y-4 border-b border-[var(--card-border)] pb-6">
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
             <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black">
-              {post.category || "راهنمای خرید و بررسی تخصصی"}
+              {post.category || "راهنمای تخصصی تکنولوژی"}
             </span>
             <span className="font-mono text-[var(--text-secondary)] font-bold">
               📅 انتشار: {post.createdAt ? new Date(post.createdAt).toLocaleDateString("fa-IR") : "امروز"}
@@ -137,6 +138,9 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
             </div>
           )}
         </header>
+
+        {/* فهرست خودکار سئو با پرش هوشمند */}
+        <TableOfContents contentHtml={post.content} />
 
         <div
           dangerouslySetInnerHTML={{ __html: post.content }}
@@ -166,7 +170,7 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
         <section className="space-y-6">
           <div className="flex justify-between items-center px-1">
             <h3 className="text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
-              <span>💎</span> تجهیزات و مانیتورهای مرتبط با این موضوع
+              <span>💎</span> کالاهای مرتبط با این موضوع
             </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

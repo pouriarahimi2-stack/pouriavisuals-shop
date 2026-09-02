@@ -7,7 +7,7 @@ const path = require('path');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   👑 ابرسامانه نهایی بازرسی خط‌به‌خط، آزمون نفوذ و پایش زنده پلتفرم آکسون (Apex Omni Sentinel v2026.4)');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   👑 ابرسامانه نهایی بازرسی خط‌به‌خط، نوسازی UI و پایش زنده پلتفرم آکسون (Apex Omni Sentinel v2026.5)');
 console.log('\x1b[35m%s\x1b[0m', '╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 const BASE_URL = process.env.SITE_URL || 'https://axoncore.ir';
@@ -57,7 +57,7 @@ function request(path, options = {}) {
       path: fullUrl.pathname + fullUrl.search,
       method: options.method || 'GET',
       headers: {
-        'User-Agent': 'Axon-Apex-Omni-Sentinel/2026.4 (High-Precision Full Coverage Inspector)',
+        'User-Agent': 'Axon-Apex-Omni-Sentinel/2026.5 (Ultra Deep 70-Point Inspector)',
         'Accept': 'application/json, text/html, */*',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         ...(options.headers || {}),
@@ -136,7 +136,7 @@ async function runApexOmniInspection() {
   assertBot('API-Core', 'نقشه داینامیک سایت برای ایندکس گوگل (/sitemap.xml)', sitemapRes.ok, 'نقشه سایت فعال است.', sitemapRes.latency);
 
   // ۲. تست مکالمه هوش مصنوعی و تطبیق فازی کارت خرید
-  printSection('۲. آزمون کواد-موتور هوش مصنوعی (مکالمه پویا، استدلال برند و پیوست کارت خرید ۵K)');
+  printSection('۲. آزمون کواد-موتور هوش مصنوعی (مکالمه پویا، گستره تکنولوژی و پیوست کارت خرید ۵K)');
 
   const greetingTest = await request('/api/ai-assistant', {
     method: 'POST',
@@ -165,12 +165,12 @@ async function runApexOmniInspection() {
   const isPriceMentioned = priceStudioReply.includes('تومان') || priceStudioReply.includes('۱۲۸') || priceStudioReply.includes('128') || priceStudioReply.length > 20;
   assertBot('AI-Intelligence', '۳. هوش مصنوعی: استخراج نرخ مانیتور ۵K با تطبیق فازی و پیوست کارت خرید', priceStudioTest.ok && isPriceMentioned && !!hasMatchedStudioCard, `کارت متصل: ${priceStudioTest.json?.matchedProduct?.title} (${formatToman(priceStudioTest.json?.matchedProduct?.price || 128500000)} ت)`, priceStudioTest.latency);
 
-  const nonStockBrandTest = await request('/api/ai-assistant', {
+  const broadTechTest = await request('/api/ai-assistant', {
     method: 'POST',
-    body: JSON.stringify({ message: 'آیا مانیتور سامسونگ یا الجی برای تدوین رنگ موجود دارید؟', role: 'customer' })
+    body: JSON.stringify({ message: 'بهترین گجت‌ها و پردازنده‌های سخت‌افزاری امسال برای تدوین و کارهای سنگین چیه؟', role: 'customer' })
   });
-  const nonStockReply = nonStockBrandTest.json?.response || nonStockBrandTest.json?.reply || '';
-  assertBot('AI-Intelligence', '۴. هوش مصنوعی: استدلال زنده برندهای ناموجود و پیشنهاد تخصصی مانیتور استودیو', nonStockBrandTest.ok && (nonStockReply.includes('سامسونگ') || nonStockReply.includes('الجی') || nonStockReply.includes('Studio Display') || nonStockReply.includes('اپل')), `استدلال: "${nonStockReply.slice(0, 65)}..."`, nonStockBrandTest.latency);
+  const broadTechReply = broadTechTest.json?.response || broadTechTest.json?.reply || '';
+  assertBot('AI-Intelligence', '۴. هوش مصنوعی: مشاوره جامع در گستره وسیع فناوری، سخت‌افزار و پردازش', broadTechTest.ok && broadTechReply.length > 40, `استدلال: "${broadTechReply.slice(0, 65)}..."`, broadTechTest.latency);
 
   const aiTeardownTest = await request('/api/ai-teardown', {
     method: 'POST',
@@ -185,15 +185,15 @@ async function runApexOmniInspection() {
   });
   assertBot('AI-Intelligence', '۶. هوش مصنوعی بینایی تصویر (Vision Engine)', aiVisionTest.ok, 'وب‌سرویس پردازش ورودی تصویری پایدار است.', aiVisionTest.latency);
 
-  // ۳. تست موتور سئوی خودمختار و سرچ‌کنسول
-  printSection('۳. آزمون موتور رشد سئوی خودمختار (Google Search Console + Competitor Gap)');
+  // ۳. تست موتور سئوی خودمختار و فهرست خودکار عناوین (TOC)
+  printSection('۳. آزمون موتور سئوی خودمختار و فهرست خودکار عناوین (Table of Contents)');
 
   const gscIntelligence = await request('/api/ai-seo-autopilot');
   assertBot('AI-Autopilot', 'تحلیل سرچ‌کنسول: استخراج کلمات کلیدی پرکلیک و رقبای گوگل', gscIntelligence.ok && gscIntelligence.json?.data?.searchConsoleKeywords?.length > 0, `تعداد ${gscIntelligence.json?.data?.searchConsoleKeywords?.length || 5} کلمه فرصت رشد شناسایی شد.`, gscIntelligence.latency);
 
   const autoArticleGen = await request('/api/ai-seo-autopilot', {
     method: 'POST',
-    body: JSON.stringify({ targetKeyword: 'بررسی تخصصی کالیبراسیون مانیتورهای ۵K استودیو در سال ۲۰۲۶' })
+    body: JSON.stringify({ targetKeyword: 'راهنمای جامع خرید گجت‌ها و سخت‌افزار تدوین در سال ۲۰۲۶' })
   });
   assertBot('AI-Autopilot', 'نگارش خودکار مقاله ۲۵۰۰ کلمه‌ای و تزریق لینک مستقیم خرید', autoArticleGen.ok && autoArticleGen.json?.data?.content && autoArticleGen.json?.data?.content.includes('href="/products/'), 'مقاله سئو با دکمه خرید در مجله منتشر گردید.', autoArticleGen.latency);
 

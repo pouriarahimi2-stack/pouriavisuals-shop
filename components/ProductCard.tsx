@@ -17,7 +17,7 @@ export default function ProductCard({ product }: { product: any }) {
     setMounted(true);
   }, []);
 
-  const title = product.title || product.title_fa || product.name || "کالای دیجیتال تخصصی";
+  const title = product.title || product.title_fa || product.name || "کالای تکنولوژی";
   const price = Number(product.price) || 0;
   const discountPrice =
     product.discountPrice !== undefined && product.discountPrice !== null
@@ -35,7 +35,7 @@ export default function ProductCard({ product }: { product: any }) {
       : [product.image_url || product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600"];
 
   const mainImage = images[0];
-  const category = product.category || product.category_name || "تجهیزات تخصصی";
+  const category = product.category || product.category_name || "تکنولوژی";
   const isAvailable =
     product.is_available !== false &&
     product.isAvailable !== false &&
@@ -49,7 +49,7 @@ export default function ProductCard({ product }: { product: any }) {
   return (
     <div
       onClick={() => userBehavior.trackProductView(product.id, category)}
-      className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.2rem] p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:border-[var(--accent-blue)] transition-all duration-300 group select-none relative"
+      className="stitch-card rounded-[2.2rem] p-4 sm:p-5 flex flex-col justify-between group select-none relative"
       dir="rtl"
     >
       <div className="relative w-full h-52 sm:h-56 rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-3.5 flex items-center justify-center p-3 border border-[var(--card-border)]">
@@ -74,7 +74,7 @@ export default function ProductCard({ product }: { product: any }) {
         {!isAvailable && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
             <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black shadow-md">
-              ناموجود در انبار
+              ناموجود
             </span>
           </div>
         )}
@@ -82,9 +82,9 @@ export default function ProductCard({ product }: { product: any }) {
 
       <div className="flex flex-col flex-grow space-y-2 mb-3">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Pro"}</span>
+          <span className="text-[var(--accent-blue)] font-extrabold">{product.brand || "Axon Tech"}</span>
           <span className={`font-bold ${isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}`}>
-            {isAvailable ? "موجود در انبار ✓" : "ناموجود"}
+            {isAvailable ? "موجود ✓" : "ناموجود"}
           </span>
         </div>
 
@@ -98,7 +98,7 @@ export default function ProductCard({ product }: { product: any }) {
         </Link>
 
         <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 font-medium leading-relaxed">
-          {product.short_description || product.description || "تجهیزات تخصصی با گارانتی اصالت طلایی"}
+          {product.short_description || product.description || "تجهیزات تخصصی و گجت‌های نوین با گارانتی طلایی"}
         </p>
       </div>
 
@@ -116,7 +116,7 @@ export default function ProductCard({ product }: { product: any }) {
             </span>
           </div>
           <Link href={`/products/${product.id}`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline transition">
-            بررسی کالا ←
+            جزئیات کالا ←
           </Link>
         </div>
 
@@ -162,7 +162,7 @@ export default function ProductCard({ product }: { product: any }) {
             disabled={!isAvailable}
             className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-md hover:opacity-90 cursor-pointer disabled:opacity-40 transition"
           >
-            ⚡ خرید سریع
+            ⚡ خرید فوری
           </button>
         </div>
       </div>

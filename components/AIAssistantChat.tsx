@@ -29,7 +29,6 @@ export default function AIAssistantChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // قفل اسکرول بدنه صفحه در موبایل هنگام باز بودن چت
   useEffect(() => {
     if (isOpen && window.innerWidth < 640) {
       document.body.style.overflow = "hidden";

@@ -1,3 +1,4 @@
+// File Path: lib/realtimeSync.ts
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { productService } from "@/services/productService";
@@ -32,7 +33,7 @@ export function applyTitleToDOM(title?: string, storeName?: string) {
   if (typeof document === "undefined") return;
   try {
     const sName = storeName || "آکسون";
-    const sTitle = title || "مرجع تخصصی مانیتور و تجهیزات تصویر";
+    const sTitle = title || "مرجع تخصصی تجهیزات دیجیتال و تصویر";
     document.title = `${sName} | ${sTitle}`;
   } catch {}
 }

@@ -13,13 +13,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "کادر کلید API خالی است." }, { status: 400 });
     }
 
-    // پایپ‌لاین تست اندپوینت‌های v1 و v1beta برای تمام نسخه‌های مدل Flash
     const endpointsToTry = [
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
       "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
     ];
 
     let reply = "";
@@ -43,14 +42,14 @@ export async function POST(req: NextRequest) {
 
         if (testJson.error) {
           lastErrorMsg = testJson.error.message || "";
-          continue; // سوئیچ خودکار به اندپوینت بعدی
+          continue;
         }
 
         const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
         if (generatedText) {
           reply = generatedText.trim();
           successfulEndpoint = ep.split("/models/")[1]?.split(":")[0] || "gemini-1.5-flash";
-          break; // موفقیت قطعی!
+          break;
         }
       } catch (err: any) {
         lastErrorMsg = err?.message || "";

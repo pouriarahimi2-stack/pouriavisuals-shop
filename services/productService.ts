@@ -62,8 +62,8 @@ const LOCAL_PRODUCTS_CACHE = "axon_products_registry_cache_v2026";
 export const FLAGSHIP_7_PRODUCTS: Product[] = [
   {
     id: "prod-macbook-pro-m5-max",
-    title: "MacBook Pro 16" (Apple M4 Max, 128GB RAM, 2TB SSD)",
-    name: "MacBook Pro 16" (Apple M4 Max, 128GB RAM, 2TB SSD)",
+    title: "MacBook Pro 16 Inch (Apple M4 Max, 128GB RAM, 2TB SSD)",
+    name: "MacBook Pro 16 Inch (Apple M4 Max, 128GB RAM, 2TB SSD)",
     title_fa: "لپ‌تاپ پرچمدار ۱۶ اینچ با تراشه M4 Max، حافظه رم ۱۲۸ گیگابایت و ۲ ترابایت SSD",
     brand: "Apple",
     category: "لپ‌تاپ و اولترابوک",
@@ -98,8 +98,8 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
   },
   {
     id: "prod-apple-watch-ultra-3",
-    title: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS + Cellular)",
-    name: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS + Cellular)",
+    title: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS)",
+    name: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS)",
     title_fa: "ساعت هوشمند پرچمدار بدنه تیتانیوم ۴۹ میلی‌متری با روشنایی ۳۰۰۰ نیت",
     brand: "Apple",
     category: "گجت‌های هوشمند",
@@ -121,8 +121,8 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
   },
   {
     id: "prod-ipad-pro-13-m5",
-    title: "iPad Pro 13" (Apple M4, Tandem OLED, 256GB Wi-Fi)",
-    name: "iPad Pro 13" (Apple M4, Tandem OLED, 256GB Wi-Fi)",
+    title: "iPad Pro 13 Inch (Apple M4, Tandem OLED, 256GB)",
+    name: "iPad Pro 13 Inch (Apple M4, Tandem OLED, 256GB)",
     title_fa: "تبلت پرچمدار ۱۳ اینچ با نمایشگر Tandem OLED و تراشه M4",
     brand: "Apple",
     category: "گجت‌های هوشمند",
@@ -144,8 +144,8 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
   },
   {
     id: "prod-studio-display-5k",
-    title: "Apple Studio Display 27" 5K Retina (Nano-Texture Glass)",
-    name: "Apple Studio Display 27" 5K Retina (Nano-Texture Glass)",
+    title: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
+    name: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
     title_fa: "نمایشگر ۲۷ اینچ ۵K رتینا با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری",
     brand: "Apple",
     category: "صوتی و تصویر",
@@ -167,8 +167,8 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
   },
   {
     id: "prod-pro-display-xdr-6k",
-    title: "Apple Pro Display XDR 32" 6K Retina (HDR 1600 Nits)",
-    name: "Apple Pro Display XDR 32" 6K Retina (HDR 1600 Nits)",
+    title: "Apple Pro Display XDR 32 Inch 6K Retina (HDR 1600 Nits)",
+    name: "Apple Pro Display XDR 32 Inch 6K Retina (HDR 1600 Nits)",
     title_fa: "نمایشگر پرچمدار ۳۲ اینچ ۶K با روشنایی ۱۶۰۰ نیت و کنتراست ۱,۰۰۰,۰۰۰:۱",
     brand: "Apple",
     category: "صوتی و تصویر",

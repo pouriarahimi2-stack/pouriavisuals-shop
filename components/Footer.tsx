@@ -18,36 +18,36 @@ export default function Footer() {
   const siteName = info?.site_name || info?.siteName || "AXON";
 
   return (
-    <footer className="w-full border-t border-white/10 bg-[#101416] text-white mt-auto select-none" dir="rtl">
+    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-auto select-none transition-colors duration-300" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <div className="text-2xl font-black text-white tracking-tighter">{siteName}</div>
-            <p className="text-xs opacity-60 leading-relaxed font-medium">مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار و ابزارهای تکنولوژی با گارانتی اصالت طلایی.</p>
+            <div className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">{siteName}</div>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار و ابزارهای تکنولوژی با گارانتی اصالت طلایی.</p>
           </div>
           <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-[#1b90ff]">دسترسی سریع</h5>
-            <ul className="space-y-2 text-xs opacity-70">
-              <li><Link href="/#products" className="hover:text-[#1b90ff]">کاتالوگ محصولات</Link></li>
-              <li><Link href="/track-order" className="hover:text-[#1b90ff]">پیگیری سفارش</Link></li>
-              <li><Link href="/news" className="hover:text-[#1b90ff]">اخبار تکنولوژی</Link></li>
-              <li><Link href="/blog" className="hover:text-[#1b90ff]">مجله سئو</Link></li>
+            <h5 className="font-bold text-sm text-[var(--accent-blue)]">دسترسی سریع</h5>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+              <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ محصولات</Link></li>
+              <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">پیگیری سفارش</Link></li>
+              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">اخبار تکنولوژی</Link></li>
+              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله سئو</Link></li>
             </ul>
           </div>
           <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-[#1b90ff]">اطلاعات تماس</h5>
-            <ul className="space-y-2 text-xs opacity-70">
+            <h5 className="font-bold text-sm text-[var(--accent-blue)]">اطلاعات تماس</h5>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
               <li>تلفن: {info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</li>
               <li>ایمیل: {info?.email || "info@axoncore.ir"}</li>
               <li>ساعات کاری: {info?.working_hours || "۹:۰۰ الی ۱۸:۰۰"}</li>
             </ul>
           </div>
           <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-emerald-400">ضمانت رسمی</h5>
-            <p className="text-xs opacity-70 leading-relaxed">۱۰۰٪ اصالت فیزیکی کالا، مهلت تست ۷ روزه سخت‌افزاری و ارسال سریع پیشتاز به سراسر ایران.</p>
+            <h5 className="font-bold text-sm text-emerald-600 dark:text-emerald-400">ضمانت رسمی</h5>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">۱۰۰٪ اصالت فیزیکی کالا، مهلت تست ۷ روزه سخت‌افزاری و ارسال سریع پیشتاز به سراسر ایران.</p>
           </div>
         </div>
-        <div className="mt-10 pt-6 border-t border-white/10 text-center text-xs opacity-50">
+        <div className="mt-10 pt-6 border-t border-[var(--card-border)] text-center text-xs text-[var(--text-secondary)] font-bold">
           تمامی حقوق محفوظ است © {new Date().getFullYear()} {siteName}
         </div>
       </div>

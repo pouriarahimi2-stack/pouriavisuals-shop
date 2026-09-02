@@ -75,36 +75,36 @@ export default function HomePage() {
   const categories = Array.from(new Set(products.map((p) => p.category || "تکنولوژی"))).filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-[#101416] text-white font-sans select-none pb-24" dir="rtl">
-      <main className="pt-8 px-3 sm:px-6 max-w-7xl mx-auto space-y-10">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-24 transition-colors duration-300" dir="rtl">
+      <main className="pt-6 sm:pt-8 px-3 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-10">
         
         {/* ۱. هیرو بنتو شیشه‌ای Google Stitch */}
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-3 min-h-[320px] rounded-3xl overflow-hidden relative glass-morphism flex flex-col justify-end p-6 sm:p-10">
-            <img src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1600" className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Tech Showcase" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#101416] via-[#101416]/50 to-transparent" />
+          <div className="md:col-span-3 min-h-[300px] sm:min-h-[340px] rounded-3xl overflow-hidden relative glass-morphism flex flex-col justify-end p-6 sm:p-10">
+            <img src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1600" className="absolute inset-0 w-full h-full object-cover opacity-25 dark:opacity-35" alt="Tech Showcase" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/60 to-transparent" />
             <div className="relative z-10 space-y-3 text-right">
-              <span className="inline-block px-3 py-1 rounded-full bg-[#1b90ff]/20 text-[#1b90ff] font-bold text-xs border border-[#1b90ff]/30">
+              <span className="inline-block px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-bold text-xs border border-[var(--accent-blue)]/30">
                 ⚡ اکوسیستم جامع تکنولوژی ۲۰۲۶
               </span>
-              <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight">
+              <h1 className="text-2xl sm:text-4xl font-black leading-tight text-[var(--text-primary)]">
                 مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-medium">
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-xl font-medium leading-relaxed">
                 تامین انواع سیستم‌های پردازشی، لپ‌تاپ‌های ورک‌استیشن، ساعت‌های هوشمند، نمایشگرهای ۵K و قطعات دیجیتال با ۱۸ ماه گارانتی اصالت طلایی.
               </p>
               <div className="pt-2 flex gap-3">
-                <Link href="/#products" className="bg-[#1b90ff] text-white px-7 py-3 rounded-full font-black text-xs hover:scale-105 transition-transform shadow-lg shadow-[#1b90ff]/20">
+                <Link href="/#products" className="bg-[var(--accent-blue)] text-white px-7 py-3.5 rounded-full font-black text-xs hover:scale-105 transition-transform shadow-lg shadow-blue-500/20">
                   مشاهده کاتالوگ محصولات ←
                 </Link>
               </div>
             </div>
           </div>
 
-          <div className="md:col-span-1 min-h-[320px] rounded-3xl glass-morphism p-6 flex flex-col justify-center items-center text-center space-y-2">
-            <div className="text-4xl font-black text-[#1b90ff]">۱۰۰٪</div>
-            <h4 className="text-sm font-bold text-white">ضمانت اصالت فیزیکی کالا</h4>
-            <p className="text-xs opacity-60">ارسال رایگان سفارش‌های بالای ۲ میلیون با پست پیشتاز</p>
+          <div className="md:col-span-1 min-h-[300px] sm:min-h-[340px] rounded-3xl glass-morphism p-6 flex flex-col justify-center items-center text-center space-y-2">
+            <div className="text-4xl font-black text-[var(--accent-blue)]">۱۰۰٪</div>
+            <h4 className="text-sm font-bold text-[var(--text-primary)]">ضمانت اصالت فیزیکی کالا</h4>
+            <p className="text-xs text-[var(--text-secondary)] font-medium">ارسال رایگان سفارش‌های بالای ۲ میلیون با پست پیشتاز</p>
           </div>
         </section>
 
@@ -116,7 +116,7 @@ export default function HomePage() {
           <button
             onClick={() => setSelectedCategory("all")}
             className={`px-6 py-2.5 rounded-full glass-morphism whitespace-nowrap text-xs font-bold transition-all cursor-pointer ${
-              selectedCategory === "all" ? "bg-[#1b90ff] text-white shadow-lg shadow-[#1b90ff]/30 border-[#1b90ff]" : "hover:bg-white/10"
+              selectedCategory === "all" ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25 border-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
             }`}
           >
             همه محصولات ({products.length})
@@ -126,7 +126,7 @@ export default function HomePage() {
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               className={`px-6 py-2.5 rounded-full glass-morphism whitespace-nowrap text-xs font-bold transition-all cursor-pointer ${
-                selectedCategory === cat ? "bg-[#1b90ff] text-white shadow-lg shadow-[#1b90ff]/30 border-[#1b90ff]" : "hover:bg-white/10"
+                selectedCategory === cat ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25 border-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
               }`}
             >
               {cat}
@@ -143,12 +143,12 @@ export default function HomePage() {
 
         {/* ۵. بخش مقالات سئو */}
         <section className="glass-morphism rounded-3xl p-6 sm:p-8 space-y-4">
-          <div className="flex justify-between items-center border-b border-white/10 pb-4">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
-              <h3 className="text-base font-bold text-white">مجله و مقالات تحلیلی فناوری</h3>
-              <p className="text-xs opacity-60">جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها</p>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">مجله و مقالات تحلیلی فناوری</h3>
+              <p className="text-xs text-[var(--text-secondary)] font-medium">جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها</p>
             </div>
-            <Link href="/blog" className="text-xs font-bold text-[#1b90ff] hover:underline">
+            <Link href="/blog" className="text-xs font-bold text-[var(--accent-blue)] hover:underline">
               مشاهده همه مقالات ←
             </Link>
           </div>
@@ -171,9 +171,9 @@ function HomeBlogSection() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
       {posts.map((post) => (
-        <article key={post.id || post.title} className="glass-morphism p-4 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[#1b90ff] transition duration-300">
-          <h4 className="font-bold text-xs line-clamp-2 text-white">{post.title}</h4>
-          <Link href={`/blog/${post.id}`} className="text-[11px] font-black text-[#1b90ff] hover:underline inline-block pt-2 border-t border-white/10">
+        <article key={post.id || post.title} className="glass-morphism p-4 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--accent-blue)] transition duration-300">
+          <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
+          <Link href={`/blog/${post.id}`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]">
             مطالعه مقاله ←
           </Link>
         </article>

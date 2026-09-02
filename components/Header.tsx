@@ -11,6 +11,8 @@ import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
 
+type ThemeMode = "dark" | "light" | "auto";
+
 export default function Header() {
   const router = useRouter();
   const cartContext = useCart();
@@ -20,6 +22,7 @@ export default function Header() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo>(DEFAULT_SITE_INFO);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>("auto");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -30,8 +33,34 @@ export default function Header() {
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
+  // اعمال هوشمند تم بر اساس ساعت دستگاه یا انتخاب دستی
+  const applyTheme = (mode: ThemeMode) => {
+    let isDark = false;
+    if (mode === "dark") {
+      isDark = true;
+    } else if (mode === "light") {
+      isDark = false;
+    } else {
+      // حالت خودکار: سنجش ساعت دستگاه (۶ صبح تا ۶ عصر = روز، ۶ عصر تا ۶ صبح = شب)
+      const currentHour = new Date().getHours();
+      isDark = currentHour < 6 || currentHour >= 18;
+    }
+
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
+    try {
+      const savedMode = (localStorage.getItem("axon_theme_mode") as ThemeMode) || "auto";
+      setThemeMode(savedMode);
+      applyTheme(savedMode);
+    } catch {}
+
     const initHeaderData = async () => {
       try {
         const [info, prods, cats] = await Promise.all([
@@ -67,6 +96,18 @@ export default function Header() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  const cycleTheme = () => {
+    soundEngine.playClick();
+    let nextMode: ThemeMode = "dark";
+    if (themeMode === "dark") nextMode = "light";
+    else if (themeMode === "light") nextMode = "auto";
+    else nextMode = "dark";
+
+    setThemeMode(nextMode);
+    localStorage.setItem("axon_theme_mode", nextMode);
+    applyTheme(nextMode);
+  };
 
   useEffect(() => {
     if (!searchQuery.trim()) { setSearchResults([]); return; }
@@ -120,23 +161,23 @@ export default function Header() {
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
 
   return (
-    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-white select-none" dir="rtl" suppressHydrationWarning>
+    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
       <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="relative" ref={categoryDropdownRef}>
             <button
               onClick={() => { soundEngine.playClick(); setIsCategoryOpen(!isCategoryOpen); }}
-              className="w-9 h-9 rounded-full bg-white/5 border border-white/10 hover:border-[#1b90ff] flex items-center justify-center text-sm transition cursor-pointer"
+              className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm transition cursor-pointer text-[var(--text-primary)]"
               title="دسته‌بندی‌های کالا"
             >
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
 
             {isCategoryOpen && (
-              <div className="absolute top-12 right-0 w-64 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 bg-[#101416]/95">
+              <div className="absolute top-12 right-0 w-64 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 bg-[var(--modal-bg)]">
                 <button
                   onClick={() => handleSelectCategory("all")}
-                  className="w-full text-right p-2.5 rounded-xl text-xs font-black text-white hover:bg-[#1b90ff] transition cursor-pointer"
+                  className="w-full text-right p-2.5 rounded-xl text-xs font-black text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
                 >
                   ⚡ تمامی محصولات
                 </button>
@@ -144,7 +185,7 @@ export default function Header() {
                   <button
                     key={cat.id || cat.name}
                     onClick={() => handleSelectCategory(cat.name)}
-                    className="w-full text-right p-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-[#1b90ff] hover:text-white transition cursor-pointer"
+                    className="w-full text-right p-2.5 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
                   >
                     🏷️ {cat.name}
                   </button>
@@ -154,16 +195,16 @@ export default function Header() {
           </div>
 
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 p-1 flex items-center justify-center overflow-hidden">
-              {logoUrl ? <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" /> : <span className="text-[#1b90ff] font-black text-lg">⚡</span>}
+            <div className="w-9 h-9 rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] p-1 flex items-center justify-center overflow-hidden">
+              {logoUrl ? <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" /> : <span className="text-[var(--accent-blue)] font-black text-lg">⚡</span>}
             </div>
-            <div className="text-xl font-black text-white tracking-tighter">{storeName}</div>
+            <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter">{storeName}</div>
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-70">
+        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-75">
           {navLinks.map((link, idx) => (
-            <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[#1b90ff] transition font-bold">
+            <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[var(--accent-blue)] transition font-bold text-[var(--text-primary)]">
               {link.title}
             </Link>
           ))}
@@ -171,22 +212,22 @@ export default function Header() {
 
         <div className="flex items-center gap-3">
           <div className="relative hidden sm:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 focus-within:border-[#1b90ff] transition w-44">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-44">
               <span className="text-xs opacity-70">🔍</span>
-              <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-white placeholder-slate-400 font-bold" />
+              <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] placeholder-slate-400 font-bold" />
             </div>
             {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-12 left-0 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 w-72 bg-[#101416]/95">
+              <div className="absolute top-12 left-0 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 w-72 bg-[var(--modal-bg)]">
                 {searchResults.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-white/10 transition gap-2">
+                  <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
                     <Link href={`/products/${p.id}`} onClick={() => setIsSearchFocused(false)} className="flex items-center gap-2 flex-1 min-w-0">
                       <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 shrink-0" />
                       <div className="flex-1 min-w-0 text-right">
-                        <h4 className="text-xs font-bold text-white truncate">{p.title || p.name}</h4>
-                        <span className="font-mono font-black text-[10px] text-[#1b90ff]">{formatPrice(p.discountPrice || p.price || 0)} ت</span>
+                        <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
+                        <span className="font-mono font-black text-[10px] text-[var(--accent-blue)]">{formatPrice(p.discountPrice || p.price || 0)} ت</span>
                       </div>
                     </Link>
-                    <button type="button" onClick={(e) => handleQuickAddFromSearch(e, p)} className="px-2 py-1 rounded-lg text-[10px] font-black bg-[#1b90ff] text-white">
+                    <button type="button" onClick={(e) => handleQuickAddFromSearch(e, p)} className="px-2 py-1 rounded-lg text-[10px] font-black bg-[var(--accent-blue)] text-white">
                       {addedItemMap[p.id] ? "✓" : "+"}
                     </button>
                   </div>
@@ -195,10 +236,20 @@ export default function Header() {
             )}
           </div>
 
-          <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="p-2 opacity-80 hover:opacity-100 transition relative cursor-pointer" title="سبد خرید">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+          {/* سوییچر ۳ حالته تم (دارک / لایت / خودکار) */}
+          <button
+            onClick={cycleTheme}
+            className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm"
+            title={themeMode === "dark" ? "تم فعلی: تاریک (کلیک: روشن)" : themeMode === "light" ? "تم فعلی: روشن (کلیک: خودکار)" : "تم فعلی: خودکار بر اساس ساعت (کلیک: تاریک)"}
+            suppressHydrationWarning
+          >
+            {mounted ? (themeMode === "dark" ? "🌙" : themeMode === "light" ? "☀️" : "⏰") : "🌙"}
+          </button>
+
+          <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="p-2 opacity-80 hover:opacity-100 transition relative cursor-pointer text-[var(--text-primary)]" title="سبد خرید">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
             {mounted && totalItems > 0 && (
-              <span className="absolute top-0 right-0 w-4 h-4 bg-[#1b90ff] rounded-full text-[10px] font-mono font-black flex items-center justify-center text-white shadow-lg animate-pulse" suppressHydrationWarning>
+              <span className="absolute top-0 right-0 w-4 h-4 bg-[var(--accent-blue)] rounded-full text-[10px] font-mono font-black flex items-center justify-center text-white shadow-lg animate-pulse" suppressHydrationWarning>
                 {totalItems}
               </span>
             )}

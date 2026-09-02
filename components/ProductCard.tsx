@@ -30,7 +30,7 @@ export default function ProductCard({ product }: { product: any }) {
       className="glass-morphism rounded-3xl overflow-hidden p-5 flex flex-col justify-between group select-none relative"
       dir="rtl"
     >
-      <div className="relative aspect-square rounded-2xl overflow-hidden bg-white/5 mb-4 flex items-center justify-center p-3 border border-white/5">
+      <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
         <Link href={`/products/${product.id}`} className="w-full h-full flex items-center justify-center">
           <img src={mainImage} alt={title} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
         </Link>
@@ -40,17 +40,17 @@ export default function ProductCard({ product }: { product: any }) {
       </div>
 
       <div className="space-y-2 mb-4 text-right flex-grow">
-        <span className="text-[#1b90ff] text-xs font-bold block">{product.brand || "AXON"}</span>
+        <span className="text-[var(--accent-blue)] text-xs font-bold block">{product.brand || "AXON"}</span>
         <Link href={`/products/${product.id}`}>
-          <h3 className="text-sm font-bold text-white line-clamp-2 leading-snug hover:text-[#1b90ff] transition">{title}</h3>
+          <h3 className="text-sm font-bold text-[var(--text-primary)] line-clamp-2 leading-snug hover:text-[var(--accent-blue)] transition">{title}</h3>
         </Link>
-        <p className="text-xs opacity-50 line-clamp-2">{product.short_description || product.description || "دارای گارانتی اصالت طلایی و ارسال پیشتاز"}</p>
+        <p className="text-xs text-[var(--text-secondary)] line-clamp-2 font-medium leading-relaxed">{product.short_description || product.description || "دارای گارانتی اصالت طلایی و ارسال پیشتاز"}</p>
       </div>
 
-      <div className="pt-3 border-t border-white/10 space-y-3 mt-auto">
+      <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
         <div className="flex justify-between items-center flex-row-reverse">
-          <span className="text-base font-mono font-black text-white" suppressHydrationWarning>{formatPrice(currentPrice)} تومان</span>
-          <span className="text-[10px] font-bold text-emerald-400">{isAvailable ? "موجود ✓" : "ناموجود"}</span>
+          <span className="text-base font-mono font-black text-[var(--text-primary)]" suppressHydrationWarning>{formatPrice(currentPrice)} تومان</span>
+          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{isAvailable ? "موجود ✓" : "ناموجود"}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -61,7 +61,7 @@ export default function ProductCard({ product }: { product: any }) {
               addToCart({ id: product.id, title, name: title, price: currentPrice, image: mainImage, stock: stockCount, quantity: 1 });
             }}
             disabled={!isAvailable}
-            className="py-2.5 bg-white/5 hover:bg-white/15 text-white text-xs font-bold rounded-xl border border-white/10 transition cursor-pointer disabled:opacity-40"
+            className="py-2.5 bg-[var(--input-bg)] hover:bg-[var(--accent-blue)] hover:text-white text-[var(--text-primary)] text-xs font-bold rounded-xl border border-[var(--card-border)] transition cursor-pointer disabled:opacity-40"
           >
             🛒 سبد خرید
           </button>
@@ -73,7 +73,7 @@ export default function ProductCard({ product }: { product: any }) {
               router.push("/checkout");
             }}
             disabled={!isAvailable}
-            className="py-2.5 bg-[#1b90ff] text-white text-xs font-black rounded-xl shadow-lg shadow-[#1b90ff]/20 hover:opacity-90 transition cursor-pointer disabled:opacity-40"
+            className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-lg shadow-blue-500/20 hover:opacity-90 transition cursor-pointer disabled:opacity-40"
           >
             ⚡ خرید فوری
           </button>

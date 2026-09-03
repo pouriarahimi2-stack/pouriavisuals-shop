@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Footer() {
   const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
@@ -24,7 +23,11 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="glass-morphism p-6 rounded-3xl space-y-4">
             <div className="flex items-center gap-3">
-              <AnimatedLogo customLogoUrl={footerLogo} size={42} />
+              {footerLogo ? (
+                <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+                  <img src={footerLogo} alt={siteName} className="w-full h-full object-contain" />
+                </div>
+              ) : null}
               <div className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">{siteName}</div>
             </div>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار و ابزارهای تکنولوژی با گارانتی اصالت طلایی.</p>

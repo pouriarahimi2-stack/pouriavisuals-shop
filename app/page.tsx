@@ -9,7 +9,6 @@ import AIAssistantChat from "@/components/AIAssistantChat";
 import ProductComparisonModal from "@/components/ProductComparisonModal";
 import ProductCard from "@/components/ProductCard";
 import TechRadarFeed from "@/components/TechRadarFeed";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function HomePage() {
@@ -78,12 +77,8 @@ export default function HomePage() {
         {/* تیکر اخبار تکنولوژی */}
         <TechRadarFeed />
 
-        {/* هیرو سکشن مدرن، عریض و یکپارچه با نورپردازی سه‌بعدی تعاملی */}
-        <section className="w-full rounded-[2.5rem] overflow-hidden glass-morphism p-6 sm:p-12 shadow-2xl border border-[var(--card-border)] relative min-h-[360px] sm:min-h-[420px] flex flex-col justify-center">
-          
-          {/* بوم سه‌بعدی پس‌زمینه با عمق نوری Three.js */}
-          <Hero3DCanvas />
-
+        {/* هیرو سکشن عریض و مدرن */}
+        <section className="w-full rounded-[2.5rem] overflow-hidden glass-morphism p-8 sm:p-14 shadow-2xl border border-[var(--card-border)] relative min-h-[320px] sm:min-h-[380px] flex flex-col justify-center">
           <div className="relative z-10 space-y-4 max-w-2xl text-right">
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
               مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین

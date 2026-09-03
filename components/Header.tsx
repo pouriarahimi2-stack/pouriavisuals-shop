@@ -10,7 +10,6 @@ import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
-import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Header() {
   const router = useRouter();
@@ -179,7 +178,17 @@ export default function Header() {
           </div>
 
           <Link href="/" className="flex items-center gap-3 group">
-            <AnimatedLogo customLogoUrl={logoUrl} size={38} />
+            <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={storeName}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <span className="text-xl text-[var(--accent-blue)] font-black">⚡</span>
+              )}
+            </div>
             <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
           </Link>
         </div>

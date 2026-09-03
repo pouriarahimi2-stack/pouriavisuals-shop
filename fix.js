@@ -5,7 +5,7 @@ const { execSync } = require('child_process');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   ✨ پاکسازی هیرو، فعال‌سازی لوگوهای متحرک اختصاصی و استقرار کاتالوگ رسمی محصولات (Axon Pure Edition)');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   ✨ اعمال ساختار کاملاً داینامیک لوگو از ادمین، پاکسازی هیرو و اصلاح کاتالوگ قیمت‌ها');
 console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 function writeProjectFile(relativePath, fileContent) {
@@ -15,107 +15,10 @@ function writeProjectFile(relativePath, fileContent) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
   fs.writeFileSync(targetPath, fileContent, 'utf8');
-  console.log(`  \x1b[32m[SAVED ✓]\x1b[0m ${relativePath.padEnd(50)} \x1b[36m(بروزرسانی قطعی)\x1b[0m`);
+  console.log(`  \x1b[32m[SAVED ✓]\x1b[0m ${relativePath.padEnd(50)} \x1b[36m(بروزرسانی کامل)\x1b[0m`);
 }
 
-// ۱. کامپوننت هوشمند لوگوی متحرک SVG / GIF اختصاصی
-writeProjectFile('components/AnimatedLogo.tsx', `"use client";
-
-import React from "react";
-
-interface AnimatedLogoProps {
-  customLogoUrl?: string;
-  size?: number;
-  className?: string;
-}
-
-export default function AnimatedLogo({ customLogoUrl, size = 42, className = "" }: AnimatedLogoProps) {
-  // در صورتی که کاربر لوگوی متحرک خود (GIF/SVG/APNG/WebP) را از ادمین آپلود کرده باشد:
-  if (customLogoUrl && customLogoUrl.trim().length > 5) {
-    return (
-      <div
-        className={"relative flex items-center justify-center shrink-0 overflow-hidden select-none " + className}
-        style={{ width: size, height: size }}
-      >
-        <img
-          src={customLogoUrl}
-          alt="Axon Logo"
-          className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(2,132,199,0.5)] transition-transform duration-300 group-hover:scale-105"
-          style={{ willChange: "transform" }}
-        />
-      </div>
-    );
-  }
-
-  // لوگوی اختصاصی آکسون با گوی آبی نئونی تپنده (دقیقاً مطابق طرح ارسالی کاربر)
-  return (
-    <div
-      className={"relative flex items-center justify-center shrink-0 select-none " + className}
-      style={{ width: size, height: size }}
-    >
-      <svg
-        viewBox="0 0 100 100"
-        className="w-full h-full drop-shadow-[0_4px_14px_rgba(0,0,0,0.5)]"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id="axonBladeDark" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#1e293b" />
-            <stop offset="50%" stopColor="#0f172a" />
-            <stop offset="100%" stopColor="#020617" />
-          </linearGradient>
-          <linearGradient id="axonBladeRight" x1="100%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#334155" />
-            <stop offset="50%" stopColor="#1e293b" />
-            <stop offset="100%" stopColor="#0f172a" />
-          </linearGradient>
-          <radialGradient id="axonOrbGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#60a5fa" />
-            <stop offset="40%" stopColor="#2563eb" />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-        </defs>
-
-        {/* بازوی چپ حرف A مشکی متالیک */}
-        <polygon
-          points="50,12 18,78 36,80 50,42"
-          fill="url(#axonBladeDark)"
-          stroke="#334155"
-          strokeWidth="0.75"
-        />
-
-        {/* بازوی راست حرف A مشکی متالیک */}
-        <polygon
-          points="50,12 82,78 64,80 50,42"
-          fill="url(#axonBladeRight)"
-          stroke="#475569"
-          strokeWidth="0.75"
-        />
-
-        {/* گوی نوری آبی درخشان و تپنده در مرکز A */}
-        <circle cx="50" cy="54" r="9" fill="url(#axonOrbGlow)">
-          <animate
-            attributeName="r"
-            values="7;11;7"
-            dur="2s"
-            repeatCount="indefinite"
-          />
-          <animate
-            attributeName="opacity"
-            values="0.85;1;0.85"
-            dur="2s"
-            repeatCount="indefinite"
-          />
-        </circle>
-        <circle cx="50" cy="54" r="4.5" fill="#38bdf8" />
-      </svg>
-    </div>
-  );
-}
-`);
-
-// ۲. هدر شیشه‌ای لوکس با نمایش دقیق لوگوی متحرک
+// ۱. به‌روزرسانی Header.tsx (خواندن ۱۰۰٪ داینامیک لوگوی متحرک از پنل ادمین)
 writeProjectFile('components/Header.tsx', `"use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -128,7 +31,6 @@ import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
-import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Header() {
   const router = useRouter();
@@ -297,7 +199,17 @@ export default function Header() {
           </div>
 
           <Link href="/" className="flex items-center gap-3 group">
-            <AnimatedLogo customLogoUrl={logoUrl} size={38} />
+            <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={storeName}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <span className="text-xl text-[var(--accent-blue)] font-black">⚡</span>
+              )}
+            </div>
             <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
           </Link>
         </div>
@@ -368,7 +280,73 @@ export default function Header() {
 }
 `);
 
-// ۳. بازنویسی هیرو سکشن صفحه اول (پاکسازی کامل بج‌ها و یکپارچگی سه‌بعدی)
+// ۲. به‌روزرسانی Footer.tsx (خواندن ۱۰۰٪ داینامیک لوگوی فوتر از پنل ادمین)
+writeProjectFile('components/Footer.tsx', `"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+
+export default function Footer() {
+  const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+
+  useEffect(() => {
+    siteInfoService.getSiteInfo().then((d) => d && setInfo(d));
+    const handleUpdate = (e: any) => { if (e.detail) setInfo(e.detail); };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
+
+  const siteName = info?.site_name || info?.siteName || "AXON";
+  const footerLogo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
+
+  return (
+    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-auto select-none transition-colors duration-300" dir="rtl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="glass-morphism p-6 rounded-3xl space-y-4">
+            <div className="flex items-center gap-3">
+              {footerLogo ? (
+                <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+                  <img src={footerLogo} alt={siteName} className="w-full h-full object-contain" />
+                </div>
+              ) : null}
+              <div className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">{siteName}</div>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار و ابزارهای تکنولوژی با گارانتی اصالت طلایی.</p>
+          </div>
+          <div className="glass-morphism p-6 rounded-3xl space-y-3">
+            <h5 className="font-bold text-sm text-[var(--accent-blue)]">دسترسی سریع</h5>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+              <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ محصولات</Link></li>
+              <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">پیگیری سفارش</Link></li>
+              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">اخبار تکنولوژی</Link></li>
+              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله سئو</Link></li>
+            </ul>
+          </div>
+          <div className="glass-morphism p-6 rounded-3xl space-y-3">
+            <h5 className="font-bold text-sm text-[var(--accent-blue)]">اطلاعات تماس</h5>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+              <li>تلفن: {info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</li>
+              <li>ایمیل: {info?.email || "info@axoncore.ir"}</li>
+              <li>ساعات کاری: {info?.working_hours || "۹:۰۰ الی ۱۸:۰۰"}</li>
+            </ul>
+          </div>
+          <div className="glass-morphism p-6 rounded-3xl space-y-3">
+            <h5 className="font-bold text-sm text-emerald-600 dark:text-emerald-400">ضمانت رسمی</h5>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">۱۰۰٪ اصالت فیزیکی کالا، مهلت تست ۷ روزه سخت‌افزاری و ارسال سریع پیشتاز به سراسر ایران.</p>
+          </div>
+        </div>
+        <div className="mt-10 pt-6 border-t border-[var(--card-border)] text-center text-xs text-[var(--text-secondary)] font-bold">
+          تمامی حقوق محفوظ است © {new Date().getFullYear()} {siteName}
+        </div>
+      </div>
+    </footer>
+  );
+}
+`);
+
+// ۳. بازنویسی app/page.tsx (هیرو مینیمال و پاکسازی‌شده بدون هیچ برچسب و دکمه زائد)
 writeProjectFile('app/page.tsx', `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -380,7 +358,6 @@ import AIAssistantChat from "@/components/AIAssistantChat";
 import ProductComparisonModal from "@/components/ProductComparisonModal";
 import ProductCard from "@/components/ProductCard";
 import TechRadarFeed from "@/components/TechRadarFeed";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function HomePage() {
@@ -449,12 +426,8 @@ export default function HomePage() {
         {/* تیکر اخبار تکنولوژی */}
         <TechRadarFeed />
 
-        {/* هیرو سکشن مدرن، عریض و یکپارچه با نورپردازی سه‌بعدی تعاملی */}
-        <section className="w-full rounded-[2.5rem] overflow-hidden glass-morphism p-6 sm:p-12 shadow-2xl border border-[var(--card-border)] relative min-h-[360px] sm:min-h-[420px] flex flex-col justify-center">
-          
-          {/* بوم سه‌بعدی پس‌زمینه با عمق نوری Three.js */}
-          <Hero3DCanvas />
-
+        {/* هیرو سکشن عریض و مدرن */}
+        <section className="w-full rounded-[2.5rem] overflow-hidden glass-morphism p-8 sm:p-14 shadow-2xl border border-[var(--card-border)] relative min-h-[320px] sm:min-h-[380px] flex flex-col justify-center">
           <div className="relative z-10 space-y-4 max-w-2xl text-right">
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
               مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
@@ -546,7 +519,7 @@ function HomeBlogSection() {
 }
 `);
 
-// ۴. به‌روزرسانی کارت کالا با قیمت‌های صحیح و دکمه ۳D
+// ۴. اصلاح کارت کالا (ProductCard)
 writeProjectFile('components/ProductCard.tsx', `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -664,8 +637,8 @@ export default function ProductCard({ product }: { product: any }) {
 // ۵. کامیت و استقرار روی ریپازیتوری
 console.log('\n📦 در حال ثبت کامیت و استقرار روی گیت‌هاب / Vercel...');
 try {
-  execSync('git add . && git commit -m "fix(ui): purify hero section, enable dynamic animated logos and accurate pricing" && git push origin main', { stdio: 'inherit' });
-  console.log('\n🎉 [SUCCESS] تمامی اصلاحات با موفقیت ۱۰۰٪ کامل و مستقر شدند!');
+  execSync('git add . && git commit -m "fix(ui): dynamic admin logos, pure clean hero and official product catalog" && git push origin main', { stdio: 'inherit' });
+  console.log('\n🎉 [SUCCESS] استقرار نهایی با موفقیت ۱۰۰٪ کامل شد!');
 } catch (e) {
   console.log('\nℹ️ در صورت لزوم دستور زیر را در ترمینال اجرا کنید:');
   console.log('git add . && git commit -m "fix(ui): update" && git push');

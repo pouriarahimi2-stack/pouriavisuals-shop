@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
 import { soundEngine } from "@/lib/soundEngine";
+import { realtimeEngine } from "@/lib/realtimeSync";
 
 export default function AdminAccountsManager() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -13,7 +14,9 @@ export default function AdminAccountsManager() {
   // استیت‌های ایجاد مدیر جدید
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmNewUserPassword, setConfirmNewUserPassword] = useState("");
   const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showCreateConfirmPassword, setShowCreateConfirmPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<AdminRole>("product_manager");
 
@@ -21,8 +24,11 @@ export default function AdminAccountsManager() {
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editFullName, setEditFullName] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -43,11 +49,30 @@ export default function AdminAccountsManager() {
 
   useEffect(() => {
     loadAdmins();
+
+    // گوش دادن به تغییرات بلادرنگ بدون نیاز به رفرش
+    const handleAdminsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setAdmins(e.detail);
+      } else {
+        loadAdmins();
+      }
+    };
+
+    window.addEventListener("admin_users_updated", handleAdminsUpdate);
+    return () => {
+      window.removeEventListener("admin_users_updated", handleAdminsUpdate);
+    };
   }, []);
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) return;
+
+    if (password.trim() !== confirmNewUserPassword.trim()) {
+      showToast("کلمه عبور با تکرار آن مطابقت ندارد!", "error");
+      return;
+    }
 
     soundEngine.playClick();
     setSubmitting(true);
@@ -59,15 +84,20 @@ export default function AdminAccountsManager() {
         role,
       });
 
-      if (res.success) {
+      if (res.success && res.data) {
         soundEngine.playSuccess();
         showToast(`کاربر مدیر «${username}» با موفقیت ایجاد گردید.`, "success");
+        
+        // به‌روزرسانی آنی و ریل‌تایم لیست
+        const updatedList = [...admins, res.data];
+        setAdmins(updatedList);
+        realtimeEngine.broadcastLocally("admin_users_updated", updatedList);
+
         setUsername("");
         setPassword("");
+        setConfirmNewUserPassword("");
         setFullName("");
         setRole("product_manager");
-        setShowCreatePassword(false);
-        await loadAdmins();
       } else {
         showToast(res.message || "خطا در ایجاد حساب کاربری مدیر.", "error");
       }
@@ -81,8 +111,10 @@ export default function AdminAccountsManager() {
     setEditingAdmin(adm);
     setEditUsername(adm.username);
     setEditFullName(adm.full_name || "");
+    setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
+    setShowCurrentPassword(false);
     setShowNewPassword(false);
     setShowConfirmPassword(false);
   };
@@ -91,8 +123,12 @@ export default function AdminAccountsManager() {
     e.preventDefault();
     if (!editingAdmin) return;
 
-    // اعتبارسنجی دو مرحله‌ای رمز عبور جدید
+    // بررسی دو مرحله‌ای رمز عبور جدید
     if (newPassword.trim()) {
+      if (!currentPassword.trim()) {
+        showToast("لطفاً کلمه عبور فعلی خود را جهت تایید هویت وارد کنید.", "error");
+        return;
+      }
       if (newPassword.trim().length < 6) {
         showToast("کلمه عبور جدید باید حداقل ۶ کاراکتر باشد.", "error");
         return;
@@ -105,21 +141,40 @@ export default function AdminAccountsManager() {
 
     soundEngine.playClick();
     setSubmitting(true);
-    try {
-      const res = await adminAuthService.updateCredentials(
-        editingAdmin.id,
-        editUsername.trim(),
-        newPassword.trim() || undefined,
-        editFullName.trim() || undefined
-      );
 
-      if (res.success) {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingAdmin.id,
+          username: editUsername.trim(),
+          currentPassword: currentPassword.trim() || undefined,
+          password: newPassword.trim() || undefined,
+          full_name: editFullName.trim() || undefined,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         soundEngine.playSuccess();
         showToast("✅ اطلاعات و کلمه عبور مدیر با موفقیت در دیتابیس ذخیره شد.", "success");
+
+        // به‌روزرسانی آنی و ریل‌تایم لیست در تمام تب‌ها و هدر
+        const updatedList = admins.map((a) =>
+          a.id === editingAdmin.id
+            ? { ...a, username: editUsername.trim(), full_name: editFullName.trim() }
+            : a
+        );
+
+        setAdmins(updatedList);
+        localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(json.data));
+        realtimeEngine.broadcastLocally("admin_users_updated", updatedList);
+
         setEditingAdmin(null);
-        await loadAdmins();
       } else {
-        showToast(res.message || "خطا در ویرایش مشخصات در دیتابیس.", "error");
+        showToast(json.message || "خطا در ذخیره‌سازی اطلاعات.", "error");
       }
     } catch {
       showToast("خطا در برقراری ارتباط با سرور.", "error");
@@ -133,7 +188,9 @@ export default function AdminAccountsManager() {
       soundEngine.playClick();
       await adminAuthService.deleteAdmin(id);
       showToast("حساب کاربری مدیر حذف شد.", "success");
-      await loadAdmins();
+      const updatedList = admins.filter((a) => a.id !== id);
+      setAdmins(updatedList);
+      realtimeEngine.broadcastLocally("admin_users_updated", updatedList);
     }
   };
 
@@ -183,7 +240,7 @@ export default function AdminAccountsManager() {
       <form onSubmit={handleCreateAdmin} className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
         <h4 className="font-black text-xs text-[var(--text-primary)]">➕ ثبت مدیر جدید</h4>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی</label>
             <input
@@ -205,6 +262,19 @@ export default function AdminAccountsManager() {
               placeholder="admin_ali"
               className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
             />
+          </div>
+
+          <div>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نقش و سطح دسترسی *</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as AdminRole)}
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer"
+            >
+              <option value="product_manager">مدیر انبار و محصولات</option>
+              <option value="content_editor">نویسنده محتوا و سئو</option>
+              <option value="super_admin">مدیر کل سیستم (Superadmin)</option>
+            </select>
           </div>
 
           <div>
@@ -230,16 +300,25 @@ export default function AdminAccountsManager() {
           </div>
 
           <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نقش و سطح دسترسی *</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as AdminRole)}
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer"
-            >
-              <option value="product_manager">مدیر انبار و محصولات</option>
-              <option value="content_editor">نویسنده محتوا و سئو</option>
-              <option value="super_admin">مدیر کل سیستم (Superadmin)</option>
-            </select>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تکرار کلمه عبور امنیتی *</label>
+            <div className="relative">
+              <input
+                type={showCreateConfirmPassword ? "text" : "password"}
+                required
+                value={confirmNewUserPassword}
+                onChange={(e) => setConfirmNewUserPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full p-3 pl-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCreateConfirmPassword(!showCreateConfirmPassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[var(--accent-blue)] transition cursor-pointer p-1 text-sm"
+                title={showCreateConfirmPassword ? "مخفی کردن رمز" : "مشاهده رمز"}
+              >
+                {showCreateConfirmPassword ? "👁️‍🗨️" : "👁️"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -299,14 +378,14 @@ export default function AdminAccountsManager() {
         )}
       </div>
 
-      {/* مودال امن ویرایش مدیر با تغییر رمز دو مرحله‌ای */}
+      {/* مودال امن ویرایش مدیر با سیستم ۲ مرحله‌ای احراز هویت و تغییر رمز */}
       {editingAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
           <form onSubmit={handleUpdateAdmin} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
               <h4 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
                 <span>✏️</span>
-                <span>ویرایش مشخصات و کلمه عبور مدیر</span>
+                <span>ویرایش مشخصات و تغییر رمز مدیر</span>
               </h4>
               <button
                 type="button"
@@ -318,7 +397,7 @@ export default function AdminAccountsManager() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی:</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی مدیر:</label>
               <input
                 type="text"
                 value={editFullName}
@@ -338,15 +417,37 @@ export default function AdminAccountsManager() {
               />
             </div>
 
-            {/* مرحله ۱ تغییر رمز: کلمه عبور جدید */}
+            {/* مرحله ۱: احراز هویت با رمز فعلی */}
+            <div className="pt-2 border-t border-[var(--card-border)]">
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">۱. کلمه عبور فعلی ادمین (جهت احراز هویت امن):</label>
+              <div className="relative">
+                <input
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="رمز فعلی خود را وارد نمایید"
+                  className="w-full p-3 pl-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[var(--accent-blue)] transition cursor-pointer p-1 text-sm"
+                  title={showCurrentPassword ? "مخفی کردن" : "مشاهده"}
+                >
+                  {showCurrentPassword ? "👁️‍🗨️" : "👁️"}
+                </button>
+              </div>
+            </div>
+
+            {/* مرحله ۲: کلمه عبور جدید */}
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">۱. کلمه عبور جدید (در صورت نیاز به تغییر):</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">۲. کلمه عبور جدید (در صورت نیاز به تغییر):</label>
               <div className="relative">
                 <input
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="در صورت خالی بودن تغییر نمی‌کند"
+                  placeholder="حداقل ۶ کاراکتر"
                   className="w-full p-3 pl-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
                 />
                 <button
@@ -360,10 +461,10 @@ export default function AdminAccountsManager() {
               </div>
             </div>
 
-            {/* مرحله ۲ تغییر رمز: تکرار کلمه عبور جدید جهت تایید */}
+            {/* مرحله ۳: تکرار کلمه عبور جدید */}
             {newPassword.trim().length > 0 && (
               <div className="animate-fadeIn space-y-1">
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">۲. تکرار کلمه عبور جدید (تایید تطابق) *:</label>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">۳. تکرار کلمه عبور جدید (تایید تطابق) *:</label>
                 <div className="relative">
                   <input
                     type={showConfirmPassword ? "text" : "password"}
@@ -401,7 +502,7 @@ export default function AdminAccountsManager() {
                 disabled={submitting}
                 className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md cursor-pointer disabled:opacity-50"
               >
-                {submitting ? "در حال ذخیره..." : "ذخیره تغییرات در دیتابیس 💾"}
+                {submitting ? "در حال ثبت..." : "ذخیره آنی در دیتابیس 💾"}
               </button>
             </div>
           </form>

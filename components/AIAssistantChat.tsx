@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
+import { siteInfoService, SiteInfo, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -21,9 +22,17 @@ export default function AIAssistantChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    siteInfoService.getSiteInfo().then((d) => d && setSiteInfo(d));
+    const handleUpdate = (e: any) => { if (e.detail) setSiteInfo(e.detail); };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,23 +109,29 @@ export default function AIAssistantChat() {
     "مک‌بوک M4 Max",
   ];
 
+  const aiChatCfg = siteInfo?.homepage_layout_config?.aiChat || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat;
+  const bottomDesktopPx = aiChatCfg.bottomDesktop || 64;
+  const bottomMobilePx = aiChatCfg.bottomMobile || 96;
+
   return (
     <div className="font-sans select-none" dir="rtl" suppressHydrationWarning>
       {!isOpen && (
         <>
-          {/* دکمه دسکتاپ: ارتفاع گرفته به بالای نوار فوتر (bottom-16) */}
+          {/* دکمه دسکتاپ: با موقعیت پویای پیکربندی‌شده در استودیو */}
           <button
+            style={{ bottom: `${bottomDesktopPx}px` }}
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="hidden sm:flex fixed bottom-16 left-6 z-50 px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
+            className="hidden sm:flex fixed left-6 z-50 px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition-all items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
           >
             <span className="text-base">🤖</span>
             <span>مشاوره هوشمند تکنولوژی</span>
           </button>
 
-          {/* دکمه موبایل: ارتفاع گرفته به بالای داک منو (bottom-24) */}
+          {/* دکمه موبایل: با ارتفاع پویای پیکربندی‌شده در استودیو جهت قرارگیری بالای داک منو */}
           <button
+            style={{ bottom: `${bottomMobilePx}px` }}
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="sm:hidden fixed bottom-24 left-4 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] flex items-center justify-center text-lg border-2 border-white/40 active:scale-90 transition-all cursor-pointer"
+            className="sm:hidden fixed left-4 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] flex items-center justify-center text-lg border-2 border-white/40 active:scale-90 transition-all cursor-pointer"
             aria-label="دستیار هوش مصنوعی"
           >
             <span className="animate-pulse">⚡</span>

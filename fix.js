@@ -1,15 +1,17 @@
 // File Path: fix.js
 /**
  * ═══════════════════════════════════════════════════════════════════════════════════════════
- *  👑 AXON MASTER ZERO-DEFECT UI/UX POLISH & AUTONOMOUS CI/CD ENGINE (v2026.7)
- *  Fixes:
- *   1. Compact Hero section (reduced height, trimmed dead vertical margins)
- *   2. Removed top pill badge from 3D Product Showcase
- *   3. Merged Product Grid into 3D Perspective Slider (with Teardown & Kinetic Cart Button)
- *   4. Relocated Mechanical Contact Dock into the brand column under warranty badges
- *   5. Cleaned up duplicate logo icon in footer & tightened footer vertical padding
- *   6. Elevated floating chat button position above footer lines
- *   7. Full multi-device responsiveness (Mobile, Tablet, Desktop)
+ *  👑 AXON STOREFRONT VISUAL MASTER CONTROLLER & AUTONOMOUS CI/CD ENGINE (v2026.8)
+ * ───────────────────────────────────────────────────────────────────────────────────────────
+ *  Architectural Deliverables:
+ *   1. Complete Layout Studio in Admin Panel (components/admin/StorefrontLayoutStudio.tsx)
+ *   2. Realtime Schema & Config in services/siteInfoService.ts & app/api/site-info/route.ts
+ *   3. Dynamic Storefront integration in app/page.tsx (Hero scale, 3D Canvas toggle, margins)
+ *   4. Parametric scaling in components/ProductPerspectiveSlider.tsx (Compact / Standard / Large)
+ *   5. Full visual controls in components/Footer.tsx (Badges, ContactDock, Compactness)
+ *   6. Dynamic elevation controls in components/AIAssistantChat.tsx (Desktop & Mobile)
+ *   7. Navigation registration in app/admin/page.tsx
+ *   8. Automatic Git stage, commit and push to remote Vercel repository
  * ═══════════════════════════════════════════════════════════════════════════════════════════
  */
 
@@ -19,7 +21,7 @@ const { execSync } = require('child_process');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   📐 اعمال اصلاحات ۵ گانه UI بر اساس تصاویر: کاهش ارتفاع هیرو، اسلایدر اصلی، داک کیبورد و فوتر');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   📐 استقرار استودیوی مدیریت بصری ویترین، کنترل ابعاد هیرو، اسلایدر ۳D و همگام‌سازی بلادرنگ');
 console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 function updateFile(relPath, content) {
@@ -29,116 +31,1141 @@ function updateFile(relPath, content) {
     fs.mkdirSync(dir, { recursive: true });
   }
   fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`  \x1b[32m[SAVED ✓]\x1b[0m ${relPath.padEnd(52)} \x1b[36m(بروزرسانی کامل و ۱۰۰٪ بدون خلاصه‌سازی)\x1b[0m`);
+  console.log(`  \x1b[32m[SAVED ✓]\x1b[0m ${relPath.padEnd(52)} \x1b[36m(بروزرسانی ۱۰۰٪ کامل و بدون خلاصه‌سازی)\x1b[0m`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۱. دکمه متحرک خرید کالا با چرخ‌دستی و شمارنده زنده (components/AddToCartButton.tsx)
+// ۱. ارتقای سرویس تنظیمات سایت و تعریف ساختار کامل HomepageLayoutConfig (services/siteInfoService.ts)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('components/AddToCartButton.tsx', `// File Path: components/AddToCartButton.tsx
+updateFile('services/siteInfoService.ts', `// File Path: services/siteInfoService.ts
+import { supabase } from "@/lib/supabase";
+import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
+
+export type MaintenanceMode = "none" | "timed" | "indefinite";
+
+export interface HomepageLayoutConfig {
+  hero: {
+    show: boolean;
+    heightMode: "compact" | "standard" | "cinematic";
+    verticalPadding: "compact" | "normal" | "relaxed";
+    title: string;
+    subtitle: string;
+    buttonText: string;
+    buttonLink: string;
+    show3DCanvas: boolean;
+  };
+  showcase3D: {
+    show: boolean;
+    cardScale: "compact" | "standard" | "large";
+    title: string;
+    subtitle: string;
+    limit: number;
+  };
+  newsTicker: {
+    show: boolean;
+  };
+  blogSection: {
+    show: boolean;
+    title: string;
+    subtitle: string;
+    count: number;
+    showViewAll: boolean;
+  };
+  contactDock: {
+    show: boolean;
+  };
+  footer: {
+    showBadges: boolean;
+    badge1Text: string;
+    badge2Text: string;
+    paddingMode: "compact" | "normal" | "relaxed";
+  };
+  aiChat: {
+    bottomDesktop: number;
+    bottomMobile: number;
+  };
+}
+
+export interface SiteInfo {
+  id?: string | number;
+  site_name?: string;
+  siteName?: string;
+  storeName?: string;
+  tagline?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  working_hours?: string;
+  logo_url?: string;
+  logoUrl?: string;
+  footer_logo_url?: string;
+  footerLogoUrl?: string;
+  favicon_url?: string;
+  faviconUrl?: string;
+  allow_google_index?: boolean;
+  allowGoogleIndex?: boolean;
+  maintenance_mode?: MaintenanceMode;
+  maintenance_until?: string;
+  maintenance_duration_minutes?: number;
+  instagram?: string;
+  telegram?: string;
+  whatsapp?: string;
+  youtube?: string;
+  header_announcement?: string;
+  free_shipping_threshold?: number;
+  description?: string;
+  footer_text?: string;
+  custom_css?: string;
+  active_font_id?: string;
+  gemini_api_key?: string;
+  homepage_layout_config?: HomepageLayoutConfig;
+  updated_at?: string;
+}
+
+const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
+
+export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
+  hero: {
+    show: true,
+    heightMode: "compact",
+    verticalPadding: "compact",
+    title: "مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین",
+    subtitle: "تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های هوشمند اولترا و ابزارهای استودیو با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.",
+    buttonText: "مشاهده کاتالوگ محصولات",
+    buttonLink: "/#products",
+    show3DCanvas: true,
+  },
+  showcase3D: {
+    show: true,
+    cardScale: "standard",
+    title: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+    subtitle: "پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری",
+    limit: 7,
+  },
+  newsTicker: {
+    show: true,
+  },
+  blogSection: {
+    show: true,
+    title: "مجله و مقالات تحلیلی فناوری",
+    subtitle: "جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها",
+    count: 3,
+    showViewAll: true,
+  },
+  contactDock: {
+    show: true,
+  },
+  footer: {
+    showBadges: true,
+    badge1Text: "✓ گارانتی اصالت ۱۰۰٪ فیزیکی",
+    badge2Text: "🚀 ارسال پیشتاز سراسری",
+    paddingMode: "compact",
+  },
+  aiChat: {
+    bottomDesktop: 64,
+    bottomMobile: 96,
+  },
+};
+
+export const DEFAULT_SITE_INFO: SiteInfo = {
+  site_name: "آکسون | Axon",
+  siteName: "آکسون | Axon",
+  storeName: "آکسون | Axon",
+  tagline: "مرجع تخصصی تجهیزات دیجیتال و تصویر",
+  allow_google_index: true,
+  allowGoogleIndex: true,
+  maintenance_mode: "none",
+  phone: "۰۲۱-۸۸۸۸۸۸۸۸",
+  email: "info@axoncore.ir",
+  address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
+  working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+  header_announcement: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | ۱۸ ماه گارانتی اصالت طلایی",
+  free_shipping_threshold: 2000000,
+  description: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
+  footer_text: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
+  homepage_layout_config: DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+};
+
+export const siteInfoService = {
+  getSiteInfoSync(): SiteInfo {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(LOCAL_STORAGE_SITE_INFO);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed === "object") {
+            return {
+              ...DEFAULT_SITE_INFO,
+              ...parsed,
+              homepage_layout_config: {
+                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+                ...(parsed.homepage_layout_config || {}),
+                hero: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero, ...(parsed.homepage_layout_config?.hero || {}) },
+                showcase3D: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D, ...(parsed.homepage_layout_config?.showcase3D || {}) },
+                newsTicker: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.newsTicker, ...(parsed.homepage_layout_config?.newsTicker || {}) },
+                blogSection: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.blogSection, ...(parsed.homepage_layout_config?.blogSection || {}) },
+                contactDock: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.contactDock, ...(parsed.homepage_layout_config?.contactDock || {}) },
+                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(parsed.homepage_layout_config?.footer || {}) },
+                aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(parsed.homepage_layout_config?.aiChat || {}) },
+              },
+            };
+          }
+        }
+      } catch {}
+    }
+    return DEFAULT_SITE_INFO;
+  },
+
+  async getSiteInfo(): Promise<SiteInfo | null> {
+    try {
+      const res = await fetch("/api/site-info", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          const data = json.data;
+          const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
+          
+          let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+          if (data.homepage_layout_config) {
+            try {
+              const incoming = typeof data.homepage_layout_config === "string"
+                ? JSON.parse(data.homepage_layout_config)
+                : data.homepage_layout_config;
+              parsedLayout = {
+                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+                ...incoming,
+                hero: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero, ...(incoming.hero || {}) },
+                showcase3D: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D, ...(incoming.showcase3D || {}) },
+                newsTicker: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.newsTicker, ...(incoming.newsTicker || {}) },
+                blogSection: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.blogSection, ...(incoming.blogSection || {}) },
+                contactDock: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.contactDock, ...(incoming.contactDock || {}) },
+                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(incoming.footer || {}) },
+                aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(incoming.aiChat || {}) },
+              };
+            } catch {}
+          }
+
+          const mapped: SiteInfo = {
+            id: data.id,
+            site_name: data.site_name || data.store_name || "آکسون | Axon",
+            siteName: data.site_name || data.store_name || "آکسون | Axon",
+            storeName: data.site_name || data.store_name || "آکسون | Axon",
+            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر",
+            phone: data.phone || "۰۲۱-۸۸۸۸۸۸۸۸",
+            email: data.email || "info@axoncore.ir",
+            address: data.address || "تهران، خیابان ولیعصر، تقاطع میرداماد",
+            working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+            logo_url: data.logo_url || "",
+            logoUrl: data.logo_url || "",
+            footer_logo_url: data.footer_logo_url || "",
+            footerLogoUrl: data.footer_logo_url || "",
+            favicon_url: data.favicon_url || "",
+            faviconUrl: data.favicon_url || "",
+            allow_google_index: isAllowed,
+            allowGoogleIndex: isAllowed,
+            maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
+            maintenance_until: data.maintenance_until || undefined,
+            maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
+            header_announcement: data.header_announcement || "",
+            free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
+            description: data.description || data.footer_text || "",
+            footer_text: data.footer_text || data.description || "",
+            custom_css: data.custom_css || "",
+            active_font_id: data.active_font_id || "Vazirmatn",
+            gemini_api_key: data.gemini_api_key || "",
+            homepage_layout_config: parsedLayout,
+            updated_at: data.updated_at,
+          };
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
+            if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
+            if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
+          }
+          return mapped;
+        }
+      }
+      return this.getSiteInfoSync();
+    } catch {
+      return this.getSiteInfoSync();
+    }
+  },
+
+  async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
+    try {
+      const current = await this.getSiteInfo();
+      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون | Axon";
+
+      const mergedConfig: HomepageLayoutConfig = {
+        ...(current?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG),
+        ...(payload.homepage_layout_config || {}),
+      };
+
+      const dbPayload: any = {
+        site_name: sName,
+        store_name: sName,
+        tagline: payload.tagline !== undefined ? payload.tagline : current?.tagline,
+        phone: payload.phone !== undefined ? payload.phone : current?.phone,
+        email: payload.email !== undefined ? payload.email : current?.email,
+        address: payload.address !== undefined ? payload.address : current?.address,
+        working_hours: payload.working_hours !== undefined ? payload.working_hours : current?.working_hours,
+        logo_url: payload.logo_url !== undefined ? payload.logo_url : current?.logo_url,
+        footer_logo_url: payload.footer_logo_url !== undefined ? payload.footer_logo_url : current?.footer_logo_url,
+        favicon_url: payload.favicon_url !== undefined ? payload.favicon_url : current?.favicon_url,
+        allow_google_index: payload.allow_google_index !== undefined ? payload.allow_google_index : current?.allow_google_index,
+        maintenance_mode: payload.maintenance_mode !== undefined ? payload.maintenance_mode : current?.maintenance_mode,
+        maintenance_until: payload.maintenance_until !== undefined ? payload.maintenance_until : current?.maintenance_until,
+        maintenance_duration_minutes: payload.maintenance_duration_minutes !== undefined ? payload.maintenance_duration_minutes : current?.maintenance_duration_minutes,
+        header_announcement: payload.header_announcement !== undefined ? payload.header_announcement : current?.header_announcement,
+        free_shipping_threshold: payload.free_shipping_threshold !== undefined ? payload.free_shipping_threshold : current?.free_shipping_threshold,
+        footer_text: payload.footer_text !== undefined ? payload.footer_text : current?.footer_text,
+        description: payload.description !== undefined ? payload.description : current?.description,
+        custom_css: payload.custom_css !== undefined ? payload.custom_css : current?.custom_css,
+        active_font_id: payload.active_font_id !== undefined ? payload.active_font_id : current?.active_font_id,
+        gemini_api_key: payload.gemini_api_key !== undefined ? payload.gemini_api_key : current?.gemini_api_key,
+        homepage_layout_config: mergedConfig,
+        updated_at: new Date().toISOString(),
+      };
+
+      const res = await fetch("/api/site-info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dbPayload),
+      });
+
+      const json = await res.json();
+      const finalData: SiteInfo = {
+        ...(current || DEFAULT_SITE_INFO),
+        ...(json.data || dbPayload),
+        homepage_layout_config: mergedConfig,
+      };
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
+        realtimeEngine.broadcastLocally("site_info_updated", finalData);
+      }
+
+      return finalData;
+    } catch (e) {
+      console.error("siteInfoService.updateSiteInfo Error:", e);
+      return null;
+    }
+  },
+};
+
+export default siteInfoService;
+`);
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// ۲. به‌روزرسانی وب‌سرویس بک‌اند تنظیمات کلان سایت (app/api/site-info/route.ts)
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+updateFile('app/api/site-info/route.ts', `// File Path: app/api/site-info/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  try {
+    const { data } = await supabaseAdmin
+      .from("site_info")
+      .select("*")
+      .order("id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    return NextResponse.json({ success: true, data: data || null });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    
+    const { data: existing } = await supabaseAdmin
+      .from("site_info")
+      .select("*")
+      .order("id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const maintMode = body.maintenance_mode !== undefined 
+      ? body.maintenance_mode 
+      : (existing?.maintenance_mode || "none");
+
+    const isAllowed = body.allow_google_index !== undefined
+      ? body.allow_google_index
+      : (maintMode === "none");
+
+    const sName = body.site_name || body.siteName || body.storeName || existing?.site_name || "آکسون | Axon";
+
+    const payload: Record<string, any> = {
+      id: existing?.id || 1,
+      site_name: sName,
+      store_name: sName,
+      tagline: body.tagline !== undefined ? body.tagline : (existing?.tagline || ""),
+      phone: body.phone !== undefined ? body.phone : (existing?.phone || ""),
+      email: body.email !== undefined ? body.email : (existing?.email || ""),
+      address: body.address !== undefined ? body.address : (existing?.address || ""),
+      working_hours: body.working_hours !== undefined ? body.working_hours : (existing?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"),
+      logo_url: body.logo_url !== undefined ? body.logo_url : (existing?.logo_url || null),
+      footer_logo_url: body.footer_logo_url !== undefined ? body.footer_logo_url : (existing?.footer_logo_url || null),
+      favicon_url: body.favicon_url !== undefined ? body.favicon_url : (existing?.favicon_url || null),
+      description: body.description || body.footer_text || existing?.description || "",
+      footer_text: body.footer_text || body.description || existing?.footer_text || "",
+      allow_google_index: isAllowed,
+      maintenance_mode: maintMode,
+      maintenance_until: body.maintenance_until !== undefined ? body.maintenance_until : (existing?.maintenance_until || null),
+      maintenance_duration_minutes: body.maintenance_duration_minutes !== undefined ? body.maintenance_duration_minutes : (existing?.maintenance_duration_minutes || null),
+      header_announcement: body.header_announcement !== undefined ? body.header_announcement : (existing?.header_announcement || ""),
+      free_shipping_threshold: Number(body.free_shipping_threshold || existing?.free_shipping_threshold || 2000000),
+      custom_css: body.custom_css !== undefined ? body.custom_css : (existing?.custom_css || ""),
+      active_font_id: body.active_font_id || existing?.active_font_id || "Vazirmatn",
+      gemini_api_key: body.gemini_api_key !== undefined ? body.gemini_api_key : (existing?.gemini_api_key || null),
+      homepage_layout_config: body.homepage_layout_config !== undefined ? body.homepage_layout_config : (existing?.homepage_layout_config || null),
+      updated_at: new Date().toISOString(),
+    };
+
+    let resultData: any = null;
+
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("site_info")
+        .upsert(payload, { onConflict: "id" })
+        .select()
+        .maybeSingle();
+
+      if (!error && data) {
+        resultData = data;
+      } else {
+        throw error;
+      }
+    } catch (upsertErr) {
+      // اگر ستون‌های اختصاصی در اسکیمای پستگرس هنوز ساخته نشده باشند، با حذف فیلدهای ناسازگار ذخیره مطمئن انجام می‌شود
+      delete payload.gemini_api_key;
+      delete payload.homepage_layout_config;
+      const { data } = await supabaseAdmin.from("site_info").upsert(payload, { onConflict: "id" }).select().maybeSingle();
+      resultData = data || payload;
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "تنظیمات کلان و چیدمان صفحه اصلی با موفقیت در دیتابیس ثبت شد.",
+      data: {
+        ...resultData,
+        homepage_layout_config: body.homepage_layout_config || existing?.homepage_layout_config,
+      },
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
+  }
+}
+`);
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// ۳. ایجاد کامپوننت استودیوی کنترل بصری و لایه‌بندی ویترین (components/admin/StorefrontLayoutStudio.tsx)
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+updateFile('components/admin/StorefrontLayoutStudio.tsx', `// File Path: components/admin/StorefrontLayoutStudio.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { siteInfoService, SiteInfo, HomepageLayoutConfig, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
-import { useCart } from "@/context/CartContext";
 
-interface AddToCartButtonProps {
-  product: {
-    id: string | number;
-    title: string;
-    price: number;
-    image: string;
-    stock?: number;
-    category?: string;
+export default function StorefrontLayoutStudio() {
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [config, setConfig] = useState<HomepageLayoutConfig>(DEFAULT_HOMEPAGE_LAYOUT_CONFIG);
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const loadCurrentSettings = async () => {
+    try {
+      const info = await siteInfoService.getSiteInfo();
+      if (info) {
+        setSiteInfo(info);
+        if (info.homepage_layout_config) {
+          setConfig({
+            ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+            ...info.homepage_layout_config,
+            hero: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero, ...(info.homepage_layout_config.hero || {}) },
+            showcase3D: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D, ...(info.homepage_layout_config.showcase3D || {}) },
+            newsTicker: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.newsTicker, ...(info.homepage_layout_config.newsTicker || {}) },
+            blogSection: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.blogSection, ...(info.homepage_layout_config.blogSection || {}) },
+            contactDock: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.contactDock, ...(info.homepage_layout_config.contactDock || {}) },
+            footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(info.homepage_layout_config.footer || {}) },
+            aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(info.homepage_layout_config.aiChat || {}) },
+          });
+        }
+      }
+    } catch {}
   };
-  className?: string;
-}
 
-export default function AddToCartButton({ product, className = "" }: AddToCartButtonProps) {
-  const { cartItems, addToCart } = useCart();
-  const [isAnimating, setIsAnimating] = useState(false);
+  useEffect(() => {
+    loadCurrentSettings();
+    const handleUpdate = (e: any) => {
+      if (e.detail?.homepage_layout_config) {
+        setConfig(e.detail.homepage_layout_config);
+      }
+    };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
 
-  const cartItem = cartItems.find((i) => String(i.id) === String(product.id));
-  const currentCount = cartItem?.quantity || 0;
-  const isAvailable = (product.stock ?? 10) > 0;
+  const updateSection = <K extends keyof HomepageLayoutConfig>(section: K, values: Partial<HomepageLayoutConfig[K]>) => {
+    setConfig((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        ...values,
+      },
+    }));
+  };
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isAvailable || isAnimating) return;
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    soundEngine.playClick();
+    setSaving(true);
+    setStatusMessage(null);
 
-    soundEngine.playAddToCart();
-    setIsAnimating(true);
+    try {
+      const updated = await siteInfoService.updateSiteInfo({
+        homepage_layout_config: config,
+      });
 
-    addToCart({
-      id: product.id,
-      title: product.title,
-      name: product.title,
-      price: product.price,
-      image: product.image,
-      stock: product.stock ?? 10,
-      category: product.category || "تکنولوژی",
-      quantity: 1,
-    });
-
-    setTimeout(() => {
-      setIsAnimating(false);
-    }, 1100);
+      if (updated) {
+        soundEngine.playSuccess();
+        setStatusMessage({
+          type: "success",
+          text: "⚡ تغییرات چیدمان ویترین و مقیاس‌ها با موفقیت در دیتابیس ثبت و به صورت بلادرنگ در سایت اعمال شد.",
+        });
+      } else {
+        throw new Error("خطا در ثبت پایگاه داده");
+      }
+    } catch (err: any) {
+      setStatusMessage({ type: "error", text: err.message || "خطا در ذخیره‌سازی تنظیمات." });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setStatusMessage(null), 4000);
+    }
   };
 
   return (
-    <div className={"flex flex-col items-center gap-1 w-full select-none " + className} dir="rtl">
-      <button
-        type="button"
-        disabled={!isAvailable}
-        onClick={handleClick}
-        className={\`relative w-full overflow-hidden py-2.5 px-4 rounded-2xl font-black text-xs transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 disabled:opacity-40 \${
-          isAnimating
-            ? "bg-emerald-600 text-white shadow-emerald-500/30 scale-[1.02]"
-            : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-95 shadow-blue-500/25"
-        }\`}
-      >
-        <div
-          className={\`flex items-center gap-1.5 transition-transform duration-500 \${
-            isAnimating ? "translate-x-1 scale-110" : ""
-          }\`}
-        >
-          <svg
-            className={\`w-4 h-4 transition-transform duration-500 \${
-              isAnimating ? "rotate-12 text-amber-300" : "text-white"
-            }\`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-            />
-          </svg>
-
-          <span className="tracking-tight">
-            {isAnimating ? "به سبد اضافه شد!" : "افزودن به سبد خرید"}
-          </span>
+    <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      {/* سربرگ استودیو چیدمان */}
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📐</span>
+            <h2 className="text-lg font-black text-[var(--accent-blue)]">
+              استودیوی کنترل بصری و تنظیم مقیاس‌های صفحه اصلی (Storefront Master Controller)
+            </h2>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            تغییر آنی ابعاد هیرو، فعال/غیرفعال‌سازی بخش‌ها، کنترل اسلایدر ۳D و فواصل عمودی با همگام‌سازی بلادرنگ
+          </p>
         </div>
 
-        {isAnimating && (
-          <span className="absolute inset-0 bg-white/20 animate-ping rounded-2xl pointer-events-none" />
-        )}
-      </button>
+        <button
+          type="button"
+          onClick={() => handleSave()}
+          disabled={saving}
+          className="px-7 py-3 bg-[var(--accent-blue)] hover:opacity-90 active:scale-95 text-white rounded-2xl text-xs font-black transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center gap-2"
+        >
+          <span>💾</span>
+          <span>{saving ? "در حال اعمال سراسری..." : "ذخیره و انتشار بلادرنگ"}</span>
+        </button>
+      </div>
 
-      <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)]">
-        {currentCount > 0 ? \`\${currentCount} عدد در سبد شما\` : "۰ عدد در سبد"}
-      </span>
+      {statusMessage && (
+        <div
+          className={\`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn \${
+            statusMessage.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
+          }\`}
+        >
+          {statusMessage.text}
+        </div>
+      )}
+
+      {/* ۱. تنظیمات بخش هیرو اصلی */}
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-2xl bg-blue-500/15 text-blue-500 flex items-center justify-center text-lg font-black">
+              🌟
+            </span>
+            <div>
+              <h3 className="font-black text-sm text-[var(--text-primary)]">۱. بخش هیرو اصلی صفحه نخست (Hero Section)</h3>
+              <p className="text-[11px] text-[var(--text-secondary)]">کنترل ارتفاع، فواصل پدینگ، متون و پس‌زمینه سه‌بعدی Three.js</p>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer bg-[var(--input-bg)] px-3.5 py-2 rounded-2xl border border-[var(--card-border)]">
+            <input
+              type="checkbox"
+              checked={config.hero.show}
+              onChange={(e) => updateSection("hero", { show: e.target.checked })}
+              className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
+            />
+            <span className="text-xs font-black">نمایش بخش هیرو در صفحه</span>
+          </label>
+        </div>
+
+        {config.hero.show && (
+          <div className="space-y-4 text-xs animate-fadeIn">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="block font-bold text-[var(--text-secondary)]">حالت ارتفاع هیرو:</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "compact", label: "بسیار فشرده" },
+                    { id: "standard", label: "استاندارد" },
+                    { id: "cinematic", label: "سینمایی" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => { soundEngine.playClick(); updateSection("hero", { heightMode: m.id as any }); }}
+                      className={\`py-2 rounded-xl text-[11px] font-bold border transition cursor-pointer \${
+                        config.hero.heightMode === m.id
+                          ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
+                          : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]"
+                      }\`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-bold text-[var(--text-secondary)]">تراکم فواصل عمودی (پدینگ):</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "compact", label: "کمترین پدینگ" },
+                    { id: "normal", label: "معمولی" },
+                    { id: "relaxed", label: "باز و جادار" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => { soundEngine.playClick(); updateSection("hero", { verticalPadding: m.id as any }); }}
+                      className={\`py-2 rounded-xl text-[11px] font-bold border transition cursor-pointer \${
+                        config.hero.verticalPadding === m.id
+                          ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
+                          : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]"
+                      }\`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-bold text-[var(--text-secondary)]">بوم سه‌بعدی Three.js در پس‌زمینه:</label>
+                <button
+                  type="button"
+                  onClick={() => { soundEngine.playClick(); updateSection("hero", { show3DCanvas: !config.hero.show3DCanvas }); }}
+                  className={\`w-full py-2 rounded-xl text-[11px] font-bold border transition cursor-pointer \${
+                    config.hero.show3DCanvas
+                      ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                      : "bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                  }\`}
+                >
+                  {config.hero.show3DCanvas ? "فعال (کره نوری اپتیکال ✓)" : "غیرفعال"}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="space-y-1">
+                <label className="block font-bold text-[var(--text-secondary)]">تیتر اصلی هیرو:</label>
+                <input
+                  type="text"
+                  value={config.hero.title}
+                  onChange={(e) => updateSection("hero", { title: e.target.value })}
+                  className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-bold text-[var(--text-secondary)]">متن دکمه اکشن (CTA):</label>
+                <input
+                  type="text"
+                  value={config.hero.buttonText}
+                  onChange={(e) => updateSection("hero", { buttonText: e.target.value })}
+                  className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="block font-bold text-[var(--text-secondary)]">زیرعنوان و توضیحات هیرو:</label>
+                <textarea
+                  rows={2}
+                  value={config.hero.subtitle}
+                  onChange={(e) => updateSection("hero", { subtitle: e.target.value })}
+                  className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-medium text-xs outline-none leading-relaxed focus:border-[var(--accent-blue)]"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ۲. تنظیمات اسلایدر سه‌بعدی محصولات */}
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center text-lg font-black">
+              🖥️
+            </span>
+            <div>
+              <h3 className="font-black text-sm text-[var(--text-primary)]">۲. نمایشگاه سه‌بعدی محصولات (3D Perspective Showcase)</h3>
+              <p className="text-[11px] text-[var(--text-secondary)]">تنظیم مقیاس کارت‌ها، تیتر و تعداد کالاهای نمایشی در کاروسل</p>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer bg-[var(--input-bg)] px-3.5 py-2 rounded-2xl border border-[var(--card-border)]">
+            <input
+              type="checkbox"
+              checked={config.showcase3D.show}
+              onChange={(e) => updateSection("showcase3D", { show: e.target.checked })}
+              className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
+            />
+            <span className="text-xs font-black">نمایش اسلایدر سه‌بعدی</span>
+          </label>
+        </div>
+
+        {config.showcase3D.show && (
+          <div className="space-y-4 text-xs animate-fadeIn">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="block font-bold text-[var(--text-secondary)]">مقیاس ابعاد کارت‌ها:</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "compact", label: "کوچک" },
+                    { id: "standard", label: "استاندارد" },
+                    { id: "large", label: "بزرگ و عریض" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => { soundEngine.playClick(); updateSection("showcase3D", { cardScale: m.id as any }); }}
+                      className={\`py-2 rounded-xl text-[11px] font-bold border transition cursor-pointer \${
+                        config.showcase3D.cardScale === m.id
+                          ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md"
+                          : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]"
+                      }\`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-bold text-[var(--text-secondary)]">تیتر بخش اسلایدر:</label>
+                <input
+                  type="text"
+                  value={config.showcase3D.title}
+                  onChange={(e) => updateSection("showcase3D", { title: e.target.value })}
+                  className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-bold text-[var(--text-secondary)]">تعداد کالاهای کاروسل:</label>
+                <input
+                  type="number"
+                  min="3"
+                  max="20"
+                  value={config.showcase3D.limit}
+                  onChange={(e) => updateSection("showcase3D", { limit: Number(e.target.value) })}
+                  className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-mono font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div className="sm:col-span-3 space-y-1">
+                <label className="block font-bold text-[var(--text-secondary)]">زیرعنوان توضیحات اسلایدر:</label>
+                <input
+                  type="text"
+                  value={config.showcase3D.subtitle}
+                  onChange={(e) => updateSection("showcase3D", { subtitle: e.target.value })}
+                  className="w-full p-3 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-2xl font-medium text-xs outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ۳. تیکر اخبار و بخش مجله */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📡</span>
+              <h3 className="font-black text-sm text-[var(--text-primary)]">۳. تیکر جدیدترین اخبار تکنولوژی</h3>
+            </div>
+            <input
+              type="checkbox"
+              checked={config.newsTicker.show}
+              onChange={(e) => updateSection("newsTicker", { show: e.target.checked })}
+              className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
+            />
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            نمایش نوار پویا و فشرده اخبار با چرخش هر ۶ ثانیه در بالای هیرو بنر صفحه نخست.
+          </p>
+        </div>
+
+        <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📚</span>
+              <h3 className="font-black text-sm text-[var(--text-primary)]">۴. مجله و مقالات تخصصی صفحه اصلی</h3>
+            </div>
+            <input
+              type="checkbox"
+              checked={config.blogSection.show}
+              onChange={(e) => updateSection("blogSection", { show: e.target.checked })}
+              className="w-4 h-4 rounded text-[var(--accent-blue)] cursor-pointer"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">تعداد مقالات:</label>
+              <select
+                value={config.blogSection.count}
+                onChange={(e) => updateSection("blogSection", { count: Number(e.target.value) })}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+              >
+                <option value={3}>۳ مقاله (یک ردیف فشرده)</option>
+                <option value={6}>۶ مقاله (دو ردیف کامل)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">دکمه «مشاهده همه»:</label>
+              <button
+                type="button"
+                onClick={() => updateSection("blogSection", { showViewAll: !config.blogSection.showViewAll })}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
+              >
+                {config.blogSection.showViewAll ? "نمایش لینک ✓" : "مخفی"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ۵. تنظیمات فوتر و داک کلیدهای کیبورد */}
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-4">
+          <span className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center text-lg font-black">
+            ⚓
+          </span>
+          <div>
+            <h3 className="font-black text-sm text-[var(--text-primary)]">۵. تنظیمات جامع فوتر و داک کلیدهای مکانیکی (Footer & ContactDock)</h3>
+            <p className="text-[11px] text-[var(--text-secondary)]">کنترل نشان‌های گارانتی، پدینگ فوتر و فعال/غیرفعال‌سازی داک کیبورد شبکه اجتماعی</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+            <span className="font-bold text-[var(--text-primary)] block">کلیدهای فلیپ‌شونده CONTACT:</span>
+            <button
+              type="button"
+              onClick={() => { soundEngine.playClick(); updateSection("contactDock", { show: !config.contactDock.show }); }}
+              className={\`w-full py-2.5 rounded-xl font-bold transition cursor-pointer border \${
+                config.contactDock.show
+                  ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                  : "bg-rose-500/15 border-rose-500/30 text-rose-600"
+              }\`}
+            >
+              {config.contactDock.show ? "داک کیبورد فعال است ✓" : "مخفی‌سازی داک کیبورد"}
+            </button>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+            <span className="font-bold text-[var(--text-primary)] block">نشان‌های گارانتی و ارسال:</span>
+            <button
+              type="button"
+              onClick={() => { soundEngine.playClick(); updateSection("footer", { showBadges: !config.footer.showBadges }); }}
+              className={\`w-full py-2.5 rounded-xl font-bold transition cursor-pointer border \${
+                config.footer.showBadges
+                  ? "bg-blue-500/15 border-blue-500/30 text-[var(--accent-blue)]"
+                  : "bg-slate-500/15 border-slate-500/30 text-slate-500"
+              }\`}
+            >
+              {config.footer.showBadges ? "نمایش بج‌های گارانتی ✓" : "مخفی‌سازی بج‌ها"}
+            </button>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+            <span className="font-bold text-[var(--text-primary)] block">تراکم و فواصل عمودی فوتر:</span>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { id: "compact", label: "فشرده" },
+                { id: "normal", label: "معمولی" },
+                { id: "relaxed", label: "باز" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => { soundEngine.playClick(); updateSection("footer", { paddingMode: m.id as any }); }}
+                  className={\`py-1.5 rounded-xl text-[10px] font-bold border transition cursor-pointer \${
+                    config.footer.paddingMode === m.id
+                      ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)]"
+                      : "bg-[var(--modal-bg)] border-[var(--card-border)] text-[var(--text-secondary)]"
+                  }\`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ۶. تنظیم ارتفاع دکمه شناور چت هوش مصنوعی */}
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-4">
+          <span className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-lg font-black shadow-md">
+            🤖
+          </span>
+          <div>
+            <h3 className="font-black text-sm text-[var(--text-primary)]">۶. تنظیم ارتفاع شناور دکمه هوش مصنوعی (AIAssistantChat)</h3>
+            <p className="text-[11px] text-[var(--text-secondary)]">تنظیم دقیق فاصله از پایین صفحه جهت جلوگیری از هرگونه تداخل با فوتر یا داک موبایل</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-[var(--text-primary)]">فاصله در دسکتاپ:</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">{config.aiChat.bottomDesktop} پیکسل</span>
+            </div>
+            <input
+              type="range"
+              min="20"
+              max="160"
+              value={config.aiChat.bottomDesktop}
+              onChange={(e) => updateSection("aiChat", { bottomDesktop: Number(e.target.value) })}
+              className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+            <span className="text-[10px] text-[var(--text-secondary)] block">پیش‌فرض: ۶۴ پیکسل (معادل bottom-16)</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-[var(--text-primary)]">فاصله در موبایل:</span>
+              <span className="font-mono font-black text-emerald-500">{config.aiChat.bottomMobile} پیکسل</span>
+            </div>
+            <input
+              type="range"
+              min="40"
+              max="180"
+              value={config.aiChat.bottomMobile}
+              onChange={(e) => updateSection("aiChat", { bottomMobile: Number(e.target.value) })}
+              className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+            <span className="text-[10px] text-[var(--text-secondary)] block">پیش‌فرض: ۹۶ پیکسل (معادل bottom-24 جهت قرارگیری بالای داک منو)</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۲. اسلایدر ۳D پرچمدار با حذف نشان بالایی و افزودن کالبدشکافی ۳D و کلیه مشخصات کارت‌ها
+// ۴. بروزرسانی صفحه اصلی جهت پذیرش تنظیمات Realtime استودیو (app/page.tsx)
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+updateFile('app/page.tsx', `"use client";
+
+import React, { useState, useEffect } from "react";
+import { productService, Product } from "@/services/productService";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
+import { bannerService, Banner } from "@/services/bannerService";
+import { siteInfoService, SiteInfo, DEFAULT_HOMEPAGE_LAYOUT_CONFIG, HomepageLayoutConfig } from "@/services/siteInfoService";
+import { useCart } from "@/context/CartContext";
+import Link from "next/link";
+import AIAssistantChat from "@/components/AIAssistantChat";
+import ProductComparisonModal from "@/components/ProductComparisonModal";
+import TechRadarFeed from "@/components/TechRadarFeed";
+import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
+
+export default function HomePage() {
+  const { addToCart } = useCart();
+
+  const [products, setProducts] = useState<Product[]>(FLAGSHIP_7_PRODUCTS);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [compareList, setCompareList] = useState<Product[]>([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [layoutConfig, setLayoutConfig] = useState<HomepageLayoutConfig>(() => {
+    return siteInfoService.getSiteInfoSync()?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+  });
+
+  const loadData = async () => {
+    try {
+      const [prods, bans, info] = await Promise.all([
+        productService.getAll(),
+        bannerService.getAll(),
+        siteInfoService.getSiteInfo(),
+      ]);
+      if (prods && prods.length > 0) setProducts(prods);
+      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
+      if (info?.homepage_layout_config) {
+        setLayoutConfig(info.homepage_layout_config);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadData();
+
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
+      else loadData();
+    };
+
+    const handleSiteInfoUpdate = (e: any) => {
+      if (e.detail?.homepage_layout_config) {
+        setLayoutConfig(e.detail.homepage_layout_config);
+      }
+    };
+
+    window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
+
+    return () => {
+      window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
+    };
+  }, []);
+
+  const heroCfg = layoutConfig.hero;
+  const showcaseCfg = layoutConfig.showcase3D;
+  const newsTickerCfg = layoutConfig.newsTicker;
+  const blogCfg = layoutConfig.blogSection;
+
+  // محاسبه کلاس‌های پویای ارتفاع هیرو
+  const heroHeightClasses =
+    heroCfg.heightMode === "cinematic"
+      ? "min-h-[440px] sm:min-h-[520px]"
+      : heroCfg.heightMode === "standard"
+      ? "min-h-[300px] sm:min-h-[360px]"
+      : "min-h-[200px] sm:min-h-[250px]";
+
+  // محاسبه کلاس‌های پویای پدینگ هیرو
+  const heroPaddingClasses =
+    heroCfg.verticalPadding === "relaxed"
+      ? "p-8 sm:p-14 lg:p-16"
+      : heroCfg.verticalPadding === "normal"
+      ? "p-6 sm:p-10 lg:p-12"
+      : "p-5 sm:p-8 lg:p-10";
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-12 transition-colors duration-300" dir="rtl">
+      <main className="pt-1 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6">
+        
+        {/* تیکر اخبار تکنولوژی با قابلیت خاموش/روشن بلادرنگ */}
+        {newsTickerCfg.show && <TechRadarFeed />}
+
+        {/* هیرو سکشن ماژولار با کنترل کامل ارتفاع، فواصل و بوم سه‌بعدی */}
+        {heroCfg.show && (
+          <section className={\`w-full rounded-[2.2rem] sm:rounded-[2.5rem] overflow-hidden glass-morphism shadow-xl border border-[var(--card-border)] relative flex flex-col justify-center transition-all duration-300 \${heroHeightClasses} \${heroPaddingClasses}\`}>
+            {heroCfg.show3DCanvas && <Hero3DCanvas />}
+
+            <div className="relative z-10 space-y-2.5 max-w-2xl text-right">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
+                {heroCfg.title}
+              </h1>
+
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-xl">
+                {heroCfg.subtitle}
+              </p>
+
+              <div className="pt-1">
+                <Link
+                  href={heroCfg.buttonLink || "/#products"}
+                  className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-7 py-3 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/25 cursor-pointer"
+                >
+                  <span>{heroCfg.buttonText}</span>
+                  <span>←</span>
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* نمایشگاه سه‌بعدی پرچمدار محصولات با کنترل اندازه کارت‌ها و تعداد کالاها */}
+        {showcaseCfg.show && (
+          <ProductPerspectiveSlider
+            products={products.slice(0, showcaseCfg.limit || 7)}
+            customTitle={showcaseCfg.title}
+            customSubtitle={showcaseCfg.subtitle}
+            cardScale={showcaseCfg.cardScale}
+          />
+        )}
+
+        {/* مجله سئو با کنترل تعداد مقالات و لینک مشاهده همه */}
+        {blogCfg.show && (
+          <section className="glass-morphism rounded-3xl p-5 sm:p-7 space-y-3">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
+                  {blogCfg.title}
+                </h3>
+                <p className="text-[11px] text-[var(--text-secondary)] font-medium">
+                  {blogCfg.subtitle}
+                </p>
+              </div>
+              {blogCfg.showViewAll && (
+                <Link href="/blog" className="text-xs font-bold text-[var(--accent-blue)] hover:underline">
+                  مشاهده همه مقالات ←
+                </Link>
+              )}
+            </div>
+            <HomeBlogSection count={blogCfg.count || 3} />
+          </section>
+        )}
+      </main>
+
+      <ProductComparisonModal products={compareList} isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))} />
+      <AIAssistantChat />
+    </div>
+  );
+}
+
+function HomeBlogSection({ count = 3 }: { count?: number }) {
+  const [posts, setPosts] = useState<any[]>([]);
+  useEffect(() => {
+    fetch("/api/blogs").then((r) => r.json()).then((d) => setPosts((d.data || d.posts || []).slice(0, count))).catch(() => {});
+  }, [count]);
+
+  return (
+    <div className={\`grid grid-cols-1 md:grid-cols-3 gap-3 pt-1\`}>
+      {posts.map((post) => (
+        <article key={post.id || post.title} className="glass-morphism p-4 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
+          <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
+          <Link href={"/blog/" + (post.id || "")} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]">
+            مطالعه مقاله ←
+          </Link>
+        </article>
+      ))}
+    </div>
+  );
+}
+`);
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// ۵. ارتقای اسلایدر ۳D با پذیرش مقیاس‌های پویا و تیتر سفارشی (components/ProductPerspectiveSlider.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 updateFile('components/ProductPerspectiveSlider.tsx', `// File Path: components/ProductPerspectiveSlider.tsx
 "use client";
@@ -168,7 +1195,19 @@ interface ProductItem {
   is_available?: boolean;
 }
 
-export default function ProductPerspectiveSlider({ products }: { products: ProductItem[] }) {
+interface ProductPerspectiveSliderProps {
+  products: ProductItem[];
+  customTitle?: string;
+  customSubtitle?: string;
+  cardScale?: "compact" | "standard" | "large";
+}
+
+export default function ProductPerspectiveSlider({
+  products,
+  customTitle,
+  customSubtitle,
+  cardScale = "standard",
+}: ProductPerspectiveSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [teardownProduct, setTeardownProduct] = useState<ProductItem | null>(null);
 
@@ -186,19 +1225,34 @@ export default function ProductPerspectiveSlider({ products }: { products: Produ
     setActiveIndex((prev) => (prev - 1 + total) % total);
   };
 
+  // تنظیم پویا ابعاد کارت‌ها بر اساس انتخاب در کنترل‌پنل ادمین
+  const cardSizeClasses =
+    cardScale === "compact"
+      ? "w-[260px] sm:w-[300px] h-[410px] sm:h-[450px]"
+      : cardScale === "large"
+      ? "w-[310px] sm:w-[370px] h-[490px] sm:h-[540px]"
+      : "w-[290px] sm:w-[340px] h-[450px] sm:h-[490px]";
+
+  const containerHeightClass =
+    cardScale === "compact"
+      ? "h-[440px] sm:h-[480px]"
+      : cardScale === "large"
+      ? "h-[520px] sm:h-[580px]"
+      : "h-[480px] sm:h-[530px]";
+
   return (
     <section id="products" className="w-full py-4 select-none font-sans space-y-4" dir="rtl">
       <div className="text-center space-y-1">
         <h2 className="text-xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
-          نمایشگاه سه‌بعدی تجهیزات پرچمدار
+          {customTitle || "نمایشگاه سه‌بعدی تجهیزات پرچمدار"}
         </h2>
         <p className="text-xs text-[var(--text-secondary)] font-medium">
-          پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری
+          {customSubtitle || "پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری"}
         </p>
       </div>
 
       {/* کاروسل ۳D کارت‌ها */}
-      <div className="relative w-full max-w-5xl mx-auto h-[480px] sm:h-[530px] flex items-center justify-center overflow-hidden [perspective:1200px]">
+      <div className={\`relative w-full max-w-5xl mx-auto flex items-center justify-center overflow-hidden [perspective:1200px] \${containerHeightClass}\`}>
         {products.map((p, idx) => {
           let offset = idx - activeIndex;
           if (offset < -Math.floor(total / 2)) offset += total;
@@ -209,7 +1263,7 @@ export default function ProductPerspectiveSlider({ products }: { products: Produ
 
           if (!isVisible) return null;
 
-          const translateX = offset * 210;
+          const translateX = offset * (cardScale === "compact" ? 180 : cardScale === "large" ? 230 : 210);
           const translateZ = -Math.abs(offset) * 170;
           const rotateY = -offset * 22;
           const opacity = isActive ? 1 : Math.max(0.2, 0.65 - Math.abs(offset) * 0.25);
@@ -234,7 +1288,7 @@ export default function ProductPerspectiveSlider({ products }: { products: Produ
                 filter,
                 zIndex,
               }}
-              className={\`absolute w-[290px] sm:w-[340px] h-[450px] sm:h-[490px] rounded-[2.5rem] p-5 sm:p-6 glass-morphism border transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col justify-between cursor-pointer \${
+              className={\`absolute rounded-[2.5rem] p-5 sm:p-6 glass-morphism border transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col justify-between cursor-pointer \${cardSizeClasses} \${
                 isActive
                   ? "border-[var(--accent-blue)] shadow-[0_20px_60px_rgba(2,132,199,0.35)] scale-100 ring-2 ring-blue-500/20"
                   : "border-[var(--card-border)] scale-95"
@@ -355,170 +1409,13 @@ export default function ProductPerspectiveSlider({ products }: { products: Produ
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۳. داک سه‌بعدی کلیدهای کیبورد شبکه اجتماعی (فشرده و استاندارد شده برای ستون برند فوتر)
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('components/ContactDock.tsx', `// File Path: components/ContactDock.tsx
-"use client";
-
-import React, { useState } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-
-interface SocialKey {
-  letter: string;
-  name: string;
-  href: string;
-  color: string;
-  icon: React.ReactNode;
-}
-
-export default function ContactDock() {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
-  const keys: SocialKey[] = [
-    {
-      letter: "C",
-      name: "گیت‌هاب رسمی",
-      href: "https://github.com",
-      color: "#24292e",
-      icon: (
-        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "O",
-      name: "اینستاگرام استودیو",
-      href: "https://instagram.com",
-      color: "#e1306c",
-      icon: (
-        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "N",
-      name: "کانال تلگرام",
-      href: "https://t.me",
-      color: "#0088cc",
-      icon: (
-        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.919z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "T",
-      name: "پشتیبانی واتساپ",
-      href: "https://wa.me",
-      color: "#25d366",
-      icon: (
-        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "A",
-      name: "کانال یوتیوب",
-      href: "https://youtube.com",
-      color: "#ff0000",
-      icon: (
-        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "C",
-      name: "شبکه اکس",
-      href: "https://x.com",
-      color: "#000000",
-      icon: (
-        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "T",
-      name: "تماس تلفنی",
-      href: "tel:02188888888",
-      color: "#0284c7",
-      icon: (
-        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-          <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.24 1.02l-2.21 2.2z" />
-        </svg>
-      ),
-    },
-  ];
-
-  return (
-    <div className="flex flex-col items-start gap-2 select-none font-sans py-1" dir="ltr">
-      {/* نوار کلیدهای مکانیکی فلیپ‌شونده */}
-      <div className="p-1.5 rounded-2xl bg-black/30 border border-white/10 shadow-lg backdrop-blur-xl flex items-center gap-1.5">
-        {keys.map((k, idx) => {
-          const isFlipped = hoveredIndex === idx;
-
-          return (
-            <a
-              key={idx}
-              href={k.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onMouseEnter={() => {
-                soundEngine.playClick();
-                setHoveredIndex(idx);
-              }}
-              onMouseLeave={() => setHoveredIndex(null)}
-              onTouchStart={() => {
-                soundEngine.playClick();
-                setHoveredIndex(idx);
-              }}
-              className="relative w-9 h-11 sm:w-10 sm:h-12 rounded-xl cursor-pointer [perspective:1000px] group active:scale-95"
-            >
-              <div
-                className={\`w-full h-full rounded-xl border transition-transform duration-500 [transform-style:preserve-3d] shadow-md \${
-                  isFlipped ? "[transform:rotateY(180deg)] border-[var(--accent-blue)]" : "border-white/10 bg-slate-900/90"
-                }\`}
-              >
-                {/* رویه کلید */}
-                <div className="absolute inset-0 rounded-xl flex items-center justify-center font-mono font-black text-sm text-slate-200 [backface-visibility:hidden] bg-gradient-to-b from-slate-800 to-slate-950 border-t border-white/20">
-                  {k.letter}
-                </div>
-
-                {/* پشت کلید: لوگو */}
-                <div
-                  style={{ backgroundColor: k.color }}
-                  className="absolute inset-0 rounded-xl flex items-center justify-center text-white [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-inner"
-                >
-                  {k.icon}
-                </div>
-              </div>
-            </a>
-          );
-        })}
-      </div>
-
-      {hoveredIndex !== null && (
-        <span className="text-[10px] font-black text-[var(--accent-blue)] transition-all animate-fadeIn" dir="rtl">
-          {keys[hoveredIndex].name}
-        </span>
-      )}
-    </div>
-  );
-}
-`);
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۴. اصلاح کامل فوتر (حذف باکس مجزای بالا، حذف آیکون تکراری، درج کلیدها در ستون برند و کاهش فاصله)
+// ۶. کنترل پویای فوتر و داک کلیدهای کیبورد (components/Footer.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 updateFile('components/Footer.tsx', `"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { siteInfoService, SiteInfo, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
 import ContactDock from "@/components/ContactDock";
 
 export default function Footer() {
@@ -531,20 +1428,30 @@ export default function Footer() {
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
+  const layoutCfg = info?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+  const footerCfg = layoutCfg.footer;
+  const contactDockCfg = layoutCfg.contactDock;
+
   const siteName = info?.site_name || info?.siteName || "آکسون | Axon";
   const phone = info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
   const email = info?.email || "info@axoncore.ir";
   const address = info?.address || "تهران، تقاطع میرداماد و ولیعصر، مجتمع پایتخت";
-  const workingHours = info?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰";
+
+  const paddingClasses =
+    footerCfg.paddingMode === "relaxed"
+      ? "py-10 sm:py-14 space-y-10"
+      : footerCfg.paddingMode === "normal"
+      ? "py-8 sm:py-10 space-y-8"
+      : "py-6 sm:py-8 space-y-6";
 
   return (
     <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-8 sm:mt-10 select-none transition-colors duration-300" dir="rtl">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
+      <div className={\`max-w-[1440px] mx-auto px-4 sm:px-8 \${paddingClasses}\`}>
         
         {/* ردیف اصلی ستون‌های فوتر */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-10 pb-6 border-b border-[var(--card-border)]">
           
-          {/* ستون ۱ و ۲: معرفی برند و کلیدهای شبکه‌های اجتماعی در کادر مشخص‌شده */}
+          {/* ستون ۱ و ۲: معرفی برند، نشان‌های گارانتی و کلیدهای شبکه‌های اجتماعی */}
           <div className="lg:col-span-2 space-y-3">
             <h3 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--text-primary)]">
               {siteName}
@@ -554,19 +1461,23 @@ export default function Footer() {
               مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر، مانیتورهای ۵K رتینا، لپ‌تاپ‌های ورک‌استیشن و گجت‌های هوشمند در ایران با ۱۸ ماه گارانتی اصالت طلایی.
             </p>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
-                ✓ گارانتی اصالت ۱۰۰٪ فیزیکی
-              </span>
-              <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[11px] border border-blue-500/20">
-                🚀 ارسال پیشتاز سراسری
-              </span>
-            </div>
+            {footerCfg.showBadges && (
+              <div className="flex flex-wrap items-center gap-2 pt-1 animate-fadeIn">
+                <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
+                  {footerCfg.badge1Text || "✓ گارانتی اصالت ۱۰۰٪ فیزیکی"}
+                </span>
+                <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[11px] border border-blue-500/20">
+                  {footerCfg.badge2Text || "🚀 ارسال پیشتاز سراسری"}
+                </span>
+              </div>
+            )}
 
-            {/* کلیدهای مکانیکی کیبورد مستقیماً در کادر سبز زیر گارانتی */}
-            <div className="pt-2">
-              <ContactDock />
-            </div>
+            {/* کلیدهای مکانیکی کیبورد CONTACT با قابلیت فعال/غیرفعال‌سازی در استودیو */}
+            {contactDockCfg.show && (
+              <div className="pt-2 animate-fadeIn">
+                <ContactDock />
+              </div>
+            )}
           </div>
 
           {/* ستون ۳: دسترسی سریع */}
@@ -631,140 +1542,14 @@ export default function Footer() {
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۵. بهینه‌سازی صفحه اصلی (کاهش ارتفاع هیرو، حذف فضای مرده بالا و پایین، حذف گرید موازی)
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('app/page.tsx', `"use client";
-
-import React, { useState, useEffect } from "react";
-import { productService, Product } from "@/services/productService";
-import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
-import { bannerService, Banner } from "@/services/bannerService";
-import { useCart } from "@/context/CartContext";
-import Link from "next/link";
-import AIAssistantChat from "@/components/AIAssistantChat";
-import ProductComparisonModal from "@/components/ProductComparisonModal";
-import TechRadarFeed from "@/components/TechRadarFeed";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
-import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
-
-export default function HomePage() {
-  const { addToCart } = useCart();
-
-  const [products, setProducts] = useState<Product[]>(FLAGSHIP_7_PRODUCTS);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [compareList, setCompareList] = useState<Product[]>([]);
-  const [isCompareOpen, setIsCompareOpen] = useState(false);
-
-  const loadData = async () => {
-    try {
-      const [prods, bans] = await Promise.all([
-        productService.getAll(),
-        bannerService.getAll(),
-      ]);
-      if (prods && prods.length > 0) setProducts(prods);
-      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
-    } catch {}
-  };
-
-  useEffect(() => {
-    loadData();
-
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
-      else loadData();
-    };
-
-    window.addEventListener("products_updated", handleProductsUpdate);
-    return () => {
-      window.removeEventListener("products_updated", handleProductsUpdate);
-    };
-  }, []);
-
-  return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-12 transition-colors duration-300" dir="rtl">
-      <main className="pt-1 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6">
-        
-        {/* تیکر اخبار تکنولوژی با حاشیه فشرده */}
-        <TechRadarFeed />
-
-        {/* هیرو سکشن فشرده‌شده با ارتفاع متناسب و بدون فاصله اضافه */}
-        <section className="w-full rounded-[2.2rem] sm:rounded-[2.5rem] overflow-hidden glass-morphism p-5 sm:p-8 lg:p-10 shadow-xl border border-[var(--card-border)] relative min-h-[200px] sm:min-h-[250px] flex flex-col justify-center">
-          <Hero3DCanvas />
-
-          <div className="relative z-10 space-y-2.5 max-w-2xl text-right">
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight">
-              مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
-            </h1>
-
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-xl">
-              تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های هوشمند اولترا و ابزارهای استودیو با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.
-            </p>
-
-            <div className="pt-1">
-              <Link
-                href="/#products"
-                className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-7 py-3 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/25"
-              >
-                <span>مشاهده کاتالوگ محصولات</span>
-                <span>←</span>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* نمایشگاه سه‌بعدی پرچمدار محصولات (ویترین اصلی کالاها بدون گرید تکراری) */}
-        <ProductPerspectiveSlider products={products.slice(0, 7)} />
-
-        {/* مجله سئو */}
-        <section className="glass-morphism rounded-3xl p-5 sm:p-7 space-y-3">
-          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">مجله و مقالات تحلیلی فناوری</h3>
-              <p className="text-[11px] text-[var(--text-secondary)] font-medium">جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها</p>
-            </div>
-            <Link href="/blog" className="text-xs font-bold text-[var(--accent-blue)] hover:underline">
-              مشاهده همه مقالات ←
-            </Link>
-          </div>
-          <HomeBlogSection />
-        </section>
-      </main>
-
-      <ProductComparisonModal products={compareList} isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))} />
-      <AIAssistantChat />
-    </div>
-  );
-}
-
-function HomeBlogSection() {
-  const [posts, setPosts] = useState<any[]>([]);
-  useEffect(() => {
-    fetch("/api/blogs").then((r) => r.json()).then((d) => setPosts((d.data || d.posts || []).slice(0, 3))).catch(() => {});
-  }, []);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-      {posts.map((post) => (
-        <article key={post.id || post.title} className="glass-morphism p-4 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
-          <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
-          <Link href={"/blog/" + (post.id || "")} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]">
-            مطالعه مقاله ←
-          </Link>
-        </article>
-      ))}
-    </div>
-  );
-}
-`);
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۶. تنظیم موقعیت ارتفاع دکمه شناور چت هوش مصنوعی (components/AIAssistantChat.tsx)
+// ۷. تنظیم داینامیک موقعیت ارتفاع دکمه چت هوش مصنوعی از استودیو (components/AIAssistantChat.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 updateFile('components/AIAssistantChat.tsx', `"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
+import { siteInfoService, SiteInfo, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -783,9 +1568,17 @@ export default function AIAssistantChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    siteInfoService.getSiteInfo().then((d) => d && setSiteInfo(d));
+    const handleUpdate = (e: any) => { if (e.detail) setSiteInfo(e.detail); };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -862,23 +1655,29 @@ export default function AIAssistantChat() {
     "مک‌بوک M4 Max",
   ];
 
+  const aiChatCfg = siteInfo?.homepage_layout_config?.aiChat || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat;
+  const bottomDesktopPx = aiChatCfg.bottomDesktop || 64;
+  const bottomMobilePx = aiChatCfg.bottomMobile || 96;
+
   return (
     <div className="font-sans select-none" dir="rtl" suppressHydrationWarning>
       {!isOpen && (
         <>
-          {/* دکمه دسکتاپ: ارتفاع گرفته به بالای نوار فوتر (bottom-16) */}
+          {/* دکمه دسکتاپ: با موقعیت پویای پیکربندی‌شده در استودیو */}
           <button
+            style={{ bottom: \`\${bottomDesktopPx}px\` }}
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="hidden sm:flex fixed bottom-16 left-6 z-50 px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
+            className="hidden sm:flex fixed left-6 z-50 px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition-all items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
           >
             <span className="text-base">🤖</span>
             <span>مشاوره هوشمند تکنولوژی</span>
           </button>
 
-          {/* دکمه موبایل: ارتفاع گرفته به بالای داک منو (bottom-24) */}
+          {/* دکمه موبایل: با ارتفاع پویای پیکربندی‌شده در استودیو جهت قرارگیری بالای داک منو */}
           <button
+            style={{ bottom: \`\${bottomMobilePx}px\` }}
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="sm:hidden fixed bottom-24 left-4 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] flex items-center justify-center text-lg border-2 border-white/40 active:scale-90 transition-all cursor-pointer"
+            className="sm:hidden fixed left-4 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] flex items-center justify-center text-lg border-2 border-white/40 active:scale-90 transition-all cursor-pointer"
             aria-label="دستیار هوش مصنوعی"
           >
             <span className="animate-pulse">⚡</span>
@@ -974,7 +1773,405 @@ export default function AIAssistantChat() {
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۷. اتوماسیون کامل Git: استیج خودکار، کامیت و Push مستقیم به مخزن و استقرار روی Vercel
+// ۸. ثبت تب جدید استودیو در پیشخوان مدیریت ادمین (app/admin/page.tsx)
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+updateFile('app/admin/page.tsx', `"use client";
+
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import AdminProducts from "@/components/AdminProducts";
+import AdminCoupons from "@/components/AdminCoupons";
+import AdminBanners from "@/components/AdminBanners";
+import AdminMenu from "@/components/AdminMenu";
+import AdminOrders from "@/components/AdminOrders";
+import AdminSiteInfo from "@/components/AdminSiteInfo";
+import AdminInventoryManager from "@/components/AdminInventoryManager";
+import AdminHealthGuard from "@/components/admin/AdminHealthGuard";
+import AdminDashboardStats from "@/components/admin/AdminDashboardStats";
+import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
+import AdminCustomers from "@/components/admin/AdminCustomers";
+import ContactMessagesManager from "@/components/admin/ContactMessagesManager";
+import PageBuilder from "@/components/admin/PageBuilder";
+import AdminBlogManager from "@/components/AdminBlogManager";
+import AdminNewsManager from "@/components/admin/AdminNewsManager";
+import StyleFontManager from "@/components/admin/StyleFontManager";
+import AdminAiSeoAutopilot from "@/components/admin/AdminAiSeoAutopilot";
+import AdminAccountsManager from "@/components/AdminAccountsManager";
+import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
+import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { adminAuthService, AdminUser } from "@/services/adminAuthService";
+import { soundEngine } from "@/lib/soundEngine";
+
+export default function AdminPage() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+
+  const [activeTab, setActiveTab] = useState<
+    | "products"
+    | "inventory"
+    | "storefront_studio"
+    | "ai_autopilot"
+    | "news_radar"
+    | "page_builder"
+    | "blogs"
+    | "coupons"
+    | "customers"
+    | "banners"
+    | "menu"
+    | "typography"
+    | "orders"
+    | "accounts"
+    | "siteInfo"
+    | "messages"
+  >("products");
+
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
+  const [maintHours, setMaintHours] = useState<number>(1);
+  const [maintMinutes, setMaintMinutes] = useState<number>(0);
+  const [isSavingMaint, setIsSavingMaint] = useState(false);
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        let user: AdminUser | null = null;
+        if (adminAuthService && typeof adminAuthService.getCurrentSession === "function") {
+          user = await adminAuthService.getCurrentSession();
+        }
+
+        if (user) {
+          setIsAuthenticated(true);
+          setCurrentUser(user);
+        } else {
+          const localUser = localStorage.getItem("axon_admin_active_session_v2026");
+          if (localUser) {
+            setIsAuthenticated(true);
+            setCurrentUser(JSON.parse(localUser));
+          } else {
+            setIsAuthenticated(false);
+            router.replace("/admin/login");
+          }
+        }
+      } catch {
+        setIsAuthenticated(false);
+        router.replace("/admin/login");
+      }
+    }
+
+    checkAuth();
+
+    siteInfoService.getSiteInfo().then((info) => {
+      if (info) {
+        setSiteInfo(info);
+        setSelectedMaintMode(info.maintenance_mode || "none");
+      }
+    });
+
+    try {
+      const savedTheme = localStorage.getItem("theme");
+      const isDark = savedTheme !== "light";
+      setIsDarkMode(isDark);
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    } catch {}
+  }, [router]);
+
+  const toggleDarkMode = () => {
+    soundEngine.playClick();
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    localStorage.setItem("theme", nextDark ? "dark" : "light");
+    if (nextDark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  };
+
+  const handleSaveMaintenance = async () => {
+    soundEngine.playClick();
+    setIsSavingMaint(true);
+
+    try {
+      let maintenanceUntil: string | null = null;
+      let durationMinutes: number | null = null;
+
+      if (selectedMaintMode === "timed") {
+        const totalMinutes = maintHours * 60 + maintMinutes;
+        durationMinutes = totalMinutes;
+        maintenanceUntil = new Date(Date.now() + totalMinutes * 60 * 1000).toISOString();
+      }
+
+      const isAllowed = selectedMaintMode === "none";
+
+      const updated = await siteInfoService.updateSiteInfo({
+        maintenance_mode: selectedMaintMode,
+        maintenance_until: maintenanceUntil || undefined,
+        maintenance_duration_minutes: durationMinutes || undefined,
+        allow_google_index: isAllowed,
+        allowGoogleIndex: isAllowed,
+      });
+
+      if (updated) {
+        setSiteInfo(updated);
+        soundEngine.playSuccess();
+        alert("✅ وضعیت ایندکس گوگل و حالت تعمیرات با موفقیت ذخیره و اعمال شد.");
+        setShowMaintenanceModal(false);
+      }
+    } catch (e) {
+      alert("خطا در ذخیره وضعیت تعمیرات.");
+    } finally {
+      setIsSavingMaint(false);
+    }
+  };
+
+  const isSuper = currentUser?.role === "superadmin" || (currentUser?.role as any) === "super_admin";
+
+  const navTabs = [
+    { id: "products", label: "محصولات و کاتالوگ", icon: "📦", show: true },
+    { id: "inventory", label: "انبارداری سریع", icon: "📥", show: true },
+    { id: "storefront_studio", label: "کنترل ویترین و لایه‌بندی", icon: "📐", show: isSuper },
+    { id: "ai_autopilot", label: "موتور سئوی خودمختار (GSC)", icon: "🤖", show: isSuper },
+    { id: "news_radar", label: "جدیدترین اخبار تکنولوژی", icon: "📡", show: true },
+    { id: "page_builder", label: "صفحه‌ساز اختصاصی", icon: "🏗️", show: isSuper },
+    { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: isSuper },
+    { id: "messages", label: "صندوق پیام‌ها و مشاوره", icon: "📩", show: isSuper },
+    { id: "coupons", label: "تخفیف‌ها و کوپن", icon: "🏷️", show: isSuper },
+    { id: "customers", label: "باشگاه مخاطبان (CRM)", icon: "👥", show: isSuper },
+    { id: "blogs", label: "مقالات تخصصی و سئو", icon: "📚", show: true },
+    { id: "typography", label: "تایپوگرافی و فونت‌ها", icon: "🎨", show: isSuper },
+    { id: "banners", label: "بنرها و اسلایدرها", icon: "🖼️", show: isSuper },
+    { id: "menu", label: "منوها و دسته‌بندی‌ها", icon: "🔗", show: isSuper },
+    { id: "accounts", label: "حساب‌های مدیران و تغییر رمز", icon: "🛡️", show: isSuper },
+    { id: "siteInfo", label: "اطلاعات سایت و ایندکس", icon: "⚙️", show: isSuper },
+  ].filter((t) => t.show);
+
+  if (isAuthenticated === null) return null;
+
+  return (
+    <div dir="rtl" className="min-h-screen p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans select-none text-[var(--text-primary)]">
+      <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
+
+      {/* هدر تمیز و استاندارد ادمین با پروفایل کلیک‌پذیر */}
+      <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
+            ⚡
+          </div>
+          <div>
+            <h1 className="text-base font-black text-[var(--text-primary)]">پیشخوان یکپارچه مدیریت فروشگاه آکسون</h1>
+            
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setActiveTab("accounts");
+              }}
+              className="flex items-center gap-1.5 mt-0.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition cursor-pointer group"
+              title="کلیک کنید تا به بخش ویرایش مشخصات و تغییر رمز هدایت شوید"
+            >
+              <span>مدیر آنلاین:</span>
+              <strong className="text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition underline decoration-dotted underline-offset-4">
+                {currentUser?.full_name || currentUser?.username}
+              </strong>
+              <span className="text-[10px] opacity-70">✏️</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isSuper && (
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setShowMaintenanceModal(true);
+              }}
+              className={\`px-3.5 py-2 rounded-2xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer \${
+                selectedMaintMode === "none"
+                  ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+                  : "bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/25 animate-pulse"
+              }\`}
+            >
+              <span>🌐</span>
+              <span>{selectedMaintMode === "none" ? "ایندکس گوگل: مجاز ✓" : "تعمیرات فعال (توقف ایندکس)"}</span>
+            </button>
+          )}
+
+          <a href="/" target="_blank" className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition flex items-center gap-1">
+            <span>🏠</span>
+            <span>مشاهده فروشگاه</span>
+          </a>
+
+          <button
+            onClick={toggleDarkMode}
+            className="w-9 h-9 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs transition cursor-pointer flex items-center justify-center shadow-sm"
+            title="تغییر تم"
+          >
+            {isDarkMode ? "🌙" : "☀️"}
+          </button>
+
+          <button
+            onClick={() => {
+              adminAuthService.logout();
+              router.replace("/admin/login");
+            }}
+            className="px-3.5 py-2 rounded-2xl bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500 hover:text-white text-xs font-bold cursor-pointer transition flex items-center gap-1"
+          >
+            <span>🚪</span>
+            <span>خروج</span>
+          </button>
+        </div>
+      </header>
+
+      <AdminDashboardStats />
+      <AdminHealthGuard />
+
+      {/* نوار تب‌های ماژول‌های ادمین شامل ماژول استودیوی چیدمان */}
+      <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+        <div className="flex flex-wrap items-center gap-2">
+          {navTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                soundEngine.playClick();
+                setActiveTab(tab.id as any);
+              }}
+              className={\`px-3.5 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 \${
+                activeTab === tab.id
+                  ? "bg-[var(--accent-blue)] text-white shadow-lg scale-105"
+                  : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--card-border)]"
+              }\`}
+            >
+              <span className="text-sm">{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* محتوای ماژول فعال */}
+      <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
+        {activeTab === "products" && <AdminProducts />}
+        {activeTab === "inventory" && <AdminInventoryManager />}
+        {activeTab === "storefront_studio" && isSuper && <StorefrontLayoutStudio />}
+        {activeTab === "ai_autopilot" && isSuper && <AdminAiSeoAutopilot />}
+        {activeTab === "news_radar" && <AdminNewsManager />}
+        {activeTab === "page_builder" && isSuper && <PageBuilder />}
+        {activeTab === "blogs" && <AdminBlogManager />}
+        {activeTab === "typography" && isSuper && <StyleFontManager />}
+        {activeTab === "orders" && isSuper && <AdminOrders />}
+        {activeTab === "messages" && isSuper && <ContactMessagesManager />}
+        {activeTab === "coupons" && isSuper && <AdminCoupons />}
+        {activeTab === "customers" && isSuper && <AdminCustomers />}
+        {activeTab === "banners" && isSuper && <AdminBanners />}
+        {activeTab === "menu" && isSuper && <AdminMenu />}
+        {activeTab === "accounts" && isSuper && <AdminAccountsManager />}
+        {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
+      </div>
+
+      {/* مودال ایندکس گوگل و حالت تعمیرات */}
+      {showMaintenanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn" dir="rtl">
+          <div className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-5 shadow-2xl text-xs text-[var(--text-primary)]">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🌐</span>
+                <h3 className="font-black text-sm text-[var(--accent-blue)]">تنظیمات ایندکس گوگل و وضعیت تعمیرات سایت</h3>
+              </div>
+              <button
+                onClick={() => setShowMaintenanceModal(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[var(--text-secondary)] leading-relaxed font-medium">
+                وضعیت دسترسی خزنده‌های گوگل (Googlebot) و کاربران به سایت را تعیین فرمایید:
+              </p>
+
+              <div className="space-y-2">
+                <label className={\`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition \${selectedMaintMode === "none" ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold" : "border-[var(--card-border)] bg-[var(--input-bg)]"}\`}>
+                  <div className="flex items-center gap-2.5">
+                    <input type="radio" name="maint" checked={selectedMaintMode === "none"} onChange={() => setSelectedMaintMode("none")} className="accent-emerald-500" />
+                    <div>
+                      <span className="font-black block">۱. سایت کاملاً فعال و آنلاین (پیش‌فرض)</span>
+                      <span className="text-[10px] opacity-75">خزش و ایندکس گوگل ۱۰۰٪ مجاز و تمامی صفحات در دسترس هستند.</span>
+                    </div>
+                  </div>
+                  <span className="text-emerald-500 font-bold">آنلاین ✓</span>
+                </label>
+
+                <label className={\`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition \${selectedMaintMode === "timed" ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold" : "border-[var(--card-border)] bg-[var(--input-bg)]"}\`}>
+                  <div className="flex items-center gap-2.5">
+                    <input type="radio" name="maint" checked={selectedMaintMode === "timed"} onChange={() => setSelectedMaintMode("timed")} className="accent-amber-500" />
+                    <div>
+                      <span className="font-black block">۲. حالت تعمیرات زمان‌دار (با تایمر شمارنده معکوس)</span>
+                      <span className="text-[10px] opacity-75">نمایش صفحه شمارش معکوس به کاربران تا پایان زمان مشخص.</span>
+                    </div>
+                  </div>
+                  <span className="text-amber-500 font-bold">زمان‌دار ⏳</span>
+                </label>
+
+                <label className={\`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition \${selectedMaintMode === "indefinite" ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold" : "border-[var(--card-border)] bg-[var(--input-bg)]"}\`}>
+                  <div className="flex items-center gap-2.5">
+                    <input type="radio" name="maint" checked={selectedMaintMode === "indefinite"} onChange={() => setSelectedMaintMode("indefinite")} className="accent-rose-500" />
+                    <div>
+                      <span className="font-black block">۳. حالت تعمیرات نامحدود (توقف موقت ایندکس)</span>
+                      <span className="text-[10px] opacity-75">خروج موقت از دسترس جهت اعمال تغییرات اساسی دیتابیس.</span>
+                    </div>
+                  </div>
+                  <span className="text-rose-500 font-bold">قفل 🔒</span>
+                </label>
+              </div>
+
+              {selectedMaintMode === "timed" && (
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-amber-500/30 space-y-2 animate-fadeIn">
+                  <span className="font-bold text-[var(--text-secondary)] block">مدت زمان تقریبی تعمیرات:</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-[var(--text-secondary)] mb-1 block">ساعت:</label>
+                      <input type="number" min="0" max="72" value={maintHours} onChange={(e) => setMaintHours(Number(e.target.value))} className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-[var(--text-secondary)] mb-1 block">دقیقه:</label>
+                      <input type="number" min="0" max="59" value={maintMinutes} onChange={(e) => setMaintMinutes(Number(e.target.value))} className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
+              <button
+                type="button"
+                onClick={() => setShowMaintenanceModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                disabled={isSavingMaint}
+                onClick={handleSaveMaintenance}
+                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {isSavingMaint ? "در حال اعمال..." : "ذخیره و اعمال وضعیت 🚀"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+`);
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// ۹. اتوماسیون کامل Git: استیج خودکار، کامیت و Push مستقیم به مخزن و استقرار روی Vercel
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
 console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🚀 آغاز فرآیند خودکار استیج، کامیت و استقرار نهایی در Git/GitHub/Vercel');
@@ -985,7 +2182,7 @@ try {
   execSync('git add .', { stdio: 'inherit' });
 
   console.log('\n  \x1b[34m[2/3]\x1b[0m در حال ثبت کامیت ساختاری (git commit)...');
-  const commitMessage = `refactor(ui): compact hero, primary 3d slider with teardown, relocate contact dock & elevate chat button [${new Date().toLocaleTimeString('fa-IR')}]`;
+  const commitMessage = `feat(admin): implement master storefront layout studio with realtime websocket sync [${new Date().toLocaleTimeString('fa-IR')}]`;
   try {
     execSync(`git commit -m "${commitMessage}"`, { stdio: 'inherit' });
   } catch (cErr) {
@@ -1001,7 +2198,7 @@ try {
   execSync(`git push origin ${currentBranch}`, { stdio: 'inherit' });
 
   console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 تمامی اصلاحات ظاهری با موفقیت ۱۰۰٪ اعمال و روی Vercel مستقر گردید!');
+  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 استودیوی کنترل بصری ویترین با موفقیت ۱۰۰٪ مستقر و تمامی تغییرات آنلاین گردید!');
   console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 } catch (gitErr) {
   console.error('\n\x1b[31m[ERROR]\x1b[0m خطا در اتصال Git:', gitErr.message);

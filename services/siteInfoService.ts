@@ -4,6 +4,49 @@ import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realti
 
 export type MaintenanceMode = "none" | "timed" | "indefinite";
 
+export interface HomepageLayoutConfig {
+  hero: {
+    show: boolean;
+    heightMode: "compact" | "standard" | "cinematic";
+    verticalPadding: "compact" | "normal" | "relaxed";
+    title: string;
+    subtitle: string;
+    buttonText: string;
+    buttonLink: string;
+    show3DCanvas: boolean;
+  };
+  showcase3D: {
+    show: boolean;
+    cardScale: "compact" | "standard" | "large";
+    title: string;
+    subtitle: string;
+    limit: number;
+  };
+  newsTicker: {
+    show: boolean;
+  };
+  blogSection: {
+    show: boolean;
+    title: string;
+    subtitle: string;
+    count: number;
+    showViewAll: boolean;
+  };
+  contactDock: {
+    show: boolean;
+  };
+  footer: {
+    showBadges: boolean;
+    badge1Text: string;
+    badge2Text: string;
+    paddingMode: "compact" | "normal" | "relaxed";
+  };
+  aiChat: {
+    bottomDesktop: number;
+    bottomMobile: number;
+  };
+}
+
 export interface SiteInfo {
   id?: string | number;
   site_name?: string;
@@ -36,10 +79,54 @@ export interface SiteInfo {
   custom_css?: string;
   active_font_id?: string;
   gemini_api_key?: string;
+  homepage_layout_config?: HomepageLayoutConfig;
   updated_at?: string;
 }
 
 const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
+
+export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
+  hero: {
+    show: true,
+    heightMode: "compact",
+    verticalPadding: "compact",
+    title: "مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین",
+    subtitle: "تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های هوشمند اولترا و ابزارهای استودیو با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.",
+    buttonText: "مشاهده کاتالوگ محصولات",
+    buttonLink: "/#products",
+    show3DCanvas: true,
+  },
+  showcase3D: {
+    show: true,
+    cardScale: "standard",
+    title: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+    subtitle: "پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری",
+    limit: 7,
+  },
+  newsTicker: {
+    show: true,
+  },
+  blogSection: {
+    show: true,
+    title: "مجله و مقالات تحلیلی فناوری",
+    subtitle: "جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها",
+    count: 3,
+    showViewAll: true,
+  },
+  contactDock: {
+    show: true,
+  },
+  footer: {
+    showBadges: true,
+    badge1Text: "✓ گارانتی اصالت ۱۰۰٪ فیزیکی",
+    badge2Text: "🚀 ارسال پیشتاز سراسری",
+    paddingMode: "compact",
+  },
+  aiChat: {
+    bottomDesktop: 64,
+    bottomMobile: 96,
+  },
+};
 
 export const DEFAULT_SITE_INFO: SiteInfo = {
   site_name: "آکسون | Axon",
@@ -57,10 +144,36 @@ export const DEFAULT_SITE_INFO: SiteInfo = {
   free_shipping_threshold: 2000000,
   description: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
   footer_text: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
+  homepage_layout_config: DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
 };
 
 export const siteInfoService = {
   getSiteInfoSync(): SiteInfo {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(LOCAL_STORAGE_SITE_INFO);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed === "object") {
+            return {
+              ...DEFAULT_SITE_INFO,
+              ...parsed,
+              homepage_layout_config: {
+                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+                ...(parsed.homepage_layout_config || {}),
+                hero: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero, ...(parsed.homepage_layout_config?.hero || {}) },
+                showcase3D: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D, ...(parsed.homepage_layout_config?.showcase3D || {}) },
+                newsTicker: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.newsTicker, ...(parsed.homepage_layout_config?.newsTicker || {}) },
+                blogSection: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.blogSection, ...(parsed.homepage_layout_config?.blogSection || {}) },
+                contactDock: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.contactDock, ...(parsed.homepage_layout_config?.contactDock || {}) },
+                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(parsed.homepage_layout_config?.footer || {}) },
+                aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(parsed.homepage_layout_config?.aiChat || {}) },
+              },
+            };
+          }
+        }
+      } catch {}
+    }
     return DEFAULT_SITE_INFO;
   },
 
@@ -72,6 +185,27 @@ export const siteInfoService = {
         if (json.data) {
           const data = json.data;
           const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
+          
+          let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+          if (data.homepage_layout_config) {
+            try {
+              const incoming = typeof data.homepage_layout_config === "string"
+                ? JSON.parse(data.homepage_layout_config)
+                : data.homepage_layout_config;
+              parsedLayout = {
+                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+                ...incoming,
+                hero: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero, ...(incoming.hero || {}) },
+                showcase3D: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D, ...(incoming.showcase3D || {}) },
+                newsTicker: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.newsTicker, ...(incoming.newsTicker || {}) },
+                blogSection: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.blogSection, ...(incoming.blogSection || {}) },
+                contactDock: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.contactDock, ...(incoming.contactDock || {}) },
+                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(incoming.footer || {}) },
+                aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(incoming.aiChat || {}) },
+              };
+            } catch {}
+          }
+
           const mapped: SiteInfo = {
             id: data.id,
             site_name: data.site_name || data.store_name || "آکسون | Axon",
@@ -100,6 +234,7 @@ export const siteInfoService = {
             custom_css: data.custom_css || "",
             active_font_id: data.active_font_id || "Vazirmatn",
             gemini_api_key: data.gemini_api_key || "",
+            homepage_layout_config: parsedLayout,
             updated_at: data.updated_at,
           };
 
@@ -111,38 +246,45 @@ export const siteInfoService = {
           return mapped;
         }
       }
-      return DEFAULT_SITE_INFO;
+      return this.getSiteInfoSync();
     } catch {
-      return DEFAULT_SITE_INFO;
+      return this.getSiteInfoSync();
     }
   },
 
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      const sName = payload.site_name || payload.siteName || payload.storeName || "آکسون | Axon";
+      const current = await this.getSiteInfo();
+      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون | Axon";
+
+      const mergedConfig: HomepageLayoutConfig = {
+        ...(current?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG),
+        ...(payload.homepage_layout_config || {}),
+      };
 
       const dbPayload: any = {
         site_name: sName,
         store_name: sName,
-        tagline: payload.tagline,
-        phone: payload.phone,
-        email: payload.email,
-        address: payload.address,
-        working_hours: payload.working_hours,
-        logo_url: payload.logo_url,
-        footer_logo_url: payload.footer_logo_url,
-        favicon_url: payload.favicon_url,
-        allow_google_index: payload.allow_google_index,
-        maintenance_mode: payload.maintenance_mode,
-        maintenance_until: payload.maintenance_until,
-        maintenance_duration_minutes: payload.maintenance_duration_minutes,
-        header_announcement: payload.header_announcement,
-        free_shipping_threshold: payload.free_shipping_threshold,
-        footer_text: payload.footer_text,
-        description: payload.description,
-        custom_css: payload.custom_css,
-        active_font_id: payload.active_font_id,
-        gemini_api_key: payload.gemini_api_key,
+        tagline: payload.tagline !== undefined ? payload.tagline : current?.tagline,
+        phone: payload.phone !== undefined ? payload.phone : current?.phone,
+        email: payload.email !== undefined ? payload.email : current?.email,
+        address: payload.address !== undefined ? payload.address : current?.address,
+        working_hours: payload.working_hours !== undefined ? payload.working_hours : current?.working_hours,
+        logo_url: payload.logo_url !== undefined ? payload.logo_url : current?.logo_url,
+        footer_logo_url: payload.footer_logo_url !== undefined ? payload.footer_logo_url : current?.footer_logo_url,
+        favicon_url: payload.favicon_url !== undefined ? payload.favicon_url : current?.favicon_url,
+        allow_google_index: payload.allow_google_index !== undefined ? payload.allow_google_index : current?.allow_google_index,
+        maintenance_mode: payload.maintenance_mode !== undefined ? payload.maintenance_mode : current?.maintenance_mode,
+        maintenance_until: payload.maintenance_until !== undefined ? payload.maintenance_until : current?.maintenance_until,
+        maintenance_duration_minutes: payload.maintenance_duration_minutes !== undefined ? payload.maintenance_duration_minutes : current?.maintenance_duration_minutes,
+        header_announcement: payload.header_announcement !== undefined ? payload.header_announcement : current?.header_announcement,
+        free_shipping_threshold: payload.free_shipping_threshold !== undefined ? payload.free_shipping_threshold : current?.free_shipping_threshold,
+        footer_text: payload.footer_text !== undefined ? payload.footer_text : current?.footer_text,
+        description: payload.description !== undefined ? payload.description : current?.description,
+        custom_css: payload.custom_css !== undefined ? payload.custom_css : current?.custom_css,
+        active_font_id: payload.active_font_id !== undefined ? payload.active_font_id : current?.active_font_id,
+        gemini_api_key: payload.gemini_api_key !== undefined ? payload.gemini_api_key : current?.gemini_api_key,
+        homepage_layout_config: mergedConfig,
         updated_at: new Date().toISOString(),
       };
 
@@ -153,7 +295,11 @@ export const siteInfoService = {
       });
 
       const json = await res.json();
-      const finalData = json.data || dbPayload;
+      const finalData: SiteInfo = {
+        ...(current || DEFAULT_SITE_INFO),
+        ...(json.data || dbPayload),
+        homepage_layout_config: mergedConfig,
+      };
 
       if (typeof window !== "undefined") {
         localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
@@ -161,7 +307,8 @@ export const siteInfoService = {
       }
 
       return finalData;
-    } catch {
+    } catch (e) {
+      console.error("siteInfoService.updateSiteInfo Error:", e);
       return null;
     }
   },

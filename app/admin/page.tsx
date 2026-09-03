@@ -20,6 +20,7 @@ import AdminNewsManager from "@/components/admin/AdminNewsManager";
 import StyleFontManager from "@/components/admin/StyleFontManager";
 import AdminAiSeoAutopilot from "@/components/admin/AdminAiSeoAutopilot";
 import AdminAccountsManager from "@/components/AdminAccountsManager";
+import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser } from "@/services/adminAuthService";
 import { soundEngine } from "@/lib/soundEngine";
@@ -32,6 +33,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<
     | "products"
     | "inventory"
+    | "storefront_studio"
     | "ai_autopilot"
     | "news_radar"
     | "page_builder"
@@ -154,6 +156,7 @@ export default function AdminPage() {
   const navTabs = [
     { id: "products", label: "محصولات و کاتالوگ", icon: "📦", show: true },
     { id: "inventory", label: "انبارداری سریع", icon: "📥", show: true },
+    { id: "storefront_studio", label: "کنترل ویترین و لایه‌بندی", icon: "📐", show: isSuper },
     { id: "ai_autopilot", label: "موتور سئوی خودمختار (GSC)", icon: "🤖", show: isSuper },
     { id: "news_radar", label: "جدیدترین اخبار تکنولوژی", icon: "📡", show: true },
     { id: "page_builder", label: "صفحه‌ساز اختصاصی", icon: "🏗️", show: isSuper },
@@ -184,7 +187,6 @@ export default function AdminPage() {
           <div>
             <h1 className="text-base font-black text-[var(--text-primary)]">پیشخوان یکپارچه مدیریت فروشگاه آکسون</h1>
             
-            {/* دکمه پروفایل مدیر آنلاین (کلیک جهت هدایت سریع به صفحه تغییر رمز و حساب‌ها) */}
             <button
               onClick={() => {
                 soundEngine.playClick();
@@ -203,7 +205,6 @@ export default function AdminPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* دکمه ایندکس گوگل و حالت تعمیرات */}
           {isSuper && (
             <button
               onClick={() => {
@@ -250,7 +251,7 @@ export default function AdminPage() {
       <AdminDashboardStats />
       <AdminHealthGuard />
 
-      {/* نوار تب‌های ماژول‌های ادمین شامل تب اختصاصی حساب‌ها و تغییر رمز */}
+      {/* نوار تب‌های ماژول‌های ادمین شامل ماژول استودیوی چیدمان */}
       <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         <div className="flex flex-wrap items-center gap-2">
           {navTabs.map((tab) => (
@@ -277,6 +278,7 @@ export default function AdminPage() {
       <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
         {activeTab === "products" && <AdminProducts />}
         {activeTab === "inventory" && <AdminInventoryManager />}
+        {activeTab === "storefront_studio" && isSuper && <StorefrontLayoutStudio />}
         {activeTab === "ai_autopilot" && isSuper && <AdminAiSeoAutopilot />}
         {activeTab === "news_radar" && <AdminNewsManager />}
         {activeTab === "page_builder" && isSuper && <PageBuilder />}

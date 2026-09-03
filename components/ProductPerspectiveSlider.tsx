@@ -26,7 +26,19 @@ interface ProductItem {
   is_available?: boolean;
 }
 
-export default function ProductPerspectiveSlider({ products }: { products: ProductItem[] }) {
+interface ProductPerspectiveSliderProps {
+  products: ProductItem[];
+  customTitle?: string;
+  customSubtitle?: string;
+  cardScale?: "compact" | "standard" | "large";
+}
+
+export default function ProductPerspectiveSlider({
+  products,
+  customTitle,
+  customSubtitle,
+  cardScale = "standard",
+}: ProductPerspectiveSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [teardownProduct, setTeardownProduct] = useState<ProductItem | null>(null);
 
@@ -44,19 +56,34 @@ export default function ProductPerspectiveSlider({ products }: { products: Produ
     setActiveIndex((prev) => (prev - 1 + total) % total);
   };
 
+  // تنظیم پویا ابعاد کارت‌ها بر اساس انتخاب در کنترل‌پنل ادمین
+  const cardSizeClasses =
+    cardScale === "compact"
+      ? "w-[260px] sm:w-[300px] h-[410px] sm:h-[450px]"
+      : cardScale === "large"
+      ? "w-[310px] sm:w-[370px] h-[490px] sm:h-[540px]"
+      : "w-[290px] sm:w-[340px] h-[450px] sm:h-[490px]";
+
+  const containerHeightClass =
+    cardScale === "compact"
+      ? "h-[440px] sm:h-[480px]"
+      : cardScale === "large"
+      ? "h-[520px] sm:h-[580px]"
+      : "h-[480px] sm:h-[530px]";
+
   return (
     <section id="products" className="w-full py-4 select-none font-sans space-y-4" dir="rtl">
       <div className="text-center space-y-1">
         <h2 className="text-xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
-          نمایشگاه سه‌بعدی تجهیزات پرچمدار
+          {customTitle || "نمایشگاه سه‌بعدی تجهیزات پرچمدار"}
         </h2>
         <p className="text-xs text-[var(--text-secondary)] font-medium">
-          پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری
+          {customSubtitle || "پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری"}
         </p>
       </div>
 
       {/* کاروسل ۳D کارت‌ها */}
-      <div className="relative w-full max-w-5xl mx-auto h-[480px] sm:h-[530px] flex items-center justify-center overflow-hidden [perspective:1200px]">
+      <div className={`relative w-full max-w-5xl mx-auto flex items-center justify-center overflow-hidden [perspective:1200px] ${containerHeightClass}`}>
         {products.map((p, idx) => {
           let offset = idx - activeIndex;
           if (offset < -Math.floor(total / 2)) offset += total;
@@ -67,7 +94,7 @@ export default function ProductPerspectiveSlider({ products }: { products: Produ
 
           if (!isVisible) return null;
 
-          const translateX = offset * 210;
+          const translateX = offset * (cardScale === "compact" ? 180 : cardScale === "large" ? 230 : 210);
           const translateZ = -Math.abs(offset) * 170;
           const rotateY = -offset * 22;
           const opacity = isActive ? 1 : Math.max(0.2, 0.65 - Math.abs(offset) * 0.25);
@@ -92,7 +119,7 @@ export default function ProductPerspectiveSlider({ products }: { products: Produ
                 filter,
                 zIndex,
               }}
-              className={`absolute w-[290px] sm:w-[340px] h-[450px] sm:h-[490px] rounded-[2.5rem] p-5 sm:p-6 glass-morphism border transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col justify-between cursor-pointer ${
+              className={`absolute rounded-[2.5rem] p-5 sm:p-6 glass-morphism border transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col justify-between cursor-pointer ${cardSizeClasses} ${
                 isActive
                   ? "border-[var(--accent-blue)] shadow-[0_20px_60px_rgba(2,132,199,0.35)] scale-100 ring-2 ring-blue-500/20"
                   : "border-[var(--card-border)] scale-95"

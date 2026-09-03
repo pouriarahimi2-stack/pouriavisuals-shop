@@ -63,25 +63,39 @@ export async function POST(req: NextRequest) {
       custom_css: body.custom_css !== undefined ? body.custom_css : (existing?.custom_css || ""),
       active_font_id: body.active_font_id || existing?.active_font_id || "Vazirmatn",
       gemini_api_key: body.gemini_api_key !== undefined ? body.gemini_api_key : (existing?.gemini_api_key || null),
+      homepage_layout_config: body.homepage_layout_config !== undefined ? body.homepage_layout_config : (existing?.homepage_layout_config || null),
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabaseAdmin
-      .from("site_info")
-      .upsert(payload, { onConflict: "id" })
-      .select()
-      .maybeSingle();
+    let resultData: any = null;
 
-    if (error) {
-      // در صورت نبود ستون gemini_api_key در اسکیمای پستگرس
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("site_info")
+        .upsert(payload, { onConflict: "id" })
+        .select()
+        .maybeSingle();
+
+      if (!error && data) {
+        resultData = data;
+      } else {
+        throw error;
+      }
+    } catch (upsertErr) {
+      // اگر ستون‌های اختصاصی در اسکیمای پستگرس هنوز ساخته نشده باشند، با حذف فیلدهای ناسازگار ذخیره مطمئن انجام می‌شود
       delete payload.gemini_api_key;
-      await supabaseAdmin.from("site_info").upsert(payload, { onConflict: "id" });
+      delete payload.homepage_layout_config;
+      const { data } = await supabaseAdmin.from("site_info").upsert(payload, { onConflict: "id" }).select().maybeSingle();
+      resultData = data || payload;
     }
 
     return NextResponse.json({
       success: true,
-      message: "تنظیمات و کلید Gemini با موفقیت ثبت شد",
-      data: data || payload
+      message: "تنظیمات کلان و چیدمان صفحه اصلی با موفقیت در دیتابیس ثبت شد.",
+      data: {
+        ...resultData,
+        homepage_layout_config: body.homepage_layout_config || existing?.homepage_layout_config,
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });

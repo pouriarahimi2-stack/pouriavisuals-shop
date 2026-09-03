@@ -140,7 +140,7 @@ export default function Header() {
     { title: "تماس با ما", href: "/contact" },
   ];
 
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "AXON";
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
 
   return (
@@ -179,12 +179,12 @@ export default function Header() {
           </div>
 
           <Link href="/" className="flex items-center gap-3 group">
-            <AnimatedLogo customLogoUrl={logoUrl} size={40} />
+            <AnimatedLogo customLogoUrl={logoUrl} size={38} />
             <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-80">
+        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-85">
           {navLinks.map((link, idx) => (
             <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[var(--accent-blue)] transition font-bold text-[var(--text-primary)]">
               {link.title}

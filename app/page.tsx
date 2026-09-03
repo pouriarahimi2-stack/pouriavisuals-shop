@@ -75,56 +75,37 @@ export default function HomePage() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-24 transition-colors duration-300" dir="rtl">
       <main className="pt-4 sm:pt-6 px-3 sm:px-6 max-w-7xl mx-auto space-y-6 sm:space-y-8">
         
-        {/* هاب اخبار تکنولوژی ۶ ساعته */}
+        {/* تیکر اخبار تکنولوژی */}
         <TechRadarFeed />
 
-        {/* ۱. هیرو اسپلیت ۳D گرید واقعی (Right: تایپوگرافی شیشه‌ای | Left: کانواس ۳D کوانتومی) */}
-        <section className="w-full rounded-[2.5rem] overflow-hidden glass-morphism p-6 sm:p-10 shadow-2xl border border-[var(--card-border)] relative grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        {/* هیرو سکشن مدرن، عریض و یکپارچه با نورپردازی سه‌بعدی تعاملی */}
+        <section className="w-full rounded-[2.5rem] overflow-hidden glass-morphism p-6 sm:p-12 shadow-2xl border border-[var(--card-border)] relative min-h-[360px] sm:min-h-[420px] flex flex-col justify-center">
           
-          {/* ستون راست: متن و دکمه‌های اقدام */}
-          <div className="lg:col-span-7 space-y-4 text-right z-10">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-bold text-xs border border-[var(--accent-blue)]/30 backdrop-blur-md">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-              <span>اکوسیستم تکنولوژی ۲۰۲۶ و کالبدشکافی ۳D اختصاصی</span>
-            </div>
+          {/* بوم سه‌بعدی پس‌زمینه با عمق نوری Three.js */}
+          <Hero3DCanvas />
 
-            <h1 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
+          <div className="relative z-10 space-y-4 max-w-2xl text-right">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
               مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
             </h1>
 
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-xl">
-              تامین مستقیم انواع مانیتورهای ۵K رتینا، مک‌بوک‌های ورک‌استیشن M4 Max، ساعت‌های اولترا و تجهیزات ضبط استودیویی با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز به سراسر ایران.
+            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed">
+              تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای، ساعت‌های هوشمند، تجهیزات پردازش و کالیبراسیون با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.
             </p>
 
-            <div className="pt-3 flex flex-wrap items-center gap-3">
+            <div className="pt-2">
               <Link
                 href="/#products"
-                className="bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25 flex items-center gap-2"
+                className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25"
               >
                 <span>مشاهده کاتالوگ محصولات</span>
                 <span>←</span>
               </Link>
-              
-              <Link
-                href="/products/prod-studio-display-5k"
-                className="bg-[var(--input-bg)] hover:bg-[var(--accent-blue)]/10 text-[var(--text-primary)] px-6 py-3.5 rounded-full font-bold text-xs border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition flex items-center gap-1.5"
-              >
-                <span>🧬</span>
-                <span>تست کالبدشکافی ۳D کالا</span>
-              </Link>
             </div>
-          </div>
-
-          {/* ستون چپ: بوم تعاملی سه‌بعدی Three.js کاملاً شفاف و درخشان */}
-          <div className="lg:col-span-5 h-[320px] sm:h-[400px] w-full relative flex items-center justify-center rounded-3xl bg-[var(--input-bg)]/40 border border-[var(--card-border)] overflow-hidden shadow-inner">
-            <div className="absolute top-3 right-4 z-20 px-3 py-1 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-mono text-blue-300 font-bold">
-              ⚡ Three.js Quantum Core
-            </div>
-            <Hero3DCanvas />
           </div>
         </section>
 
-        {/* ۲. گرید محصولات */}
+        {/* کاتالوگ محصولات */}
         <section id="products" className="space-y-6">
           <div className="border-b border-[var(--card-border)] pb-4 px-1 flex justify-between items-center">
             <div>
@@ -152,7 +133,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ۳. بخش مقالات سئو */}
+        {/* مجله سئو */}
         <section className="glass-morphism rounded-3xl p-6 sm:p-8 space-y-4">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>

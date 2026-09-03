@@ -5,7 +5,7 @@ const { execSync } = require('child_process');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🌟 استقرار نهایی هیرو سه‌بعدی Three.js، لوگوهای متحرک SVG، اصلاح قیمت‌ها و موتور کالبدشکافی Draftly');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   ✨ پاکسازی هیرو، فعال‌سازی لوگوهای متحرک اختصاصی و استقرار کاتالوگ رسمی محصولات (Axon Pure Edition)');
 console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 function writeProjectFile(relativePath, fileContent) {
@@ -15,45 +15,10 @@ function writeProjectFile(relativePath, fileContent) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
   fs.writeFileSync(targetPath, fileContent, 'utf8');
-  console.log(`  \x1b[32m[SAVED ✓]\x1b[0m ${relativePath.padEnd(50)} \x1b[36m(بروزرسانی کامل)\x1b[0m`);
+  console.log(`  \x1b[32m[SAVED ✓]\x1b[0m ${relativePath.padEnd(50)} \x1b[36m(بروزرسانی قطعی)\x1b[0m`);
 }
 
-// ۱. به‌روزرسانی package.json با پکیج رسمی Three.js
-writeProjectFile('package.json', JSON.stringify({
-  name: "my-apple-store",
-  version: "0.1.0",
-  private: true,
-  scripts: {
-    dev: "next dev",
-    build: "next build",
-    start: "next start",
-    lint: "next lint",
-    push: "git add . && git commit -m \"update: auto commit changes\" && git push"
-  },
-  dependencies: {
-    "@google/generative-ai": "^0.24.0",
-    "@supabase/supabase-js": "^2.49.1",
-    "lucide-react": "^0.475.0",
-    "next": "^15.1.7",
-    "nodemailer": "^6.10.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "three": "^0.173.0"
-  },
-  devDependencies: {
-    "@types/node": "^20.17.19",
-    "@types/nodemailer": "^6.4.17",
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
-    "@types/three": "^0.173.0",
-    "autoprefixer": "^10.5.4",
-    "postcss": "^8.5.2",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.3"
-  }
-}, null, 2));
-
-// ۲. کامپوننت لوگوی متحرک اختصاصی SVG برای هدر و فوتر
+// ۱. کامپوننت هوشمند لوگوی متحرک SVG / GIF اختصاصی
 writeProjectFile('components/AnimatedLogo.tsx', `"use client";
 
 import React from "react";
@@ -64,23 +29,25 @@ interface AnimatedLogoProps {
   className?: string;
 }
 
-export default function AnimatedLogo({ customLogoUrl, size = 38, className = "" }: AnimatedLogoProps) {
-  if (customLogoUrl && customLogoUrl.length > 5) {
+export default function AnimatedLogo({ customLogoUrl, size = 42, className = "" }: AnimatedLogoProps) {
+  // در صورتی که کاربر لوگوی متحرک خود (GIF/SVG/APNG/WebP) را از ادمین آپلود کرده باشد:
+  if (customLogoUrl && customLogoUrl.trim().length > 5) {
     return (
       <div
-        className={"relative flex items-center justify-center overflow-hidden shrink-0 " + className}
+        className={"relative flex items-center justify-center shrink-0 overflow-hidden select-none " + className}
         style={{ width: size, height: size }}
       >
         <img
           src={customLogoUrl}
-          alt="Axon"
-          className="w-full h-full object-contain animate-pulse"
+          alt="Axon Logo"
+          className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(2,132,199,0.5)] transition-transform duration-300 group-hover:scale-105"
+          style={{ willChange: "transform" }}
         />
       </div>
     );
   }
 
-  // لوگوی متحرک برداری فوق‌مدرن آکسون با هسته کوانتومی چرخشی و حلقه‌های الکترونی
+  // لوگوی اختصاصی آکسون با گوی آبی نئونی تپنده (دقیقاً مطابق طرح ارسالی کاربر)
   return (
     <div
       className={"relative flex items-center justify-center shrink-0 select-none " + className}
@@ -88,774 +55,67 @@ export default function AnimatedLogo({ customLogoUrl, size = 38, className = "" 
     >
       <svg
         viewBox="0 0 100 100"
-        className="w-full h-full drop-shadow-[0_0_12px_rgba(2,132,199,0.6)]"
+        className="w-full h-full drop-shadow-[0_4px_14px_rgba(0,0,0,0.5)]"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient id="axonNeonGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#0284c7" />
-            <stop offset="50%" stopColor="#38bdf8" />
-            <stop offset="100%" stopColor="#818cf8" />
+          <linearGradient id="axonBladeDark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1e293b" />
+            <stop offset="50%" stopColor="#0f172a" />
+            <stop offset="100%" stopColor="#020617" />
           </linearGradient>
-          <linearGradient id="axonNeonGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#38bdf8" />
-            <stop offset="100%" stopColor="#0284c7" />
+          <linearGradient id="axonBladeRight" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#334155" />
+            <stop offset="50%" stopColor="#1e293b" />
+            <stop offset="100%" stopColor="#0f172a" />
           </linearGradient>
-          <filter id="axonGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
+          <radialGradient id="axonOrbGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#60a5fa" />
+            <stop offset="40%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="transparent" />
+          </radialGradient>
         </defs>
 
-        {/* حلقه مداری چرخشی ۱ */}
-        <ellipse
-          cx="50"
-          cy="50"
-          rx="42"
-          ry="18"
-          stroke="url(#axonNeonGrad1)"
-          strokeWidth="2.5"
-          strokeDasharray="12 6"
-          transform="rotate(-30 50 50)"
-          className="origin-center"
-        >
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="0 50 50"
-            to="360 50 50"
-            dur="8s"
-            repeatCount="indefinite"
-          />
-        </ellipse>
-
-        {/* حلقه مداری چرخشی ۲ */}
-        <ellipse
-          cx="50"
-          cy="50"
-          rx="42"
-          ry="18"
-          stroke="url(#axonNeonGrad2)"
-          strokeWidth="2"
-          strokeDasharray="8 8"
-          transform="rotate(30 50 50)"
-          className="origin-center"
-        >
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="360 50 50"
-            to="0 50 50"
-            dur="6s"
-            repeatCount="indefinite"
-          />
-        </ellipse>
-
-        {/* شش‌ضلعی هندسی تیتانیوم مرکزی */}
+        {/* بازوی چپ حرف A مشکی متالیک */}
         <polygon
-          points="50,22 74,36 74,64 50,78 26,64 26,36"
-          stroke="url(#axonNeonGrad1)"
-          strokeWidth="3.5"
-          fill="rgba(2, 132, 199, 0.12)"
-          filter="url(#axonGlow)"
-        >
-          <animate
-            attributeName="stroke-width"
-            values="3;4.5;3"
-            dur="2s"
-            repeatCount="indefinite"
-          />
-        </polygon>
+          points="50,12 18,78 36,80 50,42"
+          fill="url(#axonBladeDark)"
+          stroke="#334155"
+          strokeWidth="0.75"
+        />
 
-        {/* هسته کوانتومی درخشان */}
-        <circle cx="50" cy="50" r="8" fill="url(#axonNeonGrad1)">
+        {/* بازوی راست حرف A مشکی متالیک */}
+        <polygon
+          points="50,12 82,78 64,80 50,42"
+          fill="url(#axonBladeRight)"
+          stroke="#475569"
+          strokeWidth="0.75"
+        />
+
+        {/* گوی نوری آبی درخشان و تپنده در مرکز A */}
+        <circle cx="50" cy="54" r="9" fill="url(#axonOrbGlow)">
           <animate
             attributeName="r"
-            values="7;10;7"
-            dur="1.5s"
+            values="7;11;7"
+            dur="2s"
             repeatCount="indefinite"
           />
           <animate
             attributeName="opacity"
-            values="0.8;1;0.8"
-            dur="1.5s"
+            values="0.85;1;0.85"
+            dur="2s"
             repeatCount="indefinite"
           />
         </circle>
+        <circle cx="50" cy="54" r="4.5" fill="#38bdf8" />
       </svg>
     </div>
   );
 }
 `);
 
-// ۳. کامپوننت هیرو سه‌بعدی Three.js کاملاً برجسته و واکنش‌گرا
-writeProjectFile('components/3d/Hero3DCanvas.tsx', `"use client";
-
-import React, { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
-
-export default function Hero3DCanvas() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    const container = containerRef.current;
-    if (!container) return;
-
-    // ۱. ساخت صحنه و رندرر WebGL
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      45,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 0, 6.2);
-
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      powerPreference: "high-performance",
-    });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.4;
-    container.appendChild(renderer.domElement);
-
-    // ۲. نورپردازی استودیویی اپل (Studio Lighting Rig)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
-    scene.add(ambientLight);
-
-    const keySpot = new THREE.SpotLight(0x0284c7, 24, 35, Math.PI / 3, 0.4);
-    keySpot.position.set(6, 6, 6);
-    scene.add(keySpot);
-
-    const fillCyan = new THREE.PointLight(0x38bdf8, 16, 25);
-    fillCyan.position.set(-6, -3, 4);
-    scene.add(fillCyan);
-
-    const rimLight = new THREE.DirectionalLight(0x818cf8, 6);
-    rimLight.position.set(0, 8, -5);
-    scene.add(rimLight);
-
-    // ۳. گروه اصلی هسته سه‌بعدی (3D Core Group)
-    const coreGroup = new THREE.Group();
-    scene.add(coreGroup);
-
-    // کره شیشه‌ای شکست نور کوانتومی (Optical Glass Icosahedron)
-    const coreGeo = new THREE.IcosahedronGeometry(1.65, 4);
-    const coreMat = new THREE.MeshPhysicalMaterial({
-      color: 0x0284c7,
-      emissive: 0x071529,
-      emissiveIntensity: 0.4,
-      roughness: 0.08,
-      metalness: 0.15,
-      transmission: 0.9,
-      ior: 1.52,
-      thickness: 1.8,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.05,
-    });
-    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-    coreGroup.add(coreMesh);
-
-    // وایرفریم نئونی هندسی
-    const wireGeo = new THREE.IcosahedronGeometry(1.68, 2);
-    const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.4,
-    });
-    const wireMesh = new THREE.Mesh(wireGeo, wireMat);
-    coreGroup.add(wireMesh);
-
-    // ۴. حلقه‌های تیتانیومی مداری چرخشی (Orbital Gyro Rings)
-    const ringMat1 = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      metalness: 0.9,
-      roughness: 0.1,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.75,
-    });
-    const ringGeo1 = new THREE.TorusGeometry(2.35, 0.03, 16, 120);
-    const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
-    ring1.rotation.x = Math.PI / 3;
-    scene.add(ring1);
-
-    const ringMat2 = new THREE.MeshStandardMaterial({
-      color: 0x818cf8,
-      metalness: 0.95,
-      roughness: 0.2,
-      transparent: true,
-      opacity: 0.5,
-    });
-    const ringGeo2 = new THREE.TorusGeometry(2.75, 0.025, 16, 120);
-    const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
-    ring2.rotation.y = Math.PI / 4;
-    scene.add(ring2);
-
-    // ۵. ماتریس ذرات نئونی معلق (Quantum Particle Matrix)
-    const particleCount = 180;
-    const particlePositions = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount * 3; i += 3) {
-      particlePositions[i] = (Math.random() - 0.5) * 12;
-      particlePositions[i + 1] = (Math.random() - 0.5) * 8;
-      particlePositions[i + 2] = (Math.random() - 0.5) * 6;
-    }
-    const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
-    const particleMat = new THREE.PointsMaterial({
-      color: 0x38bdf8,
-      size: 0.05,
-      transparent: true,
-      opacity: 0.8,
-      blending: THREE.AdditiveBlending,
-    });
-    const particles = new THREE.Points(particleGeo, particleMat);
-    scene.add(particles);
-
-    // ۶. رهگیری تعاملی حرکت ماوس و لمس
-    let mouseX = 0;
-    let mouseY = 0;
-    let targetX = 0;
-    let targetY = 0;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left - rect.width / 2;
-      const y = e.clientY - rect.top - rect.height / 2;
-      mouseX = (x / rect.width) * 2;
-      mouseY = -(y / rect.height) * 2;
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-
-    // ۷. حلقه رندرینگ ۶۰ فریم
-    let animationFrameId: number;
-    const clock = new THREE.Clock();
-
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-      const elapsedTime = clock.getElapsedTime();
-
-      coreMesh.rotation.y = elapsedTime * 0.3;
-      coreMesh.rotation.x = Math.sin(elapsedTime * 0.25) * 0.25;
-      wireMesh.rotation.y = -elapsedTime * 0.35;
-      wireMesh.rotation.z = elapsedTime * 0.2;
-
-      ring1.rotation.z = elapsedTime * 0.25;
-      ring1.rotation.y = Math.sin(elapsedTime * 0.35) * 0.5;
-
-      ring2.rotation.x = -elapsedTime * 0.2;
-      ring2.rotation.z = Math.cos(elapsedTime * 0.3) * 0.4;
-
-      particles.rotation.y = elapsedTime * 0.08;
-
-      targetX += (mouseX - targetX) * 0.06;
-      targetY += (mouseY - targetY) * 0.06;
-
-      coreGroup.rotation.y = targetX * 0.7;
-      coreGroup.rotation.x = -targetY * 0.7;
-      camera.position.x = targetX * 0.35;
-      camera.position.y = targetY * 0.35;
-      camera.lookAt(0, 0, 0);
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      if (!container) return;
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("resize", handleResize);
-      cancelAnimationFrame(animationFrameId);
-
-      coreGeo.dispose();
-      coreMat.dispose();
-      wireGeo.dispose();
-      wireMat.dispose();
-      ringGeo1.dispose();
-      ringMat1.dispose();
-      ringGeo2.dispose();
-      ringMat2.dispose();
-      particleGeo.dispose();
-      particleMat.dispose();
-      renderer.dispose();
-
-      if (container && renderer.domElement) {
-        container.removeChild(renderer.domElement);
-      }
-    };
-  }, []);
-
-  if (!mounted) return null;
-
-  return (
-    <div
-      ref={containerRef}
-      className="w-full h-full min-h-[300px] sm:min-h-[360px] relative flex items-center justify-center select-none"
-    />
-  );
-}
-`);
-
-// ۴. اصلاح کاتالوگ محصولات با قیمت‌های رسمی و تصاویر باکیفیت
-writeProjectFile('services/productService.ts', `"use client";
-
-import { supabase } from "@/lib/supabase";
-import { realtimeEngine } from "@/lib/realtimeSync";
-
-export interface ProductVariant {
-  id: string;
-  name: string;
-  colorHex?: string;
-  modelType?: string;
-  priceDelta?: number;
-  stock?: number;
-}
-
-export interface MarketBenchmark {
-  storeName: string;
-  price?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  warranty: string;
-  isOurStore?: boolean;
-  deliveryTime?: string;
-  logo?: string;
-}
-
-export interface Product {
-  id: string;
-  title: string;
-  name?: string;
-  title_fa?: string;
-  sku?: string;
-  brand?: string;
-  price: number;
-  discountPrice?: number;
-  discount_price?: number;
-  originalPrice?: number;
-  stock: number;
-  category: string;
-  category_id?: string;
-  category_name?: string;
-  description: string;
-  short_description?: string;
-  highlights?: string[];
-  image: string;
-  image_url?: string;
-  images: string[];
-  variants?: ProductVariant[];
-  specs: Record<string, string>;
-  warranty?: string;
-  badge?: string;
-  isAvailable: boolean;
-  is_available?: boolean;
-  is_featured?: boolean;
-  market_comparison?: MarketBenchmark[];
-  meta_title?: string;
-  meta_description?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-const LOCAL_PRODUCTS_CACHE = "axon_products_registry_cache_v2026";
-
-export const FLAGSHIP_7_PRODUCTS: Product[] = [
-  {
-    id: "prod-macbook-pro-m5-max",
-    title: "MacBook Pro 16 Inch (Apple M4 Max, 128GB RAM, 2TB SSD)",
-    name: "MacBook Pro 16 Inch (Apple M4 Max, 128GB RAM, 2TB SSD)",
-    title_fa: "لپ‌تاپ پرچمدار ۱۶ اینچ با تراشه M4 Max، حافظه رم ۱۲۸ گیگابایت و ۲ ترابایت SSD",
-    brand: "Apple",
-    category: "لپ‌تاپ و اولترابوک",
-    price: 310000000,
-    discountPrice: 208500000,
-    discount_price: 208500000,
-    originalPrice: 310000000,
-    stock: 8,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی آکسون + مهلت تست ۷ روزه",
-    badge: "⚡ ابرقدرت پردازش",
-    image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-    images: [
-      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-      "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800"
-    ],
-    description: "ورک‌استیشن پرتابل ۱۶ اینچ با صفحه Liquid Retina XDR، پردازشگر ۱۶ هسته‌ای M4 Max با ۴۰ هسته گرافیکی و پهنای باند حافظه ۵۴۶ گیگابایت بر ثانیه.",
-    highlights: [
-      "تراشه ۳ نانومتری با ۴۰ هسته گرافیکی",
-      "رم یکپارچه ۱۲۸ گیگابایت فوق‌سریع",
-      "صفحه نمایش ۱۲۰ هرتز Liquid Retina XDR",
-      "باتری با دوام تا ۲۲ ساعت کار مداوم"
-    ],
-    specs: {
-      "پردازنده مرکزی": "Apple M4 Max (16-Core CPU, 40-Core GPU)",
-      "حافظه رم": "128GB Unified Memory",
-      "حافظه ذخیره‌سازی": "2TB NVMe SSD",
-      "نمایشگر": "16.2 Inch Liquid Retina XDR (120Hz ProMotion)"
-    }
-  },
-  {
-    id: "prod-studio-display-5k",
-    title: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
-    name: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
-    title_fa: "نمایشگر ۲۷ اینچ ۵K رتینا با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری",
-    brand: "Apple",
-    category: "صوتی و تصویر",
-    price: 135000000,
-    discountPrice: 128500000,
-    discount_price: 128500000,
-    originalPrice: 135000000,
-    stock: 6,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی آکسون",
-    badge: "🖥️ وضوح شگفت‌انگیز 5K",
-    image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
-    images: ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"],
-    description: "نمایشگر حرفه‌ای ۲۷ اینچ با تفکیک رنگ ۱۰ بیتی، پوشش کامل گاموت DCI-P3، درگاه تاندربولت ۳ و سیستم صوتی ۶ درایور استودیو.",
-    highlights: ["پنل 5K رتینا با ۲۱۸ PPI", "پوشش ۹۹.۲٪ گاموت DCI-P3", "شیشه نانوتکستچر ضد انعکاس"],
-    specs: { "رزولوشن": "5120 در 2880 پیکسل", "روشنایی": "600 نیت پایدار", "پورت‌ها": "Thunderbolt 3 + USB-C" }
-  },
-  {
-    id: "prod-apple-watch-ultra-3",
-    title: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS)",
-    name: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS)",
-    title_fa: "ساعت هوشمند پرچمدار بدنه تیتانیوم ۴۹ میلی‌متری با روشنایی ۳۰۰۰ نیت",
-    brand: "Apple",
-    category: "گجت‌های هوشمند",
-    price: 58500000,
-    discountPrice: 55800000,
-    discount_price: 55800000,
-    originalPrice: 58500000,
-    stock: 12,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی تعویض طلایی شرکتی",
-    badge: "🏔️ مقاوم‌ترین ساعت هوشمند",
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800",
-    images: ["https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800"],
-    description: "ساعت هوشمند پرچمدار با بدنه تیتانیوم گرید هوافضا، شیشه یاقوت کبود، روشنایی نمایشگر ۳۰۰۰ نیت و مقاومت در برابر آب تا عمق ۱۰۰ متر.",
-    highlights: ["روشنایی خیره‌کننده ۳۰۰۰ نیت", "بدنه تیتانیوم گرید ۵", "عمق‌سنج خودکار و آژیر اضطراری"],
-    specs: { "جنس بدنه": "Titanium Grade 5", "روشنایی": "3000 Nits OLED", "مقاومت آب": "100 متر (WR100)" }
-  },
-  {
-    id: "prod-ipad-pro-13-m5",
-    title: "iPad Pro 13 Inch (Apple M4, Tandem OLED, 256GB)",
-    name: "iPad Pro 13 Inch (Apple M4, Tandem OLED, 256GB)",
-    title_fa: "تبلت پرچمدار ۱۳ اینچ با نمایشگر Tandem OLED و تراشه M4",
-    brand: "Apple",
-    category: "گجت‌های هوشمند",
-    price: 98500000,
-    discountPrice: 94900000,
-    discount_price: 94900000,
-    originalPrice: 98500000,
-    stock: 9,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی",
-    badge: "🎨 باریک‌ترین تبلت دنیا",
-    image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800",
-    images: ["https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800"],
-    description: "باریک‌ترین دستگاه تاریخ با ضخامت ۵.۱ میلی‌متر، نمایشگر Ultra Retina XDR با دو لایه اولد تاندم و قدرت پردازش تراشه M4.",
-    highlights: ["فناوری Tandem OLED", "ضخامت شگفت‌انگیز ۵.۱ میلی‌متر", "پردازنده پرقدرت M4"],
-    specs: { "نمایشگر": "13.0 Inch Tandem OLED", "روشنایی": "1600 Nits Peak", "ضخامت": "5.1 میلی‌متر" }
-  },
-  {
-    id: "prod-pro-display-xdr-6k",
-    title: "Apple Pro Display XDR 32 Inch 6K Retina (HDR 1600 Nits)",
-    name: "Apple Pro Display XDR 32 Inch 6K Retina (HDR 1600 Nits)",
-    title_fa: "نمایشگر پرچمدار ۳۲ اینچ ۶K با روشنایی ۱۶۰۰ نیت و کنتراست ۱,۰۰۰,۰۰۰:۱",
-    brand: "Apple",
-    category: "صوتی و تصویر",
-    price: 295000000,
-    discountPrice: 279000000,
-    discount_price: 279000000,
-    originalPrice: 295000000,
-    stock: 4,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی تعویض طلایی",
-    badge: "💎 استاندارد 6K HDR",
-    image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800",
-    images: ["https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800"],
-    description: "نمایشگر ۶K حرفه‌ای با ماتریس نوردهی موضعی ۵۷۶ زون، کنتراست ۱,۰۰۰,۰۰۰:۱ و پوشش ۱۰۰٪ فضای رنگی سینمایی.",
-    highlights: ["رزولوشن 6K با ۲۰.۴ میلیون پیکسل", "روشنایی ۱۶۰۰ نیت", "کنتراست بی‌نهایت ۱,۰۰۰,۰۰۰:۱"],
-    specs: { "رزولوشن": "6016 در 3384 پیکسل", "روشنایی پیک": "1600 نیت", "تعداد زون‌ها": "576 ناحیه مستقل" }
-  },
-  {
-    id: "prod-decklink-8k-pro",
-    title: "Blackmagic DeckLink 8K Pro Capture Card",
-    name: "Blackmagic DeckLink 8K Pro",
-    title_fa: "کارت کپچر و پردازش ویدیویی 8K با درگاه چهارگانه 12G-SDI",
-    brand: "Blackmagic Design",
-    category: "سخت‌افزار و پردازش",
-    price: 68000000,
-    discountPrice: 63500000,
-    discount_price: 63500000,
-    originalPrice: 68000000,
-    stock: 5,
-    isAvailable: true,
-    is_available: true,
-    is_featured: false,
-    warranty: "۲ سال گارانتی معتبر شرکتی",
-    badge: "🎬 پردازش 8K RAW",
-    image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800",
-    images: ["https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800"],
-    description: "کارت کپچر PCIe نسل جدید با پشتیبانی از استریم‌های 8K DCI تا ۶۰ فریم در ثانیه با عمق رنگ ۱۲ بیت RGB 4:4:4.",
-    highlights: ["پشتیبانی تا 8K DCI", "چهار پورت دوطرفه 12G-SDI", "رابط PCIe Gen3 x8 با تاخیر صفر"],
-    specs: { "رزولوشن کپچر": "8K DCI 60p", "عمق رنگ": "12-Bit RGB 4:4:4", "درگاه‌ها": "4x 12G-SDI" }
-  },
-  {
-    id: "prod-calibrite-colorchecker",
-    title: "Calibrite ColorChecker Display Plus Sensor",
-    name: "Calibrite ColorChecker Display Plus",
-    title_fa: "سنسور کالیبراسیون سخت‌افزاری نمایشگرها تا ۲۰۰۰ نیت",
-    brand: "Calibrite",
-    category: "هوش مصنوعی و دیجیتال",
-    price: 29500000,
-    discountPrice: 27800000,
-    discount_price: 27800000,
-    originalPrice: 29500000,
-    stock: 7,
-    isAvailable: true,
-    is_available: true,
-    is_featured: false,
-    warranty: "۱ سال گارانتی تعویض شرکتی",
-    badge: "🎯 دقت سنجش رنگ",
-    image: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800",
-    images: ["https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800"],
-    description: "حسگر کالیبراسیون اپتیکال برای سنجش دقیق نمایشگرهای HDR، OLED و Mini-LED تا روشنایی ۲۰۰۰ نیت.",
-    highlights: ["سنجش شدت نور تا ۲۰۰۰ نیت", "فیلتر اپتیکال شیشه‌ای", "سازگار با ویندوز و مک"],
-    specs: { "دامنه سنجش": "0.05 تا 2000 cd/m2", "دقت": "Delta E < 0.2", "اتصال": "USB-C" }
-  }
-];
-
-export function normalizeProduct(p: any): Product {
-  if (!p) return FLAGSHIP_7_PRODUCTS[0];
-
-  const matchedFlagship = FLAGSHIP_7_PRODUCTS.find((f) => String(f.id) === String(p.id));
-
-  let price = Number(p.price || 0);
-  let discountPrice = p.discountPrice !== undefined ? Number(p.discountPrice) : (p.discount_price !== undefined ? Number(p.discount_price) : undefined);
-
-  if ((!price || price <= 0) && matchedFlagship) {
-    price = matchedFlagship.price;
-    discountPrice = matchedFlagship.discountPrice;
-  }
-
-  const title = (p.title && p.title !== "کالای تکنولوژی") ? p.title : (matchedFlagship?.title || p.name || "کالای تکنولوژی آکسون");
-
-  const images = Array.isArray(p.images) && p.images.length > 0
-    ? p.images
-    : (matchedFlagship?.images || [p.image || p.image_url || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"]);
-
-  const stock = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 10;
-  const isAvailable = p.is_available !== false && p.isAvailable !== false && stock > 0;
-
-  return {
-    ...p,
-    id: String(p.id),
-    title,
-    name: title,
-    title_fa: p.title_fa || matchedFlagship?.title_fa || "",
-    sku: p.sku || \`SKU-\${String(p.id).slice(-6)}\`,
-    brand: p.brand || matchedFlagship?.brand || "Apple",
-    price: price > 0 ? price : 55800000,
-    discountPrice: discountPrice && discountPrice > 0 ? discountPrice : undefined,
-    discount_price: discountPrice && discountPrice > 0 ? discountPrice : undefined,
-    originalPrice: p.originalPrice ? Number(p.originalPrice) : price,
-    stock,
-    category: p.category || matchedFlagship?.category || "تکنولوژی",
-    description: p.description || matchedFlagship?.description || "تجهیزات تخصصی و گجت‌های نوین با گارانتی اصالت طلایی آکسون",
-    short_description: p.short_description || matchedFlagship?.short_description || "",
-    highlights: Array.isArray(p.highlights) && p.highlights.length > 0 ? p.highlights : (matchedFlagship?.highlights || []),
-    image: images[0],
-    image_url: images[0],
-    images,
-    variants: Array.isArray(p.variants) ? p.variants : [],
-    specs: p.specs && typeof p.specs === "object" ? p.specs : (matchedFlagship?.specs || {}),
-    warranty: p.warranty || matchedFlagship?.warranty || "۱۸ ماه گارانتی اصالت طلایی آکسون",
-    badge: p.badge || matchedFlagship?.badge || "",
-    isAvailable,
-    is_available: isAvailable,
-    is_featured: Boolean(p.is_featured ?? matchedFlagship?.is_featured),
-    market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
-    created_at: p.created_at || new Date().toISOString(),
-    updated_at: p.updated_at || new Date().toISOString(),
-  };
-}
-
-export const productService = {
-  getProductSync(id: string): Product | null {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(LOCAL_PRODUCTS_CACHE);
-        if (cached) {
-          const list: Product[] = JSON.parse(cached);
-          const found = list.find((p) => p.id === id);
-          if (found) return normalizeProduct(found);
-        }
-      } catch {}
-    }
-    const defaultItem = FLAGSHIP_7_PRODUCTS.find((p) => p.id === id);
-    return defaultItem ? normalizeProduct(defaultItem) : null;
-  },
-
-  getAllSync(): Product[] {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(LOCAL_PRODUCTS_CACHE);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map(normalizeProduct);
-          }
-        }
-      } catch {}
-    }
-    return FLAGSHIP_7_PRODUCTS.map(normalizeProduct);
-  },
-
-  async getAll(): Promise<Product[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          const normalized = data.map(normalizeProduct);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(normalized));
-          }
-          return normalized;
-        }
-      }
-      return this.getAllSync();
-    } catch {
-      return this.getAllSync();
-    }
-  },
-
-  async getById(id: string): Promise<Product | null> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .eq("id", id)
-          .maybeSingle();
-
-        if (!error && data) {
-          return normalizeProduct(data);
-        }
-      }
-      return this.getProductSync(id);
-    } catch {
-      return this.getProductSync(id);
-    }
-  },
-
-  async saveProduct(productData: Partial<Product>): Promise<Product | null> {
-    try {
-      const id = productData.id || \`prod_\${Date.now()}\`;
-      const normalized = normalizeProduct({ ...productData, id });
-
-      const dbPayload: any = {
-        id: normalized.id,
-        title: normalized.title,
-        name: normalized.title,
-        title_fa: normalized.title_fa || null,
-        sku: normalized.sku || null,
-        brand: normalized.brand || "Apple",
-        price: normalized.price,
-        discount_price: normalized.discountPrice || null,
-        stock: normalized.stock,
-        category: normalized.category,
-        description: normalized.description,
-        short_description: normalized.short_description || null,
-        highlights: normalized.highlights || [],
-        image: normalized.image,
-        image_url: normalized.image,
-        images: normalized.images,
-        variants: normalized.variants || [],
-        specs: normalized.specs || {},
-        warranty: normalized.warranty || null,
-        badge: normalized.badge || null,
-        is_available: normalized.is_available,
-        is_featured: normalized.is_featured,
-        market_comparison: normalized.market_comparison || [],
-        meta_title: normalized.meta_title || normalized.title,
-        meta_description: normalized.meta_description || normalized.short_description || null,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (supabase) {
-        await supabase.from("products").upsert(dbPayload, { onConflict: "id" });
-      }
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = [normalized, ...all.filter((p) => p.id !== normalized.id)];
-        localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("products_updated", updated);
-      }
-
-      return normalized;
-    } catch (e) {
-      console.error("productService.saveProduct error:", e);
-      return null;
-    }
-  },
-
-  async deleteProduct(id: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("products").delete().eq("id", id);
-      }
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = all.filter((p) => p.id !== id);
-        localStorage.setItem(LOCAL_PRODUCTS_CACHE, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("products_updated", updated);
-      }
-      return true;
-    } catch (e) {
-      console.error("productService.deleteProduct error:", e);
-      return false;
-    }
-  },
-};
-
-export default productService;
-`);
-
-// ۵. بازنویسی هدر با لوگوی متحرک SVG
+// ۲. هدر شیشه‌ای لوکس با نمایش دقیق لوگوی متحرک
 writeProjectFile('components/Header.tsx', `"use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -998,7 +258,7 @@ export default function Header() {
     { title: "تماس با ما", href: "/contact" },
   ];
 
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "AXON";
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
 
   return (
@@ -1037,12 +297,12 @@ export default function Header() {
           </div>
 
           <Link href="/" className="flex items-center gap-3 group">
-            <AnimatedLogo customLogoUrl={logoUrl} size={40} />
+            <AnimatedLogo customLogoUrl={logoUrl} size={38} />
             <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-80">
+        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-85">
           {navLinks.map((link, idx) => (
             <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[var(--accent-blue)] transition font-bold text-[var(--text-primary)]">
               {link.title}
@@ -1108,70 +368,7 @@ export default function Header() {
 }
 `);
 
-// ۶. بازنویسی فوتر با لوگوی متحرک SVG
-writeProjectFile('components/Footer.tsx', `"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import AnimatedLogo from "@/components/AnimatedLogo";
-
-export default function Footer() {
-  const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-
-  useEffect(() => {
-    siteInfoService.getSiteInfo().then((d) => d && setInfo(d));
-    const handleUpdate = (e: any) => { if (e.detail) setInfo(e.detail); };
-    window.addEventListener("site_info_updated", handleUpdate);
-    return () => window.removeEventListener("site_info_updated", handleUpdate);
-  }, []);
-
-  const siteName = info?.site_name || info?.siteName || "AXON";
-  const footerLogo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
-
-  return (
-    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-auto select-none transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="glass-morphism p-6 rounded-3xl space-y-4">
-            <div className="flex items-center gap-3">
-              <AnimatedLogo customLogoUrl={footerLogo} size={42} />
-              <div className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">{siteName}</div>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار و ابزارهای تکنولوژی با گارانتی اصالت طلایی.</p>
-          </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-[var(--accent-blue)]">دسترسی سریع</h5>
-            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-              <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ محصولات</Link></li>
-              <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">پیگیری سفارش</Link></li>
-              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">اخبار تکنولوژی</Link></li>
-              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله سئو</Link></li>
-            </ul>
-          </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-[var(--accent-blue)]">اطلاعات تماس</h5>
-            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-              <li>تلفن: {info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</li>
-              <li>ایمیل: {info?.email || "info@axoncore.ir"}</li>
-              <li>ساعات کاری: {info?.working_hours || "۹:۰۰ الی ۱۸:۰۰"}</li>
-            </ul>
-          </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-emerald-600 dark:text-emerald-400">ضمانت رسمی</h5>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">۱۰۰٪ اصالت فیزیکی کالا، مهلت تست ۷ روزه سخت‌افزاری و ارسال سریع پیشتاز به سراسر ایران.</p>
-          </div>
-        </div>
-        <div className="mt-10 pt-6 border-t border-[var(--card-border)] text-center text-xs text-[var(--text-secondary)] font-bold">
-          تمامی حقوق محفوظ است © {new Date().getFullYear()} {siteName}
-        </div>
-      </div>
-    </footer>
-  );
-}
-`);
-
-// ۷. بازنویسی صفحه اصلی (Home) با هیرو اسپلیت ۳D گرید واقعی و برجسته
+// ۳. بازنویسی هیرو سکشن صفحه اول (پاکسازی کامل بج‌ها و یکپارچگی سه‌بعدی)
 writeProjectFile('app/page.tsx', `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -1249,56 +446,37 @@ export default function HomePage() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-24 transition-colors duration-300" dir="rtl">
       <main className="pt-4 sm:pt-6 px-3 sm:px-6 max-w-7xl mx-auto space-y-6 sm:space-y-8">
         
-        {/* هاب اخبار تکنولوژی ۶ ساعته */}
+        {/* تیکر اخبار تکنولوژی */}
         <TechRadarFeed />
 
-        {/* ۱. هیرو اسپلیت ۳D گرید واقعی (Right: تایپوگرافی شیشه‌ای | Left: کانواس ۳D کوانتومی) */}
-        <section className="w-full rounded-[2.5rem] overflow-hidden glass-morphism p-6 sm:p-10 shadow-2xl border border-[var(--card-border)] relative grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        {/* هیرو سکشن مدرن، عریض و یکپارچه با نورپردازی سه‌بعدی تعاملی */}
+        <section className="w-full rounded-[2.5rem] overflow-hidden glass-morphism p-6 sm:p-12 shadow-2xl border border-[var(--card-border)] relative min-h-[360px] sm:min-h-[420px] flex flex-col justify-center">
           
-          {/* ستون راست: متن و دکمه‌های اقدام */}
-          <div className="lg:col-span-7 space-y-4 text-right z-10">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-bold text-xs border border-[var(--accent-blue)]/30 backdrop-blur-md">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-              <span>اکوسیستم تکنولوژی ۲۰۲۶ و کالبدشکافی ۳D اختصاصی</span>
-            </div>
+          {/* بوم سه‌بعدی پس‌زمینه با عمق نوری Three.js */}
+          <Hero3DCanvas />
 
-            <h1 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
+          <div className="relative z-10 space-y-4 max-w-2xl text-right">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
               مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
             </h1>
 
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-xl">
-              تامین مستقیم انواع مانیتورهای ۵K رتینا، مک‌بوک‌های ورک‌استیشن M4 Max، ساعت‌های اولترا و تجهیزات ضبط استودیویی با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز به سراسر ایران.
+            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed">
+              تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای، ساعت‌های هوشمند، تجهیزات پردازش و کالیبراسیون با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.
             </p>
 
-            <div className="pt-3 flex flex-wrap items-center gap-3">
+            <div className="pt-2">
               <Link
                 href="/#products"
-                className="bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25 flex items-center gap-2"
+                className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25"
               >
                 <span>مشاهده کاتالوگ محصولات</span>
                 <span>←</span>
               </Link>
-              
-              <Link
-                href="/products/prod-studio-display-5k"
-                className="bg-[var(--input-bg)] hover:bg-[var(--accent-blue)]/10 text-[var(--text-primary)] px-6 py-3.5 rounded-full font-bold text-xs border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition flex items-center gap-1.5"
-              >
-                <span>🧬</span>
-                <span>تست کالبدشکافی ۳D کالا</span>
-              </Link>
             </div>
-          </div>
-
-          {/* ستون چپ: بوم تعاملی سه‌بعدی Three.js کاملاً شفاف و درخشان */}
-          <div className="lg:col-span-5 h-[320px] sm:h-[400px] w-full relative flex items-center justify-center rounded-3xl bg-[var(--input-bg)]/40 border border-[var(--card-border)] overflow-hidden shadow-inner">
-            <div className="absolute top-3 right-4 z-20 px-3 py-1 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-mono text-blue-300 font-bold">
-              ⚡ Three.js Quantum Core
-            </div>
-            <Hero3DCanvas />
           </div>
         </section>
 
-        {/* ۲. گرید محصولات */}
+        {/* کاتالوگ محصولات */}
         <section id="products" className="space-y-6">
           <div className="border-b border-[var(--card-border)] pb-4 px-1 flex justify-between items-center">
             <div>
@@ -1326,7 +504,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ۳. بخش مقالات سئو */}
+        {/* مجله سئو */}
         <section className="glass-morphism rounded-3xl p-6 sm:p-8 space-y-4">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
@@ -1368,7 +546,7 @@ function HomeBlogSection() {
 }
 `);
 
-// ۸. به‌روزرسانی ProductCard با دکمه ۳D Teardown و قیمت‌های دقیق
+// ۴. به‌روزرسانی کارت کالا با قیمت‌های صحیح و دکمه ۳D
 writeProjectFile('components/ProductCard.tsx', `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -1483,12 +661,12 @@ export default function ProductCard({ product }: { product: any }) {
 }
 `);
 
-// ۹. کامیت و استقرار روی ریپازیتوری
+// ۵. کامیت و استقرار روی ریپازیتوری
 console.log('\n📦 در حال ثبت کامیت و استقرار روی گیت‌هاب / Vercel...');
 try {
-  execSync('git add . && git commit -m "feat(3d): deploy split 3D hero grid, animated SVG logos, fixed pricing and Draftly teardown" && git push origin main', { stdio: 'inherit' });
-  console.log('\n🎉 [SUCCESS] استقرار نهایی با موفقیت کامل ۱۰۰٪ انجام شد!');
+  execSync('git add . && git commit -m "fix(ui): purify hero section, enable dynamic animated logos and accurate pricing" && git push origin main', { stdio: 'inherit' });
+  console.log('\n🎉 [SUCCESS] تمامی اصلاحات با موفقیت ۱۰۰٪ کامل و مستقر شدند!');
 } catch (e) {
   console.log('\nℹ️ در صورت لزوم دستور زیر را در ترمینال اجرا کنید:');
-  console.log('git add . && git commit -m "feat(3d): deploy 3D engine" && git push');
+  console.log('git add . && git commit -m "fix(ui): update" && git push');
 }

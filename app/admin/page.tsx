@@ -19,6 +19,7 @@ import AdminBlogManager from "@/components/AdminBlogManager";
 import AdminNewsManager from "@/components/admin/AdminNewsManager";
 import StyleFontManager from "@/components/admin/StyleFontManager";
 import AdminAiSeoAutopilot from "@/components/admin/AdminAiSeoAutopilot";
+import AdminAccountsManager from "@/components/AdminAccountsManager";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser } from "@/services/adminAuthService";
 import { soundEngine } from "@/lib/soundEngine";
@@ -41,6 +42,7 @@ export default function AdminPage() {
     | "menu"
     | "typography"
     | "orders"
+    | "accounts"
     | "siteInfo"
     | "messages"
   >("products");
@@ -163,6 +165,7 @@ export default function AdminPage() {
     { id: "typography", label: "تایپوگرافی و فونت‌ها", icon: "🎨", show: isSuper },
     { id: "banners", label: "بنرها و اسلایدرها", icon: "🖼️", show: isSuper },
     { id: "menu", label: "منوها و دسته‌بندی‌ها", icon: "🔗", show: isSuper },
+    { id: "accounts", label: "حساب‌های مدیران و تغییر رمز", icon: "🛡️", show: isSuper },
     { id: "siteInfo", label: "اطلاعات سایت و ایندکس", icon: "⚙️", show: isSuper },
   ].filter((t) => t.show);
 
@@ -172,7 +175,7 @@ export default function AdminPage() {
     <div dir="rtl" className="min-h-screen p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans select-none text-[var(--text-primary)]">
       <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
 
-      {/* هدر اصلی پیشخوان مدیریت منطبق با ریپومیکس */}
+      {/* هدر تمیز و استاندارد ادمین با پروفایل کلیک‌پذیر */}
       <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
@@ -180,9 +183,22 @@ export default function AdminPage() {
           </div>
           <div>
             <h1 className="text-base font-black text-[var(--text-primary)]">پیشخوان یکپارچه مدیریت فروشگاه آکسون</h1>
-            <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
-              مدیر آنلاین: <strong className="text-[var(--text-primary)]">{currentUser?.full_name || currentUser?.username}</strong>
-            </p>
+            
+            {/* دکمه پروفایل مدیر آنلاین (کلیک جهت هدایت سریع به صفحه تغییر رمز و حساب‌ها) */}
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setActiveTab("accounts");
+              }}
+              className="flex items-center gap-1.5 mt-0.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition cursor-pointer group"
+              title="کلیک کنید تا به بخش ویرایش مشخصات و تغییر رمز هدایت شوید"
+            >
+              <span>مدیر آنلاین:</span>
+              <strong className="text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition underline decoration-dotted underline-offset-4">
+                {currentUser?.full_name || currentUser?.username}
+              </strong>
+              <span className="text-[10px] opacity-70">✏️</span>
+            </button>
           </div>
         </div>
 
@@ -234,7 +250,7 @@ export default function AdminPage() {
       <AdminDashboardStats />
       <AdminHealthGuard />
 
-      {/* نوار تب‌های ۱۴ ماژول ادمین */}
+      {/* نوار تب‌های ماژول‌های ادمین شامل تب اختصاصی حساب‌ها و تغییر رمز */}
       <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         <div className="flex flex-wrap items-center gap-2">
           {navTabs.map((tab) => (
@@ -244,13 +260,13 @@ export default function AdminPage() {
                 soundEngine.playClick();
                 setActiveTab(tab.id as any);
               }}
-              className={`px-3.5 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer ${
+              className={`px-3.5 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === tab.id
-                  ? "bg-[var(--accent-blue)] text-white shadow-lg"
-                  : "bg-[var(--input-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]"
+                  ? "bg-[var(--accent-blue)] text-white shadow-lg scale-105"
+                  : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--card-border)]"
               }`}
             >
-              <span className="text-sm ml-1.5">{tab.icon}</span>
+              <span className="text-sm">{tab.icon}</span>
               <span>{tab.label}</span>
             </button>
           ))}
@@ -272,6 +288,7 @@ export default function AdminPage() {
         {activeTab === "customers" && isSuper && <AdminCustomers />}
         {activeTab === "banners" && isSuper && <AdminBanners />}
         {activeTab === "menu" && isSuper && <AdminMenu />}
+        {activeTab === "accounts" && isSuper && <AdminAccountsManager />}
         {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
       </div>
 

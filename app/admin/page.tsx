@@ -47,11 +47,20 @@ export default function AdminPage() {
 
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  
+  // مودال ایندکس گوگل و تعمیرات
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
   const [maintMinutes, setMaintMinutes] = useState<number>(0);
   const [isSavingMaint, setIsSavingMaint] = useState(false);
+
+  // مودال تغییر رمز و مشخصات ادمین
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newFullName, setNewFullName] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   useEffect(() => {
     async function checkAuth() {
@@ -110,6 +119,39 @@ export default function AdminPage() {
   const triggerGlobalSearch = () => {
     soundEngine.playClick();
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+  };
+
+  const handleUpdateAdminPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    soundEngine.playClick();
+    setIsUpdatingPassword(true);
+
+    try {
+      const res = await adminAuthService.updateCredentials(
+        currentUser.id,
+        newUsername.trim() || undefined,
+        newPassword.trim() || undefined,
+        newFullName.trim() || undefined
+      );
+
+      if (res.success) {
+        soundEngine.playSuccess();
+        alert("✅ مشخصات و کلمه عبور مدیر با موفقیت به‌روزرسانی شد.");
+        if (res.data) {
+          setCurrentUser(res.data);
+          localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(res.data));
+        }
+        setShowPasswordModal(false);
+      } else {
+        alert(res.message || "خطا در ویرایش اطلاعات مدیر.");
+      }
+    } catch {
+      alert("خطا در برقراری ارتباط با سرور.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   const handleSaveMaintenance = async () => {
@@ -178,7 +220,7 @@ export default function AdminPage() {
     <div dir="rtl" className="min-h-screen p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans select-none text-[var(--text-primary)]">
       <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
 
-      {/* هدر کامل پیشخوان ادمین با تمامی دکمه‌ها، ابزارها و سوییچرها */}
+      {/* هدر کامل پیشخوان ادمین با دکمه تغییر رمز ادمین */}
       <header className="p-4 md:p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 shadow-xl backdrop-blur-2xl">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1.5 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
@@ -202,13 +244,13 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* جعبه ابزار کامل دکمه‌های هدر ادمین */}
+        {/* جعبه ابزار دکمه‌های هدر ادمین */}
         <div className="flex flex-wrap items-center gap-2">
           
           {/* ۱. دکمه جستجوی سریع (Ctrl+K) */}
           <button
             onClick={triggerGlobalSearch}
-            className="px-3.5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3.5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm text-[var(--text-primary)]"
             title="جستجوی سریع در کل سیستم (کلید میانبر Ctrl + K)"
           >
             <span>🔍</span>
@@ -216,17 +258,21 @@ export default function AdminPage() {
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 opacity-70">Ctrl+K</span>
           </button>
 
-          {/* ۲. دکمه میانبر موتور سئوی هوش مصنوعی */}
-          {isSuper && (
-            <button
-              onClick={() => { soundEngine.playClick(); setActiveTab("ai_autopilot"); }}
-              className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600/15 to-indigo-600/15 border border-blue-500/30 text-[var(--accent-blue)] hover:bg-blue-600 hover:text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-              title="موتور سئوی خودمختار سرچ‌کنسول"
-            >
-              <span>🤖</span>
-              <span className="hidden sm:inline">موتور سئو GSC</span>
-            </button>
-          )}
+          {/* ۲. دکمه بازگردانده‌شده تغییر رمز ادمین */}
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              setNewFullName(currentUser?.full_name || "");
+              setNewUsername(currentUser?.username || "");
+              setNewPassword("");
+              setShowPasswordModal(true);
+            }}
+            className="px-3.5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-amber-500 text-amber-600 dark:text-amber-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            title="تغییر نام کاربری و کلمه عبور ادمین"
+          >
+            <span>🔑</span>
+            <span className="hidden sm:inline">تغییر رمز ادمین</span>
+          </button>
 
           {/* ۳. دکمه وضعیت ایندکس گوگل و حالت تعمیرات */}
           {isSuper && (
@@ -327,7 +373,81 @@ export default function AdminPage() {
         {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
       </div>
 
-      {/* مودال جامع ایندکس گوگل و وضعیت تعمیرات */}
+      {/* مودال امن تغییر نام کاربری و کلمه عبور ادمین */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn" dir="rtl">
+          <form onSubmit={handleUpdateAdminPassword} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-4 shadow-2xl text-xs text-[var(--text-primary)]">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔑</span>
+                <h3 className="font-black text-sm text-[var(--accent-blue)]">تغییر کلمه عبور و مشخصات مدیر</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی مدیر:</label>
+                <input
+                  type="text"
+                  value={newFullName}
+                  onChange={(e) => setNewFullName(e.target.value)}
+                  placeholder="مثال: مدیر ارشد سیستم"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری ورود (Username):</label>
+                <input
+                  type="text"
+                  required
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  placeholder="admin"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور جدید (در صورت تمایل به تغییر):</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="در صورت خالی بودن تغییر نمی‌کند"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                disabled={isUpdatingPassword}
+                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {isUpdatingPassword ? "در حال ثبت..." : "ذخیره مشخصات 💾"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* مودال ایندکس گوگل و وضعیت تعمیرات */}
       {showMaintenanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn" dir="rtl">
           <div className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-5 shadow-2xl text-xs text-[var(--text-primary)]">

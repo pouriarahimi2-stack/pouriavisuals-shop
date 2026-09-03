@@ -3,10 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🎬 [AXON ARCHITECT] در حال تجهیز کامل هدر پیشخوان ادمین با تمامی ۸ دکمه، جستجوی سریع، مودال ایندکس گوگل، سوییچر تم و دکمه خروج...');
+console.log('🎬 [AXON ARCHITECT] در حال حذف دکمه سئو از هدر، جایگزینی دکمه و مودال تغییر رمز ادمین و استقرار نهایی در Vercel...');
 
 const files = {
-  // ۱. پیشخوان ادمین با هدر کامل، تمامی ۸ دکمه، مودال ایندکس گوگل و ۱۴ ماژول کنترلی
+  // ۱. صفحه پیشخوان ادمین با دکمه و مودال اختصاصی تغییر رمز عبور و مشخصات مدیر
   'app/admin/page.tsx': `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -56,11 +56,20 @@ export default function AdminPage() {
 
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  
+  // مودال ایندکس گوگل و تعمیرات
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
   const [maintHours, setMaintHours] = useState<number>(1);
   const [maintMinutes, setMaintMinutes] = useState<number>(0);
   const [isSavingMaint, setIsSavingMaint] = useState(false);
+
+  // مودال تغییر رمز و مشخصات ادمین
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newFullName, setNewFullName] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   useEffect(() => {
     async function checkAuth() {
@@ -119,6 +128,39 @@ export default function AdminPage() {
   const triggerGlobalSearch = () => {
     soundEngine.playClick();
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+  };
+
+  const handleUpdateAdminPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    soundEngine.playClick();
+    setIsUpdatingPassword(true);
+
+    try {
+      const res = await adminAuthService.updateCredentials(
+        currentUser.id,
+        newUsername.trim() || undefined,
+        newPassword.trim() || undefined,
+        newFullName.trim() || undefined
+      );
+
+      if (res.success) {
+        soundEngine.playSuccess();
+        alert("✅ مشخصات و کلمه عبور مدیر با موفقیت به‌روزرسانی شد.");
+        if (res.data) {
+          setCurrentUser(res.data);
+          localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(res.data));
+        }
+        setShowPasswordModal(false);
+      } else {
+        alert(res.message || "خطا در ویرایش اطلاعات مدیر.");
+      }
+    } catch {
+      alert("خطا در برقراری ارتباط با سرور.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   const handleSaveMaintenance = async () => {
@@ -187,7 +229,7 @@ export default function AdminPage() {
     <div dir="rtl" className="min-h-screen p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans select-none text-[var(--text-primary)]">
       <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
 
-      {/* هدر کامل پیشخوان ادمین با تمامی دکمه‌ها، ابزارها و سوییچرها */}
+      {/* هدر کامل پیشخوان ادمین با دکمه تغییر رمز ادمین */}
       <header className="p-4 md:p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 shadow-xl backdrop-blur-2xl">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1.5 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
@@ -211,13 +253,13 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* جعبه ابزار کامل دکمه‌های هدر ادمین */}
+        {/* جعبه ابزار دکمه‌های هدر ادمین */}
         <div className="flex flex-wrap items-center gap-2">
           
           {/* ۱. دکمه جستجوی سریع (Ctrl+K) */}
           <button
             onClick={triggerGlobalSearch}
-            className="px-3.5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3.5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm text-[var(--text-primary)]"
             title="جستجوی سریع در کل سیستم (کلید میانبر Ctrl + K)"
           >
             <span>🔍</span>
@@ -225,17 +267,21 @@ export default function AdminPage() {
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 opacity-70">Ctrl+K</span>
           </button>
 
-          {/* ۲. دکمه میانبر موتور سئوی هوش مصنوعی */}
-          {isSuper && (
-            <button
-              onClick={() => { soundEngine.playClick(); setActiveTab("ai_autopilot"); }}
-              className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600/15 to-indigo-600/15 border border-blue-500/30 text-[var(--accent-blue)] hover:bg-blue-600 hover:text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-              title="موتور سئوی خودمختار سرچ‌کنسول"
-            >
-              <span>🤖</span>
-              <span className="hidden sm:inline">موتور سئو GSC</span>
-            </button>
-          )}
+          {/* ۲. دکمه بازگردانده‌شده تغییر رمز ادمین */}
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              setNewFullName(currentUser?.full_name || "");
+              setNewUsername(currentUser?.username || "");
+              setNewPassword("");
+              setShowPasswordModal(true);
+            }}
+            className="px-3.5 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-amber-500 text-amber-600 dark:text-amber-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            title="تغییر نام کاربری و کلمه عبور ادمین"
+          >
+            <span>🔑</span>
+            <span className="hidden sm:inline">تغییر رمز ادمین</span>
+          </button>
 
           {/* ۳. دکمه وضعیت ایندکس گوگل و حالت تعمیرات */}
           {isSuper && (
@@ -336,7 +382,81 @@ export default function AdminPage() {
         {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
       </div>
 
-      {/* مودال جامع ایندکس گوگل و وضعیت تعمیرات */}
+      {/* مودال امن تغییر نام کاربری و کلمه عبور ادمین */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn" dir="rtl">
+          <form onSubmit={handleUpdateAdminPassword} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-4 shadow-2xl text-xs text-[var(--text-primary)]">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔑</span>
+                <h3 className="font-black text-sm text-[var(--accent-blue)]">تغییر کلمه عبور و مشخصات مدیر</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی مدیر:</label>
+                <input
+                  type="text"
+                  value={newFullName}
+                  onChange={(e) => setNewFullName(e.target.value)}
+                  placeholder="مثال: مدیر ارشد سیستم"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری ورود (Username):</label>
+                <input
+                  type="text"
+                  required
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  placeholder="admin"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور جدید (در صورت تمایل به تغییر):</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="در صورت خالی بودن تغییر نمی‌کند"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                disabled={isUpdatingPassword}
+                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {isUpdatingPassword ? "در حال ثبت..." : "ذخیره مشخصات 💾"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* مودال ایندکس گوگل و وضعیت تعمیرات */}
       {showMaintenanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn" dir="rtl">
           <div className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-5 shadow-2xl text-xs text-[var(--text-primary)]">
@@ -433,126 +553,6 @@ export default function AdminPage() {
     </div>
   );
 }
-`,
-
-  // ۲. کامپوننت مستقل هدر ادمین با پشتیبانی کامل از تمام دکمه‌ها
-  'components/AdminHeader.tsx': `"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { adminAuthService } from "@/services/adminAuthService";
-import { soundEngine } from "@/lib/soundEngine";
-
-export default function AdminHeader() {
-  const router = useRouter();
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
-
-  const fetchHeaderInfo = async () => {
-    try {
-      const data = await siteInfoService.getSiteInfo();
-      if (data) setSiteInfo(data);
-    } catch (e) {
-      console.error("AdminHeader fetch error:", e);
-    }
-  };
-
-  useEffect(() => {
-    fetchHeaderInfo();
-
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      const isDark = savedTheme !== "light";
-      setIsDarkMode(isDark);
-      if (isDark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-    } catch {}
-
-    const handleSiteUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-    };
-
-    window.addEventListener("site_info_updated", handleSiteUpdate);
-    return () => {
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
-    };
-  }, []);
-
-  const toggleDarkMode = () => {
-    soundEngine.playClick();
-    const nextDark = !isDarkMode;
-    setIsDarkMode(nextDark);
-    localStorage.setItem("theme", nextDark ? "dark" : "light");
-    if (nextDark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  };
-
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
-  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-  const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
-
-  return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-2xl bg-[var(--modal-bg)]/90 border-b border-[var(--card-border)] text-[var(--text-primary)] transition-colors select-none font-sans" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        
-        <Link href="/admin" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group-hover:scale-105 transition">
-            {logoUrl ? (
-              <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
-            ) : (
-              <span className="text-xl text-[var(--accent-blue)] font-black">⚡</span>
-            )}
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-black text-sm text-[var(--text-primary)] block">
-                {storeName} <span className="text-[10px] text-[var(--accent-blue)] font-bold">(پنل مدیریت)</span>
-              </span>
-              <span className={\`w-2 h-2 rounded-full \${isOnline ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.9)] animate-pulse" : "bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.9)]"}\`} />
-            </div>
-            <span className="text-[10px] text-[var(--text-secondary)] font-medium block">
-              کنترل‌پنل جامع فروشگاهی و هوش مصنوعی
-            </span>
-          </div>
-        </Link>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/"
-            target="_blank"
-            className="text-xs px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] transition font-bold shadow-sm flex items-center gap-1.5"
-          >
-            <span>🏠</span>
-            <span>مشاهده فروشگاه</span>
-          </Link>
-
-          <button
-            onClick={toggleDarkMode}
-            className="w-9 h-9 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] transition cursor-pointer text-xs font-bold shadow-sm flex items-center justify-center"
-            title="تغییر تم"
-          >
-            {isDarkMode ? "🌙" : "☀️"}
-          </button>
-
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              adminAuthService.logout();
-              router.replace("/admin/login");
-            }}
-            className="px-3 py-2 rounded-xl bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500 hover:text-white text-xs font-bold transition cursor-pointer flex items-center gap-1"
-            title="خروج از حساب کاربری ادمین"
-          >
-            <span>🚪</span>
-            <span>خروج</span>
-          </button>
-        </div>
-      </div>
-    </header>
-  );
-}
 `
 };
 
@@ -561,12 +561,12 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ [ADMIN FULL HEADER] فایل با موفقیت به‌روزرسانی شد: ${filePath}`);
+  console.log(`✅ [UPDATED] فایل با موفقیت به‌روزرسانی شد: ${filePath}`);
 }
 
-console.log('📦 در حال Push به گیت‌هاب و دیپلوی روی Vercel...');
+console.log('📦 در حال Push به گیت‌هاب و دیپلوی خودکار روی Vercel...');
 try {
-  execSync('git add . && git commit -m "feat: complete all-in-one admin header with 8 dynamic tool buttons & google index modal" && git push origin main', { stdio: 'inherit' });
+  execSync('git add . && git commit -m "feat: replace GSC button with change admin password button & secure modal in admin header" && git push origin main', { stdio: 'inherit' });
   console.log('🎉 [DEPLOYED] استقرار نهایی با موفقیت ۱۰۰٪ کامل شد!');
 } catch (e) {
   console.log('⚠️ دستور دستی: git push origin main');

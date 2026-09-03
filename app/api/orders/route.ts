@@ -2,8 +2,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { FLAGSHIP_7_PRODUCTS } from '@/services/productCatalog';
+import { authSecurity } from '@/lib/authSecurity';
 
 export const dynamic = 'force-dynamic';
+
+function generateGuestUsername(fullName: string): string {
+  const translitMap: Record<string, string> = {
+    'ا': 'a', 'آ': 'a', 'ب': 'b', 'پ': 'p', 'ت': 't', 'ث': 's', 'ج': 'j', 'چ': 'ch',
+    'ح': 'h', 'خ': 'kh', 'د': 'd', 'ذ': 'z', 'ر': 'r', 'ز': 'z', 'ژ': 'zh', 'س': 's',
+    'ش': 'sh', 'ص': 's', 'ض': 'z', 'ط': 't', 'ظ': 'z', 'ع': 'a', 'غ': 'gh', 'ف': 'f',
+    'ق': 'gh', 'ک': 'k', 'گ': 'g', 'ل': 'l', 'م': 'm', 'ن': 'n', 'و': 'v', 'ه': 'h', 'ی': 'y'
+  };
+  const clean = String(fullName || 'user')
+    .trim()
+    .toLowerCase()
+    .split('')
+    .map((c) => translitMap[c] || c)
+    .join('')
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 14);
+
+  const randNumber = Math.floor(100 + Math.random() * 900);
+  return `${clean || 'buyer'}_${randNumber}`;
+}
+
+function generateGuestPassword(cleanPhone: string): string {
+  const alphabet = 'abcdefghjkmnpqrstuvwxyz';
+  let letters = '';
+  for (let i = 0; i < 3; i++) {
+    letters += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+  return `${cleanPhone}${letters}`;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +49,10 @@ export async function POST(req: NextRequest) {
     const postalCode = body.postalCode || body.postal_code || body.customer?.postalCode || null;
     const rawItems = Array.isArray(body.items) ? body.items : [];
     const couponCode = body.couponCode || body.coupon_code || null;
+
+    // ۱. تولید خودکار حساب کاربری خریدار مهمان
+    const guestUsername = generateGuestUsername(customerName);
+    const guestPassword = generateGuestPassword(phone || '09120000000');
 
     let productIds = rawItems.map((i: any) => String(i.productId || i.id || i.product_id)).filter(Boolean);
     let dbProducts: any[] = [];
@@ -104,6 +139,8 @@ export async function POST(req: NextRequest) {
       payment_method: body.payment_method || body.paymentMethod || 'online',
       tracking_code: body.tracking_code || body.trackingCode || null,
       notes: body.notes || body.customer?.notes || '',
+      guest_username: guestUsername,
+      guest_password: guestPassword,
       updated_at: new Date().toISOString(),
     };
 
@@ -145,6 +182,10 @@ export async function POST(req: NextRequest) {
       success: true,
       message: 'فاکتور با موفقیت اعتبارسنجی و ثبت گردید.',
       data: orderPayload,
+      credentials: {
+        username: guestUsername,
+        password: guestPassword,
+      },
     });
   } catch (err: any) {
     console.error("Order Route Error:", err);

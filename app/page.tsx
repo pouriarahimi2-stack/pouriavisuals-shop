@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { productService, Product, FLAGSHIP_7_PRODUCTS } from "@/services/productService";
+import { productService, Product } from "@/services/productService";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
 import { bannerService, Banner } from "@/services/bannerService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
@@ -10,6 +11,7 @@ import ProductComparisonModal from "@/components/ProductComparisonModal";
 import ProductCard from "@/components/ProductCard";
 import TechRadarFeed from "@/components/TechRadarFeed";
 import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function HomePage() {
@@ -73,15 +75,13 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-16 transition-colors duration-300" dir="rtl">
-      <main className="pt-2 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6">
+      <main className="pt-2 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-6 sm:space-y-10">
         
-        {/* تیکر اخبار تکنولوژی فشرده */}
+        {/* تیکر اخبار تکنولوژی */}
         <TechRadarFeed />
 
-        {/* هیرو سکشن عریض، لوکس و پرکننده فضا با بوم سه‌بعدی Three.js در پس‌زمینه */}
+        {/* هیرو سکشن عریض با بوم سه‌بعدی Three.js */}
         <section className="w-full rounded-[2.2rem] sm:rounded-[2.8rem] overflow-hidden glass-morphism p-6 sm:p-12 lg:p-14 shadow-2xl border border-[var(--card-border)] relative min-h-[340px] sm:min-h-[420px] flex flex-col justify-center">
-          
-          {/* بوم سه‌بعدی Three.js */}
           <Hero3DCanvas />
 
           <div className="relative z-10 space-y-4 max-w-2xl text-right">
@@ -105,7 +105,10 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* کاتالوگ محصولات */}
+        {/* نمایشگاه ۳D کاروسل محصولات پرچمدار (برگرفته از ویدیو ۱) */}
+        <ProductPerspectiveSlider products={products.slice(0, 7)} />
+
+        {/* کاتالوگ گرید محصولات */}
         <section id="products" className="space-y-5 pt-2">
           <div className="border-b border-[var(--card-border)] pb-3 px-1 flex justify-between items-center">
             <div>

@@ -2,16 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
 import ProductExplodedView from "@/components/ProductExplodedView";
+import AddToCartButton from "@/components/AddToCartButton";
 
 export default function ProductCard({ product }: { product: any }) {
-  const { addToCart } = useCart();
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isTeardownOpen, setIsTeardownOpen] = useState(false);
 
@@ -72,31 +69,16 @@ export default function ProductCard({ product }: { product: any }) {
             <span className="text-[10px] font-bold text-emerald-500">{isAvailable ? "موجود ✓" : "ناموجود"}</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={(e) => {
-                e.preventDefault(); e.stopPropagation();
-                soundEngine.playAddToCart();
-                addToCart({ id: product.id, title, name: title, price: currentPrice, image: mainImage, stock: stockCount, quantity: 1 });
-              }}
-              disabled={!isAvailable}
-              className="py-2.5 bg-[var(--input-bg)] hover:bg-[var(--accent-blue)] hover:text-white text-[var(--text-primary)] text-xs font-bold rounded-xl border border-[var(--card-border)] transition cursor-pointer disabled:opacity-40"
-            >
-              🛒 سبد خرید
-            </button>
-            <button
-              onClick={(e) => {
-                e.preventDefault(); e.stopPropagation();
-                soundEngine.playAddToCart();
-                addToCart({ id: product.id, title, name: title, price: currentPrice, image: mainImage, stock: stockCount, quantity: 1 });
-                router.push("/checkout");
-              }}
-              disabled={!isAvailable}
-              className="py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-500/25 hover:opacity-90 transition cursor-pointer disabled:opacity-40"
-            >
-              ⚡ خرید فوری
-            </button>
-          </div>
+          <AddToCartButton
+            product={{
+              id: product.id,
+              title,
+              price: currentPrice,
+              image: mainImage,
+              stock: stockCount,
+              category,
+            }}
+          />
         </div>
       </div>
 

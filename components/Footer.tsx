@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import AnimatedLogo from "@/components/AnimatedLogo";
+import ContactDock from "@/components/ContactDock";
 
 export default function Footer() {
   const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
@@ -24,8 +25,16 @@ export default function Footer() {
 
   return (
     <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-16 select-none transition-colors duration-300" dir="rtl">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 py-12 sm:py-16">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 py-12 sm:py-16 space-y-10">
         
+        {/* داک سه‌بعدی تعاملی شبکه‌های اجتماعی (برگرفته از ویدیو ۳) */}
+        <div className="w-full flex flex-col items-center justify-center p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
+          <span className="text-xs font-black text-[var(--accent-blue)] mb-1">
+            CONNECT WITH US • ارتباط در تمامی پلتفرم‌ها
+          </span>
+          <ContactDock />
+        </div>
+
         {/* ردیف اصلی ستون‌های فوتر */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12 pb-12 border-b border-[var(--card-border)]">
           

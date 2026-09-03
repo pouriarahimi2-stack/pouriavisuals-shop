@@ -1,15 +1,14 @@
 // File Path: app/api/torob/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { FLAGSHIP_7_PRODUCTS } from "@/services/productService";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
-
-    let rawProducts: any[] = FLAGSHIP_7_PRODUCTS;
+    let rawProducts: any[] = Array.isArray(FLAGSHIP_7_PRODUCTS) && FLAGSHIP_7_PRODUCTS.length > 0 ? [...FLAGSHIP_7_PRODUCTS] : [];
 
     try {
       if (supabaseAdmin) {
@@ -21,11 +20,13 @@ export async function GET() {
 
         if (dbProducts && dbProducts.length > 0) {
           const dbIds = new Set(dbProducts.map((p: any) => String(p.id)));
-          const extraFlagships = FLAGSHIP_7_PRODUCTS.filter((f) => !dbIds.has(String(f.id)));
+          const extraFlagships = rawProducts.filter((f) => !dbIds.has(String(f.id)));
           rawProducts = [...dbProducts, ...extraFlagships];
         }
       }
-    } catch {}
+    } catch (dbErr) {
+      console.warn("Torob DB fallback warning:", dbErr);
+    }
 
     const formattedList = rawProducts.map((p: any) => {
       const basePrice = Number(p.price || 0);
@@ -64,6 +65,7 @@ export async function GET() {
       }
     );
   } catch (err: any) {
+    console.error("Torob Route Error:", err);
     return NextResponse.json({ count: 0, products: [], error: err.message }, { status: 500 });
   }
 }

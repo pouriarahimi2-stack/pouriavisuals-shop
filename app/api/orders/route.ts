@@ -1,7 +1,7 @@
 // File Path: app/api/orders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { FLAGSHIP_7_PRODUCTS } from '@/services/productService';
+import { FLAGSHIP_7_PRODUCTS } from '@/services/productCatalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,12 +29,14 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
+    const catalogList = Array.isArray(FLAGSHIP_7_PRODUCTS) ? FLAGSHIP_7_PRODUCTS : [];
+
     let calculatedTotal = 0;
     const validatedItems = rawItems.map((item: any) => {
       const pId = String(item.productId || item.id || item.product_id);
       let matchedDb = dbProducts.find((p: any) => String(p.id) === pId);
       if (!matchedDb) {
-        matchedDb = FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === pId);
+        matchedDb = catalogList.find((p) => String(p.id) === pId);
       }
 
       const officialPrice = matchedDb
@@ -109,11 +111,14 @@ export async function POST(req: NextRequest) {
     if (couponCode) orderPayload.coupon_code = String(couponCode).trim().toUpperCase();
 
     try {
-      await supabaseAdmin.from('orders').upsert(orderPayload, { onConflict: 'id' });
+      if (supabaseAdmin) {
+        await supabaseAdmin.from('orders').upsert(orderPayload, { onConflict: 'id' });
+      }
     } catch (dbErr) {
       console.warn('Orders db upsert warning:', dbErr);
     }
 
+    // کسر اتمیک انبار
     for (const item of validatedItems) {
       if (item.productId && supabaseAdmin) {
         try {
@@ -142,6 +147,7 @@ export async function POST(req: NextRequest) {
       data: orderPayload,
     });
   } catch (err: any) {
+    console.error("Order Route Error:", err);
     return NextResponse.json({ success: false, message: err?.message || 'خطا در ثبت فاکتور' }, { status: 500 });
   }
 }

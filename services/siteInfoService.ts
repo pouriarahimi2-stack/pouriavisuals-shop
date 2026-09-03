@@ -4,6 +4,38 @@ import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realti
 
 export type MaintenanceMode = "none" | "timed" | "indefinite";
 
+export interface FooterLinkItem {
+  id: string;
+  title: string;
+  url: string;
+}
+
+export interface FooterContactItem {
+  id: string;
+  type: "phone" | "email" | "address" | "working_hours" | "custom";
+  title: string;
+  value: string;
+  link?: string;
+  icon?: string;
+  show: boolean;
+}
+
+export interface FooterCertificateItem {
+  id: string;
+  title: string;
+  codeOrHtml?: string;
+  imageUrl?: string;
+  link?: string;
+  show: boolean;
+}
+
+export interface SocialKeyItem {
+  letter: string;
+  name: string;
+  href: string;
+  color: string;
+}
+
 export interface HomepageLayoutConfig {
   hero: {
     show: boolean;
@@ -34,16 +66,52 @@ export interface HomepageLayoutConfig {
   };
   contactDock: {
     show: boolean;
+    title: string;
+    scale: "small" | "medium" | "large";
+    keys: SocialKeyItem[];
   };
   footer: {
+    show: boolean;
+    paddingMode: "compact" | "normal" | "relaxed";
+    scaleMode: "compact" | "normal" | "large";
+    brandTitle?: string;
+    brandSubtitle?: string;
+    description?: string;
     showBadges: boolean;
     badge1Text: string;
     badge2Text: string;
-    paddingMode: "compact" | "normal" | "relaxed";
+    quickLinks: {
+      show: boolean;
+      title: string;
+      links: FooterLinkItem[];
+    };
+    customerServices: {
+      show: boolean;
+      title: string;
+      links: FooterLinkItem[];
+    };
+    contactInfo: {
+      show: boolean;
+      title: string;
+      items: FooterContactItem[];
+    };
+    certificates: {
+      show: boolean;
+      title: string;
+      items: FooterCertificateItem[];
+    };
+    bottomBar: {
+      show: boolean;
+      copyrightText: string;
+      designerText: string;
+      enamadBadgeText: string;
+    };
   };
   aiChat: {
     bottomDesktop: number;
     bottomMobile: number;
+    sizeMode: "compact" | "standard" | "large";
+    autoHideNearFooter: boolean;
   };
 }
 
@@ -115,16 +183,85 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
   },
   contactDock: {
     show: true,
+    title: "شبکه‌های ارتباطی و اجتماعی استودیو:",
+    scale: "medium",
+    keys: [
+      { letter: "C", name: "گیت‌هاب رسمی", href: "https://github.com", color: "#24292e" },
+      { letter: "O", name: "اینستاگرام استودیو", href: "https://instagram.com", color: "#e1306c" },
+      { letter: "N", name: "کانال تلگرام", href: "https://t.me", color: "#0088cc" },
+      { letter: "T", name: "پشتیبانی واتساپ", href: "https://wa.me", color: "#25d366" },
+      { letter: "A", name: "کانال یوتیوب", href: "https://youtube.com", color: "#ff0000" },
+      { letter: "C", name: "شبکه اکس", href: "https://x.com", color: "#0f172a" },
+      { letter: "T", name: "تماس تلفنی مستقیم", href: "tel:09376110200", color: "#0284c7" },
+    ],
   },
   footer: {
-    showBadges: true,
-    badge1Text: "✓ گارانتی اصالت ۱۰۰٪ فیزیکی",
-    badge2Text: "🚀 ارسال پیشتاز سراسری",
+    show: true,
     paddingMode: "compact",
+    scaleMode: "normal",
+    brandTitle: "آکسون | Axon",
+    brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
+    description: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر، مانیتورهای ۵K رتینا، لپ‌تاپ‌های ورک‌استیشن و گجت‌های هوشمند در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+    showBadges: true,
+    badge1Text: "گارانتی اصالت ۱۰۰٪ فیزیکی",
+    badge2Text: "ارسال پیشتاز سراسری",
+    quickLinks: {
+      show: true,
+      title: "دسترسی سریع",
+      links: [
+        { id: "l1", title: "کاتالوگ کالاها", url: "/#products" },
+        { id: "l2", title: "سامانه رهگیری مرسولات", url: "/track-order" },
+        { id: "l3", title: "جدیدترین اخبار تکنولوژی", url: "/news" },
+        { id: "l4", title: "مجله مقالات تخصصی", url: "/blog" },
+        { id: "l5", title: "درباره آکسون", url: "/about" },
+      ],
+    },
+    customerServices: {
+      show: true,
+      title: "خدمات مشتریان",
+      links: [
+        { id: "s1", title: "ثبت تیکت مشاوره", url: "/contact" },
+        { id: "s2", title: "شرایط گارانتی طلایی", url: "/#products" },
+        { id: "s3", title: "ضمانت بازگشت وجه ۷ روزه", url: "/#products" },
+        { id: "s4", title: "راهنمای کالیبراسیون ۵K", url: "/blog" },
+        { id: "s5", title: "روش‌های پرداخت امن شاپرک", url: "/track-order" },
+      ],
+    },
+    contactInfo: {
+      show: true,
+      title: "اطلاعات تماس و دفتر",
+      items: [
+        { id: "c1", type: "phone", title: "تلفن پشتیبانی:", value: "09376110200", link: "tel:09376110200", show: true },
+        { id: "c2", type: "email", title: "پست الکترونیک:", value: "Pouriarahimi@yahoo.com", link: "mailto:Pouriarahimi@yahoo.com", show: true },
+        { id: "c3", type: "address", title: "نشانی تحویل حضوری و انبار:", value: "شیراز - ستارخان", show: true },
+        { id: "c4", type: "working_hours", title: "ساعات پاسخگویی:", value: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰", show: true },
+      ],
+    },
+    certificates: {
+      show: true,
+      title: "مجوزها و تاییدیه رسمی",
+      items: [
+        {
+          id: "cert-enamad",
+          title: "نماد اعتماد الکترونیکی (اینماد ۲۷۴۲۴۵۳۴)",
+          imageUrl: "https://trustseal.enamad.ir/logo.aspx?id=27424534",
+          link: "https://enamad.ir",
+          show: true,
+        },
+      ],
+    },
+    bottomBar: {
+      show: true,
+      copyrightText: "تمامی حقوق مادی و معنوی برای آکسون | Axon محفوظ است",
+      designerText: "طراحی و معماری مهندسی پایدار",
+      enamadBadgeText: "نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)",
+    },
   },
   aiChat: {
     bottomDesktop: 64,
     bottomMobile: 96,
+    sizeMode: "standard",
+    autoHideNearFooter: true,
   },
 };
 
@@ -136,9 +273,9 @@ export const DEFAULT_SITE_INFO: SiteInfo = {
   allow_google_index: true,
   allowGoogleIndex: true,
   maintenance_mode: "none",
-  phone: "۰۲۱-۸۸۸۸۸۸۸۸",
-  email: "info@axoncore.ir",
-  address: "تهران، خیابان ولیعصر، تقاطع میرداماد",
+  phone: "09376110200",
+  email: "Pouriarahimi@yahoo.com",
+  address: "شیراز - ستارخان",
   working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
   header_announcement: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | ۱۸ ماه گارانتی اصالت طلایی",
   free_shipping_threshold: 2000000,
@@ -185,7 +322,7 @@ export const siteInfoService = {
         if (json.data) {
           const data = json.data;
           const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
-          
+
           let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
           if (data.homepage_layout_config) {
             try {
@@ -212,9 +349,9 @@ export const siteInfoService = {
             siteName: data.site_name || data.store_name || "آکسون | Axon",
             storeName: data.site_name || data.store_name || "آکسون | Axon",
             tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر",
-            phone: data.phone || "۰۲۱-۸۸۸۸۸۸۸۸",
-            email: data.email || "info@axoncore.ir",
-            address: data.address || "تهران، خیابان ولیعصر، تقاطع میرداماد",
+            phone: data.phone || "09376110200",
+            email: data.email || "Pouriarahimi@yahoo.com",
+            address: data.address || "شیراز - ستارخان",
             working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
             logo_url: data.logo_url || "",
             logoUrl: data.logo_url || "",

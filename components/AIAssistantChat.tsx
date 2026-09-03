@@ -23,6 +23,7 @@ export default function AIAssistantChat() {
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+  const [isNearFooter, setIsNearFooter] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -32,6 +33,22 @@ export default function AIAssistantChat() {
     const handleUpdate = (e: any) => { if (e.detail) setSiteInfo(e.detail); };
     window.addEventListener("site_info_updated", handleUpdate);
     return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
+
+  // سنسور هوشمند تلاقی با فوتر جهت جلوگیری از پوشاندن کارت‌های تماس یا مجوزها
+  useEffect(() => {
+    const footerEl = document.getElementById("storefront-footer");
+    if (!footerEl) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsNearFooter(entry.isIntersecting);
+      },
+      { root: null, threshold: 0.08 }
+    );
+
+    observer.observe(footerEl);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -112,29 +129,49 @@ export default function AIAssistantChat() {
   const aiChatCfg = siteInfo?.homepage_layout_config?.aiChat || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat;
   const bottomDesktopPx = aiChatCfg.bottomDesktop || 64;
   const bottomMobilePx = aiChatCfg.bottomMobile || 96;
+  const autoHideNearFooter = aiChatCfg.autoHideNearFooter !== false;
 
   return (
     <div className="font-sans select-none" dir="rtl" suppressHydrationWarning>
       {!isOpen && (
         <>
-          {/* دکمه دسکتاپ: با موقعیت پویای پیکربندی‌شده در استودیو */}
+          {/* دکمه دسکتاپ: با طراحی کپسولی لوکس اپل و سنسور هوشمند جمع شدن در نزدیکی فوتر */}
           <button
             style={{ bottom: `${bottomDesktopPx}px` }}
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="hidden sm:flex fixed left-6 z-50 px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition-all items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
+            className={`hidden sm:flex fixed left-6 z-50 rounded-full transition-all duration-500 ease-out items-center cursor-pointer border shadow-2xl backdrop-blur-2xl ${
+              autoHideNearFooter && isNearFooter
+                ? "w-12 h-12 justify-center bg-slate-900/90 border-blue-500/40 text-white hover:scale-110 opacity-80 hover:opacity-100 p-0"
+                : "px-5 py-3.5 gap-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 text-white border-white/20 hover:scale-105 active:scale-95 text-xs font-black shadow-blue-500/25 ring-2 ring-blue-500/20"
+            }`}
+            title="مشاوره هوشمند تکنولوژی"
           >
-            <span className="text-base">🤖</span>
-            <span>مشاوره هوشمند تکنولوژی</span>
+            {autoHideNearFooter && isNearFooter ? (
+              <span className="text-xl animate-pulse">🤖</span>
+            ) : (
+              <>
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-300 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+                </span>
+                <span className="text-sm">🤖</span>
+                <span className="tracking-tight">مشاوره هوشمند تکنولوژی</span>
+              </>
+            )}
           </button>
 
-          {/* دکمه موبایل: با ارتفاع پویای پیکربندی‌شده در استودیو جهت قرارگیری بالای داک منو */}
+          {/* دکمه موبایل: قرارگیری دقیق بالای منوی پایین موبایل با گوی شناور */}
           <button
             style={{ bottom: `${bottomMobilePx}px` }}
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="sm:hidden fixed left-4 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] flex items-center justify-center text-lg border-2 border-white/40 active:scale-90 transition-all cursor-pointer"
+            className={`sm:hidden fixed left-4 z-40 rounded-full transition-all duration-500 ease-out flex items-center justify-center border-2 active:scale-90 cursor-pointer ${
+              autoHideNearFooter && isNearFooter
+                ? "w-10 h-10 bg-slate-950/90 border-blue-400/40 text-white opacity-75 p-0"
+                : "w-12 h-12 bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] border-white/40"
+            }`}
             aria-label="دستیار هوش مصنوعی"
           >
-            <span className="animate-pulse">⚡</span>
+            <span className="animate-pulse text-base">⚡</span>
           </button>
         </>
       )}
@@ -149,7 +186,7 @@ export default function AIAssistantChat() {
                 <h4 className="text-xs font-black">مشاور هوشمند تکنولوژی</h4>
                 <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  آنلاین و متصل به Gemini
+                  آنلاین و متصل به Gemini Pro
                 </span>
               </div>
             </div>
@@ -166,7 +203,7 @@ export default function AIAssistantChat() {
           <div className="p-4 flex-1 overflow-y-auto space-y-3.5 text-xs leading-relaxed">
             {messages.map((m, idx) => (
               <div key={idx} className="space-y-2">
-                <div className={`p-4 rounded-2xl max-w-[90%] leading-relaxed ${m.role === "user" ? "mr-auto bg-[var(--accent-blue)] text-white" : "ml-auto bg-[var(--input-bg)] border border-[var(--card-border)]"}`}>
+                <div className={`p-4 rounded-2xl max-w-[90%] leading-relaxed ${m.role === "user" ? "mr-auto bg-[var(--accent-blue)] text-white shadow-md" : "ml-auto bg-[var(--input-bg)] border border-[var(--card-border)]"}`}>
                   <p className="whitespace-pre-line">{m.text}</p>
                   
                   {m.matchedProduct && (

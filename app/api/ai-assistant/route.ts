@@ -145,7 +145,7 @@ export async function POST(req: Request) {
 
     const normalizedMsg = normalizePersianText(userMessage);
 
-    // پاسخ‌های هوشمند و بدون تاخیر با مهار تمامی اصطلاحات عامیانه «چنده»، «قیمت»، «نرخ»، «هزینه»
+    // پاسخ هوشمند با رفع خطای سینتکس و استفاده از عبارت رسمی فارسی «اینچ»
     if (!aiResponse) {
       const isPriceQuery =
         normalizedMsg.includes("قیمت") ||
@@ -160,9 +160,9 @@ export async function POST(req: Request) {
         normalizedMsg.includes("5k");
 
       if (isPriceQuery && isStudio) {
-        aiResponse = "مانیتور فوق‌العاده **Apple Studio Display 27" 5K Retina** با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری در حال حاضر با قیمت رسمی **۱۲۸,۵۰۰,۰۰۰ تومان** و ۱۸ ماه گارانتی اصالت طلایی آکسون در انبار موجود است. 🖥️✨";
+        aiResponse = "مانیتور فوق‌العاده **Apple Studio Display 27 اینچ 5K Retina** با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری در حال حاضر با قیمت رسمی **۱۲۸,۵۰۰,۰۰۰ تومان** و ۱۸ ماه گارانتی اصالت طلایی آکسون در انبار موجود است. 🖥️✨";
       } else if (normalizedMsg.includes("مک بوک") || normalizedMsg.includes("macbook")) {
-        aiResponse = "لپ‌تاپ پرچمدار **MacBook Pro 16" M4 Max** با رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ۲۰۸,۵۰۰,۰۰۰ تومان و گارانتی طلایی در انبار موجود است.";
+        aiResponse = "لپ‌تاپ پرچمدار **MacBook Pro 16 اینچ M4 Max** با رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ۲۰۸,۵۰۰,۰۰۰ تومان و گارانتی طلایی در انبار موجود است.";
       } else {
         aiResponse = `سلام و درود! من مشاور هوشمند فناوری در پلتفرم ${storeName} هستم. چطور می‌توانم در انتخاب سخت‌افزار و تجهیزات دیجیتال راهنماییتان کنم؟`;
       }

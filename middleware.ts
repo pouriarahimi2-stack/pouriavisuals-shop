@@ -6,13 +6,13 @@ import { verifyPayload } from '@/lib/session';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ۱. تاییدیه اینماد
+  // ۱. تاییدیه اینماد با پاسخ ایزوله در لبه شبکه
   if (pathname === '/27424534.txt' || pathname.includes('27424534.txt')) {
     return new NextResponse('27424534', {
       status: 200,
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
       },
     });
   }

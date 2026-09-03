@@ -104,19 +104,19 @@ export default function AIAssistantChat() {
     <div className="font-sans select-none" dir="rtl" suppressHydrationWarning>
       {!isOpen && (
         <>
-          {/* دکمه دسکتاپ: کپسول لوکس شیشه‌ای */}
+          {/* دکمه دسکتاپ: ارتفاع گرفته به بالای نوار فوتر (bottom-16) */}
           <button
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="hidden sm:flex fixed bottom-6 left-6 z-50 px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
+            className="hidden sm:flex fixed bottom-16 left-6 z-50 px-5 py-3.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition items-center gap-2.5 text-xs font-black cursor-pointer border border-white/20 backdrop-blur-md"
           >
             <span className="text-base">🤖</span>
             <span>مشاوره هوشمند تکنولوژی</span>
           </button>
 
-          {/* دکمه موبایل: آیکون گرد شناور بالای داک (Apple Intelligence Orb) */}
+          {/* دکمه موبایل: ارتفاع گرفته به بالای داک منو (bottom-24) */}
           <button
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className="sm:hidden fixed bottom-20 left-4 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] flex items-center justify-center text-lg border-2 border-white/40 active:scale-90 transition-all cursor-pointer"
+            className="sm:hidden fixed bottom-24 left-4 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white shadow-[0_8px_25px_rgba(37,99,235,0.7)] flex items-center justify-center text-lg border-2 border-white/40 active:scale-90 transition-all cursor-pointer"
             aria-label="دستیار هوش مصنوعی"
           >
             <span className="animate-pulse">⚡</span>
@@ -127,7 +127,6 @@ export default function AIAssistantChat() {
       {isOpen && (
         <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:left-6 sm:w-[420px] sm:h-[580px] sm:max-h-[85vh] sm:rounded-[2.5rem] bg-[var(--modal-bg)] sm:border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)] backdrop-blur-3xl animate-fadeIn z-[9999]">
           
-          {/* هدر بالایی با دکمه شفاف و بزرگ بستن گفتگو در موبایل */}
           <div className="p-4 border-b border-[var(--card-border)] flex justify-between items-center bg-[var(--input-bg)] shrink-0 pt-safe">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm shadow-md">⚡</div>
@@ -140,7 +139,6 @@ export default function AIAssistantChat() {
               </div>
             </div>
 
-            {/* دکمه بستن با دسترسی کامل و تاچ بزرگ */}
             <button
               onClick={() => setIsOpen(false)}
               className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/30 text-xs font-black transition cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"

@@ -46,7 +46,7 @@ export default function AddToCartButton({ product, className = "" }: AddToCartBu
 
     setTimeout(() => {
       setIsAnimating(false);
-    }, 1200);
+    }, 1100);
   };
 
   return (
@@ -55,13 +55,12 @@ export default function AddToCartButton({ product, className = "" }: AddToCartBu
         type="button"
         disabled={!isAvailable}
         onClick={handleClick}
-        className={`relative w-full overflow-hidden py-3 px-5 rounded-2xl font-black text-xs transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 disabled:opacity-40 ${
+        className={`relative w-full overflow-hidden py-2.5 px-4 rounded-2xl font-black text-xs transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 disabled:opacity-40 ${
           isAnimating
             ? "bg-emerald-600 text-white shadow-emerald-500/30 scale-[1.02]"
             : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-95 shadow-blue-500/25"
         }`}
       >
-        {/* انیمیشن چرخ‌دستی در حال حرکت */}
         <div
           className={`flex items-center gap-1.5 transition-transform duration-500 ${
             isAnimating ? "translate-x-1 scale-110" : ""
@@ -84,18 +83,16 @@ export default function AddToCartButton({ product, className = "" }: AddToCartBu
           </svg>
 
           <span className="tracking-tight">
-            {isAnimating ? "به سبد افزوده شد!" : "افزودن به سبد خرید"}
+            {isAnimating ? "به سبد اضافه شد!" : "افزودن به سبد خرید"}
           </span>
         </div>
 
-        {/* پالس نورانی هنگام کلیک */}
         {isAnimating && (
           <span className="absolute inset-0 bg-white/20 animate-ping rounded-2xl pointer-events-none" />
         )}
       </button>
 
-      {/* شمارنده زنده تعداد در سبد (برگرفته از ویدیو) */}
-      <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)] transition-all">
+      <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)]">
         {currentCount > 0 ? `${currentCount} عدد در سبد شما` : "۰ عدد در سبد"}
       </span>
     </div>

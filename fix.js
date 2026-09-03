@@ -3,434 +3,487 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🎬 [AXON ARCHITECT] در حال اعمال اصلاحات ۴ گانه درخواستی: پاکسازی المان‌های اضافه، فول‌عرض کردن هیرو، حذف اخبار و دسته‌های تکراری و اصلاح آیکون تم...');
+console.log('🎬 [AXON ARCHITECT] در حال بازگردانی کامل هدر پیشخوان ادمین، دکمه و مودال ایندکس گوگل/تعمیرات، دکمه خروج و سوییچر تم...');
 
 const files = {
-  // ۱. هدر شیشه‌ای اصلاح‌شده (حذف صفحه نخست، آیکون مدرن SVG تم و دکمه مستقیم اخبار تکنولوژی)
-  'components/Header.tsx': `"use client";
+  // ۱. صفحه پیشخوان ادمین با هدر کامل، دکمه و مودال ایندکس گوگل و ۱۴ ماژول
+  'app/admin/page.tsx': `"use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
-import { siteInfoService, SiteInfo, DEFAULT_SITE_INFO } from "@/services/siteInfoService";
-import { productService, Product } from "@/services/productService";
-import { categoryService, Category } from "@/services/categoryService";
+import AdminProducts from "@/components/AdminProducts";
+import AdminCoupons from "@/components/AdminCoupons";
+import AdminBanners from "@/components/AdminBanners";
+import AdminMenu from "@/components/AdminMenu";
+import AdminOrders from "@/components/AdminOrders";
+import AdminSiteInfo from "@/components/AdminSiteInfo";
+import AdminInventoryManager from "@/components/AdminInventoryManager";
+import AdminHealthGuard from "@/components/admin/AdminHealthGuard";
+import AdminDashboardStats from "@/components/admin/AdminDashboardStats";
+import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
+import AdminCustomers from "@/components/admin/AdminCustomers";
+import ContactMessagesManager from "@/components/admin/ContactMessagesManager";
+import PageBuilder from "@/components/admin/PageBuilder";
+import AdminBlogManager from "@/components/AdminBlogManager";
+import AdminNewsManager from "@/components/admin/AdminNewsManager";
+import StyleFontManager from "@/components/admin/StyleFontManager";
+import AdminAiSeoAutopilot from "@/components/admin/AdminAiSeoAutopilot";
+import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { adminAuthService, AdminUser } from "@/services/adminAuthService";
 import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
-import { formatPrice } from "@/lib/formatters";
 
-export default function Header() {
+export default function AdminPage() {
   const router = useRouter();
-  const cartContext = useCart();
-  const { totalItems, toggleCart, addToCart } = cartContext;
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
-  const [mounted, setMounted] = useState(false);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo>(DEFAULT_SITE_INFO);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<
+    | "products"
+    | "inventory"
+    | "ai_autopilot"
+    | "news_radar"
+    | "page_builder"
+    | "blogs"
+    | "coupons"
+    | "customers"
+    | "banners"
+    | "menu"
+    | "typography"
+    | "orders"
+    | "siteInfo"
+    | "messages"
+  >("products");
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
-
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
-
-  const applyTheme = (isDark: boolean) => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  };
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [selectedMaintMode, setSelectedMaintMode] = useState<MaintenanceMode>("none");
+  const [maintHours, setMaintHours] = useState<number>(1);
+  const [maintMinutes, setMaintMinutes] = useState<number>(0);
+  const [isSavingMaint, setIsSavingMaint] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    async function checkAuth() {
+      try {
+        let user: AdminUser | null = null;
+        if (adminAuthService && typeof adminAuthService.getCurrentSession === "function") {
+          user = await adminAuthService.getCurrentSession();
+        }
+
+        if (user) {
+          setIsAuthenticated(true);
+          setCurrentUser(user);
+        } else {
+          const localUser = localStorage.getItem("axon_admin_active_session_v2026");
+          if (localUser) {
+            setIsAuthenticated(true);
+            setCurrentUser(JSON.parse(localUser));
+          } else {
+            setIsAuthenticated(false);
+            router.replace("/admin/login");
+          }
+        }
+      } catch {
+        setIsAuthenticated(false);
+        router.replace("/admin/login");
+      }
+    }
+
+    checkAuth();
+
+    siteInfoService.getSiteInfo().then((info) => {
+      if (info) {
+        setSiteInfo(info);
+        setSelectedMaintMode(info.maintenance_mode || "none");
+      }
+    });
+
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
       setIsDarkMode(isDark);
-      applyTheme(isDark);
+      if (isDark) document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
     } catch {}
+  }, [router]);
 
-    const initHeaderData = async () => {
-      try {
-        const [info, prods, cats] = await Promise.all([
-          siteInfoService.getSiteInfo(),
-          productService.getAll(),
-          categoryService.getAll(),
-        ]);
-        if (info) setSiteInfo(info);
-        if (prods) setAllProducts(prods);
-        if (cats) setCategories(cats);
-      } catch {}
-    };
-
-    initHeaderData();
-
-    const handleSiteInfoUpdate = (e: any) => { if (e.detail) setSiteInfo(e.detail); };
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
-    };
-
-    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
-    window.addEventListener("products_updated", handleProductsUpdate);
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) setIsCategoryOpen(false);
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) setIsSearchFocused(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  const toggleTheme = () => {
+  const toggleDarkMode = () => {
     soundEngine.playClick();
     const nextDark = !isDarkMode;
     setIsDarkMode(nextDark);
     localStorage.setItem("theme", nextDark ? "dark" : "light");
-    applyTheme(nextDark);
+    if (nextDark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
   };
 
-  useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults([]); return; }
-    const q = searchQuery.toLowerCase().trim();
-    userBehavior.trackSearch(q);
-    const matches = allProducts.filter((p) =>
-      (p.title || p.name || "").toLowerCase().includes(q) ||
-      (p.category || "").toLowerCase().includes(q)
-    );
-    setSearchResults(matches.slice(0, 5));
-  }, [searchQuery, allProducts]);
-
-  const handleSelectCategory = (catName: string) => {
+  const handleSaveMaintenance = async () => {
     soundEngine.playClick();
-    setIsCategoryOpen(false);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("category_selected", { detail: catName }));
+    setIsSavingMaint(true);
+
+    try {
+      let maintenanceUntil: string | null = null;
+      let durationMinutes: number | null = null;
+
+      if (selectedMaintMode === "timed") {
+        const totalMinutes = maintHours * 60 + maintMinutes;
+        durationMinutes = totalMinutes;
+        maintenanceUntil = new Date(Date.now() + totalMinutes * 60 * 1000).toISOString();
+      }
+
+      const isAllowed = selectedMaintMode === "none";
+
+      const updated = await siteInfoService.updateSiteInfo({
+        maintenance_mode: selectedMaintMode,
+        maintenance_until: maintenanceUntil || undefined,
+        maintenance_duration_minutes: durationMinutes || undefined,
+        allow_google_index: isAllowed,
+        allowGoogleIndex: isAllowed,
+      });
+
+      if (updated) {
+        setSiteInfo(updated);
+        soundEngine.playSuccess();
+        alert("✅ وضعیت ایندکس گوگل و حالت تعمیرات با موفقیت ذخیره و اعمال شد.");
+        setShowMaintenanceModal(false);
+      }
+    } catch (e) {
+      alert("خطا در ذخیره وضعیت تعمیرات.");
+    } finally {
+      setIsSavingMaint(false);
     }
-    router.push("/#products");
   };
 
-  const handleQuickAddFromSearch = (e: React.MouseEvent, product: Product) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    addToCart({
-      id: product.id,
-      title: product.title || product.name || "کالای دیجیتال",
-      name: product.title || product.name || "کالای دیجیتال",
-      price: Number(product.discountPrice ?? product.price ?? 0),
-      discountPrice: product.discountPrice ? Number(product.discountPrice) : undefined,
-      image: product.images?.[0] || product.image || "/placeholder.png",
-      stock: Number(product.stock ?? 10),
-      category: product.category || "عمومی",
-      quantity: 1,
-    });
-    setAddedItemMap((prev) => ({ ...prev, [product.id]: true }));
-    setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
-  };
+  const isSuper = currentUser?.role === "superadmin" || (currentUser?.role as any) === "super_admin";
 
-  // منوی تمیز ناوبری (بدون "صفحه نخست")
-  const navLinks = [
-    { title: "کاتالوگ محصولات", href: "/#products" },
-    { title: "اخبار تکنولوژی", href: "/news" },
-    { title: "مجله سئو", href: "/blog" },
-    { title: "پیگیری سفارش", href: "/track-order" },
-    { title: "تماس با ما", href: "/contact" },
-  ];
+  const navTabs = [
+    { id: "products", label: "محصولات و کاتالوگ", icon: "📦", show: true },
+    { id: "inventory", label: "انبارداری سریع", icon: "📥", show: true },
+    { id: "ai_autopilot", label: "موتور سئوی خودمختار (GSC)", icon: "🤖", show: isSuper },
+    { id: "news_radar", label: "جدیدترین اخبار تکنولوژی", icon: "📡", show: true },
+    { id: "page_builder", label: "صفحه‌ساز اختصاصی", icon: "🏗️", show: isSuper },
+    { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: isSuper },
+    { id: "messages", label: "صندوق پیام‌ها و مشاوره", icon: "📩", show: isSuper },
+    { id: "coupons", label: "تخفیف‌ها و کوپن", icon: "🏷️", show: isSuper },
+    { id: "customers", label: "باشگاه مخاطبان (CRM)", icon: "👥", show: isSuper },
+    { id: "blogs", label: "مقالات تخصصی و سئو", icon: "📚", show: true },
+    { id: "typography", label: "تایپوگرافی و فونت‌ها", icon: "🎨", show: isSuper },
+    { id: "banners", label: "بنرها و اسلایدرها", icon: "🖼️", show: isSuper },
+    { id: "menu", label: "منوها و دسته‌بندی‌ها", icon: "🔗", show: isSuper },
+    { id: "siteInfo", label: "اطلاعات سایت و لوگوها", icon: "⚙️", show: isSuper },
+  ].filter((t) => t.show);
 
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "AXON";
-  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
+  if (isAuthenticated === null) return null;
+
+  const isSiteOnline = (siteInfo?.maintenance_mode || "none") === "none";
 
   return (
-    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
-      <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          
-          {/* دکمه دراپ‌داون دسته‌بندی‌ها */}
-          <div className="relative" ref={categoryDropdownRef}>
-            <button
-              onClick={() => { soundEngine.playClick(); setIsCategoryOpen(!isCategoryOpen); }}
-              className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm transition cursor-pointer text-[var(--text-primary)]"
-              title="دسته‌بندی‌های کالا"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-            </button>
+    <div dir="rtl" className="min-h-screen p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans select-none text-[var(--text-primary)]">
+      <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
 
-            {isCategoryOpen && (
-              <div className="absolute top-12 right-0 w-64 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 bg-[var(--modal-bg)]">
-                <button
-                  onClick={() => handleSelectCategory("all")}
-                  className="w-full text-right p-2.5 rounded-xl text-xs font-black text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                >
-                  ⚡ تمامی محصولات
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id || cat.name}
-                    onClick={() => handleSelectCategory(cat.name)}
-                    className="w-full text-right p-2.5 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                  >
-                    🏷️ {cat.name}
-                  </button>
-                ))}
-              </div>
-            )}
+      {/* هدر کامل و حرفه‌ای ادمین */}
+      <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
+            ⚡
           </div>
-
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] p-1 flex items-center justify-center overflow-hidden">
-              {logoUrl ? <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" /> : <span className="text-[var(--accent-blue)] font-black text-lg">⚡</span>}
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-[var(--text-primary)]">پیشخوان یکپارچه مدیریت فروشگاه آکسون</h1>
+              <span className={\`w-2.5 h-2.5 rounded-full \${isSiteOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"}\`} title={isSiteOnline ? "سایت آنلاین و ایندکس فعال است" : "حالت تعمیرات فعال است"} />
             </div>
-            <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter">{storeName}</div>
-          </Link>
+            <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">
+              مدیر آنلاین: <strong className="text-[var(--text-primary)]">{currentUser?.full_name || currentUser?.username}</strong>
+            </p>
+          </div>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-75">
-          {navLinks.map((link, idx) => (
-            <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[var(--accent-blue)] transition font-bold text-[var(--text-primary)]">
-              {link.title}
-            </Link>
-          ))}
-        </nav>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* دکمه اختصاصی ایندکس گوگل و حالت تعمیرات */}
+          {isSuper && (
+            <button
+              onClick={() => { soundEngine.playClick(); setShowMaintenanceModal(true); }}
+              className={\`px-3.5 py-2 rounded-2xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer \${
+                isSiteOnline
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                  : "bg-rose-500/15 border-rose-500/40 text-rose-500 hover:bg-rose-500/25 animate-pulse"
+              }\`}
+              title="تنظیمات ایندکس گوگل و وضعیت دسترسی کاربران"
+            >
+              <span>🌐</span>
+              <span>{isSiteOnline ? "ایندکس گوگل: فعال ✓" : "تعمیرات فعال (ایندکس قفل)"}</span>
+            </button>
+          )}
 
-        <div className="flex items-center gap-3">
-          <div className="relative hidden sm:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-44">
-              <span className="text-xs opacity-70">🔍</span>
-              <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] placeholder-slate-400 font-bold" />
-            </div>
-            {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-12 left-0 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 w-72 bg-[var(--modal-bg)]">
-                {searchResults.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
-                    <Link href={\`/products/\${p.id}\`} onClick={() => setIsSearchFocused(false)} className="flex items-center gap-2 flex-1 min-w-0">
-                      <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 shrink-0" />
-                      <div className="flex-1 min-w-0 text-right">
-                        <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
-                        <span className="font-mono font-black text-[10px] text-[var(--accent-blue)]">{formatPrice(p.discountPrice || p.price || 0)} ت</span>
-                      </div>
-                    </Link>
-                    <button type="button" onClick={(e) => handleQuickAddFromSearch(e, p)} className="px-2 py-1 rounded-lg text-[10px] font-black bg-[var(--accent-blue)] text-white">
-                      {addedItemMap[p.id] ? "✓" : "+"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <a href="/" target="_blank" className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-1">
+            <span>🏠</span>
+            <span>مشاهده فروشگاه</span>
+          </a>
 
-          {/* آیکون استاندارد و فوق‌العاده شیک SVG برای تغییر تم */}
           <button
-            onClick={toggleTheme}
-            className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)]"
-            title={isDarkMode ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
-            suppressHydrationWarning
+            onClick={toggleDarkMode}
+            className="w-9 h-9 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs transition cursor-pointer flex items-center justify-center shadow-sm"
+            title="تغییر تم"
           >
-            {mounted ? (
-              isDarkMode ? (
-                // آیکون خورشید برای تم لایت
-                <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-              ) : (
-                // آیکون ماه برای تم دارک
-                <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-              )
-            ) : (
-              <span className="w-4 h-4" />
-            )}
+            {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="p-2 opacity-80 hover:opacity-100 transition relative cursor-pointer text-[var(--text-primary)]" title="سبد خرید">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-            {mounted && totalItems > 0 && (
-              <span className="absolute top-0 right-0 w-4 h-4 bg-[var(--accent-blue)] rounded-full text-[10px] font-mono font-black flex items-center justify-center text-white shadow-lg animate-pulse" suppressHydrationWarning>
-                {totalItems}
-              </span>
-            )}
+          <button
+            onClick={() => {
+              adminAuthService.logout();
+              router.replace("/admin/login");
+            }}
+            className="px-3.5 py-2 rounded-2xl bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500 hover:text-white text-xs font-bold transition cursor-pointer flex items-center gap-1"
+          >
+            <span>🚪</span>
+            <span>خروج</span>
           </button>
+        </div>
+      </header>
+
+      <AdminDashboardStats />
+      <AdminHealthGuard />
+
+      <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+        <div className="flex flex-wrap items-center gap-2">
+          {navTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                soundEngine.playClick();
+                setActiveTab(tab.id as any);
+              }}
+              className={\`px-3.5 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer \${
+                activeTab === tab.id
+                  ? "bg-[var(--accent-blue)] text-white shadow-lg"
+                  : "bg-[var(--input-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]"
+              }\`}
+            >
+              <span className="text-sm ml-1.5">{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
       </div>
-    </header>
+
+      <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
+        {activeTab === "products" && <AdminProducts />}
+        {activeTab === "inventory" && <AdminInventoryManager />}
+        {activeTab === "ai_autopilot" && isSuper && <AdminAiSeoAutopilot />}
+        {activeTab === "news_radar" && <AdminNewsManager />}
+        {activeTab === "page_builder" && isSuper && <PageBuilder />}
+        {activeTab === "blogs" && <AdminBlogManager />}
+        {activeTab === "typography" && isSuper && <StyleFontManager />}
+        {activeTab === "orders" && isSuper && <AdminOrders />}
+        {activeTab === "messages" && isSuper && <ContactMessagesManager />}
+        {activeTab === "coupons" && isSuper && <AdminCoupons />}
+        {activeTab === "customers" && isSuper && <AdminCustomers />}
+        {activeTab === "banners" && isSuper && <AdminBanners />}
+        {activeTab === "menu" && isSuper && <AdminMenu />}
+        {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
+      </div>
+
+      {/* مودال جامع ایندکس گوگل و وضعیت تعمیرات */}
+      {showMaintenanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn" dir="rtl">
+          <div className="max-w-lg w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-5 shadow-2xl text-xs text-[var(--text-primary)]">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🌐</span>
+                <h3 className="font-black text-sm text-[var(--accent-blue)]">تنظیمات ایندکس گوگل و وضعیت تعمیرات سایت</h3>
+              </div>
+              <button
+                onClick={() => setShowMaintenanceModal(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[var(--text-secondary)] leading-relaxed">
+                می‌توانید وضعیت در دسترس بودن فروشگاه برای کاربران و خزنده‌های گوگل (Googlebot) را کنترل کنید:
+              </p>
+
+              <div className="space-y-2">
+                <label className={\`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition \${selectedMaintMode === "none" ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold" : "border-[var(--card-border)] bg-[var(--input-bg)]"}\`}>
+                  <div className="flex items-center gap-2.5">
+                    <input type="radio" name="maint" checked={selectedMaintMode === "none"} onChange={() => setSelectedMaintMode("none")} className="accent-emerald-500" />
+                    <div>
+                      <span className="font-black block">۱. سایت کاملاً فعال و آنلاین (پیش‌فرض)</span>
+                      <span className="text-[10px] opacity-75">ایندکس گوگل مجاز و تمامی صفحات در دسترس هستند.</span>
+                    </div>
+                  </div>
+                  <span className="text-emerald-500 font-bold">آنلاین ✓</span>
+                </label>
+
+                <label className={\`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition \${selectedMaintMode === "timed" ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold" : "border-[var(--card-border)] bg-[var(--input-bg)]"}\`}>
+                  <div className="flex items-center gap-2.5">
+                    <input type="radio" name="maint" checked={selectedMaintMode === "timed"} onChange={() => setSelectedMaintMode("timed")} className="accent-amber-500" />
+                    <div>
+                      <span className="font-black block">۲. حالت تعمیرات زمان‌دار (با تایمر معکوس)</span>
+                      <span className="text-[10px] opacity-75">نمایش صفحه شمارش معکوس به کاربران تا پایان زمان مشخص.</span>
+                    </div>
+                  </div>
+                  <span className="text-amber-500 font-bold">زمان‌دار ⏳</span>
+                </label>
+
+                <label className={\`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition \${selectedMaintMode === "indefinite" ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold" : "border-[var(--card-border)] bg-[var(--input-bg)]"}\`}>
+                  <div className="flex items-center gap-2.5">
+                    <input type="radio" name="maint" checked={selectedMaintMode === "indefinite"} onChange={() => setSelectedMaintMode("indefinite")} className="accent-rose-500" />
+                    <div>
+                      <span className="font-black block">۳. حالت تعمیرات نامحدود (توقف موقت ایندکس)</span>
+                      <span className="text-[10px] opacity-75">خروج موقت از دسترس جهت اعمال تغییرات اساسی دیتابیس.</span>
+                    </div>
+                  </div>
+                  <span className="text-rose-500 font-bold">قفل 🔒</span>
+                </label>
+              </div>
+
+              {selectedMaintMode === "timed" && (
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-amber-500/30 space-y-2 animate-fadeIn">
+                  <span className="font-bold text-[var(--text-secondary)] block">مدت زمان تقریبی تعمیرات:</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-[var(--text-secondary)] mb-1 block">ساعت:</label>
+                      <input type="number" min="0" max="72" value={maintHours} onChange={(e) => setMaintHours(Number(e.target.value))} className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-[var(--text-secondary)] mb-1 block">دقیقه:</label>
+                      <input type="number" min="0" max="59" value={maintMinutes} onChange={(e) => setMaintMinutes(Number(e.target.value))} className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
+              <button
+                type="button"
+                onClick={() => setShowMaintenanceModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                disabled={isSavingMaint}
+                onClick={handleSaveMaintenance}
+                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {isSavingMaint ? "در حال اعمال..." : "ذخیره و اعمال وضعیت 🚀"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 `,
 
-  // ۲. صفحه اصلی اصلاح‌شده (هیرو فول‌عرض، بدون باکس سمت چپ، بدون اخبار و بدون دسته‌های تکراری)
-  'app/page.tsx': `// File Path: app/page.tsx
-"use client";
+  // ۲. هدر ادمین مستقل با تمامی دکمه‌ها و نشانگرها
+  'components/AdminHeader.tsx': `"use client";
 
 import React, { useState, useEffect } from "react";
-import { productService, Product, FLAGSHIP_7_PRODUCTS } from "@/services/productService";
-import { bannerService, Banner } from "@/services/bannerService";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { useCart } from "@/context/CartContext";
 import Link from "next/link";
-import AIAssistantChat from "@/components/AIAssistantChat";
-import ProductComparisonModal from "@/components/ProductComparisonModal";
-import ProductCard from "@/components/ProductCard";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
 
-export default function HomePage() {
-  const { addToCart } = useCart();
+export default function AdminHeader() {
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
-  const [products, setProducts] = useState<Product[]>(FLAGSHIP_7_PRODUCTS);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-
-  const [compareList, setCompareList] = useState<Product[]>([]);
-  const [isCompareOpen, setIsCompareOpen] = useState(false);
-
-  const loadData = async () => {
+  const fetchHeaderInfo = async () => {
     try {
-      const [prods, bans] = await Promise.all([
-        productService.getAll(),
-        bannerService.getAll(),
-      ]);
-      if (prods && prods.length > 0) setProducts(prods);
-      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
-    } catch {}
-  };
-
-  useEffect(() => {
-    loadData();
-
-    const handleCategoryChange = (e: any) => setSelectedCategory(e.detail || "all");
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
-      else loadData();
-    };
-
-    window.addEventListener("category_selected", handleCategoryChange);
-    window.addEventListener("products_updated", handleProductsUpdate);
-
-    return () => {
-      window.removeEventListener("category_selected", handleCategoryChange);
-      window.removeEventListener("products_updated", handleProductsUpdate);
-    };
-  }, []);
-
-  const toggleCompare = (p: Product) => {
-    soundEngine.playClick();
-    if (compareList.some((item) => item.id === p.id)) {
-      setCompareList(compareList.filter((item) => item.id !== p.id));
-    } else {
-      if (compareList.length >= 4) {
-        alert("حداکثر ۴ کالا را می‌توانید همزمان مقایسه نمایید.");
-        return;
-      }
-      setCompareList([...compareList, p]);
+      const data = await siteInfoService.getSiteInfo();
+      if (data) setSiteInfo(data);
+    } catch (e) {
+      console.error("AdminHeader fetch error:", e);
     }
   };
 
-  const filteredProducts = products.filter((product) => {
-    if (selectedCategory === "all") return true;
-    const cat = (product.category || (product as any).category_name || "").toLowerCase();
-    const target = selectedCategory.toLowerCase();
-    return cat === target || cat.includes(target) || target.includes(cat);
-  });
-
-  return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-24 transition-colors duration-300" dir="rtl">
-      <main className="pt-6 sm:pt-8 px-3 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-10">
-        
-        {/* ۱. هیرو بنر عریض، یکپارچه و فوق‌العاده شیک (بدون باکس سمت چپ) */}
-        <section className="w-full min-h-[300px] sm:min-h-[380px] rounded-3xl overflow-hidden relative glass-morphism flex flex-col justify-end p-6 sm:p-12 shadow-2xl">
-          <img src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1600" className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-35" alt="Tech Showcase" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/60 to-transparent" />
-          <div className="relative z-10 space-y-3.5 text-right max-w-3xl">
-            <span className="inline-block px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-bold text-xs border border-[var(--accent-blue)]/30">
-              ⚡ اکوسیستم جامع تکنولوژی و گجت‌های نوین ۲۰۲۶
-            </span>
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight text-[var(--text-primary)]">
-              مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
-            </h1>
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed">
-              تامین انواع سیستم‌های پردازشی، لپ‌تاپ‌های حرفه‌ای، ساعت‌های هوشمند، نمایشگرهای پیشرفته و قطعات دیجیتال با ۱۸ ماه گارانتی اصالت طلایی.
-            </p>
-            <div className="pt-2 flex gap-3">
-              <Link href="/#products" className="bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 transition-transform shadow-lg shadow-blue-500/20">
-                مشاهده کاتالوگ محصولات ←
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* ۲. گرید محصولات بدون دسته‌بندی‌های تکراری */}
-        <section id="products" className="space-y-6">
-          <div className="border-b border-[var(--card-border)] pb-4 px-1 flex justify-between items-center">
-            <div>
-              <h2 className="text-lg sm:text-2xl font-black tracking-tight text-[var(--text-primary)]">
-                محصولات و تجهیزات تکنولوژی
-              </h2>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-                تمامی کالاها با گارانتی اصالت طلایی و ارسال سریع پیشتاز عرضه می‌شوند
-              </p>
-            </div>
-            {selectedCategory !== "all" && (
-              <button
-                onClick={() => setSelectedCategory("all")}
-                className="text-xs font-bold text-[var(--accent-blue)] hover:underline cursor-pointer"
-              >
-                نمایش همه کالاها ({products.length})
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
-
-        {/* ۳. بخش مقالات سئو */}
-        <section className="glass-morphism rounded-3xl p-6 sm:p-8 space-y-4">
-          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
-            <div>
-              <h3 className="text-base font-bold text-[var(--text-primary)]">مجله و مقالات تحلیلی فناوری</h3>
-              <p className="text-xs text-[var(--text-secondary)] font-medium">جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها</p>
-            </div>
-            <Link href="/blog" className="text-xs font-bold text-[var(--accent-blue)] hover:underline">
-              مشاهده همه مقالات ←
-            </Link>
-          </div>
-          <HomeBlogSection />
-        </section>
-      </main>
-
-      <ProductComparisonModal products={compareList} isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))} />
-      <AIAssistantChat />
-    </div>
-  );
-}
-
-function HomeBlogSection() {
-  const [posts, setPosts] = useState<any[]>([]);
   useEffect(() => {
-    fetch("/api/blogs").then((r) => r.json()).then((d) => setPosts((d.data || d.posts || []).slice(0, 3))).catch(() => {});
+    fetchHeaderInfo();
+
+    try {
+      const savedTheme = localStorage.getItem("theme");
+      const isDark = savedTheme !== "light";
+      setIsDarkMode(isDark);
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    } catch {}
+
+    const handleSiteUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
+
+    window.addEventListener("site_info_updated", handleSiteUpdate);
+    return () => {
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
+    };
   }, []);
 
+  const toggleDarkMode = () => {
+    soundEngine.playClick();
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    localStorage.setItem("theme", nextDark ? "dark" : "light");
+    if (nextDark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  };
+
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
+  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
+  const isOnline = (siteInfo?.maintenance_mode || "none") === "none";
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-      {posts.map((post) => (
-        <article key={post.id || post.title} className="glass-morphism p-4 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--accent-blue)] transition duration-300">
-          <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
-          <Link href={\`/blog/\${post.id}\`} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]">
-            مطالعه مقاله ←
+    <header className="sticky top-0 z-40 w-full backdrop-blur-2xl bg-[var(--modal-bg)]/90 border-b border-[var(--card-border)] text-[var(--text-primary)] transition-colors select-none font-sans" dir="rtl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        
+        <Link href="/admin" className="flex items-center gap-3 group">
+          <div className="w-10 h-10 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group-hover:scale-105 transition">
+            {logoUrl ? (
+              <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
+            ) : (
+              <span className="text-xl text-[var(--accent-blue)] font-black">⚡</span>
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-black text-sm text-[var(--text-primary)] block">
+                {storeName} <span className="text-[10px] text-[var(--accent-blue)] font-bold">(پنل مدیریت)</span>
+              </span>
+              <span className={\`w-2 h-2 rounded-full \${isOnline ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}\`} />
+            </div>
+            <span className="text-[10px] text-[var(--text-secondary)] font-medium block">
+              کنترل‌پنل جامع فروشگاهی و هوش مصنوعی
+            </span>
+          </div>
+        </Link>
+
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/"
+            target="_blank"
+            className="text-xs px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] transition font-bold shadow-sm flex items-center gap-1.5"
+          >
+            <span>🏠</span>
+            <span>مشاهده فروشگاه</span>
           </Link>
-        </article>
-      ))}
-    </div>
+
+          <button
+            onClick={toggleDarkMode}
+            className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[var(--text-primary)] transition cursor-pointer text-xs font-bold shadow-sm"
+            title="تغییر تم"
+          >
+            {isDarkMode ? "🌙" : "☀️"}
+          </button>
+        </div>
+      </div>
+    </header>
   );
 }
 `
@@ -441,12 +494,12 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ [CLEANED & UPDATED] فایل بهینه‌سازی شد: ${filePath}`);
+  console.log(`✅ [ADMIN RESTORED] فایل با موفقیت به‌روزرسانی شد: ${filePath}`);
 }
 
-console.log('📦 در حال Push به گیت‌هاب و دیپلوی تمیز روی Vercel...');
+console.log('📦 در حال Push به گیت‌هاب و دیپلوی روی Vercel...');
 try {
-  execSync('git add . && git commit -m "feat: clean UI, remove clutter, full-width hero, add news header link & clean SVG theme toggle" && git push origin main', { stdio: 'inherit' });
+  execSync('git add . && git commit -m "feat: restore admin header, google index maintenance mode control modal & dark mode switch" && git push origin main', { stdio: 'inherit' });
   console.log('🎉 [DEPLOYED] استقرار نهایی با موفقیت ۱۰۰٪ کامل شد!');
 } catch (e) {
   console.log('⚠️ دستور دستی: git push origin main');

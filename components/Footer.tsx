@@ -1,9 +1,9 @@
-// File Path: components/Footer.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Footer() {
   const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
@@ -16,13 +16,17 @@ export default function Footer() {
   }, []);
 
   const siteName = info?.site_name || info?.siteName || "AXON";
+  const footerLogo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
 
   return (
     <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-auto select-none transition-colors duration-300" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <div className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">{siteName}</div>
+          <div className="glass-morphism p-6 rounded-3xl space-y-4">
+            <div className="flex items-center gap-3">
+              <AnimatedLogo customLogoUrl={footerLogo} size={42} />
+              <div className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">{siteName}</div>
+            </div>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار و ابزارهای تکنولوژی با گارانتی اصالت طلایی.</p>
           </div>
           <div className="glass-morphism p-6 rounded-3xl space-y-3">

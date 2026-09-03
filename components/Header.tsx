@@ -10,6 +10,7 @@ import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Header() {
   const router = useRouter();
@@ -131,7 +132,6 @@ export default function Header() {
     setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
   };
 
-  // منوی تمیز ناوبری (بدون "صفحه نخست")
   const navLinks = [
     { title: "کاتالوگ محصولات", href: "/#products" },
     { title: "اخبار تکنولوژی", href: "/news" },
@@ -148,11 +148,10 @@ export default function Header() {
       <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           
-          {/* دکمه دراپ‌داون دسته‌بندی‌ها */}
           <div className="relative" ref={categoryDropdownRef}>
             <button
               onClick={() => { soundEngine.playClick(); setIsCategoryOpen(!isCategoryOpen); }}
-              className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm transition cursor-pointer text-[var(--text-primary)]"
+              className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm transition cursor-pointer text-[var(--text-primary)] shadow-sm"
               title="دسته‌بندی‌های کالا"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -179,15 +178,13 @@ export default function Header() {
             )}
           </div>
 
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] p-1 flex items-center justify-center overflow-hidden">
-              {logoUrl ? <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" /> : <span className="text-[var(--accent-blue)] font-black text-lg">⚡</span>}
-            </div>
-            <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter">{storeName}</div>
+          <Link href="/" className="flex items-center gap-3 group">
+            <AnimatedLogo customLogoUrl={logoUrl} size={40} />
+            <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-75">
+        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-80">
           {navLinks.map((link, idx) => (
             <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[var(--accent-blue)] transition font-bold text-[var(--text-primary)]">
               {link.title}
@@ -197,7 +194,7 @@ export default function Header() {
 
         <div className="flex items-center gap-3">
           <div className="relative hidden sm:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-44">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-48">
               <span className="text-xs opacity-70">🔍</span>
               <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] placeholder-slate-400 font-bold" />
             </div>
@@ -205,7 +202,7 @@ export default function Header() {
               <div className="absolute top-12 left-0 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 w-72 bg-[var(--modal-bg)]">
                 {searchResults.map((p) => (
                   <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
-                    <Link href={`/products/${p.id}`} onClick={() => setIsSearchFocused(false)} className="flex items-center gap-2 flex-1 min-w-0">
+                    <Link href={"/products/" + p.id} onClick={() => setIsSearchFocused(false)} className="flex items-center gap-2 flex-1 min-w-0">
                       <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 shrink-0" />
                       <div className="flex-1 min-w-0 text-right">
                         <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
@@ -221,19 +218,16 @@ export default function Header() {
             )}
           </div>
 
-          {/* آیکون استاندارد و فوق‌العاده شیک SVG برای تغییر تم */}
           <button
             onClick={toggleTheme}
-            className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)]"
+            className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)]"
             title={isDarkMode ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
             suppressHydrationWarning
           >
             {mounted ? (
               isDarkMode ? (
-                // آیکون خورشید برای تم لایت
                 <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
               ) : (
-                // آیکون ماه برای تم دارک
                 <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
               )
             ) : (

@@ -1,4 +1,5 @@
-// File Path: services/productService.ts
+"use client";
+
 import { supabase } from "@/lib/supabase";
 import { realtimeEngine } from "@/lib/realtimeSync";
 
@@ -97,6 +98,29 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
     }
   },
   {
+    id: "prod-studio-display-5k",
+    title: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
+    name: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
+    title_fa: "نمایشگر ۲۷ اینچ ۵K رتینا با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری",
+    brand: "Apple",
+    category: "صوتی و تصویر",
+    price: 135000000,
+    discountPrice: 128500000,
+    discount_price: 128500000,
+    originalPrice: 135000000,
+    stock: 6,
+    isAvailable: true,
+    is_available: true,
+    is_featured: true,
+    warranty: "۱۸ ماه گارانتی اصالت طلایی آکسون",
+    badge: "🖥️ وضوح شگفت‌انگیز 5K",
+    image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
+    images: ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"],
+    description: "نمایشگر حرفه‌ای ۲۷ اینچ با تفکیک رنگ ۱۰ بیتی، پوشش کامل گاموت DCI-P3، درگاه تاندربولت ۳ و سیستم صوتی ۶ درایور استودیو.",
+    highlights: ["پنل 5K رتینا با ۲۱۸ PPI", "پوشش ۹۹.۲٪ گاموت DCI-P3", "شیشه نانوتکستچر ضد انعکاس"],
+    specs: { "رزولوشن": "5120 در 2880 پیکسل", "روشنایی": "600 نیت پایدار", "پورت‌ها": "Thunderbolt 3 + USB-C" }
+  },
+  {
     id: "prod-apple-watch-ultra-3",
     title: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS)",
     name: "Apple Watch Ultra 2 (Titanium Case, 49mm GPS)",
@@ -141,29 +165,6 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
     description: "باریک‌ترین دستگاه تاریخ با ضخامت ۵.۱ میلی‌متر، نمایشگر Ultra Retina XDR با دو لایه اولد تاندم و قدرت پردازش تراشه M4.",
     highlights: ["فناوری Tandem OLED", "ضخامت شگفت‌انگیز ۵.۱ میلی‌متر", "پردازنده پرقدرت M4"],
     specs: { "نمایشگر": "13.0 Inch Tandem OLED", "روشنایی": "1600 Nits Peak", "ضخامت": "5.1 میلی‌متر" }
-  },
-  {
-    id: "prod-studio-display-5k",
-    title: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
-    name: "Apple Studio Display 27 Inch 5K Retina (Nano-Texture)",
-    title_fa: "نمایشگر ۲۷ اینچ ۵K رتینا با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری",
-    brand: "Apple",
-    category: "صوتی و تصویر",
-    price: 135000000,
-    discountPrice: 128500000,
-    discount_price: 128500000,
-    originalPrice: 135000000,
-    stock: 6,
-    isAvailable: true,
-    is_available: true,
-    is_featured: true,
-    warranty: "۱۸ ماه گارانتی اصالت طلایی آکسون",
-    badge: "🖥️ وضوح شگفت‌انگیز 5K",
-    image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
-    images: ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"],
-    description: "نمایشگر حرفه‌ای ۲۷ اینچ با تفکیک رنگ ۱۰ بیتی، پوشش کامل گاموت DCI-P3، درگاه تاندربولت ۳ و سیستم صوتی ۶ درایور استودیو.",
-    highlights: ["پنل 5K رتینا با ۲۱۸ PPI", "پوشش ۹۹.۲٪ گاموت DCI-P3", "شیشه نانوتکستچر ضد انعکاس"],
-    specs: { "رزولوشن": "5120 در 2880 پیکسل", "روشنایی": "600 نیت پایدار", "پورت‌ها": "Thunderbolt 3 + USB-C" }
   },
   {
     id: "prod-pro-display-xdr-6k",
@@ -238,17 +239,22 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
 
 export function normalizeProduct(p: any): Product {
   if (!p) return FLAGSHIP_7_PRODUCTS[0];
-  const price = Number(p.price || 0);
-  const discountPrice =
-    p.discountPrice !== undefined && p.discountPrice !== null
-      ? Number(p.discountPrice)
-      : p.discount_price !== undefined && p.discount_price !== null
-      ? Number(p.discount_price)
-      : undefined;
+
+  const matchedFlagship = FLAGSHIP_7_PRODUCTS.find((f) => String(f.id) === String(p.id));
+
+  let price = Number(p.price || 0);
+  let discountPrice = p.discountPrice !== undefined ? Number(p.discountPrice) : (p.discount_price !== undefined ? Number(p.discount_price) : undefined);
+
+  if ((!price || price <= 0) && matchedFlagship) {
+    price = matchedFlagship.price;
+    discountPrice = matchedFlagship.discountPrice;
+  }
+
+  const title = (p.title && p.title !== "کالای تکنولوژی") ? p.title : (matchedFlagship?.title || p.name || "کالای تکنولوژی آکسون");
 
   const images = Array.isArray(p.images) && p.images.length > 0
     ? p.images
-    : [p.image || p.image_url || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"];
+    : (matchedFlagship?.images || [p.image || p.image_url || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"]);
 
   const stock = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 10;
   const isAvailable = p.is_available !== false && p.isAvailable !== false && stock > 0;
@@ -256,30 +262,30 @@ export function normalizeProduct(p: any): Product {
   return {
     ...p,
     id: String(p.id),
-    title: p.title || p.name || "کالای تکنولوژی",
-    name: p.name || p.title || "کالای تکنولوژی",
-    title_fa: p.title_fa || "",
+    title,
+    name: title,
+    title_fa: p.title_fa || matchedFlagship?.title_fa || "",
     sku: p.sku || `SKU-${String(p.id).slice(-6)}`,
-    brand: p.brand || "Axon Tech",
-    price,
-    discountPrice,
-    discount_price: discountPrice,
+    brand: p.brand || matchedFlagship?.brand || "Apple",
+    price: price > 0 ? price : 55800000,
+    discountPrice: discountPrice && discountPrice > 0 ? discountPrice : undefined,
+    discount_price: discountPrice && discountPrice > 0 ? discountPrice : undefined,
     originalPrice: p.originalPrice ? Number(p.originalPrice) : price,
     stock,
-    category: p.category || p.category_name || "تکنولوژی",
-    description: p.description || "تجهیزات تخصصی و گجت‌های نوین با گارانتی اصالت طلایی آکسون",
-    short_description: p.short_description || "",
-    highlights: Array.isArray(p.highlights) ? p.highlights : [],
+    category: p.category || matchedFlagship?.category || "تکنولوژی",
+    description: p.description || matchedFlagship?.description || "تجهیزات تخصصی و گجت‌های نوین با گارانتی اصالت طلایی آکسون",
+    short_description: p.short_description || matchedFlagship?.short_description || "",
+    highlights: Array.isArray(p.highlights) && p.highlights.length > 0 ? p.highlights : (matchedFlagship?.highlights || []),
     image: images[0],
     image_url: images[0],
     images,
     variants: Array.isArray(p.variants) ? p.variants : [],
-    specs: p.specs && typeof p.specs === "object" ? p.specs : {},
-    warranty: p.warranty || "۱۸ ماه گارانتی اصالت طلایی آکسون",
-    badge: p.badge || "",
+    specs: p.specs && typeof p.specs === "object" ? p.specs : (matchedFlagship?.specs || {}),
+    warranty: p.warranty || matchedFlagship?.warranty || "۱۸ ماه گارانتی اصالت طلایی آکسون",
+    badge: p.badge || matchedFlagship?.badge || "",
     isAvailable,
     is_available: isAvailable,
-    is_featured: Boolean(p.is_featured),
+    is_featured: Boolean(p.is_featured ?? matchedFlagship?.is_featured),
     market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
     created_at: p.created_at || new Date().toISOString(),
     updated_at: p.updated_at || new Date().toISOString(),
@@ -369,7 +375,7 @@ export const productService = {
         name: normalized.title,
         title_fa: normalized.title_fa || null,
         sku: normalized.sku || null,
-        brand: normalized.brand || "Axon Tech",
+        brand: normalized.brand || "Apple",
         price: normalized.price,
         discount_price: normalized.discountPrice || null,
         stock: normalized.stock,

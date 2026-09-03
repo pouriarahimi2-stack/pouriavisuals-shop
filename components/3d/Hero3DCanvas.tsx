@@ -12,7 +12,7 @@ export default function Hero3DCanvas() {
     const container = containerRef.current;
     if (!container) return;
 
-    // ۱. ایجاد صحنه، دوربین و رندرر WebGL
+    // ۱. ساخت صحنه و رندرر WebGL
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
       45,
@@ -20,7 +20,7 @@ export default function Hero3DCanvas() {
       0.1,
       1000
     );
-    camera.position.set(0, 0, 7);
+    camera.position.set(0, 0, 6.2);
 
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
@@ -30,39 +30,40 @@ export default function Hero3DCanvas() {
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.3;
+    renderer.toneMappingExposure = 1.4;
     container.appendChild(renderer.domElement);
 
-    // ۲. سیستم نورپردازی استودیویی ۳ گانه (Apple Studio Lighting Rig)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    // ۲. نورپردازی استودیویی اپل (Studio Lighting Rig)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
     scene.add(ambientLight);
 
-    const keySpot = new THREE.SpotLight(0x0284c7, 18, 30, Math.PI / 3, 0.4);
+    const keySpot = new THREE.SpotLight(0x0284c7, 24, 35, Math.PI / 3, 0.4);
     keySpot.position.set(6, 6, 6);
     scene.add(keySpot);
 
-    const fillCyan = new THREE.PointLight(0x38bdf8, 12, 25);
+    const fillCyan = new THREE.PointLight(0x38bdf8, 16, 25);
     fillCyan.position.set(-6, -3, 4);
     scene.add(fillCyan);
 
-    const rimIndigo = new THREE.DirectionalLight(0x818cf8, 5);
-    rimIndigo.position.set(0, 8, -5);
-    scene.add(rimIndigo);
+    const rimLight = new THREE.DirectionalLight(0x818cf8, 6);
+    rimLight.position.set(0, 8, -5);
+    scene.add(rimLight);
 
-    // ۳. هسته اپتیکال شیشه‌ای مواج (Procedural Quantum Glass Core)
+    // ۳. گروه اصلی هسته سه‌بعدی (3D Core Group)
     const coreGroup = new THREE.Group();
     scene.add(coreGroup);
 
+    // کره شیشه‌ای شکست نور کوانتومی (Optical Glass Icosahedron)
     const coreGeo = new THREE.IcosahedronGeometry(1.65, 4);
     const coreMat = new THREE.MeshPhysicalMaterial({
       color: 0x0284c7,
       emissive: 0x071529,
+      emissiveIntensity: 0.4,
       roughness: 0.08,
-      metalness: 0.1,
-      transmission: 0.92,
+      metalness: 0.15,
+      transmission: 0.9,
       ior: 1.52,
-      thickness: 1.6,
-      specularIntensity: 1.0,
+      thickness: 1.8,
       clearcoat: 1.0,
       clearcoatRoughness: 0.05,
     });
@@ -70,63 +71,63 @@ export default function Hero3DCanvas() {
     coreGroup.add(coreMesh);
 
     // وایرفریم نئونی هندسی
-    const wireGeo = new THREE.IcosahedronGeometry(1.67, 2);
+    const wireGeo = new THREE.IcosahedronGeometry(1.68, 2);
     const wireMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       wireframe: true,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.4,
     });
     const wireMesh = new THREE.Mesh(wireGeo, wireMat);
     coreGroup.add(wireMesh);
 
-    // ۴. حلقه‌های تیتانیومی مداری (Orbital Gyro Rings)
+    // ۴. حلقه‌های تیتانیومی مداری چرخشی (Orbital Gyro Rings)
     const ringMat1 = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
-      metalness: 0.85,
-      roughness: 0.15,
+      metalness: 0.9,
+      roughness: 0.1,
       wireframe: true,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.75,
     });
-    const ringGeo1 = new THREE.TorusGeometry(2.4, 0.025, 16, 120);
+    const ringGeo1 = new THREE.TorusGeometry(2.35, 0.03, 16, 120);
     const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
     ring1.rotation.x = Math.PI / 3;
     scene.add(ring1);
 
     const ringMat2 = new THREE.MeshStandardMaterial({
       color: 0x818cf8,
-      metalness: 0.9,
-      roughness: 0.25,
+      metalness: 0.95,
+      roughness: 0.2,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.5,
     });
-    const ringGeo2 = new THREE.TorusGeometry(2.85, 0.02, 16, 120);
+    const ringGeo2 = new THREE.TorusGeometry(2.75, 0.025, 16, 120);
     const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
     ring2.rotation.y = Math.PI / 4;
     scene.add(ring2);
 
-    // ۵. ماتریس ذرات درخشان موجی (Quantum Particle Field)
-    const particleCount = 200;
+    // ۵. ماتریس ذرات نئونی معلق (Quantum Particle Matrix)
+    const particleCount = 180;
     const particlePositions = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount * 3; i += 3) {
-      particlePositions[i] = (Math.random() - 0.5) * 14;
-      particlePositions[i + 1] = (Math.random() - 0.5) * 9;
-      particlePositions[i + 2] = (Math.random() - 0.5) * 7;
+      particlePositions[i] = (Math.random() - 0.5) * 12;
+      particlePositions[i + 1] = (Math.random() - 0.5) * 8;
+      particlePositions[i + 2] = (Math.random() - 0.5) * 6;
     }
     const particleGeo = new THREE.BufferGeometry();
     particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
     const particleMat = new THREE.PointsMaterial({
       color: 0x38bdf8,
-      size: 0.045,
+      size: 0.05,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.8,
       blending: THREE.AdditiveBlending,
     });
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    // ۶. رهگیری لمس و حرکت ماوس با اینرسی نرم (Parallax Tilt)
+    // ۶. رهگیری تعاملی حرکت ماوس و لمس
     let mouseX = 0;
     let mouseY = 0;
     let targetX = 0;
@@ -142,7 +143,7 @@ export default function Hero3DCanvas() {
 
     window.addEventListener("pointermove", handlePointerMove);
 
-    // ۷. حلقه رندرینگ ۶۰ تا ۱۲۰ فریم
+    // ۷. حلقه رندرینگ ۶۰ فریم
     let animationFrameId: number;
     const clock = new THREE.Clock();
 
@@ -150,24 +151,24 @@ export default function Hero3DCanvas() {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
 
-      coreMesh.rotation.y = elapsedTime * 0.28;
-      coreMesh.rotation.x = Math.sin(elapsedTime * 0.2) * 0.25;
-      wireMesh.rotation.y = -elapsedTime * 0.32;
-      wireMesh.rotation.z = elapsedTime * 0.18;
+      coreMesh.rotation.y = elapsedTime * 0.3;
+      coreMesh.rotation.x = Math.sin(elapsedTime * 0.25) * 0.25;
+      wireMesh.rotation.y = -elapsedTime * 0.35;
+      wireMesh.rotation.z = elapsedTime * 0.2;
 
-      ring1.rotation.z = elapsedTime * 0.22;
-      ring1.rotation.y = Math.sin(elapsedTime * 0.3) * 0.45;
+      ring1.rotation.z = elapsedTime * 0.25;
+      ring1.rotation.y = Math.sin(elapsedTime * 0.35) * 0.5;
 
-      ring2.rotation.x = -elapsedTime * 0.18;
-      ring2.rotation.z = Math.cos(elapsedTime * 0.25) * 0.35;
+      ring2.rotation.x = -elapsedTime * 0.2;
+      ring2.rotation.z = Math.cos(elapsedTime * 0.3) * 0.4;
 
-      particles.rotation.y = elapsedTime * 0.06;
+      particles.rotation.y = elapsedTime * 0.08;
 
-      targetX += (mouseX - targetX) * 0.05;
-      targetY += (mouseY - targetY) * 0.05;
+      targetX += (mouseX - targetX) * 0.06;
+      targetY += (mouseY - targetY) * 0.06;
 
-      coreGroup.rotation.y = targetX * 0.6;
-      coreGroup.rotation.x = -targetY * 0.6;
+      coreGroup.rotation.y = targetX * 0.7;
+      coreGroup.rotation.x = -targetY * 0.7;
       camera.position.x = targetX * 0.35;
       camera.position.y = targetY * 0.35;
       camera.lookAt(0, 0, 0);
@@ -214,8 +215,7 @@ export default function Hero3DCanvas() {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-hidden"
-      style={{ opacity: 0.9 }}
+      className="w-full h-full min-h-[300px] sm:min-h-[360px] relative flex items-center justify-center select-none"
     />
   );
 }

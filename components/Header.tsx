@@ -34,8 +34,6 @@ export default function Header() {
 
   useEffect(() => {
     setMounted(true);
-
-    // ۱. بررسی و خواندن تم ذخیره‌شده
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
@@ -83,7 +81,6 @@ export default function Header() {
     };
   }, []);
 
-  // تابع سوییچ تم با ذخیره در لوکال‌استوریج و تغییر آنی کلاس داکیومنت
   const toggleTheme = () => {
     soundEngine.playClick();
     const nextDark = !isDarkMode;
@@ -149,8 +146,8 @@ export default function Header() {
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
 
   return (
-    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
-      <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+    <header className="sticky top-2 sm:top-3 z-50 w-full max-w-[1440px] mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
+      <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           
           <div className="relative" ref={categoryDropdownRef}>
@@ -185,11 +182,11 @@ export default function Header() {
 
           <Link href="/" className="flex items-center gap-3 group">
             <AnimatedLogo customLogoUrl={logoUrl} size={38} />
-            <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
+            <div className="text-xl font-black text-[var(--text-primary)] tracking-tight group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-85">
+        <nav className="hidden lg:flex items-center gap-7 text-sm opacity-85">
           {navLinks.map((link, idx) => (
             <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[var(--accent-blue)] transition font-bold text-[var(--text-primary)]">
               {link.title}
@@ -199,7 +196,7 @@ export default function Header() {
 
         <div className="flex items-center gap-3">
           <div className="relative hidden sm:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-48">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-52">
               <span className="text-xs opacity-70">🔍</span>
               <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] placeholder-slate-400 font-bold" />
             </div>
@@ -223,7 +220,6 @@ export default function Header() {
             )}
           </div>
 
-          {/* دکمه فعال و سالم تغییر تم دارک / لایت */}
           <button
             onClick={toggleTheme}
             className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)] active:scale-95"
@@ -237,7 +233,7 @@ export default function Header() {
                 <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
               )
             ) : (
-              <span className="w-5 h-5" />
+              <span className="w-4 h-4" />
             )}
           </button>
 

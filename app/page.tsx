@@ -72,31 +72,31 @@ export default function HomePage() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-28 transition-colors duration-300" dir="rtl">
-      <main className="pt-4 sm:pt-6 px-3 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-16 transition-colors duration-300" dir="rtl">
+      <main className="pt-2 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6">
         
-        {/* تیکر اخبار تکنولوژی */}
+        {/* تیکر اخبار تکنولوژی فشرده */}
         <TechRadarFeed />
 
-        {/* هیرو سکشن عریض و مدرن */}
-        <section className="w-full rounded-[2.8rem] overflow-hidden glass-morphism p-8 sm:p-14 lg:p-16 shadow-2xl border border-[var(--card-border)] relative min-h-[380px] sm:min-h-[440px] flex flex-col justify-center">
+        {/* هیرو سکشن عریض، لوکس و پرکننده فضا با بوم سه‌بعدی Three.js در پس‌زمینه */}
+        <section className="w-full rounded-[2.2rem] sm:rounded-[2.8rem] overflow-hidden glass-morphism p-6 sm:p-12 lg:p-14 shadow-2xl border border-[var(--card-border)] relative min-h-[340px] sm:min-h-[420px] flex flex-col justify-center">
           
-          {/* بوم سه‌بعدی Three.js در پس‌زمینه با شفافیت کامل */}
+          {/* بوم سه‌بعدی Three.js */}
           <Hero3DCanvas />
 
-          <div className="relative z-10 space-y-5 max-w-2xl text-right">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
+          <div className="relative z-10 space-y-4 max-w-2xl text-right">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight">
               مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
             </h1>
 
             <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-xl">
-              تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های اولترا و تجهیزات ضبط استودیویی با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.
+              تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های هوشمند اولترا و ابزارهای استودیو با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.
             </p>
 
-            <div className="pt-3">
+            <div className="pt-2">
               <Link
                 href="/#products"
-                className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-9 py-4 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25"
+                className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25"
               >
                 <span>مشاهده کاتالوگ محصولات</span>
                 <span>←</span>
@@ -105,14 +105,14 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* بخش کاتالوگ محصولات */}
-        <section id="products" className="space-y-6">
-          <div className="border-b border-[var(--card-border)] pb-4 px-1 flex justify-between items-center">
+        {/* کاتالوگ محصولات */}
+        <section id="products" className="space-y-5 pt-2">
+          <div className="border-b border-[var(--card-border)] pb-3 px-1 flex justify-between items-center">
             <div>
               <h2 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--text-primary)]">
                 محصولات و تجهیزات تکنولوژی
               </h2>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
                 تمامی کالاها با گارانتی اصالت طلایی و ارسال سریع پیشتاز عرضه می‌شوند
               </p>
             </div>
@@ -126,7 +126,7 @@ export default function HomePage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -134,8 +134,8 @@ export default function HomePage() {
         </section>
 
         {/* مجله سئو */}
-        <section className="glass-morphism rounded-[2.5rem] p-6 sm:p-8 space-y-4">
-          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+        <section className="glass-morphism rounded-3xl p-6 sm:p-8 space-y-4">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <div>
               <h3 className="text-base font-bold text-[var(--text-primary)]">مجله و مقالات تحلیلی فناوری</h3>
               <p className="text-xs text-[var(--text-secondary)] font-medium">جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها</p>
@@ -161,9 +161,9 @@ function HomeBlogSection() {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
       {posts.map((post) => (
-        <article key={post.id || post.title} className="glass-morphism p-5 rounded-3xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
+        <article key={post.id || post.title} className="glass-morphism p-5 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
           <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
           <Link href={"/blog/" + (post.id || "")} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]">
             مطالعه مقاله ←

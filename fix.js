@@ -5,7 +5,7 @@ const { execSync } = require('child_process');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🌓 رفع مشکل دکمه تم، همگام‌سازی کامل تم دارک و لایت و فعال‌سازی لوگوی متحرک ادمین (Axon Dual Engine)');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   📐 حذف فاصله‌های اضافه کناره‌ها، عریض‌سازی هیرو و بازطراحی مدرن و یکپارچه فوتر (Axon Wide Layout)');
 console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 function writeProjectFile(relativePath, fileContent) {
@@ -18,94 +18,123 @@ function writeProjectFile(relativePath, fileContent) {
   console.log(`  \x1b[32m[SAVED ✓]\x1b[0m ${relativePath.padEnd(50)} \x1b[36m(بروزرسانی کامل)\x1b[0m`);
 }
 
-// ۱. اصلاح ساختار متغیرهای CSS در globals.css (پشتیبانی استاندارد از :root برای لایت و .dark برای دارک)
-writeProjectFile('app/globals.css', `@tailwind base;
-@tailwind components;
-@tailwind utilities;
+// ۱. بازطراحی کامل و یکپارچه فوتر (یکدست، حرفه‌ای و بدون باکس‌های حبابی)
+writeProjectFile('components/Footer.tsx', `"use client";
 
-:root {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --card-border: rgba(15, 23, 42, 0.08);
-  --card-border-hover: rgba(2, 132, 199, 0.35);
-  --accent-blue: #0284c7;
-  --accent-glow: rgba(2, 132, 199, 0.15);
-  --modal-bg: #ffffff;
-  --input-bg: #f1f5f9;
-  --glass-surface: rgba(255, 255, 255, 0.85);
-}
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
-.dark {
-  --bg-primary: #07090e;
-  --bg-secondary: #0c1017;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --card-border: rgba(255, 255, 255, 0.08);
-  --card-border-hover: rgba(56, 189, 248, 0.4);
-  --accent-blue: #38bdf8;
-  --accent-glow: rgba(56, 189, 248, 0.3);
-  --modal-bg: #0c1017;
-  --input-bg: rgba(255, 255, 255, 0.04);
-  --glass-surface: rgba(12, 16, 23, 0.75);
-}
+export default function Footer() {
+  const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
 
-html, body {
-  overflow-x: hidden !important;
-  width: 100%;
-  max-width: 100vw;
-  scroll-behavior: smooth;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  -webkit-tap-highlight-color: transparent;
-}
+  useEffect(() => {
+    siteInfoService.getSiteInfo().then((d) => d && setInfo(d));
+    const handleUpdate = (e: any) => { if (e.detail) setInfo(e.detail); };
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
 
-body {
-  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -webkit-overflow-scrolling: touch;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
+  const siteName = info?.site_name || info?.siteName || "آکسون | Axon";
+  const logo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
+  const phone = info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+  const email = info?.email || "info@axoncore.ir";
+  const address = info?.address || "تهران، تقاطع میرداماد و ولیعصر، مجتمع پایتخت";
+  const workingHours = info?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰";
 
-/* کارت‌های شیشه‌ای بلورین با شفافیت پویا */
-.glass-morphism {
-  background: var(--glass-surface);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 10px 35px 0 rgba(0, 0, 0, 0.08);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
+  return (
+    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-16 select-none transition-colors duration-300" dir="rtl">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 py-12 sm:py-16">
+        
+        {/* ردیف اصلی ستون‌های فوتر */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12 pb-12 border-b border-[var(--card-border)]">
+          
+          {/* ستون ۱ و ۲: معرفی برند و شعار */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center gap-3">
+              <AnimatedLogo customLogoUrl={logo} size={40} />
+              <span className="text-2xl font-black tracking-tight">{siteName}</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium max-w-md">
+              مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر، مانیتورهای ۵K رتینا، لپ‌تاپ‌های ورک‌استیشن و گجت‌های هوشمند در ایران با ۱۸ ماه گارانتی اصالت طلایی.
+            </p>
+            <div className="flex items-center gap-2 pt-2">
+              <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
+                ✓ گارانتی اصالت ۱۰۰٪ فیزیکی
+              </span>
+              <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[11px] border border-blue-500/20">
+                🚀 ارسال پیشتاز سراسری
+              </span>
+            </div>
+          </div>
 
-.dark .glass-morphism {
-  box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.5);
-}
+          {/* ستون ۳: دسترسی سریع */}
+          <div className="space-y-3">
+            <h4 className="font-black text-xs text-[var(--text-primary)]">دسترسی سریع</h4>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+              <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ کالاها</Link></li>
+              <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">سامانه رهگیری مرسولات</Link></li>
+              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">جدیدترین اخبار تکنولوژی</Link></li>
+              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله مقالات تخصصی</Link></li>
+              <li><Link href="/about" className="hover:text-[var(--accent-blue)] transition">درباره آکسون</Link></li>
+            </ul>
+          </div>
 
-.glass-morphism:hover {
-  border-color: var(--card-border-hover);
-  box-shadow: 0 14px 45px 0 var(--accent-glow);
-}
+          {/* ستون ۴: خدمات و پشتیبانی */}
+          <div className="space-y-3">
+            <h4 className="font-black text-xs text-[var(--text-primary)]">خدمات مشتریان</h4>
+            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
+              <li><Link href="/contact" className="hover:text-[var(--accent-blue)] transition">ثبت تیکت مشاوره</Link></li>
+              <li><span className="cursor-default">شرایط گارانتی طلایی</span></li>
+              <li><span className="cursor-default">ضمانت بازگشت وجه ۷ روزه</span></li>
+              <li><span className="cursor-default">راهنمای کالیبراسیون ۵K</span></li>
+              <li><span className="cursor-default">روش‌های پرداخت امن شاپرک</span></li>
+            </ul>
+          </div>
 
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+          {/* ستون ۵: ارتباط مستقیم */}
+          <div className="space-y-3">
+            <h4 className="font-black text-xs text-[var(--text-primary)]">اطلاعات تماس</h4>
+            <div className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
+              <div>
+                <span className="block text-[10px] opacity-70">تلفن پشتیبانی:</span>
+                <span className="font-mono font-bold text-[var(--text-primary)] text-sm">{phone}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] opacity-70">پست الکترونیک:</span>
+                <span className="font-mono text-xs">{email}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] opacity-70">ساعات پاسخگویی:</span>
+                <span>{workingHours}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] opacity-70">نشانی تحویل:</span>
+                <span className="leading-snug block">{address}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        {/* نوار پایانی فوتر */}
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] font-medium">
+          <p>
+            تمامی حقوق مادی و معنوی برای <strong className="text-[var(--text-primary)]">{siteName}</strong> محفوظ است © {new Date().getFullYear()}
+          </p>
+          <div className="flex items-center gap-4 text-[11px]">
+            <span>طراحی و معماری مهندسی پایدار</span>
+            <span>•</span>
+            <span className="text-emerald-500 font-bold">نماد اعتماد الکترونیکی فعال</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
 }
 `);
 
-// ۲. اصلاح Header.tsx با سوییچر تم کاملاً سالم، واکنش‌گرا و اتصال به دیتابیس لوگو
+// ۲. اصلاح عرض هدر (Header.tsx) برای پر کردن صفحه
 writeProjectFile('components/Header.tsx', `"use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -142,8 +171,6 @@ export default function Header() {
 
   useEffect(() => {
     setMounted(true);
-
-    // ۱. بررسی و خواندن تم ذخیره‌شده
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
@@ -191,7 +218,6 @@ export default function Header() {
     };
   }, []);
 
-  // تابع سوییچ تم با ذخیره در لوکال‌استوریج و تغییر آنی کلاس داکیومنت
   const toggleTheme = () => {
     soundEngine.playClick();
     const nextDark = !isDarkMode;
@@ -257,8 +283,8 @@ export default function Header() {
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
 
   return (
-    <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
-      <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+    <header className="sticky top-2 sm:top-3 z-50 w-full max-w-[1440px] mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
+      <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           
           <div className="relative" ref={categoryDropdownRef}>
@@ -293,11 +319,11 @@ export default function Header() {
 
           <Link href="/" className="flex items-center gap-3 group">
             <AnimatedLogo customLogoUrl={logoUrl} size={38} />
-            <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
+            <div className="text-xl font-black text-[var(--text-primary)] tracking-tight group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm opacity-85">
+        <nav className="hidden lg:flex items-center gap-7 text-sm opacity-85">
           {navLinks.map((link, idx) => (
             <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[var(--accent-blue)] transition font-bold text-[var(--text-primary)]">
               {link.title}
@@ -307,7 +333,7 @@ export default function Header() {
 
         <div className="flex items-center gap-3">
           <div className="relative hidden sm:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-48">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-52">
               <span className="text-xs opacity-70">🔍</span>
               <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] placeholder-slate-400 font-bold" />
             </div>
@@ -331,7 +357,6 @@ export default function Header() {
             )}
           </div>
 
-          {/* دکمه فعال و سالم تغییر تم دارک / لایت */}
           <button
             onClick={toggleTheme}
             className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)] active:scale-95"
@@ -345,7 +370,7 @@ export default function Header() {
                 <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
               )
             ) : (
-              <span className="w-5 h-5" />
+              <span className="w-4 h-4" />
             )}
           </button>
 
@@ -364,7 +389,69 @@ export default function Header() {
 }
 `);
 
-// ۳. به‌روزرسانی هیرو سکشن (سازگار با هر دو تم تاریک و روشن بدون بریدگی)
+// ۳. تیکر اخبار تکنولوژی با عرض متناسب و بهینه
+writeProjectFile('components/TechRadarFeed.tsx', `"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { newsService, TechNewsItem, STATIC_DEFAULT_NEWS } from "@/services/newsService";
+import { soundEngine } from "@/lib/soundEngine";
+
+export default function TechRadarFeed() {
+  const [newsList, setNewsList] = useState<TechNewsItem[]>(STATIC_DEFAULT_NEWS);
+  const [startIndex, setStartIndex] = useState(0);
+
+  const loadUniqueNews = async () => {
+    try {
+      const data = await newsService.getAll();
+      if (data && data.length > 0) {
+        setNewsList(data);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadUniqueNews();
+    const handleNewsUpdate = () => loadUniqueNews();
+    window.addEventListener("news_updated", handleNewsUpdate);
+    return () => window.removeEventListener("news_updated", handleNewsUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (newsList.length <= 3) return;
+    const interval = setInterval(() => {
+      setStartIndex((prev) => (prev + 3 >= newsList.length ? 0 : prev + 3));
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [newsList.length]);
+
+  const visibleNews = newsList.slice(startIndex, startIndex + 3);
+
+  return (
+    <section className="w-full max-w-[1440px] mx-auto font-sans select-none px-1 my-1 overflow-hidden" dir="rtl" suppressHydrationWarning>
+      <div className="flex flex-col sm:flex-row items-center justify-between p-2 px-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] shadow-sm transition-all duration-300 gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-black text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+            جدیدترین اخبار تکنولوژی
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 w-full overflow-hidden">
+          {visibleNews.map((item, idx) => (
+            <Link key={(item.id || item.slug) + "-" + idx} href={"/news/" + item.slug} onClick={() => soundEngine.playClick()} className="flex items-center gap-2 p-1.5 px-2 rounded-xl bg-[var(--input-bg)] hover:bg-[var(--accent-blue)]/10 transition border border-transparent hover:border-[var(--card-border)] overflow-hidden group min-w-0">
+              <img src={item.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=100"} alt="" className="w-7 h-7 rounded-lg object-cover shrink-0 border border-[var(--card-border)]" />
+              <h4 className="text-[11px] font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition truncate">{item.title}</h4>
+            </Link>
+          ))}
+        </div>
+        <Link href="/news" className="text-[11px] font-black text-[var(--accent-blue)] hover:underline shrink-0 px-2">آرشیو اخبار ←</Link>
+      </div>
+    </section>
+  );
+}
+`);
+
+// ۴. اصلاح صفحه اصلی (app/page.tsx) با پر کردن کامل عرض نمایشگر و حذف فاصله‌های بیهوده
 writeProjectFile('app/page.tsx', `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -439,31 +526,31 @@ export default function HomePage() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-28 transition-colors duration-300" dir="rtl">
-      <main className="pt-4 sm:pt-6 px-3 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-16 transition-colors duration-300" dir="rtl">
+      <main className="pt-2 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6">
         
-        {/* تیکر اخبار تکنولوژی */}
+        {/* تیکر اخبار تکنولوژی فشرده */}
         <TechRadarFeed />
 
-        {/* هیرو سکشن عریض و مدرن */}
-        <section className="w-full rounded-[2.8rem] overflow-hidden glass-morphism p-8 sm:p-14 lg:p-16 shadow-2xl border border-[var(--card-border)] relative min-h-[380px] sm:min-h-[440px] flex flex-col justify-center">
+        {/* هیرو سکشن عریض، لوکس و پرکننده فضا با بوم سه‌بعدی Three.js در پس‌زمینه */}
+        <section className="w-full rounded-[2.2rem] sm:rounded-[2.8rem] overflow-hidden glass-morphism p-6 sm:p-12 lg:p-14 shadow-2xl border border-[var(--card-border)] relative min-h-[340px] sm:min-h-[420px] flex flex-col justify-center">
           
-          {/* بوم سه‌بعدی Three.js در پس‌زمینه با شفافیت کامل */}
+          {/* بوم سه‌بعدی Three.js */}
           <Hero3DCanvas />
 
-          <div className="relative z-10 space-y-5 max-w-2xl text-right">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
+          <div className="relative z-10 space-y-4 max-w-2xl text-right">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight">
               مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
             </h1>
 
             <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-xl">
-              تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های اولترا و تجهیزات ضبط استودیویی با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.
+              تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های هوشمند اولترا و ابزارهای استودیو با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.
             </p>
 
-            <div className="pt-3">
+            <div className="pt-2">
               <Link
                 href="/#products"
-                className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-9 py-4 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25"
+                className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25"
               >
                 <span>مشاهده کاتالوگ محصولات</span>
                 <span>←</span>
@@ -472,14 +559,14 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* بخش کاتالوگ محصولات */}
-        <section id="products" className="space-y-6">
-          <div className="border-b border-[var(--card-border)] pb-4 px-1 flex justify-between items-center">
+        {/* کاتالوگ محصولات */}
+        <section id="products" className="space-y-5 pt-2">
+          <div className="border-b border-[var(--card-border)] pb-3 px-1 flex justify-between items-center">
             <div>
               <h2 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--text-primary)]">
                 محصولات و تجهیزات تکنولوژی
               </h2>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
                 تمامی کالاها با گارانتی اصالت طلایی و ارسال سریع پیشتاز عرضه می‌شوند
               </p>
             </div>
@@ -493,7 +580,7 @@ export default function HomePage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -501,8 +588,8 @@ export default function HomePage() {
         </section>
 
         {/* مجله سئو */}
-        <section className="glass-morphism rounded-[2.5rem] p-6 sm:p-8 space-y-4">
-          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+        <section className="glass-morphism rounded-3xl p-6 sm:p-8 space-y-4">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <div>
               <h3 className="text-base font-bold text-[var(--text-primary)]">مجله و مقالات تحلیلی فناوری</h3>
               <p className="text-xs text-[var(--text-secondary)] font-medium">جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها</p>
@@ -528,9 +615,9 @@ function HomeBlogSection() {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
       {posts.map((post) => (
-        <article key={post.id || post.title} className="glass-morphism p-5 rounded-3xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
+        <article key={post.id || post.title} className="glass-morphism p-5 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
           <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
           <Link href={"/blog/" + (post.id || "")} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]">
             مطالعه مقاله ←
@@ -542,12 +629,12 @@ function HomeBlogSection() {
 }
 `);
 
-// ۴. کامیت و استقرار نهایی
+// ۵. کامیت و استقرار نهایی روی Vercel
 console.log('\n📦 در حال ثبت کامیت و استقرار روی گیت‌هاب / Vercel...');
 try {
-  execSync('git add . && git commit -m "fix(theme): restore functional dark/light switcher and dynamic responsive hero" && git push origin main', { stdio: 'inherit' });
+  execSync('git add . && git commit -m "fix(layout): expand screen width, remove dead margins, and deploy unified enterprise footer" && git push origin main', { stdio: 'inherit' });
   console.log('\n🎉 [SUCCESS] استقرار نهایی با موفقیت ۱۰۰٪ کامل شد!');
 } catch (e) {
   console.log('\nℹ️ در صورت لزوم دستور زیر را در ترمینال اجرا کنید:');
-  console.log('git add . && git commit -m "fix(theme): update" && git push');
+  console.log('git add . && git commit -m "fix(layout): update" && git push');
 }

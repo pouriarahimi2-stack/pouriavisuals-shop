@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Footer() {
   const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
@@ -14,48 +15,97 @@ export default function Footer() {
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
-  const siteName = info?.site_name || info?.siteName || "AXON";
-  const footerLogo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
+  const siteName = info?.site_name || info?.siteName || "آکسون | Axon";
+  const logo = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url;
+  const phone = info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+  const email = info?.email || "info@axoncore.ir";
+  const address = info?.address || "تهران، تقاطع میرداماد و ولیعصر، مجتمع پایتخت";
+  const workingHours = info?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰";
 
   return (
-    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-auto select-none transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="glass-morphism p-6 rounded-3xl space-y-4">
+    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-16 select-none transition-colors duration-300" dir="rtl">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 py-12 sm:py-16">
+        
+        {/* ردیف اصلی ستون‌های فوتر */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12 pb-12 border-b border-[var(--card-border)]">
+          
+          {/* ستون ۱ و ۲: معرفی برند و شعار */}
+          <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              {footerLogo ? (
-                <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
-                  <img src={footerLogo} alt={siteName} className="w-full h-full object-contain" />
-                </div>
-              ) : null}
-              <div className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">{siteName}</div>
+              <AnimatedLogo customLogoUrl={logo} size={40} />
+              <span className="text-2xl font-black tracking-tight">{siteName}</span>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار و ابزارهای تکنولوژی با گارانتی اصالت طلایی.</p>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium max-w-md">
+              مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر، مانیتورهای ۵K رتینا، لپ‌تاپ‌های ورک‌استیشن و گجت‌های هوشمند در ایران با ۱۸ ماه گارانتی اصالت طلایی.
+            </p>
+            <div className="flex items-center gap-2 pt-2">
+              <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
+                ✓ گارانتی اصالت ۱۰۰٪ فیزیکی
+              </span>
+              <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[11px] border border-blue-500/20">
+                🚀 ارسال پیشتاز سراسری
+              </span>
+            </div>
           </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-[var(--accent-blue)]">دسترسی سریع</h5>
+
+          {/* ستون ۳: دسترسی سریع */}
+          <div className="space-y-3">
+            <h4 className="font-black text-xs text-[var(--text-primary)]">دسترسی سریع</h4>
             <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-              <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ محصولات</Link></li>
-              <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">پیگیری سفارش</Link></li>
-              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">اخبار تکنولوژی</Link></li>
-              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله سئو</Link></li>
+              <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ کالاها</Link></li>
+              <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">سامانه رهگیری مرسولات</Link></li>
+              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">جدیدترین اخبار تکنولوژی</Link></li>
+              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله مقالات تخصصی</Link></li>
+              <li><Link href="/about" className="hover:text-[var(--accent-blue)] transition">درباره آکسون</Link></li>
             </ul>
           </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-[var(--accent-blue)]">اطلاعات تماس</h5>
+
+          {/* ستون ۴: خدمات و پشتیبانی */}
+          <div className="space-y-3">
+            <h4 className="font-black text-xs text-[var(--text-primary)]">خدمات مشتریان</h4>
             <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-              <li>تلفن: {info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</li>
-              <li>ایمیل: {info?.email || "info@axoncore.ir"}</li>
-              <li>ساعات کاری: {info?.working_hours || "۹:۰۰ الی ۱۸:۰۰"}</li>
+              <li><Link href="/contact" className="hover:text-[var(--accent-blue)] transition">ثبت تیکت مشاوره</Link></li>
+              <li><span className="cursor-default">شرایط گارانتی طلایی</span></li>
+              <li><span className="cursor-default">ضمانت بازگشت وجه ۷ روزه</span></li>
+              <li><span className="cursor-default">راهنمای کالیبراسیون ۵K</span></li>
+              <li><span className="cursor-default">روش‌های پرداخت امن شاپرک</span></li>
             </ul>
           </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-emerald-600 dark:text-emerald-400">ضمانت رسمی</h5>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">۱۰۰٪ اصالت فیزیکی کالا، مهلت تست ۷ روزه سخت‌افزاری و ارسال سریع پیشتاز به سراسر ایران.</p>
+
+          {/* ستون ۵: ارتباط مستقیم */}
+          <div className="space-y-3">
+            <h4 className="font-black text-xs text-[var(--text-primary)]">اطلاعات تماس</h4>
+            <div className="space-y-2.5 text-xs text-[var(--text-secondary)] font-medium">
+              <div>
+                <span className="block text-[10px] opacity-70">تلفن پشتیبانی:</span>
+                <span className="font-mono font-bold text-[var(--text-primary)] text-sm">{phone}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] opacity-70">پست الکترونیک:</span>
+                <span className="font-mono text-xs">{email}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] opacity-70">ساعات پاسخگویی:</span>
+                <span>{workingHours}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] opacity-70">نشانی تحویل:</span>
+                <span className="leading-snug block">{address}</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="mt-10 pt-6 border-t border-[var(--card-border)] text-center text-xs text-[var(--text-secondary)] font-bold">
-          تمامی حقوق محفوظ است © {new Date().getFullYear()} {siteName}
+
+        {/* نوار پایانی فوتر */}
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] font-medium">
+          <p>
+            تمامی حقوق مادی و معنوی برای <strong className="text-[var(--text-primary)]">{siteName}</strong> محفوظ است © {new Date().getFullYear()}
+          </p>
+          <div className="flex items-center gap-4 text-[11px]">
+            <span>طراحی و معماری مهندسی پایدار</span>
+            <span>•</span>
+            <span className="text-emerald-500 font-bold">نماد اعتماد الکترونیکی فعال</span>
+          </div>
         </div>
       </div>
     </footer>

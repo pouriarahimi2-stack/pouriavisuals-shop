@@ -47,7 +47,6 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* کارت‌های شیشه‌ای بلورین با شفافیت پویا */
 .glass-morphism {
   background: var(--glass-surface);
   backdrop-filter: blur(24px);
@@ -79,6 +78,15 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes bounceShort {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -4px); }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-bounce-short {
+  animation: bounceShort 2.4s ease-in-out infinite;
 }

@@ -1,7 +1,7 @@
 // File Path: app/api/orders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { FLAGSHIP_7_PRODUCTS, normalizeProduct } from '@/services/productService';
+import { FLAGSHIP_7_PRODUCTS } from '@/services/productService';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
     const rawItems = Array.isArray(body.items) ? body.items : [];
     const couponCode = body.couponCode || body.coupon_code || null;
 
-    // ۱. استعلام و اعتبارسنجی قیمت واقعی محصولات در سرور (مهار ۱۰۰٪ تقلب کلاینت)
     let productIds = rawItems.map((i: any) => String(i.productId || i.id || i.product_id)).filter(Boolean);
     let dbProducts: any[] = [];
 
@@ -38,7 +37,6 @@ export async function POST(req: NextRequest) {
         matchedDb = FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === pId);
       }
 
-      // اگر در دیتابیس نرخ رسمی وجود داشت از آن استفاده شود تا دستکاری قیمت کلاینت مهار شود
       const officialPrice = matchedDb
         ? (matchedDb.discount_price && Number(matchedDb.discount_price) > 0
             ? Number(matchedDb.discount_price)
@@ -61,7 +59,6 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // ۲. اعتبارسنجی کوپن تخفیف
     let discountAmount = Number(body.discountAmount || body.discount_amount || 0);
     if (couponCode) {
       try {
@@ -115,6 +112,28 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.from('orders').upsert(orderPayload, { onConflict: 'id' });
     } catch (dbErr) {
       console.warn('Orders db upsert warning:', dbErr);
+    }
+
+    for (const item of validatedItems) {
+      if (item.productId && supabaseAdmin) {
+        try {
+          const { data: currentP } = await supabaseAdmin
+            .from("products")
+            .select("stock")
+            .eq("id", item.productId)
+            .maybeSingle();
+
+          if (currentP && currentP.stock !== null && currentP.stock !== undefined) {
+            const newStock = Math.max(0, Number(currentP.stock) - Number(item.quantity || 1));
+            await supabaseAdmin
+              .from("products")
+              .update({ stock: newStock, is_available: newStock > 0 })
+              .eq("id", item.productId);
+          }
+        } catch (stkErr) {
+          console.warn("Stock decrease atomic error:", stkErr);
+        }
+      }
     }
 
     return NextResponse.json({

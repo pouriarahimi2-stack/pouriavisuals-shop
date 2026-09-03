@@ -48,6 +48,8 @@ class MasterRealtimeEngine {
   private channel: RealtimeChannel | null = null;
   private broadcastBus: BroadcastChannel | null = null;
   private isSubscribed: boolean = false;
+  private reconnectTimer: any = null;
+  private reconnectAttempts: number = 0;
 
   constructor() {
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
@@ -116,7 +118,7 @@ class MasterRealtimeEngine {
       const eventNames = [
         "products_updated", "site_info_updated", "banners_updated",
         "orders_updated", "coupons_updated", "menu_updated", "news_updated",
-        "contact_messages_updated", "posts_updated"
+        "contact_messages_updated", "posts_updated", "admin_users_updated"
       ];
 
       eventNames.forEach((ev) => {
@@ -129,7 +131,12 @@ class MasterRealtimeEngine {
         });
       });
 
-      const tables = ["products", "orders", "site_info", "banners", "tech_news", "coupons", "menu_items", "categories", "contact_messages", "posts"];
+      const tables = [
+        "products", "orders", "site_info", "banners",
+        "tech_news", "coupons", "menu_items", "categories",
+        "contact_messages", "posts", "admin_users"
+      ];
+
       tables.forEach((tableName) => {
         this.channel?.on(
           "postgres_changes",
@@ -157,11 +164,27 @@ class MasterRealtimeEngine {
       this.channel.subscribe((status) => {
         if (status === "SUBSCRIBED") {
           this.isSubscribed = true;
+          this.reconnectAttempts = 0;
+          if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          this.isSubscribed = false;
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+          this.reconnectAttempts++;
+          this.reconnectTimer = setTimeout(() => {
+            this.init();
+          }, delay);
         }
       });
     } catch {}
 
-    return () => {};
+    return () => {
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+      if (this.channel) {
+        supabase.removeChannel(this.channel);
+        this.channel = null;
+        this.isSubscribed = false;
+      }
+    };
   }
 }
 

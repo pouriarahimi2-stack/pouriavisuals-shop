@@ -11,8 +11,6 @@ import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
 
-type ThemeMode = "dark" | "light" | "auto";
-
 export default function Header() {
   const router = useRouter();
   const cartContext = useCart();
@@ -22,7 +20,7 @@ export default function Header() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo>(DEFAULT_SITE_INFO);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [themeMode, setThemeMode] = useState<ThemeMode>("auto");
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -33,19 +31,7 @@ export default function Header() {
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
-  // اعمال هوشمند تم بر اساس ساعت دستگاه یا انتخاب دستی
-  const applyTheme = (mode: ThemeMode) => {
-    let isDark = false;
-    if (mode === "dark") {
-      isDark = true;
-    } else if (mode === "light") {
-      isDark = false;
-    } else {
-      // حالت خودکار: سنجش ساعت دستگاه (۶ صبح تا ۶ عصر = روز، ۶ عصر تا ۶ صبح = شب)
-      const currentHour = new Date().getHours();
-      isDark = currentHour < 6 || currentHour >= 18;
-    }
-
+  const applyTheme = (isDark: boolean) => {
     if (isDark) {
       document.documentElement.classList.add("dark");
     } else {
@@ -56,9 +42,10 @@ export default function Header() {
   useEffect(() => {
     setMounted(true);
     try {
-      const savedMode = (localStorage.getItem("axon_theme_mode") as ThemeMode) || "auto";
-      setThemeMode(savedMode);
-      applyTheme(savedMode);
+      const savedTheme = localStorage.getItem("theme");
+      const isDark = savedTheme !== "light";
+      setIsDarkMode(isDark);
+      applyTheme(isDark);
     } catch {}
 
     const initHeaderData = async () => {
@@ -97,16 +84,12 @@ export default function Header() {
     };
   }, []);
 
-  const cycleTheme = () => {
+  const toggleTheme = () => {
     soundEngine.playClick();
-    let nextMode: ThemeMode = "dark";
-    if (themeMode === "dark") nextMode = "light";
-    else if (themeMode === "light") nextMode = "auto";
-    else nextMode = "dark";
-
-    setThemeMode(nextMode);
-    localStorage.setItem("axon_theme_mode", nextMode);
-    applyTheme(nextMode);
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    localStorage.setItem("theme", nextDark ? "dark" : "light");
+    applyTheme(nextDark);
   };
 
   useEffect(() => {
@@ -148,8 +131,8 @@ export default function Header() {
     setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
   };
 
+  // منوی تمیز ناوبری (بدون "صفحه نخست")
   const navLinks = [
-    { title: "صفحه نخست", href: "/" },
     { title: "کاتالوگ محصولات", href: "/#products" },
     { title: "اخبار تکنولوژی", href: "/news" },
     { title: "مجله سئو", href: "/blog" },
@@ -164,6 +147,8 @@ export default function Header() {
     <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
       <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          
+          {/* دکمه دراپ‌داون دسته‌بندی‌ها */}
           <div className="relative" ref={categoryDropdownRef}>
             <button
               onClick={() => { soundEngine.playClick(); setIsCategoryOpen(!isCategoryOpen); }}
@@ -236,14 +221,24 @@ export default function Header() {
             )}
           </div>
 
-          {/* سوییچر ۳ حالته تم (دارک / لایت / خودکار) */}
+          {/* آیکون استاندارد و فوق‌العاده شیک SVG برای تغییر تم */}
           <button
-            onClick={cycleTheme}
-            className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm"
-            title={themeMode === "dark" ? "تم فعلی: تاریک (کلیک: روشن)" : themeMode === "light" ? "تم فعلی: روشن (کلیک: خودکار)" : "تم فعلی: خودکار بر اساس ساعت (کلیک: تاریک)"}
+            onClick={toggleTheme}
+            className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)]"
+            title={isDarkMode ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
             suppressHydrationWarning
           >
-            {mounted ? (themeMode === "dark" ? "🌙" : themeMode === "light" ? "☀️" : "⏰") : "🌙"}
+            {mounted ? (
+              isDarkMode ? (
+                // آیکون خورشید برای تم لایت
+                <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+              ) : (
+                // آیکون ماه برای تم دارک
+                <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+              )
+            ) : (
+              <span className="w-4 h-4" />
+            )}
           </button>
 
           <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="p-2 opacity-80 hover:opacity-100 transition relative cursor-pointer text-[var(--text-primary)]" title="سبد خرید">

@@ -8,7 +8,6 @@ import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 import AIAssistantChat from "@/components/AIAssistantChat";
-import TechRadarFeed from "@/components/TechRadarFeed";
 import ProductComparisonModal from "@/components/ProductComparisonModal";
 import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
@@ -72,76 +71,61 @@ export default function HomePage() {
     return cat === target || cat.includes(target) || target.includes(cat);
   });
 
-  const categories = Array.from(new Set(products.map((p) => p.category || "تکنولوژی"))).filter(Boolean);
-
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-24 transition-colors duration-300" dir="rtl">
       <main className="pt-6 sm:pt-8 px-3 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-10">
         
-        {/* ۱. هیرو بنتو شیشه‌ای Google Stitch */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-3 min-h-[300px] sm:min-h-[340px] rounded-3xl overflow-hidden relative glass-morphism flex flex-col justify-end p-6 sm:p-10">
-            <img src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1600" className="absolute inset-0 w-full h-full object-cover opacity-25 dark:opacity-35" alt="Tech Showcase" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/60 to-transparent" />
-            <div className="relative z-10 space-y-3 text-right">
-              <span className="inline-block px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-bold text-xs border border-[var(--accent-blue)]/30">
-                ⚡ اکوسیستم جامع تکنولوژی ۲۰۲۶
-              </span>
-              <h1 className="text-2xl sm:text-4xl font-black leading-tight text-[var(--text-primary)]">
-                مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
-              </h1>
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-xl font-medium leading-relaxed">
-                تامین انواع سیستم‌های پردازشی، لپ‌تاپ‌های ورک‌استیشن، ساعت‌های هوشمند، نمایشگرهای ۵K و قطعات دیجیتال با ۱۸ ماه گارانتی اصالت طلایی.
-              </p>
-              <div className="pt-2 flex gap-3">
-                <Link href="/#products" className="bg-[var(--accent-blue)] text-white px-7 py-3.5 rounded-full font-black text-xs hover:scale-105 transition-transform shadow-lg shadow-blue-500/20">
-                  مشاهده کاتالوگ محصولات ←
-                </Link>
-              </div>
+        {/* ۱. هیرو بنر عریض، یکپارچه و فوق‌العاده شیک (بدون باکس سمت چپ) */}
+        <section className="w-full min-h-[300px] sm:min-h-[380px] rounded-3xl overflow-hidden relative glass-morphism flex flex-col justify-end p-6 sm:p-12 shadow-2xl">
+          <img src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1600" className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-35" alt="Tech Showcase" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/60 to-transparent" />
+          <div className="relative z-10 space-y-3.5 text-right max-w-3xl">
+            <span className="inline-block px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-bold text-xs border border-[var(--accent-blue)]/30">
+              ⚡ اکوسیستم جامع تکنولوژی و گجت‌های نوین ۲۰۲۶
+            </span>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight text-[var(--text-primary)]">
+              مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
+            </h1>
+            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed">
+              تامین انواع سیستم‌های پردازشی، لپ‌تاپ‌های حرفه‌ای، ساعت‌های هوشمند، نمایشگرهای پیشرفته و قطعات دیجیتال با ۱۸ ماه گارانتی اصالت طلایی.
+            </p>
+            <div className="pt-2 flex gap-3">
+              <Link href="/#products" className="bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 transition-transform shadow-lg shadow-blue-500/20">
+                مشاهده کاتالوگ محصولات ←
+              </Link>
             </div>
-          </div>
-
-          <div className="md:col-span-1 min-h-[300px] sm:min-h-[340px] rounded-3xl glass-morphism p-6 flex flex-col justify-center items-center text-center space-y-2">
-            <div className="text-4xl font-black text-[var(--accent-blue)]">۱۰۰٪</div>
-            <h4 className="text-sm font-bold text-[var(--text-primary)]">ضمانت اصالت فیزیکی کالا</h4>
-            <p className="text-xs text-[var(--text-secondary)] font-medium">ارسال رایگان سفارش‌های بالای ۲ میلیون با پست پیشتاز</p>
           </div>
         </section>
 
-        {/* ۲. تیکر اخبار روز تکنولوژی */}
-        <TechRadarFeed />
+        {/* ۲. گرید محصولات بدون دسته‌بندی‌های تکراری */}
+        <section id="products" className="space-y-6">
+          <div className="border-b border-[var(--card-border)] pb-4 px-1 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg sm:text-2xl font-black tracking-tight text-[var(--text-primary)]">
+                محصولات و تجهیزات تکنولوژی
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+                تمامی کالاها با گارانتی اصالت طلایی و ارسال سریع پیشتاز عرضه می‌شوند
+              </p>
+            </div>
+            {selectedCategory !== "all" && (
+              <button
+                onClick={() => setSelectedCategory("all")}
+                className="text-xs font-bold text-[var(--accent-blue)] hover:underline cursor-pointer"
+              >
+                نمایش همه کالاها ({products.length})
+              </button>
+            )}
+          </div>
 
-        {/* ۳. پیل‌های سگمنت دسته‌بندی Google Stitch */}
-        <nav className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" dir="rtl">
-          <button
-            onClick={() => setSelectedCategory("all")}
-            className={`px-6 py-2.5 rounded-full glass-morphism whitespace-nowrap text-xs font-bold transition-all cursor-pointer ${
-              selectedCategory === "all" ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25 border-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-            }`}
-          >
-            همه محصولات ({products.length})
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-6 py-2.5 rounded-full glass-morphism whitespace-nowrap text-xs font-bold transition-all cursor-pointer ${
-                selectedCategory === cat ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25 border-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </nav>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
 
-        {/* ۴. گرید محصولات با کارت‌های شیشه‌ای Google Stitch */}
-        <div id="products" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-
-        {/* ۵. بخش مقالات سئو */}
+        {/* ۳. بخش مقالات سئو */}
         <section className="glass-morphism rounded-3xl p-6 sm:p-8 space-y-4">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>

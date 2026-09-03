@@ -3,105 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🎬 [AXON ARCHITECT] در حال اعمال سیستم جامع تم ۳ حالته (دارک Google Stitch، لایت شیشه‌ای و خودکار بر اساس ساعت دستگاه)، تعمیم تکنولوژی و رفع ارورها...');
+console.log('🎬 [AXON ARCHITECT] در حال اعمال اصلاحات ۴ گانه درخواستی: پاکسازی المان‌های اضافه، فول‌عرض کردن هیرو، حذف اخبار و دسته‌های تکراری و اصلاح آیکون تم...');
 
 const files = {
-  // ۱. توکن‌های رنگی و استایل متغیرهای سراسری برای تم دارک و لایت Google Stitch
-  'app/globals.css': `/* File Path: app/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --card-border: rgba(15, 23, 42, 0.08);
-  --accent-blue: #0284c7;
-  --accent-glow: rgba(2, 132, 199, 0.15);
-  --modal-bg: #ffffff;
-  --input-bg: #f1f5f9;
-  --glass-surface: rgba(255, 255, 255, 0.75);
-}
-
-.dark {
-  --bg-primary: #101416;
-  --bg-secondary: #161b1e;
-  --text-primary: #ffffff;
-  --text-secondary: #94a3b8;
-  --card-border: rgba(255, 255, 255, 0.08);
-  --accent-blue: #1b90ff;
-  --accent-glow: rgba(27, 144, 255, 0.25);
-  --modal-bg: #161b1e;
-  --input-bg: rgba(255, 255, 255, 0.04);
-  --glass-surface: rgba(255, 255, 255, 0.03);
-}
-
-html, body {
-  overflow-x: hidden !important;
-  width: 100%;
-  max-width: 100vw;
-  scroll-behavior: smooth;
-  -webkit-tap-highlight-color: transparent;
-}
-
-body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.pt-safe {
-  padding-top: max(1rem, env(safe-area-inset-top));
-}
-
-.pb-safe {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-}
-
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* شیشه و کارت‌های مدرن Google Stitch */
-.glass-morphism {
-  background: var(--glass-surface);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.12);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.dark .glass-morphism {
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-}
-
-.glass-morphism:hover {
-  border-color: var(--accent-blue);
-  box-shadow: 0 12px 40px 0 var(--accent-glow);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-`,
-
-  // ۲. هدر کپسولی شیشه‌ای با سوییچر ۳ حالته تم (دارک / لایت / خودکار ساعتی)
+  // ۱. هدر شیشه‌ای اصلاح‌شده (حذف صفحه نخست، آیکون مدرن SVG تم و دکمه مستقیم اخبار تکنولوژی)
   'components/Header.tsx': `"use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -115,8 +20,6 @@ import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
 
-type ThemeMode = "dark" | "light" | "auto";
-
 export default function Header() {
   const router = useRouter();
   const cartContext = useCart();
@@ -126,7 +29,7 @@ export default function Header() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo>(DEFAULT_SITE_INFO);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [themeMode, setThemeMode] = useState<ThemeMode>("auto");
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -137,19 +40,7 @@ export default function Header() {
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
-  // اعمال هوشمند تم بر اساس ساعت دستگاه یا انتخاب دستی
-  const applyTheme = (mode: ThemeMode) => {
-    let isDark = false;
-    if (mode === "dark") {
-      isDark = true;
-    } else if (mode === "light") {
-      isDark = false;
-    } else {
-      // حالت خودکار: سنجش ساعت دستگاه (۶ صبح تا ۶ عصر = روز، ۶ عصر تا ۶ صبح = شب)
-      const currentHour = new Date().getHours();
-      isDark = currentHour < 6 || currentHour >= 18;
-    }
-
+  const applyTheme = (isDark: boolean) => {
     if (isDark) {
       document.documentElement.classList.add("dark");
     } else {
@@ -160,9 +51,10 @@ export default function Header() {
   useEffect(() => {
     setMounted(true);
     try {
-      const savedMode = (localStorage.getItem("axon_theme_mode") as ThemeMode) || "auto";
-      setThemeMode(savedMode);
-      applyTheme(savedMode);
+      const savedTheme = localStorage.getItem("theme");
+      const isDark = savedTheme !== "light";
+      setIsDarkMode(isDark);
+      applyTheme(isDark);
     } catch {}
 
     const initHeaderData = async () => {
@@ -201,16 +93,12 @@ export default function Header() {
     };
   }, []);
 
-  const cycleTheme = () => {
+  const toggleTheme = () => {
     soundEngine.playClick();
-    let nextMode: ThemeMode = "dark";
-    if (themeMode === "dark") nextMode = "light";
-    else if (themeMode === "light") nextMode = "auto";
-    else nextMode = "dark";
-
-    setThemeMode(nextMode);
-    localStorage.setItem("axon_theme_mode", nextMode);
-    applyTheme(nextMode);
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    localStorage.setItem("theme", nextDark ? "dark" : "light");
+    applyTheme(nextDark);
   };
 
   useEffect(() => {
@@ -252,8 +140,8 @@ export default function Header() {
     setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
   };
 
+  // منوی تمیز ناوبری (بدون "صفحه نخست")
   const navLinks = [
-    { title: "صفحه نخست", href: "/" },
     { title: "کاتالوگ محصولات", href: "/#products" },
     { title: "اخبار تکنولوژی", href: "/news" },
     { title: "مجله سئو", href: "/blog" },
@@ -268,6 +156,8 @@ export default function Header() {
     <header className="sticky top-2 sm:top-4 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
       <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          
+          {/* دکمه دراپ‌داون دسته‌بندی‌ها */}
           <div className="relative" ref={categoryDropdownRef}>
             <button
               onClick={() => { soundEngine.playClick(); setIsCategoryOpen(!isCategoryOpen); }}
@@ -340,14 +230,24 @@ export default function Header() {
             )}
           </div>
 
-          {/* سوییچر ۳ حالته تم (دارک / لایت / خودکار) */}
+          {/* آیکون استاندارد و فوق‌العاده شیک SVG برای تغییر تم */}
           <button
-            onClick={cycleTheme}
-            className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm"
-            title={themeMode === "dark" ? "تم فعلی: تاریک (کلیک: روشن)" : themeMode === "light" ? "تم فعلی: روشن (کلیک: خودکار)" : "تم فعلی: خودکار بر اساس ساعت (کلیک: تاریک)"}
+            onClick={toggleTheme}
+            className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)]"
+            title={isDarkMode ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
             suppressHydrationWarning
           >
-            {mounted ? (themeMode === "dark" ? "🌙" : themeMode === "light" ? "☀️" : "⏰") : "🌙"}
+            {mounted ? (
+              isDarkMode ? (
+                // آیکون خورشید برای تم لایت
+                <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+              ) : (
+                // آیکون ماه برای تم دارک
+                <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+              )
+            ) : (
+              <span className="w-4 h-4" />
+            )}
           </button>
 
           <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="p-2 opacity-80 hover:opacity-100 transition relative cursor-pointer text-[var(--text-primary)]" title="سبد خرید">
@@ -365,7 +265,7 @@ export default function Header() {
 }
 `,
 
-  // ۳. صفحه اصلی کاملاً هماهنگ در هر دو حالت لایت و دارک Google Stitch
+  // ۲. صفحه اصلی اصلاح‌شده (هیرو فول‌عرض، بدون باکس سمت چپ، بدون اخبار و بدون دسته‌های تکراری)
   'app/page.tsx': `// File Path: app/page.tsx
 "use client";
 
@@ -376,7 +276,6 @@ import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 import AIAssistantChat from "@/components/AIAssistantChat";
-import TechRadarFeed from "@/components/TechRadarFeed";
 import ProductComparisonModal from "@/components/ProductComparisonModal";
 import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
@@ -440,76 +339,61 @@ export default function HomePage() {
     return cat === target || cat.includes(target) || target.includes(cat);
   });
 
-  const categories = Array.from(new Set(products.map((p) => p.category || "تکنولوژی"))).filter(Boolean);
-
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-24 transition-colors duration-300" dir="rtl">
       <main className="pt-6 sm:pt-8 px-3 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-10">
         
-        {/* ۱. هیرو بنتو شیشه‌ای Google Stitch */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-3 min-h-[300px] sm:min-h-[340px] rounded-3xl overflow-hidden relative glass-morphism flex flex-col justify-end p-6 sm:p-10">
-            <img src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1600" className="absolute inset-0 w-full h-full object-cover opacity-25 dark:opacity-35" alt="Tech Showcase" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/60 to-transparent" />
-            <div className="relative z-10 space-y-3 text-right">
-              <span className="inline-block px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-bold text-xs border border-[var(--accent-blue)]/30">
-                ⚡ اکوسیستم جامع تکنولوژی ۲۰۲۶
-              </span>
-              <h1 className="text-2xl sm:text-4xl font-black leading-tight text-[var(--text-primary)]">
-                مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
-              </h1>
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-xl font-medium leading-relaxed">
-                تامین انواع سیستم‌های پردازشی، لپ‌تاپ‌های ورک‌استیشن، ساعت‌های هوشمند، نمایشگرهای ۵K و قطعات دیجیتال با ۱۸ ماه گارانتی اصالت طلایی.
-              </p>
-              <div className="pt-2 flex gap-3">
-                <Link href="/#products" className="bg-[var(--accent-blue)] text-white px-7 py-3.5 rounded-full font-black text-xs hover:scale-105 transition-transform shadow-lg shadow-blue-500/20">
-                  مشاهده کاتالوگ محصولات ←
-                </Link>
-              </div>
+        {/* ۱. هیرو بنر عریض، یکپارچه و فوق‌العاده شیک (بدون باکس سمت چپ) */}
+        <section className="w-full min-h-[300px] sm:min-h-[380px] rounded-3xl overflow-hidden relative glass-morphism flex flex-col justify-end p-6 sm:p-12 shadow-2xl">
+          <img src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1600" className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-35" alt="Tech Showcase" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--modal-bg)] via-[var(--modal-bg)]/60 to-transparent" />
+          <div className="relative z-10 space-y-3.5 text-right max-w-3xl">
+            <span className="inline-block px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-bold text-xs border border-[var(--accent-blue)]/30">
+              ⚡ اکوسیستم جامع تکنولوژی و گجت‌های نوین ۲۰۲۶
+            </span>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight text-[var(--text-primary)]">
+              مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
+            </h1>
+            <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed">
+              تامین انواع سیستم‌های پردازشی، لپ‌تاپ‌های حرفه‌ای، ساعت‌های هوشمند، نمایشگرهای پیشرفته و قطعات دیجیتال با ۱۸ ماه گارانتی اصالت طلایی.
+            </p>
+            <div className="pt-2 flex gap-3">
+              <Link href="/#products" className="bg-[var(--accent-blue)] text-white px-8 py-3.5 rounded-full font-black text-xs hover:scale-105 transition-transform shadow-lg shadow-blue-500/20">
+                مشاهده کاتالوگ محصولات ←
+              </Link>
             </div>
-          </div>
-
-          <div className="md:col-span-1 min-h-[300px] sm:min-h-[340px] rounded-3xl glass-morphism p-6 flex flex-col justify-center items-center text-center space-y-2">
-            <div className="text-4xl font-black text-[var(--accent-blue)]">۱۰۰٪</div>
-            <h4 className="text-sm font-bold text-[var(--text-primary)]">ضمانت اصالت فیزیکی کالا</h4>
-            <p className="text-xs text-[var(--text-secondary)] font-medium">ارسال رایگان سفارش‌های بالای ۲ میلیون با پست پیشتاز</p>
           </div>
         </section>
 
-        {/* ۲. تیکر اخبار روز تکنولوژی */}
-        <TechRadarFeed />
+        {/* ۲. گرید محصولات بدون دسته‌بندی‌های تکراری */}
+        <section id="products" className="space-y-6">
+          <div className="border-b border-[var(--card-border)] pb-4 px-1 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg sm:text-2xl font-black tracking-tight text-[var(--text-primary)]">
+                محصولات و تجهیزات تکنولوژی
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+                تمامی کالاها با گارانتی اصالت طلایی و ارسال سریع پیشتاز عرضه می‌شوند
+              </p>
+            </div>
+            {selectedCategory !== "all" && (
+              <button
+                onClick={() => setSelectedCategory("all")}
+                className="text-xs font-bold text-[var(--accent-blue)] hover:underline cursor-pointer"
+              >
+                نمایش همه کالاها ({products.length})
+              </button>
+            )}
+          </div>
 
-        {/* ۳. پیل‌های سگمنت دسته‌بندی Google Stitch */}
-        <nav className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" dir="rtl">
-          <button
-            onClick={() => setSelectedCategory("all")}
-            className={\`px-6 py-2.5 rounded-full glass-morphism whitespace-nowrap text-xs font-bold transition-all cursor-pointer \${
-              selectedCategory === "all" ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25 border-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-            }\`}
-          >
-            همه محصولات ({products.length})
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={\`px-6 py-2.5 rounded-full glass-morphism whitespace-nowrap text-xs font-bold transition-all cursor-pointer \${
-                selectedCategory === cat ? "bg-[var(--accent-blue)] text-white shadow-lg shadow-blue-500/25 border-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)]"
-              }\`}
-            >
-              {cat}
-            </button>
-          ))}
-        </nav>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
 
-        {/* ۴. گرید محصولات با کارت‌های شیشه‌ای Google Stitch */}
-        <div id="products" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-
-        {/* ۵. بخش مقالات سئو */}
+        {/* ۳. بخش مقالات سئو */}
         <section className="glass-morphism rounded-3xl p-6 sm:p-8 space-y-4">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
@@ -549,188 +433,6 @@ function HomeBlogSection() {
     </div>
   );
 }
-`,
-
-  // ۴. کارت محصول تطبیق‌پذیر با تم لایت و دارک Google Stitch
-  'components/ProductCard.tsx': `"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
-import { formatPrice } from "@/lib/formatters";
-
-export default function ProductCard({ product }: { product: any }) {
-  const { addToCart } = useCart();
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
-
-  const title = product.title || product.title_fa || product.name || "کالای تکنولوژی";
-  const price = Number(product.price) || 0;
-  const discountPrice = product.discountPrice ? Number(product.discountPrice) : undefined;
-  const currentPrice = discountPrice || price;
-  const stockCount = product.stock !== undefined ? Number(product.stock) : 10;
-  const mainImage = product.images?.[0] || product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600";
-  const category = product.category || "تکنولوژی";
-  const isAvailable = product.is_available !== false && stockCount > 0;
-
-  return (
-    <div
-      onClick={() => userBehavior.trackProductView(product.id, category)}
-      className="glass-morphism rounded-3xl overflow-hidden p-5 flex flex-col justify-between group select-none relative"
-      dir="rtl"
-    >
-      <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
-        <Link href={\`/products/\${product.id}\`} className="w-full h-full flex items-center justify-center">
-          <img src={mainImage} alt={title} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
-        </Link>
-        <span className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">
-          {category}
-        </span>
-      </div>
-
-      <div className="space-y-2 mb-4 text-right flex-grow">
-        <span className="text-[var(--accent-blue)] text-xs font-bold block">{product.brand || "AXON"}</span>
-        <Link href={\`/products/\${product.id}\`}>
-          <h3 className="text-sm font-bold text-[var(--text-primary)] line-clamp-2 leading-snug hover:text-[var(--accent-blue)] transition">{title}</h3>
-        </Link>
-        <p className="text-xs text-[var(--text-secondary)] line-clamp-2 font-medium leading-relaxed">{product.short_description || product.description || "دارای گارانتی اصالت طلایی و ارسال پیشتاز"}</p>
-      </div>
-
-      <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
-        <div className="flex justify-between items-center flex-row-reverse">
-          <span className="text-base font-mono font-black text-[var(--text-primary)]" suppressHydrationWarning>{formatPrice(currentPrice)} تومان</span>
-          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{isAvailable ? "موجود ✓" : "ناموجود"}</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={(e) => {
-              e.preventDefault(); e.stopPropagation();
-              soundEngine.playAddToCart();
-              addToCart({ id: product.id, title, name: title, price: currentPrice, image: mainImage, stock: stockCount, quantity: 1 });
-            }}
-            disabled={!isAvailable}
-            className="py-2.5 bg-[var(--input-bg)] hover:bg-[var(--accent-blue)] hover:text-white text-[var(--text-primary)] text-xs font-bold rounded-xl border border-[var(--card-border)] transition cursor-pointer disabled:opacity-40"
-          >
-            🛒 سبد خرید
-          </button>
-          <button
-            onClick={(e) => {
-              e.preventDefault(); e.stopPropagation();
-              soundEngine.playAddToCart();
-              addToCart({ id: product.id, title, name: title, price: currentPrice, image: mainImage, stock: stockCount, quantity: 1 });
-              router.push("/checkout");
-            }}
-            disabled={!isAvailable}
-            className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-lg shadow-blue-500/20 hover:opacity-90 transition cursor-pointer disabled:opacity-40"
-          >
-            ⚡ خرید فوری
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-`,
-
-  // ۵. فوتر بنتو هماهنگ
-  'components/Footer.tsx': `// File Path: components/Footer.tsx
-"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-
-export default function Footer() {
-  const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
-
-  useEffect(() => {
-    siteInfoService.getSiteInfo().then((d) => d && setInfo(d));
-    const handleUpdate = (e: any) => { if (e.detail) setInfo(e.detail); };
-    window.addEventListener("site_info_updated", handleUpdate);
-    return () => window.removeEventListener("site_info_updated", handleUpdate);
-  }, []);
-
-  const siteName = info?.site_name || info?.siteName || "AXON";
-
-  return (
-    <footer className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-auto select-none transition-colors duration-300" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <div className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">{siteName}</div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">مرجع تخصصی خرید جدیدترین گجت‌های نوین، سخت‌افزار و ابزارهای تکنولوژی با گارانتی اصالت طلایی.</p>
-          </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-[var(--accent-blue)]">دسترسی سریع</h5>
-            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-              <li><Link href="/#products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ محصولات</Link></li>
-              <li><Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">پیگیری سفارش</Link></li>
-              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">اخبار تکنولوژی</Link></li>
-              <li><Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله سئو</Link></li>
-            </ul>
-          </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-[var(--accent-blue)]">اطلاعات تماس</h5>
-            <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-              <li>تلفن: {info?.phone || "۰۲۱-۸۸۸۸۸۸۸۸"}</li>
-              <li>ایمیل: {info?.email || "info@axoncore.ir"}</li>
-              <li>ساعات کاری: {info?.working_hours || "۹:۰۰ الی ۱۸:۰۰"}</li>
-            </ul>
-          </div>
-          <div className="glass-morphism p-6 rounded-3xl space-y-3">
-            <h5 className="font-bold text-sm text-emerald-600 dark:text-emerald-400">ضمانت رسمی</h5>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">۱۰۰٪ اصالت فیزیکی کالا، مهلت تست ۷ روزه سخت‌افزاری و ارسال سریع پیشتاز به سراسر ایران.</p>
-          </div>
-        </div>
-        <div className="mt-10 pt-6 border-t border-[var(--card-border)] text-center text-xs text-[var(--text-secondary)] font-bold">
-          تمامی حقوق محفوظ است © {new Date().getFullYear()} {siteName}
-        </div>
-      </div>
-    </footer>
-  );
-}
-`,
-
-  // ۶. داک ناوبری شناور اپلیکیشن در موبایل
-  'components/MobileBottomNav.tsx': `// File Path: components/MobileBottomNav.tsx
-"use client";
-
-import React from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useCart } from '@/context/CartContext';
-import { soundEngine } from '@/lib/soundEngine';
-
-export default function MobileBottomNav() {
-  const pathname = usePathname();
-  const { totalItems, toggleCart } = useCart();
-
-  if (pathname?.startsWith("/admin")) return null;
-
-  return (
-    <nav className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md glass-morphism rounded-full p-2 flex justify-around items-center z-50 shadow-2xl backdrop-blur-2xl" dir="rtl">
-      <Link href="/" onClick={() => soundEngine.playClick()} className={\`p-3 rounded-full transition-all \${pathname === "/" ? "text-[var(--accent-blue)] bg-[var(--accent-blue)]/15" : "opacity-60 text-[var(--text-primary)]"}\`}>
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-      </Link>
-      <Link href="/#products" onClick={() => soundEngine.playClick()} className={\`p-3 rounded-full transition-all \${pathname === "/products" ? "text-[var(--accent-blue)] bg-[var(--accent-blue)]/15" : "opacity-60 text-[var(--text-primary)]"}\`}>
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-      </Link>
-      <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="p-3 text-[var(--text-primary)] opacity-60 hover:opacity-100 relative cursor-pointer">
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-        {totalItems > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-[var(--accent-blue)] text-white rounded-full text-[9px] font-mono font-bold flex items-center justify-center">{totalItems}</span>}
-      </button>
-      <Link href="/track-order" onClick={() => soundEngine.playClick()} className={\`p-3 rounded-full transition-all \${pathname === "/track-order" ? "text-[var(--accent-blue)] bg-[var(--accent-blue)]/15" : "opacity-60 text-[var(--text-primary)]"}\`}>
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-      </Link>
-    </nav>
-  );
-}
 `
 };
 
@@ -739,13 +441,13 @@ for (const [filePath, content] of Object.entries(files)) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');
-  console.log(`✅ [STITCH THEME READY] فایل به‌روزرسانی شد: ${filePath}`);
+  console.log(`✅ [CLEANED & UPDATED] فایل بهینه‌سازی شد: ${filePath}`);
 }
 
-console.log('📦 در حال Push به گیت‌هاب و دیپلوی روی Vercel...');
+console.log('📦 در حال Push به گیت‌هاب و دیپلوی تمیز روی Vercel...');
 try {
-  execSync('git add . && git commit -m "feat: complete adaptive 3-mode theme switcher (dark Google Stitch, crisp light & smart time-based auto)" && git push origin main', { stdio: 'inherit' });
-  console.log('🎉 [DEPLOYED] استقرار با موفقیت ۱۰۰٪ کامل شد!');
+  execSync('git add . && git commit -m "feat: clean UI, remove clutter, full-width hero, add news header link & clean SVG theme toggle" && git push origin main', { stdio: 'inherit' });
+  console.log('🎉 [DEPLOYED] استقرار نهایی با موفقیت ۱۰۰٪ کامل شد!');
 } catch (e) {
   console.log('⚠️ دستور دستی: git push origin main');
 }

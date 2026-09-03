@@ -30,7 +30,7 @@ export default function ProductCard({ product }: { product: any }) {
     <>
       <div
         onClick={() => userBehavior.trackProductView(product.id, category)}
-        className="glass-morphism rounded-3xl overflow-hidden p-5 flex flex-col justify-between group select-none relative"
+        className="glass-morphism rounded-[2.2rem] overflow-hidden p-5 flex flex-col justify-between group select-none relative"
         dir="rtl"
       >
         <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
@@ -38,7 +38,7 @@ export default function ProductCard({ product }: { product: any }) {
             <img src={mainImage} alt={title} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
           </Link>
           
-          <span className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+          <span className="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-md text-white text-[10px] px-3 py-1 rounded-full font-bold border border-white/10">
             {category}
           </span>
 
@@ -50,11 +50,11 @@ export default function ProductCard({ product }: { product: any }) {
               soundEngine.playExplodeShift();
               setIsTeardownOpen(true);
             }}
-            className="absolute bottom-2.5 right-2.5 px-3 py-1 rounded-xl bg-black/70 hover:bg-blue-600 text-white font-bold text-[10px] border border-white/20 backdrop-blur-md transition flex items-center gap-1 shadow-md cursor-pointer"
+            className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-blue-600 text-white font-bold text-[10px] border border-white/20 backdrop-blur-md transition flex items-center gap-1 shadow-md cursor-pointer"
             title="مشاهده کالبدشکافی ۳D"
           >
             <span>🧬</span>
-            <span>۳D</span>
+            <span>کالبدشکافی ۳D</span>
           </button>
         </div>
 
@@ -69,7 +69,7 @@ export default function ProductCard({ product }: { product: any }) {
         <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
           <div className="flex justify-between items-center flex-row-reverse">
             <span className="text-base font-mono font-black text-[var(--text-primary)]" suppressHydrationWarning>{formatPrice(currentPrice)} تومان</span>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{isAvailable ? "موجود ✓" : "ناموجود"}</span>
+            <span className="text-[10px] font-bold text-emerald-500">{isAvailable ? "موجود ✓" : "ناموجود"}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -92,7 +92,7 @@ export default function ProductCard({ product }: { product: any }) {
                 router.push("/checkout");
               }}
               disabled={!isAvailable}
-              className="py-2.5 bg-[var(--accent-blue)] text-white text-xs font-black rounded-xl shadow-lg shadow-blue-500/20 hover:opacity-90 transition cursor-pointer disabled:opacity-40"
+              className="py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-500/25 hover:opacity-90 transition cursor-pointer disabled:opacity-40"
             >
               ⚡ خرید فوری
             </button>

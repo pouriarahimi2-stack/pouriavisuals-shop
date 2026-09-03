@@ -40,7 +40,7 @@ export default function ContactDock() {
     },
     {
       letter: "N",
-      name: "کانال تلگرام",
+      name: "کانال رسمی تلگرام",
       href: "https://t.me",
       color: "#0088cc",
       icon: (
@@ -62,7 +62,7 @@ export default function ContactDock() {
     },
     {
       letter: "A",
-      name: "کانال یوتیوب",
+      name: "کانال یوتیوب استودیو",
       href: "https://youtube.com",
       color: "#ff0000",
       icon: (
@@ -73,9 +73,9 @@ export default function ContactDock() {
     },
     {
       letter: "C",
-      name: "شبکه اکس",
+      name: "شبکه اکس (توییتر)",
       href: "https://x.com",
-      color: "#000000",
+      color: "#0f172a",
       icon: (
         <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -84,8 +84,8 @@ export default function ContactDock() {
     },
     {
       letter: "T",
-      name: "تماس تلفنی",
-      href: "tel:02188888888",
+      name: "تماس تلفنی مستقیم",
+      href: "tel:09376110200",
       color: "#0284c7",
       icon: (
         <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -96,57 +96,79 @@ export default function ContactDock() {
   ];
 
   return (
-    <div className="flex flex-col items-start gap-2 select-none font-sans py-1" dir="ltr">
-      {/* نوار کلیدهای مکانیکی فلیپ‌شونده */}
-      <div className="p-1.5 rounded-2xl bg-black/30 border border-white/10 shadow-lg backdrop-blur-xl flex items-center gap-1.5">
-        {keys.map((k, idx) => {
-          const isFlipped = hoveredIndex === idx;
-
-          return (
-            <a
-              key={idx}
-              href={k.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onMouseEnter={() => {
-                soundEngine.playClick();
-                setHoveredIndex(idx);
-              }}
-              onMouseLeave={() => setHoveredIndex(null)}
-              onTouchStart={() => {
-                soundEngine.playClick();
-                setHoveredIndex(idx);
-              }}
-              className="relative w-9 h-11 sm:w-10 sm:h-12 rounded-xl cursor-pointer [perspective:1000px] group active:scale-95"
-            >
-              <div
-                className={`w-full h-full rounded-xl border transition-transform duration-500 [transform-style:preserve-3d] shadow-md ${
-                  isFlipped ? "[transform:rotateY(180deg)] border-[var(--accent-blue)]" : "border-white/10 bg-slate-900/90"
-                }`}
-              >
-                {/* رویه کلید */}
-                <div className="absolute inset-0 rounded-xl flex items-center justify-center font-mono font-black text-sm text-slate-200 [backface-visibility:hidden] bg-gradient-to-b from-slate-800 to-slate-950 border-t border-white/20">
-                  {k.letter}
-                </div>
-
-                {/* پشت کلید: لوگو */}
-                <div
-                  style={{ backgroundColor: k.color }}
-                  className="absolute inset-0 rounded-xl flex items-center justify-center text-white [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-inner"
-                >
-                  {k.icon}
-                </div>
-              </div>
-            </a>
-          );
-        })}
+    <div className="w-full flex flex-col items-start gap-2 select-none font-sans text-right" dir="rtl">
+      <div className="flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)]" />
+        <span className="text-[11px] font-black text-[var(--text-primary)]">
+          شبکه‌های ارتباطی و اجتماعی استودیو:
+        </span>
       </div>
 
-      {hoveredIndex !== null && (
-        <span className="text-[10px] font-black text-[var(--accent-blue)] transition-all animate-fadeIn" dir="rtl">
-          {keys[hoveredIndex].name}
-        </span>
-      )}
+      {/* کلیدهای مکانیکی به ترتیب لاتین C-O-N-T-A-C-T تراز شده در سمت راست */}
+      <div className="flex items-center justify-start w-full">
+        <div
+          className="p-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-md backdrop-blur-xl flex items-center gap-1.5"
+          dir="ltr"
+        >
+          {keys.map((k, idx) => {
+            const isFlipped = hoveredIndex === idx;
+
+            return (
+              <a
+                key={idx}
+                href={k.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onMouseEnter={() => {
+                  soundEngine.playClick();
+                  setHoveredIndex(idx);
+                }}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onTouchStart={() => {
+                  soundEngine.playClick();
+                  setHoveredIndex(idx);
+                }}
+                className="relative w-8 h-10 sm:w-9 sm:h-11 rounded-xl cursor-pointer [perspective:1000px] group active:scale-95"
+                title={k.name}
+              >
+                <div
+                  className={`w-full h-full rounded-xl border transition-transform duration-500 [transform-style:preserve-3d] shadow-sm ${
+                    isFlipped
+                      ? "[transform:rotateY(180deg)] border-[var(--accent-blue)] shadow-md"
+                      : "border-[var(--card-border)] bg-[var(--modal-bg)] hover:border-[var(--accent-blue)]/50"
+                  }`}
+                >
+                  {/* رویه کلید مکانیکی */}
+                  <div className="absolute inset-0 rounded-xl flex items-center justify-center font-mono font-black text-xs sm:text-sm text-[var(--text-primary)] [backface-visibility:hidden] bg-gradient-to-b from-[var(--input-bg)] to-[var(--modal-bg)] border-t border-white/20">
+                    {k.letter}
+                  </div>
+
+                  {/* پشت کلید: آیکون اختصاصی برند */}
+                  <div
+                    style={{ backgroundColor: k.color }}
+                    className="absolute inset-0 rounded-xl flex items-center justify-center text-white [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-inner"
+                  >
+                    {k.icon}
+                  </div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* نمایش نام شبکه فعال شده */}
+      <div className="h-4 flex items-center pr-1">
+        {hoveredIndex !== null ? (
+          <span className="text-[10px] font-black text-[var(--accent-blue)] transition-all animate-fadeIn">
+            {keys[hoveredIndex].name} ↗
+          </span>
+        ) : (
+          <span className="text-[10px] text-[var(--text-secondary)] font-medium">
+            روی کلیدها نگه دارید تا دسترسی مستقیم فعال شود
+          </span>
+        )}
+      </div>
     </div>
   );
 }

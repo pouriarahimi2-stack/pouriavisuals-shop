@@ -1,4 +1,3 @@
-// File Path: components/AdminAccountsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -11,15 +10,19 @@ export default function AdminAccountsManager() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
+  // استیت‌های ایجاد مدیر جدید
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<AdminRole>("product_manager");
 
+  // استیت‌های ویرایش و تغییر رمز
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editFullName, setEditFullName] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -61,6 +64,7 @@ export default function AdminAccountsManager() {
         setPassword("");
         setFullName("");
         setRole("product_manager");
+        setShowCreatePassword(false);
         await loadAdmins();
       } else {
         showToast(res.message || "خطا در ایجاد حساب کاربری مدیر.");
@@ -76,6 +80,7 @@ export default function AdminAccountsManager() {
     setEditUsername(adm.username);
     setEditFullName(adm.full_name || "");
     setNewPassword("");
+    setShowEditPassword(false);
   };
 
   const handleUpdateAdmin = async (e: React.FormEvent) => {
@@ -87,14 +92,14 @@ export default function AdminAccountsManager() {
     try {
       const res = await adminAuthService.updateCredentials(
         editingAdmin.id,
-        editUsername,
+        editUsername.trim(),
         newPassword.trim() || undefined,
         editFullName.trim() || undefined
       );
 
       if (res.success) {
         soundEngine.playSuccess();
-        showToast("اطلاعات حساب مدیر با موفقیت به‌روزرسانی شد.");
+        showToast("اطلاعات و کلمه عبور مدیر با موفقیت به‌روزرسانی شد.");
         setEditingAdmin(null);
         await loadAdmins();
       } else {
@@ -118,12 +123,12 @@ export default function AdminAccountsManager() {
     switch (r) {
       case "super_admin":
       case "superadmin":
-        return <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px]">مدیر کل سیستم</span>;
+        return <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px]">مدیر کل سیستم (Superadmin)</span>;
       case "product_manager":
       case "inventory_manager":
         return <span className="px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">مدیر انبار و محصولات</span>;
       case "content_editor":
-        return <span className="px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">نویسنده و سئو</span>;
+        return <span className="px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">نویسنده محتوا و سئو</span>;
     }
   };
 
@@ -140,10 +145,10 @@ export default function AdminAccountsManager() {
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h3 className="font-black text-base flex items-center gap-2 text-[var(--accent-blue)]">
-            <span>🛡️</span> مدیریت دسترسی‌ها و حساب‌های مدیران
+            <span>🛡️</span> مدیریت دسترسی‌ها، حساب‌ها و تغییر کلمه عبور مدیران
           </h3>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تعریف نقش‌های دسترسی، ایجاد حساب کاربری برای همکاران و تغییر کلمه عبور
+            تعریف نقش‌های دسترسی، ایجاد حساب کاربری برای همکاران و تغییر آنی رمز عبور
           </p>
         </div>
 
@@ -182,14 +187,24 @@ export default function AdminAccountsManager() {
 
           <div>
             <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کلمه عبور امنیتی *</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-            />
+            <div className="relative">
+              <input
+                type={showCreatePassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full p-3 pl-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCreatePassword(!showCreatePassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[var(--accent-blue)] transition cursor-pointer p-1 text-sm"
+                title={showCreatePassword ? "مخفی کردن رمز" : "مشاهده رمز"}
+              >
+                {showCreatePassword ? "👁️‍🗨️" : "👁️"}
+              </button>
+            </div>
           </div>
 
           <div>
@@ -201,7 +216,7 @@ export default function AdminAccountsManager() {
             >
               <option value="product_manager">مدیر انبار و محصولات</option>
               <option value="content_editor">نویسنده محتوا و سئو</option>
-              <option value="super_admin">مدیر کل سیستم</option>
+              <option value="super_admin">مدیر کل سیستم (Superadmin)</option>
             </select>
           </div>
         </div>
@@ -233,10 +248,10 @@ export default function AdminAccountsManager() {
                 <th className="pb-3 px-2 text-center">عملیات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--card-border)]">
+            <tbody className="divide-y divide-[var(--card-border)] font-medium">
               {admins.map((adm) => (
                 <tr key={adm.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                  <td className="py-3 px-2 font-bold">{adm.full_name || "بدون نام"}</td>
+                  <td className="py-3 px-2 font-bold text-[var(--text-primary)]">{adm.full_name || "بدون نام"}</td>
                   <td className="py-3 px-2 font-mono font-bold text-[var(--accent-blue)]">{adm.username}</td>
                   <td className="py-3 px-2">{getRoleBadge(adm.role)}</td>
                   <td className="py-3 px-2 text-center flex items-center justify-center gap-2">
@@ -262,16 +277,19 @@ export default function AdminAccountsManager() {
         )}
       </div>
 
-      {/* مودال ویرایش مدیر */}
+      {/* مودال ویرایش مدیر با قابلیت نمایش و پنهان‌سازی رمز */}
       {editingAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <form onSubmit={handleUpdateAdmin} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
+          <form onSubmit={handleUpdateAdmin} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h4 className="font-black text-sm text-[var(--accent-blue)]">✏️ ویرایش مشخصات ادمین</h4>
+              <h4 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
+                <span>✏️</span>
+                <span>ویرایش مشخصات و کلمه عبور مدیر</span>
+              </h4>
               <button
                 type="button"
                 onClick={() => setEditingAdmin(null)}
-                className="w-7 h-7 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -288,7 +306,7 @@ export default function AdminAccountsManager() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری:</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری ورود (Username):</label>
               <input
                 type="text"
                 required
@@ -299,28 +317,38 @@ export default function AdminAccountsManager() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور جدید (در صورت نیاز):</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="در صورت خالی بودن تغییر نمی‌کند"
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-              />
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور جدید (در صورت نیاز به تغییر):</label>
+              <div className="relative">
+                <input
+                  type={showEditPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="در صورت خالی بودن تغییر نمی‌کند"
+                  className="w-full p-3 pl-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[var(--accent-blue)] transition cursor-pointer p-1 text-sm"
+                  title={showEditPassword ? "مخفی کردن رمز" : "مشاهده رمز"}
+                >
+                  {showEditPassword ? "👁️‍🗨️" : "👁️"}
+                </button>
+              </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
               <button
                 type="button"
                 onClick={() => setEditingAdmin(null)}
-                className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
               >
                 انصراف
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md cursor-pointer disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md cursor-pointer disabled:opacity-50"
               >
                 {submitting ? "در حال ثبت..." : "ذخیره تغییرات 💾"}
               </button>

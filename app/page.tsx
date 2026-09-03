@@ -75,17 +75,17 @@ export default function HomePage() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-28 transition-colors duration-300" dir="rtl">
       <main className="pt-4 sm:pt-6 px-3 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
         
-        {/* هاب اخبار تکنولوژی */}
+        {/* تیکر اخبار تکنولوژی */}
         <TechRadarFeed />
 
-        {/* هیرو سکشن سینمایی اپل/ویژن‌او‌اس با نورپردازی سه‌بعدی Three.js در پس‌زمینه */}
-        <section className="w-full rounded-[2.8rem] overflow-hidden glass-morphism p-8 sm:p-14 lg:p-16 shadow-2xl border border-[var(--card-border)] relative min-h-[380px] sm:min-h-[460px] flex flex-col justify-center">
+        {/* هیرو سکشن عریض و مدرن */}
+        <section className="w-full rounded-[2.8rem] overflow-hidden glass-morphism p-8 sm:p-14 lg:p-16 shadow-2xl border border-[var(--card-border)] relative min-h-[380px] sm:min-h-[440px] flex flex-col justify-center">
           
-          {/* بوم سه‌بعدی تعاملی Three.js */}
+          {/* بوم سه‌بعدی Three.js در پس‌زمینه با شفافیت کامل */}
           <Hero3DCanvas />
 
           <div className="relative z-10 space-y-5 max-w-2xl text-right">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight text-gradient-hero">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
               مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین
             </h1>
 
@@ -96,7 +96,7 @@ export default function HomePage() {
             <div className="pt-3">
               <Link
                 href="/#products"
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600 hover:opacity-95 text-white px-9 py-4 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/30"
+                className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-9 py-4 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-500/25"
               >
                 <span>مشاهده کاتالوگ محصولات</span>
                 <span>←</span>

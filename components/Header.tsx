@@ -10,6 +10,7 @@ import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { userBehavior } from "@/lib/userBehavior";
 import { formatPrice } from "@/lib/formatters";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Header() {
   const router = useRouter();
@@ -31,21 +32,19 @@ export default function Header() {
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
-  const applyTheme = (isDark: boolean) => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  };
-
   useEffect(() => {
     setMounted(true);
+
+    // ۱. بررسی و خواندن تم ذخیره‌شده
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
       setIsDarkMode(isDark);
-      applyTheme(isDark);
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
     } catch {}
 
     const initHeaderData = async () => {
@@ -84,12 +83,19 @@ export default function Header() {
     };
   }, []);
 
+  // تابع سوییچ تم با ذخیره در لوکال‌استوریج و تغییر آنی کلاس داکیومنت
   const toggleTheme = () => {
     soundEngine.playClick();
     const nextDark = !isDarkMode;
     setIsDarkMode(nextDark);
-    localStorage.setItem("theme", nextDark ? "dark" : "light");
-    applyTheme(nextDark);
+    try {
+      localStorage.setItem("theme", nextDark ? "dark" : "light");
+      if (nextDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    } catch {}
   };
 
   useEffect(() => {
@@ -178,17 +184,7 @@ export default function Header() {
           </div>
 
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={storeName}
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <span className="text-xl text-[var(--accent-blue)] font-black">⚡</span>
-              )}
-            </div>
+            <AnimatedLogo customLogoUrl={logoUrl} size={38} />
             <div className="text-xl font-black text-[var(--text-primary)] tracking-tighter group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
           </Link>
         </div>
@@ -227,20 +223,21 @@ export default function Header() {
             )}
           </div>
 
+          {/* دکمه فعال و سالم تغییر تم دارک / لایت */}
           <button
             onClick={toggleTheme}
-            className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)]"
+            className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)] active:scale-95"
             title={isDarkMode ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
             suppressHydrationWarning
           >
             {mounted ? (
               isDarkMode ? (
-                <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
               ) : (
-                <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
               )
             ) : (
-              <span className="w-4 h-4" />
+              <span className="w-5 h-5" />
             )}
           </button>
 

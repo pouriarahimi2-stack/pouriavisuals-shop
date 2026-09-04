@@ -10,7 +10,8 @@ interface AddToCartButtonProps {
     id: string | number;
     title: string;
     price: number;
-    image: string;
+    image?: string;
+    images?: string[];
     stock?: number;
     category?: string;
   };
@@ -38,6 +39,12 @@ export default function AddToCartButton({
   const isAvailable = stockLimit > 0;
   const isMaxReached = currentCount >= stockLimit;
 
+  // استخراج تصویر مطمئن برای جلوگیری از باگ لود نشدن تصویر در کشوی سبد خرید
+  const guaranteedImage =
+    product.images?.[0] ||
+    product.image ||
+    "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800";
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -47,14 +54,15 @@ export default function AddToCartButton({
     soundEngine.playAddToCart();
     setAnimState("adding");
 
-    // افزودن کالا به وضعیت سبد خرید (بدون باز شدن ناگهانی کشو)
+    // ۱. افزودن فوری به استیت بدون باز شدن زودهنگام کشو
     addToCart(
       {
         id: product.id,
         title: product.title,
         name: product.title,
         price: product.price,
-        image: product.image,
+        image: guaranteedImage,
+        images: [guaranteedImage],
         stock: stockLimit,
         category: product.category || "تکنولوژی",
         quantity: 1,
@@ -62,13 +70,13 @@ export default function AddToCartButton({
       false
     );
 
-    // انیمیشن جهش فنری شمارنده
+    // ۲. جهش فنری شمارنده
     setTimeout(() => {
       setBumpCounter(true);
       setTimeout(() => setBumpCounter(false), 500);
     }, 550);
 
-    // پس از پایان کامل چرخه ۱۲۵۰ میلی‌ثانیه‌ای انیمیشن: بازنشانی دکمه و باز شدن کشوی سبد
+    // ۳. پس از پایان دقیق ۱۲۵۰ میلی‌ثانیه انیمیشن چرخ‌دستی: باز شدن کشوی سبد خرید
     setTimeout(() => {
       setAnimState("idle");
       openCart();
@@ -80,20 +88,20 @@ export default function AddToCartButton({
   return (
     <div className={`flex flex-col items-center gap-1.5 w-full select-none ${className}`} dir="rtl" suppressHydrationWarning>
       
-      {/* دکمه کپسولی: در تم روشن مشکی با آیکون سفید، در تم تاریک سفید با آیکون مشکی */}
+      {/* دکمه کپسولی: در تم روشن کاملاً مشکی مات با آیکون سفید، در تم تاریک کاملاً سفید با آیکون مشکی */}
       <button
         type="button"
         disabled={!isAvailable || isMaxReached}
         onClick={handleAddToCart}
-        className={`relative w-full h-[50px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer shadow-xl active:scale-[0.98] border ${
+        className={`relative w-full h-[52px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer shadow-xl active:scale-[0.98] border ${
           !isAvailable || isMaxReached
             ? "bg-slate-800/40 opacity-40 cursor-not-allowed text-slate-400 border-transparent"
-            : "bg-black text-white border-black/10 hover:bg-neutral-900 shadow-black/10 dark:bg-white dark:text-black dark:border-white/20 dark:hover:bg-neutral-100 dark:shadow-white/10"
+            : "bg-[#000000] text-white border-black/10 hover:bg-[#111111] shadow-black/15 dark:bg-[#ffffff] dark:text-[#000000] dark:border-white/20 dark:hover:bg-[#f0f0f0] dark:shadow-white/10"
         }`}
       >
         <div className="relative w-full h-full flex items-center justify-center px-4 overflow-hidden">
           
-          {/* کانتینر سبد خرید و بسته متحرک */}
+          {/* کانتینر سبد خرید متحرک و بسته در حال پرتاب */}
           <div
             className={`flex items-center justify-center transition-all duration-300 ${
               isAnimating
@@ -101,17 +109,17 @@ export default function AddToCartButton({
                 : "translate-x-0"
             }`}
           >
-            {/* بسته محصول سفید با روبان آبی که به درون سبد سقوط می‌کند */}
+            {/* بسته سفید با روبان آبی که با پرتاب الاستیک وارد سبد می‌شود */}
             {isAnimating && (
               <div className="absolute -top-3.5 left-[8px] z-30 pointer-events-none animate-kinetic-item-drop">
-                <div className="w-3.5 h-3.5 rounded-[3px] bg-white dark:bg-slate-900 shadow-lg border border-slate-300 dark:border-slate-600 flex items-center justify-center relative">
+                <div className="w-3.5 h-3.5 rounded-[3px] bg-white dark:bg-slate-900 shadow-md border border-slate-300 dark:border-slate-600 flex items-center justify-center relative">
                   <span className="w-full h-[1.5px] bg-blue-500 absolute top-1/2 -translate-y-1/2" />
                   <span className="h-full w-[1.5px] bg-blue-500 absolute left-1/2 -translate-x-1/2" />
                 </div>
               </div>
             )}
 
-            {/* آیکون چرخ‌دستی که به سمت چپ حرکت می‌کند */}
+            {/* آیکون چرخ‌دستی که به سمت چپ می‌راند */}
             <svg
               className="w-5 h-5 shrink-0 drop-shadow-sm"
               viewBox="0 0 24 24"
@@ -142,7 +150,7 @@ export default function AddToCartButton({
             </svg>
           </div>
 
-          {/* متن دکمه که هنگام کلیک با ترنزیشن محو می‌شود */}
+          {/* متن دکمه که با انیمیشن در زمان کلیک محو می‌شود */}
           <span
             className={`font-black text-xs tracking-wider uppercase mr-2.5 transition-all duration-300 whitespace-nowrap ${
               isAnimating
@@ -159,7 +167,7 @@ export default function AddToCartButton({
         </div>
       </button>
 
-      {/* شمارنده زیر دکمه با جهش فنری */}
+      {/* شمارنده با جهش فنری */}
       {showCounter && (
         <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] font-sans" suppressHydrationWarning>
           <span

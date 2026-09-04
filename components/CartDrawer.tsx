@@ -4,7 +4,6 @@
 import React, { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { orderService } from "@/services/orderService";
-import { couponService } from "@/services/couponService";
 import { IRAN_PROVINCES } from "@/lib/iranProvinces";
 import { useRouter } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
@@ -217,10 +216,12 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
             </div>
           ) : (
             <>
+              {/* لیست کالاها با تضمین نمایش تصویر صحیح و بدون باگ */}
               <div className="space-y-3">
                 {cartItems.map((item: any) => {
                   const stockLimit = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
                   const isMaxReached = item.quantity >= stockLimit;
+                  const itemImg = item.image || item.images?.[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800";
 
                   return (
                     <div
@@ -271,20 +272,20 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                           </span>
                         </div>
 
-                        {(item.image || item.images?.[0]) && (
+                        <div className="w-13 h-13 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)] p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                           <img
-                            src={item.image || item.images?.[0]}
+                            src={itemImg}
                             alt=""
-                            className="w-12 h-12 rounded-xl object-contain bg-[var(--modal-bg)] border border-[var(--card-border)] p-1 shrink-0"
+                            className="w-full h-full object-contain"
                           />
-                        )}
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* باکس تخفیف */}
+              {/* باکس کد تخفیف */}
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                 <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
                 <div className="flex gap-2">
@@ -310,7 +311,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                 )}
               </div>
 
-              {/* فرم آدرس پستی */}
+              {/* فرم آدرس پستی با استایل تمیز و کنتراست عالی */}
               <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
                 <div className="flex items-center gap-1.5 font-black text-xs text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
                   <span>📋</span>
@@ -324,19 +325,19 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                 )}
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">نام و نام خانوادگی تحویل‌گیرنده *</label>
+                  <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">نام و نام خانوادگی تحویل‌گیرنده *</label>
                   <input
                     type="text"
                     required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="مثال: پوریا رحیمی"
-                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] shadow-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">شماره موبایل جهت پیامک رهگیری *</label>
+                  <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">شماره موبایل جهت پیامک رهگیری *</label>
                   <input
                     type="tel"
                     required
@@ -344,17 +345,17 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="09123456789"
-                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-right text-[var(--text-primary)]"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-right text-[var(--text-primary)] shadow-sm"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">استان *</label>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">استان *</label>
                     <select
                       value={selectedProvince}
                       onChange={(e) => handleProvinceChange(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] cursor-pointer"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] cursor-pointer shadow-sm"
                     >
                       {IRAN_PROVINCES.map((prov) => (
                         <option key={prov.name} value={prov.name}>
@@ -365,11 +366,11 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">شهرستان / شهر *</label>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">شهرستان / شهر *</label>
                     <select
                       value={selectedCity}
                       onChange={(e) => setSelectedCity(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] cursor-pointer"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] cursor-pointer shadow-sm"
                     >
                       {currentCities.map((city) => (
                         <option key={city} value={city}>
@@ -381,55 +382,55 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">خیابان و کوچه (نشانی دقیق) *</label>
+                  <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">خیابان و کوچه (نشانی دقیق) *</label>
                   <input
                     type="text"
                     required
                     value={streetAddress}
                     onChange={(e) => setStreetAddress(e.target.value)}
                     placeholder="مثال: خیابان ولیعصر، تقاطع میرداماد"
-                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-medium text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-medium text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] shadow-sm"
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">پلاک *</label>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">پلاک *</label>
                     <input
                       type="text"
                       required
                       value={buildingNo}
                       onChange={(e) => setBuildingNo(e.target.value)}
                       placeholder="مثال: ۲۴"
-                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] text-center shadow-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">واحد (اختیاری)</label>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">واحد (اختیاری)</label>
                     <input
                       type="text"
                       value={unitNo}
                       onChange={(e) => setUnitNo(e.target.value)}
                       placeholder="مثال: ۳"
-                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] text-center shadow-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">طبقه (اختیاری)</label>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">طبقه (اختیاری)</label>
                     <input
                       type="text"
                       value={floorNo}
                       onChange={(e) => setFloorNo(e.target.value)}
                       placeholder="مثال: ۲"
-                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] text-center shadow-sm"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">کد پستی ۱۰ رقمی (اختیاری)</label>
+                  <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">کد پستی ۱۰ رقمی (اختیاری)</label>
                   <input
                     type="text"
                     dir="ltr"
@@ -437,7 +438,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                     value={postalCode}
                     onChange={(e) => setPostalCode(e.target.value)}
                     placeholder="7138152316"
-                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-right text-[var(--text-primary)]"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-right text-[var(--text-primary)] shadow-sm"
                   />
                 </div>
               </form>
@@ -445,7 +446,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
           )}
         </div>
 
-        {/* فوتر تسویه نهایی */}
+        {/* فوتر تسویه نهایی فاکتور */}
         {cartItems.length > 0 && (
           <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs">
             <div className="space-y-1.5 font-bold">

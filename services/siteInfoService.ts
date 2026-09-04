@@ -186,13 +186,13 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
     title: "شبکه‌های ارتباطی و اجتماعی استودیو:",
     scale: "medium",
     keys: [
-      { letter: "C", name: "گیت‌هاب رسمی", href: "https://github.com", color: "#24292e" },
-      { letter: "O", name: "اینستاگرام استودیو", href: "https://instagram.com", color: "#e1306c" },
-      { letter: "N", name: "کانال تلگرام", href: "https://t.me", color: "#0088cc" },
-      { letter: "T", name: "پشتیبانی واتساپ", href: "https://wa.me", color: "#25d366" },
-      { letter: "A", name: "کانال یوتیوب", href: "https://youtube.com", color: "#ff0000" },
-      { letter: "C", name: "شبکه اکس", href: "https://x.com", color: "#0f172a" },
-      { letter: "T", name: "تماس تلفنی مستقیم", href: "tel:09376110200", color: "#0284c7" },
+      { letter: "C", name: "GitHub", href: "https://github.com", color: "#181717" },
+      { letter: "O", name: "LinkedIn", href: "https://linkedin.com", color: "#0A66C2" },
+      { letter: "N", name: "Discord", href: "https://discord.com", color: "#5865F2" },
+      { letter: "T", name: "Instagram", href: "https://instagram.com", color: "#E4405F" },
+      { letter: "A", name: "Telegram", href: "https://t.me", color: "#26A5E4" },
+      { letter: "C", name: "X / Twitter", href: "https://x.com", color: "#000000" },
+      { letter: "T", name: "پشتیبانی تماس", href: "tel:09376110200", color: "#0284C7" },
     ],
   },
   footer: {
@@ -201,7 +201,7 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
     scaleMode: "normal",
     brandTitle: "آکسون | Axon",
     brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
-    description: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر، مانیتورهای ۵K رتینا، لپ‌تاپ‌های ورک‌استیشن و گجت‌های هوشمند در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+    description: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
     showBadges: true,
     badge1Text: "گارانتی اصالت ۱۰۰٪ فیزیکی",
     badge2Text: "ارسال پیشتاز سراسری",
@@ -243,9 +243,8 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
       items: [
         {
           id: "cert-enamad",
-          title: "نماد اعتماد الکترونیکی (اینماد ۲۷۴۲۴۵۳۴)",
-          imageUrl: "https://trustseal.enamad.ir/logo.aspx?id=27424534",
-          link: "https://enamad.ir",
+          title: "نماد اعتماد الکترونیکی (کد ۲۷۴۲۴۵۳۴)",
+          link: "https://trustseal.enamad.ir/?id=27424534",
           show: true,
         },
       ],
@@ -285,32 +284,8 @@ export const DEFAULT_SITE_INFO: SiteInfo = {
 };
 
 export const siteInfoService = {
+  // این تابع برای رندر اولیه SSR و CSR باید کاملاً یکسان باشد تا خطای ۴۱۸ هیدریشن تولید نشود
   getSiteInfoSync(): SiteInfo {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(LOCAL_STORAGE_SITE_INFO);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && typeof parsed === "object") {
-            return {
-              ...DEFAULT_SITE_INFO,
-              ...parsed,
-              homepage_layout_config: {
-                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
-                ...(parsed.homepage_layout_config || {}),
-                hero: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero, ...(parsed.homepage_layout_config?.hero || {}) },
-                showcase3D: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D, ...(parsed.homepage_layout_config?.showcase3D || {}) },
-                newsTicker: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.newsTicker, ...(parsed.homepage_layout_config?.newsTicker || {}) },
-                blogSection: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.blogSection, ...(parsed.homepage_layout_config?.blogSection || {}) },
-                contactDock: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.contactDock, ...(parsed.homepage_layout_config?.contactDock || {}) },
-                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(parsed.homepage_layout_config?.footer || {}) },
-                aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(parsed.homepage_layout_config?.aiChat || {}) },
-              },
-            };
-          }
-        }
-      } catch {}
-    }
     return DEFAULT_SITE_INFO;
   },
 
@@ -383,9 +358,9 @@ export const siteInfoService = {
           return mapped;
         }
       }
-      return this.getSiteInfoSync();
+      return DEFAULT_SITE_INFO;
     } catch {
-      return this.getSiteInfoSync();
+      return DEFAULT_SITE_INFO;
     }
   },
 

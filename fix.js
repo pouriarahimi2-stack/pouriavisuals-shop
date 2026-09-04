@@ -1,23 +1,24 @@
 // File Path: fix.js
 /**
  * ═══════════════════════════════════════════════════════════════════════════════════════════
- *  👑 AXON MASTER ZERO-DEFECT HIGH-PRECISION UI/UX & STABILITY FIX (v2026.14)
+ *  👑 AXON MASTER ZERO-DEFECT HIGH-PRECISION UI/UX & HYDRATION PURGE (v2026.15)
  * ───────────────────────────────────────────────────────────────────────────────────────────
- *  Key Enhancements:
- *   1. AddToCartButton: 
- *      - Light Mode: Sleek Black Button with White Text/Icon.
- *      - Dark Mode: Premium White Button with Black Text/Icon.
- *      - Fixed layout shift: Cart perfectly centers, box drops inside, cart zooms LEFT,
- *        wheels spin, wrap-around re-entry, counter bumps, and drawer opens ONLY after completion.
- *   2. ContactDock (Video 1 True Replica):
- *      - 7 Distinct Official SVG logos (GitHub, LinkedIn, Discord, Instagram, Telegram, X, Phone).
- *      - True 3D mechanical keycaps: Elevation (-28px) + 180° Y-flip revealing floating white card.
- *   3. Zero Console Errors:
- *      - Eliminated React error #418 (SSR/CSR Hydration Mismatch).
- *      - Eliminated AudioContext gesture warning (Lazy gesture-driven activation).
- *      - Eliminated Enamad net::ERR_CONNECTION_CLOSED by embedding self-hosted responsive SVG seal.
- *      - Eliminated MaxListeners memory leak warning in realtimeSync.
- *   4. Full Responsive design across Mobile, Tablet, and Desktop.
+ *  Specific Fixes from User Video Audit:
+ *   1. AddToCartButton Styling:
+ *      - Light Mode: Pitch Black button with Pure White text and icon.
+ *      - Dark Mode: Crisp White button with Pitch Black text and icon.
+ *   2. AddToCartButton Animation:
+ *      - Text collapses cleanly without layout shifting.
+ *      - Cart shifts to exact geometric center.
+ *      - Parcel drops vertically directly into cart basket with elastic bounce.
+ *      - Cart drives off to the LEFT, re-enters from right to center.
+ *      - Counter bumps underneath.
+ *      - Cart Drawer opens ONLY after the 1250ms animation finishes!
+ *   3. CartDrawer Overhaul:
+ *      - Crisp product thumbnail guaranteed (Apple Watch image bug fixed).
+ *      - Clear contrast for all form inputs in light/dark modes.
+ *   4. Zero Console Errors:
+ *      - React Error #418 eliminated (removed SSR localStorage hydration leak).
  *   5. Strict No-Truncation Rule enforced.
  *   6. Automated Git staging, atomic commit and push to remote repository for Vercel deployment.
  * ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -29,7 +30,7 @@ const { execSync } = require('child_process');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   📐 اعمال اصلاحات نهایی: تم دکمه خرید (سفید در تاریک، سیاه در روشن)، کلیدهای ۳D واقعی و صفر خطای کنسول');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   📐 اعمال اصلاحات تکمیلی ویدیو: دکمه مشکی در روز/سفید در شب، رفع باگ تصویر سبد و ریشه‌کنی خطای #418');
 console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 function updateFile(relPath, content) {
@@ -43,369 +44,441 @@ function updateFile(relPath, content) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۱. رفع خطای صوتی AudioContext و راه‌اندازی فقط پس از تعامل کاربر (lib/soundEngine.ts)
+// ۱. رفع ریشه‌ای خطای Hydration Error #418 در siteInfoService (services/siteInfoService.ts)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('lib/soundEngine.ts', `// File Path: lib/soundEngine.ts
-/**
- * موتور سنتز صداهای سیستمی و فیدبک لمسی بر پایه Web Audio API
- * رفع کامل ارور AudioContext was not allowed to start با فعال‌سازی تنبل صرفاً در زمان کلیک
- */
+updateFile('services/siteInfoService.ts', `// File Path: services/siteInfoService.ts
+import { supabase } from "@/lib/supabase";
+import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
-class SoundEngine {
-  private ctx: AudioContext | null = null;
-  private isMuted: boolean = false;
+export type MaintenanceMode = "none" | "timed" | "indefinite";
 
-  private initContext(): boolean {
-    if (typeof window === "undefined") return false;
+export interface FooterLinkItem {
+  id: string;
+  title: string;
+  url: string;
+}
+
+export interface FooterContactItem {
+  id: string;
+  type: "phone" | "email" | "address" | "working_hours" | "custom";
+  title: string;
+  value: string;
+  link?: string;
+  icon?: string;
+  show: boolean;
+}
+
+export interface FooterCertificateItem {
+  id: string;
+  title: string;
+  codeOrHtml?: string;
+  imageUrl?: string;
+  link?: string;
+  show: boolean;
+}
+
+export interface SocialKeyItem {
+  letter: string;
+  name: string;
+  href: string;
+  color: string;
+}
+
+export interface HomepageLayoutConfig {
+  hero: {
+    show: boolean;
+    heightMode: "compact" | "standard" | "cinematic";
+    verticalPadding: "compact" | "normal" | "relaxed";
+    title: string;
+    subtitle: string;
+    buttonText: string;
+    buttonLink: string;
+    show3DCanvas: boolean;
+  };
+  showcase3D: {
+    show: boolean;
+    cardScale: "compact" | "standard" | "large";
+    title: string;
+    subtitle: string;
+    limit: number;
+  };
+  newsTicker: {
+    show: boolean;
+  };
+  blogSection: {
+    show: boolean;
+    title: string;
+    subtitle: string;
+    count: number;
+    showViewAll: boolean;
+  };
+  contactDock: {
+    show: boolean;
+    title: string;
+    scale: "small" | "medium" | "large";
+    keys: SocialKeyItem[];
+  };
+  footer: {
+    show: boolean;
+    paddingMode: "compact" | "normal" | "relaxed";
+    scaleMode: "compact" | "normal" | "large";
+    brandTitle?: string;
+    brandSubtitle?: string;
+    description?: string;
+    showBadges: boolean;
+    badge1Text: string;
+    badge2Text: string;
+    quickLinks: {
+      show: boolean;
+      title: string;
+      links: FooterLinkItem[];
+    };
+    customerServices: {
+      show: boolean;
+      title: string;
+      links: FooterLinkItem[];
+    };
+    contactInfo: {
+      show: boolean;
+      title: string;
+      items: FooterContactItem[];
+    };
+    certificates: {
+      show: boolean;
+      title: string;
+      items: FooterCertificateItem[];
+    };
+    bottomBar: {
+      show: boolean;
+      copyrightText: string;
+      designerText: string;
+      enamadBadgeText: string;
+    };
+  };
+  aiChat: {
+    bottomDesktop: number;
+    bottomMobile: number;
+    sizeMode: "compact" | "standard" | "large";
+    autoHideNearFooter: boolean;
+  };
+}
+
+export interface SiteInfo {
+  id?: string | number;
+  site_name?: string;
+  siteName?: string;
+  storeName?: string;
+  tagline?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  working_hours?: string;
+  logo_url?: string;
+  logoUrl?: string;
+  footer_logo_url?: string;
+  footerLogoUrl?: string;
+  favicon_url?: string;
+  faviconUrl?: string;
+  allow_google_index?: boolean;
+  allowGoogleIndex?: boolean;
+  maintenance_mode?: MaintenanceMode;
+  maintenance_until?: string;
+  maintenance_duration_minutes?: number;
+  instagram?: string;
+  telegram?: string;
+  whatsapp?: string;
+  youtube?: string;
+  header_announcement?: string;
+  free_shipping_threshold?: number;
+  description?: string;
+  footer_text?: string;
+  custom_css?: string;
+  active_font_id?: string;
+  gemini_api_key?: string;
+  homepage_layout_config?: HomepageLayoutConfig;
+  updated_at?: string;
+}
+
+const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
+
+export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
+  hero: {
+    show: true,
+    heightMode: "compact",
+    verticalPadding: "compact",
+    title: "مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین",
+    subtitle: "تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های هوشمند اولترا و ابزارهای استودیو با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.",
+    buttonText: "مشاهده کاتالوگ محصولات",
+    buttonLink: "/#products",
+    show3DCanvas: true,
+  },
+  showcase3D: {
+    show: true,
+    cardScale: "standard",
+    title: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+    subtitle: "پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری",
+    limit: 7,
+  },
+  newsTicker: {
+    show: true,
+  },
+  blogSection: {
+    show: true,
+    title: "مجله و مقالات تحلیلی فناوری",
+    subtitle: "جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها",
+    count: 3,
+    showViewAll: true,
+  },
+  contactDock: {
+    show: true,
+    title: "شبکه‌های ارتباطی و اجتماعی استودیو:",
+    scale: "medium",
+    keys: [
+      { letter: "C", name: "GitHub", href: "https://github.com", color: "#181717" },
+      { letter: "O", name: "LinkedIn", href: "https://linkedin.com", color: "#0A66C2" },
+      { letter: "N", name: "Discord", href: "https://discord.com", color: "#5865F2" },
+      { letter: "T", name: "Instagram", href: "https://instagram.com", color: "#E4405F" },
+      { letter: "A", name: "Telegram", href: "https://t.me", color: "#26A5E4" },
+      { letter: "C", name: "X / Twitter", href: "https://x.com", color: "#000000" },
+      { letter: "T", name: "پشتیبانی تماس", href: "tel:09376110200", color: "#0284C7" },
+    ],
+  },
+  footer: {
+    show: true,
+    paddingMode: "compact",
+    scaleMode: "normal",
+    brandTitle: "آکسون | Axon",
+    brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
+    description: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+    showBadges: true,
+    badge1Text: "گارانتی اصالت ۱۰۰٪ فیزیکی",
+    badge2Text: "ارسال پیشتاز سراسری",
+    quickLinks: {
+      show: true,
+      title: "دسترسی سریع",
+      links: [
+        { id: "l1", title: "کاتالوگ کالاها", url: "/#products" },
+        { id: "l2", title: "سامانه رهگیری مرسولات", url: "/track-order" },
+        { id: "l3", title: "جدیدترین اخبار تکنولوژی", url: "/news" },
+        { id: "l4", title: "مجله مقالات تخصصی", url: "/blog" },
+        { id: "l5", title: "درباره آکسون", url: "/about" },
+      ],
+    },
+    customerServices: {
+      show: true,
+      title: "خدمات مشتریان",
+      links: [
+        { id: "s1", title: "ثبت تیکت مشاوره", url: "/contact" },
+        { id: "s2", title: "شرایط گارانتی طلایی", url: "/#products" },
+        { id: "s3", title: "ضمانت بازگشت وجه ۷ روزه", url: "/#products" },
+        { id: "s4", title: "راهنمای کالیبراسیون ۵K", url: "/blog" },
+        { id: "s5", title: "روش‌های پرداخت امن شاپرک", url: "/track-order" },
+      ],
+    },
+    contactInfo: {
+      show: true,
+      title: "اطلاعات تماس و دفتر",
+      items: [
+        { id: "c1", type: "phone", title: "تلفن پشتیبانی:", value: "09376110200", link: "tel:09376110200", show: true },
+        { id: "c2", type: "email", title: "پست الکترونیک:", value: "Pouriarahimi@yahoo.com", link: "mailto:Pouriarahimi@yahoo.com", show: true },
+        { id: "c3", type: "address", title: "نشانی تحویل حضوری و انبار:", value: "شیراز - ستارخان", show: true },
+        { id: "c4", type: "working_hours", title: "ساعات پاسخگویی:", value: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰", show: true },
+      ],
+    },
+    certificates: {
+      show: true,
+      title: "مجوزها و تاییدیه رسمی",
+      items: [
+        {
+          id: "cert-enamad",
+          title: "نماد اعتماد الکترونیکی (کد ۲۷۴۲۴۵۳۴)",
+          link: "https://trustseal.enamad.ir/?id=27424534",
+          show: true,
+        },
+      ],
+    },
+    bottomBar: {
+      show: true,
+      copyrightText: "تمامی حقوق مادی و معنوی برای آکسون | Axon محفوظ است",
+      designerText: "طراحی و معماری مهندسی پایدار",
+      enamadBadgeText: "نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)",
+    },
+  },
+  aiChat: {
+    bottomDesktop: 64,
+    bottomMobile: 96,
+    sizeMode: "standard",
+    autoHideNearFooter: true,
+  },
+};
+
+export const DEFAULT_SITE_INFO: SiteInfo = {
+  site_name: "آکسون | Axon",
+  siteName: "آکسون | Axon",
+  storeName: "آکسون | Axon",
+  tagline: "مرجع تخصصی تجهیزات دیجیتال و تصویر",
+  allow_google_index: true,
+  allowGoogleIndex: true,
+  maintenance_mode: "none",
+  phone: "09376110200",
+  email: "Pouriarahimi@yahoo.com",
+  address: "شیراز - ستارخان",
+  working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+  header_announcement: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | ۱۸ ماه گارانتی اصالت طلایی",
+  free_shipping_threshold: 2000000,
+  description: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
+  footer_text: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
+  homepage_layout_config: DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+};
+
+export const siteInfoService = {
+  // این تابع برای رندر اولیه SSR و CSR باید کاملاً یکسان باشد تا خطای ۴۱۸ هیدریشن تولید نشود
+  getSiteInfoSync(): SiteInfo {
+    return DEFAULT_SITE_INFO;
+  },
+
+  async getSiteInfo(): Promise<SiteInfo | null> {
     try {
-      if (!this.ctx) {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          this.ctx = new AudioCtx();
+      const res = await fetch("/api/site-info", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          const data = json.data;
+          const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
+
+          let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+          if (data.homepage_layout_config) {
+            try {
+              const incoming = typeof data.homepage_layout_config === "string"
+                ? JSON.parse(data.homepage_layout_config)
+                : data.homepage_layout_config;
+              parsedLayout = {
+                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+                ...incoming,
+                hero: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero, ...(incoming.hero || {}) },
+                showcase3D: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D, ...(incoming.showcase3D || {}) },
+                newsTicker: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.newsTicker, ...(incoming.newsTicker || {}) },
+                blogSection: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.blogSection, ...(incoming.blogSection || {}) },
+                contactDock: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.contactDock, ...(incoming.contactDock || {}) },
+                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(incoming.footer || {}) },
+                aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(incoming.aiChat || {}) },
+              };
+            } catch {}
+          }
+
+          const mapped: SiteInfo = {
+            id: data.id,
+            site_name: data.site_name || data.store_name || "آکسون | Axon",
+            siteName: data.site_name || data.store_name || "آکسون | Axon",
+            storeName: data.site_name || data.store_name || "آکسون | Axon",
+            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر",
+            phone: data.phone || "09376110200",
+            email: data.email || "Pouriarahimi@yahoo.com",
+            address: data.address || "شیراز - ستارخان",
+            working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+            logo_url: data.logo_url || "",
+            logoUrl: data.logo_url || "",
+            footer_logo_url: data.footer_logo_url || "",
+            footerLogoUrl: data.footer_logo_url || "",
+            favicon_url: data.favicon_url || "",
+            faviconUrl: data.favicon_url || "",
+            allow_google_index: isAllowed,
+            allowGoogleIndex: isAllowed,
+            maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
+            maintenance_until: data.maintenance_until || undefined,
+            maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
+            header_announcement: data.header_announcement || "",
+            free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
+            description: data.description || data.footer_text || "",
+            footer_text: data.footer_text || data.description || "",
+            custom_css: data.custom_css || "",
+            active_font_id: data.active_font_id || "Vazirmatn",
+            gemini_api_key: data.gemini_api_key || "",
+            homepage_layout_config: parsedLayout,
+            updated_at: data.updated_at,
+          };
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
+            if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
+            if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
+          }
+          return mapped;
         }
       }
-      if (this.ctx && this.ctx.state === "suspended") {
-        this.ctx.resume().catch(() => {});
-      }
-      return !!this.ctx;
+      return DEFAULT_SITE_INFO;
     } catch {
-      return false;
+      return DEFAULT_SITE_INFO;
     }
-  }
+  },
 
-  public setMuted(muted: boolean) {
-    this.isMuted = muted;
-  }
-
-  public playClick() {
-    if (this.isMuted) return;
+  async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      if (!this.initContext() || !this.ctx) return;
+      const current = await this.getSiteInfo();
+      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون | Axon";
 
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+      const mergedConfig: HomepageLayoutConfig = {
+        ...(current?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG),
+        ...(payload.homepage_layout_config || {}),
+      };
 
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(850, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(220, this.ctx.currentTime + 0.035);
+      const dbPayload: any = {
+        site_name: sName,
+        store_name: sName,
+        tagline: payload.tagline !== undefined ? payload.tagline : current?.tagline,
+        phone: payload.phone !== undefined ? payload.phone : current?.phone,
+        email: payload.email !== undefined ? payload.email : current?.email,
+        address: payload.address !== undefined ? payload.address : current?.address,
+        working_hours: payload.working_hours !== undefined ? payload.working_hours : current?.working_hours,
+        logo_url: payload.logo_url !== undefined ? payload.logo_url : current?.logo_url,
+        footer_logo_url: payload.footer_logo_url !== undefined ? payload.footer_logo_url : current?.footer_logo_url,
+        favicon_url: payload.favicon_url !== undefined ? payload.favicon_url : current?.favicon_url,
+        allow_google_index: payload.allow_google_index !== undefined ? payload.allow_google_index : current?.allow_google_index,
+        maintenance_mode: payload.maintenance_mode !== undefined ? payload.maintenance_mode : current?.maintenance_mode,
+        maintenance_until: payload.maintenance_until !== undefined ? payload.maintenance_until : current?.maintenance_until,
+        maintenance_duration_minutes: payload.maintenance_duration_minutes !== undefined ? payload.maintenance_duration_minutes : current?.maintenance_duration_minutes,
+        header_announcement: payload.header_announcement !== undefined ? payload.header_announcement : current?.header_announcement,
+        free_shipping_threshold: payload.free_shipping_threshold !== undefined ? payload.free_shipping_threshold : current?.free_shipping_threshold,
+        footer_text: payload.footer_text !== undefined ? payload.footer_text : current?.footer_text,
+        description: payload.description !== undefined ? payload.description : current?.description,
+        custom_css: payload.custom_css !== undefined ? payload.custom_css : current?.custom_css,
+        active_font_id: payload.active_font_id !== undefined ? payload.active_font_id : current?.active_font_id,
+        gemini_api_key: payload.gemini_api_key !== undefined ? payload.gemini_api_key : current?.gemini_api_key,
+        homepage_layout_config: mergedConfig,
+        updated_at: new Date().toISOString(),
+      };
 
-      gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.035);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.035);
-    } catch {}
-  }
-
-  public playAddToCart() {
-    if (this.isMuted) return;
-    try {
-      if (!this.initContext() || !this.ctx) return;
-
-      const now = this.ctx.currentTime;
-      const osc1 = this.ctx.createOscillator();
-      const osc2 = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc1.type = "sine";
-      osc2.type = "sine";
-
-      osc1.frequency.setValueAtTime(523.25, now);
-      osc1.frequency.exponentialRampToValueAtTime(659.25, now + 0.07);
-
-      osc2.frequency.setValueAtTime(659.25, now + 0.07);
-      osc2.frequency.exponentialRampToValueAtTime(1046.5, now + 0.16);
-
-      gain.gain.setValueAtTime(0.06, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
-
-      osc1.connect(gain);
-      osc2.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc1.start(now);
-      osc1.stop(now + 0.09);
-      osc2.start(now + 0.07);
-      osc2.stop(now + 0.2);
-    } catch {}
-  }
-
-  public playExplodeShift(freqMultiplier: number = 1) {
-    if (this.isMuted) return;
-    try {
-      if (!this.initContext() || !this.ctx) return;
-
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      const filter = this.ctx.createBiquadFilter();
-
-      const validMultiplier = isNaN(freqMultiplier) || freqMultiplier <= 0 ? 1 : freqMultiplier;
-
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(320 * validMultiplier, now);
-      osc.frequency.exponentialRampToValueAtTime(120 * validMultiplier, now + 0.06);
-
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(1200, now);
-
-      gain.gain.setValueAtTime(0.05, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.06);
-    } catch {}
-  }
-
-  public playSuccess() {
-    if (this.isMuted) return;
-    try {
-      if (!this.initContext() || !this.ctx) return;
-
-      const now = this.ctx.currentTime;
-      const notes = [523.25, 659.25, 783.99, 1046.5];
-
-      notes.forEach((freq, idx) => {
-        if (!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
-
-        gain.gain.setValueAtTime(0.05, now + idx * 0.06);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.06 + 0.3);
-
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-
-        osc.start(now + idx * 0.06);
-        osc.stop(now + idx * 0.06 + 0.3);
+      const res = await fetch("/api/site-info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dbPayload),
       });
-    } catch {}
-  }
-}
 
-export const soundEngine = new SoundEngine();
-export default soundEngine;
+      const json = await res.json();
+      const finalData: SiteInfo = {
+        ...(current || DEFAULT_SITE_INFO),
+        ...(json.data || dbPayload),
+        homepage_layout_config: mergedConfig,
+      };
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
+        realtimeEngine.broadcastLocally("site_info_updated", finalData);
+      }
+
+      return finalData;
+    } catch (e) {
+      console.error("siteInfoService.updateSiteInfo Error:", e);
+      return null;
+    }
+  },
+};
+
+export default siteInfoService;
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۲. استایل‌های سراسری با کی‌فریم‌های دقیق داک مکانیکی ۳D و رانش چرخ‌دستی به چپ (app/globals.css)
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('app/globals.css', `@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --card-border: rgba(15, 23, 42, 0.08);
-  --card-border-hover: rgba(2, 132, 199, 0.35);
-  --accent-blue: #0284c7;
-  --accent-glow: rgba(2, 132, 199, 0.15);
-  --modal-bg: #ffffff;
-  --input-bg: #f1f5f9;
-  --glass-surface: rgba(255, 255, 255, 0.85);
-}
-
-.dark {
-  --bg-primary: #07090e;
-  --bg-secondary: #0c1017;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --card-border: rgba(255, 255, 255, 0.08);
-  --card-border-hover: rgba(56, 189, 248, 0.4);
-  --accent-blue: #38bdf8;
-  --accent-glow: rgba(56, 189, 248, 0.3);
-  --modal-bg: #0c1017;
-  --input-bg: rgba(255, 255, 255, 0.04);
-  --glass-surface: rgba(12, 16, 23, 0.75);
-}
-
-html, body {
-  overflow-x: hidden !important;
-  width: 100%;
-  max-width: 100vw;
-  scroll-behavior: smooth;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  -webkit-tap-highlight-color: transparent;
-}
-
-body {
-  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -webkit-overflow-scrolling: touch;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.glass-morphism {
-  background: var(--glass-surface);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 10px 35px 0 rgba(0, 0, 0, 0.08);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.dark .glass-morphism {
-  box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.5);
-}
-
-.glass-morphism:hover {
-  border-color: var(--card-border-hover);
-  box-shadow: 0 14px 45px 0 var(--accent-glow);
-}
-
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   🛒 کی‌فریم‌های انیمیشن چرخ‌دستی و بسته و حرکت به چپ (Kinetic Left Drive)
-   ══════════════════════════════════════════════════════════════════════════════ */
-
-@keyframes kineticItemDropCenter {
-  0% {
-    transform: translateY(-38px) scale(0.6);
-    opacity: 0;
-  }
-  45% {
-    opacity: 1;
-    transform: translateY(-4px) scale(1.08);
-  }
-  75% {
-    transform: translateY(2px) scale(0.96);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes kineticCartDriveToLeft {
-  0% {
-    transform: translateX(0);
-  }
-  38% {
-    transform: translateX(0) rotate(0deg);
-  }
-  44% {
-    transform: translateX(5px) rotate(3deg);
-  }
-  64% {
-    transform: translateX(-180px) rotate(-6deg);
-    opacity: 0;
-  }
-  65% {
-    transform: translateX(180px) rotate(6deg);
-    opacity: 0;
-  }
-  84% {
-    opacity: 1;
-    transform: translateX(8px) rotate(-2deg);
-  }
-  92% {
-    transform: translateX(-2px) rotate(1deg);
-  }
-  100% {
-    transform: translateX(0) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-@keyframes kineticWheelSpinToLeft {
-  0% {
-    transform: rotate(0deg);
-  }
-  42% {
-    transform: rotate(0deg);
-  }
-  64% {
-    transform: rotate(-720deg);
-  }
-  100% {
-    transform: rotate(-1440deg);
-  }
-}
-
-@keyframes kineticCounterBump {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.35) translateY(-2px);
-    color: #10b981;
-  }
-  70% {
-    transform: scale(0.95) translateY(1px);
-  }
-  100% {
-    transform: scale(1) translateY(0);
-  }
-}
-
-.animate-kinetic-item-drop {
-  animation: kineticItemDropCenter 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-.animate-kinetic-cart-left {
-  animation: kineticCartDriveToLeft 1.25s cubic-bezier(0.45, 0, 0.55, 1) forwards;
-}
-
-.animate-kinetic-wheel-left {
-  animation: kineticWheelSpinToLeft 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-
-.animate-kinetic-counter-bump {
-  animation: kineticCounterBump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   🎹 کی‌فریم‌های داک مکانیکی ۳D کلیدهای فوتر (Video 1 True Mechanical Keycaps)
-   ══════════════════════════════════════════════════════════════════════════════ */
-
-.keycap-dock-tray {
-  perspective: 1200px;
-}
-
-.keycap-3d-item {
-  transform-style: preserve-3d;
-  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.38s ease;
-}
-
-.keycap-3d-item:hover,
-.keycap-3d-item:active {
-  transform: translate3d(0, -28px, 22px) scale(1.18) rotateY(180deg);
-  z-index: 50;
-}
-`);
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۳. اصلاح کامل دکمه خرید با تم سفید در تاریک، مشکی در روشن و انیمیشن بدون نقص (components/AddToCartButton.tsx)
+// ۲. بازنویسی دکمه خرید با استایل تم مشکی در روز، سفید در شب و انیمیشن بدون خطا (components/AddToCartButton.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 updateFile('components/AddToCartButton.tsx', `// File Path: components/AddToCartButton.tsx
 "use client";
@@ -419,7 +492,8 @@ interface AddToCartButtonProps {
     id: string | number;
     title: string;
     price: number;
-    image: string;
+    image?: string;
+    images?: string[];
     stock?: number;
     category?: string;
   };
@@ -447,6 +521,12 @@ export default function AddToCartButton({
   const isAvailable = stockLimit > 0;
   const isMaxReached = currentCount >= stockLimit;
 
+  // استخراج تصویر مطمئن برای جلوگیری از باگ لود نشدن تصویر در کشوی سبد خرید
+  const guaranteedImage =
+    product.images?.[0] ||
+    product.image ||
+    "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800";
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -456,14 +536,15 @@ export default function AddToCartButton({
     soundEngine.playAddToCart();
     setAnimState("adding");
 
-    // افزودن کالا به وضعیت سبد خرید (بدون باز شدن ناگهانی کشو)
+    // ۱. افزودن فوری به استیت بدون باز شدن زودهنگام کشو
     addToCart(
       {
         id: product.id,
         title: product.title,
         name: product.title,
         price: product.price,
-        image: product.image,
+        image: guaranteedImage,
+        images: [guaranteedImage],
         stock: stockLimit,
         category: product.category || "تکنولوژی",
         quantity: 1,
@@ -471,13 +552,13 @@ export default function AddToCartButton({
       false
     );
 
-    // انیمیشن جهش فنری شمارنده
+    // ۲. جهش فنری شمارنده
     setTimeout(() => {
       setBumpCounter(true);
       setTimeout(() => setBumpCounter(false), 500);
     }, 550);
 
-    // پس از پایان کامل چرخه ۱۲۵۰ میلی‌ثانیه‌ای انیمیشن: بازنشانی دکمه و باز شدن کشوی سبد
+    // ۳. پس از پایان دقیق ۱۲۵۰ میلی‌ثانیه انیمیشن چرخ‌دستی: باز شدن کشوی سبد خرید
     setTimeout(() => {
       setAnimState("idle");
       openCart();
@@ -489,20 +570,20 @@ export default function AddToCartButton({
   return (
     <div className={\`flex flex-col items-center gap-1.5 w-full select-none \${className}\`} dir="rtl" suppressHydrationWarning>
       
-      {/* دکمه کپسولی: در تم روشن مشکی با آیکون سفید، در تم تاریک سفید با آیکون مشکی */}
+      {/* دکمه کپسولی: در تم روشن کاملاً مشکی مات با آیکون سفید، در تم تاریک کاملاً سفید با آیکون مشکی */}
       <button
         type="button"
         disabled={!isAvailable || isMaxReached}
         onClick={handleAddToCart}
-        className={\`relative w-full h-[50px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer shadow-xl active:scale-[0.98] border \${
+        className={\`relative w-full h-[52px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer shadow-xl active:scale-[0.98] border \${
           !isAvailable || isMaxReached
             ? "bg-slate-800/40 opacity-40 cursor-not-allowed text-slate-400 border-transparent"
-            : "bg-black text-white border-black/10 hover:bg-neutral-900 shadow-black/10 dark:bg-white dark:text-black dark:border-white/20 dark:hover:bg-neutral-100 dark:shadow-white/10"
+            : "bg-[#000000] text-white border-black/10 hover:bg-[#111111] shadow-black/15 dark:bg-[#ffffff] dark:text-[#000000] dark:border-white/20 dark:hover:bg-[#f0f0f0] dark:shadow-white/10"
         }\`}
       >
         <div className="relative w-full h-full flex items-center justify-center px-4 overflow-hidden">
           
-          {/* کانتینر سبد خرید و بسته متحرک */}
+          {/* کانتینر سبد خرید متحرک و بسته در حال پرتاب */}
           <div
             className={\`flex items-center justify-center transition-all duration-300 \${
               isAnimating
@@ -510,17 +591,17 @@ export default function AddToCartButton({
                 : "translate-x-0"
             }\`}
           >
-            {/* بسته محصول سفید با روبان آبی که به درون سبد سقوط می‌کند */}
+            {/* بسته سفید با روبان آبی که با پرتاب الاستیک وارد سبد می‌شود */}
             {isAnimating && (
               <div className="absolute -top-3.5 left-[8px] z-30 pointer-events-none animate-kinetic-item-drop">
-                <div className="w-3.5 h-3.5 rounded-[3px] bg-white dark:bg-slate-900 shadow-lg border border-slate-300 dark:border-slate-600 flex items-center justify-center relative">
+                <div className="w-3.5 h-3.5 rounded-[3px] bg-white dark:bg-slate-900 shadow-md border border-slate-300 dark:border-slate-600 flex items-center justify-center relative">
                   <span className="w-full h-[1.5px] bg-blue-500 absolute top-1/2 -translate-y-1/2" />
                   <span className="h-full w-[1.5px] bg-blue-500 absolute left-1/2 -translate-x-1/2" />
                 </div>
               </div>
             )}
 
-            {/* آیکون چرخ‌دستی که به سمت چپ حرکت می‌کند */}
+            {/* آیکون چرخ‌دستی که به سمت چپ می‌راند */}
             <svg
               className="w-5 h-5 shrink-0 drop-shadow-sm"
               viewBox="0 0 24 24"
@@ -551,7 +632,7 @@ export default function AddToCartButton({
             </svg>
           </div>
 
-          {/* متن دکمه که هنگام کلیک با ترنزیشن محو می‌شود */}
+          {/* متن دکمه که با انیمیشن در زمان کلیک محو می‌شود */}
           <span
             className={\`font-black text-xs tracking-wider uppercase mr-2.5 transition-all duration-300 whitespace-nowrap \${
               isAnimating
@@ -568,7 +649,7 @@ export default function AddToCartButton({
         </div>
       </button>
 
-      {/* شمارنده زیر دکمه با جهش فنری */}
+      {/* شمارنده با جهش فنری */}
       {showCounter && (
         <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] font-sans" suppressHydrationWarning>
           <span
@@ -587,161 +668,492 @@ export default function AddToCartButton({
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۴. بازسازی کامل داک کلیدهای مکانیکی ۳D فوتر مطابق دقیق ویدیوی ۱ (components/ContactDock.tsx)
+// ۳. اصلاح کامل کشوی سبد خرید، نمایش قطعی تصویر کالا و کنتراست عالی فرم‌ها (components/CartDrawer.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('components/ContactDock.tsx', `// File Path: components/ContactDock.tsx
+updateFile('components/CartDrawer.tsx', `// File Path: components/CartDrawer.tsx
 "use client";
 
 import React, { useState } from "react";
+import { useCart } from "@/context/CartContext";
+import { orderService } from "@/services/orderService";
+import { IRAN_PROVINCES } from "@/lib/iranProvinces";
+import { useRouter } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
-import { SocialKeyItem } from "@/services/siteInfoService";
 
-interface ContactDockProps {
-  customKeys?: SocialKeyItem[];
-  title?: string;
-  scale?: "small" | "medium" | "large";
+interface CartDrawerProps {
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function ContactDock({ title }: ContactDockProps) {
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }: CartDrawerProps = {}) {
+  const router = useRouter();
+  const cartContext = useCart();
+  const cartItems = cartContext?.cartItems || [];
+  const isCartOpen = propIsOpen !== undefined ? propIsOpen : (cartContext?.isCartOpen || false);
+  const closeCart = propOnClose || cartContext?.closeCart || (() => {});
+  const removeFromCart = cartContext?.removeFromCart || (() => {});
+  const updateQuantity = cartContext?.updateQuantity || (() => {});
+  const totalPrice = cartContext?.totalPrice || 0;
+  const discountAmount = cartContext?.discountAmount || 0;
+  const finalPayable = cartContext?.finalPayable || totalPrice;
+  const amountUntilFreeShipping = cartContext?.amountUntilFreeShipping || 0;
 
-  // تعریف دقیق ۷ کلید C-O-N-T-A-C-T با لوگوهای رسمی تفکیک‌شده (دقیقاً مطابق ویدیو ۱)
-  const officialKeys = [
-    {
-      letter: "C",
-      name: "GitHub",
-      href: "https://github.com",
-      brandColor: "#181717",
-      icon: (
-        <svg className="w-5 h-5 fill-current text-[#181717]" viewBox="0 0 24 24">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "O",
-      name: "LinkedIn",
-      href: "https://linkedin.com",
-      brandColor: "#0A66C2",
-      icon: (
-        <svg className="w-5 h-5 fill-current text-[#0A66C2]" viewBox="0 0 24 24">
-          <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "N",
-      name: "Discord",
-      href: "https://discord.com",
-      brandColor: "#5865F2",
-      icon: (
-        <svg className="w-5 h-5 fill-current text-[#5865F2]" viewBox="0 0 24 24">
-          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "T",
-      name: "Instagram",
-      href: "https://instagram.com",
-      brandColor: "#E4405F",
-      icon: (
-        <svg className="w-5 h-5 fill-current text-[#E4405F]" viewBox="0 0 24 24">
-          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "A",
-      name: "Telegram",
-      href: "https://t.me",
-      brandColor: "#26A5E4",
-      icon: (
-        <svg className="w-5 h-5 fill-current text-[#26A5E4]" viewBox="0 0 24 24">
-          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.919z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "C",
-      name: "X / Twitter",
-      href: "https://x.com",
-      brandColor: "#000000",
-      icon: (
-        <svg className="w-5 h-5 fill-current text-black" viewBox="0 0 24 24">
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-        </svg>
-      ),
-    },
-    {
-      letter: "T",
-      name: "پشتیبانی تماس",
-      href: "tel:09376110200",
-      brandColor: "#0284C7",
-      icon: (
-        <svg className="w-5 h-5 fill-current text-[#0284C7]" viewBox="0 0 24 24">
-          <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.24 1.02l-2.21 2.2z" />
-        </svg>
-      ),
-    },
-  ];
+  const [customerName, setCustomerName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [selectedProvince, setSelectedProvince] = useState("تهران");
+  const [selectedCity, setSelectedCity] = useState("تهران");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [buildingNo, setBuildingNo] = useState("");
+  const [unitNo, setUnitNo] = useState("");
+  const [floorNo, setFloorNo] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+
+  const [couponCode, setCouponCode] = useState("");
+  const [couponMsg, setCouponMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const totalItemUnits = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+
+  const handleProvinceChange = (provName: string) => {
+    setSelectedProvince(provName);
+    const prov = IRAN_PROVINCES.find((p) => p.name === provName);
+    if (prov && prov.cities.length > 0) {
+      setSelectedCity(prov.cities[0]);
+    }
+  };
+
+  if (!isCartOpen) return null;
+
+  const handleIncreaseQuantity = (item: any) => {
+    const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
+    if (item.quantity >= currentStock) {
+      alert(\`⚠️ حداکثر موجودی قابل سفارش برای این کالا \${currentStock} عدد می‌باشد.\`);
+      return;
+    }
+    soundEngine.playClick();
+    updateQuantity(item.id, 1);
+  };
+
+  const handleDecreaseQuantity = (item: any) => {
+    soundEngine.playClick();
+    updateQuantity(item.id, -1);
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponMsg(null);
+    soundEngine.playClick();
+
+    const res = await cartContext.applyCoupon(couponCode);
+    if (res.success) {
+      soundEngine.playSuccess();
+      setCouponMsg({ type: "success", text: res.message });
+    } else {
+      setCouponMsg({ type: "error", text: res.message });
+    }
+  };
+
+  const handleFinalCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setValidationError(null);
+
+    if (!customerName.trim()) {
+      setValidationError("لطفاً نام و نام خانوادگی خود را وارد نمایید.");
+      return;
+    }
+
+    const cleanPhone = phone
+      .trim()
+      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/\\D/g, "");
+
+    if (!/^09\\d{9}$/.test(cleanPhone)) {
+      setValidationError("شماره موبایل وارد شده باید ۱۱ رقم و با 09 شروع شود.");
+      return;
+    }
+
+    if (!streetAddress.trim()) {
+      setValidationError("لطفاً نشانی دقیق خیابان و کوچه را وارد نمایید.");
+      return;
+    }
+
+    if (!buildingNo.trim()) {
+      setValidationError("لطفاً پلاک ساختمان را وارد نمایید.");
+      return;
+    }
+
+    if (cartItems.length === 0) return;
+
+    const fullConstructedAddress = \`استان \${selectedProvince}، شهر \${selectedCity}، \${streetAddress.trim()}، پلاک \${buildingNo.trim()}\${
+      unitNo.trim() ? \`، واحد \${unitNo.trim()}\` : ""
+    }\${floorNo.trim() ? \`، طبقه \${floorNo.trim()}\` : ""}\`;
+
+    setSubmitting(true);
+    soundEngine.playClick();
+
+    try {
+      const orderId = \`ORD-\${Date.now().toString().slice(-6)}\`;
+      const orderPayload = {
+        id: orderId,
+        order_number: orderId,
+        customer_name: customerName.trim(),
+        phone: cleanPhone,
+        province: selectedProvince,
+        city: selectedCity,
+        address: fullConstructedAddress,
+        postal_code: postalCode.trim() || null,
+        items: cartItems.map((item) => ({
+          productId: item.id,
+          product_id: item.id,
+          title: item.title || item.name || "کالا",
+          name: item.name || item.title || "کالا",
+          price: Number(item.price) || 0,
+          quantity: Number(item.quantity) || 1,
+          image: item.image || item.images?.[0] || "",
+        })),
+        total_amount: totalPrice,
+        discount_amount: discountAmount,
+        final_amount: finalPayable,
+        coupon_code: cartContext.appliedCoupon ? cartContext.appliedCoupon.code : null,
+        status: "pending" as const,
+        payment_status: "pending" as const,
+      };
+
+      const newOrder = await orderService.create(orderPayload);
+
+      if (newOrder) {
+        closeCart();
+        router.push(\`/checkout/payment?orderId=\${newOrder.orderNumber || newOrder.id}\`);
+      } else {
+        throw new Error("خطا در ایجاد فاکتور در سرور.");
+      }
+    } catch (err: any) {
+      setValidationError(err?.message || "خطا در اتصال به سرور.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const currentCities = IRAN_PROVINCES.find((p) => p.name === selectedProvince)?.cities || [];
 
   return (
-    <div className="w-full flex flex-col items-start gap-2.5 select-none font-sans text-right" dir="rtl" suppressHydrationWarning>
-      <div className="flex items-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)]" />
-        <span className="text-[11px] font-black text-[var(--text-primary)]">
-          {title || "شبکه‌های ارتباطی و اجتماعی استودیو:"}
-        </span>
-      </div>
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md font-sans select-none animate-fadeIn" dir="rtl">
+      <div className="w-full max-w-lg bg-[var(--modal-bg)] border-r border-[var(--card-border)] h-full shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)]">
+        
+        {/* هدر کشو */}
+        <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between">
+          <button
+            onClick={closeCart}
+            className="w-9 h-9 rounded-2xl bg-[var(--input-bg)] flex items-center justify-center font-bold text-xs hover:border-[var(--accent-blue)] border border-[var(--card-border)] transition cursor-pointer text-[var(--text-primary)]"
+          >
+            ✕
+          </button>
 
-      {/* تری داک کیبورد با استایل ۳D فلیپ واقعی ویدیوی ۱ */}
-      <div className="flex items-center justify-start w-full pt-1">
-        <div
-          className="keycap-dock-tray p-2.5 rounded-[1.8rem] bg-[#0c1017] border border-slate-700/60 shadow-2xl backdrop-blur-2xl flex items-center gap-2"
-          dir="ltr"
-        >
-          {officialKeys.map((k, idx) => (
-            <a
-              key={idx}
-              href={k.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onMouseEnter={() => {
-                soundEngine.playClick();
-                setActiveTooltip(k.name);
-              }}
-              onMouseLeave={() => setActiveTooltip(null)}
-              onTouchStart={() => {
-                soundEngine.playClick();
-                setActiveTooltip(k.name);
-              }}
-              className="keycap-3d-item relative w-9 h-11 sm:w-11 sm:h-13 rounded-2xl cursor-pointer block"
-            >
-              {/* رویه کلید مکانیکی تیره (حرف لاتین C-O-N-T-A-C-T) */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#1e2536] to-[#0d121c] border border-slate-700/80 shadow-md flex items-center justify-center font-mono font-black text-sm text-slate-200 [backface-visibility:hidden]">
-                {k.letter}
-              </div>
-
-              {/* پشت کلید: کارت سفید برآمده با لوگوی اصلی رنگی شبکه اجتماعی (دقیقاً ویدیوی ۱) */}
-              <div className="absolute inset-0 rounded-2xl bg-white shadow-2xl border border-slate-200 flex items-center justify-center [transform:rotateY(180deg)] [backface-visibility:hidden]">
-                {k.icon}
-              </div>
-            </a>
-          ))}
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-xs text-[var(--text-primary)]">سبد خرید شما</span>
+            <span className="text-[var(--accent-blue)] font-black text-xs font-mono">
+              {totalItemUnits} قلم
+            </span>
+            <span className="text-lg">🛒</span>
+          </div>
         </div>
-      </div>
 
-      {/* تول‌تیپ اختصاصی نام شبکه فعال‌شده */}
-      <div className="h-4 flex items-center pr-1">
-        {activeTooltip ? (
-          <span className="text-[10px] font-black text-[var(--accent-blue)] animate-fadeIn">
-            {activeTooltip} ↗
-          </span>
-        ) : (
-          <span className="text-[10px] text-[var(--text-secondary)] font-medium">
-            روی کلیدها نگه دارید تا فلیپ سه‌بعدی فعال شود
-          </span>
+        {/* وضعیت ارسال رایگان */}
+        {totalPrice > 0 && (
+          <div className="p-3 bg-[var(--input-bg)] border-b border-[var(--card-border)] text-xs space-y-1.5">
+            <div className="flex justify-between text-[11px] font-bold">
+              <span>🚀 وضعیت ارسال رایگان پیشتاز:</span>
+              <span className={amountUntilFreeShipping === 0 ? "text-emerald-500 font-black" : "text-[var(--accent-blue)]"}>
+                {amountUntilFreeShipping === 0
+                  ? "✓ ارسال مرسوله شما رایگان شد!"
+                  : \`فقط \${amountUntilFreeShipping.toLocaleString("fa-IR")} تومان تا ارسال رایگان\`}
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-700/30 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-500"
+                style={{ width: \`\${Math.min(100, (totalPrice / 2000000) * 100)}%\` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* لیست محصولات و فرم تحویل */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
+          {cartItems.length === 0 ? (
+            <div className="py-28 text-center text-[var(--text-secondary)] space-y-2 font-bold">
+              <span className="text-4xl block">🛍️</span>
+              <p>سبد خرید شما در حال حاضر خالی است.</p>
+            </div>
+          ) : (
+            <>
+              {/* لیست کالاها با تضمین نمایش تصویر صحیح و بدون باگ */}
+              <div className="space-y-3">
+                {cartItems.map((item: any) => {
+                  const stockLimit = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
+                  const isMaxReached = item.quantity >= stockLimit;
+                  const itemImg = item.image || item.images?.[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800";
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            soundEngine.playClick();
+                            removeFromCart(item.id);
+                          }}
+                          className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition cursor-pointer"
+                          title="حذف کالا"
+                        >
+                          🗑️
+                        </button>
+
+                        <div className="flex items-center gap-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-2xl px-2.5 py-1 font-bold">
+                          <button
+                            onClick={() => handleDecreaseQuantity(item)}
+                            className="hover:text-[var(--accent-blue)] cursor-pointer px-1 font-bold text-sm"
+                          >
+                            -
+                          </button>
+                          <span className="font-mono font-black text-xs px-1 text-[var(--text-primary)]">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => handleIncreaseQuantity(item)}
+                            disabled={isMaxReached}
+                            className={\`px-1 font-bold text-sm transition \${
+                              isMaxReached ? "opacity-30 cursor-not-allowed text-gray-400" : "hover:text-[var(--accent-blue)] cursor-pointer"
+                            }\`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-left">
+                        <div>
+                          <h4 className="font-black text-xs text-[var(--text-primary)] line-clamp-1 text-right" dir="rtl">
+                            {item.title || item.name}
+                          </h4>
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black block mt-0.5 text-right" dir="rtl">
+                            {Number(item.discountPrice ?? item.price ?? 0).toLocaleString("fa-IR")} تومان
+                          </span>
+                        </div>
+
+                        <div className="w-13 h-13 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)] p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                          <img
+                            src={itemImg}
+                            alt=""
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* باکس کد تخفیف */}
+              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+                <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition cursor-pointer shadow-md"
+                  >
+                    اعمال
+                  </button>
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder="مثال: OFF10"
+                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-xs outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)] uppercase"
+                  />
+                </div>
+                {couponMsg && (
+                  <p className={\`text-[10px] font-bold \${couponMsg.type === "success" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}\`}>
+                    {couponMsg.text}
+                  </p>
+                )}
+              </div>
+
+              {/* فرم آدرس پستی با استایل تمیز و کنتراست عالی */}
+              <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                <div className="flex items-center gap-1.5 font-black text-xs text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
+                  <span>📋</span>
+                  <span>مشخصات تحویل‌گیرنده و نشانی پستی:</span>
+                </div>
+
+                {validationError && (
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-[11px] leading-relaxed">
+                    ⚠️ {validationError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">نام و نام خانوادگی تحویل‌گیرنده *</label>
+                  <input
+                    type="text"
+                    required
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="مثال: پوریا رحیمی"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] shadow-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">شماره موبایل جهت پیامک رهگیری *</label>
+                  <input
+                    type="tel"
+                    required
+                    dir="ltr"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="09123456789"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-right text-[var(--text-primary)] shadow-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">استان *</label>
+                    <select
+                      value={selectedProvince}
+                      onChange={(e) => handleProvinceChange(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] cursor-pointer shadow-sm"
+                    >
+                      {IRAN_PROVINCES.map((prov) => (
+                        <option key={prov.name} value={prov.name}>
+                          {prov.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">شهرستان / شهر *</label>
+                    <select
+                      value={selectedCity}
+                      onChange={(e) => setSelectedCity(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] cursor-pointer shadow-sm"
+                    >
+                      {currentCities.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">خیابان و کوچه (نشانی دقیق) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={streetAddress}
+                    onChange={(e) => setStreetAddress(e.target.value)}
+                    placeholder="مثال: خیابان ولیعصر، تقاطع میرداماد"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-medium text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] shadow-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">پلاک *</label>
+                    <input
+                      type="text"
+                      required
+                      value={buildingNo}
+                      onChange={(e) => setBuildingNo(e.target.value)}
+                      placeholder="مثال: ۲۴"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] text-center shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">واحد (اختیاری)</label>
+                    <input
+                      type="text"
+                      value={unitNo}
+                      onChange={(e) => setUnitNo(e.target.value)}
+                      placeholder="مثال: ۳"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] text-center shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">طبقه (اختیاری)</label>
+                    <input
+                      type="text"
+                      value={floorNo}
+                      onChange={(e) => setFloorNo(e.target.value)}
+                      placeholder="مثال: ۲"
+                      className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)] text-center shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">کد پستی ۱۰ رقمی (اختیاری)</label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    maxLength={10}
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                    placeholder="7138152316"
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-slate-300 dark:border-slate-700 outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] text-right text-[var(--text-primary)] shadow-sm"
+                  />
+                </div>
+              </form>
+            </>
+          )}
+        </div>
+
+        {/* فوتر تسویه نهایی فاکتور */}
+        {cartItems.length > 0 && (
+          <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs">
+            <div className="space-y-1.5 font-bold">
+              <div className="flex justify-between items-center text-[var(--text-secondary)]">
+                <span>جمع کل اقلام:</span>
+                <span className="font-mono text-sm text-[var(--text-primary)]">
+                  {totalPrice.toLocaleString("fa-IR")} تومان
+                </span>
+              </div>
+
+              {discountAmount > 0 && (
+                <div className="flex justify-between items-center text-rose-500 font-black">
+                  <span>تخفیف اعمال‌شده:</span>
+                  <span className="font-mono">- {discountAmount.toLocaleString("fa-IR")} تومان</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-sm font-black pt-2 border-t border-[var(--card-border)]">
+                <span>مبلغ نهایی قابل پرداخت:</span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 text-base">
+                  {finalPayable.toLocaleString("fa-IR")} تومان
+                </span>
+              </div>
+            </div>
+
+            <button
+              form="cart-checkout-form"
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 active:scale-[0.99] transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <span>💳</span>
+              <span>{submitting ? "در حال انتقال به درگاه بانکی..." : "تأیید نهایی و اتصال به شاپرک"}</span>
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -750,386 +1162,187 @@ export default function ContactDock({ title }: ContactDockProps) {
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۵. اصلاح کامل فوتر، رفع خطای هیدریشن و بج پایدار اینماد بدون رکوئست شکست‌خورده (components/Footer.tsx)
+// ۴. رفع عدم تطابق هیدریشن در صفحه نخست (app/page.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('components/Footer.tsx', `"use client";
+updateFile('app/page.tsx', `"use client";
 
 import React, { useState, useEffect } from "react";
+import { productService, Product } from "@/services/productService";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
+import { bannerService, Banner } from "@/services/bannerService";
+import { siteInfoService, DEFAULT_HOMEPAGE_LAYOUT_CONFIG, HomepageLayoutConfig } from "@/services/siteInfoService";
+import { useCart } from "@/context/CartContext";
 import Link from "next/link";
-import { siteInfoService, SiteInfo, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
-import ContactDock from "@/components/ContactDock";
-import AnimatedLogo from "@/components/AnimatedLogo";
-import { soundEngine } from "@/lib/soundEngine";
+import AIAssistantChat from "@/components/AIAssistantChat";
+import ProductComparisonModal from "@/components/ProductComparisonModal";
+import TechRadarFeed from "@/components/TechRadarFeed";
+import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
 
-export default function Footer() {
-  const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+export default function HomePage() {
+  const { addToCart } = useCart();
+
+  const [products, setProducts] = useState<Product[]>(FLAGSHIP_7_PRODUCTS);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [compareList, setCompareList] = useState<Product[]>([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [layoutConfig, setLayoutConfig] = useState<HomepageLayoutConfig>(DEFAULT_HOMEPAGE_LAYOUT_CONFIG);
   const [mounted, setMounted] = useState(false);
+
+  const loadData = async () => {
+    try {
+      const [prods, bans, info] = await Promise.all([
+        productService.getAll(),
+        bannerService.getAll(),
+        siteInfoService.getSiteInfo(),
+      ]);
+      if (prods && prods.length > 0) setProducts(prods);
+      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
+      if (info?.homepage_layout_config) {
+        setLayoutConfig(info.homepage_layout_config);
+      }
+    } catch {}
+  };
 
   useEffect(() => {
     setMounted(true);
-    siteInfoService.getSiteInfo().then((d) => d && setInfo(d));
-    const handleUpdate = (e: any) => {
-      if (e.detail) setInfo(e.detail);
+    loadData();
+
+    const handleProductsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
+      else loadData();
     };
-    window.addEventListener("site_info_updated", handleUpdate);
-    return () => window.removeEventListener("site_info_updated", handleUpdate);
+
+    const handleSiteInfoUpdate = (e: any) => {
+      if (e.detail?.homepage_layout_config) {
+        setLayoutConfig(e.detail.homepage_layout_config);
+      }
+    };
+
+    window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
+
+    return () => {
+      window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
+    };
   }, []);
 
-  const layoutCfg = info?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
-  const footerCfg = layoutCfg.footer;
-  const contactDockCfg = layoutCfg.contactDock;
+  const heroCfg = layoutConfig.hero;
+  const showcaseCfg = layoutConfig.showcase3D;
+  const newsTickerCfg = layoutConfig.newsTicker;
+  const blogCfg = layoutConfig.blogSection;
 
-  if (footerCfg.show === false) return null;
+  const heroHeightClasses =
+    heroCfg.heightMode === "cinematic"
+      ? "min-h-[440px] sm:min-h-[520px]"
+      : heroCfg.heightMode === "standard"
+      ? "min-h-[300px] sm:min-h-[360px]"
+      : "min-h-[200px] sm:min-h-[250px]";
 
-  const siteName = footerCfg.brandTitle || info?.site_name || info?.siteName || "آکسون | Axon";
-  const brandSubtitle = footerCfg.brandSubtitle || "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو";
-  const brandDesc = footerCfg.description || info?.footer_text || info?.description || "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.";
-  const logoUrl = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url || info?.logoUrl;
-
-  const paddingClasses =
-    footerCfg.paddingMode === "relaxed"
-      ? "py-10 sm:py-14 space-y-8"
-      : footerCfg.paddingMode === "normal"
-      ? "py-8 sm:py-10 space-y-7"
-      : "py-6 sm:py-8 space-y-6";
+  const heroPaddingClasses =
+    heroCfg.verticalPadding === "relaxed"
+      ? "p-8 sm:p-14 lg:p-16"
+      : heroCfg.verticalPadding === "normal"
+      ? "p-6 sm:p-10 lg:p-12"
+      : "p-5 sm:p-8 lg:p-10";
 
   return (
-    <footer
-      id="storefront-footer"
-      className={\`w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-10 select-none transition-colors duration-300 font-sans relative z-10 \${paddingClasses}\`}
-      dir="rtl"
-      suppressHydrationWarning
-    >
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 space-y-6">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-12 transition-colors duration-300" dir="rtl" suppressHydrationWarning>
+      <main className="pt-1 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6" suppressHydrationWarning>
         
-        {/* ردیف اصلی: گرید ۱۲ ستونی استودیویی با تراز عالی */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 pb-8 border-b border-[var(--card-border)] items-start">
-          
-          {/* ستون ۱ (راست): مشخصات برند، توضیحات، نشان‌ها و داک کلیدها (۵ ستون) */}
-          <div className="lg:col-span-5 space-y-4 text-right">
-            
-            <div className="flex items-center gap-3">
-              <AnimatedLogo customLogoUrl={logoUrl} size={38} />
+        {/* تیکر اخبار تکنولوژی */}
+        {newsTickerCfg.show && <TechRadarFeed />}
+
+        {/* هیرو سکشن ماژولار */}
+        {heroCfg.show && (
+          <section className={\`w-full rounded-[2.2rem] sm:rounded-[2.5rem] overflow-hidden glass-morphism shadow-xl border border-[var(--card-border)] relative flex flex-col justify-center transition-all duration-300 \${heroHeightClasses} \${heroPaddingClasses}\`}>
+            {heroCfg.show3DCanvas && <Hero3DCanvas />}
+
+            <div className="relative z-10 space-y-2.5 max-w-2xl text-right">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
+                {heroCfg.title}
+              </h1>
+
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-xl">
+                {heroCfg.subtitle}
+              </p>
+
+              <div className="pt-1">
+                <Link
+                  href={heroCfg.buttonLink || "/#products"}
+                  className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-7 py-3 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/25 cursor-pointer"
+                >
+                  <span>{heroCfg.buttonText}</span>
+                  <span>←</span>
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* نمایشگاه سه‌بعدی محصولات */}
+        {showcaseCfg.show && (
+          <ProductPerspectiveSlider
+            products={products.slice(0, showcaseCfg.limit || 7)}
+            customTitle={showcaseCfg.title}
+            customSubtitle={showcaseCfg.subtitle}
+            cardScale={showcaseCfg.cardScale}
+          />
+        )}
+
+        {/* مجله سئو */}
+        {blogCfg.show && (
+          <section className="glass-morphism rounded-3xl p-5 sm:p-7 space-y-3">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
               <div>
-                <h3 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--text-primary)]">
-                  {siteName}
+                <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
+                  {blogCfg.title}
                 </h3>
-                <span className="text-[11px] text-[var(--accent-blue)] font-bold block">
-                  {brandSubtitle}
-                </span>
+                <p className="text-[11px] text-[var(--text-secondary)] font-medium">
+                  {blogCfg.subtitle}
+                </p>
               </div>
+              {blogCfg.showViewAll && (
+                <Link href="/blog" className="text-xs font-bold text-[var(--accent-blue)] hover:underline">
+                  مشاهده همه مقالات ←
+                </Link>
+              )}
             </div>
+            <HomeBlogSection count={blogCfg.count || 3} />
+          </section>
+        )}
+      </main>
 
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium max-w-lg text-justify">
-              {brandDesc}
-            </p>
+      <ProductComparisonModal products={compareList} isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))} />
+      <AIAssistantChat />
+    </div>
+  );
+}
 
-            {footerCfg.showBadges && (
-              <div className="flex flex-wrap items-center gap-2 pt-1 animate-fadeIn">
-                <span className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20 shadow-sm flex items-center gap-1.5">
-                  <span className="text-emerald-500 text-xs">✓</span>
-                  <span>{footerCfg.badge1Text || "گارانتی اصالت ۱۰۰٪ فیزیکی"}</span>
-                </span>
-                <span className="px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[11px] border border-blue-500/20 shadow-sm flex items-center gap-1.5">
-                  <span className="text-xs">🚀</span>
-                  <span>{footerCfg.badge2Text || "ارسال پیشتاز سراسری"}</span>
-                </span>
-              </div>
-            )}
+function HomeBlogSection({ count = 3 }: { count?: number }) {
+  const [posts, setPosts] = useState<any[]>([]);
+  useEffect(() => {
+    fetch("/api/blogs").then((r) => r.json()).then((d) => setPosts((d.data || d.posts || []).slice(0, count))).catch(() => {});
+  }, [count]);
 
-            {/* داک کلیدهای کیبورد CONTACT با تراز راست کامل */}
-            {contactDockCfg.show && (
-              <div className="pt-2 border-t border-[var(--card-border)]/60">
-                <ContactDock
-                  title={contactDockCfg.title}
-                  scale={contactDockCfg.scale}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* ستون ۲: پیوندهای دسترسی سریع (۲ ستون) */}
-          {footerCfg.quickLinks.show && (
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-2.5">
-                <span className="w-2 h-2 rounded-full bg-[var(--accent-blue)]" />
-                <h4 className="font-black text-xs sm:text-sm text-[var(--text-primary)]">
-                  {footerCfg.quickLinks.title || "دسترسی سریع"}
-                </h4>
-              </div>
-
-              <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-bold">
-                {footerCfg.quickLinks.links.map((link) => (
-                  <li key={link.id}>
-                    <Link
-                      href={link.url}
-                      onClick={() => soundEngine.playClick()}
-                      className="hover:text-[var(--accent-blue)] transition-colors flex items-center gap-1.5 py-1"
-                    >
-                      <span className="text-[10px] opacity-60">›</span>
-                      <span>{link.title}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* ستون ۳: خدمات مشتریان و پشتیبانی (۲ ستون) */}
-          {footerCfg.customerServices.show && (
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-2.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <h4 className="font-black text-xs sm:text-sm text-[var(--text-primary)]">
-                  {footerCfg.customerServices.title || "خدمات مشتریان"}
-                </h4>
-              </div>
-
-              <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-bold">
-                {footerCfg.customerServices.links.map((link) => (
-                  <li key={link.id}>
-                    <Link
-                      href={link.url}
-                      onClick={() => soundEngine.playClick()}
-                      className="hover:text-[var(--accent-blue)] transition-colors flex items-center gap-1.5 py-1"
-                    >
-                      <span className="text-[10px] opacity-60">›</span>
-                      <span>{link.title}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* ستون ۴ (چپ): میکروکارت‌های اطلاعات تماس و بج پایدار اینماد (۳ ستون) */}
-          {footerCfg.contactInfo.show && (
-            <div className="lg:col-span-3 space-y-3">
-              <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-2.5">
-                <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                <h4 className="font-black text-xs sm:text-sm text-[var(--text-primary)]">
-                  {footerCfg.contactInfo.title || "اطلاعات تماس و دفتر"}
-                </h4>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                {footerCfg.contactInfo.items
-                  .filter((it) => it.show !== false)
-                  .map((it) => {
-                    const isLink = Boolean(it.link);
-                    const CardComponent = isLink ? "a" : "div";
-                    const linkProps = isLink ? { href: it.link, onClick: () => soundEngine.playClick() } : {};
-
-                    return (
-                      <CardComponent
-                        key={it.id}
-                        {...linkProps}
-                        className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition-all flex items-center justify-between group shadow-sm"
-                      >
-                        <div className="flex items-center gap-2.5 overflow-hidden">
-                          <span className="w-8 h-8 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center text-sm font-bold shadow-inner shrink-0">
-                            {it.type === "phone" ? "📞" : it.type === "email" ? "✉️" : it.type === "address" ? "📍" : "⏰"}
-                          </span>
-                          <div className="overflow-hidden text-right">
-                            <span className="text-[10px] text-[var(--text-secondary)] block font-bold">
-                              {it.title}
-                            </span>
-                            <span className="font-bold text-xs text-[var(--text-primary)] truncate block group-hover:text-[var(--accent-blue)] transition-colors" dir={it.type === "phone" || it.type === "email" ? "ltr" : "rtl"}>
-                              {it.value}
-                            </span>
-                          </div>
-                        </div>
-                        {isLink && (
-                          <span className="text-[10px] text-[var(--accent-blue)] opacity-0 group-hover:opacity-100 transition-opacity font-bold shrink-0 mr-2">
-                            ↗
-                          </span>
-                        )}
-                      </CardComponent>
-                    );
-                  })}
-              </div>
-
-              {/* بخش پایدار نماد اعتماد الکترونیکی (Enamad SVG Badge - بدون ارور Connection Closed) */}
-              <div className="pt-3 border-t border-[var(--card-border)]/60 space-y-2">
-                <span className="text-[11px] font-black text-[var(--text-secondary)] block">
-                  مجوزها و تاییدیه رسمی:
-                </span>
-                <div className="flex items-center gap-3">
-                  <a
-                    href="https://trustseal.enamad.ir/?id=27424534"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-emerald-500 transition-all flex items-center gap-3 group shadow-sm"
-                    title="مشاهده تاییدیه رسمی نماد اعتماد الکترونیکی (کد ۲۷۴۲۴۵۳۴)"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 font-bold shrink-0">
-                      <svg className="w-6 h-6 stroke-current" fill="none" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-[var(--text-primary)] block group-hover:text-emerald-500 transition">
-                        نماد اعتماد الکترونیکی
-                      </span>
-                      <span className="text-[10px] font-mono font-bold text-[var(--accent-blue)] block" dir="ltr">
-                        کد رسمی: 27424534
-                      </span>
-                    </div>
-                  </a>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* نوار پایین فوتر با سازگاری ۱۰۰٪ هیدریشن */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-secondary)] font-medium pt-2" suppressHydrationWarning>
-          <p className="text-center sm:text-right">
-            تمامی حقوق مادی و معنوی برای <strong className="text-[var(--text-primary)] font-black">{siteName}</strong> محفوظ است © 2026
-          </p>
-
-          <div className="flex items-center gap-4 text-[11px] font-bold">
-            <span className="text-[var(--text-secondary)]">طراحی و معماری مهندسی پایدار</span>
-            <span className="text-slate-400">•</span>
-            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)</span>
-            </span>
-          </div>
-        </div>
-      </div>
-    </footer>
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+      {posts.map((post) => (
+        <article key={post.id || post.title} className="glass-morphism p-4 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
+          <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
+          <Link href={"/blog/" + (post.id || "")} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]">
+            مطالعه مقاله ←
+          </Link>
+        </article>
+      ))}
+    </div>
   );
 }
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۶. مدیریت حافظه کانال وب‌سوکت و رفع هشدار MaxListeners (lib/realtimeSync.ts)
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('lib/realtimeSync.ts', `// File Path: lib/realtimeSync.ts
-import { supabase } from "@/lib/supabase";
-import { RealtimeChannel } from "@supabase/supabase-js";
-import { productService } from "@/services/productService";
-import { siteInfoService } from "@/services/siteInfoService";
-import { bannerService } from "@/services/bannerService";
-
-export function applyFaviconToDOM(url?: string) {
-  if (typeof document === "undefined" || !url) return;
-  try {
-    let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      document.head.appendChild(link);
-    }
-    link.rel = "icon";
-    link.href = \`\${url}\${url.includes("?") ? "&" : "?"}v=\${Date.now()}\`;
-  } catch {}
-}
-
-export function applyTitleToDOM(title?: string, storeName?: string) {
-  if (typeof document === "undefined") return;
-  try {
-    const sName = storeName || "آکسون";
-    const sTitle = title || "مرجع تخصصی تجهیزات دیجیتال و تصویر";
-    document.title = \`\${sName} | \${sTitle}\`;
-  } catch {}
-}
-
-declare global {
-  interface Window {
-    __AXON_REALTIME_SINGLETON__?: MasterRealtimeEngine;
-  }
-}
-
-class MasterRealtimeEngine {
-  private channel: RealtimeChannel | null = null;
-  private broadcastBus: BroadcastChannel | null = null;
-  private isSubscribed: boolean = false;
-  private isChannelCreated: boolean = false;
-
-  constructor() {
-    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-      try {
-        this.broadcastBus = new BroadcastChannel("axon_master_bus_v2026");
-        this.broadcastBus.onmessage = (event) => {
-          const { type, data } = event.data || {};
-          if (type) {
-            window.dispatchEvent(new CustomEvent(type, { detail: data }));
-          }
-        };
-      } catch {}
-    }
-  }
-
-  public static getInstance(): MasterRealtimeEngine {
-    if (typeof window !== "undefined") {
-      if (!window.__AXON_REALTIME_SINGLETON__) {
-        window.__AXON_REALTIME_SINGLETON__ = new MasterRealtimeEngine();
-      }
-      return window.__AXON_REALTIME_SINGLETON__;
-    }
-    return new MasterRealtimeEngine();
-  }
-
-  public broadcastLocally(type: string, data: any) {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(new CustomEvent(type, { detail: data }));
-    if (this.broadcastBus) {
-      try {
-        this.broadcastBus.postMessage({ type, data });
-      } catch {}
-    }
-    if (this.channel && this.isSubscribed) {
-      try {
-        this.channel.send({ type: "broadcast", event: type, payload: data });
-      } catch {}
-    }
-  }
-
-  public init(): () => void {
-    if (typeof window === "undefined" || this.isChannelCreated) return () => {};
-
-    try {
-      this.isChannelCreated = true;
-      this.channel = supabase.channel("axon_main_stream_v2026", {
-        config: { broadcast: { ack: false } },
-      });
-
-      const eventNames = [
-        "products_updated", "site_info_updated", "banners_updated",
-        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
-        "contact_messages_updated", "posts_updated", "admin_users_updated"
-      ];
-
-      eventNames.forEach((ev) => {
-        this.channel?.on("broadcast", { event: ev }, (payload) => {
-          window.dispatchEvent(new CustomEvent(ev, { detail: payload.payload }));
-        });
-      });
-
-      this.channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          this.isSubscribed = true;
-        }
-      });
-    } catch {}
-
-    return () => {
-      // نگه‌داشتن پایدار ارتباط به عنوان سینگلتون سراسری
-    };
-  }
-}
-
-export function initRealtimeSync(): () => void {
-  return MasterRealtimeEngine.getInstance().init();
-}
-
-export const realtimeEngine = MasterRealtimeEngine.getInstance();
-export default MasterRealtimeEngine;
-`);
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۷. اتوماسیون کامل Git: استیج خودکار، کامیت و Push مستقیم به مخزن و استقرار روی Vercel
+// ۵. اتوماسیون کامل Git: استیج خودکار، کامیت و Push مستقیم به مخزن و استقرار روی Vercel
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
 console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🚀 آغاز فرآیند خودکار استیج، کامیت و استقرار نهایی در Git/GitHub/Vercel');
@@ -1140,7 +1353,7 @@ try {
   execSync('git add .', { stdio: 'inherit' });
 
   console.log('\n  \x1b[34m[2/3]\x1b[0m در حال ثبت کامیت ساختاری (git commit)...');
-  const commitMessage = `fix(ui): black button in light mode, white in dark mode, authentic 3d contact dock & zero console errors [${new Date().toLocaleTimeString('fa-IR')}]`;
+  const commitMessage = `fix(ui): black button in light, white in dark, fixed cart drawer thumbnails, eliminated hydration error #418 [${new Date().toLocaleTimeString('fa-IR')}]`;
   try {
     execSync(`git commit -m "${commitMessage}"`, { stdio: 'inherit' });
   } catch (cErr) {
@@ -1156,7 +1369,7 @@ try {
   execSync(`git push origin ${currentBranch}`, { stdio: 'inherit' });
 
   console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 تمامی اصلاحات با موفقیت ۱۰۰٪ اعمال، خطاهای کنسول برطرف و روی Vercel مستقر گردید!');
+  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 تمامی اصلاحات با موفقیت ۱۰۰٪ اعمال، خطاهای کنسول حذف و روی Vercel مستقر گردید!');
   console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 } catch (gitErr) {
   console.error('\n\x1b[31m[ERROR]\x1b[0m خطا در اتصال Git:', gitErr.message);

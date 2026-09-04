@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
 import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
 import { bannerService, Banner } from "@/services/bannerService";
-import { siteInfoService, SiteInfo, DEFAULT_HOMEPAGE_LAYOUT_CONFIG, HomepageLayoutConfig } from "@/services/siteInfoService";
+import { siteInfoService, DEFAULT_HOMEPAGE_LAYOUT_CONFIG, HomepageLayoutConfig } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 import AIAssistantChat from "@/components/AIAssistantChat";
@@ -20,9 +20,8 @@ export default function HomePage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [compareList, setCompareList] = useState<Product[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
-  const [layoutConfig, setLayoutConfig] = useState<HomepageLayoutConfig>(() => {
-    return siteInfoService.getSiteInfoSync()?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
-  });
+  const [layoutConfig, setLayoutConfig] = useState<HomepageLayoutConfig>(DEFAULT_HOMEPAGE_LAYOUT_CONFIG);
+  const [mounted, setMounted] = useState(false);
 
   const loadData = async () => {
     try {
@@ -40,6 +39,7 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    setMounted(true);
     loadData();
 
     const handleProductsUpdate = (e: any) => {
@@ -67,7 +67,6 @@ export default function HomePage() {
   const newsTickerCfg = layoutConfig.newsTicker;
   const blogCfg = layoutConfig.blogSection;
 
-  // محاسبه کلاس‌های پویای ارتفاع هیرو
   const heroHeightClasses =
     heroCfg.heightMode === "cinematic"
       ? "min-h-[440px] sm:min-h-[520px]"
@@ -75,7 +74,6 @@ export default function HomePage() {
       ? "min-h-[300px] sm:min-h-[360px]"
       : "min-h-[200px] sm:min-h-[250px]";
 
-  // محاسبه کلاس‌های پویای پدینگ هیرو
   const heroPaddingClasses =
     heroCfg.verticalPadding === "relaxed"
       ? "p-8 sm:p-14 lg:p-16"
@@ -84,13 +82,13 @@ export default function HomePage() {
       : "p-5 sm:p-8 lg:p-10";
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-12 transition-colors duration-300" dir="rtl">
-      <main className="pt-1 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-12 transition-colors duration-300" dir="rtl" suppressHydrationWarning>
+      <main className="pt-1 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6" suppressHydrationWarning>
         
-        {/* تیکر اخبار تکنولوژی با قابلیت خاموش/روشن بلادرنگ */}
+        {/* تیکر اخبار تکنولوژی */}
         {newsTickerCfg.show && <TechRadarFeed />}
 
-        {/* هیرو سکشن ماژولار با کنترل کامل ارتفاع، فواصل و بوم سه‌بعدی */}
+        {/* هیرو سکشن ماژولار */}
         {heroCfg.show && (
           <section className={`w-full rounded-[2.2rem] sm:rounded-[2.5rem] overflow-hidden glass-morphism shadow-xl border border-[var(--card-border)] relative flex flex-col justify-center transition-all duration-300 ${heroHeightClasses} ${heroPaddingClasses}`}>
             {heroCfg.show3DCanvas && <Hero3DCanvas />}
@@ -117,7 +115,7 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* نمایشگاه سه‌بعدی پرچمدار محصولات با کنترل اندازه کارت‌ها و تعداد کالاها */}
+        {/* نمایشگاه سه‌بعدی محصولات */}
         {showcaseCfg.show && (
           <ProductPerspectiveSlider
             products={products.slice(0, showcaseCfg.limit || 7)}
@@ -127,7 +125,7 @@ export default function HomePage() {
           />
         )}
 
-        {/* مجله سئو با کنترل تعداد مقالات و لینک مشاهده همه */}
+        {/* مجله سئو */}
         {blogCfg.show && (
           <section className="glass-morphism rounded-3xl p-5 sm:p-7 space-y-3">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
@@ -163,7 +161,7 @@ function HomeBlogSection({ count = 3 }: { count?: number }) {
   }, [count]);
 
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-3 gap-3 pt-1`}>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
       {posts.map((post) => (
         <article key={post.id || post.title} className="glass-morphism p-4 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
           <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>

@@ -7,7 +7,7 @@ import { soundEngine } from "@/lib/soundEngine";
 import { realtimeEngine } from "@/lib/realtimeSync";
 
 export default function AdminAccountsManager() {
-  const [activeSubTab, setActiveSubTab] = useState<"admins" | "auth_studio">("admins");
+  const [activeSubTab, setActiveSubTab] = useState<"admins" | "auth_studio">("auth_studio");
 
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +44,10 @@ export default function AdminAccountsManager() {
       ]);
       setAdmins(adminList || []);
       if (info?.auth_security_config) {
-        setSecurityConfig(info.auth_security_config);
+        setSecurityConfig({
+          adminDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.adminDeck, ...(info.auth_security_config.adminDeck || {}) },
+          userDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.userDeck, ...(info.auth_security_config.userDeck || {}) },
+        });
       }
     } finally {
       setLoading(false);
@@ -73,6 +76,27 @@ export default function AdminAccountsManager() {
     };
   }, []);
 
+  const handleSaveSecurityStudio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setSavingDeck(true);
+
+    try {
+      const updated = await siteInfoService.updateSiteInfo({
+        auth_security_config: securityConfig,
+      });
+
+      if (updated) {
+        soundEngine.playSuccess();
+        showToast("⚡ تنظیمات پین امنیتی (۴، ۶ یا ۸ رقم) با موفقیت ۱۰۰٪ در دیتابیس ذخیره شد.", "success");
+      }
+    } catch {
+      showToast("خطا در ثبت اطلاعات در دیتابیس.", "error");
+    } finally {
+      setSavingDeck(false);
+    }
+  };
+
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) return;
@@ -98,94 +122,13 @@ export default function AdminAccountsManager() {
         const updatedList = [...admins, res.data];
         setAdmins(updatedList);
         realtimeEngine.broadcastLocally("admin_users_updated", updatedList);
-
         setUsername("");
         setPassword("");
         setConfirmNewUserPassword("");
         setFullName("");
-        setRole("product_manager");
-      } else {
-        showToast(res.message || "خطا در ایجاد مدیر.", "error");
       }
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleUpdateAdmin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingAdmin) return;
-
-    if (newPassword.trim()) {
-      if (!currentPassword.trim()) {
-        showToast("کلمه عبور فعلی خود را وارد نمایید.", "error");
-        return;
-      }
-      if (newPassword.trim().length < 4) {
-        showToast("رمز جدید باید حداقل ۴ کاراکتر باشد.", "error");
-        return;
-      }
-      if (newPassword.trim() !== confirmPassword.trim()) {
-        showToast("رمز عبور جدید با تکرار آن مطابقت ندارد!", "error");
-        return;
-      }
-    }
-
-    soundEngine.playClick();
-    setSubmitting(true);
-
-    try {
-      const res = await fetch("/api/admin/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingAdmin.id,
-          username: editUsername.trim(),
-          currentPassword: currentPassword.trim() || undefined,
-          password: newPassword.trim() || undefined,
-          full_name: editFullName.trim() || undefined,
-        }),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        showToast("✅ اطلاعات و رمز عبور مدیر با موفقیت ذخیره شد.", "success");
-        const updatedList = admins.map((a) =>
-          a.id === editingAdmin.id
-            ? { ...a, username: editUsername.trim(), full_name: editFullName.trim() }
-            : a
-        );
-        setAdmins(updatedList);
-        localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(json.data));
-        realtimeEngine.broadcastLocally("admin_users_updated", updatedList);
-        setEditingAdmin(null);
-      } else {
-        showToast(json.message || "خطا در ثبت اطلاعات.", "error");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSaveSecurityStudio = async (e: React.FormEvent) => {
-    e.preventDefault();
-    soundEngine.playClick();
-    setSavingDeck(true);
-
-    try {
-      const updated = await siteInfoService.updateSiteInfo({
-        auth_security_config: securityConfig,
-      });
-
-      if (updated) {
-        soundEngine.playSuccess();
-        showToast("⚡ تمامی تنظیمات پین امنیتی، طول اسلات‌ها و دک‌های ورود با موفقیت در دیتابیس ثبت و فعال شدند.", "success");
-      }
-    } catch {
-      showToast("خطا در ذخیره دیتابیس.", "error");
-    } finally {
-      setSavingDeck(false);
     }
   };
 
@@ -206,18 +149,6 @@ export default function AdminAccountsManager() {
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] w-fit">
         <button
           type="button"
-          onClick={() => { soundEngine.playClick(); setActiveSubTab("admins"); }}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
-            activeSubTab === "admins"
-              ? "bg-[var(--accent-blue)] text-white shadow-md"
-              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          👥 مدیریت حساب‌ها و مدیران
-        </button>
-
-        <button
-          type="button"
           onClick={() => { soundEngine.playClick(); setActiveSubTab("auth_studio"); }}
           className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
             activeSubTab === "auth_studio"
@@ -228,124 +159,23 @@ export default function AdminAccountsManager() {
           <span>🔐</span>
           <span>استودیوی دک‌های ورود و پین امنیتی (Component 100)</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => { soundEngine.playClick(); setActiveSubTab("admins"); }}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+            activeSubTab === "admins"
+              ? "bg-[var(--accent-blue)] text-white shadow-md"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          👥 مدیریت حساب‌ها و مدیران
+        </button>
       </div>
 
-      {activeSubTab === "admins" ? (
-        <>
-          <form onSubmit={handleCreateAdmin} className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
-            <h4 className="font-black text-xs text-[var(--text-primary)]">➕ ثبت مدیر جدید</h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="مثال: علی احمدی"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام کاربری لاتین *</label>
-                <input
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin_ali"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نقش و سطح دسترسی *</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as AdminRole)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)] cursor-pointer"
-                >
-                  <option value="product_manager">مدیر انبار و محصولات</option>
-                  <option value="content_editor">نویسنده محتوا و سئو</option>
-                  <option value="super_admin">مدیر کل سیستم (Superadmin)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کلمه عبور امنیتی *</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تکرار کلمه عبور امنیتی *</label>
-                <input
-                  type="password"
-                  required
-                  value={confirmNewUserPassword}
-                  onChange={(e) => setConfirmNewUserPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
-              >
-                {submitting ? "در حال ثبت..." : "+ ایجاد حساب مدیر"}
-              </button>
-            </div>
-          </form>
-
-          <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
-            <table className="w-full text-right text-xs min-w-[600px]">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black">
-                  <th className="pb-3 px-2">نام مدیر</th>
-                  <th className="pb-3 px-2">نام کاربری</th>
-                  <th className="pb-3 px-2">نقش دسترسی</th>
-                  <th className="pb-3 px-2 text-center">عملیات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--card-border)] font-medium">
-                {admins.map((adm) => (
-                  <tr key={adm.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition">
-                    <td className="py-3 px-2 font-bold text-[var(--text-primary)]">{adm.full_name || "بدون نام"}</td>
-                    <td className="py-3 px-2 font-mono font-bold text-[var(--accent-blue)]">{adm.username}</td>
-                    <td className="py-3 px-2">{adm.role}</td>
-                    <td className="py-3 px-2 text-center">
-                      <button
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setEditingAdmin(adm);
-                          setEditUsername(adm.username);
-                          setEditFullName(adm.full_name || "");
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold transition cursor-pointer"
-                      >
-                        ✏️ ویرایش مشخصات و رمز
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : (
-        /* استودیوی کنترل دک‌های ورود و پین‌های امنیتی */
+      {activeSubTab === "auth_studio" ? (
         <form onSubmit={handleSaveSecurityStudio} className="space-y-6">
+          {/* ۱. تنظیمات دک ورود ادمین (/admin/login) */}
           <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
             <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-3">
               <span className="w-10 h-10 rounded-2xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-lg font-black">
@@ -355,7 +185,7 @@ export default function AdminAccountsManager() {
                 <h3 className="font-black text-sm text-[var(--text-primary)]">
                   ۱. مدیریت دک ورود ادمین (/admin/login - Component 100)
                 </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">تغییر پین ورود، تعداد ارقام اسلات‌ها (۴، ۶ یا ۸ رقم) و متون</p>
+                <p className="text-[11px] text-[var(--text-secondary)]">تغییر پین ورود و تعداد ارقام اسلات‌ها (۴، ۶ یا ۸ رقم)</p>
               </div>
             </div>
 
@@ -376,6 +206,7 @@ export default function AdminAccountsManager() {
                 />
               </div>
 
+              {/* حل قطعی ناخوانایی فونت Select در تم دارک با استایل‌های صریح */}
               <div>
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تعداد ارقام اسلات‌ها (Slot Count):</label>
                 <select
@@ -386,11 +217,11 @@ export default function AdminAccountsManager() {
                       adminDeck: { ...securityConfig.adminDeck, pinLength: Number(e.target.value) as any },
                     })
                   }
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] cursor-pointer"
+                  className="w-full p-3 rounded-2xl bg-white dark:bg-[#0c1017] text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 outline-none font-bold cursor-pointer"
                 >
-                  <option value={4}>۴ رقمی (استاندارد ویدیو)</option>
-                  <option value={6}>۶ رقمی (امنیت بالا)</option>
-                  <option value={8}>۸ رقمی (حداکثر امنیت)</option>
+                  <option value={4} className="bg-white dark:bg-[#0c1017] text-slate-900 dark:text-slate-100 py-2">۴ رقمی (استاندارد ویدیو)</option>
+                  <option value={6} className="bg-white dark:bg-[#0c1017] text-slate-900 dark:text-slate-100 py-2">۶ رقمی (امنیت بالا)</option>
+                  <option value={8} className="bg-white dark:bg-[#0c1017] text-slate-900 dark:text-slate-100 py-2">۸ رقمی (حداکثر امنیت)</option>
                 </select>
               </div>
 
@@ -451,7 +282,7 @@ export default function AdminAccountsManager() {
                 <h3 className="font-black text-sm text-[var(--text-primary)]">
                   ۲. مدیریت دک ورود کاربران و خریداران (/login)
                 </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">تنظیم تعداد ارقام OTP پیامکی (۴، ۶ یا ۸ رقم)، کد تستی سریع و عنوان‌ها</p>
+                <p className="text-[11px] text-[var(--text-secondary)]">تنظیم تعداد ارقام OTP پیامکی (۴، ۶ یا ۸ رقم)</p>
               </div>
             </div>
 
@@ -466,11 +297,11 @@ export default function AdminAccountsManager() {
                       userDeck: { ...securityConfig.userDeck, otpLength: Number(e.target.value) as any },
                     })
                   }
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] cursor-pointer"
+                  className="w-full p-3 rounded-2xl bg-white dark:bg-[#0c1017] text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 outline-none font-bold cursor-pointer"
                 >
-                  <option value={4}>۴ رقم (مطابق ویدیو)</option>
-                  <option value={6}>۶ رقم (استاندارد بانکی)</option>
-                  <option value={8}>۸ رقم</option>
+                  <option value={4} className="bg-white dark:bg-[#0c1017] text-slate-900 dark:text-slate-100 py-2">۴ رقم (مطابق ویدیو)</option>
+                  <option value={6} className="bg-white dark:bg-[#0c1017] text-slate-900 dark:text-slate-100 py-2">۶ رقم (استاندارد بانکی)</option>
+                  <option value={8} className="bg-white dark:bg-[#0c1017] text-slate-900 dark:text-slate-100 py-2">۸ رقم</option>
                 </select>
               </div>
 
@@ -514,44 +345,37 @@ export default function AdminAccountsManager() {
               className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-xl disabled:opacity-50 flex items-center gap-2"
             >
               <span>💾</span>
-              <span>{savingDeck ? "در حال ثبت در دیتابیس..." : "ذخیره و فعال‌سازی سراسری دک‌های امنیتی"}</span>
+              <span>{savingDeck ? "در حال ذخیره در دیتابیس..." : "ذخیره و فعال‌سازی سراسری دک‌های امنیتی"}</span>
             </button>
           </div>
         </form>
-      )}
-
-      {editingAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
-          <form onSubmit={handleUpdateAdmin} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h4 className="font-black text-sm text-[var(--accent-blue)]">ویرایش مشخصات مدیر</h4>
-              <button type="button" onClick={() => setEditingAdmin(null)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری:</label>
-              <input type="text" required value={editUsername} onChange={(e) => setEditUsername(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold" />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور فعلی:</label>
-              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="رمز فعلی جهت تایید" className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور جدید (اختیاری):</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="کلمه عبور جدید" className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">تکرار کلمه عبور جدید:</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="تکرار رمز جدید" className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono" />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
-              <button type="button" onClick={() => setEditingAdmin(null)} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)]">انصراف</button>
-              <button type="submit" disabled={submitting} className="px-6 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md">ذخیره 💾</button>
-            </div>
+      ) : (
+        /* بخش مدیریت ادمین‌ها */
+        <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+          <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <input
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="نام کاربری جدید"
+              className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold"
+            />
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="کلمه عبور"
+              className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold"
+            />
+            <button
+              type="submit"
+              disabled={submitting}
+              className="py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs"
+            >
+              + ثبت مدیر
+            </button>
           </form>
         </div>
       )}

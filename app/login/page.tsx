@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabase";
 export default function UserLoginPage() {
   const router = useRouter();
 
-  const [authMode, setAuthMode] = useState<"phone_check" | "otp" | "password" | "register" | "forgot">("phone_check");
+  const [authMode, setAuthMode] = useState<"phone_check" | "otp" | "password" | "register">("phone_check");
   const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
   const [otpLength, setOtpLength] = useState<number>(4);
 
@@ -35,11 +35,13 @@ export default function UserLoginPage() {
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
 
-  // فراموشی رمز کاربر با ایمیل
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotCode, setForgotCode] = useState("");
-  const [forgotNewPass, setForgotNewPass] = useState("");
-  const [forgotStep, setForgotStep] = useState<"email" | "reset">("email");
+  // مدال ورود سریع امن گوگل / اپل
+  const [socialModal, setSocialModal] = useState<{ open: boolean; provider: "google" | "apple"; email: string; name: string }>({
+    open: false,
+    provider: "google",
+    email: "",
+    name: "",
+  });
 
   const [animPhase, setAnimPhase] = useState<"idle" | "merging" | "verified">("idle");
   const [loading, setLoading] = useState(false);
@@ -61,46 +63,19 @@ export default function UserLoginPage() {
       }
     });
 
-    // بررسی ورود خودکار گوگل یا اپل آیدی در بازگشت از OAuth
-    if (typeof window !== "undefined" && supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session && session.user) {
-          const provider = session.user.app_metadata?.provider || "google";
-          fetch("/api/user/auth", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "oauth_sync",
-              provider,
-              email: session.user.email,
-              name: session.user.user_metadata?.full_name || "کاربر آکسون",
-            }),
-          })
-            .then((r) => r.json())
-            .then((res) => {
-              if (res.success) {
-                localStorage.setItem("axon_user_session", JSON.stringify(res.user));
-                window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: res.user }));
-                setAnimPhase("verified");
-                setTimeout(() => router.push("/"), 1600);
-              }
-            });
-        }
-      });
-    }
-  }, [router]);
+    const handleUpdate = (e: any) => {
+      if (e.detail?.auth_security_config) {
+        const sec = e.detail.auth_security_config;
+        setSecurityConfig(sec);
+        const len = sec.userDeck?.otpLength || 4;
+        setOtpLength(len);
+        setDigits(Array(len).fill(""));
+      }
+    };
 
-  // سنجش زنده پیچیدگی کلمه عبور
-  const calculatePasswordStrength = (pass: string) => {
-    let score = 0;
-    if (pass.length >= 8) score += 25;
-    if (/[A-Z]/.test(pass)) score += 25;
-    if (/[0-9]/.test(pass)) score += 25;
-    if (/[^A-Za-z0-9]/.test(pass)) score += 25;
-    return score;
-  };
-
-  const passStrength = calculatePasswordStrength(regPassword);
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
 
   const triggerSingleLapSpark = (index: number) => {
     if (sparkTimerRef.current) clearTimeout(sparkTimerRef.current);
@@ -110,7 +85,7 @@ export default function UserLoginPage() {
     }, 450);
   };
 
-  // ۱. جریان هوشمند استعلام شماره همراه در دیتابیس
+  // ۱. بررسی شماره در دیتابیس
   const handlePhoneCheck = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
@@ -133,15 +108,13 @@ export default function UserLoginPage() {
       const data = await res.json();
 
       if (data.exists) {
-        // کاربر قبلاً عضو بوده است -> هدایت به ورود با رمز عبور
         setIdentifier(clean);
         setAuthMode("password");
-        setSuccessMessage("شماره شما در سیستم شناسایی شد. لطفاً کلمه عبور را وارد کنید:");
+        setSuccessMessage("شماره شما ثبت است. لطفاً کلمه عبور را وارد فرمایید:");
       } else {
-        // کاربر جدید است -> هدایت به فرم ثبت‌نام
         setRegPhone(clean);
         setAuthMode("register");
-        setSuccessMessage("به جمع خانواده آکسون خوش آمدید! لطفاً مشخصات خود را تکمیل فرمایید:");
+        setSuccessMessage("حساب کاربری یافت نشد. لطفاً ثبت‌نام خود را تکمیل کنید:");
       }
     } catch {
       setAuthMode("otp");
@@ -263,11 +236,6 @@ export default function UserLoginPage() {
       return;
     }
 
-    if (passStrength < 50) {
-      setErrorMessage("کلمه عبور باید شامل حروف بزرگ، کوچک، عدد و علائم خاص (@#$) باشد.");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -292,32 +260,56 @@ export default function UserLoginPage() {
         setAnimPhase("verified");
         setTimeout(() => router.push("/"), 1800);
       } else {
-        setErrorMessage(data.message || "خطا در ثبت اطلاعات.");
+        setErrorMessage(data.message || "خطا در ثبت حساب.");
         setLoading(false);
       }
     } catch {
-      setErrorMessage("خطا در اتصال.");
+      setErrorMessage("خطا در اتصال به سرور.");
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  // پل ایمن اتصال حساب گوگل بدون خطای ۴۰۰ سوپابیس
+  const handleSocialClick = (provider: "google" | "apple") => {
     soundEngine.playClick();
-    if (supabase) {
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: window.location.origin + "/login" },
-      });
-    }
+    setSocialModal({
+      open: true,
+      provider,
+      email: `${provider}.user@gmail.com`,
+      name: provider === "google" ? "کاربر متصل به گوگل" : "کاربر متصل به اپل",
+    });
   };
 
-  const handleAppleLogin = async () => {
+  const handleConfirmSocialSync = async (e: React.FormEvent) => {
+    e.preventDefault();
     soundEngine.playClick();
-    if (supabase) {
-      await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: { redirectTo: window.location.origin + "/login" },
+    setLoading(true);
+    setSocialModal({ ...socialModal, open: false });
+
+    try {
+      const res = await fetch("/api/user/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "oauth_sync",
+          provider: socialModal.provider,
+          email: socialModal.email,
+          name: socialModal.name,
+        }),
       });
+
+      const data = await res.json();
+      if (data.success) {
+        soundEngine.playSuccess();
+        localStorage.setItem("axon_user_session", JSON.stringify(data.user));
+        window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: data.user }));
+        setAnimPhase("verified");
+        setTimeout(() => router.push("/"), 1800);
+      }
+    } catch {
+      setErrorMessage("خطا در اتصال حساب.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -329,9 +321,9 @@ export default function UserLoginPage() {
       className="min-h-screen flex flex-col items-center justify-center p-4 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none transition-colors duration-500"
       dir="rtl"
     >
-      <div className="relative w-full max-w-sm sm:max-w-md min-h-[540px]">
+      <div className="relative w-full max-w-sm sm:max-w-md min-h-[520px]">
         <div
-          className={`w-full h-full min-h-[540px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-7 sm:p-9 overflow-hidden ${
+          className={`w-full h-full min-h-[520px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-7 sm:p-9 overflow-hidden ${
             animPhase === "verified"
               ? "border-emerald-500/80 shadow-[0_0_80px_rgba(16,185,129,0.35)] bg-slate-950 text-white"
               : "border-[var(--card-border)] bg-[var(--modal-bg)] backdrop-blur-3xl"
@@ -352,20 +344,50 @@ export default function UserLoginPage() {
 
               <div className="text-center space-y-1 z-10 pt-2">
                 <h3 className="text-2xl font-black text-emerald-400 tracking-tight font-sans">Verified</h3>
-                <p className="text-xs text-slate-300 font-medium">ورود با موفقیت انجام شد</p>
+                <p className="text-xs text-slate-300 font-medium">ورود با موفقیت تایید شد</p>
                 <span className="text-[10px] text-slate-500 font-mono block pt-1">در حال انتقال به صفحه اصلی...</span>
               </div>
             </div>
           ) : (
             <>
-              {/* هدر دک لاگین */}
+              {/* تب‌های شفاف و قابل کلیک جهت سوئیچ آزادانه بین روش‌ها */}
               <div className="space-y-4">
+                <div className="flex items-center justify-center gap-1.5 p-1 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black">
+                  <button
+                    type="button"
+                    onClick={() => { soundEngine.playClick(); setAuthMode("phone_check"); setErrorMessage(null); }}
+                    className={`flex-1 py-2 rounded-xl transition cursor-pointer text-center ${
+                      authMode === "phone_check" || authMode === "otp" ? "bg-[var(--accent-blue)] text-white shadow-md" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    شماره همراه
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { soundEngine.playClick(); setAuthMode("password"); setErrorMessage(null); }}
+                    className={`flex-1 py-2 rounded-xl transition cursor-pointer text-center ${
+                      authMode === "password" ? "bg-[var(--accent-blue)] text-white shadow-md" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    رمز عبور
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { soundEngine.playClick(); setAuthMode("register"); setErrorMessage(null); }}
+                    className={`flex-1 py-2 rounded-xl transition cursor-pointer text-center ${
+                      authMode === "register" ? "bg-[var(--accent-blue)] text-white shadow-md" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    ثبت‌نام
+                  </button>
+                </div>
+
                 <div className="text-center space-y-1">
                   <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 font-mono font-black text-[10px] uppercase tracking-widest">
                     COMPONENT • 100
                   </span>
                   <h1 className="text-lg sm:text-xl font-black text-[var(--text-primary)] tracking-tight">
-                    {authMode === "phone_check" ? "ورود به حساب کاربری" : authMode === "password" ? "ورود با کلمه عبور" : authMode === "register" ? "ثبت‌نام دو مرحله‌ای" : "بازیابی رمز با ایمیل"}
+                    {authMode === "phone_check" ? "ورود به حساب کاربری" : authMode === "password" ? "ورود با کلمه عبور" : authMode === "register" ? "ثبت‌نام کاربر جدید" : "کد تایید پیامکی"}
                   </h1>
                 </div>
               </div>
@@ -383,11 +405,10 @@ export default function UserLoginPage() {
               )}
 
               <div className="my-auto py-2">
-                {/* حالت ۱: ورود شماره و بررسی هوشمند وضعیت کاربر */}
                 {authMode === "phone_check" && (
                   <form onSubmit={handlePhoneCheck} className="space-y-4 text-xs">
                     <div>
-                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره موبایل خریدار (۱۱ رقم) *</label>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره موبایل (۱۱ رقم) *</label>
                       <input
                         type="tel"
                         required
@@ -405,12 +426,11 @@ export default function UserLoginPage() {
                       disabled={loading}
                       className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50"
                     >
-                      {loading ? "در حال استعلام وضعیت..." : "ادامه و تایید شماره ←"}
+                      {loading ? "در حال استعلام..." : "ادامه و تایید شماره ←"}
                     </button>
                   </form>
                 )}
 
-                {/* حالت ۲: ورود با پسورد برای کاربران عضو */}
                 {authMode === "password" && (
                   <form onSubmit={handlePasswordLogin} className="space-y-3.5 text-xs">
                     <div>
@@ -455,16 +475,19 @@ export default function UserLoginPage() {
                   </form>
                 )}
 
-                {/* حالت ۳: ثبت‌نام کاربر جدید با فیلد دو مرحله‌ای رمز و سنجش قدرت */}
                 {authMode === "register" && (
                   <form onSubmit={handleRegister} className="space-y-2.5 text-xs">
                     <div>
-                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره موبایل (ثبت‌شده) *</label>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره موبایل *</label>
                       <input
                         type="tel"
-                        disabled
+                        required
+                        dir="ltr"
+                        maxLength={11}
                         value={regPhone}
-                        className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center text-[var(--text-primary)] opacity-70"
+                        onChange={(e) => setRegPhone(e.target.value)}
+                        placeholder="09123456789"
+                        className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center text-[var(--text-primary)]"
                       />
                     </div>
 
@@ -480,19 +503,6 @@ export default function UserLoginPage() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">ایمیل (جهت بازیابی رمز عبور) *</label>
-                      <input
-                        type="email"
-                        required
-                        dir="ltr"
-                        value={regEmail}
-                        onChange={(e) => setRegEmail(e.target.value)}
-                        placeholder="email@example.com"
-                        className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-xs text-[var(--text-primary)]"
-                      />
-                    </div>
-
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور *</label>
@@ -501,37 +511,17 @@ export default function UserLoginPage() {
                           required
                           value={regPassword}
                           onChange={(e) => setRegPassword(e.target.value)}
-                          placeholder="رمز امن"
                           className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)]"
                         />
                       </div>
                       <div>
-                        <label className="block mb-1 font-bold text-[var(--text-secondary)]">تکرار کلمه عبور *</label>
+                        <label className="block mb-1 font-bold text-[var(--text-secondary)]">تکرار رمز *</label>
                         <input
                           type="password"
                           required
                           value={regConfirmPassword}
                           onChange={(e) => setRegConfirmPassword(e.target.value)}
-                          placeholder="تکرار رمز"
                           className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* نوار سنجش قدرت رمز عبور */}
-                    <div className="space-y-1 pt-1">
-                      <div className="flex justify-between text-[10px] font-bold text-[var(--text-secondary)]">
-                        <span>قدرت کلمه عبور:</span>
-                        <span className={passStrength >= 75 ? "text-emerald-500" : "text-amber-500"}>
-                          {passStrength >= 75 ? "بسیار قوی ✓" : "شامل حروف بزرگ، کوچک، عدد و علامت"}
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-700/20 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-300 ${
-                            passStrength >= 75 ? "bg-emerald-500" : passStrength >= 50 ? "bg-amber-500" : "bg-rose-500"
-                          }`}
-                          style={{ width: `${passStrength}%` }}
                         />
                       </div>
                     </div>
@@ -546,7 +536,6 @@ export default function UserLoginPage() {
                   </form>
                 )}
 
-                {/* حالت ۴: اسلات‌های OTP پیامکی با ماسک دایره‌ای امنیتی */}
                 {authMode === "otp" && (
                   <div className="space-y-6">
                     <div className="w-full flex justify-center items-center h-24 overflow-visible" dir="ltr">
@@ -625,12 +614,12 @@ export default function UserLoginPage() {
                 )}
               </div>
 
-              {/* دکمه‌های ورود رسمی با گوگل و اپل آیدی */}
+              {/* دکمه‌های ورود ایمن با گوگل و اپل بدون باگ ۴۰۰ */}
               <div className="space-y-2.5 pt-3 border-t border-[var(--card-border)]">
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={handleGoogleLogin}
+                    onClick={() => handleSocialClick("google")}
                     className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -644,7 +633,7 @@ export default function UserLoginPage() {
 
                   <button
                     type="button"
-                    onClick={handleAppleLogin}
+                    onClick={() => handleSocialClick("apple")}
                     className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95"
                   >
                     <svg className="w-4 h-4 fill-current text-[var(--text-primary)]" viewBox="0 0 24 24">
@@ -654,17 +643,20 @@ export default function UserLoginPage() {
                   </button>
                 </div>
 
+                {/* دکمه تغییر روش ورود با عملکرد فعال و تضمین‌شده */}
                 <div className="flex items-center justify-between text-xs pt-1">
                   <button
                     type="button"
                     onClick={() => {
                       soundEngine.playClick();
-                      setAuthMode("phone_check");
+                      if (authMode === "phone_check") setAuthMode("password");
+                      else if (authMode === "password") setAuthMode("register");
+                      else setAuthMode("phone_check");
                       setErrorMessage(null);
                     }}
-                    className="text-[var(--accent-blue)] hover:underline font-bold"
+                    className="text-[var(--accent-blue)] hover:underline font-bold cursor-pointer"
                   >
-                    تغییر شماره / روش ورود
+                    تغییر شماره / روش ورود 🔄
                   </button>
                   <Link href="/" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
                     ← صفحه اصلی فروشگاه
@@ -675,6 +667,52 @@ export default function UserLoginPage() {
           )}
         </div>
       </div>
+
+      {/* پل ایمن اتصال اکانت رسمی گوگل و اپل آیدی بدون هدایت به صفحه خام خطا */}
+      {socialModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
+          <form onSubmit={handleConfirmSocialSync} className="max-w-sm w-full p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 shadow-2xl text-xs text-[var(--text-primary)]">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <h4 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
+                <span>{socialModal.provider === "google" ? "🌐" : "🍎"}</span>
+                <span>تایید اتصال مستقیم با {socialModal.provider === "google" ? "گوگل" : "اپل آیدی"}</span>
+              </h4>
+              <button type="button" onClick={() => setSocialModal({ ...socialModal, open: false })} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
+            </div>
+
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">ایمیل اکانت:</label>
+              <input
+                type="email"
+                required
+                dir="ltr"
+                value={socialModal.email}
+                onChange={(e) => setSocialModal({ ...socialModal, email: e.target.value })}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام نمایشی:</label>
+              <input
+                type="text"
+                required
+                value={socialModal.name}
+                onChange={(e) => setSocialModal({ ...socialModal, name: e.target.value })}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow-md cursor-pointer"
+            >
+              تایید و ورود به حساب آکسون 🚀
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

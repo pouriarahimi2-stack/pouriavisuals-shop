@@ -90,3 +90,106 @@ body {
 .animate-bounce-short {
   animation: bounceShort 2.4s ease-in-out infinite;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   🛒 کی‌فریم‌های انیمیشن چرخ‌دستی، پرتاب بسته و شمارنده جنبشی (Kinetic Cart Animation)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes kineticItemDrop {
+  0% {
+    transform: translateY(-38px) scale(0.6);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1.05);
+  }
+  65% {
+    transform: translateY(2px) scale(0.95);
+  }
+  85% {
+    transform: translateY(-1px) scale(1.02);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes kineticCartRide {
+  0% {
+    transform: translateX(0);
+  }
+  42% {
+    transform: translateX(0) rotate(0deg);
+  }
+  48% {
+    transform: translateX(-4px) rotate(-3deg);
+  }
+  64% {
+    transform: translateX(120px) rotate(4deg);
+    opacity: 0;
+  }
+  65% {
+    transform: translateX(-120px) rotate(-4deg);
+    opacity: 0;
+  }
+  78% {
+    opacity: 1;
+    transform: translateX(-6px) rotate(2deg);
+  }
+  90% {
+    transform: translateX(2px) rotate(-1deg);
+  }
+  100% {
+    transform: translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes kineticWheelSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  45% {
+    transform: rotate(0deg);
+  }
+  65% {
+    transform: rotate(720deg);
+  }
+  100% {
+    transform: rotate(1440deg);
+  }
+}
+
+@keyframes kineticCounterBump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.4) translateY(-3px);
+    color: #10b981;
+  }
+  70% {
+    transform: scale(0.92) translateY(1px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-kinetic-item-drop {
+  animation: kineticItemDrop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-kinetic-cart-ride {
+  animation: kineticCartRide 1.35s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+
+.animate-kinetic-wheel-spin {
+  animation: kineticWheelSpin 1.35s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.animate-kinetic-counter-bump {
+  animation: kineticCounterBump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}

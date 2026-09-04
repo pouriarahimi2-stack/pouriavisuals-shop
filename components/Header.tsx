@@ -23,6 +23,10 @@ export default function Header() {
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
+  // استیت‌های حساب کاربری
+  const [userSession, setUserSession] = useState<{ phone: string } | null>(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -31,9 +35,22 @@ export default function Header() {
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const checkUserAuth = () => {
+    try {
+      const saved = localStorage.getItem("axon_user_session");
+      if (saved) setUserSession(JSON.parse(saved));
+      else setUserSession(null);
+    } catch {
+      setUserSession(null);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
+    checkUserAuth();
+
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
@@ -64,19 +81,23 @@ export default function Header() {
     const handleProductsUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
     };
+    const handleUserAuthChanged = () => checkUserAuth();
 
     window.addEventListener("site_info_updated", handleSiteInfoUpdate);
     window.addEventListener("products_updated", handleProductsUpdate);
+    window.addEventListener("user_auth_changed", handleUserAuthChanged);
 
     const handleClickOutside = (e: MouseEvent) => {
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) setIsCategoryOpen(false);
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) setIsSearchFocused(false);
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setIsUserMenuOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
       window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
       window.removeEventListener("products_updated", handleProductsUpdate);
+      window.removeEventListener("user_auth_changed", handleUserAuthChanged);
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
@@ -134,6 +155,13 @@ export default function Header() {
     setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
   };
 
+  const handleUserLogout = () => {
+    soundEngine.playClick();
+    localStorage.removeItem("axon_user_session");
+    setUserSession(null);
+    setIsUserMenuOpen(false);
+  };
+
   const navLinks = [
     { title: "کاتالوگ محصولات", href: "/#products" },
     { title: "اخبار تکنولوژی", href: "/news" },
@@ -147,7 +175,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-2 sm:top-3 z-50 w-full max-w-[1440px] mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
-      <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+      <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">
           
           <div className="relative" ref={categoryDropdownRef}>
@@ -194,9 +222,9 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="relative hidden sm:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-52">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-48 lg:w-56">
               <span className="text-xs opacity-70">🔍</span>
               <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] placeholder-slate-400 font-bold" />
             </div>
@@ -216,6 +244,58 @@ export default function Header() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* آیکون و کنترلر ورود و حساب کاربری کاربر */}
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                if (userSession) {
+                  setIsUserMenuOpen(!isUserMenuOpen);
+                } else {
+                  router.push("/login");
+                }
+              }}
+              className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)] relative active:scale-95"
+              title={userSession ? `حساب کاربری: ${userSession.phone}` : "ورود به حساب کاربری"}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+
+              {userSession && (
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute top-1 right-1 border-2 border-[var(--modal-bg)] shadow-md" />
+              )}
+            </button>
+
+            {isUserMenuOpen && userSession && (
+              <div className="absolute top-12 left-0 w-52 p-3 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs text-right">
+                <div className="border-b border-[var(--card-border)] pb-2">
+                  <span className="text-[10px] text-[var(--text-secondary)] block">حساب متصل:</span>
+                  <span className="font-mono font-black text-[var(--text-primary)] text-xs" dir="ltr">
+                    {userSession.phone}
+                  </span>
+                </div>
+
+                <Link
+                  href="/track-order"
+                  onClick={() => setIsUserMenuOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded-xl hover:bg-[var(--input-bg)] font-bold transition text-[var(--text-primary)]"
+                >
+                  <span>📦</span>
+                  <span>پیگیری سفارشات من</span>
+                </Link>
+
+                <button
+                  onClick={handleUserLogout}
+                  className="w-full text-right flex items-center gap-2 p-2 rounded-xl text-rose-500 hover:bg-rose-500/15 font-bold transition cursor-pointer"
+                >
+                  <span>🚪</span>
+                  <span>خروج از حساب</span>
+                </button>
               </div>
             )}
           </div>

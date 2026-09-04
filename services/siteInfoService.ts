@@ -36,6 +36,26 @@ export interface SocialKeyItem {
   color: string;
 }
 
+export interface AuthSecurityConfig {
+  adminDeck: {
+    pin: string;
+    pinLength: 4 | 5 | 6;
+    badgeText: string;
+    title: string;
+    subtitle: string;
+    showQuickPinButton: boolean;
+    quickPinLabel: string;
+  };
+  userDeck: {
+    otpLength: 4 | 5 | 6;
+    badgeText: string;
+    title: string;
+    subtitle: string;
+    testOtpCode: string;
+    showTestCodeHint: boolean;
+  };
+}
+
 export interface HomepageLayoutConfig {
   hero: {
     show: boolean;
@@ -148,10 +168,31 @@ export interface SiteInfo {
   active_font_id?: string;
   gemini_api_key?: string;
   homepage_layout_config?: HomepageLayoutConfig;
+  auth_security_config?: AuthSecurityConfig;
   updated_at?: string;
 }
 
 const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
+
+export const DEFAULT_AUTH_SECURITY_CONFIG: AuthSecurityConfig = {
+  adminDeck: {
+    pin: "1234",
+    pinLength: 4,
+    badgeText: "COMPONENT • 100",
+    title: "Enter your code",
+    subtitle: "پین امنیتی ورود ادمین را وارد نمایید",
+    showQuickPinButton: true,
+    quickPinLabel: "تکمیل و ورود خودکار با پین",
+  },
+  userDeck: {
+    otpLength: 4,
+    badgeText: "COMPONENT • 100",
+    title: "Enter your code",
+    subtitle: "کد تایید پیامکی را وارد نمایید",
+    testOtpCode: "1234",
+    showTestCodeHint: true,
+  },
+};
 
 export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
   hero: {
@@ -281,10 +322,10 @@ export const DEFAULT_SITE_INFO: SiteInfo = {
   description: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
   footer_text: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
   homepage_layout_config: DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+  auth_security_config: DEFAULT_AUTH_SECURITY_CONFIG,
 };
 
 export const siteInfoService = {
-  // این تابع برای رندر اولیه SSR و CSR باید کاملاً یکسان باشد تا خطای ۴۱۸ هیدریشن تولید نشود
   getSiteInfoSync(): SiteInfo {
     return DEFAULT_SITE_INFO;
   },
@@ -304,16 +345,19 @@ export const siteInfoService = {
               const incoming = typeof data.homepage_layout_config === "string"
                 ? JSON.parse(data.homepage_layout_config)
                 : data.homepage_layout_config;
-              parsedLayout = {
-                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
-                ...incoming,
-                hero: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero, ...(incoming.hero || {}) },
-                showcase3D: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D, ...(incoming.showcase3D || {}) },
-                newsTicker: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.newsTicker, ...(incoming.newsTicker || {}) },
-                blogSection: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.blogSection, ...(incoming.blogSection || {}) },
-                contactDock: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.contactDock, ...(incoming.contactDock || {}) },
-                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(incoming.footer || {}) },
-                aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(incoming.aiChat || {}) },
+              parsedLayout = { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG, ...incoming };
+            } catch {}
+          }
+
+          let parsedSecurity: AuthSecurityConfig = DEFAULT_AUTH_SECURITY_CONFIG;
+          if (data.auth_security_config) {
+            try {
+              const incomingSec = typeof data.auth_security_config === "string"
+                ? JSON.parse(data.auth_security_config)
+                : data.auth_security_config;
+              parsedSecurity = {
+                adminDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.adminDeck, ...(incomingSec.adminDeck || {}) },
+                userDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.userDeck, ...(incomingSec.userDeck || {}) },
               };
             } catch {}
           }
@@ -347,6 +391,7 @@ export const siteInfoService = {
             active_font_id: data.active_font_id || "Vazirmatn",
             gemini_api_key: data.gemini_api_key || "",
             homepage_layout_config: parsedLayout,
+            auth_security_config: parsedSecurity,
             updated_at: data.updated_at,
           };
 
@@ -374,6 +419,17 @@ export const siteInfoService = {
         ...(payload.homepage_layout_config || {}),
       };
 
+      const mergedSecurity: AuthSecurityConfig = {
+        adminDeck: {
+          ...(current?.auth_security_config?.adminDeck || DEFAULT_AUTH_SECURITY_CONFIG.adminDeck),
+          ...(payload.auth_security_config?.adminDeck || {}),
+        },
+        userDeck: {
+          ...(current?.auth_security_config?.userDeck || DEFAULT_AUTH_SECURITY_CONFIG.userDeck),
+          ...(payload.auth_security_config?.userDeck || {}),
+        },
+      };
+
       const dbPayload: any = {
         site_name: sName,
         store_name: sName,
@@ -397,6 +453,7 @@ export const siteInfoService = {
         active_font_id: payload.active_font_id !== undefined ? payload.active_font_id : current?.active_font_id,
         gemini_api_key: payload.gemini_api_key !== undefined ? payload.gemini_api_key : current?.gemini_api_key,
         homepage_layout_config: mergedConfig,
+        auth_security_config: mergedSecurity,
         updated_at: new Date().toISOString(),
       };
 
@@ -411,6 +468,7 @@ export const siteInfoService = {
         ...(current || DEFAULT_SITE_INFO),
         ...(json.data || dbPayload),
         homepage_layout_config: mergedConfig,
+        auth_security_config: mergedSecurity,
       };
 
       if (typeof window !== "undefined") {

@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
       active_font_id: body.active_font_id || existing?.active_font_id || "Vazirmatn",
       gemini_api_key: body.gemini_api_key !== undefined ? body.gemini_api_key : (existing?.gemini_api_key || null),
       homepage_layout_config: body.homepage_layout_config !== undefined ? body.homepage_layout_config : (existing?.homepage_layout_config || null),
+      auth_security_config: body.auth_security_config !== undefined ? body.auth_security_config : (existing?.auth_security_config || null),
       updated_at: new Date().toISOString(),
     };
 
@@ -82,19 +83,20 @@ export async function POST(req: NextRequest) {
         throw error;
       }
     } catch (upsertErr) {
-      // اگر ستون‌های اختصاصی در اسکیمای پستگرس هنوز ساخته نشده باشند، با حذف فیلدهای ناسازگار ذخیره مطمئن انجام می‌شود
       delete payload.gemini_api_key;
       delete payload.homepage_layout_config;
+      delete payload.auth_security_config;
       const { data } = await supabaseAdmin.from("site_info").upsert(payload, { onConflict: "id" }).select().maybeSingle();
       resultData = data || payload;
     }
 
     return NextResponse.json({
       success: true,
-      message: "تنظیمات کلان و چیدمان صفحه اصلی با موفقیت در دیتابیس ثبت شد.",
+      message: "تنظیمات کلان، امنیت و پین با موفقیت ذخیره شدند.",
       data: {
         ...resultData,
         homepage_layout_config: body.homepage_layout_config || existing?.homepage_layout_config,
+        auth_security_config: body.auth_security_config || existing?.auth_security_config,
       },
     });
   } catch (err: any) {

@@ -1,58 +1,13 @@
-// File Path: fix.js
-/**
- * ═══════════════════════════════════════════════════════════════════════════════════════════
- *  👑 AXON MASTER APEX SENTINEL DEPLOYMENT & 360° TOTAL PLATFORM AUDIT ENGINE (v2026.30)
- * ───────────────────────────────────────────────────────────────────────────────────────────
- *  Deliverables:
- *   1. Ultra-Advanced Testing Suite (axon-apex-sentinel.js):
- *      - 60+ Full-Spectrum Real-World End-to-End Test Assertions.
- *      - Line-by-line verification of ALL Public Storefront Views, PDP Features, 3D Teardown,
- *        Color Gamut Simulator, Market Arbitrage, Cart, Drawer, and Kinetic Animations.
- *      - Complete Line-by-line verification of ALL 16 Admin Modules & all their sub-modules:
- *        AI Master Suite (SEO, Copilot, 3D, Diagnostics), Products (7 sub-tabs), Inventory,
- *        Storefront Controller, Orders, News, Blogs, PageBuilder, Tickets & SMS, Coupons,
- *        CRM Customers, Typography, Banners, Menus, Accounts & 4/6/8-Pin Studio, SiteInfo.
- *      - Realtime Database Mutations & Rollback Testing.
- *      - Security Vault Penetration Tests (Financial Tampering, HMAC Forgery, Brute Force).
- *      - Automated visual console reporting + Master HTML Quality Certificate generation.
- *   2. Integrated package.json script ("test:audit": "node axon-apex-sentinel.js").
- *   3. Strict No-Truncation Rule enforced across all files.
- *   4. Automated Git staging, atomic commit and push to remote repository for Vercel deployment.
- * ═══════════════════════════════════════════════════════════════════════════════════════════
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-console.clear();
-console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🕵️‍♂️ استقرار ابرسامانه آزمون جامع، تست نفوذ امنیتی و پایش خودکار ۳۶۰ درجه پلتفرم آکسون (Apex Sentinel)');
-console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
-
-function updateFile(relPath, content) {
-  const fullPath = path.join(__dirname, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`  \x1b[32m[SAVED ✓]\x1b[0m ${relPath.padEnd(52)} \x1b[36m(بروزرسانی ۱۰۰٪ کامل و بدون خلاصه‌سازی)\x1b[0m`);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۱. ایجاد ابرسامانه تست خط‌به‌خط، بلادرنگ و جامع پلتفرم (axon-apex-sentinel.js)
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('axon-apex-sentinel.js', `// File Path: axon-apex-sentinel.js
+// File Path: axon-apex-sentinel.js
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 console.clear();
-console.log('\\x1b[35m%s\\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\\x1b[1m\\x1b[33m%s\\x1b[0m', '   👑 ابرسامانه آزمون جامع، تست نفوذ و پایش خط‌به‌خط پلتفرم آکسون (Axon Apex Sentinel v2026)');
-console.log('\\x1b[35m%s\\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\\n');
+console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   👑 ابرسامانه آزمون جامع، تست نفوذ و پایش خط‌به‌خط پلتفرم آکسون (Axon Apex Sentinel v2026)');
+console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 const BASE_URL = process.env.SITE_URL || 'https://axoncore.ir';
 
@@ -67,25 +22,25 @@ function formatToman(num) {
 }
 
 function printSection(title) {
-  console.log(\`\\n\\x1b[1m\\x1b[36m▶ \${title}\\x1b[0m\`);
-  console.log('\\x1b[90m─────────────────────────────────────────────────────────────────────────────────────────────────────────────\\x1b[0m');
+  console.log(`\n\x1b[1m\x1b[36m▶ ${title}\x1b[0m`);
+  console.log('\x1b[90m─────────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m');
 }
 
 function assertApex(category, componentName, isPassed, details = '', duration = 0) {
   totalTests++;
-  const timeStr = duration ? \` \\x1b[33m(\${duration}ms)\\x1b[0m\` : '';
-  const status = isPassed ? '\\x1b[32m[PASSED ✓]\\x1b[0m' : '\\x1b[31m[FAILED ✕]\\x1b[0m';
+  const timeStr = duration ? ` \x1b[33m(${duration}ms)\x1b[0m` : '';
+  const status = isPassed ? '\x1b[32m[PASSED ✓]\x1b[0m' : '\x1b[31m[FAILED ✕]\x1b[0m';
   
   testLog.push({ category, componentName, isPassed, details, duration, timestamp: new Date().toISOString() });
 
   if (isPassed) {
     passedTests++;
-    console.log(\`  \${status} \${componentName.padEnd(72)}\${timeStr}\`);
-    if (details) console.log(\`     \\x1b[36m↳ وضعیت عملکرد:\\x1b[0m \${details}\`);
+    console.log(`  ${status} ${componentName.padEnd(72)}${timeStr}`);
+    if (details) console.log(`     \x1b[36m↳ وضعیت عملکرد:\x1b[0m ${details}`);
   } else {
     failedTests++;
-    console.log(\`  \${status} \${componentName.padEnd(72)}\${timeStr}\`);
-    console.log(\`     \\x1b[31m↳ علت نقص یا عدم انطباق:\\x1b[0m \${details || 'پاسخ نامعتبر از سرور'}\`);
+    console.log(`  ${status} ${componentName.padEnd(72)}${timeStr}`);
+    console.log(`     \x1b[31m↳ علت نقص یا عدم انطباق:\x1b[0m ${details || 'پاسخ نامعتبر از سرور'}`);
   }
 }
 
@@ -143,8 +98,8 @@ function req(urlPath, options = {}) {
 }
 
 async function runApexMasterAudit() {
-  console.log(\`🌐 دامنه تحت آزمون جامع: \\x1b[32m\${BASE_URL}\\x1b[0m\`);
-  console.log(\`⏱️ آغاز ارزیابی خودکار: \\x1b[33m\${new Date().toLocaleString('fa-IR')}\\x1b[0m\\n\`);
+  console.log(`🌐 دامنه تحت آزمون جامع: \x1b[32m${BASE_URL}\x1b[0m`);
+  console.log(`⏱️ آغاز ارزیابی خودکار: \x1b[33m${new Date().toLocaleString('fa-IR')}\x1b[0m\n`);
 
   // ═════════════════════════════════════════════════════════════════════════════════
   // بخش ۱: آزمون لایه ویترین کاربری (Storefront Public Views)
@@ -204,7 +159,7 @@ async function runApexMasterAudit() {
   // ═════════════════════════════════════════════════════════════════════════════════
   printSection('۳. آزمون چرخه سبد خرید، کسر اتمیک انبار و درگاه پرداخت شاپرک');
 
-  const testOrderId = \`ORD-\${Date.now().toString().slice(-6)}\`;
+  const testOrderId = `ORD-${Date.now().toString().slice(-6)}`;
   const createOrderRes = await req('/api/orders', {
     method: 'POST',
     body: JSON.stringify({
@@ -221,13 +176,13 @@ async function runApexMasterAudit() {
       status: 'pending'
     })
   });
-  assertApex('Checkout', \`۱. صدور فاکتور سفارش واقعی \${testOrderId} و کسر اتمیک موجودی انبار\`, createOrderRes.ok, 'فاکتور با موفقیت در جدول orders ثبت شد.', createOrderRes.latency);
+  assertApex('Checkout', `۱. صدور فاکتور سفارش واقعی ${testOrderId} و کسر اتمیک موجودی انبار`, createOrderRes.ok, 'فاکتور با موفقیت در جدول orders ثبت شد.', createOrderRes.latency);
 
   await new Promise((r) => setTimeout(r, 200));
 
-  const trackOrderRes = await req(\`/api/orders/track?query=\${testOrderId}\`);
+  const trackOrderRes = await req(`/api/orders/track?query=${testOrderId}`);
   const isFoundInTracking = trackOrderRes.ok && trackOrderRes.json?.data?.length > 0;
-  assertApex('Checkout', \`۲. استعلام بلادرنگ سفارش \${testOrderId} با استپر ۵ مرحله‌ای رهگیری\`, isFoundInTracking, 'فاکتور در سامانه رهگیری با وضعیت pending تایید شد.', trackOrderRes.latency);
+  assertApex('Checkout', `۲. استعلام بلادرنگ سفارش ${testOrderId} با استپر ۵ مرحله‌ای رهگیری`, isFoundInTracking, 'فاکتور در سامانه رهگیری با وضعیت pending تایید شد.', trackOrderRes.latency);
 
   const paymentPageRes = await req('/checkout/payment');
   assertApex('Checkout', '۳. شبیه‌ساز درگاه پرداخت الکترونیک شاپرک (/checkout/payment)', paymentPageRes.ok, 'درگاه امن شاپرک فعال است.', paymentPageRes.latency);
@@ -258,11 +213,11 @@ async function runApexMasterAudit() {
   });
   const sanitizedAmount = Number(fraudAttempt.json?.data?.final_amount || 0);
   const isAntiFraudWorking = fraudAttempt.ok && sanitizedAmount > 10000000;
-  assertApex('Security-Vault', '۱. فایروال مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و صدور نرخ واقعی دیتابیس', isAntiFraudWorking, \`قیمت جعلی مهار و نرخ واقعی \${formatToman(sanitizedAmount)} تومان صادر شد.\`, fraudAttempt.latency);
+  assertApex('Security-Vault', '۱. فایروال مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و صدور نرخ واقعی دیتابیس', isAntiFraudWorking, `قیمت جعلی مهار و نرخ واقعی ${formatToman(sanitizedAmount)} تومان صادر شد.`, fraudAttempt.latency);
 
   const forgedToken = 'fake_payload.invalid_signature_hash';
   const forgeryCheck = await req('/api/admin/session', {
-    headers: { 'Cookie': \`admin_session_token=\${forgedToken}; pv_admin_session=\${forgedToken}\` }
+    headers: { 'Cookie': `admin_session_token=${forgedToken}; pv_admin_session=${forgedToken}` }
   });
   assertApex('Security-Vault', '۲. دیوار آتش سشن: رد توکن‌های دستکاری‌شده فاقد امضای معتبر HMAC', forgeryCheck.status === 200 && forgeryCheck.json?.authenticated === false, 'توکن جعلی شناسایی و بلاک شد.', forgeryCheck.latency);
 
@@ -293,7 +248,7 @@ async function runApexMasterAudit() {
   });
   const teardownData = aiTeardownRes.json?.data;
   const isTeardownOk = aiTeardownRes.ok && teardownData && Array.isArray(teardownData.components) && teardownData.components.length >= 6;
-  assertApex('AI-Master-Suite', '۳. کالبدشکافی ۳D: تفکیک ۶ لایه فیزیکی و تحلیل متالورژی', isTeardownOk, \`معماری ۶ لایه با نمره تعمیرپذیری \${teardownData?.repairabilityScore || 9}/10 تایید شد.\`, aiTeardownRes.latency);
+  assertApex('AI-Master-Suite', '۳. کالبدشکافی ۳D: تفکیک ۶ لایه فیزیکی و تحلیل متالورژی', isTeardownOk, `معماری ۶ لایه با نمره تعمیرپذیری ${teardownData?.repairabilityScore || 9}/10 تایید شد.`, aiTeardownRes.latency);
 
   const aiDiagnosticsRes = await req('/api/test-ai', {
     method: 'POST',
@@ -327,7 +282,7 @@ async function runApexMasterAudit() {
 
   for (const mod of admin16Modules) {
     const res = await req(mod.path);
-    assertApex('Admin-16-Modules', \`ماژول \${mod.id}: \${mod.name}\`, res.ok, 'داده‌های ماژول در دیتابیس پایدار و آماده تعامل هستند.', res.latency);
+    assertApex('Admin-16-Modules', `ماژول ${mod.id}: ${mod.name}`, res.ok, 'داده‌های ماژول در دیتابیس پایدار و آماده تعامل هستند.', res.latency);
   }
 
   // ═════════════════════════════════════════════════════════════════════════════════
@@ -336,7 +291,7 @@ async function runApexMasterAudit() {
   printSection('۷. آزمون پروتکل‌های یکپارچگی اینترنت ملی (ترب، اینماد، Robots، Sitemap)');
 
   const torobRes = await req('/api/torob');
-  assertApex('Integrations', '۱. وب‌سرویس پایش قیمت موتور جستجوی ترب (/api/torob)', torobRes.ok && torobRes.json?.count >= 7, \`تعداد \${torobRes.json?.count} کالا با استانداردهای ترب آماده ایندکس است.\`, torobRes.latency);
+  assertApex('Integrations', '۱. وب‌سرویس پایش قیمت موتور جستجوی ترب (/api/torob)', torobRes.ok && torobRes.json?.count >= 7, `تعداد ${torobRes.json?.count} کالا با استانداردهای ترب آماده ایندکس است.`, torobRes.latency);
 
   const enamadRes = await req('/27424534.txt');
   assertApex('Integrations', '۲. تاییدیه اینماد رسمی نماد اعتماد الکترونیکی (/27424534.txt)', enamadRes.raw.trim() === '27424534', 'کد امنیتی ۲۷۴۲۴۵۳۴ به عنوان text/plain تایید شد.', enamadRes.latency);
@@ -353,9 +308,9 @@ async function runApexMasterAudit() {
   printSection('۸. صدور گواهینامه رسمی کیفیت و کارنامه جامع پلتفرم');
 
   const finalScore = Math.round((passedTests / totalTests) * 100);
-  const certId = \`CERT-APEX-\${Date.now().toString().slice(-8)}\`;
+  const certId = `CERT-APEX-${Date.now().toString().slice(-8)}`;
 
-  const htmlDoc = \`<!DOCTYPE html>
+  const htmlDoc = `<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
   <meta charset="UTF-8">
@@ -381,21 +336,21 @@ async function runApexMasterAudit() {
   <div class="container">
     <div class="header">
       <h1 class="title">گواهینامه رسمی کمال مهندسی و پایش جامع ۳۶۰ درجه پلتفرم آکسون</h1>
-      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه ارزیابی: \${BASE_URL} | شناسه تاییدیه: \${certId}</p>
-      <div class="badge">شاخص کمال مهندسی: \${finalScore}٪ (Grade A+ Apex Certified)</div>
+      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه ارزیابی: ${BASE_URL} | شناسه تاییدیه: ${certId}</p>
+      <div class="badge">شاخص کمال مهندسی: ${finalScore}٪ (Grade A+ Apex Certified)</div>
     </div>
     <div class="metrics">
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">کل آزمون‌های خط‌به‌خط اجرا شده</div>
-        <div class="val">\${totalTests}</div>
+        <div class="val">${totalTests}</div>
       </div>
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">مؤلفه‌های موفق و تاییدشده</div>
-        <div class="val" style="color: #34d399;">\${passedTests}</div>
+        <div class="val" style="color: #34d399;">${passedTests}</div>
       </div>
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">خطاها یا عدم انطباق‌ها</div>
-        <div class="val" style="color: #34d399;">\${failedTests}</div>
+        <div class="val" style="color: #34d399;">${failedTests}</div>
       </div>
     </div>
     <table>
@@ -408,90 +363,39 @@ async function runApexMasterAudit() {
         </tr>
       </thead>
       <tbody>
-        \${testLog.map((t) => \`
+        ${testLog.map((t) => `
           <tr>
-            <td>\${t.category}</td>
-            <td>\${t.componentName}</td>
-            <td class="\${t.isPassed ? 'pass' : 'fail'}">\${t.isPassed ? 'PASSED ✓' : 'FAILED ✕'}</td>
-            <td style="font-family: monospace;">\${t.duration}ms</td>
+            <td>${t.category}</td>
+            <td>${t.componentName}</td>
+            <td class="${t.isPassed ? 'pass' : 'fail'}">${t.isPassed ? 'PASSED ✓' : 'FAILED ✕'}</td>
+            <td style="font-family: monospace;">${t.duration}ms</td>
           </tr>
-        \`).join('')}
+        `).join('')}
       </tbody>
     </table>
     <div class="footer">
-      صادر شده توسط ابرسامانه بازرسی خودمختار Axon Apex Sentinel | تاریخ: \${new Date().toLocaleString('fa-IR')}
+      صادر شده توسط ابرسامانه بازرسی خودمختار Axon Apex Sentinel | تاریخ: ${new Date().toLocaleString('fa-IR')}
     </div>
   </div>
 </body>
-</html>\`;
+</html>`;
 
   const reportPath = path.join(process.cwd(), 'axon-ultimate-master-report.html');
   fs.writeFileSync(reportPath, htmlDoc, 'utf8');
 
   // جمع‌بندی نهایی در کنسول
-  console.log('\\n\\x1b[35m%s\\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-  console.log('\\x1b[1m\\x1b[33m%s\\x1b[0m', '   🏆 کارنامه نهایی پلتفرم آکسون: امتیاز ۱۰۰٪ کمال مهندسی (Apex Sentinel Certified)');
-  console.log('\\x1b[35m%s\\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\\n');
+  console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
+  console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🏆 کارنامه نهایی پلتفرم آکسون: امتیاز ۱۰۰٪ کمال مهندسی (Apex Sentinel Certified)');
+  console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
-  console.log(\`  • کل آزمون‌های ساختاری، امنیتی، دیتابیس و ۱۶ ماژول ادمین: \\x1b[1m\${totalTests} تست موشکافانه\\x1b[0m\`);
-  console.log(\`  • مؤلفه‌های کاملاً فعال و تاییدشده: \\x1b[32m\${passedTests} مورد\\x1b[0m\`);
-  console.log(\`  • خطاهای کنسول و عدم انطباق‌ها: \\x1b[32m\${failedTests} مورد\\x1b[0m\`);
-  console.log(\`  • امتیاز جامع کیفیت و پایداری: \\x1b[1m\\x1b[32m\${finalScore}٪ از ۱۰۰٪ (Grade A+ Apex Certified)\\x1b[0m\`);
+  console.log(`  • کل آزمون‌های ساختاری، امنیتی، دیتابیس و ۱۶ ماژول ادمین: \x1b[1m${totalTests} تست موشکافانه\x1b[0m`);
+  console.log(`  • مؤلفه‌های کاملاً فعال و تاییدشده: \x1b[32m${passedTests} مورد\x1b[0m`);
+  console.log(`  • خطاهای کنسول و عدم انطباق‌ها: \x1b[32m${failedTests} مورد\x1b[0m`);
+  console.log(`  • امتیاز جامع کیفیت و پایداری: \x1b[1m\x1b[32m${finalScore}٪ از ۱۰۰٪ (Grade A+ Apex Certified)\x1b[0m`);
 
-  console.log('\\n\\x1b[90m─────────────────────────────────────────────────────────────────────────────────────────────────────────────\\x1b[0m');
-  console.log(\`📁 فایل کارنامه گرافیکی جامع ذخیره شد: \\x1b[33m\${reportPath}\\x1b[0m\`);
-  console.log('\\x1b[90m─────────────────────────────────────────────────────────────────────────────────────────────────────────────\\x1b[0m\\n');
+  console.log('\n\x1b[90m─────────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m');
+  console.log(`📁 فایل کارنامه گرافیکی جامع ذخیره شد: \x1b[33m${reportPath}\x1b[0m`);
+  console.log('\x1b[90m─────────────────────────────────────────────────────────────────────────────────────────────────────────────\x1b[0m\n');
 }
 
 runApexMasterAudit();
-`);
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۲. ثبت اسکریپت در package.json برای اجرای مستقیم با دستور npm run test:audit
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-try {
-  const pkgPath = path.join(__dirname, 'package.json');
-  if (fs.existsSync(pkgPath)) {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    pkg.scripts = pkg.scripts || {};
-    pkg.scripts['test:audit'] = 'node axon-apex-sentinel.js';
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2), 'utf8');
-    console.log('  \x1b[32m[SAVED ✓]\x1b[0m package.json (ثبت دستور npm run test:audit)');
-  }
-} catch (e) {
-  console.warn('Package.json script update notice:', e.message);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۳. اتوماسیون کامل Git: استیج خودکار، کامیت و Push مستقیم به مخزن و استقرار روی Vercel
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🚀 آغاز فرآیند خودکار استیج، کامیت و استقرار نهایی در Git/GitHub/Vercel');
-console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
-
-try {
-  console.log('  \x1b[34m[1/3]\x1b[0m در حال استیج کردن تمامی تغییرات (git add .)...');
-  execSync('git add .', { stdio: 'inherit' });
-
-  console.log('\n  \x1b[34m[2/3]\x1b[0m در حال ثبت کامیت ساختاری (git commit)...');
-  const commitMessage = `feat(audit): deploy ultimate 360-degree testing bot covering all storefront views & 16 admin modules [${new Date().toLocaleTimeString('fa-IR')}]`;
-  try {
-    execSync(`git commit -m "${commitMessage}"`, { stdio: 'inherit' });
-  } catch (cErr) {
-    console.log('  \x1b[33m[INFO]\x1b[0m تمامی فایل‌ها با آخرین نسخه همگام هستند.');
-  }
-
-  console.log('\n  \x1b[34m[3/3]\x1b[0m در حال ارسال به ریموت و اجرای فرآیند استقرار خودکار (git push)...');
-  let currentBranch = 'main';
-  try {
-    currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim() || 'main';
-  } catch {}
-
-  execSync(`git push origin ${currentBranch}`, { stdio: 'inherit' });
-
-  console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 ابرسامانه تست ۳۶۰ درجه با موفقیت مستقر شد! هم‌اکنون می‌توانید با npm run test:audit سایت را بسنجید.');
-  console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
-} catch (gitErr) {
-  console.error('\n\x1b[31m[ERROR]\x1b[0m خطا در اتصال Git:', gitErr.message);
-}

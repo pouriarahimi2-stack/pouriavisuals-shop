@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "push": "git add . && git commit -m \"update: auto commit changes\" && git push"
+    "push": "git add . && git commit -m \"update: auto commit changes\" && git push",
+    "test:audit": "node axon-apex-sentinel.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",

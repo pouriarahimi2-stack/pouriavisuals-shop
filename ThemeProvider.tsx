@@ -1,6 +1,8 @@
+// File Path: ThemeProvider.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { themeEngine } from "@/lib/themeEngine";
 
 export default function ThemeProvider({
   children,
@@ -11,15 +13,16 @@ export default function ThemeProvider({
 
   useEffect(() => {
     setMounted(true);
-    try {
-      const saved = localStorage.getItem("theme");
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      if (saved === "dark" || (!saved && prefersDark)) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
+    themeEngine.applyTheme();
+
+    const interval = setInterval(() => {
+      const isManual = localStorage.getItem("axon_theme_manual_override") === "true";
+      if (!isManual) {
+        themeEngine.applyTheme();
       }
-    } catch {}
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return <>{children}</>;

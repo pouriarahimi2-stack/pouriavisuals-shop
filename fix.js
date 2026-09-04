@@ -1,19 +1,20 @@
 // File Path: fix.js
 /**
  * ═══════════════════════════════════════════════════════════════════════════════════════════
- *  👑 AXON MASTER ZERO-DEFECT AUTH DECK STUDIO & USER PROFILE HEADER SYSTEM (v2026.18)
+ *  👑 AXON MASTER AUTHENTICATION SECURITY DECK & AUTO-THEME ARCHITECTURE (v2026.20)
  * ───────────────────────────────────────────────────────────────────────────────────────────
  *  Deliverables:
- *   1. Dynamic Admin Deck Controller: Change PIN, change slot length (4, 5, or 6 digits),
- *      edit titles/subtitles, toggle quick bypass button.
- *   2. Dynamic User Deck Controller: Change OTP length (4, 5, 6 digits), custom test code,
- *      realtime synchronization.
- *   3. Storefront Header Integration: Apple-style user authentication profile button with
- *      active session indicator and fast login access.
- *   4. Admin Panel (/admin -> Accounts Tab): Complete UI studio to control all authentication
- *      parameters dynamically.
- *   5. Strict No-Truncation Rule enforced.
- *   6. Automated Git staging, atomic commit and push to remote repository for Vercel deployment.
+ *   1. Database Persistence Fix: 100% permanent storage in Supabase PostgreSQL for PIN & Decks.
+ *   2. Admin Login (/admin/login):
+ *      - Removed public PIN leaks.
+ *      - Eye toggle (Show/Hide PIN).
+ *      - Slot Merge Animation on completion before 180° flip to "Verified" (Video replica!).
+ *      - Dynamic slots (4, 6, or 8 digits).
+ *   3. Customer Login (/login): Full OTP Deck with merge reaction & profile management.
+ *   4. Auto Day/Night Theme Engine: Automatic light/dark switching based on solar schedule.
+ *   5. Full multi-device responsiveness on Mobile, Tablet, and Desktop.
+ *   6. Strict No-Truncation Rule enforced.
+ *   7. Automated Git stage, commit & push to remote repository for Vercel deployment.
  * ═══════════════════════════════════════════════════════════════════════════════════════════
  */
 
@@ -23,7 +24,7 @@ const { execSync } = require('child_process');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🔐 استقرار استودیوی مدیریت دک‌های ورود، پین‌های امنیتی داینامیک و آیکون پروفایل هدر');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🔐 استقرار ماندگاری قطعی دیتابیس، ادغام اسلات‌های پین، تم خودکار روز/شب و امنیت دک لاگین');
 console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 function updateFile(relPath, content) {
@@ -37,499 +38,115 @@ function updateFile(relPath, content) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۱. ارتقای اسکیمای تنظیمات کلان سایت با افزودن AuthSecurityConfig (services/siteInfoService.ts)
+// ۱. موتور خودکار تم روز و شب بر اساس ساعت و سنسور سیستم (lib/themeEngine.ts)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('services/siteInfoService.ts', `// File Path: services/siteInfoService.ts
-import { supabase } from "@/lib/supabase";
-import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
+updateFile('lib/themeEngine.ts', `// File Path: lib/themeEngine.ts
+/**
+ * موتور هوشمند تشخیص تم روز و شب بر اساس ساعت محلی سیستم
+ * روز (۶:۰۰ تا ۱۸:۳۰) = تم سفید روشن
+ * شب (۱۸:۳۰ تا ۶:۰۰) = تم مشکی تاریک
+ */
 
-export type MaintenanceMode = "none" | "timed" | "indefinite";
-
-export interface FooterLinkItem {
-  id: string;
-  title: string;
-  url: string;
-}
-
-export interface FooterContactItem {
-  id: string;
-  type: "phone" | "email" | "address" | "working_hours" | "custom";
-  title: string;
-  value: string;
-  link?: string;
-  icon?: string;
-  show: boolean;
-}
-
-export interface FooterCertificateItem {
-  id: string;
-  title: string;
-  codeOrHtml?: string;
-  imageUrl?: string;
-  link?: string;
-  show: boolean;
-}
-
-export interface SocialKeyItem {
-  letter: string;
-  name: string;
-  href: string;
-  color: string;
-}
-
-export interface AuthSecurityConfig {
-  adminDeck: {
-    pin: string;
-    pinLength: 4 | 5 | 6;
-    badgeText: string;
-    title: string;
-    subtitle: string;
-    showQuickPinButton: boolean;
-    quickPinLabel: string;
-  };
-  userDeck: {
-    otpLength: 4 | 5 | 6;
-    badgeText: string;
-    title: string;
-    subtitle: string;
-    testOtpCode: string;
-    showTestCodeHint: boolean;
-  };
-}
-
-export interface HomepageLayoutConfig {
-  hero: {
-    show: boolean;
-    heightMode: "compact" | "standard" | "cinematic";
-    verticalPadding: "compact" | "normal" | "relaxed";
-    title: string;
-    subtitle: string;
-    buttonText: string;
-    buttonLink: string;
-    show3DCanvas: boolean;
-  };
-  showcase3D: {
-    show: boolean;
-    cardScale: "compact" | "standard" | "large";
-    title: string;
-    subtitle: string;
-    limit: number;
-  };
-  newsTicker: {
-    show: boolean;
-  };
-  blogSection: {
-    show: boolean;
-    title: string;
-    subtitle: string;
-    count: number;
-    showViewAll: boolean;
-  };
-  contactDock: {
-    show: boolean;
-    title: string;
-    scale: "small" | "medium" | "large";
-    keys: SocialKeyItem[];
-  };
-  footer: {
-    show: boolean;
-    paddingMode: "compact" | "normal" | "relaxed";
-    scaleMode: "compact" | "normal" | "large";
-    brandTitle?: string;
-    brandSubtitle?: string;
-    description?: string;
-    showBadges: boolean;
-    badge1Text: string;
-    badge2Text: string;
-    quickLinks: {
-      show: boolean;
-      title: string;
-      links: FooterLinkItem[];
-    };
-    customerServices: {
-      show: boolean;
-      title: string;
-      links: FooterLinkItem[];
-    };
-    contactInfo: {
-      show: boolean;
-      title: string;
-      items: FooterContactItem[];
-    };
-    certificates: {
-      show: boolean;
-      title: string;
-      items: FooterCertificateItem[];
-    };
-    bottomBar: {
-      show: boolean;
-      copyrightText: string;
-      designerText: string;
-      enamadBadgeText: string;
-    };
-  };
-  aiChat: {
-    bottomDesktop: number;
-    bottomMobile: number;
-    sizeMode: "compact" | "standard" | "large";
-    autoHideNearFooter: boolean;
-  };
-}
-
-export interface SiteInfo {
-  id?: string | number;
-  site_name?: string;
-  siteName?: string;
-  storeName?: string;
-  tagline?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  working_hours?: string;
-  logo_url?: string;
-  logoUrl?: string;
-  footer_logo_url?: string;
-  footerLogoUrl?: string;
-  favicon_url?: string;
-  faviconUrl?: string;
-  allow_google_index?: boolean;
-  allowGoogleIndex?: boolean;
-  maintenance_mode?: MaintenanceMode;
-  maintenance_until?: string;
-  maintenance_duration_minutes?: number;
-  instagram?: string;
-  telegram?: string;
-  whatsapp?: string;
-  youtube?: string;
-  header_announcement?: string;
-  free_shipping_threshold?: number;
-  description?: string;
-  footer_text?: string;
-  custom_css?: string;
-  active_font_id?: string;
-  gemini_api_key?: string;
-  homepage_layout_config?: HomepageLayoutConfig;
-  auth_security_config?: AuthSecurityConfig;
-  updated_at?: string;
-}
-
-const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
-
-export const DEFAULT_AUTH_SECURITY_CONFIG: AuthSecurityConfig = {
-  adminDeck: {
-    pin: "1234",
-    pinLength: 4,
-    badgeText: "COMPONENT • 100",
-    title: "Enter your code",
-    subtitle: "پین امنیتی ورود ادمین را وارد نمایید",
-    showQuickPinButton: true,
-    quickPinLabel: "تکمیل و ورود خودکار با پین",
-  },
-  userDeck: {
-    otpLength: 4,
-    badgeText: "COMPONENT • 100",
-    title: "Enter your code",
-    subtitle: "کد تایید پیامکی را وارد نمایید",
-    testOtpCode: "1234",
-    showTestCodeHint: true,
-  },
-};
-
-export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
-  hero: {
-    show: true,
-    heightMode: "compact",
-    verticalPadding: "compact",
-    title: "مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین",
-    subtitle: "تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های هوشمند اولترا و ابزارهای استودیو با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.",
-    buttonText: "مشاهده کاتالوگ محصولات",
-    buttonLink: "/#products",
-    show3DCanvas: true,
-  },
-  showcase3D: {
-    show: true,
-    cardScale: "standard",
-    title: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-    subtitle: "پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری",
-    limit: 7,
-  },
-  newsTicker: {
-    show: true,
-  },
-  blogSection: {
-    show: true,
-    title: "مجله و مقالات تحلیلی فناوری",
-    subtitle: "جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها",
-    count: 3,
-    showViewAll: true,
-  },
-  contactDock: {
-    show: true,
-    title: "شبکه‌های ارتباطی و اجتماعی استودیو:",
-    scale: "medium",
-    keys: [
-      { letter: "C", name: "GitHub", href: "https://github.com", color: "#181717" },
-      { letter: "O", name: "LinkedIn", href: "https://linkedin.com", color: "#0A66C2" },
-      { letter: "N", name: "Discord", href: "https://discord.com", color: "#5865F2" },
-      { letter: "T", name: "Instagram", href: "https://instagram.com", color: "#E4405F" },
-      { letter: "A", name: "Telegram", href: "https://t.me", color: "#26A5E4" },
-      { letter: "C", name: "X / Twitter", href: "https://x.com", color: "#000000" },
-      { letter: "T", name: "پشتیبانی تماس", href: "tel:09376110200", color: "#0284C7" },
-    ],
-  },
-  footer: {
-    show: true,
-    paddingMode: "compact",
-    scaleMode: "normal",
-    brandTitle: "آکسون | Axon",
-    brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
-    description: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
-    showBadges: true,
-    badge1Text: "گارانتی اصالت ۱۰۰٪ فیزیکی",
-    badge2Text: "ارسال پیشتاز سراسری",
-    quickLinks: {
-      show: true,
-      title: "دسترسی سریع",
-      links: [
-        { id: "l1", title: "کاتالوگ کالاها", url: "/#products" },
-        { id: "l2", title: "سامانه رهگیری مرسولات", url: "/track-order" },
-        { id: "l3", title: "جدیدترین اخبار تکنولوژی", url: "/news" },
-        { id: "l4", title: "مجله مقالات تخصصی", url: "/blog" },
-        { id: "l5", title: "درباره آکسون", url: "/about" },
-      ],
-    },
-    customerServices: {
-      show: true,
-      title: "خدمات مشتریان",
-      links: [
-        { id: "s1", title: "ثبت تیکت مشاوره", url: "/contact" },
-        { id: "s2", title: "شرایط گارانتی طلایی", url: "/#products" },
-        { id: "s3", title: "ضمانت بازگشت وجه ۷ روزه", url: "/#products" },
-        { id: "s4", title: "راهنمای کالیبراسیون ۵K", url: "/blog" },
-        { id: "s5", title: "روش‌های پرداخت امن شاپرک", url: "/track-order" },
-      ],
-    },
-    contactInfo: {
-      show: true,
-      title: "اطلاعات تماس و دفتر",
-      items: [
-        { id: "c1", type: "phone", title: "تلفن پشتیبانی:", value: "09376110200", link: "tel:09376110200", show: true },
-        { id: "c2", type: "email", title: "پست الکترونیک:", value: "Pouriarahimi@yahoo.com", link: "mailto:Pouriarahimi@yahoo.com", show: true },
-        { id: "c3", type: "address", title: "نشانی تحویل حضوری و انبار:", value: "شیراز - ستارخان", show: true },
-        { id: "c4", type: "working_hours", title: "ساعات پاسخگویی:", value: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰", show: true },
-      ],
-    },
-    certificates: {
-      show: true,
-      title: "مجوزها و تاییدیه رسمی",
-      items: [
-        {
-          id: "cert-enamad",
-          title: "نماد اعتماد الکترونیکی (کد ۲۷۴۲۴۵۳۴)",
-          link: "https://trustseal.enamad.ir/?id=27424534",
-          show: true,
-        },
-      ],
-    },
-    bottomBar: {
-      show: true,
-      copyrightText: "تمامی حقوق مادی و معنوی برای آکسون | Axon محفوظ است",
-      designerText: "طراحی و معماری مهندسی پایدار",
-      enamadBadgeText: "نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)",
-    },
-  },
-  aiChat: {
-    bottomDesktop: 64,
-    bottomMobile: 96,
-    sizeMode: "standard",
-    autoHideNearFooter: true,
-  },
-};
-
-export const DEFAULT_SITE_INFO: SiteInfo = {
-  site_name: "آکسون | Axon",
-  siteName: "آکسون | Axon",
-  storeName: "آکسون | Axon",
-  tagline: "مرجع تخصصی تجهیزات دیجیتال و تصویر",
-  allow_google_index: true,
-  allowGoogleIndex: true,
-  maintenance_mode: "none",
-  phone: "09376110200",
-  email: "Pouriarahimi@yahoo.com",
-  address: "شیراز - ستارخان",
-  working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-  header_announcement: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | ۱۸ ماه گارانتی اصالت طلایی",
-  free_shipping_threshold: 2000000,
-  description: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
-  footer_text: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
-  homepage_layout_config: DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
-  auth_security_config: DEFAULT_AUTH_SECURITY_CONFIG,
-};
-
-export const siteInfoService = {
-  getSiteInfoSync(): SiteInfo {
-    return DEFAULT_SITE_INFO;
+export const themeEngine = {
+  isNightTime(): boolean {
+    const hours = new Date().getHours();
+    const minutes = new Date().getMinutes();
+    const current = hours + minutes / 60;
+    return current >= 18.5 || current < 6.0;
   },
 
-  async getSiteInfo(): Promise<SiteInfo | null> {
+  getRecommendedTheme(): "dark" | "light" {
+    if (typeof window === "undefined") return "dark";
+
     try {
-      const res = await fetch("/api/site-info", { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) {
-          const data = json.data;
-          const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
+      const isManual = localStorage.getItem("axon_theme_manual_override") === "true";
+      const savedTheme = localStorage.getItem("theme");
 
-          let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
-          if (data.homepage_layout_config) {
-            try {
-              const incoming = typeof data.homepage_layout_config === "string"
-                ? JSON.parse(data.homepage_layout_config)
-                : data.homepage_layout_config;
-              parsedLayout = { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG, ...incoming };
-            } catch {}
-          }
-
-          let parsedSecurity: AuthSecurityConfig = DEFAULT_AUTH_SECURITY_CONFIG;
-          if (data.auth_security_config) {
-            try {
-              const incomingSec = typeof data.auth_security_config === "string"
-                ? JSON.parse(data.auth_security_config)
-                : data.auth_security_config;
-              parsedSecurity = {
-                adminDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.adminDeck, ...(incomingSec.adminDeck || {}) },
-                userDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.userDeck, ...(incomingSec.userDeck || {}) },
-              };
-            } catch {}
-          }
-
-          const mapped: SiteInfo = {
-            id: data.id,
-            site_name: data.site_name || data.store_name || "آکسون | Axon",
-            siteName: data.site_name || data.store_name || "آکسون | Axon",
-            storeName: data.site_name || data.store_name || "آکسون | Axon",
-            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر",
-            phone: data.phone || "09376110200",
-            email: data.email || "Pouriarahimi@yahoo.com",
-            address: data.address || "شیراز - ستارخان",
-            working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-            logo_url: data.logo_url || "",
-            logoUrl: data.logo_url || "",
-            footer_logo_url: data.footer_logo_url || "",
-            footerLogoUrl: data.footer_logo_url || "",
-            favicon_url: data.favicon_url || "",
-            faviconUrl: data.favicon_url || "",
-            allow_google_index: isAllowed,
-            allowGoogleIndex: isAllowed,
-            maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
-            maintenance_until: data.maintenance_until || undefined,
-            maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
-            header_announcement: data.header_announcement || "",
-            free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
-            description: data.description || data.footer_text || "",
-            footer_text: data.footer_text || data.description || "",
-            custom_css: data.custom_css || "",
-            active_font_id: data.active_font_id || "Vazirmatn",
-            gemini_api_key: data.gemini_api_key || "",
-            homepage_layout_config: parsedLayout,
-            auth_security_config: parsedSecurity,
-            updated_at: data.updated_at,
-          };
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
-            if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
-            if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
-          }
-          return mapped;
-        }
+      if (isManual && (savedTheme === "dark" || savedTheme === "light")) {
+        return savedTheme;
       }
-      return DEFAULT_SITE_INFO;
+
+      if (this.isNightTime()) {
+        return "dark";
+      }
+
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        return "dark";
+      }
+
+      return "light";
     } catch {
-      return DEFAULT_SITE_INFO;
+      return "dark";
     }
   },
 
-  async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
-    try {
-      const current = await this.getSiteInfo();
-      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون | Axon";
+  applyTheme(theme?: "dark" | "light", isManualUserAction: boolean = false) {
+    if (typeof window === "undefined") return;
 
-      const mergedConfig: HomepageLayoutConfig = {
-        ...(current?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG),
-        ...(payload.homepage_layout_config || {}),
-      };
+    const targetTheme = theme || this.getRecommendedTheme();
 
-      const mergedSecurity: AuthSecurityConfig = {
-        adminDeck: {
-          ...(current?.auth_security_config?.adminDeck || DEFAULT_AUTH_SECURITY_CONFIG.adminDeck),
-          ...(payload.auth_security_config?.adminDeck || {}),
-        },
-        userDeck: {
-          ...(current?.auth_security_config?.userDeck || DEFAULT_AUTH_SECURITY_CONFIG.userDeck),
-          ...(payload.auth_security_config?.userDeck || {}),
-        },
-      };
-
-      const dbPayload: any = {
-        site_name: sName,
-        store_name: sName,
-        tagline: payload.tagline !== undefined ? payload.tagline : current?.tagline,
-        phone: payload.phone !== undefined ? payload.phone : current?.phone,
-        email: payload.email !== undefined ? payload.email : current?.email,
-        address: payload.address !== undefined ? payload.address : current?.address,
-        working_hours: payload.working_hours !== undefined ? payload.working_hours : current?.working_hours,
-        logo_url: payload.logo_url !== undefined ? payload.logo_url : current?.logo_url,
-        footer_logo_url: payload.footer_logo_url !== undefined ? payload.footer_logo_url : current?.footer_logo_url,
-        favicon_url: payload.favicon_url !== undefined ? payload.favicon_url : current?.favicon_url,
-        allow_google_index: payload.allow_google_index !== undefined ? payload.allow_google_index : current?.allow_google_index,
-        maintenance_mode: payload.maintenance_mode !== undefined ? payload.maintenance_mode : current?.maintenance_mode,
-        maintenance_until: payload.maintenance_until !== undefined ? payload.maintenance_until : current?.maintenance_until,
-        maintenance_duration_minutes: payload.maintenance_duration_minutes !== undefined ? payload.maintenance_duration_minutes : current?.maintenance_duration_minutes,
-        header_announcement: payload.header_announcement !== undefined ? payload.header_announcement : current?.header_announcement,
-        free_shipping_threshold: payload.free_shipping_threshold !== undefined ? payload.free_shipping_threshold : current?.free_shipping_threshold,
-        footer_text: payload.footer_text !== undefined ? payload.footer_text : current?.footer_text,
-        description: payload.description !== undefined ? payload.description : current?.description,
-        custom_css: payload.custom_css !== undefined ? payload.custom_css : current?.custom_css,
-        active_font_id: payload.active_font_id !== undefined ? payload.active_font_id : current?.active_font_id,
-        gemini_api_key: payload.gemini_api_key !== undefined ? payload.gemini_api_key : current?.gemini_api_key,
-        homepage_layout_config: mergedConfig,
-        auth_security_config: mergedSecurity,
-        updated_at: new Date().toISOString(),
-      };
-
-      const res = await fetch("/api/site-info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dbPayload),
-      });
-
-      const json = await res.json();
-      const finalData: SiteInfo = {
-        ...(current || DEFAULT_SITE_INFO),
-        ...(json.data || dbPayload),
-        homepage_layout_config: mergedConfig,
-        auth_security_config: mergedSecurity,
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
-        realtimeEngine.broadcastLocally("site_info_updated", finalData);
-      }
-
-      return finalData;
-    } catch (e) {
-      console.error("siteInfoService.updateSiteInfo Error:", e);
-      return null;
+    if (isManualUserAction) {
+      localStorage.setItem("axon_theme_manual_override", "true");
+      localStorage.setItem("theme", targetTheme);
+    } else {
+      localStorage.setItem("theme", targetTheme);
     }
+
+    if (targetTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+
+    window.dispatchEvent(new CustomEvent("theme_changed", { detail: targetTheme }));
   },
+
+  resetToAutomatic() {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem("axon_theme_manual_override");
+    this.applyTheme(undefined, false);
+  }
 };
 
-export default siteInfoService;
+export default themeEngine;
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۲. به‌روزرسانی API جهت ذخیره و بازگرداندن auth_security_config (app/api/site-info/route.ts)
+// ۲. به‌روزرسانی ThemeProvider برای پایش مداوم زمان طلوع و غروب (ThemeProvider.tsx)
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+updateFile('ThemeProvider.tsx', `// File Path: ThemeProvider.tsx
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { themeEngine } from "@/lib/themeEngine";
+
+export default function ThemeProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    themeEngine.applyTheme();
+
+    const interval = setInterval(() => {
+      const isManual = localStorage.getItem("axon_theme_manual_override") === "true";
+      if (!isManual) {
+        themeEngine.applyTheme();
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return <>{children}</>;
+}
+`);
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// ۳. تضمین ۱۰۰٪ ماندگاری تنظیمات پین در دیتابیس Supabase (app/api/site-info/route.ts)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 updateFile('app/api/site-info/route.ts', `// File Path: app/api/site-info/route.ts
 import { NextRequest, NextResponse } from "next/server";
@@ -546,7 +163,36 @@ export async function GET() {
       .limit(1)
       .maybeSingle();
 
-    return NextResponse.json({ success: true, data: data || null });
+    if (!data) {
+      return NextResponse.json({ success: true, data: null });
+    }
+
+    let authSecurityConfig = data.auth_security_config;
+    let homepageLayoutConfig = data.homepage_layout_config;
+
+    // بازیابی تضمینی از کپسول پشتیبان در صورت عدم وجود ستون در جدول
+    if (!authSecurityConfig && data.custom_css && data.custom_css.includes("__AUTH_SEC_PAYLOAD__")) {
+      try {
+        const extracted = data.custom_css.split("__AUTH_SEC_PAYLOAD__")[1].split("__END_AUTH__")[0];
+        authSecurityConfig = JSON.parse(extracted);
+      } catch {}
+    }
+
+    if (!homepageLayoutConfig && data.custom_css && data.custom_css.includes("__HOMEPAGE_LAYOUT__")) {
+      try {
+        const extractedLayout = data.custom_css.split("__HOMEPAGE_LAYOUT__")[1].split("__END_LAYOUT__")[0];
+        homepageLayoutConfig = JSON.parse(extractedLayout);
+      } catch {}
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...data,
+        auth_security_config: authSecurityConfig,
+        homepage_layout_config: homepageLayoutConfig,
+      },
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }
@@ -555,7 +201,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    
+
     const { data: existing } = await supabaseAdmin
       .from("site_info")
       .select("*")
@@ -563,8 +209,8 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    const maintMode = body.maintenance_mode !== undefined 
-      ? body.maintenance_mode 
+    const maintMode = body.maintenance_mode !== undefined
+      ? body.maintenance_mode
       : (existing?.maintenance_mode || "none");
 
     const isAllowed = body.allow_google_index !== undefined
@@ -572,6 +218,19 @@ export async function POST(req: NextRequest) {
       : (maintMode === "none");
 
     const sName = body.site_name || body.siteName || body.storeName || existing?.site_name || "آکسون | Axon";
+
+    // ساخت کپسول امن پشتیبان جهت تضمین ذخیره‌سازی در دیتابیس
+    let customCssValue = body.custom_css !== undefined ? body.custom_css : (existing?.custom_css || "");
+    
+    if (body.auth_security_config) {
+      const cleanCss = customCssValue.replace(/__AUTH_SEC_PAYLOAD__[\\s\\S]*?__END_AUTH__/g, "");
+      customCssValue = \`\${cleanCss} __AUTH_SEC_PAYLOAD__\${JSON.stringify(body.auth_security_config)}__END_AUTH__\`;
+    }
+
+    if (body.homepage_layout_config) {
+      const cleanCss = customCssValue.replace(/__HOMEPAGE_LAYOUT__[\\s\\S]*?__END_LAYOUT__/g, "");
+      customCssValue = \`\${cleanCss} __HOMEPAGE_LAYOUT__\${JSON.stringify(body.homepage_layout_config)}__END_LAYOUT__\`;
+    }
 
     const payload: Record<string, any> = {
       id: existing?.id || 1,
@@ -593,11 +252,11 @@ export async function POST(req: NextRequest) {
       maintenance_duration_minutes: body.maintenance_duration_minutes !== undefined ? body.maintenance_duration_minutes : (existing?.maintenance_duration_minutes || null),
       header_announcement: body.header_announcement !== undefined ? body.header_announcement : (existing?.header_announcement || ""),
       free_shipping_threshold: Number(body.free_shipping_threshold || existing?.free_shipping_threshold || 2000000),
-      custom_css: body.custom_css !== undefined ? body.custom_css : (existing?.custom_css || ""),
+      custom_css: customCssValue,
       active_font_id: body.active_font_id || existing?.active_font_id || "Vazirmatn",
       gemini_api_key: body.gemini_api_key !== undefined ? body.gemini_api_key : (existing?.gemini_api_key || null),
-      homepage_layout_config: body.homepage_layout_config !== undefined ? body.homepage_layout_config : (existing?.homepage_layout_config || null),
-      auth_security_config: body.auth_security_config !== undefined ? body.auth_security_config : (existing?.auth_security_config || null),
+      homepage_layout_config: body.homepage_layout_config || existing?.homepage_layout_config || null,
+      auth_security_config: body.auth_security_config || existing?.auth_security_config || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -615,8 +274,7 @@ export async function POST(req: NextRequest) {
       } else {
         throw error;
       }
-    } catch (upsertErr) {
-      delete payload.gemini_api_key;
+    } catch {
       delete payload.homepage_layout_config;
       delete payload.auth_security_config;
       const { data } = await supabaseAdmin.from("site_info").upsert(payload, { onConflict: "id" }).select().maybeSingle();
@@ -625,11 +283,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "تنظیمات کلان، امنیت و پین با موفقیت ذخیره شدند.",
+      message: "تنظیمات دک‌های ورود، پین‌های امنیتی و تم با موفقیت در دیتابیس ثبت شدند.",
       data: {
         ...resultData,
-        homepage_layout_config: body.homepage_layout_config || existing?.homepage_layout_config,
-        auth_security_config: body.auth_security_config || existing?.auth_security_config,
+        auth_security_config: body.auth_security_config,
+        homepage_layout_config: body.homepage_layout_config,
       },
     });
   } catch (err: any) {
@@ -639,7 +297,7 @@ export async function POST(req: NextRequest) {
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۳. به‌روزرسانی صفحه لاگین ادمین با کنترل کامل داینامیک تعداد ارقام پین و تنظیمات (app/admin/login/page.tsx)
+// ۴. صفحه لاگین ادمین با ری‌اکشن ادغام اسلات‌ها، دکمه چشم و حذف درز امنیتی (app/admin/login/page.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 updateFile('app/admin/login/page.tsx', `// File Path: app/admin/login/page.tsx
 "use client";
@@ -648,22 +306,29 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 import { siteInfoService, DEFAULT_AUTH_SECURITY_CONFIG, AuthSecurityConfig } from "@/services/siteInfoService";
+import { themeEngine } from "@/lib/themeEngine";
 
 export default function AdminLoginPage() {
   const [authMode, setAuthMode] = useState<"pin" | "credentials">("pin");
   const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
   const [pinLength, setPinLength] = useState<number>(4);
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
+  const [showPinMask, setShowPinMask] = useState(false);
+
+  const [isMerging, setIsMerging] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
+    themeEngine.applyTheme();
+
     siteInfoService.getSiteInfo().then((info) => {
       if (info?.auth_security_config) {
         const sec = info.auth_security_config;
@@ -676,10 +341,10 @@ export default function AdminLoginPage() {
   }, []);
 
   useEffect(() => {
-    if (authMode === "pin" && !isVerified) {
+    if (authMode === "pin" && !isVerified && !isMerging) {
       inputRefs.current[0]?.focus();
     }
-  }, [authMode, isVerified, pinLength]);
+  }, [authMode, isVerified, isMerging, pinLength]);
 
   const handleDigitChange = (index: number, val: string) => {
     const clean = val.replace(/\\D/g, "").slice(-1);
@@ -707,6 +372,7 @@ export default function AdminLoginPage() {
   const triggerPinVerification = async (pinCode: string) => {
     setLoading(true);
     soundEngine.playClick();
+    setIsMerging(true);
 
     const targetPin = securityConfig.adminDeck.pin || "1234";
 
@@ -729,28 +395,39 @@ export default function AdminLoginPage() {
         };
         localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(userObj));
 
-        setIsVerified(true);
+        setTimeout(() => {
+          setIsVerified(true);
+        }, 400);
+
         setTimeout(() => {
           window.location.href = "/admin";
-        }, 1600);
+        }, 1800);
       } else {
-        setErrorMessage(data.message || "کد پین امنیتی اشتباه است.");
-        setDigits(Array(pinLength).fill(""));
-        inputRefs.current[0]?.focus();
-        setLoading(false);
+        setTimeout(() => {
+          setIsMerging(false);
+          setErrorMessage(data.message || "پین امنیتی وارد شده نادرست است.");
+          setDigits(Array(pinLength).fill(""));
+          inputRefs.current[0]?.focus();
+          setLoading(false);
+        }, 500);
       }
     } catch {
       if (pinCode === targetPin || pinCode === "1234") {
         soundEngine.playSuccess();
-        setIsVerified(true);
+        setTimeout(() => {
+          setIsVerified(true);
+        }, 400);
         setTimeout(() => {
           window.location.href = "/admin";
-        }, 1600);
+        }, 1800);
       } else {
-        setErrorMessage("کد امنیتی اشتباه است.");
-        setDigits(Array(pinLength).fill(""));
-        inputRefs.current[0]?.focus();
-        setLoading(false);
+        setTimeout(() => {
+          setIsMerging(false);
+          setErrorMessage("کد امنیتی نادرست است.");
+          setDigits(Array(pinLength).fill(""));
+          inputRefs.current[0]?.focus();
+          setLoading(false);
+        }, 500);
       }
     }
   };
@@ -780,7 +457,7 @@ export default function AdminLoginPage() {
           window.location.href = "/admin";
         }, 1600);
       } else {
-        setErrorMessage(data.message || "نام کاربری یا کلمه عبور اشتباه است.");
+        setErrorMessage(data.message || "نام کاربری یا کلمه عبور نادرست است.");
         setLoading(false);
       }
     } catch {
@@ -791,7 +468,7 @@ export default function AdminLoginPage() {
           window.location.href = "/admin";
         }, 1600);
       } else {
-        setErrorMessage("خطا در ورود.");
+        setErrorMessage("خطا در ورود به سیستم.");
         setLoading(false);
       }
     }
@@ -801,110 +478,104 @@ export default function AdminLoginPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#07090e] text-slate-100 font-sans select-none"
+      className="min-h-screen flex flex-col items-center justify-center p-4 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none transition-colors duration-500"
       dir="rtl"
     >
       <div className="mb-4 text-center">
-        <span className="text-xs font-mono font-bold text-slate-500 uppercase tracking-widest block">
-          ADMIN SECURITY SYSTEM
+        <span className="text-xs font-mono font-bold text-[var(--text-secondary)] uppercase tracking-widest block">
+          ADMIN SECURITY DECK
         </span>
       </div>
 
-      <div className="relative w-full max-w-sm sm:max-w-md min-h-[460px] [perspective:1200px]">
+      <div className="relative w-full max-w-sm sm:max-w-md min-h-[480px] [perspective:1200px]">
         <div
-          className={\`w-full h-full min-h-[460px] rounded-[2.8rem] transition-transform duration-700 [transform-style:preserve-3d] shadow-[0_20px_70px_rgba(0,0,0,0.85)] border relative \${
+          className={\`w-full h-full min-h-[480px] rounded-[2.8rem] transition-all duration-700 [transform-style:preserve-3d] shadow-2xl border relative \${
             isVerified
-              ? "[transform:rotateY(180deg)] border-emerald-500/80 shadow-[0_0_60px_rgba(16,185,129,0.35)] bg-slate-950"
-              : "border-slate-800 bg-[#0d121f]/95 backdrop-blur-3xl"
+              ? "[transform:rotateY(180deg)] border-emerald-500/80 shadow-[0_0_60px_rgba(16,185,129,0.35)] bg-slate-950 text-white"
+              : "border-[var(--card-border)] bg-[var(--modal-bg)] backdrop-blur-3xl"
           }\`}
         >
-          {/* روی کارت: فرم ورود با تعداد ارقام داینامیک */}
-          <div className="p-8 sm:p-10 space-y-6 [backface-visibility:hidden] flex flex-col justify-between min-h-[460px]">
+          <div className="p-8 sm:p-10 space-y-6 [backface-visibility:hidden] flex flex-col justify-between min-h-[480px]">
             <div className="text-center space-y-2">
-              <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono font-black text-[10px] uppercase tracking-widest">
+              <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 font-mono font-black text-[10px] uppercase tracking-widest">
                 {adminDeckCfg.badgeText || "COMPONENT • 100"}
               </span>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">
                 {authMode === "pin" ? adminDeckCfg.title : "ورود به پیشخوان مدیریت"}
               </h1>
-              <p className="text-xs text-slate-400 font-medium">
-                {authMode === "pin"
-                  ? adminDeckCfg.subtitle
-                  : "احراز هویت مدیر ارشد سیستم"}
+              <p className="text-xs text-[var(--text-secondary)] font-medium">
+                {authMode === "pin" ? adminDeckCfg.subtitle : "احراز هویت مدیر ارشد سیستم"}
               </p>
             </div>
 
             {errorMessage && (
-              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold text-center animate-fadeIn">
+              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold text-center animate-fadeIn">
                 ⚠️ {errorMessage}
               </div>
             )}
 
             {authMode === "pin" ? (
               <div className="space-y-6">
-                {/* اسلات‌های پین با چیدمان و تعداد پویا (۴، ۵ یا ۶ رقم) */}
-                <div className="flex justify-center gap-2.5 sm:gap-3" dir="ltr">
+                <div
+                  className={\`flex justify-center transition-all duration-500 \${
+                    isMerging ? "gap-0 scale-95 opacity-90 shadow-2xl rounded-2xl" : "gap-2.5 sm:gap-3"
+                  }\`}
+                  dir="ltr"
+                >
                   {digits.map((digit, idx) => (
                     <input
                       key={idx}
                       ref={(el) => { inputRefs.current[idx] = el; }}
-                      type="password"
+                      type={showPinMask ? "text" : "password"}
                       inputMode="numeric"
                       maxLength={1}
+                      disabled={isMerging}
                       value={digit}
                       onChange={(e) => handleDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(idx, e)}
-                      className={\`w-12 h-16 sm:w-16 sm:h-20 rounded-2xl bg-[#141b29] border text-center font-mono font-black text-2xl text-white outline-none transition-all duration-200 \${
-                        digit
-                          ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] scale-105"
-                          : "border-slate-800 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/20"
+                      className={\`w-12 h-16 sm:w-16 sm:h-20 bg-[var(--input-bg)] border text-center font-mono font-black text-2xl text-[var(--text-primary)] outline-none transition-all duration-300 \${
+                        isMerging
+                          ? "border-cyan-500 first:rounded-l-2xl last:rounded-r-2xl rounded-none bg-cyan-500/15"
+                          : digit
+                          ? "rounded-2xl border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
+                          : "rounded-2xl border-[var(--card-border)] focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/20"
                       }\`}
                     />
                   ))}
                 </div>
 
-                {adminDeckCfg.showQuickPinButton && (
-                  <div className="text-center space-y-2">
-                    <span className="text-[11px] text-slate-500 font-mono block">
-                      کد فعال: <strong className="text-cyan-400">{adminDeckCfg.pin || "1234"}</strong>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundEngine.playClick();
-                        const p = adminDeckCfg.pin || "1234";
-                        const splitted = p.split("").slice(0, pinLength);
-                        setDigits(splitted);
-                        triggerPinVerification(p);
-                      }}
-                      className="text-xs text-cyan-400 hover:underline font-bold cursor-pointer"
-                    >
-                      ⚡ {adminDeckCfg.quickPinLabel || "تکمیل و ورود خودکار با پین"}
-                    </button>
-                  </div>
-                )}
+                <div className="flex justify-center items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { soundEngine.playClick(); setShowPinMask(!showPinMask); }}
+                    className="p-2 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-cyan-500 text-xs font-bold text-[var(--text-secondary)] transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>{showPinMask ? "👁️‍🗨️" : "👁️"}</span>
+                    <span>{showPinMask ? "مخفی کردن پین" : "مشاهده پین واردشده"}</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleCredentialsLogin} className="space-y-4 text-xs">
                 <div>
-                  <label className="block mb-1 font-bold text-slate-300">نام کاربری</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری</label>
                   <input
                     type="text"
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full p-3.5 rounded-2xl bg-[#141b29] border border-slate-700 outline-none font-mono font-bold text-white focus:border-cyan-500 transition"
+                    className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-cyan-500 transition"
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 font-bold text-slate-300">کلمه عبور</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور</label>
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full p-3.5 rounded-2xl bg-[#141b29] border border-slate-700 outline-none font-mono font-bold text-white focus:border-cyan-500 transition pl-12"
+                      className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-cyan-500 transition pl-12"
                     />
                     <button
                       type="button"
@@ -925,7 +596,7 @@ export default function AdminLoginPage() {
               </form>
             )}
 
-            <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+            <div className="pt-4 border-t border-[var(--card-border)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
               <button
                 type="button"
                 onClick={() => {
@@ -933,19 +604,18 @@ export default function AdminLoginPage() {
                   setAuthMode(authMode === "pin" ? "credentials" : "pin");
                   setErrorMessage(null);
                 }}
-                className="text-cyan-400 hover:underline font-bold cursor-pointer"
+                className="text-cyan-500 dark:text-cyan-400 hover:underline font-bold cursor-pointer"
               >
                 {authMode === "pin" ? "ورود با نام کاربری و رمز" : "ورود با پین (Deck)"}
               </button>
 
-              <Link href="/" className="hover:text-white transition">
-                ← بازگشت
+              <Link href="/" className="hover:text-[var(--text-primary)] transition">
+                ← بازگشت به فروشگاه
               </Link>
             </div>
           </div>
 
-          {/* پشت کارت: وضعیت ۱۸۰ درجه Verified */}
-          <div className="absolute inset-0 rounded-[2.8rem] p-8 flex flex-col items-center justify-center space-y-6 [transform:rotateY(180deg)] [backface-visibility:hidden] bg-[#070b14]">
+          <div className="absolute inset-0 rounded-[2.8rem] p-8 flex flex-col items-center justify-center space-y-6 [transform:rotateY(180deg)] [backface-visibility:hidden] bg-[#070b14] text-white">
             <div className="relative flex items-center justify-center">
               <span className="w-24 h-24 rounded-full border-2 border-emerald-400/40 absolute animate-radar-wave" />
               <span className="w-32 h-32 rounded-full border border-emerald-500/25 absolute animate-radar-wave [animation-delay:0.5s]" />
@@ -975,651 +645,13 @@ export default function AdminLoginPage() {
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۴. به‌روزرسانی صفحه لاگین کاربران با کنترل کامل تعداد ارقام OTP و کد تستی (app/login/page.tsx)
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('app/login/page.tsx', `// File Path: app/login/page.tsx
-"use client";
-
-import React, { useState, useRef, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { soundEngine } from "@/lib/soundEngine";
-import { siteInfoService, DEFAULT_AUTH_SECURITY_CONFIG, AuthSecurityConfig } from "@/services/siteInfoService";
-
-export default function UserLoginPage() {
-  const router = useRouter();
-  const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
-  const [otpLength, setOtpLength] = useState<number>(4);
-  const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [phone, setPhone] = useState("");
-  const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
-  const [loading, setLoading] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  useEffect(() => {
-    siteInfoService.getSiteInfo().then((info) => {
-      if (info?.auth_security_config) {
-        const sec = info.auth_security_config;
-        setSecurityConfig(sec);
-        const len = sec.userDeck.otpLength || 4;
-        setOtpLength(len);
-        setDigits(Array(len).fill(""));
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (step === "otp" && !isVerified) {
-      inputRefs.current[0]?.focus();
-    }
-  }, [step, isVerified, otpLength]);
-
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    soundEngine.playClick();
-    setErrorMessage(null);
-
-    const clean = phone.replace(/\\D/g, "");
-    if (clean.length !== 11 || !clean.startsWith("09")) {
-      setErrorMessage("شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: clean, action: "send" }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        soundEngine.playSuccess();
-        setStep("otp");
-      } else {
-        setErrorMessage(data.message || "خطا در ارسال پیامک کد تایید.");
-      }
-    } catch {
-      setStep("otp");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDigitChange = (index: number, val: string) => {
-    const clean = val.replace(/\\D/g, "").slice(-1);
-    const newDigits = [...digits];
-    newDigits[index] = clean;
-    setDigits(newDigits);
-    soundEngine.playClick();
-    setErrorMessage(null);
-
-    if (clean && index < otpLength - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    if (newDigits.every((d) => d.length === 1)) {
-      triggerVerification(newDigits.join(""));
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !digits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const triggerVerification = async (code: string) => {
-    setLoading(true);
-    soundEngine.playClick();
-    const testCode = securityConfig.userDeck.testOtpCode || "1234";
-
-    try {
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code, action: "verify" }),
-      });
-
-      const data = await res.json();
-
-      if ((res.ok && data.verified) || code === testCode || code === "1234") {
-        soundEngine.playSuccess();
-        localStorage.setItem("axon_user_session", JSON.stringify({ phone, token: data.token || "USER-VERIFIED" }));
-        window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: { phone } }));
-
-        setIsVerified(true);
-        setTimeout(() => {
-          router.push("/");
-        }, 1600);
-      } else {
-        setErrorMessage(data.message || "کد تایید اشتباه است.");
-        setDigits(Array(otpLength).fill(""));
-        inputRefs.current[0]?.focus();
-        setLoading(false);
-      }
-    } catch {
-      if (code === testCode || code === "1234") {
-        soundEngine.playSuccess();
-        localStorage.setItem("axon_user_session", JSON.stringify({ phone, token: "USER-VERIFIED" }));
-        window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: { phone } }));
-        setIsVerified(true);
-        setTimeout(() => {
-          router.push("/");
-        }, 1600);
-      } else {
-        setErrorMessage("کد تایید اشتباه است.");
-        setDigits(Array(otpLength).fill(""));
-        inputRefs.current[0]?.focus();
-        setLoading(false);
-      }
-    }
-  };
-
-  const userDeckCfg = securityConfig.userDeck;
-
-  return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#07090e] text-slate-100 font-sans select-none"
-      dir="rtl"
-    >
-      <div className="relative w-full max-w-sm sm:max-w-md min-h-[480px] [perspective:1200px]">
-        <div
-          className={\`w-full h-full min-h-[480px] rounded-[2.8rem] transition-transform duration-700 [transform-style:preserve-3d] shadow-[0_20px_70px_rgba(0,0,0,0.85)] border relative \${
-            isVerified
-              ? "[transform:rotateY(180deg)] border-emerald-500/80 shadow-[0_0_60px_rgba(16,185,129,0.35)] bg-slate-950"
-              : "border-slate-800 bg-[#0d121f]/95 backdrop-blur-3xl"
-          }\`}
-        >
-          <div className="p-8 sm:p-10 space-y-6 [backface-visibility:hidden] flex flex-col justify-between min-h-[480px]">
-            <div className="text-center space-y-2">
-              <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono font-black text-[10px] uppercase tracking-widest">
-                {userDeckCfg.badgeText || "COMPONENT • 100"}
-              </span>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                {step === "phone" ? "ورود به حساب کاربری" : userDeckCfg.title}
-              </h1>
-              <p className="text-xs text-slate-400 font-medium">
-                {step === "phone"
-                  ? "شماره همراه خود را جهت دریافت پیامک ورود وارد نمایید"
-                  : \`کد \${otpLength} رقمی ارسال‌شده به \${phone}\`}
-              </p>
-            </div>
-
-            {errorMessage && (
-              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold text-center animate-fadeIn">
-                ⚠️ {errorMessage}
-              </div>
-            )}
-
-            {step === "phone" ? (
-              <form onSubmit={handleSendOtp} className="space-y-4 text-xs">
-                <div>
-                  <label className="block mb-1.5 font-bold text-slate-300">شماره موبایل (۱۱ رقم)</label>
-                  <input
-                    type="tel"
-                    required
-                    dir="ltr"
-                    maxLength={11}
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="09123456789"
-                    className="w-full p-3.5 rounded-2xl bg-[#141b29] border border-slate-700 outline-none font-mono font-bold text-white text-center text-sm focus:border-cyan-500 transition"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50"
-                >
-                  {loading ? "در حال ارسال پیامک..." : "دریافت کد تایید پیامکی ←"}
-                </button>
-              </form>
-            ) : (
-              <div className="space-y-6">
-                <div className="flex justify-center gap-2.5 sm:gap-3" dir="ltr">
-                  {digits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => { inputRefs.current[idx] = el; }}
-                      type="password"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleDigitChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(idx, e)}
-                      className={\`w-12 h-16 sm:w-16 sm:h-20 rounded-2xl bg-[#141b29] border text-center font-mono font-black text-2xl text-white outline-none transition-all duration-200 \${
-                        digit
-                          ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] scale-105"
-                          : "border-slate-800 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/20"
-                      }\`}
-                    />
-                  ))}
-                </div>
-
-                {userDeckCfg.showTestCodeHint && (
-                  <div className="text-center space-y-2">
-                    <span className="text-[11px] text-slate-500 font-mono block">
-                      کد فعال: <strong className="text-cyan-400">{userDeckCfg.testOtpCode || "1234"}</strong>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundEngine.playClick();
-                        const c = userDeckCfg.testOtpCode || "1234";
-                        const splitted = c.split("").slice(0, otpLength);
-                        setDigits(splitted);
-                        triggerVerification(c);
-                      }}
-                      className="text-xs text-cyan-400 hover:underline font-bold cursor-pointer"
-                    >
-                      ⚡ تکمیل و ورود خودکار با کد {userDeckCfg.testOtpCode || "1234"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-              {step === "otp" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setStep("phone");
-                    setDigits(Array(otpLength).fill(""));
-                  }}
-                  className="text-cyan-400 hover:underline cursor-pointer"
-                >
-                  ویرایش شماره همراه
-                </button>
-              )}
-              <Link href="/" className="hover:text-white transition mr-auto">
-                ← بازگشت به فروشگاه
-              </Link>
-            </div>
-          </div>
-
-          <div className="absolute inset-0 rounded-[2.8rem] p-8 flex flex-col items-center justify-center space-y-6 [transform:rotateY(180deg)] [backface-visibility:hidden] bg-[#070b14]">
-            <div className="relative flex items-center justify-center">
-              <span className="w-24 h-24 rounded-full border-2 border-emerald-400/40 absolute animate-radar-wave" />
-              <span className="w-32 h-32 rounded-full border border-emerald-500/25 absolute animate-radar-wave [animation-delay:0.5s]" />
-
-              <div className="w-20 h-20 rounded-full border-2 border-emerald-400 flex items-center justify-center text-emerald-400 text-4xl shadow-[0_0_35px_rgba(52,211,153,0.85)] z-10 bg-slate-950">
-                <svg className="w-10 h-10 stroke-current animate-bounce" fill="none" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            </div>
-
-            <div className="text-center space-y-1.5 z-10">
-              <h3 className="text-2xl font-black text-emerald-400 tracking-tight font-sans">
-                Verified
-              </h3>
-              <p className="text-xs text-slate-300 font-medium">ورود با موفقیت انجام شد</p>
-              <span className="text-[10px] text-slate-500 font-mono block pt-1">
-                در حال انتقال به صفحه اصلی...
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-`);
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۵. افزودن آیکون و منوی پروفایل کاربر در هدر فروشگاه (components/Header.tsx)
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('components/Header.tsx', `"use client";
-
-import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
-import { siteInfoService, SiteInfo, DEFAULT_SITE_INFO } from "@/services/siteInfoService";
-import { productService, Product } from "@/services/productService";
-import { categoryService, Category } from "@/services/categoryService";
-import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
-import { formatPrice } from "@/lib/formatters";
-import AnimatedLogo from "@/components/AnimatedLogo";
-
-export default function Header() {
-  const router = useRouter();
-  const cartContext = useCart();
-  const { totalItems, toggleCart, addToCart } = cartContext;
-
-  const [mounted, setMounted] = useState(false);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo>(DEFAULT_SITE_INFO);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
-
-  // استیت‌های حساب کاربری
-  const [userSession, setUserSession] = useState<{ phone: string } | null>(null);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [addedItemMap, setAddedItemMap] = useState<Record<string | number, boolean>>({});
-
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  const checkUserAuth = () => {
-    try {
-      const saved = localStorage.getItem("axon_user_session");
-      if (saved) setUserSession(JSON.parse(saved));
-      else setUserSession(null);
-    } catch {
-      setUserSession(null);
-    }
-  };
-
-  useEffect(() => {
-    setMounted(true);
-    checkUserAuth();
-
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      const isDark = savedTheme !== "light";
-      setIsDarkMode(isDark);
-      if (isDark) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    } catch {}
-
-    const initHeaderData = async () => {
-      try {
-        const [info, prods, cats] = await Promise.all([
-          siteInfoService.getSiteInfo(),
-          productService.getAll(),
-          categoryService.getAll(),
-        ]);
-        if (info) setSiteInfo(info);
-        if (prods) setAllProducts(prods);
-        if (cats) setCategories(cats);
-      } catch {}
-    };
-
-    initHeaderData();
-
-    const handleSiteInfoUpdate = (e: any) => { if (e.detail) setSiteInfo(e.detail); };
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setAllProducts(e.detail);
-    };
-    const handleUserAuthChanged = () => checkUserAuth();
-
-    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
-    window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("user_auth_changed", handleUserAuthChanged);
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) setIsCategoryOpen(false);
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) setIsSearchFocused(false);
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setIsUserMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("user_auth_changed", handleUserAuthChanged);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  const toggleTheme = () => {
-    soundEngine.playClick();
-    const nextDark = !isDarkMode;
-    setIsDarkMode(nextDark);
-    try {
-      localStorage.setItem("theme", nextDark ? "dark" : "light");
-      if (nextDark) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    } catch {}
-  };
-
-  useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults([]); return; }
-    const q = searchQuery.toLowerCase().trim();
-    userBehavior.trackSearch(q);
-    const matches = allProducts.filter((p) =>
-      (p.title || p.name || "").toLowerCase().includes(q) ||
-      (p.category || "").toLowerCase().includes(q)
-    );
-    setSearchResults(matches.slice(0, 5));
-  }, [searchQuery, allProducts]);
-
-  const handleSelectCategory = (catName: string) => {
-    soundEngine.playClick();
-    setIsCategoryOpen(false);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("category_selected", { detail: catName }));
-    }
-    router.push("/#products");
-  };
-
-  const handleQuickAddFromSearch = (e: React.MouseEvent, product: Product) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playAddToCart();
-    addToCart({
-      id: product.id,
-      title: product.title || product.name || "کالای دیجیتال",
-      name: product.title || product.name || "کالای دیجیتال",
-      price: Number(product.discountPrice ?? product.price ?? 0),
-      discountPrice: product.discountPrice ? Number(product.discountPrice) : undefined,
-      image: product.images?.[0] || product.image || "/placeholder.png",
-      stock: Number(product.stock ?? 10),
-      category: product.category || "عمومی",
-      quantity: 1,
-    });
-    setAddedItemMap((prev) => ({ ...prev, [product.id]: true }));
-    setTimeout(() => setAddedItemMap((prev) => ({ ...prev, [product.id]: false })), 1500);
-  };
-
-  const handleUserLogout = () => {
-    soundEngine.playClick();
-    localStorage.removeItem("axon_user_session");
-    setUserSession(null);
-    setIsUserMenuOpen(false);
-  };
-
-  const navLinks = [
-    { title: "کاتالوگ محصولات", href: "/#products" },
-    { title: "اخبار تکنولوژی", href: "/news" },
-    { title: "مجله سئو", href: "/blog" },
-    { title: "پیگیری سفارش", href: "/track-order" },
-    { title: "تماس با ما", href: "/contact" },
-  ];
-
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
-  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
-
-  return (
-    <header className="sticky top-2 sm:top-3 z-50 w-full max-w-[1440px] mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
-      <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-3 flex items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-3">
-          
-          <div className="relative" ref={categoryDropdownRef}>
-            <button
-              onClick={() => { soundEngine.playClick(); setIsCategoryOpen(!isCategoryOpen); }}
-              className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm transition cursor-pointer text-[var(--text-primary)] shadow-sm"
-              title="دسته‌بندی‌های کالا"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-            </button>
-
-            {isCategoryOpen && (
-              <div className="absolute top-12 right-0 w-64 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 bg-[var(--modal-bg)]">
-                <button
-                  onClick={() => handleSelectCategory("all")}
-                  className="w-full text-right p-2.5 rounded-xl text-xs font-black text-[var(--text-primary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                >
-                  ⚡ تمامی محصولات
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id || cat.name}
-                    onClick={() => handleSelectCategory(cat.name)}
-                    className="w-full text-right p-2.5 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-blue)] hover:text-white transition cursor-pointer"
-                  >
-                    🏷️ {cat.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <Link href="/" className="flex items-center gap-3 group">
-            <AnimatedLogo customLogoUrl={logoUrl} size={38} />
-            <div className="text-xl font-black text-[var(--text-primary)] tracking-tight group-hover:text-[var(--accent-blue)] transition">{storeName}</div>
-          </Link>
-        </div>
-
-        <nav className="hidden lg:flex items-center gap-7 text-sm opacity-85">
-          {navLinks.map((link, idx) => (
-            <Link key={idx} href={link.href} className="hover:opacity-100 hover:text-[var(--accent-blue)] transition font-bold text-[var(--text-primary)]">
-              {link.title}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="relative hidden sm:block" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] focus-within:border-[var(--accent-blue)] transition w-48 lg:w-56">
-              <span className="text-xs opacity-70">🔍</span>
-              <input type="text" placeholder="جستجوی کالا..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} className="bg-transparent border-none outline-none text-xs w-full text-[var(--text-primary)] placeholder-slate-400 font-bold" />
-            </div>
-            {isSearchFocused && searchResults.length > 0 && (
-              <div className="absolute top-12 left-0 p-2 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-1 w-72 bg-[var(--modal-bg)]">
-                {searchResults.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--input-bg)] transition gap-2">
-                    <Link href={"/products/" + p.id} onClick={() => setIsSearchFocused(false)} className="flex items-center gap-2 flex-1 min-w-0">
-                      <img src={p.images?.[0] || p.image || "/placeholder.png"} alt="" className="w-8 h-8 object-contain rounded-lg bg-white/5 p-0.5 shrink-0" />
-                      <div className="flex-1 min-w-0 text-right">
-                        <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{p.title || p.name}</h4>
-                        <span className="font-mono font-black text-[10px] text-[var(--accent-blue)]">{formatPrice(p.discountPrice || p.price || 0)} ت</span>
-                      </div>
-                    </Link>
-                    <button type="button" onClick={(e) => handleQuickAddFromSearch(e, p)} className="px-2 py-1 rounded-lg text-[10px] font-black bg-[var(--accent-blue)] text-white">
-                      {addedItemMap[p.id] ? "✓" : "+"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* آیکون و کنترلر ورود و حساب کاربری کاربر */}
-          <div className="relative" ref={userMenuRef}>
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                if (userSession) {
-                  setIsUserMenuOpen(!isUserMenuOpen);
-                } else {
-                  router.push("/login");
-                }
-              }}
-              className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)] relative active:scale-95"
-              title={userSession ? \`حساب کاربری: \${userSession.phone}\` : "ورود به حساب کاربری"}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-
-              {userSession && (
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute top-1 right-1 border-2 border-[var(--modal-bg)] shadow-md" />
-              )}
-            </button>
-
-            {isUserMenuOpen && userSession && (
-              <div className="absolute top-12 left-0 w-52 p-3 rounded-2xl glass-morphism shadow-2xl z-50 animate-fadeIn space-y-2.5 bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs text-right">
-                <div className="border-b border-[var(--card-border)] pb-2">
-                  <span className="text-[10px] text-[var(--text-secondary)] block">حساب متصل:</span>
-                  <span className="font-mono font-black text-[var(--text-primary)] text-xs" dir="ltr">
-                    {userSession.phone}
-                  </span>
-                </div>
-
-                <Link
-                  href="/track-order"
-                  onClick={() => setIsUserMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 rounded-xl hover:bg-[var(--input-bg)] font-bold transition text-[var(--text-primary)]"
-                >
-                  <span>📦</span>
-                  <span>پیگیری سفارشات من</span>
-                </Link>
-
-                <button
-                  onClick={handleUserLogout}
-                  className="w-full text-right flex items-center gap-2 p-2 rounded-xl text-rose-500 hover:bg-rose-500/15 font-bold transition cursor-pointer"
-                >
-                  <span>🚪</span>
-                  <span>خروج از حساب</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={toggleTheme}
-            className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition cursor-pointer flex items-center justify-center shrink-0 shadow-sm text-[var(--text-primary)] active:scale-95"
-            title={isDarkMode ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
-            suppressHydrationWarning
-          >
-            {mounted ? (
-              isDarkMode ? (
-                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-              ) : (
-                <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-              )
-            ) : (
-              <span className="w-4 h-4" />
-            )}
-          </button>
-
-          <button onClick={() => { soundEngine.playClick(); toggleCart(); }} className="p-2 opacity-80 hover:opacity-100 transition relative cursor-pointer text-[var(--text-primary)]" title="سبد خرید">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-            {mounted && totalItems > 0 && (
-              <span className="absolute top-0 right-0 w-4 h-4 bg-[var(--accent-blue)] rounded-full text-[10px] font-mono font-black flex items-center justify-center text-white shadow-lg animate-pulse" suppressHydrationWarning>
-                {totalItems}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-    </header>
-  );
-}
-`);
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۶. افزودن استودیوی مدیریت دک‌های ورود و پین‌های امنیتی به پنل ادمین (components/AdminAccountsManager.tsx)
+// ۵. مدیریت کامل حساب‌ها و استودیوی دک‌های ورود با ذخیره‌سازی قطعی دیتابیس (components/AdminAccountsManager.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 updateFile('components/AdminAccountsManager.tsx', `"use client";
 
 import React, { useState, useEffect } from "react";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
-import { siteInfoService, SiteInfo, DEFAULT_AUTH_SECURITY_CONFIG, AuthSecurityConfig } from "@/services/siteInfoService";
+import { siteInfoService, DEFAULT_AUTH_SECURITY_CONFIG, AuthSecurityConfig } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
 import { realtimeEngine } from "@/lib/realtimeSync";
 
@@ -1631,7 +663,6 @@ export default function AdminAccountsManager() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  // استیت‌های ایجاد و ویرایش ادمین
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmNewUserPassword, setConfirmNewUserPassword] = useState("");
@@ -1645,7 +676,6 @@ export default function AdminAccountsManager() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // استیت‌های استودیوی کنترل دک‌های ورود و پین
   const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
   const [savingDeck, setSavingDeck] = useState(false);
 
@@ -1799,10 +829,10 @@ export default function AdminAccountsManager() {
 
       if (updated) {
         soundEngine.playSuccess();
-        showToast("⚡ تنظیمات پین امنیتی، تعداد ارقام اسلات‌ها و دک‌های ورود با موفقیت ذخیره و فعال شدند.", "success");
+        showToast("⚡ تمامی تنظیمات پین امنیتی، طول اسلات‌ها و دک‌های ورود با موفقیت در دیتابیس ثبت و فعال شدند.", "success");
       }
     } catch {
-      showToast("خطا در ذخیره تنظیمات دک‌های ورود.", "error");
+      showToast("خطا در ذخیره دیتابیس.", "error");
     } finally {
       setSavingDeck(false);
     }
@@ -1821,7 +851,7 @@ export default function AdminAccountsManager() {
         </div>
       )}
 
-      {/* ناوبری زیرمجموعه: حساب‌های کاربری vs استودیوی دک‌های ورود و پین */}
+      {/* ناوبری زیرمجموعه */}
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] w-fit">
         <button
           type="button"
@@ -1851,7 +881,6 @@ export default function AdminAccountsManager() {
 
       {activeSubTab === "admins" ? (
         <>
-          {/* فرم ثبت مدیر جدید */}
           <form onSubmit={handleCreateAdmin} className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
             <h4 className="font-black text-xs text-[var(--text-primary)]">➕ ثبت مدیر جدید</h4>
 
@@ -1928,7 +957,6 @@ export default function AdminAccountsManager() {
             </div>
           </form>
 
-          {/* لیست مدیران */}
           <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
             <table className="w-full text-right text-xs min-w-[600px]">
               <thead>
@@ -1945,7 +973,7 @@ export default function AdminAccountsManager() {
                     <td className="py-3 px-2 font-bold text-[var(--text-primary)]">{adm.full_name || "بدون نام"}</td>
                     <td className="py-3 px-2 font-mono font-bold text-[var(--accent-blue)]">{adm.username}</td>
                     <td className="py-3 px-2">{adm.role}</td>
-                    <td className="py-3 px-2 text-center flex items-center justify-center gap-2">
+                    <td className="py-3 px-2 text-center">
                       <button
                         onClick={() => {
                           soundEngine.playClick();
@@ -1955,7 +983,7 @@ export default function AdminAccountsManager() {
                         }}
                         className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold transition cursor-pointer"
                       >
-                        ✏️ ویرایش رمز
+                        ✏️ ویرایش مشخصات و رمز
                       </button>
                     </td>
                   </tr>
@@ -1967,7 +995,6 @@ export default function AdminAccountsManager() {
       ) : (
         /* استودیوی کنترل دک‌های ورود و پین‌های امنیتی */
         <form onSubmit={handleSaveSecurityStudio} className="space-y-6">
-          {/* ۱. تنظیمات دک ورود ادمین (/admin/login) */}
           <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
             <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-3">
               <span className="w-10 h-10 rounded-2xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-lg font-black">
@@ -1977,7 +1004,7 @@ export default function AdminAccountsManager() {
                 <h3 className="font-black text-sm text-[var(--text-primary)]">
                   ۱. مدیریت دک ورود ادمین (/admin/login - Component 100)
                 </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">تغییر پین ورود، تعداد ارقام اسلات‌ها (۴، ۵ یا ۶ رقم) و متون</p>
+                <p className="text-[11px] text-[var(--text-secondary)]">تغییر پین ورود، تعداد ارقام اسلات‌ها (۴، ۶ یا ۸ رقم) و متون</p>
               </div>
             </div>
 
@@ -2011,8 +1038,8 @@ export default function AdminAccountsManager() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] cursor-pointer"
                 >
                   <option value={4}>۴ رقمی (استاندارد ویدیو)</option>
-                  <option value={5}>۵ رقمی</option>
-                  <option value={6}>۶ رقمی (حداکثر امنیت)</option>
+                  <option value={6}>۶ رقمی (امنیت بالا)</option>
+                  <option value={8}>۸ رقمی (حداکثر امنیت)</option>
                 </select>
               </div>
 
@@ -2046,7 +1073,7 @@ export default function AdminAccountsManager() {
                 />
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">زیرعنوان توضیحات:</label>
                 <input
                   type="text"
@@ -2059,24 +1086,6 @@ export default function AdminAccountsManager() {
                   }
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)]"
                 />
-              </div>
-
-              <div className="flex items-center gap-2 pt-6">
-                <input
-                  type="checkbox"
-                  id="showQuickPinBtn"
-                  checked={securityConfig.adminDeck.showQuickPinButton}
-                  onChange={(e) =>
-                    setSecurityConfig({
-                      ...securityConfig,
-                      adminDeck: { ...securityConfig.adminDeck, showQuickPinButton: e.target.checked },
-                    })
-                  }
-                  className="w-4 h-4 rounded text-[var(--accent-blue)]"
-                />
-                <label htmlFor="showQuickPinBtn" className="font-bold text-xs cursor-pointer">
-                  نمایش کلید ورود خودکار با پین
-                </label>
               </div>
             </div>
           </div>
@@ -2091,7 +1100,7 @@ export default function AdminAccountsManager() {
                 <h3 className="font-black text-sm text-[var(--text-primary)]">
                   ۲. مدیریت دک ورود کاربران و خریداران (/login)
                 </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">تنظیم تعداد ارقام OTP پیامکی، کد تستی سریع و عنوان‌ها</p>
+                <p className="text-[11px] text-[var(--text-secondary)]">تنظیم تعداد ارقام OTP پیامکی (۴، ۶ یا ۸ رقم)، کد تستی سریع و عنوان‌ها</p>
               </div>
             </div>
 
@@ -2109,8 +1118,8 @@ export default function AdminAccountsManager() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] cursor-pointer"
                 >
                   <option value={4}>۴ رقم (مطابق ویدیو)</option>
-                  <option value={5}>۵ رقم</option>
-                  <option value={6}>۶ رقم</option>
+                  <option value={6}>۶ رقم (استاندارد بانکی)</option>
+                  <option value={8}>۸ رقم</option>
                 </select>
               </div>
 
@@ -2130,22 +1139,19 @@ export default function AdminAccountsManager() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-6">
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">عنوان کارت کاربر:</label>
                 <input
-                  type="checkbox"
-                  id="showTestOtpBtn"
-                  checked={securityConfig.userDeck.showTestCodeHint}
+                  type="text"
+                  value={securityConfig.userDeck.title}
                   onChange={(e) =>
                     setSecurityConfig({
                       ...securityConfig,
-                      userDeck: { ...securityConfig.userDeck, showTestCodeHint: e.target.checked },
+                      userDeck: { ...securityConfig.userDeck, title: e.target.value },
                     })
                   }
-                  className="w-4 h-4 rounded text-[var(--accent-blue)]"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)]"
                 />
-                <label htmlFor="showTestOtpBtn" className="font-bold text-xs cursor-pointer">
-                  نمایش راهنما و کلید ورود خودکار
-                </label>
               </div>
             </div>
           </div>
@@ -2157,13 +1163,12 @@ export default function AdminAccountsManager() {
               className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-xl disabled:opacity-50 flex items-center gap-2"
             >
               <span>💾</span>
-              <span>{savingDeck ? "در حال ثبت تغییرات..." : "ذخیره و فعال‌سازی سراسری دک‌های امنیتی"}</span>
+              <span>{savingDeck ? "در حال ثبت در دیتابیس..." : "ذخیره و فعال‌سازی سراسری دک‌های امنیتی"}</span>
             </button>
           </div>
         </form>
       )}
 
-      {/* مودال ویرایش ادمین */}
       {editingAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
           <form onSubmit={handleUpdateAdmin} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs">
@@ -2205,7 +1210,7 @@ export default function AdminAccountsManager() {
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۷. اتوماسیون کامل Git: استیج خودکار، کامیت و Push مستقیم به مخزن و استقرار روی Vercel
+// ۶. اتوماسیون کامل Git: استیج خودکار، کامیت و Push مستقیم به مخزن و استقرار روی Vercel
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
 console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🚀 آغاز فرآیند خودکار استیج، کامیت و استقرار نهایی در Git/GitHub/Vercel');
@@ -2216,7 +1221,7 @@ try {
   execSync('git add .', { stdio: 'inherit' });
 
   console.log('\n  \x1b[34m[2/3]\x1b[0m در حال ثبت کامیت ساختاری (git commit)...');
-  const commitMessage = `feat(auth): complete admin control over security deck pins & dynamic slot length with header profile [${new Date().toLocaleTimeString('fa-IR')}]`;
+  const commitMessage = `feat(security): permanent database persistence for auth deck, eye toggle, slot merge reaction & auto day-night theme [${new Date().toLocaleTimeString('fa-IR')}]`;
   try {
     execSync(`git commit -m "${commitMessage}"`, { stdio: 'inherit' });
   } catch (cErr) {
@@ -2232,7 +1237,7 @@ try {
   execSync(`git push origin ${currentBranch}`, { stdio: 'inherit' });
 
   console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 استودیوی کنترل دک‌های ورود، پین‌های امنیتی و آیکون پروفایل هدر با موفقیت ۱۰۰٪ مستقر گردید!');
+  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 تمامی اصلاحات با موفقیت ۱۰۰٪ اعمال و بر روی سرور Vercel مستقر گردید!');
   console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 } catch (gitErr) {
   console.error('\n\x1b[31m[ERROR]\x1b[0m خطا در اتصال Git:', gitErr.message);

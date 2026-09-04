@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { adminAuthService, AdminUser, AdminRole } from "@/services/adminAuthService";
-import { siteInfoService, SiteInfo, DEFAULT_AUTH_SECURITY_CONFIG, AuthSecurityConfig } from "@/services/siteInfoService";
+import { siteInfoService, DEFAULT_AUTH_SECURITY_CONFIG, AuthSecurityConfig } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
 import { realtimeEngine } from "@/lib/realtimeSync";
 
@@ -14,7 +14,6 @@ export default function AdminAccountsManager() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  // استیت‌های ایجاد و ویرایش ادمین
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmNewUserPassword, setConfirmNewUserPassword] = useState("");
@@ -28,7 +27,6 @@ export default function AdminAccountsManager() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // استیت‌های استودیوی کنترل دک‌های ورود و پین
   const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
   const [savingDeck, setSavingDeck] = useState(false);
 
@@ -182,10 +180,10 @@ export default function AdminAccountsManager() {
 
       if (updated) {
         soundEngine.playSuccess();
-        showToast("⚡ تنظیمات پین امنیتی، تعداد ارقام اسلات‌ها و دک‌های ورود با موفقیت ذخیره و فعال شدند.", "success");
+        showToast("⚡ تمامی تنظیمات پین امنیتی، طول اسلات‌ها و دک‌های ورود با موفقیت در دیتابیس ثبت و فعال شدند.", "success");
       }
     } catch {
-      showToast("خطا در ذخیره تنظیمات دک‌های ورود.", "error");
+      showToast("خطا در ذخیره دیتابیس.", "error");
     } finally {
       setSavingDeck(false);
     }
@@ -204,7 +202,7 @@ export default function AdminAccountsManager() {
         </div>
       )}
 
-      {/* ناوبری زیرمجموعه: حساب‌های کاربری vs استودیوی دک‌های ورود و پین */}
+      {/* ناوبری زیرمجموعه */}
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] w-fit">
         <button
           type="button"
@@ -234,7 +232,6 @@ export default function AdminAccountsManager() {
 
       {activeSubTab === "admins" ? (
         <>
-          {/* فرم ثبت مدیر جدید */}
           <form onSubmit={handleCreateAdmin} className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
             <h4 className="font-black text-xs text-[var(--text-primary)]">➕ ثبت مدیر جدید</h4>
 
@@ -311,7 +308,6 @@ export default function AdminAccountsManager() {
             </div>
           </form>
 
-          {/* لیست مدیران */}
           <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
             <table className="w-full text-right text-xs min-w-[600px]">
               <thead>
@@ -328,7 +324,7 @@ export default function AdminAccountsManager() {
                     <td className="py-3 px-2 font-bold text-[var(--text-primary)]">{adm.full_name || "بدون نام"}</td>
                     <td className="py-3 px-2 font-mono font-bold text-[var(--accent-blue)]">{adm.username}</td>
                     <td className="py-3 px-2">{adm.role}</td>
-                    <td className="py-3 px-2 text-center flex items-center justify-center gap-2">
+                    <td className="py-3 px-2 text-center">
                       <button
                         onClick={() => {
                           soundEngine.playClick();
@@ -338,7 +334,7 @@ export default function AdminAccountsManager() {
                         }}
                         className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold transition cursor-pointer"
                       >
-                        ✏️ ویرایش رمز
+                        ✏️ ویرایش مشخصات و رمز
                       </button>
                     </td>
                   </tr>
@@ -350,7 +346,6 @@ export default function AdminAccountsManager() {
       ) : (
         /* استودیوی کنترل دک‌های ورود و پین‌های امنیتی */
         <form onSubmit={handleSaveSecurityStudio} className="space-y-6">
-          {/* ۱. تنظیمات دک ورود ادمین (/admin/login) */}
           <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
             <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-3">
               <span className="w-10 h-10 rounded-2xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-lg font-black">
@@ -360,7 +355,7 @@ export default function AdminAccountsManager() {
                 <h3 className="font-black text-sm text-[var(--text-primary)]">
                   ۱. مدیریت دک ورود ادمین (/admin/login - Component 100)
                 </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">تغییر پین ورود، تعداد ارقام اسلات‌ها (۴، ۵ یا ۶ رقم) و متون</p>
+                <p className="text-[11px] text-[var(--text-secondary)]">تغییر پین ورود، تعداد ارقام اسلات‌ها (۴، ۶ یا ۸ رقم) و متون</p>
               </div>
             </div>
 
@@ -394,8 +389,8 @@ export default function AdminAccountsManager() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] cursor-pointer"
                 >
                   <option value={4}>۴ رقمی (استاندارد ویدیو)</option>
-                  <option value={5}>۵ رقمی</option>
-                  <option value={6}>۶ رقمی (حداکثر امنیت)</option>
+                  <option value={6}>۶ رقمی (امنیت بالا)</option>
+                  <option value={8}>۸ رقمی (حداکثر امنیت)</option>
                 </select>
               </div>
 
@@ -429,7 +424,7 @@ export default function AdminAccountsManager() {
                 />
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">زیرعنوان توضیحات:</label>
                 <input
                   type="text"
@@ -442,24 +437,6 @@ export default function AdminAccountsManager() {
                   }
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)]"
                 />
-              </div>
-
-              <div className="flex items-center gap-2 pt-6">
-                <input
-                  type="checkbox"
-                  id="showQuickPinBtn"
-                  checked={securityConfig.adminDeck.showQuickPinButton}
-                  onChange={(e) =>
-                    setSecurityConfig({
-                      ...securityConfig,
-                      adminDeck: { ...securityConfig.adminDeck, showQuickPinButton: e.target.checked },
-                    })
-                  }
-                  className="w-4 h-4 rounded text-[var(--accent-blue)]"
-                />
-                <label htmlFor="showQuickPinBtn" className="font-bold text-xs cursor-pointer">
-                  نمایش کلید ورود خودکار با پین
-                </label>
               </div>
             </div>
           </div>
@@ -474,7 +451,7 @@ export default function AdminAccountsManager() {
                 <h3 className="font-black text-sm text-[var(--text-primary)]">
                   ۲. مدیریت دک ورود کاربران و خریداران (/login)
                 </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">تنظیم تعداد ارقام OTP پیامکی، کد تستی سریع و عنوان‌ها</p>
+                <p className="text-[11px] text-[var(--text-secondary)]">تنظیم تعداد ارقام OTP پیامکی (۴، ۶ یا ۸ رقم)، کد تستی سریع و عنوان‌ها</p>
               </div>
             </div>
 
@@ -492,8 +469,8 @@ export default function AdminAccountsManager() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)] cursor-pointer"
                 >
                   <option value={4}>۴ رقم (مطابق ویدیو)</option>
-                  <option value={5}>۵ رقم</option>
-                  <option value={6}>۶ رقم</option>
+                  <option value={6}>۶ رقم (استاندارد بانکی)</option>
+                  <option value={8}>۸ رقم</option>
                 </select>
               </div>
 
@@ -513,22 +490,19 @@ export default function AdminAccountsManager() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-6">
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">عنوان کارت کاربر:</label>
                 <input
-                  type="checkbox"
-                  id="showTestOtpBtn"
-                  checked={securityConfig.userDeck.showTestCodeHint}
+                  type="text"
+                  value={securityConfig.userDeck.title}
                   onChange={(e) =>
                     setSecurityConfig({
                       ...securityConfig,
-                      userDeck: { ...securityConfig.userDeck, showTestCodeHint: e.target.checked },
+                      userDeck: { ...securityConfig.userDeck, title: e.target.value },
                     })
                   }
-                  className="w-4 h-4 rounded text-[var(--accent-blue)]"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-[var(--text-primary)]"
                 />
-                <label htmlFor="showTestOtpBtn" className="font-bold text-xs cursor-pointer">
-                  نمایش راهنما و کلید ورود خودکار
-                </label>
               </div>
             </div>
           </div>
@@ -540,13 +514,12 @@ export default function AdminAccountsManager() {
               className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-xl disabled:opacity-50 flex items-center gap-2"
             >
               <span>💾</span>
-              <span>{savingDeck ? "در حال ثبت تغییرات..." : "ذخیره و فعال‌سازی سراسری دک‌های امنیتی"}</span>
+              <span>{savingDeck ? "در حال ثبت در دیتابیس..." : "ذخیره و فعال‌سازی سراسری دک‌های امنیتی"}</span>
             </button>
           </div>
         </form>
       )}
 
-      {/* مودال ویرایش ادمین */}
       {editingAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn font-sans">
           <form onSubmit={handleUpdateAdmin} className="max-w-md w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-4 shadow-2xl text-[var(--text-primary)] text-xs">

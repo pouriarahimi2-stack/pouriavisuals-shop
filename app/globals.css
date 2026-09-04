@@ -60,11 +60,6 @@ body {
   box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.5);
 }
 
-.glass-morphism:hover {
-  border-color: var(--card-border-hover);
-  box-shadow: 0 14px 45px 0 var(--accent-glow);
-}
-
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
@@ -83,120 +78,51 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   🛒 کی‌فریم‌های انیمیشن چرخ‌دستی و بسته و حرکت به چپ (Kinetic Left Drive)
+   ⚡ بارقه نوری دور کادر اسلات‌ها (Laser Spark Runner)
    ══════════════════════════════════════════════════════════════════════════════ */
 
-@keyframes kineticItemDropCenter {
+@keyframes sparkTravel {
   0% {
-    transform: translateY(-38px) scale(0.6);
-    opacity: 0;
-  }
-  45% {
-    opacity: 1;
-    transform: translateY(-4px) scale(1.08);
-  }
-  75% {
-    transform: translateY(2px) scale(0.96);
+    stroke-dashoffset: 1;
   }
   100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
+    stroke-dashoffset: 0;
   }
 }
 
-@keyframes kineticCartDriveToLeft {
-  0% {
-    transform: translateX(0);
-  }
-  38% {
-    transform: translateX(0) rotate(0deg);
-  }
-  44% {
-    transform: translateX(5px) rotate(3deg);
-  }
-  64% {
-    transform: translateX(-180px) rotate(-6deg);
-    opacity: 0;
-  }
-  65% {
-    transform: translateX(180px) rotate(6deg);
-    opacity: 0;
-  }
-  84% {
-    opacity: 1;
-    transform: translateX(8px) rotate(-2deg);
-  }
-  92% {
-    transform: translateX(-2px) rotate(1deg);
-  }
-  100% {
-    transform: translateX(0) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-@keyframes kineticWheelSpinToLeft {
-  0% {
-    transform: rotate(0deg);
-  }
-  42% {
-    transform: rotate(0deg);
-  }
-  64% {
-    transform: rotate(-720deg);
-  }
-  100% {
-    transform: rotate(-1440deg);
-  }
-}
-
-@keyframes kineticCounterBump {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.35) translateY(-2px);
-    color: #10b981;
-  }
-  70% {
-    transform: scale(0.95) translateY(1px);
-  }
-  100% {
-    transform: scale(1) translateY(0);
-  }
-}
-
-.animate-kinetic-item-drop {
-  animation: kineticItemDropCenter 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-.animate-kinetic-cart-left {
-  animation: kineticCartDriveToLeft 1.25s cubic-bezier(0.45, 0, 0.55, 1) forwards;
-}
-
-.animate-kinetic-wheel-left {
-  animation: kineticWheelSpinToLeft 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-
-.animate-kinetic-counter-bump {
-  animation: kineticCounterBump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+.laser-spark-path {
+  stroke-dasharray: 0.25 0.75;
+  animation: sparkTravel 2.4s linear infinite;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   🎹 کی‌فریم‌های داک مکانیکی ۳D کلیدهای فوتر (Video 1 True Mechanical Keycaps)
+   🎴 انیمیشن ادغام اسلات‌ها در یک کارت مرکزی (Slot Merge Physics)
    ══════════════════════════════════════════════════════════════════════════════ */
 
-.keycap-dock-tray {
-  perspective: 1200px;
+@keyframes deckMergePulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1.05);
+  }
 }
 
-.keycap-3d-item {
-  transform-style: preserve-3d;
-  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.38s ease;
+/* امواج راداری سبز نئونی برای مربع تایید نهایی */
+@keyframes greenRadarWave {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
 }
 
-.keycap-3d-item:hover,
-.keycap-3d-item:active {
-  transform: translate3d(0, -28px, 22px) scale(1.18) rotateY(180deg);
-  z-index: 50;
+.animate-green-radar {
+  animation: greenRadarWave 1.8s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }

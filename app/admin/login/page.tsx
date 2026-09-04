@@ -12,10 +12,10 @@ export default function AdminLoginPage() {
   const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
   const [pinLength, setPinLength] = useState<number>(4);
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
-  const [showPinMask, setShowPinMask] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number>(0);
 
-  const [isMerging, setIsMerging] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
+  // فازهای انیمیشن: idle -> merging (ادغام اسلات‌ها) -> verified (تبدیل به مربع سبز نئونی)
+  const [animPhase, setAnimPhase] = useState<"idle" | "merging" | "verified">("idle");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -40,10 +40,10 @@ export default function AdminLoginPage() {
   }, []);
 
   useEffect(() => {
-    if (authMode === "pin" && !isVerified && !isMerging) {
+    if (authMode === "pin" && animPhase === "idle") {
       inputRefs.current[0]?.focus();
     }
-  }, [authMode, isVerified, isMerging, pinLength]);
+  }, [authMode, animPhase, pinLength]);
 
   const handleDigitChange = (index: number, val: string) => {
     const clean = val.replace(/\D/g, "").slice(-1);
@@ -54,24 +54,28 @@ export default function AdminLoginPage() {
     setErrorMessage(null);
 
     if (clean && index < pinLength - 1) {
+      setFocusedIndex(index + 1);
       inputRefs.current[index + 1]?.focus();
     }
 
     if (newDigits.every((d) => d.length === 1)) {
-      triggerPinVerification(newDigits.join(""));
+      triggerVerificationSequence(newDigits.join(""));
     }
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !digits[index] && index > 0) {
+      setFocusedIndex(index - 1);
       inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const triggerPinVerification = async (pinCode: string) => {
+  const triggerVerificationSequence = async (pinCode: string) => {
     setLoading(true);
     soundEngine.playClick();
-    setIsMerging(true);
+
+    // فاز ۱: ادغام اسلات‌ها در یک کارت مرکزی (Merge & Collapse مطابق ویدیو)
+    setAnimPhase("merging");
 
     const targetPin = securityConfig.adminDeck.pin || "1234";
 
@@ -85,7 +89,6 @@ export default function AdminLoginPage() {
       const data = await res.json();
 
       if ((res.ok && data.success) || pinCode === targetPin || pinCode === "1234") {
-        soundEngine.playSuccess();
         const userObj = data.user || {
           id: "admin_master",
           username: "admin",
@@ -94,39 +97,44 @@ export default function AdminLoginPage() {
         };
         localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(userObj));
 
+        // فاز ۲: پس از ۴۵۰ میلی‌ثانیه ادغام -> تبدیل به مربع سبز نئونی و تایید (Verified Box)
         setTimeout(() => {
-          setIsVerified(true);
-        }, 400);
+          soundEngine.playSuccess();
+          setAnimPhase("verified");
+        }, 450);
 
+        // هدایت نهایی پس از نمایش انیمیشن تایید
         setTimeout(() => {
           window.location.href = "/admin";
-        }, 1800);
+        }, 1850);
       } else {
         setTimeout(() => {
-          setIsMerging(false);
+          setAnimPhase("idle");
           setErrorMessage(data.message || "پین امنیتی وارد شده نادرست است.");
           setDigits(Array(pinLength).fill(""));
+          setFocusedIndex(0);
           inputRefs.current[0]?.focus();
           setLoading(false);
-        }, 500);
+        }, 550);
       }
     } catch {
       if (pinCode === targetPin || pinCode === "1234") {
-        soundEngine.playSuccess();
         setTimeout(() => {
-          setIsVerified(true);
-        }, 400);
+          soundEngine.playSuccess();
+          setAnimPhase("verified");
+        }, 450);
         setTimeout(() => {
           window.location.href = "/admin";
-        }, 1800);
+        }, 1850);
       } else {
         setTimeout(() => {
-          setIsMerging(false);
-          setErrorMessage("کد امنیتی نادرست است.");
+          setAnimPhase("idle");
+          setErrorMessage("کد امنیتی اشتباه است.");
           setDigits(Array(pinLength).fill(""));
+          setFocusedIndex(0);
           inputRefs.current[0]?.focus();
           setLoading(false);
-        }, 500);
+        }, 550);
       }
     }
   };
@@ -151,7 +159,7 @@ export default function AdminLoginPage() {
         if (data.user) {
           localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(data.user));
         }
-        setIsVerified(true);
+        setAnimPhase("verified");
         setTimeout(() => {
           window.location.href = "/admin";
         }, 1600);
@@ -162,7 +170,7 @@ export default function AdminLoginPage() {
     } catch {
       if (username.trim() === "admin" && (password.trim() === "admin123456" || password.trim() === "1234")) {
         soundEngine.playSuccess();
-        setIsVerified(true);
+        setAnimPhase("verified");
         setTimeout(() => {
           window.location.href = "/admin";
         }, 1600);
@@ -188,154 +196,183 @@ export default function AdminLoginPage() {
 
       <div className="relative w-full max-w-sm sm:max-w-md min-h-[480px] [perspective:1200px]">
         <div
-          className={`w-full h-full min-h-[480px] rounded-[2.8rem] transition-all duration-700 [transform-style:preserve-3d] shadow-2xl border relative ${
-            isVerified
-              ? "[transform:rotateY(180deg)] border-emerald-500/80 shadow-[0_0_60px_rgba(16,185,129,0.35)] bg-slate-950 text-white"
+          className={`w-full h-full min-h-[480px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-8 sm:p-10 ${
+            animPhase === "verified"
+              ? "border-emerald-500/80 shadow-[0_0_80px_rgba(16,185,129,0.35)] bg-slate-950 text-white"
               : "border-[var(--card-border)] bg-[var(--modal-bg)] backdrop-blur-3xl"
           }`}
         >
-          <div className="p-8 sm:p-10 space-y-6 [backface-visibility:hidden] flex flex-col justify-between min-h-[480px]">
-            <div className="text-center space-y-2">
-              <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 font-mono font-black text-[10px] uppercase tracking-widest">
-                {adminDeckCfg.badgeText || "COMPONENT • 100"}
-              </span>
-              <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">
-                {authMode === "pin" ? adminDeckCfg.title : "ورود به پیشخوان مدیریت"}
-              </h1>
-              <p className="text-xs text-[var(--text-secondary)] font-medium">
-                {authMode === "pin" ? adminDeckCfg.subtitle : "احراز هویت مدیر ارشد سیستم"}
-              </p>
+          {animPhase === "verified" ? (
+            /* وضعیت نهایی: مربع سبز نئونی با پالس راداری و تیک متحرک (دقیقاً فریم آخر ویدیو) */
+            <div className="h-full flex-1 flex flex-col items-center justify-center space-y-6 animate-fadeIn py-8">
+              <div className="relative flex items-center justify-center">
+                <span className="w-28 h-28 rounded-[2rem] border-2 border-emerald-400/40 absolute animate-green-radar" />
+                <span className="w-36 h-36 rounded-[2.5rem] border border-emerald-500/20 absolute animate-green-radar [animation-delay:0.4s]" />
+
+                {/* مربع سبز نئونی تبدیل‌شده */}
+                <div className="w-20 h-20 rounded-3xl bg-emerald-500 border-2 border-emerald-300 text-slate-950 flex items-center justify-center text-4xl shadow-[0_0_50px_rgba(16,185,129,0.9)] z-10 animate-bounce">
+                  <svg className="w-10 h-10 stroke-current" fill="none" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="text-center space-y-1 z-10 pt-2">
+                <h3 className="text-2xl font-black text-emerald-400 tracking-tight font-sans">
+                  Verified
+                </h3>
+                <p className="text-xs text-slate-300 font-medium">احراز هویت مدیر با موفقیت تایید شد</p>
+                <span className="text-[10px] text-slate-500 font-mono block pt-1">
+                  در حال ورود به پیشخوان مدیریت...
+                </span>
+              </div>
             </div>
-
-            {errorMessage && (
-              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold text-center animate-fadeIn">
-                ⚠️ {errorMessage}
+          ) : (
+            /* وضعیت در حال ورود و اسلات‌های بارقه نوری لیزری */
+            <>
+              <div className="text-center space-y-2">
+                <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 font-mono font-black text-[10px] uppercase tracking-widest">
+                  {adminDeckCfg.badgeText || "COMPONENT • 100"}
+                </span>
+                <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">
+                  {authMode === "pin" ? adminDeckCfg.title : "ورود به پیشخوان مدیریت"}
+                </h1>
+                <p className="text-xs text-[var(--text-secondary)] font-medium">
+                  {authMode === "pin" ? adminDeckCfg.subtitle : "احراز هویت مدیر ارشد سیستم"}
+                </p>
               </div>
-            )}
 
-            {authMode === "pin" ? (
-              <div className="space-y-6">
-                <div
-                  className={`flex justify-center transition-all duration-500 ${
-                    isMerging ? "gap-0 scale-95 opacity-90 shadow-2xl rounded-2xl" : "gap-2.5 sm:gap-3"
-                  }`}
-                  dir="ltr"
-                >
-                  {digits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => { inputRefs.current[idx] = el; }}
-                      type={showPinMask ? "text" : "password"}
-                      inputMode="numeric"
-                      maxLength={1}
-                      disabled={isMerging}
-                      value={digit}
-                      onChange={(e) => handleDigitChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(idx, e)}
-                      className={`w-12 h-16 sm:w-16 sm:h-20 bg-[var(--input-bg)] border text-center font-mono font-black text-2xl text-[var(--text-primary)] outline-none transition-all duration-300 ${
-                        isMerging
-                          ? "border-cyan-500 first:rounded-l-2xl last:rounded-r-2xl rounded-none bg-cyan-500/15"
-                          : digit
-                          ? "rounded-2xl border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
-                          : "rounded-2xl border-[var(--card-border)] focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/20"
-                      }`}
-                    />
-                  ))}
+              {errorMessage && (
+                <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold text-center animate-fadeIn">
+                  ⚠️ {errorMessage}
                 </div>
+              )}
 
-                <div className="flex justify-center items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { soundEngine.playClick(); setShowPinMask(!showPinMask); }}
-                    className="p-2 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-cyan-500 text-xs font-bold text-[var(--text-secondary)] transition cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span>{showPinMask ? "👁️‍🗨️" : "👁️"}</span>
-                    <span>{showPinMask ? "مخفی کردن پین" : "مشاهده پین واردشده"}</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleCredentialsLogin} className="space-y-4 text-xs">
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری</label>
-                  <input
-                    type="text"
-                    required
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-cyan-500 transition"
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-cyan-500 transition pl-12"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 p-1"
-                    >
-                      {showPassword ? "👁️‍🗨️" : "👁️"}
-                    </button>
+              {authMode === "pin" ? (
+                <div className="space-y-6 my-auto">
+                  {/* ردیف اسلات‌ها با انیمیشن ادغام فیزیکی به مرکز (Slot Merge Physics) */}
+                  <div className="relative flex justify-center items-center h-24" dir="ltr">
+                    {digits.map((digit, idx) => {
+                      const totalSlots = pinLength;
+                      const centerOffset = idx - (totalSlots - 1) / 2;
+                      const isSlotActive = focusedIndex === idx;
+
+                      // محاسبه جابجایی هنگام ادغام: همه اسلات‌ها دقیقا روی مرکز هم انباشته می‌شوند
+                      const mergeTranslateX = animPhase === "merging" ? `${-centerOffset * 56}px` : "0px";
+                      const mergeScale = animPhase === "merging" ? "0.9" : "1";
+                      const mergeOpacity = animPhase === "merging" ? (idx === 0 ? "1" : "0.3") : "1";
+
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            transform: `translateX(${mergeTranslateX}) scale(${mergeScale})`,
+                            opacity: mergeOpacity,
+                            transition: "all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                          }}
+                          className="relative mx-1.5 sm:mx-2"
+                        >
+                          <input
+                            ref={(el) => { inputRefs.current[idx] = el; }}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={1}
+                            disabled={animPhase !== "idle"}
+                            value={digit}
+                            onFocus={() => setFocusedIndex(idx)}
+                            onChange={(e) => handleDigitChange(idx, e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(idx, e)}
+                            className={`w-13 h-16 sm:w-15 sm:h-20 rounded-2xl bg-[var(--input-bg)] border text-center font-mono font-black text-2xl sm:text-3xl text-[var(--text-primary)] outline-none transition-all duration-300 relative z-10 ${
+                              digit
+                                ? "border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
+                                : isSlotActive
+                                ? "border-cyan-500/80 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                                : "border-[var(--card-border)]"
+                            }`}
+                          />
+
+                          {/* بارقه نوری لیزری متحرک دور اسلات فعال (Traveling Laser Spark) */}
+                          {isSlotActive && animPhase === "idle" && (
+                            <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
+                              <rect
+                                x="1"
+                                y="1"
+                                width="96%"
+                                height="96%"
+                                rx="16"
+                                fill="none"
+                                stroke="#22d3ee"
+                                strokeWidth="2.5"
+                                pathLength="1"
+                                className="laser-spark-path drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
+                              />
+                            </svg>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
+              ) : (
+                <form onSubmit={handleCredentialsLogin} className="space-y-4 text-xs my-auto">
+                  <div>
+                    <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری</label>
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-cyan-500 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 font-bold text-[var(--text-secondary)]">کلمه عبور</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)] focus:border-cyan-500 transition pl-12"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 p-1"
+                      >
+                        {showPassword ? "👁️‍🗨️" : "👁️"}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-4 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? "در حال اعتبارسنجی..." : "ورود به پیشخوان مدیریت ←"}
+                  </button>
+                </form>
+              )}
+
+              <div className="pt-4 border-t border-[var(--card-border)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50"
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setAuthMode(authMode === "pin" ? "credentials" : "pin");
+                    setErrorMessage(null);
+                  }}
+                  className="text-cyan-500 dark:text-cyan-400 hover:underline font-bold cursor-pointer"
                 >
-                  {loading ? "در حال اعتبارسنجی..." : "ورود به پیشخوان مدیریت ←"}
+                  {authMode === "pin" ? "ورود با نام کاربری و رمز" : "ورود با پین (Deck)"}
                 </button>
-              </form>
-            )}
 
-            <div className="pt-4 border-t border-[var(--card-border)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playClick();
-                  setAuthMode(authMode === "pin" ? "credentials" : "pin");
-                  setErrorMessage(null);
-                }}
-                className="text-cyan-500 dark:text-cyan-400 hover:underline font-bold cursor-pointer"
-              >
-                {authMode === "pin" ? "ورود با نام کاربری و رمز" : "ورود با پین (Deck)"}
-              </button>
-
-              <Link href="/" className="hover:text-[var(--text-primary)] transition">
-                ← بازگشت به فروشگاه
-              </Link>
-            </div>
-          </div>
-
-          <div className="absolute inset-0 rounded-[2.8rem] p-8 flex flex-col items-center justify-center space-y-6 [transform:rotateY(180deg)] [backface-visibility:hidden] bg-[#070b14] text-white">
-            <div className="relative flex items-center justify-center">
-              <span className="w-24 h-24 rounded-full border-2 border-emerald-400/40 absolute animate-radar-wave" />
-              <span className="w-32 h-32 rounded-full border border-emerald-500/25 absolute animate-radar-wave [animation-delay:0.5s]" />
-
-              <div className="w-20 h-20 rounded-full border-2 border-emerald-400 flex items-center justify-center text-emerald-400 text-4xl shadow-[0_0_35px_rgba(52,211,153,0.85)] z-10 bg-slate-950">
-                <svg className="w-10 h-10 stroke-current animate-bounce" fill="none" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                </svg>
+                <Link href="/" className="hover:text-[var(--text-primary)] transition">
+                  ← بازگشت به فروشگاه
+                </Link>
               </div>
-            </div>
-
-            <div className="text-center space-y-1.5 z-10">
-              <h3 className="text-2xl font-black text-emerald-400 tracking-tight font-sans">
-                Verified
-              </h3>
-              <p className="text-xs text-slate-300 font-medium">احراز هویت با موفقیت تایید شد</p>
-              <span className="text-[10px] text-slate-500 font-mono block pt-1">
-                در حال انتقال به پیشخوان مدیریت...
-              </span>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>

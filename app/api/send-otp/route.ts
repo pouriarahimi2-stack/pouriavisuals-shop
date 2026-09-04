@@ -4,13 +4,12 @@ import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-const OTP_SECRET = process.env.OTP_SECRET || "axon_secure_otp_salt_secret_key_2026";
 const globalOtpStore = new Map<string, { code: string; expiresAt: number }>();
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { phone, code, action, customerName, trackingCode } = body;
+    const { phone, code, action } = body;
 
     if (!phone) {
       return NextResponse.json(
@@ -21,54 +20,18 @@ export async function POST(req: NextRequest) {
 
     const cleanPhone = String(phone)
       .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
       .replace(/\D/g, "");
-
-    if (action === "tracking") {
-      if (!trackingCode) {
-        return NextResponse.json(
-          { success: false, message: "کد رهگیری پستی الزامی است." },
-          { status: 400 }
-        );
-      }
-
-      const smsApiKey = process.env.KAVENEGAR_API_KEY || process.env.SMS_API_KEY;
-
-      if (smsApiKey) {
-        try {
-          const text = encodeURIComponent(
-            `${customerName || "خریدار گرامی"}، مرسوله شما تحویل شرکت ملی پست گردید.\nکد رهگیری ۲۴ رقمی: ${trackingCode}\nسامانه پیگیری: https://tracking.post.ir/?id=${trackingCode}\nفروشگاه آکسون`
-          );
-          await fetch(
-            `https://api.kavenegar.com/v1/${smsApiKey}/sms/send.json?receptor=${cleanPhone}&message=${text}`
-          );
-        } catch (smsErr) {
-          console.error("SMS Gateway Error:", smsErr);
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: "پیامک رهگیری با موفقیت برای خریدار ارسال گردید.",
-      });
-    }
 
     if (action === "verify") {
       if (!code) {
-        return NextResponse.json(
-          { success: false, message: "کد تایید وارد نشده است." },
-          { status: 400 }
-        );
+        return NextResponse.json({ success: false, message: "کد تایید الزامی است." }, { status: 400 });
       }
 
-      const cleanCode = String(code)
-        .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-        .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
-        .trim();
-
+      const cleanCode = String(code).trim();
       const stored = globalOtpStore.get(cleanPhone);
 
-      const isDevPass = cleanCode === "123456" || cleanCode === "584920" || cleanCode === "111111";
+      // پشتیبانی از کدهای تستی سریع ویدیو: 1234 و 5849
+      const isDevPass = cleanCode === "1234" || cleanCode === "5849" || cleanCode === "123456";
       const isMemoryValid = stored && stored.code === cleanCode && stored.expiresAt > Date.now();
 
       if (isMemoryValid || isDevPass) {
@@ -78,19 +41,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: true,
           verified: true,
-          token: `OTP-TOKEN-${token}`,
-          message: "شماره موبایل با موفقیت تایید شد.",
+          token: `USER-TOKEN-${token}`,
+          message: "تایید هویت با موفقیت انجام شد.",
         });
       }
 
       return NextResponse.json(
-        { success: false, verified: false, message: "کد تایید وارد شده اشتباه است یا منقضی شده است." },
+        { success: false, verified: false, message: "کد تایید وارد شده نادرست است." },
         { status: 400 }
       );
     }
 
-    const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 120 * 1000;
+    // تولید کد ۴ رقمی اختصاصی مطابق ویدیوی ۲
+    const generatedCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const expiresAt = Date.now() + 180 * 1000;
 
     globalOtpStore.set(cleanPhone, { code: generatedCode, expiresAt });
 
@@ -98,13 +62,11 @@ export async function POST(req: NextRequest) {
 
     if (smsApiKey) {
       try {
-        const text = encodeURIComponent(`کد تایید ثبت سفارش آکسون: ${generatedCode}\nاعتبار: ۲ دقیقه`);
+        const text = encodeURIComponent(`کد تایید ورود به آکسون: ${generatedCode}`);
         await fetch(
           `https://api.kavenegar.com/v1/${smsApiKey}/sms/send.json?receptor=${cleanPhone}&message=${text}`
         );
-      } catch (e) {
-        console.error("Kavenegar SMS Error:", e);
-      }
+      } catch {}
     }
 
     return NextResponse.json({
@@ -113,10 +75,6 @@ export async function POST(req: NextRequest) {
       simulatedCode: process.env.NODE_ENV !== "production" ? generatedCode : undefined,
     });
   } catch (error: any) {
-    console.error("Send OTP Route Error:", error);
-    return NextResponse.json(
-      { success: false, message: "خطای سرور در پردازش پیامک." },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }

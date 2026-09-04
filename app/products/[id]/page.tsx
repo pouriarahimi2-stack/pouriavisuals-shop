@@ -20,7 +20,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const { addToCart } = useCart();
   const tabsContentRef = useRef<HTMLDivElement>(null);
 
-  const initialProduct = productService.getProductSync(id) || FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || FLAGSHIP_7_PRODUCTS[3];
+  const initialProduct = productService.getProductSync(id) || FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || FLAGSHIP_7_PRODUCTS[1];
   
   const [product, setProduct] = useState<Product>(initialProduct);
   const [activeImage, setActiveImage] = useState<string>(() => {
@@ -85,7 +85,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 font-sans select-none text-[var(--text-primary)] space-y-6 pb-28 sm:pb-10" dir="rtl">
+    <div className="max-w-7xl mx-auto px-4 py-6 font-sans select-none text-[var(--text-primary)] space-y-6 pb-28 sm:pb-10" dir="rtl" suppressHydrationWarning>
       
       {/* نوار مسیر ناوبری مینیمال */}
       <nav className="flex items-center gap-2 p-3 px-5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-bold shadow-sm backdrop-blur-md">
@@ -198,13 +198,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* کنترلر مدرن اپل در موبایل و دسکتاپ (iOS Segmented Control) */}
+      {/* ناوبری هوشمند تب‌های محصول با رندر ماندگار و سئومحور */}
       <div ref={tabsContentRef} className="space-y-6 pt-2">
         <div className="p-1.5 rounded-2xl sm:rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 text-xs">
           {[
             { id: "specs", label: "⚙️ مشخصات فنی" },
             { id: "gamut", label: "🎨 گاموت رنگی" },
-            { id: "comparison", label: "⚖️ پایش قیمت بازار" },
+            { id: "comparison", label: "⚖️ پایش قیمت بازار (ترب و دیجی‌کالا)" },
             { id: "desc", label: "📝 نقد و بررسی" },
             { id: "reviews", label: "⭐ نظرات کاربران" },
           ].map((tab) => (
@@ -222,7 +222,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           ))}
         </div>
 
-        {activeTab === "specs" && (
+        {/* ۱. تب مشخصات فنی */}
+        <div className={activeTab === "specs" ? "block animate-fadeIn" : "hidden"}>
           <div className="p-5 sm:p-8 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               {specsEntries.map(([k, v], idx) => (
@@ -233,22 +234,35 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               ))}
             </div>
           </div>
-        )}
+        </div>
 
-        {activeTab === "gamut" && <ColorGamutSimulator productTitle={product.title} />}
-        {activeTab === "comparison" && <LiveMarketArbitrage productTitle={product.title} ourPrice={finalUnitPrice} marketBenchmarks={product.market_comparison} />}
+        {/* ۲. تب گاموت رنگی */}
+        <div className={activeTab === "gamut" ? "block animate-fadeIn" : "hidden"}>
+          <ColorGamutSimulator productTitle={product.title} />
+        </div>
+
+        {/* ۳. تب پایش قیمت بازار (ترب، ایمالز، دیجی‌کالا) با رندر سئومحور */}
+        <div className={activeTab === "comparison" ? "block animate-fadeIn" : "hidden"}>
+          <LiveMarketArbitrage
+            productTitle={product.title}
+            ourPrice={finalUnitPrice}
+            marketBenchmarks={product.market_comparison}
+          />
+        </div>
         
-        {activeTab === "desc" && (
+        {/* ۴. تب نقد و بررسی */}
+        <div className={activeTab === "desc" ? "block animate-fadeIn" : "hidden"}>
           <div className="p-5 sm:p-8 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs sm:text-sm leading-loose text-[var(--text-secondary)] text-justify">
             <p className="whitespace-pre-line font-medium">{product.description}</p>
           </div>
-        )}
+        </div>
 
-        {activeTab === "reviews" && (
+        {/* ۵. تب نظرات و بازخورد کاربران با رندر سئومحور */}
+        <div className={activeTab === "reviews" ? "block animate-fadeIn" : "hidden"}>
           <div className="p-5 sm:p-8 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
             <ProductReviews productId={product.id} />
           </div>
-        )}
+        </div>
       </div>
 
       <ProductExplodedView

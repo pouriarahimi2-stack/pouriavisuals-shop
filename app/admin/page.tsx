@@ -18,9 +18,9 @@ import PageBuilder from "@/components/admin/PageBuilder";
 import AdminBlogManager from "@/components/AdminBlogManager";
 import AdminNewsManager from "@/components/admin/AdminNewsManager";
 import StyleFontManager from "@/components/admin/StyleFontManager";
-import AdminAiSeoAutopilot from "@/components/admin/AdminAiSeoAutopilot";
 import AdminAccountsManager from "@/components/AdminAccountsManager";
 import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
+import AdminAiMasterSuite from "@/components/admin/AdminAiMasterSuite";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { adminAuthService, AdminUser } from "@/services/adminAuthService";
 import { soundEngine } from "@/lib/soundEngine";
@@ -33,8 +33,8 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<
     | "products"
     | "inventory"
+    | "ai_suite"
     | "storefront_studio"
-    | "ai_autopilot"
     | "news_radar"
     | "page_builder"
     | "blogs"
@@ -47,7 +47,7 @@ export default function AdminPage() {
     | "accounts"
     | "siteInfo"
     | "messages"
-  >("products");
+  >("ai_suite");
 
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
@@ -151,25 +151,24 @@ export default function AdminPage() {
     }
   };
 
-  const isSuper = currentUser?.role === "superadmin" || (currentUser?.role as any) === "super_admin";
-
+  // تمام ماژول‌های حیاتی از جمله هوش مصنوعی همیشه فعال و نمایان هستند (show: true)
   const navTabs = [
+    { id: "ai_suite", label: "مرکز جامع هوش مصنوعی (AI Suite)", icon: "🤖", show: true },
     { id: "products", label: "محصولات و کاتالوگ", icon: "📦", show: true },
     { id: "inventory", label: "انبارداری سریع", icon: "📥", show: true },
-    { id: "storefront_studio", label: "کنترل ویترین و لایه‌بندی", icon: "📐", show: isSuper },
-    { id: "ai_autopilot", label: "موتور سئوی خودمختار (GSC)", icon: "🤖", show: isSuper },
+    { id: "storefront_studio", label: "کنترل ویترین و لایه‌بندی", icon: "📐", show: true },
+    { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: true },
     { id: "news_radar", label: "جدیدترین اخبار تکنولوژی", icon: "📡", show: true },
-    { id: "page_builder", label: "صفحه‌ساز اختصاصی", icon: "🏗️", show: isSuper },
-    { id: "orders", label: "سفارش‌ها و پست", icon: "📑", show: isSuper },
-    { id: "messages", label: "صندوق پیام‌ها و مشاوره", icon: "📩", show: isSuper },
-    { id: "coupons", label: "تخفیف‌ها و کوپن", icon: "🏷️", show: isSuper },
-    { id: "customers", label: "باشگاه مخاطبان (CRM)", icon: "👥", show: isSuper },
     { id: "blogs", label: "مقالات تخصصی و سئو", icon: "📚", show: true },
-    { id: "typography", label: "تایپوگرافی و فونت‌ها", icon: "🎨", show: isSuper },
-    { id: "banners", label: "بنرها و اسلایدرها", icon: "🖼️", show: isSuper },
-    { id: "menu", label: "منوها و دسته‌بندی‌ها", icon: "🔗", show: isSuper },
-    { id: "accounts", label: "حساب‌های مدیران و تغییر رمز", icon: "🛡️", show: isSuper },
-    { id: "siteInfo", label: "اطلاعات سایت و ایندکس", icon: "⚙️", show: isSuper },
+    { id: "page_builder", label: "صفحه‌ساز اختصاصی", icon: "🏗️", show: true },
+    { id: "messages", label: "صندوق پیام‌ها و مشاوره", icon: "📩", show: true },
+    { id: "coupons", label: "تخفیف‌ها و کوپن", icon: "🏷️", show: true },
+    { id: "customers", label: "باشگاه مخاطبان (CRM)", icon: "👥", show: true },
+    { id: "typography", label: "تایپوگرافی و فونت‌ها", icon: "🎨", show: true },
+    { id: "banners", label: "بنرها و اسلایدرها", icon: "🖼️", show: true },
+    { id: "menu", label: "منوها و دسته‌بندی‌ها", icon: "🔗", show: true },
+    { id: "accounts", label: "حساب‌های مدیران و تغییر رمز", icon: "🛡️", show: true },
+    { id: "siteInfo", label: "اطلاعات سایت و ایندکس", icon: "⚙️", show: true },
   ].filter((t) => t.show);
 
   if (isAuthenticated === null) return null;
@@ -178,7 +177,7 @@ export default function AdminPage() {
     <div dir="rtl" className="min-h-screen p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans select-none text-[var(--text-primary)]">
       <AdminGlobalSearch onSelectTab={(t: any) => setActiveTab(t)} />
 
-      {/* هدر تمیز و استاندارد ادمین با پروفایل کلیک‌پذیر */}
+      {/* هدر تمیز و استاندارد ادمین */}
       <header className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 text-lg font-black shadow-sm">
@@ -186,14 +185,12 @@ export default function AdminPage() {
           </div>
           <div>
             <h1 className="text-base font-black text-[var(--text-primary)]">پیشخوان یکپارچه مدیریت فروشگاه آکسون</h1>
-            
             <button
               onClick={() => {
                 soundEngine.playClick();
                 setActiveTab("accounts");
               }}
               className="flex items-center gap-1.5 mt-0.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition cursor-pointer group"
-              title="کلیک کنید تا به بخش ویرایش مشخصات و تغییر رمز هدایت شوید"
             >
               <span>مدیر آنلاین:</span>
               <strong className="text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition underline decoration-dotted underline-offset-4">
@@ -205,22 +202,20 @@ export default function AdminPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {isSuper && (
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setShowMaintenanceModal(true);
-              }}
-              className={`px-3.5 py-2 rounded-2xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                selectedMaintMode === "none"
-                  ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
-                  : "bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/25 animate-pulse"
-              }`}
-            >
-              <span>🌐</span>
-              <span>{selectedMaintMode === "none" ? "ایندکس گوگل: مجاز ✓" : "تعمیرات فعال (توقف ایندکس)"}</span>
-            </button>
-          )}
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              setShowMaintenanceModal(true);
+            }}
+            className={`px-3.5 py-2 rounded-2xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              selectedMaintMode === "none"
+                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+                : "bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/25 animate-pulse"
+            }`}
+          >
+            <span>🌐</span>
+            <span>{selectedMaintMode === "none" ? "ایندکس گوگل: مجاز ✓" : "تعمیرات فعال (توقف ایندکس)"}</span>
+          </button>
 
           <a href="/" target="_blank" className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition flex items-center gap-1">
             <span>🏠</span>
@@ -251,7 +246,7 @@ export default function AdminPage() {
       <AdminDashboardStats />
       <AdminHealthGuard />
 
-      {/* نوار تب‌های ماژول‌های ادمین شامل ماژول استودیوی چیدمان */}
+      {/* نوار تب‌های ماژول‌های ادمین با نمایش دائمی مرکز هوش مصنوعی */}
       <div className="p-3 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         <div className="flex flex-wrap items-center gap-2">
           {navTabs.map((tab) => (
@@ -276,22 +271,22 @@ export default function AdminPage() {
 
       {/* محتوای ماژول فعال */}
       <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl">
+        {activeTab === "ai_suite" && <AdminAiMasterSuite />}
         {activeTab === "products" && <AdminProducts />}
         {activeTab === "inventory" && <AdminInventoryManager />}
-        {activeTab === "storefront_studio" && isSuper && <StorefrontLayoutStudio />}
-        {activeTab === "ai_autopilot" && isSuper && <AdminAiSeoAutopilot />}
+        {activeTab === "storefront_studio" && <StorefrontLayoutStudio />}
         {activeTab === "news_radar" && <AdminNewsManager />}
-        {activeTab === "page_builder" && isSuper && <PageBuilder />}
+        {activeTab === "page_builder" && <PageBuilder />}
         {activeTab === "blogs" && <AdminBlogManager />}
-        {activeTab === "typography" && isSuper && <StyleFontManager />}
-        {activeTab === "orders" && isSuper && <AdminOrders />}
-        {activeTab === "messages" && isSuper && <ContactMessagesManager />}
-        {activeTab === "coupons" && isSuper && <AdminCoupons />}
-        {activeTab === "customers" && isSuper && <AdminCustomers />}
-        {activeTab === "banners" && isSuper && <AdminBanners />}
-        {activeTab === "menu" && isSuper && <AdminMenu />}
-        {activeTab === "accounts" && isSuper && <AdminAccountsManager />}
-        {activeTab === "siteInfo" && isSuper && <AdminSiteInfo />}
+        {activeTab === "typography" && <StyleFontManager />}
+        {activeTab === "orders" && <AdminOrders />}
+        {activeTab === "messages" && <ContactMessagesManager />}
+        {activeTab === "coupons" && <AdminCoupons />}
+        {activeTab === "customers" && <AdminCustomers />}
+        {activeTab === "banners" && <AdminBanners />}
+        {activeTab === "menu" && <AdminMenu />}
+        {activeTab === "accounts" && <AdminAccountsManager />}
+        {activeTab === "siteInfo" && <AdminSiteInfo />}
       </div>
 
       {/* مودال ایندکس گوگل و حالت تعمیرات */}
@@ -322,7 +317,7 @@ export default function AdminPage() {
                     <input type="radio" name="maint" checked={selectedMaintMode === "none"} onChange={() => setSelectedMaintMode("none")} className="accent-emerald-500" />
                     <div>
                       <span className="font-black block">۱. سایت کاملاً فعال و آنلاین (پیش‌فرض)</span>
-                      <span className="text-[10px] opacity-75">خزش و ایندکس گوگل ۱۰۰٪ مجاز و تمامی صفحات در دسترس هستند.</span>
+                      <span className="text-[10px] opacity-75">خزش و ایندکس گوگل ۱۰۰٪ مجاز است.</span>
                     </div>
                   </div>
                   <span className="text-emerald-500 font-bold">آنلاین ✓</span>
@@ -333,7 +328,7 @@ export default function AdminPage() {
                     <input type="radio" name="maint" checked={selectedMaintMode === "timed"} onChange={() => setSelectedMaintMode("timed")} className="accent-amber-500" />
                     <div>
                       <span className="font-black block">۲. حالت تعمیرات زمان‌دار (با تایمر شمارنده معکوس)</span>
-                      <span className="text-[10px] opacity-75">نمایش صفحه شمارش معکوس به کاربران تا پایان زمان مشخص.</span>
+                      <span className="text-[10px] opacity-75">نمایش صفحه شمارش معکوس به کاربران.</span>
                     </div>
                   </div>
                   <span className="text-amber-500 font-bold">زمان‌دار ⏳</span>
@@ -344,7 +339,7 @@ export default function AdminPage() {
                     <input type="radio" name="maint" checked={selectedMaintMode === "indefinite"} onChange={() => setSelectedMaintMode("indefinite")} className="accent-rose-500" />
                     <div>
                       <span className="font-black block">۳. حالت تعمیرات نامحدود (توقف موقت ایندکس)</span>
-                      <span className="text-[10px] opacity-75">خروج موقت از دسترس جهت اعمال تغییرات اساسی دیتابیس.</span>
+                      <span className="text-[10px] opacity-75">خروج موقت از دسترس جهت اعمال تغییرات.</span>
                     </div>
                   </div>
                   <span className="text-rose-500 font-bold">قفل 🔒</span>

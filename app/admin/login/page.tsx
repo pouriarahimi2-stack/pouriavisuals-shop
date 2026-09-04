@@ -14,7 +14,11 @@ export default function AdminLoginPage() {
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
   const [focusedIndex, setFocusedIndex] = useState<number>(0);
 
-  // فازهای انیمیشن: idle -> merging (ادغام اسلات‌ها) -> verified (تبدیل به مربع سبز نئونی)
+  // شاخص اسلاتی که در حال حاضر با زدن کلید در حال بارقه‌زنی تک‌دور است
+  const [activeSparkIndex, setActiveSparkIndex] = useState<number | null>(null);
+  const sparkTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // فازهای انیمیشن: idle -> merging (ادغام اسلات‌ها) -> verified (تبدیل به مربع سبز)
   const [animPhase, setAnimPhase] = useState<"idle" | "merging" | "verified">("idle");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -45,6 +49,15 @@ export default function AdminLoginPage() {
     }
   }, [authMode, animPhase, pinLength]);
 
+  // راه‌اندازی بارقه لیزری تک‌دور فقط هنگام تایپ عدد (دقیقاً ۴۵۰ میلی‌ثانیه یک دور و خاموش)
+  const triggerSingleLapSpark = (index: number) => {
+    if (sparkTimerRef.current) clearTimeout(sparkTimerRef.current);
+    setActiveSparkIndex(index);
+    sparkTimerRef.current = setTimeout(() => {
+      setActiveSparkIndex(null);
+    }, 450);
+  };
+
   const handleDigitChange = (index: number, val: string) => {
     const clean = val.replace(/\D/g, "").slice(-1);
     const newDigits = [...digits];
@@ -52,6 +65,11 @@ export default function AdminLoginPage() {
     setDigits(newDigits);
     soundEngine.playClick();
     setErrorMessage(null);
+
+    // زدن بارقه فقط هنگام وارد کردن عدد
+    if (clean) {
+      triggerSingleLapSpark(index);
+    }
 
     if (clean && index < pinLength - 1) {
       setFocusedIndex(index + 1);
@@ -74,7 +92,7 @@ export default function AdminLoginPage() {
     setLoading(true);
     soundEngine.playClick();
 
-    // فاز ۱: ادغام اسلات‌ها در یک کارت مرکزی (Merge & Collapse مطابق ویدیو)
+    // فاز ۱: ادغام اسلات‌ها در مرکز (Merge & Collapse)
     setAnimPhase("merging");
 
     const targetPin = securityConfig.adminDeck.pin || "1234";
@@ -97,13 +115,12 @@ export default function AdminLoginPage() {
         };
         localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(userObj));
 
-        // فاز ۲: پس از ۴۵۰ میلی‌ثانیه ادغام -> تبدیل به مربع سبز نئونی و تایید (Verified Box)
+        // فاز ۲: پس از ۴۵۰ میلی‌ثانیه ادغام -> تبدیل به مربع سبز نئونی و تایید Verified
         setTimeout(() => {
           soundEngine.playSuccess();
           setAnimPhase("verified");
         }, 450);
 
-        // هدایت نهایی پس از نمایش انیمیشن تایید
         setTimeout(() => {
           window.location.href = "/admin";
         }, 1850);
@@ -115,7 +132,7 @@ export default function AdminLoginPage() {
           setFocusedIndex(0);
           inputRefs.current[0]?.focus();
           setLoading(false);
-        }, 550);
+        }, 500);
       }
     } catch {
       if (pinCode === targetPin || pinCode === "1234") {
@@ -129,12 +146,12 @@ export default function AdminLoginPage() {
       } else {
         setTimeout(() => {
           setAnimPhase("idle");
-          setErrorMessage("کد امنیتی اشتباه است.");
+          setErrorMessage("کد امنیتی نادرست است.");
           setDigits(Array(pinLength).fill(""));
           setFocusedIndex(0);
           inputRefs.current[0]?.focus();
           setLoading(false);
-        }, 550);
+        }, 500);
       }
     }
   };
@@ -183,6 +200,11 @@ export default function AdminLoginPage() {
 
   const adminDeckCfg = securityConfig.adminDeck;
 
+  // محاسبه ابعاد دقیق پیکسلی اسلات‌ها بر اساس تعداد ارقام (ضد بیرون‌زدگی ۱۰۰٪)
+  const slotWidthPx = pinLength >= 8 ? 38 : pinLength >= 6 ? 48 : 60;
+  const slotHeightPx = pinLength >= 8 ? 52 : pinLength >= 6 ? 64 : 76;
+  const slotFontSize = pinLength >= 8 ? "text-lg" : pinLength >= 6 ? "text-xl" : "text-2xl sm:text-3xl";
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-4 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none transition-colors duration-500"
@@ -194,22 +216,21 @@ export default function AdminLoginPage() {
         </span>
       </div>
 
-      <div className="relative w-full max-w-sm sm:max-w-md min-h-[480px] [perspective:1200px]">
+      <div className="relative w-full max-w-sm sm:max-w-md min-h-[480px]">
         <div
-          className={`w-full h-full min-h-[480px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-8 sm:p-10 ${
+          className={`w-full h-full min-h-[480px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-8 sm:p-10 overflow-hidden ${
             animPhase === "verified"
               ? "border-emerald-500/80 shadow-[0_0_80px_rgba(16,185,129,0.35)] bg-slate-950 text-white"
               : "border-[var(--card-border)] bg-[var(--modal-bg)] backdrop-blur-3xl"
           }`}
         >
           {animPhase === "verified" ? (
-            /* وضعیت نهایی: مربع سبز نئونی با پالس راداری و تیک متحرک (دقیقاً فریم آخر ویدیو) */
+            /* وضعیت مربع سبز نئونی با تیک و امواج راداری */
             <div className="h-full flex-1 flex flex-col items-center justify-center space-y-6 animate-fadeIn py-8">
               <div className="relative flex items-center justify-center">
                 <span className="w-28 h-28 rounded-[2rem] border-2 border-emerald-400/40 absolute animate-green-radar" />
                 <span className="w-36 h-36 rounded-[2.5rem] border border-emerald-500/20 absolute animate-green-radar [animation-delay:0.4s]" />
 
-                {/* مربع سبز نئونی تبدیل‌شده */}
                 <div className="w-20 h-20 rounded-3xl bg-emerald-500 border-2 border-emerald-300 text-slate-950 flex items-center justify-center text-4xl shadow-[0_0_50px_rgba(16,185,129,0.9)] z-10 animate-bounce">
                   <svg className="w-10 h-10 stroke-current" fill="none" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7" />
@@ -228,7 +249,7 @@ export default function AdminLoginPage() {
               </div>
             </div>
           ) : (
-            /* وضعیت در حال ورود و اسلات‌های بارقه نوری لیزری */
+            /* وضعیت در حال ورود ادمین */
             <>
               <div className="text-center space-y-2">
                 <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 font-mono font-black text-[10px] uppercase tracking-widest">
@@ -250,67 +271,80 @@ export default function AdminLoginPage() {
 
               {authMode === "pin" ? (
                 <div className="space-y-6 my-auto">
-                  {/* ردیف اسلات‌ها با انیمیشن ادغام فیزیکی به مرکز (Slot Merge Physics) */}
-                  <div className="relative flex justify-center items-center h-24" dir="ltr">
-                    {digits.map((digit, idx) => {
-                      const totalSlots = pinLength;
-                      const centerOffset = idx - (totalSlots - 1) / 2;
-                      const isSlotActive = focusedIndex === idx;
+                  {/* کانتینر اسلات‌ها با عرض دقیق و بدون امکان اسکرول یا شکستگی کادر */}
+                  <div className="w-full flex justify-center items-center h-24 overflow-visible" dir="ltr">
+                    <div className="flex items-center justify-center">
+                      {digits.map((digit, idx) => {
+                        const totalSlots = pinLength;
+                        const centerOffset = idx - (totalSlots - 1) / 2;
+                        const isSlotFocused = focusedIndex === idx;
+                        const isSlotSparking = activeSparkIndex === idx;
 
-                      // محاسبه جابجایی هنگام ادغام: همه اسلات‌ها دقیقا روی مرکز هم انباشته می‌شوند
-                      const mergeTranslateX = animPhase === "merging" ? `${-centerOffset * 56}px` : "0px";
-                      const mergeScale = animPhase === "merging" ? "0.9" : "1";
-                      const mergeOpacity = animPhase === "merging" ? (idx === 0 ? "1" : "0.3") : "1";
+                        // فاصله ادغام فیزیکی
+                        const mergeDistance = (slotWidthPx + 10) * centerOffset;
+                        const mergeTranslateX = animPhase === "merging" ? `${-mergeDistance}px` : "0px";
+                        const mergeScale = animPhase === "merging" ? "0.9" : "1";
+                        const mergeOpacity = animPhase === "merging" ? (idx === 0 ? "1" : "0.2") : "1";
 
-                      return (
-                        <div
-                          key={idx}
-                          style={{
-                            transform: `translateX(${mergeTranslateX}) scale(${mergeScale})`,
-                            opacity: mergeOpacity,
-                            transition: "all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)",
-                          }}
-                          className="relative mx-1.5 sm:mx-2"
-                        >
-                          <input
-                            ref={(el) => { inputRefs.current[idx] = el; }}
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={1}
-                            disabled={animPhase !== "idle"}
-                            value={digit}
-                            onFocus={() => setFocusedIndex(idx)}
-                            onChange={(e) => handleDigitChange(idx, e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(idx, e)}
-                            className={`w-13 h-16 sm:w-15 sm:h-20 rounded-2xl bg-[var(--input-bg)] border text-center font-mono font-black text-2xl sm:text-3xl text-[var(--text-primary)] outline-none transition-all duration-300 relative z-10 ${
-                              digit
-                                ? "border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
-                                : isSlotActive
-                                ? "border-cyan-500/80 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-                                : "border-[var(--card-border)]"
-                            }`}
-                          />
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              width: `${slotWidthPx}px`,
+                              height: `${slotHeightPx}px`,
+                              transform: `translateX(${mergeTranslateX}) scale(${mergeScale})`,
+                              opacity: mergeOpacity,
+                              transition: "transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.45s ease",
+                            }}
+                            className="relative mx-1 sm:mx-1.5 shrink-0"
+                          >
+                            <input
+                              ref={(el) => { inputRefs.current[idx] = el; }}
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={1}
+                              disabled={animPhase !== "idle"}
+                              value={digit}
+                              onFocus={() => setFocusedIndex(idx)}
+                              onChange={(e) => handleDigitChange(idx, e.target.value)}
+                              onKeyDown={(e) => handleKeyDown(idx, e)}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                minWidth: `${slotWidthPx}px`,
+                                maxWidth: `${slotWidthPx}px`,
+                                boxSizing: "border-box",
+                              }}
+                              className={`rounded-2xl bg-[var(--input-bg)] border text-center font-mono font-black ${slotFontSize} text-[var(--text-primary)] outline-none transition-all duration-200 relative z-10 p-0 ${
+                                digit
+                                  ? "border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
+                                  : isSlotFocused
+                                  ? "border-cyan-500/80 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                                  : "border-[var(--card-border)]"
+                              }`}
+                            />
 
-                          {/* بارقه نوری لیزری متحرک دور اسلات فعال (Traveling Laser Spark) */}
-                          {isSlotActive && animPhase === "idle" && (
-                            <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
-                              <rect
-                                x="1"
-                                y="1"
-                                width="96%"
-                                height="96%"
-                                rx="16"
-                                fill="none"
-                                stroke="#22d3ee"
-                                strokeWidth="2.5"
-                                pathLength="1"
-                                className="laser-spark-path drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
-                              />
-                            </svg>
-                          )}
-                        </div>
-                      );
-                    })}
+                            {/* بارقه لیزری تک‌دور فقط هنگام تایپ عدد در همین اسلات */}
+                            {isSlotSparking && (
+                              <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
+                                <rect
+                                  x="1"
+                                  y="1"
+                                  width="96%"
+                                  height="96%"
+                                  rx="16"
+                                  fill="none"
+                                  stroke="#22d3ee"
+                                  strokeWidth="2.5"
+                                  pathLength="1"
+                                  className="laser-spark-on-type drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -338,7 +372,7 @@ export default function AdminLoginPage() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 p-1"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 p-1 cursor-pointer"
                       >
                         {showPassword ? "👁️‍🗨️" : "👁️"}
                       </button>

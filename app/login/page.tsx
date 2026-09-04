@@ -12,31 +12,27 @@ import { supabase } from "@/lib/supabase";
 export default function UserLoginPage() {
   const router = useRouter();
 
-  // مدهای احراز هویت: otp (پیامک) | password (رمز عبور) | register (ثبت‌نام)
   const [authMode, setAuthMode] = useState<"otp" | "password" | "register">("otp");
   const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
   const [otpLength, setOtpLength] = useState<number>(4);
 
-  // استیت‌های ورود با پیامک (OTP)
   const [otpStep, setOtpStep] = useState<"phone" | "verify">("phone");
   const [phone, setPhone] = useState("");
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
   const [focusedIndex, setFocusedIndex] = useState<number>(0);
+  const [activeSparkIndex, setActiveSparkIndex] = useState<number | null>(null);
+  const sparkTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // استیت‌های ورود با رمز
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // استیت‌های ثبت‌نام
   const [regPhone, setRegPhone] = useState("");
   const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regEmail, setRegEmail] = useState("");
 
-  // فازهای انیمیشن Component 100
-  const [isMerging, setIsMerging] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
+  const [animPhase, setAnimPhase] = useState<"idle" | "merging" | "verified">("idle");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -57,12 +53,19 @@ export default function UserLoginPage() {
   }, []);
 
   useEffect(() => {
-    if (authMode === "otp" && otpStep === "verify" && !isVerified && !isMerging) {
+    if (authMode === "otp" && otpStep === "verify" && animPhase === "idle") {
       inputRefs.current[0]?.focus();
     }
-  }, [authMode, otpStep, isVerified, isMerging, otpLength]);
+  }, [authMode, otpStep, animPhase, otpLength]);
 
-  // ۱. درخواست ارسال پیامک OTP
+  const triggerSingleLapSpark = (index: number) => {
+    if (sparkTimerRef.current) clearTimeout(sparkTimerRef.current);
+    setActiveSparkIndex(index);
+    sparkTimerRef.current = setTimeout(() => {
+      setActiveSparkIndex(null);
+    }, 450);
+  };
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
@@ -97,7 +100,6 @@ export default function UserLoginPage() {
     }
   };
 
-  // ۲. مدیریت خانه‌های کد OTP و ادغام اسلات‌ها (Merge Reaction)
   const handleDigitChange = (index: number, val: string) => {
     const clean = val.replace(/\D/g, "").slice(-1);
     const newDigits = [...digits];
@@ -105,6 +107,10 @@ export default function UserLoginPage() {
     setDigits(newDigits);
     soundEngine.playClick();
     setErrorMessage(null);
+
+    if (clean) {
+      triggerSingleLapSpark(index);
+    }
 
     if (clean && index < otpLength - 1) {
       setFocusedIndex(index + 1);
@@ -126,7 +132,7 @@ export default function UserLoginPage() {
   const triggerOtpVerification = async (code: string) => {
     setLoading(true);
     soundEngine.playClick();
-    setIsMerging(true);
+    setAnimPhase("merging");
 
     const testCode = securityConfig.userDeck.testOtpCode || "1234";
 
@@ -140,21 +146,21 @@ export default function UserLoginPage() {
       const data = await res.json();
 
       if ((res.ok && data.verified) || code === testCode || code === "1234") {
-        soundEngine.playSuccess();
         const userObj = { phone, token: data.token || "USER-VERIFIED" };
         localStorage.setItem("axon_user_session", JSON.stringify(userObj));
         window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: userObj }));
 
         setTimeout(() => {
-          setIsVerified(true);
-        }, 400);
+          soundEngine.playSuccess();
+          setAnimPhase("verified");
+        }, 450);
 
         setTimeout(() => {
           router.push("/");
-        }, 1800);
+        }, 1850);
       } else {
         setTimeout(() => {
-          setIsMerging(false);
+          setAnimPhase("idle");
           setErrorMessage(data.message || "کد تایید اشتباه است.");
           setDigits(Array(otpLength).fill(""));
           setFocusedIndex(0);
@@ -164,19 +170,19 @@ export default function UserLoginPage() {
       }
     } catch {
       if (code === testCode || code === "1234") {
-        soundEngine.playSuccess();
         const userObj = { phone, token: "USER-VERIFIED" };
         localStorage.setItem("axon_user_session", JSON.stringify(userObj));
         window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: userObj }));
         setTimeout(() => {
-          setIsVerified(true);
-        }, 400);
+          soundEngine.playSuccess();
+          setAnimPhase("verified");
+        }, 450);
         setTimeout(() => {
           router.push("/");
-        }, 1800);
+        }, 1850);
       } else {
         setTimeout(() => {
-          setIsMerging(false);
+          setAnimPhase("idle");
           setErrorMessage("کد تایید اشتباه است.");
           setDigits(Array(otpLength).fill(""));
           setFocusedIndex(0);
@@ -187,7 +193,6 @@ export default function UserLoginPage() {
     }
   };
 
-  // ۳. ورود با نام کاربری و کلمه عبور
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
@@ -208,7 +213,7 @@ export default function UserLoginPage() {
         localStorage.setItem("axon_user_session", JSON.stringify(data.user));
         window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: data.user }));
 
-        setIsVerified(true);
+        setAnimPhase("verified");
         setTimeout(() => {
           router.push("/");
         }, 1800);
@@ -222,7 +227,6 @@ export default function UserLoginPage() {
     }
   };
 
-  // ۴. ثبت‌نام حساب جدید
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
@@ -261,7 +265,7 @@ export default function UserLoginPage() {
         localStorage.setItem("axon_user_session", JSON.stringify(data.user));
         window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: data.user }));
 
-        setIsVerified(true);
+        setAnimPhase("verified");
         setTimeout(() => {
           router.push("/");
         }, 1800);
@@ -275,84 +279,48 @@ export default function UserLoginPage() {
     }
   };
 
-  // ۵. ورود با حساب گوگل (Google OAuth)
   const handleGoogleLogin = async () => {
     soundEngine.playClick();
     try {
       if (supabase) {
         await supabase.auth.signInWithOAuth({
           provider: "google",
-          options: {
-            redirectTo: `${window.location.origin}/login`,
-          },
+          options: { redirectTo: `${window.location.origin}/login` },
         });
-      } else {
-        // شبیه‌سازی ورود موفق گوگل در صورت تست لوکال
-        await triggerOAuthMock("google");
       }
-    } catch {
-      await triggerOAuthMock("google");
-    }
+    } catch {}
   };
 
-  // ۶. ورود با اپل آیدی (Apple ID OAuth)
   const handleAppleLogin = async () => {
     soundEngine.playClick();
     try {
       if (supabase) {
         await supabase.auth.signInWithOAuth({
           provider: "apple",
-          options: {
-            redirectTo: `${window.location.origin}/login`,
-          },
+          options: { redirectTo: `${window.location.origin}/login` },
         });
-      } else {
-        await triggerOAuthMock("apple");
       }
-    } catch {
-      await triggerOAuthMock("apple");
-    }
+    } catch {}
   };
 
-  const triggerOAuthMock = async (provider: "google" | "apple") => {
-    setLoading(true);
-    const res = await fetch("/api/user/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "oauth_sync",
-        provider,
-        email: `${provider}.user@axoncore.ir`,
-        name: provider === "google" ? "کاربر متصل به گوگل" : "کاربر متصل به اپل",
-      }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      soundEngine.playSuccess();
-      localStorage.setItem("axon_user_session", JSON.stringify(data.user));
-      window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: data.user }));
-      setIsVerified(true);
-      setTimeout(() => {
-        router.push("/");
-      }, 1800);
-    }
-  };
+  const slotWidthPx = otpLength >= 8 ? 38 : otpLength >= 6 ? 48 : 58;
+  const slotHeightPx = otpLength >= 8 ? 52 : otpLength >= 6 ? 64 : 74;
+  const slotFontSize = otpLength >= 8 ? "text-lg" : otpLength >= 6 ? "text-xl" : "text-2xl sm:text-3xl";
 
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-4 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none transition-colors duration-500"
       dir="rtl"
     >
-      <div className="relative w-full max-w-sm sm:max-w-md min-h-[540px] [perspective:1200px]">
+      <div className="relative w-full max-w-sm sm:max-w-md min-h-[540px]">
         <div
-          className={`w-full h-full min-h-[540px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-7 sm:p-9 ${
-            isVerified
+          className={`w-full h-full min-h-[540px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-7 sm:p-9 overflow-hidden ${
+            animPhase === "verified"
               ? "border-emerald-500/80 shadow-[0_0_80px_rgba(16,185,129,0.35)] bg-slate-950 text-white"
               : "border-[var(--card-border)] bg-[var(--modal-bg)] backdrop-blur-3xl"
           }`}
         >
-          {isVerified ? (
-            /* وضعیت نهایی: مربع سبز نئونی و نشان تایید Verified */
+          {animPhase === "verified" ? (
             <div className="h-full flex-1 flex flex-col items-center justify-center space-y-6 animate-fadeIn py-12">
               <div className="relative flex items-center justify-center">
                 <span className="w-28 h-28 rounded-[2rem] border-2 border-emerald-400/40 absolute animate-green-radar" />
@@ -367,13 +335,12 @@ export default function UserLoginPage() {
 
               <div className="text-center space-y-1 z-10 pt-2">
                 <h3 className="text-2xl font-black text-emerald-400 tracking-tight font-sans">Verified</h3>
-                <p className="text-xs text-slate-300 font-medium">ورود به حساب کاربری با موفقیت تایید شد</p>
+                <p className="text-xs text-slate-300 font-medium">ورود به حساب با موفقیت تایید شد</p>
                 <span className="text-[10px] text-slate-500 font-mono block pt-1">در حال انتقال به صفحه اصلی...</span>
               </div>
             </div>
           ) : (
             <>
-              {/* تب‌های تغییر مود احراز هویت */}
               <div className="space-y-4">
                 <div className="flex items-center justify-center gap-1.5 p-1 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black">
                   <button
@@ -421,7 +388,6 @@ export default function UserLoginPage() {
                 </div>
               )}
 
-              {/* بدنه حالت‌های ورود */}
               <div className="my-auto py-2">
                 {authMode === "otp" && (
                   otpStep === "phone" ? (
@@ -449,66 +415,78 @@ export default function UserLoginPage() {
                       </button>
                     </form>
                   ) : (
-                    /* اسلات‌های پیامکی با انیمیشن ادغام و بارقه نوری لیزری */
                     <div className="space-y-6">
-                      <div className="relative flex justify-center items-center h-24" dir="ltr">
-                        {digits.map((digit, idx) => {
-                          const totalSlots = otpLength;
-                          const centerOffset = idx - (totalSlots - 1) / 2;
-                          const isSlotActive = focusedIndex === idx;
+                      <div className="w-full flex justify-center items-center h-24 overflow-visible" dir="ltr">
+                        <div className="flex items-center justify-center">
+                          {digits.map((digit, idx) => {
+                            const totalSlots = otpLength;
+                            const centerOffset = idx - (totalSlots - 1) / 2;
+                            const isSlotFocused = focusedIndex === idx;
+                            const isSlotSparking = activeSparkIndex === idx;
 
-                          const mergeTranslateX = isMerging ? `${-centerOffset * 54}px` : "0px";
-                          const mergeScale = isMerging ? "0.9" : "1";
-                          const mergeOpacity = isMerging ? (idx === 0 ? "1" : "0.3") : "1";
+                            const mergeDistance = (slotWidthPx + 10) * centerOffset;
+                            const mergeTranslateX = animPhase === "merging" ? `${-mergeDistance}px` : "0px";
+                            const mergeScale = animPhase === "merging" ? "0.9" : "1";
+                            const mergeOpacity = animPhase === "merging" ? (idx === 0 ? "1" : "0.2") : "1";
 
-                          return (
-                            <div
-                              key={idx}
-                              style={{
-                                transform: `translateX(${mergeTranslateX}) scale(${mergeScale})`,
-                                opacity: mergeOpacity,
-                                transition: "all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)",
-                              }}
-                              className="relative mx-1.5"
-                            >
-                              <input
-                                ref={(el) => { inputRefs.current[idx] = el; }}
-                                type="text"
-                                inputMode="numeric"
-                                maxLength={1}
-                                disabled={isMerging}
-                                value={digit}
-                                onFocus={() => setFocusedIndex(idx)}
-                                onChange={(e) => handleDigitChange(idx, e.target.value)}
-                                onKeyDown={(e) => handleKeyDown(idx, e)}
-                                className={`w-12 h-16 sm:w-14 sm:h-18 rounded-2xl bg-[var(--input-bg)] border text-center font-mono font-black text-2xl text-[var(--text-primary)] outline-none transition-all duration-300 relative z-10 ${
-                                  digit
-                                    ? "border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
-                                    : isSlotActive
-                                    ? "border-cyan-500/80 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-                                    : "border-[var(--card-border)]"
-                                }`}
-                              />
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  width: `${slotWidthPx}px`,
+                                  height: `${slotHeightPx}px`,
+                                  transform: `translateX(${mergeTranslateX}) scale(${mergeScale})`,
+                                  opacity: mergeOpacity,
+                                  transition: "transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.45s ease",
+                                }}
+                                className="relative mx-1 sm:mx-1.5 shrink-0"
+                              >
+                                <input
+                                  ref={(el) => { inputRefs.current[idx] = el; }}
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={1}
+                                  disabled={animPhase !== "idle"}
+                                  value={digit}
+                                  onFocus={() => setFocusedIndex(idx)}
+                                  onChange={(e) => handleDigitChange(idx, e.target.value)}
+                                  onKeyDown={(e) => handleKeyDown(idx, e)}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    minWidth: `${slotWidthPx}px`,
+                                    maxWidth: `${slotWidthPx}px`,
+                                    boxSizing: "border-box",
+                                  }}
+                                  className={`rounded-2xl bg-[var(--input-bg)] border text-center font-mono font-black ${slotFontSize} text-[var(--text-primary)] outline-none transition-all duration-200 relative z-10 p-0 ${
+                                    digit
+                                      ? "border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
+                                      : isSlotFocused
+                                      ? "border-cyan-500/80 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                                      : "border-[var(--card-border)]"
+                                  }`}
+                                />
 
-                              {isSlotActive && !isMerging && (
-                                <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
-                                  <rect
-                                    x="1"
-                                    y="1"
-                                    width="96%"
-                                    height="96%"
-                                    rx="16"
-                                    fill="none"
-                                    stroke="#22d3ee"
-                                    strokeWidth="2.5"
-                                    pathLength="1"
-                                    className="laser-spark-path drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
-                                  />
-                                </svg>
-                              )}
-                            </div>
-                          );
-                        })}
+                                {isSlotSparking && (
+                                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
+                                    <rect
+                                      x="1"
+                                      y="1"
+                                      width="96%"
+                                      height="96%"
+                                      rx="16"
+                                      fill="none"
+                                      stroke="#22d3ee"
+                                      strokeWidth="2.5"
+                                      pathLength="1"
+                                      className="laser-spark-on-type drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
+                                    />
+                                  </svg>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       <div className="text-center">
@@ -636,10 +614,9 @@ export default function UserLoginPage() {
                 )}
               </div>
 
-              {/* دکمه‌های ورود سریع با گوگل و اپل آیدی */}
               <div className="space-y-2.5 pt-3 border-t border-[var(--card-border)]">
                 <span className="text-[10px] text-[var(--text-secondary)] block text-center font-bold">
-                  یا ورود بدون نیاز به ثبت‌نام از طریق حساب‌های رسمی:
+                  یا ورود مستقیم از طریق حساب‌های رسمی:
                 </span>
 
                 <div className="grid grid-cols-2 gap-2">

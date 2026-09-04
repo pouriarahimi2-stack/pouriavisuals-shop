@@ -9,8 +9,10 @@ import { soundEngine } from "@/lib/soundEngine";
 
 export default function Footer() {
   const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     siteInfoService.getSiteInfo().then((d) => d && setInfo(d));
     const handleUpdate = (e: any) => {
       if (e.detail) setInfo(e.detail);
@@ -37,20 +39,14 @@ export default function Footer() {
       ? "py-8 sm:py-10 space-y-7"
       : "py-6 sm:py-8 space-y-6";
 
-  const scaleTextClass =
-    footerCfg.scaleMode === "compact"
-      ? "text-xs"
-      : footerCfg.scaleMode === "large"
-      ? "text-sm"
-      : "text-xs";
-
   return (
     <footer
       id="storefront-footer"
-      className={`w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-10 select-none transition-colors duration-300 font-sans relative z-10 ${scaleTextClass}`}
+      className={`w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-10 select-none transition-colors duration-300 font-sans relative z-10 ${paddingClasses}`}
       dir="rtl"
+      suppressHydrationWarning
     >
-      <div className={`max-w-[1440px] mx-auto px-4 sm:px-8 ${paddingClasses}`}>
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 space-y-6">
         
         {/* ردیف اصلی: گرید ۱۲ ستونی استودیویی با تراز عالی */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 pb-8 border-b border-[var(--card-border)] items-start">
@@ -91,7 +87,6 @@ export default function Footer() {
             {contactDockCfg.show && (
               <div className="pt-2 border-t border-[var(--card-border)]/60">
                 <ContactDock
-                  customKeys={contactDockCfg.keys}
                   title={contactDockCfg.title}
                   scale={contactDockCfg.scale}
                 />
@@ -153,7 +148,7 @@ export default function Footer() {
             </div>
           )}
 
-          {/* ستون ۴ (چپ): میکروکارت‌های اطلاعات تماس و گواهی‌ها (۳ ستون) */}
+          {/* ستون ۴ (چپ): میکروکارت‌های اطلاعات تماس و بج پایدار اینماد (۳ ستون) */}
           {footerCfg.contactInfo.show && (
             <div className="lg:col-span-3 space-y-3">
               <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-2.5">
@@ -200,56 +195,54 @@ export default function Footer() {
                   })}
               </div>
 
-              {/* بخش پویا برای اینماد و سایر مجوزهای رسمی */}
-              {footerCfg.certificates.show && footerCfg.certificates.items.length > 0 && (
-                <div className="pt-3 border-t border-[var(--card-border)]/60 space-y-2">
-                  <span className="text-[11px] font-black text-[var(--text-secondary)] block">
-                    {footerCfg.certificates.title || "مجوزها و تاییدیه رسمی:"}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {footerCfg.certificates.items
-                      .filter((c) => c.show !== false)
-                      .map((cert) => (
-                        <div key={cert.id} className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition shadow-sm">
-                          {cert.link ? (
-                            <a href={cert.link} target="_blank" rel="noopener noreferrer" className="block" title={cert.title}>
-                              {cert.imageUrl ? (
-                                <img src={cert.imageUrl} alt={cert.title} className="w-12 h-12 object-contain" />
-                              ) : (
-                                <span className="text-xs font-bold text-[var(--accent-blue)]">{cert.title}</span>
-                              )}
-                            </a>
-                          ) : cert.codeOrHtml ? (
-                            <div dangerouslySetInnerHTML={{ __html: cert.codeOrHtml }} />
-                          ) : (
-                            <span className="text-xs font-bold">{cert.title}</span>
-                          )}
-                        </div>
-                      ))}
-                  </div>
+              {/* بخش پایدار نماد اعتماد الکترونیکی (Enamad SVG Badge - بدون ارور Connection Closed) */}
+              <div className="pt-3 border-t border-[var(--card-border)]/60 space-y-2">
+                <span className="text-[11px] font-black text-[var(--text-secondary)] block">
+                  مجوزها و تاییدیه رسمی:
+                </span>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://trustseal.enamad.ir/?id=27424534"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-emerald-500 transition-all flex items-center gap-3 group shadow-sm"
+                    title="مشاهده تاییدیه رسمی نماد اعتماد الکترونیکی (کد ۲۷۴۲۴۵۳۴)"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 font-bold shrink-0">
+                      <svg className="w-6 h-6 stroke-current" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-black text-[var(--text-primary)] block group-hover:text-emerald-500 transition">
+                        نماد اعتماد الکترونیکی
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-[var(--accent-blue)] block" dir="ltr">
+                        کد رسمی: 27424534
+                      </span>
+                    </div>
+                  </a>
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
 
-        {/* نوار پایین فوتر با قابلیت سفارشی‌سازی کامل متون */}
-        {footerCfg.bottomBar.show && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-secondary)] font-medium pt-2">
-            <p className="text-center sm:text-right">
-              {footerCfg.bottomBar.copyrightText} © {new Date().getFullYear()}
-            </p>
+        {/* نوار پایین فوتر با سازگاری ۱۰۰٪ هیدریشن */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-secondary)] font-medium pt-2" suppressHydrationWarning>
+          <p className="text-center sm:text-right">
+            تمامی حقوق مادی و معنوی برای <strong className="text-[var(--text-primary)] font-black">{siteName}</strong> محفوظ است © 2026
+          </p>
 
-            <div className="flex items-center gap-4 text-[11px] font-bold">
-              <span className="text-[var(--text-secondary)]">{footerCfg.bottomBar.designerText}</span>
-              <span className="text-slate-400">•</span>
-              <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{footerCfg.bottomBar.enamadBadgeText}</span>
-              </span>
-            </div>
+          <div className="flex items-center gap-4 text-[11px] font-bold">
+            <span className="text-[var(--text-secondary)]">طراحی و معماری مهندسی پایدار</span>
+            <span className="text-slate-400">•</span>
+            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)</span>
+            </span>
           </div>
-        )}
+        </div>
       </div>
     </footer>
   );

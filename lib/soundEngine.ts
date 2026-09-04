@@ -1,23 +1,28 @@
 // File Path: lib/soundEngine.ts
 /**
- * موتور سنتز بلادرنگ صداهای سیستمی و فیدبک‌های لمسی بر پایه Web Audio API
- * با قابلیت خودکار بازگشایی تعلیق در مرورگرهای موبایل (iOS Safari / Android)
+ * موتور سنتز صداهای سیستمی و فیدبک لمسی بر پایه Web Audio API
+ * رفع کامل ارور AudioContext was not allowed to start با فعال‌سازی تنبل صرفاً در زمان کلیک
  */
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
 
-  private initContext() {
-    if (typeof window === "undefined") return;
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
+  private initContext(): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          this.ctx = new AudioCtx();
+        }
       }
-    }
-    if (this.ctx && this.ctx.state === "suspended") {
-      this.ctx.resume().catch(() => {});
+      if (this.ctx && this.ctx.state === "suspended") {
+        this.ctx.resume().catch(() => {});
+      }
+      return !!this.ctx;
+    } catch {
+      return false;
     }
   }
 
@@ -25,12 +30,10 @@ class SoundEngine {
     this.isMuted = muted;
   }
 
-  // ۱. صدای کلیک بسیار نرم و لوکس اپلی
   public playClick() {
     if (this.isMuted) return;
     try {
-      this.initContext();
-      if (!this.ctx) return;
+      if (!this.initContext() || !this.ctx) return;
 
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -39,7 +42,7 @@ class SoundEngine {
       osc.frequency.setValueAtTime(850, this.ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(220, this.ctx.currentTime + 0.035);
 
-      gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+      gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.035);
 
       osc.connect(gain);
@@ -50,12 +53,10 @@ class SoundEngine {
     } catch {}
   }
 
-  // ۲. صدای اضافه شدن به سبد خرید
   public playAddToCart() {
     if (this.isMuted) return;
     try {
-      this.initContext();
-      if (!this.ctx) return;
+      if (!this.initContext() || !this.ctx) return;
 
       const now = this.ctx.currentTime;
       const osc1 = this.ctx.createOscillator();
@@ -65,13 +66,13 @@ class SoundEngine {
       osc1.type = "sine";
       osc2.type = "sine";
 
-      osc1.frequency.setValueAtTime(523.25, now); // C5
-      osc1.frequency.exponentialRampToValueAtTime(659.25, now + 0.07); // E5
+      osc1.frequency.setValueAtTime(523.25, now);
+      osc1.frequency.exponentialRampToValueAtTime(659.25, now + 0.07);
 
       osc2.frequency.setValueAtTime(659.25, now + 0.07);
-      osc2.frequency.exponentialRampToValueAtTime(1046.5, now + 0.16); // C6
+      osc2.frequency.exponentialRampToValueAtTime(1046.5, now + 0.16);
 
-      gain.gain.setValueAtTime(0.07, now);
+      gain.gain.setValueAtTime(0.06, now);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
 
       osc1.connect(gain);
@@ -85,12 +86,10 @@ class SoundEngine {
     } catch {}
   }
 
-  // ۳. صدای انفصال و حرکت لایه‌های سه‌بعدی (Exploded View)
   public playExplodeShift(freqMultiplier: number = 1) {
     if (this.isMuted) return;
     try {
-      this.initContext();
-      if (!this.ctx) return;
+      if (!this.initContext() || !this.ctx) return;
 
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
@@ -106,7 +105,7 @@ class SoundEngine {
       filter.type = "lowpass";
       filter.frequency.setValueAtTime(1200, now);
 
-      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.setValueAtTime(0.05, now);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
 
       osc.connect(filter);
@@ -118,15 +117,13 @@ class SoundEngine {
     } catch {}
   }
 
-  // ۴. صدای تایید پرداخت و صدور بارنامه
   public playSuccess() {
     if (this.isMuted) return;
     try {
-      this.initContext();
-      if (!this.ctx) return;
+      if (!this.initContext() || !this.ctx) return;
 
       const now = this.ctx.currentTime;
-      const notes = [523.25, 659.25, 783.99, 1046.5]; // Arpeggio C Major
+      const notes = [523.25, 659.25, 783.99, 1046.5];
 
       notes.forEach((freq, idx) => {
         if (!this.ctx) return;
@@ -136,7 +133,7 @@ class SoundEngine {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + idx * 0.06);
 
-        gain.gain.setValueAtTime(0.06, now + idx * 0.06);
+        gain.gain.setValueAtTime(0.05, now + idx * 0.06);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.06 + 0.3);
 
         osc.connect(gain);
@@ -150,3 +147,4 @@ class SoundEngine {
 }
 
 export const soundEngine = new SoundEngine();
+export default soundEngine;

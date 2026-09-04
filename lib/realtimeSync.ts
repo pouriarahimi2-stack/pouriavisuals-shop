@@ -37,7 +37,7 @@ class MasterRealtimeEngine {
   private channel: RealtimeChannel | null = null;
   private broadcastBus: BroadcastChannel | null = null;
   private isSubscribed: boolean = false;
-  private reconnectTimer: any = null;
+  private isChannelCreated: boolean = false;
 
   constructor() {
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
@@ -79,9 +79,10 @@ class MasterRealtimeEngine {
   }
 
   public init(): () => void {
-    if (typeof window === "undefined" || this.isSubscribed) return () => {};
+    if (typeof window === "undefined" || this.isChannelCreated) return () => {};
 
     try {
+      this.isChannelCreated = true;
       this.channel = supabase.channel("axon_main_stream_v2026", {
         config: { broadcast: { ack: false } },
       });
@@ -106,11 +107,7 @@ class MasterRealtimeEngine {
     } catch {}
 
     return () => {
-      if (this.channel) {
-        supabase.removeChannel(this.channel);
-        this.channel = null;
-        this.isSubscribed = false;
-      }
+      // نگه‌داشتن پایدار ارتباط به عنوان سینگلتون سراسری
     };
   }
 }

@@ -31,7 +31,7 @@ interface CartContextType {
   toggleCart: () => void;
   openCart: () => void;
   closeCart: () => void;
-  addToCart: (item: any) => void;
+  addToCart: (item: any, openDrawer?: boolean) => void;
   removeFromCart: (id: string | number) => void;
   updateQuantity: (id: string | number, deltaOrQty: number) => void;
   clearCart: () => void;
@@ -114,7 +114,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
-  const addToCart = useCallback((item: any) => {
+  const addToCart = useCallback((item: any, openDrawer: boolean = false) => {
     const itemId = String(item.id);
     const itemTitle = item.title || item.name || "کالای دیجیتال";
     const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);
@@ -153,7 +153,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
-    setIsCartOpen(true);
+    if (openDrawer) {
+      setIsCartOpen(true);
+    }
   }, []);
 
   const removeFromCart = useCallback((id: string | number) => {

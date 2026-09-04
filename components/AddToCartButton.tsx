@@ -23,7 +23,7 @@ export default function AddToCartButton({
   className = "",
   showCounter = true,
 }: AddToCartButtonProps) {
-  const { cartItems, addToCart } = useCart();
+  const { cartItems, addToCart, openCart } = useCart();
   const [animState, setAnimState] = useState<"idle" | "adding">("idle");
   const [bumpCounter, setBumpCounter] = useState(false);
 
@@ -42,27 +42,31 @@ export default function AddToCartButton({
     soundEngine.playAddToCart();
     setAnimState("adding");
 
-    // افزودن کالا به کانتکست سبد خرید
-    addToCart({
-      id: product.id,
-      title: product.title,
-      name: product.title,
-      price: product.price,
-      image: product.image,
-      stock: stockLimit,
-      category: product.category || "تکنولوژی",
-      quantity: 1,
-    });
+    // ۱. افزودن فوری کالا به وضعیت سبد خرید (بدون باز کردن شتاب‌زده کشو)
+    addToCart(
+      {
+        id: product.id,
+        title: product.title,
+        name: product.title,
+        price: product.price,
+        image: product.image,
+        stock: stockLimit,
+        category: product.category || "تکنولوژی",
+        quantity: 1,
+      },
+      false // عدم باز شدن ناگهانی تا اتمام انیمیشن
+    );
 
-    // انیمیشن پرتاب بسته و جهش شمارنده
+    // ۲. انیمیشن جهش الاستیک شمارنده در ثانیه ۰.۶
     setTimeout(() => {
       setBumpCounter(true);
       setTimeout(() => setBumpCounter(false), 550);
     }, 600);
 
-    // بازنشانی وضعیت دکمه پس از اتمام چرخه کامل رانش چرخ‌دستی (دقیقاً ۱۲۵۰ میلی‌ثانیه)
+    // ۳. پس از تکمیل دقیق ۱۲۵۰ میلی‌ثانیه انیمیشن چرخ‌دستی: ریست وضعیت دکمه + باز شدن سبد خرید
     setTimeout(() => {
       setAnimState("idle");
+      openCart(); // باز شدن نرم کشوی سبد خرید دقیقاً پس از اتمام کامل انیمیشن دکمه
     }, 1250);
   };
 
@@ -110,7 +114,6 @@ export default function AddToCartButton({
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
-              {/* بدنه و دسته چرخ‌دستی */}
               <path
                 d="M3 3H5.2L7.1 14.2C7.25 15.1 8 15.8 8.9 15.8H18.2C19.1 15.8 19.85 15.1 20 14.2L21.4 7.2C21.55 6.4 20.95 5.7 20.15 5.7H6.2"
                 stroke="currentColor"
@@ -118,7 +121,6 @@ export default function AddToCartButton({
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              {/* چرخ جلو */}
               <circle
                 cx="9.5"
                 cy="19.5"
@@ -126,7 +128,6 @@ export default function AddToCartButton({
                 fill="currentColor"
                 className={isAnimating ? "animate-kinetic-wheel-spin origin-[9.5px_19.5px]" : ""}
               />
-              {/* چرخ عقب */}
               <circle
                 cx="17.5"
                 cy="19.5"
@@ -157,7 +158,7 @@ export default function AddToCartButton({
         <div className="absolute inset-0 rounded-full bg-gradient-to-t from-white/0 via-white/5 to-white/10 pointer-events-none" />
       </button>
 
-      {/* شمارنده زیر دکمه با انیمیشن جهش فنری دقیقا همانند ویدیو (X in your cart) */}
+      {/* شمارنده زیر دکمه با انیمیشن جهش فنری (X عدد در سبد شما) */}
       {showCounter && (
         <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] font-sans">
           <span

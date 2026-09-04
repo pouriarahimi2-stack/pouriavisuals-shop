@@ -1,16 +1,14 @@
 // File Path: fix.js
 /**
  * ═══════════════════════════════════════════════════════════════════════════════════════════
- *  👑 AXON MASTER KINETIC "ADD TO CART" BUTTON ENGINE (v2026.11)
+ *  👑 AXON MASTER SEQUENTIAL CART DRAWER OPENING ENGINE (v2026.12)
  * ───────────────────────────────────────────────────────────────────────────────────────────
- *  Exact Video Animation Specifications:
- *   1. Text collapse & cart horizontal centering.
- *   2. Package/Bag vertical drop into cart basket with elastic bounce physics.
- *   3. Cart kinetic reaction & high-velocity drive away with spinning wheels.
- *   4. Seamless wrap-around re-entry and button text restoration.
- *   5. Spring-physics counter bump animation underneath the button.
- *   6. Strict No-Truncation Rule enforced.
- *   7. Automated Git stage, commit & push to remote repository for Vercel deployment.
+ *  Specifications:
+ *   1. Updates CartContext to support delayed/parameterized drawer opening.
+ *   2. Synchronizes AddToCartButton animation lifecycle: cart drawer opens smoothly
+ *      EXACTLY at 1250ms after the parcel drop, drive-away and counter bump conclude.
+ *   3. Strict No-Truncation Rule enforced on all files.
+ *   4. Automated Git stage, atomic commit and push to remote repository for Vercel deployment.
  * ═══════════════════════════════════════════════════════════════════════════════════════════
  */
 
@@ -20,7 +18,7 @@ const { execSync } = require('child_process');
 
 console.clear();
 console.log('\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🛒 استقرار موتور انیمیشن فوق‌پیشرفته و جنبشی دکمه Add To Cart (دقیقاً مطابق ویدیو)');
+console.log('\x1b[1m\x1b[33m%s\x1b[0m', '   🛒 اتصال هوشمند توالی انیمیشن: باز شدن خودکار سبد خرید دقیقاً پس از اتمام انیمیشن دکمه');
 console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 
 function updateFile(relPath, content) {
@@ -34,207 +32,326 @@ function updateFile(relPath, content) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۱. افزودن کی‌فریم‌های انیمیشن جنبشی چرخ‌دستی، بسته و شمارنده به استایل‌های سراسری (app/globals.css)
+// ۱. بروزرسانی CartContext جهت کنترل زمان باز شدن کشو (context/CartContext.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-updateFile('app/globals.css', `@tailwind base;
-@tailwind components;
-@tailwind utilities;
+updateFile('context/CartContext.tsx', `// File Path: context/CartContext.tsx
+"use client";
 
-:root {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --card-border: rgba(15, 23, 42, 0.08);
-  --card-border-hover: rgba(2, 132, 199, 0.35);
-  --accent-blue: #0284c7;
-  --accent-glow: rgba(2, 132, 199, 0.15);
-  --modal-bg: #ffffff;
-  --input-bg: #f1f5f9;
-  --glass-surface: rgba(255, 255, 255, 0.85);
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { couponService } from "@/services/couponService";
+
+export interface CartItem {
+  id: string | number;
+  title: string;
+  name?: string;
+  price: number;
+  discountPrice?: number;
+  image: string;
+  quantity: number;
+  stock?: number;
+  category?: string;
 }
 
-.dark {
-  --bg-primary: #07090e;
-  --bg-secondary: #0c1017;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --card-border: rgba(255, 255, 255, 0.08);
-  --card-border-hover: rgba(56, 189, 248, 0.4);
-  --accent-blue: #38bdf8;
-  --accent-glow: rgba(56, 189, 248, 0.3);
-  --modal-bg: #0c1017;
-  --input-bg: rgba(255, 255, 255, 0.04);
-  --glass-surface: rgba(12, 16, 23, 0.75);
+export interface AppliedCoupon {
+  code: string;
+  discountPercent: number;
+  maxDiscount?: number;
 }
 
-html, body {
-  overflow-x: hidden !important;
-  width: 100%;
-  max-width: 100vw;
-  scroll-behavior: smooth;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  -webkit-tap-highlight-color: transparent;
+interface CartContextType {
+  cartItems: CartItem[];
+  cart: CartItem[];
+  totalItems: number;
+  isCartOpen: boolean;
+  setIsCartOpen: (open: boolean) => void;
+  toggleCart: () => void;
+  openCart: () => void;
+  closeCart: () => void;
+  addToCart: (item: any, openDrawer?: boolean) => void;
+  removeFromCart: (id: string | number) => void;
+  updateQuantity: (id: string | number, deltaOrQty: number) => void;
+  clearCart: () => void;
+  appliedCoupon: AppliedCoupon | null;
+  applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
+  removeCoupon: () => void;
+  totalPrice: number;
+  totalAmount: number;
+  discountAmount: number;
+  finalPayable: number;
+  freeShippingThreshold: number;
+  amountUntilFreeShipping: number;
+  submitOrder?: (orderData: any) => { id: string; [key: string]: any };
 }
 
-body {
-  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -webkit-overflow-scrolling: touch;
-  transition: background-color 0.3s ease, color 0.3s ease;
+const CartContext = createContext<CartContextType | undefined>(undefined);
+const CART_STORAGE_KEY = "axon_cart_store_v2026";
+const COUPON_STORAGE_KEY = "axon_active_coupon_v2026";
+
+export function CartProvider({ children }: { children: React.ReactNode }) {
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [freeShippingThreshold] = useState<number>(2000000);
+
+  // بارگذاری داده‌ها از LocalStorage در مرحله کلاینت
+  useEffect(() => {
+    try {
+      const localCart = localStorage.getItem(CART_STORAGE_KEY);
+      if (localCart) {
+        const parsed = JSON.parse(localCart);
+        if (Array.isArray(parsed)) setCartItems(parsed);
+      }
+
+      const localCoupon = localStorage.getItem(COUPON_STORAGE_KEY);
+      if (localCoupon) {
+        const parsed = JSON.parse(localCoupon);
+        if (parsed && typeof parsed === "object") setAppliedCoupon(parsed);
+      }
+    } catch (err) {
+      console.error("Cart hydration error:", err);
+    }
+  }, []);
+
+  // همگام‌سازی بلادرنگ سبد خرید بین تمام تب‌های باز مرورگر (Cross-Tab Sync)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === CART_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) setCartItems(parsed);
+        } catch {}
+      }
+      if (e.key === COUPON_STORAGE_KEY) {
+        try {
+          setAppliedCoupon(e.newValue ? JSON.parse(e.newValue) : null);
+        } catch {}
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  const persistCart = useCallback((items: CartItem[]) => {
+    setCartItems(items);
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    } catch {}
+  }, []);
+
+  const persistCoupon = useCallback((coupon: AppliedCoupon | null) => {
+    setAppliedCoupon(coupon);
+    try {
+      if (coupon) {
+        localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(coupon));
+      } else {
+        localStorage.removeItem(COUPON_STORAGE_KEY);
+      }
+    } catch {}
+  }, []);
+
+  const addToCart = useCallback((item: any, openDrawer: boolean = false) => {
+    const itemId = String(item.id);
+    const itemTitle = item.title || item.name || "کالای دیجیتال";
+    const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);
+    const itemImage = item.image || item.image_url || item.images?.[0] || "/placeholder.png";
+    const itemStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
+    const addQuantity = Number(item.quantity || 1);
+
+    setCartItems((prevItems) => {
+      const existingIndex = prevItems.findIndex((i) => String(i.id) === itemId);
+      let updated: CartItem[];
+
+      if (existingIndex > -1) {
+        const existingItem = prevItems[existingIndex];
+        const newQty = Math.min(itemStock, existingItem.quantity + addQuantity);
+        updated = prevItems.map((i, idx) => (idx === existingIndex ? { ...i, quantity: newQty } : i));
+      } else {
+        updated = [
+          ...prevItems,
+          {
+            id: itemId,
+            title: itemTitle,
+            name: itemTitle,
+            price: itemPrice,
+            discountPrice: item.discountPrice ? Number(item.discountPrice) : undefined,
+            image: itemImage,
+            quantity: Math.min(itemStock, addQuantity),
+            stock: itemStock,
+            category: item.category || "عمومی",
+          },
+        ];
+      }
+
+      try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (openDrawer) {
+      setIsCartOpen(true);
+    }
+  }, []);
+
+  const removeFromCart = useCallback((id: string | number) => {
+    setCartItems((prev) => {
+      const updated = prev.filter((i) => String(i.id) !== String(id));
+      try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
+
+  const updateQuantity = useCallback((id: string | number, deltaOrQty: number) => {
+    setCartItems((prev) => {
+      const existing = prev.find((i) => String(i.id) === String(id));
+      if (!existing) return prev;
+
+      let newQty = deltaOrQty;
+      if (deltaOrQty === 1 || deltaOrQty === -1) {
+        newQty = existing.quantity + deltaOrQty;
+      }
+
+      if (newQty <= 0) {
+        const filtered = prev.filter((i) => String(i.id) !== String(id));
+        try {
+          localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(filtered));
+        } catch {}
+        return filtered;
+      }
+
+      const maxLimit = existing.stock !== undefined && existing.stock !== null ? existing.stock : 999;
+      const finalQty = Math.min(maxLimit, newQty);
+
+      const updated = prev.map((i) => (String(i.id) === String(id) ? { ...i, quantity: finalQty } : i));
+      try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
+
+  const clearCart = useCallback(() => {
+    persistCart([]);
+    persistCoupon(null);
+  }, [persistCart, persistCoupon]);
+
+  const openCart = () => setIsCartOpen(true);
+  const closeCart = () => setIsCartOpen(false);
+  const toggleCart = () => setIsCartOpen((prev) => !prev);
+
+  const totalPrice = useMemo(() => {
+    return cartItems.reduce(
+      (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
+      0
+    );
+  }, [cartItems]);
+
+  const discountAmount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    let disc = Math.round((totalPrice * appliedCoupon.discountPercent) / 100);
+    if (appliedCoupon.maxDiscount && disc > appliedCoupon.maxDiscount) {
+      disc = appliedCoupon.maxDiscount;
+    }
+    return disc;
+  }, [totalPrice, appliedCoupon]);
+
+  const finalPayable = useMemo(() => {
+    return Math.max(0, totalPrice - discountAmount);
+  }, [totalPrice, discountAmount]);
+
+  const totalItems = useMemo(() => {
+    return cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+  }, [cartItems]);
+
+  const amountUntilFreeShipping = Math.max(0, freeShippingThreshold - totalPrice);
+
+  const applyCoupon = async (code: string) => {
+    const clean = code.trim().toUpperCase();
+    const res = await couponService.validateCoupon(clean, totalPrice);
+    if (res.valid && res.coupon) {
+      const discountPercent =
+        res.coupon.type === "percent" || res.coupon.discount_type === "percent"
+          ? Number(res.coupon.value || res.coupon.discount_value || 0)
+          : Math.round((res.discount / (totalPrice || 1)) * 100);
+
+      const newCoupon = {
+        code: clean,
+        discountPercent,
+        maxDiscount: res.coupon.max_discount || res.coupon.max_discount_amount || undefined,
+      };
+
+      persistCoupon(newCoupon);
+      return { success: true, message: res.message };
+    }
+    return { success: false, message: res.message || "کد تخفیف نامعتبر است." };
+  };
+
+  const removeCoupon = () => persistCoupon(null);
+
+  const submitOrder = (orderData: any) => {
+    const orderId = \`ORD-\${Date.now().toString().slice(-6)}\`;
+    const fullOrder = {
+      id: orderId,
+      ...orderData,
+      items: cartItems,
+      totalAmount: totalPrice,
+      finalAmount: finalPayable,
+      discountAmount,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const existing = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([fullOrder, ...existing]));
+    } catch {}
+    return fullOrder;
+  };
+
+  return (
+    <CartContext.Provider
+      value={{
+        cartItems,
+        cart: cartItems,
+        totalItems,
+        isCartOpen,
+        setIsCartOpen,
+        toggleCart,
+        openCart,
+        closeCart,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+        appliedCoupon,
+        applyCoupon,
+        removeCoupon,
+        totalPrice,
+        totalAmount: totalPrice,
+        discountAmount,
+        finalPayable,
+        freeShippingThreshold,
+        amountUntilFreeShipping,
+        submitOrder,
+      }}
+    >
+      {children}
+    </CartContext.Provider>
+  );
 }
 
-.glass-morphism {
-  background: var(--glass-surface);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 10px 35px 0 rgba(0, 0, 0, 0.08);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.dark .glass-morphism {
-  box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.5);
-}
-
-.glass-morphism:hover {
-  border-color: var(--card-border-hover);
-  box-shadow: 0 14px 45px 0 var(--accent-glow);
-}
-
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes bounceShort {
-  0%, 100% { transform: translate(-50%, 0); }
-  50% { transform: translate(-50%, -4px); }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-bounce-short {
-  animation: bounceShort 2.4s ease-in-out infinite;
-}
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   🛒 کی‌فریم‌های انیمیشن چرخ‌دستی، پرتاب بسته و شمارنده جنبشی (Kinetic Cart Animation)
-   ══════════════════════════════════════════════════════════════════════════════ */
-
-@keyframes kineticItemDrop {
-  0% {
-    transform: translateY(-38px) scale(0.6);
-    opacity: 0;
+export function useCart() {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error("useCart must be used within a CartProvider");
   }
-  35% {
-    opacity: 1;
-    transform: translateY(-10px) scale(1.05);
-  }
-  65% {
-    transform: translateY(2px) scale(0.95);
-  }
-  85% {
-    transform: translateY(-1px) scale(1.02);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes kineticCartRide {
-  0% {
-    transform: translateX(0);
-  }
-  42% {
-    transform: translateX(0) rotate(0deg);
-  }
-  48% {
-    transform: translateX(-4px) rotate(-3deg);
-  }
-  64% {
-    transform: translateX(120px) rotate(4deg);
-    opacity: 0;
-  }
-  65% {
-    transform: translateX(-120px) rotate(-4deg);
-    opacity: 0;
-  }
-  78% {
-    opacity: 1;
-    transform: translateX(-6px) rotate(2deg);
-  }
-  90% {
-    transform: translateX(2px) rotate(-1deg);
-  }
-  100% {
-    transform: translateX(0) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-@keyframes kineticWheelSpin {
-  0% {
-    transform: rotate(0deg);
-  }
-  45% {
-    transform: rotate(0deg);
-  }
-  65% {
-    transform: rotate(720deg);
-  }
-  100% {
-    transform: rotate(1440deg);
-  }
-}
-
-@keyframes kineticCounterBump {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.4) translateY(-3px);
-    color: #10b981;
-  }
-  70% {
-    transform: scale(0.92) translateY(1px);
-  }
-  100% {
-    transform: scale(1) translateY(0);
-  }
-}
-
-.animate-kinetic-item-drop {
-  animation: kineticItemDrop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-.animate-kinetic-cart-ride {
-  animation: kineticCartRide 1.35s cubic-bezier(0.45, 0, 0.55, 1) forwards;
-}
-
-.animate-kinetic-wheel-spin {
-  animation: kineticWheelSpin 1.35s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-
-.animate-kinetic-counter-bump {
-  animation: kineticCounterBump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  return context;
 }
 `);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// ۲. بازنویسی دکمه اختصاصی خرید محصول دقیقاً مطابق ویدیوی نمونه (components/AddToCartButton.tsx)
+// ۲. اعمال باز شدن کشوی سبد پس از پایان ۱۲۵۰ میلی‌ثانیه‌ای انیمیشن (components/AddToCartButton.tsx)
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 updateFile('components/AddToCartButton.tsx', `// File Path: components/AddToCartButton.tsx
 "use client";
@@ -261,7 +378,7 @@ export default function AddToCartButton({
   className = "",
   showCounter = true,
 }: AddToCartButtonProps) {
-  const { cartItems, addToCart } = useCart();
+  const { cartItems, addToCart, openCart } = useCart();
   const [animState, setAnimState] = useState<"idle" | "adding">("idle");
   const [bumpCounter, setBumpCounter] = useState(false);
 
@@ -280,27 +397,31 @@ export default function AddToCartButton({
     soundEngine.playAddToCart();
     setAnimState("adding");
 
-    // افزودن کالا به کانتکست سبد خرید
-    addToCart({
-      id: product.id,
-      title: product.title,
-      name: product.title,
-      price: product.price,
-      image: product.image,
-      stock: stockLimit,
-      category: product.category || "تکنولوژی",
-      quantity: 1,
-    });
+    // ۱. افزودن فوری کالا به وضعیت سبد خرید (بدون باز کردن شتاب‌زده کشو)
+    addToCart(
+      {
+        id: product.id,
+        title: product.title,
+        name: product.title,
+        price: product.price,
+        image: product.image,
+        stock: stockLimit,
+        category: product.category || "تکنولوژی",
+        quantity: 1,
+      },
+      false // عدم باز شدن ناگهانی تا اتمام انیمیشن
+    );
 
-    // انیمیشن پرتاب بسته و جهش شمارنده
+    // ۲. انیمیشن جهش الاستیک شمارنده در ثانیه ۰.۶
     setTimeout(() => {
       setBumpCounter(true);
       setTimeout(() => setBumpCounter(false), 550);
     }, 600);
 
-    // بازنشانی وضعیت دکمه پس از اتمام چرخه کامل رانش چرخ‌دستی (دقیقاً ۱۲۵۰ میلی‌ثانیه)
+    // ۳. پس از تکمیل دقیق ۱۲۵۰ میلی‌ثانیه انیمیشن چرخ‌دستی: ریست وضعیت دکمه + باز شدن سبد خرید
     setTimeout(() => {
       setAnimState("idle");
+      openCart(); // باز شدن نرم کشوی سبد خرید دقیقاً پس از اتمام کامل انیمیشن دکمه
     }, 1250);
   };
 
@@ -348,7 +469,6 @@ export default function AddToCartButton({
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
-              {/* بدنه و دسته چرخ‌دستی */}
               <path
                 d="M3 3H5.2L7.1 14.2C7.25 15.1 8 15.8 8.9 15.8H18.2C19.1 15.8 19.85 15.1 20 14.2L21.4 7.2C21.55 6.4 20.95 5.7 20.15 5.7H6.2"
                 stroke="currentColor"
@@ -356,7 +476,6 @@ export default function AddToCartButton({
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              {/* چرخ جلو */}
               <circle
                 cx="9.5"
                 cy="19.5"
@@ -364,7 +483,6 @@ export default function AddToCartButton({
                 fill="currentColor"
                 className={isAnimating ? "animate-kinetic-wheel-spin origin-[9.5px_19.5px]" : ""}
               />
-              {/* چرخ عقب */}
               <circle
                 cx="17.5"
                 cy="19.5"
@@ -395,7 +513,7 @@ export default function AddToCartButton({
         <div className="absolute inset-0 rounded-full bg-gradient-to-t from-white/0 via-white/5 to-white/10 pointer-events-none" />
       </button>
 
-      {/* شمارنده زیر دکمه با انیمیشن جهش فنری دقیقا همانند ویدیو (X in your cart) */}
+      {/* شمارنده زیر دکمه با انیمیشن جهش فنری (X عدد در سبد شما) */}
       {showCounter && (
         <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] font-sans">
           <span
@@ -425,7 +543,7 @@ try {
   execSync('git add .', { stdio: 'inherit' });
 
   console.log('\n  \x1b[34m[2/3]\x1b[0m در حال ثبت کامیت ساختاری (git commit)...');
-  const commitMessage = `feat(ui): exact kinetic add-to-cart button animation matching video with item drop & wheel drive [${new Date().toLocaleTimeString('fa-IR')}]`;
+  const commitMessage = `feat(cart): open cart drawer smoothly after kinetic button animation completes [${new Date().toLocaleTimeString('fa-IR')}]`;
   try {
     execSync(`git commit -m "${commitMessage}"`, { stdio: 'inherit' });
   } catch (cErr) {
@@ -441,7 +559,7 @@ try {
   execSync(`git push origin ${currentBranch}`, { stdio: 'inherit' });
 
   console.log('\n\x1b[35m%s\x1b[0m', '╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗');
-  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 دکمه متحرک خرید دقیقاً مطابق با ویدیوی مرجع با موفقیت پیاده‌سازی و مستقر گردید!');
+  console.log('\x1b[1m\x1b[32m%s\x1b[0m', '   🎉 باز شدن سبد خرید پس از اتمام انیمیشن با موفقیت اعمال و روی سرور مستقر گردید!');
   console.log('\x1b[35m%s\x1b[0m', '╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
 } catch (gitErr) {
   console.error('\n\x1b[31m[ERROR]\x1b[0m خطا در اتصال Git:', gitErr.message);

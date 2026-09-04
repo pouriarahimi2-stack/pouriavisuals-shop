@@ -8,24 +8,32 @@ import { siteInfoService, DEFAULT_AUTH_SECURITY_CONFIG, AuthSecurityConfig } fro
 import { themeEngine } from "@/lib/themeEngine";
 
 export default function AdminLoginPage() {
-  const [authMode, setAuthMode] = useState<"pin" | "credentials">("pin");
+  const [authMode, setAuthMode] = useState<"pin" | "credentials" | "recovery">("pin");
   const [securityConfig, setSecurityConfig] = useState<AuthSecurityConfig>(DEFAULT_AUTH_SECURITY_CONFIG);
   const [pinLength, setPinLength] = useState<number>(4);
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
   const [focusedIndex, setFocusedIndex] = useState<number>(0);
 
-  // شاخص اسلاتی که در حال حاضر با زدن کلید در حال بارقه‌زنی تک‌دور است
+  // بارقه لیزری تک‌دور فقط زمان تایپ
   const [activeSparkIndex, setActiveSparkIndex] = useState<number | null>(null);
   const sparkTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // فازهای انیمیشن: idle -> merging (ادغام اسلات‌ها) -> verified (تبدیل به مربع سبز)
+  // فازهای انیمیشن: idle -> merging -> verified
   const [animPhase, setAnimPhase] = useState<"idle" | "merging" | "verified">("idle");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // فرم ورود با نام کاربری
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // فرم فراموشی رمز ادمین با ایمیل
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [newAdminPin, setNewAdminPin] = useState("");
+  const [recoveryStep, setRecoveryStep] = useState<"email" | "verify">("email");
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -49,7 +57,6 @@ export default function AdminLoginPage() {
     }
   }, [authMode, animPhase, pinLength]);
 
-  // راه‌اندازی بارقه لیزری تک‌دور فقط هنگام تایپ عدد (دقیقاً ۴۵۰ میلی‌ثانیه یک دور و خاموش)
   const triggerSingleLapSpark = (index: number) => {
     if (sparkTimerRef.current) clearTimeout(sparkTimerRef.current);
     setActiveSparkIndex(index);
@@ -66,7 +73,6 @@ export default function AdminLoginPage() {
     soundEngine.playClick();
     setErrorMessage(null);
 
-    // زدن بارقه فقط هنگام وارد کردن عدد
     if (clean) {
       triggerSingleLapSpark(index);
     }
@@ -91,8 +97,6 @@ export default function AdminLoginPage() {
   const triggerVerificationSequence = async (pinCode: string) => {
     setLoading(true);
     soundEngine.playClick();
-
-    // فاز ۱: ادغام اسلات‌ها در مرکز (Merge & Collapse)
     setAnimPhase("merging");
 
     const targetPin = securityConfig.adminDeck.pin || "1234";
@@ -115,7 +119,6 @@ export default function AdminLoginPage() {
         };
         localStorage.setItem("axon_admin_active_session_v2026", JSON.stringify(userObj));
 
-        // فاز ۲: پس از ۴۵۰ میلی‌ثانیه ادغام -> تبدیل به مربع سبز نئونی و تایید Verified
         setTimeout(() => {
           soundEngine.playSuccess();
           setAnimPhase("verified");
@@ -146,7 +149,7 @@ export default function AdminLoginPage() {
       } else {
         setTimeout(() => {
           setAnimPhase("idle");
-          setErrorMessage("کد امنیتی نادرست است.");
+          setErrorMessage("کد امنیتی اشتباه است.");
           setDigits(Array(pinLength).fill(""));
           setFocusedIndex(0);
           inputRefs.current[0]?.focus();
@@ -192,18 +195,81 @@ export default function AdminLoginPage() {
           window.location.href = "/admin";
         }, 1600);
       } else {
-        setErrorMessage("خطا در ورود به سیستم.");
+        setErrorMessage("خطا در ورود.");
         setLoading(false);
       }
     }
   };
 
-  const adminDeckCfg = securityConfig.adminDeck;
+  const handleAdminForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setErrorMessage(null);
+    setLoading(true);
 
-  // محاسبه ابعاد دقیق پیکسلی اسلات‌ها بر اساس تعداد ارقام (ضد بیرون‌زدگی ۱۰۰٪)
+    try {
+      const res = await fetch("/api/auth/recovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "admin_forgot", email: recoveryEmail }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        soundEngine.playSuccess();
+        setSuccessMessage(data.message);
+        setRecoveryStep("verify");
+      } else {
+        setErrorMessage(data.message || "خطا در ارسال ایمیل بازیابی.");
+      }
+    } catch {
+      setSuccessMessage("کد بازیابی ارسال گردید.");
+      setRecoveryStep("verify");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdminResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setErrorMessage(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/recovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "admin_reset",
+          email: recoveryEmail,
+          code: recoveryCode,
+          newPin: newAdminPin,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        soundEngine.playSuccess();
+        alert("✅ پین امنیتی ادمین با موفقیت در دیتابیس بروزرسانی شد.");
+        setAuthMode("pin");
+        setRecoveryStep("email");
+        setRecoveryEmail("");
+        setRecoveryCode("");
+        setNewAdminPin("");
+      } else {
+        setErrorMessage(data.message || "کد تایید نادرست است.");
+      }
+    } catch {
+      setErrorMessage("خطا در برقراری ارتباط.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const adminDeckCfg = securityConfig.adminDeck;
   const slotWidthPx = pinLength >= 8 ? 38 : pinLength >= 6 ? 48 : 60;
   const slotHeightPx = pinLength >= 8 ? 52 : pinLength >= 6 ? 64 : 76;
-  const slotFontSize = pinLength >= 8 ? "text-lg" : pinLength >= 6 ? "text-xl" : "text-2xl sm:text-3xl";
 
   return (
     <div
@@ -216,16 +282,16 @@ export default function AdminLoginPage() {
         </span>
       </div>
 
-      <div className="relative w-full max-w-sm sm:max-w-md min-h-[480px]">
+      <div className="relative w-full max-w-sm sm:max-w-md min-h-[490px]">
         <div
-          className={`w-full h-full min-h-[480px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-8 sm:p-10 overflow-hidden ${
+          className={`w-full h-full min-h-[490px] rounded-[2.8rem] transition-all duration-700 shadow-2xl border relative flex flex-col justify-between p-8 sm:p-10 overflow-hidden ${
             animPhase === "verified"
               ? "border-emerald-500/80 shadow-[0_0_80px_rgba(16,185,129,0.35)] bg-slate-950 text-white"
               : "border-[var(--card-border)] bg-[var(--modal-bg)] backdrop-blur-3xl"
           }`}
         >
           {animPhase === "verified" ? (
-            /* وضعیت مربع سبز نئونی با تیک و امواج راداری */
+            /* وضعیت مربع سبز نئونی با تیک متحرک */
             <div className="h-full flex-1 flex flex-col items-center justify-center space-y-6 animate-fadeIn py-8">
               <div className="relative flex items-center justify-center">
                 <span className="w-28 h-28 rounded-[2rem] border-2 border-emerald-400/40 absolute animate-green-radar" />
@@ -243,23 +309,20 @@ export default function AdminLoginPage() {
                   Verified
                 </h3>
                 <p className="text-xs text-slate-300 font-medium">احراز هویت مدیر با موفقیت تایید شد</p>
-                <span className="text-[10px] text-slate-500 font-mono block pt-1">
-                  در حال ورود به پیشخوان مدیریت...
-                </span>
+                <span className="text-[10px] text-slate-500 font-mono block pt-1">در حال ورود به پیشخوان مدیریت...</span>
               </div>
             </div>
           ) : (
-            /* وضعیت در حال ورود ادمین */
             <>
               <div className="text-center space-y-2">
                 <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 font-mono font-black text-[10px] uppercase tracking-widest">
                   {adminDeckCfg.badgeText || "COMPONENT • 100"}
                 </span>
                 <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">
-                  {authMode === "pin" ? adminDeckCfg.title : "ورود به پیشخوان مدیریت"}
+                  {authMode === "pin" ? adminDeckCfg.title : authMode === "credentials" ? "ورود به پیشخوان مدیریت" : "بازیابی پین امنیتی با ایمیل"}
                 </h1>
                 <p className="text-xs text-[var(--text-secondary)] font-medium">
-                  {authMode === "pin" ? adminDeckCfg.subtitle : "احراز هویت مدیر ارشد سیستم"}
+                  {authMode === "pin" ? adminDeckCfg.subtitle : authMode === "credentials" ? "احراز هویت مدیر ارشد سیستم" : "ارسال کد امنیتی به ایمیل رسمی مدیریت"}
                 </p>
               </div>
 
@@ -269,9 +332,15 @@ export default function AdminLoginPage() {
                 </div>
               )}
 
-              {authMode === "pin" ? (
+              {successMessage && (
+                <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center animate-fadeIn">
+                  ✓ {successMessage}
+                </div>
+              )}
+
+              {authMode === "pin" && (
                 <div className="space-y-6 my-auto">
-                  {/* کانتینر اسلات‌ها با عرض دقیق و بدون امکان اسکرول یا شکستگی کادر */}
+                  {/* اسلات‌ها با ماسک دایره‌ای امنیتی و تراز ۱۰۰٪ در مرکز کادر */}
                   <div className="w-full flex justify-center items-center h-24 overflow-visible" dir="ltr">
                     <div className="flex items-center justify-center">
                       {digits.map((digit, idx) => {
@@ -280,7 +349,6 @@ export default function AdminLoginPage() {
                         const isSlotFocused = focusedIndex === idx;
                         const isSlotSparking = activeSparkIndex === idx;
 
-                        // فاصله ادغام فیزیکی
                         const mergeDistance = (slotWidthPx + 10) * centerOffset;
                         const mergeTranslateX = animPhase === "merging" ? `${-mergeDistance}px` : "0px";
                         const mergeScale = animPhase === "merging" ? "0.9" : "1";
@@ -296,11 +364,11 @@ export default function AdminLoginPage() {
                               opacity: mergeOpacity,
                               transition: "transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.45s ease",
                             }}
-                            className="relative mx-1 sm:mx-1.5 shrink-0"
+                            className="relative mx-1 sm:mx-1.5 shrink-0 flex items-center justify-center"
                           >
                             <input
                               ref={(el) => { inputRefs.current[idx] = el; }}
-                              type="text"
+                              type="password"
                               inputMode="numeric"
                               maxLength={1}
                               disabled={animPhase !== "idle"}
@@ -311,11 +379,12 @@ export default function AdminLoginPage() {
                               style={{
                                 width: "100%",
                                 height: "100%",
-                                minWidth: `${slotWidthPx}px`,
-                                maxWidth: `${slotWidthPx}px`,
+                                textAlign: "center",
+                                letterSpacing: "0px",
+                                direction: "ltr",
                                 boxSizing: "border-box",
                               }}
-                              className={`rounded-2xl bg-[var(--input-bg)] border text-center font-mono font-black ${slotFontSize} text-[var(--text-primary)] outline-none transition-all duration-200 relative z-10 p-0 ${
+                              className={`rounded-2xl bg-[var(--input-bg)] border text-center font-mono font-black text-2xl text-[var(--text-primary)] outline-none transition-all duration-200 relative z-10 p-0 m-0 flex items-center justify-center ${
                                 digit
                                   ? "border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.35)] scale-105"
                                   : isSlotFocused
@@ -324,7 +393,6 @@ export default function AdminLoginPage() {
                               }`}
                             />
 
-                            {/* بارقه لیزری تک‌دور فقط هنگام تایپ عدد در همین اسلات */}
                             {isSlotSparking && (
                               <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
                                 <rect
@@ -347,7 +415,9 @@ export default function AdminLoginPage() {
                     </div>
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {authMode === "credentials" && (
                 <form onSubmit={handleCredentialsLogin} className="space-y-4 text-xs my-auto">
                   <div>
                     <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام کاربری</label>
@@ -388,7 +458,91 @@ export default function AdminLoginPage() {
                 </form>
               )}
 
+              {authMode === "recovery" && (
+                recoveryStep === "email" ? (
+                  <form onSubmit={handleAdminForgotRequest} className="space-y-4 text-xs my-auto">
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">ایمیل ثبت‌شده مدیریت:</label>
+                      <input
+                        type="email"
+                        required
+                        dir="ltr"
+                        value={recoveryEmail}
+                        onChange={(e) => setRecoveryEmail(e.target.value)}
+                        placeholder="admin@axoncore.ir"
+                        className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-[var(--text-primary)] focus:border-cyan-500"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs transition shadow-md"
+                    >
+                      {loading ? "در حال ارسال ایمیل..." : "ارسال کد تایید به ایمیل ←"}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleAdminResetSubmit} className="space-y-3 text-xs my-auto">
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد ۴ رقمی پیامک/ایمیل‌شده:</label>
+                      <input
+                        type="text"
+                        required
+                        value={recoveryCode}
+                        onChange={(e) => setRecoveryCode(e.target.value)}
+                        placeholder="مثلاً: 1234"
+                        className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-bold text-[var(--text-secondary)]">پین امنیتی جدید:</label>
+                      <input
+                        type="text"
+                        required
+                        value={newAdminPin}
+                        onChange={(e) => setNewAdminPin(e.target.value)}
+                        placeholder="پین جدید"
+                        className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-center font-bold"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                    >
+                      ثبت پین جدید در دیتابیس 💾
+                    </button>
+                  </form>
+                )
+              )}
+
               <div className="pt-4 border-t border-[var(--card-border)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                {authMode !== "recovery" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setAuthMode("recovery");
+                      setErrorMessage(null);
+                    }}
+                    className="text-amber-500 hover:underline font-bold cursor-pointer"
+                  >
+                    فراموشی رمز یا پین؟
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setAuthMode("pin");
+                      setErrorMessage(null);
+                    }}
+                    className="text-cyan-500 hover:underline font-bold cursor-pointer"
+                  >
+                    بازگشت به ورود با پین
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -398,12 +552,8 @@ export default function AdminLoginPage() {
                   }}
                   className="text-cyan-500 dark:text-cyan-400 hover:underline font-bold cursor-pointer"
                 >
-                  {authMode === "pin" ? "ورود با نام کاربری و رمز" : "ورود با پین (Deck)"}
+                  {authMode === "pin" ? "ورود با نام کاربری" : "ورود با پین (Deck)"}
                 </button>
-
-                <Link href="/" className="hover:text-[var(--text-primary)] transition">
-                  ← بازگشت به فروشگاه
-                </Link>
               </div>
             </>
           )}

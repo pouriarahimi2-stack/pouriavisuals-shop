@@ -42,7 +42,7 @@ export default function AddToCartButton({
     soundEngine.playAddToCart();
     setAnimState("adding");
 
-    // ۱. افزودن فوری کالا به وضعیت سبد خرید (بدون باز کردن شتاب‌زده کشو)
+    // افزودن کالا به سبد خرید بدون باز شدن فوری کشو
     addToCart(
       {
         id: product.id,
@@ -54,60 +54,59 @@ export default function AddToCartButton({
         category: product.category || "تکنولوژی",
         quantity: 1,
       },
-      false // عدم باز شدن ناگهانی تا اتمام انیمیشن
+      false
     );
 
-    // ۲. انیمیشن جهش الاستیک شمارنده در ثانیه ۰.۶
+    // انیمیشن جهش فنری شمارنده
     setTimeout(() => {
       setBumpCounter(true);
-      setTimeout(() => setBumpCounter(false), 550);
+      setTimeout(() => setBumpCounter(false), 500);
     }, 600);
 
-    // ۳. پس از تکمیل دقیق ۱۲۵۰ میلی‌ثانیه انیمیشن چرخ‌دستی: ریست وضعیت دکمه + باز شدن سبد خرید
+    // پایان انیمیشن (۱۲۵۰ میلی‌ثانیه): بازگشت به حالت اولیه و باز شدن نرم سبد خرید
     setTimeout(() => {
       setAnimState("idle");
-      openCart(); // باز شدن نرم کشوی سبد خرید دقیقاً پس از اتمام کامل انیمیشن دکمه
+      openCart();
     }, 1250);
   };
 
   const isAnimating = animState === "adding";
 
   return (
-    <div className={`flex flex-col items-center gap-2 w-full select-none ${className}`} dir="rtl">
+    <div className={`flex flex-col items-center gap-1.5 w-full select-none ${className}`} dir="rtl" suppressHydrationWarning>
       
-      {/* کپسول مشکی مات دکمه (Black Pill Button) مطابق با ویدیو */}
+      {/* دکمه کپسولی پیوسته مشکی مات مطابق ویدیو با فیکس موقعیت بدون پرش */}
       <button
         type="button"
         disabled={!isAvailable || isMaxReached}
         onClick={handleAddToCart}
-        className={`relative w-full h-[50px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer shadow-xl active:scale-[0.98] border border-white/15 ${
+        className={`relative w-full h-[52px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer shadow-xl active:scale-[0.98] border border-white/15 ${
           !isAvailable || isMaxReached
-            ? "bg-slate-900/60 opacity-40 cursor-not-allowed text-slate-400"
+            ? "bg-slate-900/70 opacity-40 cursor-not-allowed text-slate-400"
             : "bg-[#0b0f19] hover:bg-[#111827] text-white hover:border-blue-500/50 hover:shadow-blue-500/20"
         }`}
       >
-        {/* کانتینر اصلی اجزای دکمه */}
-        <div className="relative w-full h-full flex items-center justify-center px-4">
+        <div className="relative w-full h-full flex items-center justify-center px-4 overflow-hidden">
           
-          {/* چرخ‌دستی متحرک و بسته در حال سقوط */}
+          {/* کانتینر متحرک چرخ‌دستی و بسته */}
           <div
             className={`relative flex items-center justify-center transition-all duration-300 ${
               isAnimating
-                ? "absolute left-1/2 -translate-x-1/2 animate-kinetic-cart-ride z-20"
+                ? "absolute left-1/2 -translate-x-1/2 animate-kinetic-cart-left z-20"
                 : "translate-x-0"
             }`}
           >
-            {/* بسته خرید که از بالا به درون سبد سقوط می‌کند (Falling Parcel) */}
+            {/* بسته محصول سفید با ربان آبی که مستقیماً داخل سبد سقوط می‌کند */}
             {isAnimating && (
-              <div className="absolute -top-3.5 left-[8px] z-30 pointer-events-none animate-kinetic-item-drop">
-                <div className="w-3.5 h-3.5 rounded-sm bg-white shadow-md border border-slate-300 flex items-center justify-center relative">
+              <div className="absolute -top-4 left-[9px] z-30 pointer-events-none animate-kinetic-item-drop">
+                <div className="w-3.5 h-3.5 rounded-[3px] bg-white shadow-lg border border-slate-300 flex items-center justify-center relative">
                   <span className="w-full h-[1.5px] bg-blue-500 absolute top-1/2 -translate-y-1/2" />
                   <span className="h-full w-[1.5px] bg-blue-500 absolute left-1/2 -translate-x-1/2" />
                 </div>
               </div>
             )}
 
-            {/* بدنه اس‌وی‌جی چرخ‌دستی به همراه چرخ‌های متحرک */}
+            {/* آیکون چرخ‌دستی که به سمت چپ می‌راند */}
             <svg
               className="w-6 h-6 text-white shrink-0 drop-shadow-md"
               viewBox="0 0 24 24"
@@ -126,23 +125,23 @@ export default function AddToCartButton({
                 cy="19.5"
                 r="1.8"
                 fill="currentColor"
-                className={isAnimating ? "animate-kinetic-wheel-spin origin-[9.5px_19.5px]" : ""}
+                className={isAnimating ? "animate-kinetic-wheel-left origin-[9.5px_19.5px]" : ""}
               />
               <circle
                 cx="17.5"
                 cy="19.5"
                 r="1.8"
                 fill="currentColor"
-                className={isAnimating ? "animate-kinetic-wheel-spin origin-[17.5px_19.5px]" : ""}
+                className={isAnimating ? "animate-kinetic-wheel-left origin-[17.5px_19.5px]" : ""}
               />
             </svg>
           </div>
 
-          {/* متن دکمه که در زمان انیمیشن جمع و محو می‌شود */}
+          {/* متن دکمه که هنگام کلیک با ترنزیشن محو می‌شود */}
           <span
-            className={`font-black text-xs tracking-wider uppercase mr-3 transition-all duration-300 text-slate-100 ${
+            className={`font-black text-xs tracking-wider uppercase mr-3 transition-all duration-300 text-slate-100 whitespace-nowrap ${
               isAnimating
-                ? "opacity-0 scale-75 -translate-x-4 pointer-events-none w-0 overflow-hidden"
+                ? "opacity-0 scale-75 -translate-x-6 pointer-events-none w-0 overflow-hidden"
                 : "opacity-100 scale-100 translate-x-0"
             }`}
           >
@@ -154,15 +153,14 @@ export default function AddToCartButton({
           </span>
         </div>
 
-        {/* بازتاب نوری شیشه‌ای پس‌زمینه */}
         <div className="absolute inset-0 rounded-full bg-gradient-to-t from-white/0 via-white/5 to-white/10 pointer-events-none" />
       </button>
 
-      {/* شمارنده زیر دکمه با انیمیشن جهش فنری (X عدد در سبد شما) */}
+      {/* شمارنده زیر دکمه با انیمیشن جهش الاستیک */}
       {showCounter && (
-        <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] font-sans">
+        <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] font-sans" suppressHydrationWarning>
           <span
-            className={`font-mono font-black transition-colors ${
+            className={`font-mono font-black transition-all duration-300 ${
               bumpCounter ? "animate-kinetic-counter-bump text-emerald-500 font-extrabold" : "text-[var(--text-primary)]"
             }`}
           >

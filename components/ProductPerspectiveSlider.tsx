@@ -1,7 +1,7 @@
 // File Path: components/ProductPerspectiveSlider.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 import { formatPrice } from "@/lib/formatters";
@@ -42,6 +42,10 @@ export default function ProductPerspectiveSlider({
   const [activeIndex, setActiveIndex] = useState(0);
   const [teardownProduct, setTeardownProduct] = useState<ProductItem | null>(null);
 
+  // استیت‌های سوایپ لمسی برای موبایل و تبلت + درگ ماوس دسکتاپ
+  const touchStartXRef = useRef<number>(0);
+  const isDraggingRef = useRef<boolean>(false);
+
   if (!products || products.length === 0) return null;
 
   const total = products.length;
@@ -56,7 +60,43 @@ export default function ProductPerspectiveSlider({
     setActiveIndex((prev) => (prev - 1 + total) % total);
   };
 
-  // تنظیم پویا ابعاد کارت‌ها بر اساس انتخاب در کنترل‌پنل ادمین
+  // هندلر تاچ و سوایپ لمسی
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartXRef.current - touchEndX;
+
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) {
+        // سوایپ به چپ -> کالای بعدی
+        handleNext();
+      } else {
+        // سوایپ به راست -> کالای قبلی
+        handlePrev();
+      }
+    }
+  };
+
+  // هندلر درگ ماوس در دسکتاپ
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDraggingRef.current = true;
+    touchStartXRef.current = e.clientX;
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    const diff = touchStartXRef.current - e.clientX;
+
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) handleNext();
+      else handlePrev();
+    }
+  };
+
   const cardSizeClasses =
     cardScale === "compact"
       ? "w-[260px] sm:w-[300px] h-[410px] sm:h-[450px]"
@@ -72,18 +112,24 @@ export default function ProductPerspectiveSlider({
       : "h-[480px] sm:h-[530px]";
 
   return (
-    <section id="products" className="w-full py-4 select-none font-sans space-y-4" dir="rtl">
+    <section id="products" className="w-full py-4 select-none font-sans space-y-4" dir="rtl" suppressHydrationWarning>
       <div className="text-center space-y-1">
         <h2 className="text-xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
           {customTitle || "نمایشگاه سه‌بعدی تجهیزات پرچمدار"}
         </h2>
         <p className="text-xs text-[var(--text-secondary)] font-medium">
-          {customSubtitle || "پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری"}
+          {customSubtitle || "پیمایش با سوایپ لمسی، درگ یا کلیدهای کنترل جهت بررسی مشخصات کالا"}
         </p>
       </div>
 
-      {/* کاروسل ۳D کارت‌ها */}
-      <div className={`relative w-full max-w-5xl mx-auto flex items-center justify-center overflow-hidden [perspective:1200px] ${containerHeightClass}`}>
+      {/* کاروسل ۳D کارت‌ها با گوش‌به‌زنگ سوایپ لمسی (Touch Gestures) */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        className={`relative w-full max-w-5xl mx-auto flex items-center justify-center overflow-hidden [perspective:1200px] cursor-grab active:cursor-grabbing ${containerHeightClass}`}
+      >
         {products.map((p, idx) => {
           let offset = idx - activeIndex;
           if (offset < -Math.floor(total / 2)) offset += total;
@@ -144,7 +190,6 @@ export default function ProductPerspectiveSlider({
                     />
                   </Link>
 
-                  {/* دکمه کالبدشکافی ۳D */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -174,7 +219,7 @@ export default function ProductPerspectiveSlider({
               </div>
 
               <div className="space-y-2.5 pt-3 border-t border-[var(--card-border)]">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center" suppressHydrationWarning>
                   <span className="font-mono font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400">
                     {formatPrice(finalPrice)} تومان
                   </span>
@@ -210,7 +255,7 @@ export default function ProductPerspectiveSlider({
             →
           </button>
 
-          <span className="font-mono font-black text-sm text-[var(--text-primary)] tracking-widest px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+          <span className="font-mono font-black text-sm text-[var(--text-primary)] tracking-widest px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]" suppressHydrationWarning>
             {String(activeIndex + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
           </span>
 
@@ -224,7 +269,6 @@ export default function ProductPerspectiveSlider({
         </div>
       </div>
 
-      {/* مدال کالبدشکافی ۳D */}
       {teardownProduct && (
         <ProductExplodedView
           productId={teardownProduct.id}

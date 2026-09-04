@@ -92,19 +92,19 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   🛒 کی‌فریم‌های انیمیشن چرخ‌دستی، پرتاب بسته و شمارنده جنبشی (Kinetic Cart Animation)
+   🛒 کی‌فریم‌های اختصاصی رانش چرخ‌دستی به سمت چپ و پرتاب عمودی بسته (Kinetic Cart)
    ══════════════════════════════════════════════════════════════════════════════ */
 
-@keyframes kineticItemDrop {
+@keyframes kineticItemDropCenter {
   0% {
-    transform: translateY(-38px) scale(0.6);
+    transform: translateY(-42px) scale(0.6);
     opacity: 0;
   }
-  35% {
+  40% {
     opacity: 1;
-    transform: translateY(-10px) scale(1.05);
+    transform: translateY(-8px) scale(1.08);
   }
-  65% {
+  70% {
     transform: translateY(2px) scale(0.95);
   }
   85% {
@@ -116,30 +116,30 @@ body {
   }
 }
 
-@keyframes kineticCartRide {
+@keyframes kineticCartDriveToLeft {
   0% {
     transform: translateX(0);
   }
-  42% {
+  38% {
     transform: translateX(0) rotate(0deg);
   }
-  48% {
-    transform: translateX(-4px) rotate(-3deg);
+  44% {
+    transform: translateX(6px) rotate(3deg);
   }
   64% {
-    transform: translateX(120px) rotate(4deg);
+    transform: translateX(-160px) rotate(-5deg);
     opacity: 0;
   }
   65% {
-    transform: translateX(-120px) rotate(-4deg);
+    transform: translateX(160px) rotate(5deg);
     opacity: 0;
   }
-  78% {
+  82% {
     opacity: 1;
-    transform: translateX(-6px) rotate(2deg);
+    transform: translateX(8px) rotate(-2deg);
   }
-  90% {
-    transform: translateX(2px) rotate(-1deg);
+  92% {
+    transform: translateX(-2px) rotate(1deg);
   }
   100% {
     transform: translateX(0) rotate(0deg);
@@ -147,18 +147,18 @@ body {
   }
 }
 
-@keyframes kineticWheelSpin {
+@keyframes kineticWheelSpinToLeft {
   0% {
     transform: rotate(0deg);
   }
-  45% {
+  42% {
     transform: rotate(0deg);
   }
-  65% {
-    transform: rotate(720deg);
+  64% {
+    transform: rotate(-720deg);
   }
   100% {
-    transform: rotate(1440deg);
+    transform: rotate(-1440deg);
   }
 }
 
@@ -167,11 +167,11 @@ body {
     transform: scale(1);
   }
   40% {
-    transform: scale(1.4) translateY(-3px);
+    transform: scale(1.35) translateY(-3px);
     color: #10b981;
   }
   70% {
-    transform: scale(0.92) translateY(1px);
+    transform: scale(0.95) translateY(1px);
   }
   100% {
     transform: scale(1) translateY(0);
@@ -179,17 +179,58 @@ body {
 }
 
 .animate-kinetic-item-drop {
-  animation: kineticItemDrop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: kineticItemDropCenter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-.animate-kinetic-cart-ride {
-  animation: kineticCartRide 1.35s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+.animate-kinetic-cart-left {
+  animation: kineticCartDriveToLeft 1.25s cubic-bezier(0.45, 0, 0.55, 1) forwards;
 }
 
-.animate-kinetic-wheel-spin {
-  animation: kineticWheelSpin 1.35s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+.animate-kinetic-wheel-left {
+  animation: kineticWheelSpinToLeft 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
 .animate-kinetic-counter-bump {
   animation: kineticCounterBump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   🎹 کی‌فریم‌های داک مکانیکی ۳D کلیدهای فوتر (Video 1 Contact Dock)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.keycap-dock-tray {
+  perspective: 1200px;
+}
+
+.keycap-3d-item {
+  transform-style: preserve-3d;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease;
+}
+
+.keycap-3d-item:hover,
+.keycap-3d-item:active {
+  transform: translate3d(0, -28px, 20px) scale(1.15) rotateY(180deg);
+  z-index: 50;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ⚡ کی‌فریم‌های حلقه راداری نئونی کارت Verified لاگین (Video 2 Verified Card)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes radarWave {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-radar-wave {
+  animation: radarWave 2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }

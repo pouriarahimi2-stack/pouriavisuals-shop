@@ -166,11 +166,12 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
   const currentCities = IRAN_PROVINCES.find((p) => p.name === selectedProvince)?.cities || [];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md font-sans select-none animate-fadeIn" dir="rtl">
-      <div className="w-full max-w-lg bg-[var(--modal-bg)] border-r border-[var(--card-border)] h-full shadow-2xl flex flex-col justify-between overflow-hidden text-[var(--text-primary)]">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-md font-sans select-none animate-fadeIn overflow-hidden" dir="rtl">
+      {/* بدنه کشو با عرض استاندارد و عایق کامل در برابر اسکرول افقی */}
+      <div className="w-full max-w-lg bg-[var(--modal-bg)] border-r border-[var(--card-border)] h-full shadow-2xl flex flex-col justify-between overflow-x-hidden text-[var(--text-primary)] relative">
         
         {/* هدر کشو */}
-        <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between">
+        <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--modal-bg)] shrink-0">
           <button
             onClick={closeCart}
             className="w-9 h-9 rounded-2xl bg-[var(--input-bg)] flex items-center justify-center font-bold text-xs hover:border-[var(--accent-blue)] border border-[var(--card-border)] transition cursor-pointer text-[var(--text-primary)]"
@@ -189,7 +190,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
 
         {/* وضعیت ارسال رایگان */}
         {totalPrice > 0 && (
-          <div className="p-3 bg-[var(--input-bg)] border-b border-[var(--card-border)] text-xs space-y-1.5">
+          <div className="p-3 bg-[var(--input-bg)] border-b border-[var(--card-border)] text-xs space-y-1.5 shrink-0">
             <div className="flex justify-between text-[11px] font-bold">
               <span>🚀 وضعیت ارسال رایگان پیشتاز:</span>
               <span className={amountUntilFreeShipping === 0 ? "text-emerald-500 font-black" : "text-[var(--accent-blue)]"}>
@@ -198,7 +199,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                   : `فقط ${amountUntilFreeShipping.toLocaleString("fa-IR")} تومان تا ارسال رایگان`}
               </span>
             </div>
-            <div className="w-full h-1.5 bg-slate-700/30 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-slate-700/20 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-500"
                 style={{ width: `${Math.min(100, (totalPrice / 2000000) * 100)}%` }}
@@ -207,8 +208,8 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
           </div>
         )}
 
-        {/* لیست محصولات و فرم تحویل */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
+        {/* محتوای اسکرول‌پذیر عمودی بدون اسکرول افقی */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 space-y-4 text-xs w-full">
           {cartItems.length === 0 ? (
             <div className="py-28 text-center text-[var(--text-secondary)] space-y-2 font-bold">
               <span className="text-4xl block">🛍️</span>
@@ -216,8 +217,8 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
             </div>
           ) : (
             <>
-              {/* لیست کالاها با تضمین نمایش تصویر صحیح و بدون باگ */}
-              <div className="space-y-3">
+              {/* لیست کالاها با چیدمان استاندارد و محفظه ایزوله تصویر */}
+              <div className="space-y-3 w-full">
                 {cartItems.map((item: any) => {
                   const stockLimit = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
                   const isMaxReached = item.quantity >= stockLimit;
@@ -226,59 +227,61 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                   return (
                     <div
                       key={item.id}
-                      className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm"
+                      className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm w-full overflow-hidden"
                     >
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            soundEngine.playClick();
-                            removeFromCart(item.id);
-                          }}
-                          className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition cursor-pointer"
-                          title="حذف کالا"
-                        >
-                          🗑️
-                        </button>
+                      {/* سمت راست: عکس قفل‌شده ۵۶ پیکسلی + نام و قیمت کالا */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-14 h-14 min-w-[56px] min-h-[56px] max-w-[56px] max-h-[56px] rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)] p-1 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
+                          <img
+                            src={itemImg}
+                            alt={item.title || "محصول"}
+                            className="w-full h-full object-contain pointer-events-none"
+                          />
+                        </div>
 
-                        <div className="flex items-center gap-2 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-2xl px-2.5 py-1 font-bold">
+                        <div className="min-w-0 flex-1 text-right">
+                          <h4 className="font-black text-xs text-[var(--text-primary)] truncate block" title={item.title || item.name}>
+                            {item.title || item.name}
+                          </h4>
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs block mt-1">
+                            {Number(item.discountPrice ?? item.price ?? 0).toLocaleString("fa-IR")} تومان
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* سمت چپ: کنترلرهای تعداد + دکمه حذف */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-xl px-2 py-1 shadow-sm">
                           <button
                             onClick={() => handleDecreaseQuantity(item)}
-                            className="hover:text-[var(--accent-blue)] cursor-pointer px-1 font-bold text-sm"
+                            className="text-sm font-black px-1 text-[var(--text-primary)] hover:text-[var(--accent-blue)] cursor-pointer"
                           >
                             -
                           </button>
-                          <span className="font-mono font-black text-xs px-1 text-[var(--text-primary)]">
+                          <span className="font-mono font-black text-xs px-1 min-w-[16px] text-center text-[var(--text-primary)]">
                             {item.quantity}
                           </span>
                           <button
                             onClick={() => handleIncreaseQuantity(item)}
                             disabled={isMaxReached}
-                            className={`px-1 font-bold text-sm transition ${
-                              isMaxReached ? "opacity-30 cursor-not-allowed text-gray-400" : "hover:text-[var(--accent-blue)] cursor-pointer"
+                            className={`text-sm font-black px-1 transition cursor-pointer ${
+                              isMaxReached ? "opacity-30 cursor-not-allowed text-gray-400" : "text-[var(--text-primary)] hover:text-[var(--accent-blue)]"
                             }`}
                           >
                             +
                           </button>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-3 text-left">
-                        <div>
-                          <h4 className="font-black text-xs text-[var(--text-primary)] line-clamp-1 text-right" dir="rtl">
-                            {item.title || item.name}
-                          </h4>
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black block mt-0.5 text-right" dir="rtl">
-                            {Number(item.discountPrice ?? item.price ?? 0).toLocaleString("fa-IR")} تومان
-                          </span>
-                        </div>
-
-                        <div className="w-13 h-13 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)] p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                          <img
-                            src={itemImg}
-                            alt=""
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
+                        <button
+                          onClick={() => {
+                            soundEngine.playClick();
+                            removeFromCart(item.id);
+                          }}
+                          className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition cursor-pointer shrink-0"
+                          title="حذف کالا"
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </div>
                   );
@@ -286,7 +289,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
               </div>
 
               {/* باکس کد تخفیف */}
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2 w-full">
                 <span className="font-bold text-[11px] text-[var(--text-secondary)] block">کد تخفیف دارید؟</span>
                 <div className="flex gap-2">
                   <button
@@ -311,8 +314,8 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                 )}
               </div>
 
-              {/* فرم آدرس پستی با استایل تمیز و کنتراست عالی */}
-              <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+              {/* فرم آدرس پستی و تحویل‌گیرنده */}
+              <form id="cart-checkout-form" onSubmit={handleFinalCheckout} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 w-full">
                 <div className="flex items-center gap-1.5 font-black text-xs text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
                   <span>📋</span>
                   <span>مشخصات تحویل‌گیرنده و نشانی پستی:</span>
@@ -407,7 +410,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">واحد (اختیاری)</label>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">واحد</label>
                     <input
                       type="text"
                       value={unitNo}
@@ -418,7 +421,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">طبقه (اختیاری)</label>
+                    <label className="block text-[11px] font-bold text-[var(--text-primary)] mb-1">طبقه</label>
                     <input
                       type="text"
                       value={floorNo}
@@ -448,7 +451,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
 
         {/* فوتر تسویه نهایی فاکتور */}
         {cartItems.length > 0 && (
-          <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs">
+          <div className="p-4 sm:p-5 border-t border-[var(--card-border)] bg-[var(--modal-bg)] space-y-3 text-xs shrink-0">
             <div className="space-y-1.5 font-bold">
               <div className="flex justify-between items-center text-[var(--text-secondary)]">
                 <span>جمع کل اقلام:</span>

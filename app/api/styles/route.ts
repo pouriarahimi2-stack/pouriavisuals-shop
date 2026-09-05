@@ -1,6 +1,6 @@
-// File Path: app/api/styles/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,10 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. ورود به پنل مدیریت الزامی است." }, { status: 401 });
+    }
+
     const body = await req.json();
     const payload = {
       id: "default_theme",

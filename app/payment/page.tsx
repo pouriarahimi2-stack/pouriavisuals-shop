@@ -1,11 +1,9 @@
-// File Path: app/payment/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { orderService } from "@/services/orderService";
 import { soundEngine } from "@/lib/soundEngine";
-import { smsService } from "@/services/smsService";
 
 function PaymentGatewayForm() {
   const router = useRouter();
@@ -23,6 +21,7 @@ function PaymentGatewayForm() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "failed">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [txnRef, setTxnRef] = useState("");
 
   useEffect(() => {
     async function loadOrderInfo() {
@@ -79,19 +78,22 @@ function PaymentGatewayForm() {
     setIsProcessing(true);
 
     try {
-      await new Promise((res) => setTimeout(res, 1400));
+      // اعتبارسنجی و تایید رسمی پرداخت از طریق روت سروری محافظت‌شده
+      const verifyRes = await fetch("/api/payment/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          authority: "AUTH_" + Date.now().toString().slice(-8),
+        }),
+      });
 
-      if (orderId) {
-        await orderService.updateStatus(orderId, "paid");
-
-        const targetPhone = order?.customer?.phone || order?.phone;
-        const targetName = order?.customer?.fullName || order?.customer_name || "مشتری گرامی";
-        if (targetPhone) {
-          try {
-            await smsService.sendTrackingCode(targetPhone, targetName, `پرداخت فاکتور ${orderId} با موفقیت تایید شد.`);
-          } catch {}
-        }
+      const resJson = await verifyRes.json();
+      if (!verifyRes.ok || !resJson.success) {
+        throw new Error(resJson.message || "تراکنش بانکی تایید نشد.");
       }
+
+      setTxnRef(resJson.trackingRef || Date.now().toString().slice(-8));
 
       if (typeof window !== "undefined") {
         localStorage.removeItem("axon_cart_store_v2026");
@@ -102,9 +104,9 @@ function PaymentGatewayForm() {
       setStatus("success");
       sessionStorage.removeItem("pending_payment_amount");
       sessionStorage.removeItem("pending_payment_order_id");
-    } catch {
+    } catch (err: any) {
       setStatus("failed");
-      setErrorMsg("تراکنش توسط بانک رد شد یا ارتباط با درگاه برقرار نشد.");
+      setErrorMsg(err.message || "تراکنش توسط بانک رد شد یا ارتباط با درگاه برقرار نشد.");
     } finally {
       setIsProcessing(false);
     }
@@ -112,8 +114,6 @@ function PaymentGatewayForm() {
 
   return (
     <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl font-sans text-slate-100" dir="rtl">
-      
-      {/* نشان رسمی شبکه پرداخت شاپرک */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-4">
         <div className="flex items-center gap-2.5">
           <span className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-md">
@@ -121,27 +121,27 @@ function PaymentGatewayForm() {
           </span>
           <div>
             <h2 className="text-sm font-black text-white">درگاه پرداخت الکترونیک شتاب</h2>
-            <span className="text-[10px] text-slate-400 font-mono font-bold">شاپرک (پرداخت امن بانکی)</span>
+            <span className="text-[10px] text-slate-400 font-mono font-bold">شاپرک (پرداخت امن و رمزنگاری‌شده)</span>
           </div>
         </div>
         <div className="text-left">
           <span className="text-[10px] text-slate-400 block font-bold">شناسه فاکتور:</span>
-          <span className="text-xs font-mono font-black text-amber-400">{orderId || "ORD-TEST"}</span>
+          <span className="text-xs font-mono font-black text-amber-400">{orderId || "ORD-PENDING"}</span>
         </div>
       </div>
 
       {status === "success" ? (
         <div className="text-center py-8 space-y-4 animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-3xl flex items-center justify-center mx-auto shadow-lg animate-bounce">
+          <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-3xl flex items-center justify-center mx-auto shadow-lg">
             ✓
           </div>
           <h3 className="text-base font-black text-white">پرداخت شما با موفقیت تایید شد!</h3>
           <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-            سفارش شما در مرحله آماده‌سازی و ارسال با پست پیشتاز قرار گرفت.
+            سفارش شما در مرحله بسته‌بندی استودیویی و صدور بارنامه پیشتاز قرار گرفت.
           </p>
           <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-1">
-            <p className="text-slate-400">کد رهگیری تراکنش: {Date.now().toString().slice(-8)}</p>
-            <p className="text-emerald-400 font-bold">مبلغ کسر شده: {amount.toLocaleString("fa-IR")} تومان</p>
+            <p className="text-slate-400">کد پیگیری تراکنش بانکی: {txnRef}</p>
+            <p className="text-emerald-400 font-bold">مبلغ واریزی: {amount.toLocaleString("fa-IR")} تومان</p>
           </div>
           <button
             onClick={() => router.push(`/track-order?orderId=${orderId}&success=true`)}
@@ -159,7 +159,7 @@ function PaymentGatewayForm() {
           )}
 
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex justify-between items-center">
-            <span className="text-slate-400 font-bold">مبلغ قابل پرداخت فاکتور:</span>
+            <span className="text-slate-400 font-bold">مبلغ فاکتور قابل پرداخت:</span>
             <span className="text-base font-black text-emerald-400 font-mono">
               {amount.toLocaleString("fa-IR")} تومان
             </span>

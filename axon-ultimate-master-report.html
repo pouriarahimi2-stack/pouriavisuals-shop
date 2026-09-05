@@ -2,7 +2,7 @@
 <html dir="rtl" lang="fa">
 <head>
   <meta charset="UTF-8">
-  <title>گواهی رسمی کمال مهندسی آکسون (Apex Sentinel v2026)</title>
+  <title>گواهی رسمی کمال مهندسی و پایش جامع آکسون (Apex Sentinel v2026)</title>
   <style>
     body { font-family: Tahoma, sans-serif; background: #07090e; color: #f8fafc; padding: 30px; margin: 0; direction: rtl; }
     .container { max-width: 1100px; margin: 0 auto; background: #0f172a; border: 1px solid #334155; border-radius: 28px; padding: 35px; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
@@ -24,21 +24,21 @@
   <div class="container">
     <div class="header">
       <h1 class="title">گواهینامه رسمی کمال مهندسی و پایش جامع ۳۶۰ درجه پلتفرم آکسون</h1>
-      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه ارزیابی: https://axoncore.ir | شناسه تاییدیه: CERT-APEX-45072015</p>
-      <div class="badge">شاخص کمال مهندسی: 100٪ (Grade A+ Apex Certified)</div>
+      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">دامنه ارزیابی: https://axoncore.ir | شناسه تاییدیه: CERT-APEX-45881356</p>
+      <div class="badge">شاخص کمال مهندسی: 98٪ (Grade A+ Apex Certified)</div>
     </div>
     <div class="metrics">
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">کل آزمون‌های خط‌به‌خط اجرا شده</div>
-        <div class="val">45</div>
+        <div class="val">48</div>
       </div>
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">مؤلفه‌های موفق و تاییدشده</div>
-        <div class="val" style="color: #34d399;">45</div>
+        <div class="val" style="color: #34d399;">47</div>
       </div>
       <div class="box">
         <div style="color: #94a3b8; font-size: 12px;">خطاها یا عدم انطباق‌ها</div>
-        <div class="val" style="color: #34d399;">0</div>
+        <div class="val" style="color: #f87171;">1</div>
       </div>
     </div>
     <table>
@@ -53,324 +53,345 @@
       <tbody>
         
           <tr>
-            <td>Storefront</td>
-            <td>۱. صفحه اصلی (Home): رندر همگام SSR و صفر خطای هیدریشن #418</td>
+            <td>Security-Headers</td>
+            <td>۱. پایش عدم افشای اطلاعات سرور (X-Powered-By Header Suppression)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1158ms</td>
+            <td style="font-family: monospace;">1297ms</td>
           </tr>
         
           <tr>
-            <td>Storefront</td>
-            <td>۲. تیکر پویای اخبار تکنولوژی (News Ticker): فید با چرخش هر ۶ ثانیه</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">0ms</td>
-          </tr>
-        
-          <tr>
-            <td>Storefront</td>
-            <td>۳. نمایشگاه سه‌بعدی کالاها (3D Showcase): اسلایدر پرچمداران و سوایپ</td>
+            <td>Security-Headers</td>
+            <td>۲. ایزولاسیون سورس‌کد و عدم نشت استک‌تریس توسعه در رندر عمومی</td>
             <td class="pass">PASSED ✓</td>
             <td style="font-family: monospace;">0ms</td>
           </tr>
         
           <tr>
-            <td>Storefront</td>
-            <td>۴. هیرو سکشن و دکمه CTA: ارجاع مستقیم به کاتالوگ محصولات</td>
+            <td>Security-Headers</td>
+            <td>۳. پویش عدم افشای کلیدهای فوق‌محرمانه سرور در فرانت‌اند (Secret Scanner)</td>
             <td class="pass">PASSED ✓</td>
             <td style="font-family: monospace;">0ms</td>
           </tr>
         
           <tr>
-            <td>Storefront</td>
-            <td>۵. صفحه کاتالوگ جامع محصولات (/products)</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">760ms</td>
-          </tr>
-        
-          <tr>
-            <td>Storefront</td>
-            <td>۶. هاب اختصاصی اخبار تکنولوژی (/news)</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">774ms</td>
-          </tr>
-        
-          <tr>
-            <td>Storefront</td>
-            <td>۷. مجله مقالات تخصصی و سئو (/blog)</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">631ms</td>
-          </tr>
-        
-          <tr>
-            <td>Storefront</td>
-            <td>۸. سامانه رهگیری سفارشات پستی (/track-order)</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">516ms</td>
-          </tr>
-        
-          <tr>
-            <td>Storefront</td>
-            <td>۹. فرم رسمی تماس با ما و ثبت تیکت (/contact)</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">558ms</td>
-          </tr>
-        
-          <tr>
-            <td>Storefront</td>
-            <td>۱۰. صفحه ورود امن کاربران (/login)</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">554ms</td>
-          </tr>
-        
-          <tr>
-            <td>PDP-Features</td>
-            <td>۱. صفحه مانیتور ۵K اپل استودیو دیسپلی (/products/prod-studio-display-5k)</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">961ms</td>
-          </tr>
-        
-          <tr>
-            <td>PDP-Features</td>
-            <td>۲. شبیه‌ساز کالیبراسیون و ۷ گاموت رنگی (Color Space Lab)</td>
+            <td>Security-Headers</td>
+            <td>۴. سیاست حفاظت از تغییر محتوا (X-Content-Type-Options: nosniff)</td>
             <td class="pass">PASSED ✓</td>
             <td style="font-family: monospace;">0ms</td>
           </tr>
         
           <tr>
-            <td>PDP-Features</td>
-            <td>۳. پایش زنده قیمت در ۵ پلتفرم بزرگ بازار (Price Arbitrage)</td>
+            <td>Auth-Vault</td>
+            <td>۱. سد نفوذ دسترسی ادمین: مهار درخواست‌های فاقد سشن با کد تایید منفی</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">0ms</td>
+            <td style="font-family: monospace;">627ms</td>
           </tr>
         
           <tr>
-            <td>PDP-Features</td>
-            <td>۴. سامانه نظرات و بازخورد خریداران (Product Reviews)</td>
+            <td>Auth-Vault</td>
+            <td>۲. راستی‌آزمایی امضای HMAC-SHA256: رد قاطع توکن‌های دستکاری‌شده</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">0ms</td>
+            <td style="font-family: monospace;">412ms</td>
           </tr>
         
           <tr>
-            <td>Checkout</td>
-            <td>۱. صدور فاکتور سفارش واقعی ORD-052178 و کسر اتمیک موجودی انبار</td>
+            <td>Auth-Vault</td>
+            <td>۳. پدافند ضد نفوذ احراز هویت: پاسخ امن 401 به تلاش‌های نامعتبر</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">3396ms</td>
+            <td style="font-family: monospace;">1156ms</td>
           </tr>
         
           <tr>
-            <td>Checkout</td>
-            <td>۲. استعلام بلادرنگ سفارش ORD-052178 با استپر ۵ مرحله‌ای رهگیری</td>
+            <td>Auth-Vault</td>
+            <td>۴. دیواره آتش پین امنیتی ادمین: مسدودسازی پین‌های اشتباه با کد 401</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">423ms</td>
+            <td style="font-family: monospace;">1124ms</td>
           </tr>
         
           <tr>
-            <td>Checkout</td>
-            <td>۳. شبیه‌ساز درگاه پرداخت الکترونیک شاپرک (/checkout/payment)</td>
+            <td>Auth-Vault</td>
+            <td>۵. سامانه ارسال رمز پیامکی و OTP: اعتبارسنجی ساختار درخواست</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">614ms</td>
+            <td style="font-family: monospace;">410ms</td>
           </tr>
         
           <tr>
-            <td>Checkout</td>
-            <td>۴. وب‌سرویس تایید تراکنش بانکی شاپرک (/api/payment/verify)</td>
+            <td>Financial-Shield</td>
+            <td>۱. فایروال ضدتقلب مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و بازنویسی با نرخ دیتابیس</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1029ms</td>
+            <td style="font-family: monospace;">1591ms</td>
           </tr>
         
           <tr>
-            <td>Security-Vault</td>
-            <td>۱. فایروال مالی: مهار قیمت جعلی ۱,۰۰۰ تومانی و صدور نرخ واقعی دیتابیس</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1455ms</td>
+            <td>Financial-Shield</td>
+            <td>۲. استحکام ورودی سفارش: رد فاکتورهای فاقد مشخصات با کد خطای 400/422</td>
+            <td class="fail">FAILED ✕</td>
+            <td style="font-family: monospace;">454ms</td>
           </tr>
         
           <tr>
-            <td>Security-Vault</td>
-            <td>۲. دیوار آتش سشن: رد توکن‌های دستکاری‌شده فاقد امضای معتبر HMAC</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">292ms</td>
-          </tr>
-        
-          <tr>
-            <td>Security-Vault</td>
-            <td>۳. سامانه ضد بروت‌فورس: رد اعتبارسنجی با خطای ۴۰۱</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">721ms</td>
-          </tr>
-        
-          <tr>
-            <td>AI-Master-Suite</td>
-            <td>۱. موتور سئوی خودمختار: استخراج کلمات پربازدید GSC</td>
-            <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">298ms</td>
-          </tr>
-        
-          <tr>
-            <td>AI-Master-Suite</td>
-            <td>۲. دستیار مشاور کاتالوگ: پاسخ استدلالی و اتصال به کارت محصول</td>
+            <td>Database-Core</td>
+            <td>۱. ثبت اتمیک فاکتور واقعی ORD-862228 در دیتابیس و کسر موجودی</td>
             <td class="pass">PASSED ✓</td>
             <td style="font-family: monospace;">1002ms</td>
           </tr>
         
           <tr>
-            <td>AI-Master-Suite</td>
-            <td>۳. کالبدشکافی ۳D: تفکیک ۶ لایه فیزیکی و تحلیل متالورژی</td>
+            <td>Database-Core</td>
+            <td>۲. استعلام زنده فاکتور ORD-862228 با استپر ۵ مرحله‌ای رهگیری پستی</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">1184ms</td>
+            <td style="font-family: monospace;">1250ms</td>
           </tr>
         
           <tr>
-            <td>AI-Master-Suite</td>
-            <td>۴. وب‌سرویس پایش و تست زنده کلید Gemini Pro (/api/test-ai)</td>
+            <td>Database-Core</td>
+            <td>۳. وب‌سرویس تایید پرداخت شاپرک و تغییر وضعیت فاکتور (/api/payment/verify)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">479ms</td>
+            <td style="font-family: monospace;">532ms</td>
+          </tr>
+        
+          <tr>
+            <td>Storefront-Views</td>
+            <td>۱. صفحه اصلی (/): رندر ۱۰۰٪ همگام SSR و کلاینت (صفر خطای هیدریشن #418)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">376ms</td>
+          </tr>
+        
+          <tr>
+            <td>Storefront-Views</td>
+            <td>۲. کاتالوگ و ویترین کامل کالاها (/products)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">942ms</td>
+          </tr>
+        
+          <tr>
+            <td>Storefront-Views</td>
+            <td>۳. هاب اختصاصی اخبار تکنولوژی (/news)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">597ms</td>
+          </tr>
+        
+          <tr>
+            <td>Storefront-Views</td>
+            <td>۴. مجله مقالات تخصصی و سئو (/blog)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">607ms</td>
+          </tr>
+        
+          <tr>
+            <td>Storefront-Views</td>
+            <td>۵. فرم ثبت تیکت و مشاوره آنلاین (/contact)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">700ms</td>
+          </tr>
+        
+          <tr>
+            <td>Storefront-Views</td>
+            <td>۶. صفحه ورود امن کاربران با دک احراز هویت (/login)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">614ms</td>
+          </tr>
+        
+          <tr>
+            <td>PDP-Features</td>
+            <td>۱. رندر پایدار صفحه محصول پرچمدار ۵K Studio Display</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">841ms</td>
+          </tr>
+        
+          <tr>
+            <td>PDP-Features</td>
+            <td>۲. شبیه‌ساز کالیبراسیون و ۷ گاموت رنگی (Display P3, sRGB, Rec2020)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">0ms</td>
+          </tr>
+        
+          <tr>
+            <td>PDP-Features</td>
+            <td>۳. پایش لحظه‌ای قیمت ۵ پلتفرم بزرگ بازار (Live Market Arbitrage)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">0ms</td>
+          </tr>
+        
+          <tr>
+            <td>PDP-Features</td>
+            <td>۴. سامانه امتیازدهی و نظرات خریداران (Product Reviews Tab)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">0ms</td>
+          </tr>
+        
+          <tr>
+            <td>AI-Suite</td>
+            <td>۱. موتور سئوی خودمختار: استخراج کلمات پربازدید GSC</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">286ms</td>
+          </tr>
+        
+          <tr>
+            <td>AI-Suite</td>
+            <td>۲. مشاور هوشمند کاتالوگ: پاسخ استدلالی و معرفی مستقیم کالا</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">1108ms</td>
+          </tr>
+        
+          <tr>
+            <td>AI-Suite</td>
+            <td>۳. کالبدشکافی ۳D: تفکیک ۶ لایه فیزیکی و تحلیل متالورژی</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">697ms</td>
+          </tr>
+        
+          <tr>
+            <td>AI-Suite</td>
+            <td>۴. وب‌سرویس تست و عیب‌یابی کلید Gemini Pro (/api/test-ai)</td>
+            <td class="pass">PASSED ✓</td>
+            <td style="font-family: monospace;">454ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
-            <td>ماژول 1: مرکز جامع هوش مصنوعی (AI Suite: SEO, Copilot, 3D, Test)</td>
+            <td>ماژول 1: مرکز جامع هوش مصنوعی (AI Suite: SEO, Copilot, 3D, Diagnostics)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">275ms</td>
+            <td style="font-family: monospace;">264ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 2: محصولات و کاتالوگ (Products: 7 Sub-tabs, Pricing, Variants)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">383ms</td>
+            <td style="font-family: monospace;">391ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
-            <td>ماژول 3: انبارداری سریع و موجودی بحرانی (Fast Inventory)</td>
+            <td>ماژول 3: انبارداری سریع و موجودی بحرانی (Fast Inventory Manager)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">140ms</td>
+            <td style="font-family: monospace;">156ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 4: کنترل ویترین و لایه‌بندی (Storefront Master Controller)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">602ms</td>
+            <td style="font-family: monospace;">528ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
-            <td>ماژول 5: سفارش‌ها، بارنامه و پست (Orders & Dispatch Pipeline)</td>
+            <td>ماژول 5: سفارش‌ها، بارنامه و صدور فاکتور (Orders & Dispatch Pipeline)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">594ms</td>
+            <td style="font-family: monospace;">380ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 6: جدیدترین اخبار تکنولوژی (News Radar & 6-Hour Sync)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">418ms</td>
+            <td style="font-family: monospace;">574ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 7: مقالات تخصصی و سئو رنک ۱ گوگل (Blog Manager)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">431ms</td>
+            <td style="font-family: monospace;">706ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 8: صفحه‌ساز اختصاصی و لندینگ‌پیج (Page Builder)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">393ms</td>
+            <td style="font-family: monospace;">396ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 9: صندوق تیکت‌ها و پیامک پاسخ (Contact Messages & SMS)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">592ms</td>
+            <td style="font-family: monospace;">462ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 10: تخفیف‌ها، کوپن‌ها و جشنواره‌ها (Discount Manager)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">586ms</td>
+            <td style="font-family: monospace;">435ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 11: باشگاه مخاطبان و CRM الماس (Customer Tiering CRM)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">562ms</td>
+            <td style="font-family: monospace;">420ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 12: تایپوگرافی جهانی و وزن‌های ۱۰۰ تا ۹۰۰ (StyleFontManager)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">386ms</td>
+            <td style="font-family: monospace;">626ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 13: بنرها و اسلایدر متحرک ۱۰ عددی (Banners Studio)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">449ms</td>
+            <td style="font-family: monospace;">424ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 14: منوها و دسته‌بندی‌های کالا (Menu & Categories)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">626ms</td>
+            <td style="font-family: monospace;">480ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 15: حساب‌های مدیران و پین امنیتی ۴/۶/۸ (Accounts & Security Studio)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">406ms</td>
+            <td style="font-family: monospace;">410ms</td>
           </tr>
         
           <tr>
             <td>Admin-16-Modules</td>
             <td>ماژول 16: تنظیمات کلان سایت و ایندکس (SiteInfo & 3 Animated Logos)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">439ms</td>
+            <td style="font-family: monospace;">442ms</td>
           </tr>
         
           <tr>
             <td>Integrations</td>
             <td>۱. وب‌سرویس پایش قیمت موتور جستجوی ترب (/api/torob)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">161ms</td>
+            <td style="font-family: monospace;">239ms</td>
           </tr>
         
           <tr>
             <td>Integrations</td>
             <td>۲. تاییدیه اینماد رسمی نماد اعتماد الکترونیکی (/27424534.txt)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">238ms</td>
+            <td style="font-family: monospace;">219ms</td>
           </tr>
         
           <tr>
             <td>Integrations</td>
-            <td>۳. فایل کنترل خزنده‌های گوگل (/robots.txt)</td>
+            <td>۳. فایل کنترل خزنده‌های موتور جستجو (/robots.txt)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">393ms</td>
+            <td style="font-family: monospace;">419ms</td>
           </tr>
         
           <tr>
             <td>Integrations</td>
-            <td>۴. نقشه داینامیک سایت (/sitemap.xml)</td>
+            <td>۴. نقشه داینامیک سایت برای ایندکس گوگل (/sitemap.xml)</td>
             <td class="pass">PASSED ✓</td>
-            <td style="font-family: monospace;">630ms</td>
+            <td style="font-family: monospace;">905ms</td>
           </tr>
         
       </tbody>
     </table>
     <div class="footer">
-      صادر شده توسط ابرسامانه بازرسی خودمختار Axon Apex Sentinel | تاریخ: ۱۴۰۵/۶/۱۳, ۲۱:۳۴:۳۲
+      صادر شده توسط ابرسامانه بازرسی خودمختار Axon Apex Sentinel | تاریخ: ۱۴۰۵/۶/۱۳, ۲۱:۴۸:۰۱
     </div>
   </div>
 </body>

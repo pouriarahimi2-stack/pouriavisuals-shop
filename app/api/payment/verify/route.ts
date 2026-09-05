@@ -1,80 +1,62 @@
-// File Path: app/api/payment/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { smsService } from "@/services/smsService";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { orderId } = body;
+    const { orderId, authority } = await req.json();
 
     if (!orderId) {
-      return NextResponse.json(
-        { success: false, message: "شناسه فاکتور سفارش الزامی است." },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "شناسه فاکتور نامعتبر است." }, { status: 400 });
     }
 
-    const cleanOrderId = String(orderId).trim();
-    let order: any = null;
+    const { data: order, error } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("id", String(orderId))
+      .single();
 
-    // جستجوی دوگانه بر اساس id و order_number
-    if (supabaseAdmin) {
+    if (error || !order) {
+      return NextResponse.json({ success: false, message: "فاکتور سفارش یافت نشد." }, { status: 404 });
+    }
+
+    if (order.status === "paid" || order.payment_status === "paid") {
+      return NextResponse.json({ success: true, message: "فاکتور قبلاً پرداخت و تایید شده است." });
+    }
+
+    const trackingRef = authority || `TXN-${Date.now().toString().slice(-8)}`;
+
+    const { error: updateError } = await supabaseAdmin
+      .from("orders")
+      .update({
+        status: "paid",
+        payment_status: "paid",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.id);
+
+    if (updateError) {
+      return NextResponse.json({ success: false, message: "خطا در تایید تراکنش بانکی." }, { status: 500 });
+    }
+
+    const targetPhone = order.phone || order.customer?.phone;
+    const targetName = order.customer_name || order.customer?.fullName || "مشتری گرامی";
+    if (targetPhone) {
       try {
-        const { data } = await supabaseAdmin
-          .from("orders")
-          .select("*")
-          .or(`id.eq.${cleanOrderId},order_number.eq.${cleanOrderId}`)
-          .maybeSingle();
-
-        order = data;
-      } catch (err) {
-        console.warn("Payment verify order lookup notice:", err);
-      }
-    }
-
-    // مقداردهی ایمن در صورتی که سفارش در محیط سرورلس در حافظه گذرا باشد
-    if (!order) {
-      order = {
-        id: cleanOrderId,
-        order_number: cleanOrderId,
-        customer_name: "خریدار گرامی",
-        phone: "09123456789",
-        total_amount: 128500000,
-        final_amount: 128500000,
-      };
-    }
-
-    const refId = `REF-${Date.now().toString().slice(-8)}`;
-
-    // به‌روزرسانی وضعیت فاکتور به پرداخت شده
-    if (supabaseAdmin) {
-      try {
-        await supabaseAdmin
-          .from("orders")
-          .update({
-            payment_status: "paid",
-            status: "paid",
-            updated_at: new Date().toISOString(),
-          })
-          .or(`id.eq.${cleanOrderId},order_number.eq.${cleanOrderId}`);
-      } catch (upErr) {
-        console.warn("Payment verify status update notice:", upErr);
+        await smsService.sendTrackingCode(targetPhone, targetName, `پرداخت فاکتور ${order.id} با موفقیت تایید شد.`);
+      } catch (smsErr) {
+        console.warn("Payment verify SMS notification error:", smsErr);
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "تراکنش بانکی شاپرک با موفقیت تایید گردید.",
-      refId,
-      orderId: cleanOrderId,
-      order,
+      message: "تراکنش با موفقیت در سیستم بانکی شاپرک تایید شد.",
+      trackingRef,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: err?.message || "خطا در تایید تراکنش" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: err.message || "خطای سیستمی در درگاه پرداخت." }, { status: 500 });
   }
 }

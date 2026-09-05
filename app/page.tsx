@@ -4,20 +4,14 @@ import React, { Suspense } from "react";
 import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
 import ProductList from "@/components/ProductList";
 import TechRadarFeed from "@/components/TechRadarFeed";
-import ContactDock from "@/components/ContactDock";
 import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
 import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen space-y-14 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      {/* نوار آربیتراژ و پایش لحظه‌ای بازار */}
-      <section className="max-w-7xl mx-auto px-4 pt-4">
-        <LiveMarketArbitrage />
-      </section>
-
-      {/* هیرو سکشن مینیمال با بنر پرمیوم */}
-      <section className="max-w-7xl mx-auto px-4">
+    <div className="min-h-screen space-y-12 font-sans select-none text-[var(--text-primary)] pb-16" dir="rtl">
+      {/* ۱. هیرو سکشن اصلی فروشگاه */}
+      <section className="max-w-7xl mx-auto px-4 pt-6">
         <div className="relative rounded-[2.5rem] bg-gradient-to-b from-[var(--modal-bg)] to-[var(--input-bg)] border border-[var(--card-border)] p-6 sm:p-12 shadow-2xl overflow-hidden">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div className="space-y-6 z-10 text-right">
@@ -49,7 +43,7 @@ export default function HomePage() {
             </div>
 
             <div className="relative h-72 sm:h-96 w-full flex items-center justify-center">
-              <Suspense fallback={<div className="text-xs text-[var(--text-secondary)] animate-pulse">در حال بارگذاری المان سه‌بعدی...</div>}>
+              <Suspense fallback={<div className="text-xs text-[var(--text-secondary)] animate-pulse">در حال بارگذاری...</div>}>
                 <Hero3DCanvas />
               </Suspense>
             </div>
@@ -57,18 +51,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ویترین اصلی کاتالوگ محصولات */}
+      {/* ۲. نوار آربیتراژ و پایش قیمت‌ها */}
+      <section className="max-w-7xl mx-auto px-4">
+        <LiveMarketArbitrage />
+      </section>
+
+      {/* ۳. ویترین اصلی کاتالوگ محصولات */}
       <section className="max-w-7xl mx-auto px-4">
         <ProductList />
       </section>
 
-      {/* فید اخبار و رادار تکنولوژی جهانی */}
-      <section className="max-w-7xl mx-auto px-4 pt-6">
+      {/* ۴. فید اخبار تکنولوژی */}
+      <section className="max-w-7xl mx-auto px-4">
         <TechRadarFeed />
       </section>
-
-      {/* داک دسترسی سریع ارتباط با ما */}
-      <ContactDock />
     </div>
   );
 }

@@ -1,4 +1,3 @@
-// File Path: app/track-order/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -6,6 +5,24 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Order, orderService } from "@/services/orderService";
 import { soundEngine } from "@/lib/soundEngine";
+
+function maskPhoneNumber(phone: string): string {
+  if (!phone || phone.length < 11) return phone || "---";
+  const clean = phone.replace(/\D/g, "");
+  if (clean.length === 11) {
+    return clean.slice(0, 4) + "***" + clean.slice(7);
+  }
+  return phone.slice(0, 3) + "***" + phone.slice(-4);
+}
+
+function maskName(name: string): string {
+  if (!name) return "خریدار گرامی";
+  const parts = name.trim().split(" ");
+  if (parts.length > 1) {
+    return parts[0] + " " + parts[1].charAt(0) + "***";
+  }
+  return name.charAt(0) + "***";
+}
 
 function TrackOrderContent() {
   const searchParams = useSearchParams();
@@ -49,7 +66,6 @@ function TrackOrderContent() {
     }
   }, [initialOrderId]);
 
-  // اشتراک زنده وب‌سوکت برای به‌روزرسانی لحظه‌ای وضعیت بسته پستی
   useEffect(() => {
     const handleOrdersUpdate = () => {
       if (searchQuery.trim()) {
@@ -98,7 +114,6 @@ function TrackOrderContent() {
 
   return (
     <div className="min-h-screen py-10 px-4 max-w-4xl mx-auto space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
       {isSuccessRedirect && (
         <div className="p-6 rounded-[2.5rem] bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-between gap-4 shadow-xl animate-fadeIn">
           <div className="flex items-center gap-3.5">
@@ -160,6 +175,8 @@ function TrackOrderContent() {
         {orders.map((order) => {
           const currentStep = getStepIndex(order.status);
           const trackCode = order.trackingCode || order.tracking_code;
+          const rawPhone = order.customer?.phone || order.phone || "";
+          const rawName = order.customer?.fullName || order.customerName || "";
 
           return (
             <div
@@ -186,7 +203,6 @@ function TrackOrderContent() {
                 </div>
               </div>
 
-              {/* استپر ۵ مرحله‌ای ارسال مرسوله */}
               <div className="py-2">
                 <div className="grid grid-cols-5 gap-2 text-center relative">
                   {trackingSteps.map((step, idx) => {
@@ -196,18 +212,18 @@ function TrackOrderContent() {
                     return (
                       <div key={step.key} className="space-y-2 flex flex-col items-center relative z-10">
                         <div
-                          className={`w-10 h-10 rounded-2xl flex items-center justify-center text-base transition-all duration-500 border ${
+                          className={"w-10 h-10 rounded-2xl flex items-center justify-center text-base transition-all duration-500 border " + (
                             isCurrent
                               ? "bg-[var(--accent-blue)] border-white text-white shadow-xl shadow-blue-500/40 scale-110 ring-4 ring-blue-500/20"
                               : isPassed
                               ? "bg-emerald-500 border-emerald-400 text-white shadow-md"
                               : "bg-[var(--input-bg)] border-[var(--card-border)] text-slate-500"
-                          }`}
+                          )}
                         >
                           {step.icon}
                         </div>
                         <div>
-                          <span className={`block font-extrabold text-[11px] ${isPassed ? "text-[var(--text-primary)]" : "text-slate-500"}`}>
+                          <span className={"block font-extrabold text-[11px] " + (isPassed ? "text-[var(--text-primary)]" : "text-slate-500")}>
                             {step.title}
                           </span>
                           <span className="text-[9px] text-[var(--text-secondary)] hidden sm:block mt-0.5">
@@ -220,7 +236,6 @@ function TrackOrderContent() {
                 </div>
               </div>
 
-              {/* بارکد پستی ۲۴ رقمی و لینک استعلام پست */}
               {trackCode ? (
                 <div className="p-5 rounded-3xl bg-blue-500/10 border border-blue-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -244,7 +259,7 @@ function TrackOrderContent() {
                       {copiedCode === trackCode ? "✓ کپی شد" : "کپی بارکد"}
                     </button>
                     <a
-                      href={`https://tracking.post.ir/?id=${trackCode}`}
+                      href={"https://tracking.post.ir/?id=" + trackCode}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 text-white text-xs font-black transition shadow-md flex items-center justify-center gap-1.5"
@@ -261,21 +276,22 @@ function TrackOrderContent() {
                 </div>
               )}
 
-              {/* مشخصات گیرنده */}
+              {/* مشخصات گیرنده با ماسک امنیتی */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                   <span className="font-bold text-[var(--text-secondary)] block">👤 تحویل‌گیرنده:</span>
-                  <p className="font-black text-[var(--text-primary)]">{order.customer?.fullName || order.customerName}</p>
-                  <p className="font-mono text-[var(--text-secondary)] font-bold">{order.customer?.phone || order.phone}</p>
+                  <p className="font-black text-[var(--text-primary)]">{maskName(rawName)}</p>
+                  <p className="font-mono text-[var(--text-secondary)] font-bold">{maskPhoneNumber(rawPhone)}</p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-                  <span className="font-bold text-[var(--text-secondary)] block">📍 نشانی پستی ارسال:</span>
-                  <p className="font-medium text-[var(--text-primary)] leading-relaxed">{order.customer?.address || order.address}</p>
+                  <span className="font-bold text-[var(--text-secondary)] block">📍 محدوده ارسال:</span>
+                  <p className="font-medium text-[var(--text-primary)] leading-relaxed">
+                    {order.customer?.province ? "استان " + order.customer.province + "، شهرستان " + (order.customer.city || "") : "نشانی ثبت‌شده در سیستم"}
+                  </p>
                 </div>
               </div>
 
-              {/* لیست اقلام */}
               <div className="space-y-3">
                 <span className="font-extrabold text-xs text-[var(--text-secondary)] block">📦 اقلام خریداری شده:</span>
                 <div className="space-y-2">
@@ -306,7 +322,7 @@ function TrackOrderContent() {
               </div>
 
               <div className="pt-4 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
-                <span className="font-bold text-[var(--text-secondary)]">مبلغ نهایی پرداخت شده:</span>
+                <span className="font-bold text-[var(--text-secondary)]">مبلغ نهایی فاکتور:</span>
                 <span className="font-mono font-black text-base text-emerald-600 dark:text-emerald-400">
                   {Number(order.finalAmount || order.totalAmount).toLocaleString("fa-IR")} تومان
                 </span>

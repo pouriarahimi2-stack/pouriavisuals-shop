@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Definitive Production Restoration & Deployment Engine (fix.js)
+ * AXON CORE - Privacy Masking & Admin Security Hardening (fix.js)
  */
 
 const fs = require('fs');
@@ -24,519 +24,414 @@ function writeFile(relPath, content) {
   success(`اصلاح شد: ${relPath}`);
 }
 
-log("شروع اعمال اصلاحات لاگین ادمین، کلیک محصولات، تفکیک قیمت و چیدمان...");
+log("شروع ماسک‌کردن شماره تماس خریداران و تقویت امنیت حریم خصوصی...");
 
-// ۱. اصلاح لاگین ادمین و پذیرش پین‌کد
-const adminLoginApi = `import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { signPayload } from "@/lib/session";
+// =============================================================================
+// ۱. اصلاح app/track-order/page.tsx: ماسک‌کردن شماره موبایل و نام کامل برای حفظ حریم خصوصی
+// =============================================================================
+const trackOrderPageContent = `"use client";
 
-export const dynamic = "force-dynamic";
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const pin = String(body.pin || body.password || "").trim();
-    const username = String(body.username || "admin").trim().toLowerCase();
-
-    let { data: adminUser } = await supabaseAdmin
-      .from("admin_users")
-      .select("*")
-      .or("username.eq." + username + ",role.eq.superadmin")
-      .limit(1)
-      .maybeSingle();
-
-    if (!adminUser) {
-      const { data: createdUser } = await supabaseAdmin
-        .from("admin_users")
-        .insert({
-          username: "admin",
-          password: "1234",
-          full_name: "مدیر ارشد آکسون",
-          role: "superadmin",
-          created_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-      adminUser = createdUser;
-    }
-
-    const isValid = adminUser && (adminUser.password === pin || pin === "1234");
-
-    if (!isValid) {
-      return NextResponse.json(
-        { success: false, message: "پین‌کد وارد شده صحیح نمی‌باشد." },
-        { status: 401 }
-      );
-    }
-
-    const token = signPayload({
-      id: String(adminUser?.id || "admin_master"),
-      username: adminUser?.username || "admin",
-      role: adminUser?.role || "superadmin",
-      full_name: adminUser?.full_name || "مدیر سیستم",
-    });
-
-    const isProd = process.env.NODE_ENV === "production";
-    const response = NextResponse.json({
-      success: true,
-      message: "ورود با موفقیت انجام شد.",
-      redirectUrl: "/admin",
-      user: {
-        id: adminUser?.id || "admin_master",
-        username: adminUser?.username || "admin",
-        role: adminUser?.role || "superadmin",
-      },
-    });
-
-    response.cookies.set("admin_session_token", token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
-    });
-
-    response.cookies.set("pv_admin_session", token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
-    });
-
-    return response;
-  } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: "خطای سرور در احراز هویت." },
-      { status: 500 }
-    );
-  }
-}
-`;
-writeFile('app/api/admin/login/route.ts', adminLoginApi);
-
-// ۲. اصلاح صفحه اصلی (حذف Price Match و قرارگیری استاندارد هیرو و محصولات)
-const mainHomePage = `"use client";
-
-import React, { Suspense } from "react";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
-import ProductList from "@/components/ProductList";
-import TechRadarFeed from "@/components/TechRadarFeed";
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-
-export default function HomePage() {
-  return (
-    <div className="min-h-screen space-y-16 font-sans select-none text-[var(--text-primary)] pb-12" dir="rtl">
-      <section className="max-w-7xl mx-auto px-4 pt-6">
-        <div className="relative rounded-[2.5rem] bg-gradient-to-b from-[var(--modal-bg)] to-[var(--input-bg)] border border-[var(--card-border)] p-6 sm:p-12 shadow-2xl overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            <div className="space-y-6 z-10 text-right">
-              <span className="px-3.5 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-black inline-block">
-                ⚡ مرجع تخصصی مانیتورهای تدوین رنگ ۵K و ۴K
-              </span>
-              <h1 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight">
-                دقت بی‌نهایت رنگ، <br className="hidden sm:block" />
-                استاندارد حرفه‌ای استودیو
-              </h1>
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-lg">
-                تامین، کالیبراسیون و مشاوره تخصصی نمایشگرهای رتینا، کابل‌های تاندربولت و تجهیزات استودیویی با ضمانت اصالت طلایی.
-              </p>
-              <div className="flex flex-wrap gap-3 pt-2">
-                <a
-                  href="#products"
-                  className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl shadow-blue-500/25 flex items-center gap-2"
-                >
-                  <span>🛒</span>
-                  <span>مشاهده کاتالوگ و خرید</span>
-                </a>
-                <Link
-                  href="/products"
-                  className="px-6 py-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
-                >
-                  آرشیو کامل محصولات ←
-                </Link>
-              </div>
-            </div>
-
-            <div className="relative h-72 sm:h-96 w-full flex items-center justify-center">
-              <Suspense fallback={<div className="text-xs text-[var(--text-secondary)] animate-pulse">در حال آماده‌سازی مدل سه‌بعدی...</div>}>
-                <Hero3DCanvas />
-              </Suspense>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-4" id="products">
-        <ProductList />
-      </section>
-
-      <section className="max-w-7xl mx-auto px-4">
-        <TechRadarFeed />
-      </section>
-    </div>
-  );
-}
-`;
-writeFile('app/page.tsx', mainHomePage);
-
-// ۳. اصلاح ProductList و ایجاد امکان کلیک به صفحه تکی محصول
-const productListFix = `"use client";
-
-import React, { useState, useEffect } from "react";
-import { productService, Product } from "@/services/productService";
-import { useCart } from "@/context/CartContext";
+import { Order, orderService } from "@/services/orderService";
 import { soundEngine } from "@/lib/soundEngine";
-import Link from "next/link";
 
-export default function ProductList() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const { addToCart } = useCart();
+function maskPhoneNumber(phone: string): string {
+  if (!phone || phone.length < 11) return phone || "---";
+  const clean = phone.replace(/\\D/g, "");
+  if (clean.length === 11) {
+    return clean.slice(0, 4) + "***" + clean.slice(7);
+  }
+  return phone.slice(0, 3) + "***" + phone.slice(-4);
+}
 
-  const loadProducts = async () => {
+function maskName(name: string): string {
+  if (!name) return "خریدار گرامی";
+  const parts = name.trim().split(" ");
+  if (parts.length > 1) {
+    return parts[0] + " " + parts[1].charAt(0) + "***";
+  }
+  return name.charAt(0) + "***";
+}
+
+function TrackOrderContent() {
+  const searchParams = useSearchParams();
+  const initialOrderId = searchParams.get("orderId") || "";
+  const isSuccessRedirect = searchParams.get("success") === "true";
+
+  const [searchQuery, setSearchQuery] = useState(initialOrderId);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const fetchOrders = async (queryText: string) => {
+    if (!queryText.trim()) return;
+
+    soundEngine.playClick();
+    setLoading(true);
+    setErrorMessage(null);
+
     try {
-      const data = await productService.getAll();
-      setProducts(data || []);
+      const results = await orderService.trackOrder(queryText.trim());
+
+      if (results && results.length > 0) {
+        setOrders(results);
+      } else {
+        setErrorMessage("فاکتوری با این مشخصات در پایگاه داده یافت نشد.");
+        setOrders([]);
+      }
+    } catch {
+      setErrorMessage("خطا در برقراری ارتباط با سرور. لطفاً مجدداً تلاش کنید.");
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadProducts();
-
-    const handleUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
-      else loadProducts();
-    };
-
-    window.addEventListener("products_updated", handleUpdate);
-    return () => {
-      window.removeEventListener("products_updated", handleUpdate);
-    };
-  }, []);
-
-  const categories = Array.from(new Set(products.map((p) => p.category || "عمومی"))).filter(Boolean);
-
-  const filtered = products.filter((p) => {
-    const isAvail = p.is_available !== false && (p.stock ?? 1) > 0;
-    const matchCat = selectedCategory === "all" || (p.category || "عمومی") === selectedCategory;
-    const matchSearch =
-      (p.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
-    return isAvail && matchCat && matchSearch;
-  });
-
-  return (
-    <section className="py-8 space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[var(--card-border)] pb-6">
-        <div>
-          <span className="text-xs font-black text-[var(--accent-blue)] block mb-1">PRO DISPLAY & GEARS</span>
-          <h2 className="text-2xl md:text-3xl font-black">کاتالوگ تجهیزات تصویر و مانیتورها</h2>
-          <p className="text-xs text-[var(--text-secondary)] font-medium mt-1">
-            تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-            <button
-              onClick={() => {
-                soundEngine.playClick();
-                setSelectedCategory("all");
-              }}
-              className={"px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap " + (selectedCategory === "all" ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]")}
-            >
-              همه ({products.length})
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => {
-                  soundEngine.playClick();
-                  setSelectedCategory(cat);
-                }}
-                className={"px-4 py-2 rounded-2xl font-black transition cursor-pointer whitespace-nowrap " + (selectedCategory === cat ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]")}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="🔍 جستجو در مدل یا مشخصات..."
-            className="p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] w-full md:w-56"
-          />
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-pulse">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="p-5 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4">
-              <div className="w-full h-48 rounded-3xl bg-[var(--input-bg)]" />
-              <div className="h-4 w-3/4 bg-[var(--input-bg)] rounded-full" />
-              <div className="h-3 w-1/2 bg-[var(--input-bg)] rounded-full" />
-            </div>
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="p-16 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] text-center text-xs font-bold text-[var(--text-secondary)]">
-          کالایی در این دسته‌بندی یافت نشد.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.map((prod) => {
-            const displayImg = prod.images?.[0] || prod.image || "";
-            return (
-              <div
-                key={prod.id}
-                className="p-5 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl hover:border-[var(--accent-blue)] transition duration-300 flex flex-col justify-between group"
-              >
-                <Link href={"/products/" + prod.id} className="space-y-4 block cursor-pointer">
-                  <div className="w-full h-48 rounded-3xl bg-[var(--input-bg)] p-3 border border-[var(--card-border)] flex items-center justify-center relative overflow-hidden">
-                    {displayImg ? (
-                      <img
-                        src={displayImg}
-                        alt={prod.title}
-                        className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
-                      />
-                    ) : (
-                      <span className="text-3xl opacity-40">🖼️</span>
-                    )}
-
-                    {prod.is_featured && (
-                      <span className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-black text-[10px] shadow-lg">
-                        🔥 پیشنهاد ویژه
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] text-[var(--accent-blue)] font-extrabold block">
-                      {prod.category || "تجهیزات"}
-                    </span>
-                    <h3 className="font-extrabold text-xs text-[var(--text-primary)] line-clamp-2 leading-snug group-hover:text-[var(--accent-blue)] transition">
-                      {prod.title}
-                    </h3>
-                    <p className="text-[11px] text-[var(--text-secondary)] font-medium line-clamp-2 leading-relaxed">
-                      {prod.description || "دارای گارانتی اصالت طلایی و تست سلامت فیزیکی"}
-                    </p>
-                  </div>
-                </Link>
-
-                <div className="pt-4 border-t border-[var(--card-border)] space-y-3 mt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
-                    <div className="text-left">
-                      {prod.discountPrice && prod.discountPrice < prod.price && (
-                        <span className="block text-[10px] text-[var(--text-secondary)] line-through font-mono">
-                          {prod.price.toLocaleString("fa-IR")}
-                        </span>
-                      )}
-                      <span className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
-                        {Number(prod.discountPrice || prod.price || 0).toLocaleString("fa-IR")} تومان
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      soundEngine.playAddToCart();
-                      addToCart({
-                        id: prod.id,
-                        title: prod.title,
-                        price: prod.discountPrice || prod.price,
-                        image: displayImg,
-                        stock: prod.stock ?? 10,
-                      });
-                    }}
-                    className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <span>🛒</span>
-                    <span>افزودن به سبد خرید</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-`;
-writeFile('components/ProductList.tsx', productListFix);
-
-// ۴. اصلاح صفحه محصول و قرارگیری پایش قیمت داخل آن
-const productDetailsPage = `"use client";
-
-import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { productService, Product } from "@/services/productService";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
-import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
-import ProductReviews from "@/components/ProductReviews";
-import ColorGamutSimulator from "@/components/ColorGamutSimulator";
-import ProductExplodedView from "@/components/ProductExplodedView";
-import Link from "next/link";
-
-export default function ProductDetailPage() {
-  const params = useParams();
-  const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeImage, setActiveImage] = useState<string>("");
-  const { addToCart } = useCart();
+    if (initialOrderId) {
+      setSearchQuery(initialOrderId);
+      fetchOrders(initialOrderId);
+    }
+  }, [initialOrderId]);
 
   useEffect(() => {
-    async function load() {
-      if (!id) return;
-      try {
-        const found = await productService.getById(id);
-        if (found) {
-          setProduct(found);
-          const firstImg = found.images?.[0] || found.image || "";
-          setActiveImage(firstImg);
-        }
-      } finally {
-        setLoading(false);
+    const handleOrdersUpdate = () => {
+      if (searchQuery.trim()) {
+        orderService.trackOrder(searchQuery.trim()).then((res) => {
+          if (res && res.length > 0) setOrders(res);
+        });
       }
+    };
+
+    window.addEventListener("orders_updated", handleOrdersUpdate);
+    return () => {
+      window.removeEventListener("orders_updated", handleOrdersUpdate);
+    };
+  }, [searchQuery]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchOrders(searchQuery);
+  };
+
+  const copyToClipboard = (text: string) => {
+    soundEngine.playClick();
+    navigator.clipboard.writeText(text);
+    setCopiedCode(text);
+    setTimeout(() => setCopiedCode(null), 2500);
+  };
+
+  const trackingSteps = [
+    { key: "pending", title: "ثبت فاکتور", desc: "سفارش در انتظار تایید", icon: "📄" },
+    { key: "paid", title: "پرداخت موفق", desc: "تاییدیه پرداخت شاپرک", icon: "💳" },
+    { key: "processing", title: "بسته‌بندی استودیویی", desc: "تست سلامت و پک ضدضربه", icon: "📦" },
+    { key: "shipped", title: "تحویل به شرکت پست", desc: "صدور بارنامه پیشتاز ۲۴ رقمی", icon: "🚚" },
+    { key: "delivered", title: "تحویل به مشتری", desc: "پایان چرخه سفارش", icon: "✅" },
+  ];
+
+  const getStepIndex = (status: string) => {
+    switch (status) {
+      case "pending": return 0;
+      case "paid": return 1;
+      case "processing": return 2;
+      case "shipped": return 3;
+      case "delivered": return 4;
+      default: return 1;
     }
-    load();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
-        در حال دریافت مشخصات کالا...
-      </div>
-    );
-  }
-
-  if (!product) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center font-sans space-y-4" dir="rtl">
-        <h2 className="text-xl font-black">کالای مورد نظر یافت نشد.</h2>
-        <Link href="/" className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold">
-          بازگشت به فروشگاه
-        </Link>
-      </div>
-    );
-  }
-
-  const allImages = product.images && product.images.length > 0 ? product.images : [product.image || ""];
-  const currentPrice = Number(product.discountPrice || product.price || 0);
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10 space-y-12 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-10 shadow-2xl">
-        <div className="space-y-4">
-          <div className="w-full h-80 sm:h-96 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-4 flex items-center justify-center overflow-hidden">
-            <img src={activeImage || allImages[0]} alt={product.title} className="w-full h-full object-contain" />
-          </div>
-          {allImages.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {allImages.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setActiveImage(img);
-                  }}
-                  className={"w-16 h-16 rounded-2xl border p-1 bg-[var(--input-bg)] transition " + (activeImage === img ? "border-[var(--accent-blue)] ring-2 ring-blue-500/30" : "border-[var(--card-border)]")}
-                >
-                  <img src={img} alt="" className="w-full h-full object-contain" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-6 flex flex-col justify-between">
-          <div className="space-y-3">
-            <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-xs font-black">
-              {product.category || "تجهیزات استودیویی"}
+    <div className="min-h-screen py-10 px-4 max-w-4xl mx-auto space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      {isSuccessRedirect && (
+        <div className="p-6 rounded-[2.5rem] bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-between gap-4 shadow-xl animate-fadeIn">
+          <div className="flex items-center gap-3.5">
+            <span className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-2xl font-black shadow-lg">
+              ✓
             </span>
-            <h1 className="text-xl sm:text-3xl font-black leading-snug">{product.title}</h1>
-            <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">
-              {product.description || "ارائه شده با ضمانت اصالت فیزیکی و پشتیبانی تخصصی استودیو."}
-            </p>
-          </div>
-
-          <div className="space-y-4 p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت نهایی:</span>
-              <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                {currentPrice.toLocaleString("fa-IR")} تومان
-              </span>
+            <div>
+              <h3 className="font-extrabold text-sm text-emerald-600 dark:text-emerald-400">
+                پرداخت و ثبت سفارش شما با موفقیت تایید شد!
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+                فاکتور رسمی صادر گردید و کد رهگیری پستی به زودی پیامک خواهد شد.
+              </p>
             </div>
-
-            <button
-              onClick={() => {
-                soundEngine.playAddToCart();
-                addToCart({
-                  id: product.id,
-                  title: product.title,
-                  price: currentPrice,
-                  image: activeImage || allImages[0],
-                  stock: product.stock ?? 10,
-                });
-              }}
-              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span>🛒</span>
-              <span>افزودن به سبد خرید</span>
-            </button>
           </div>
+          <Link
+            href="/"
+            className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-emerald-500 transition"
+          >
+            صفحه اصلی
+          </Link>
         </div>
+      )}
+
+      <div className="text-center space-y-2">
+        <div className="w-14 h-14 mx-auto rounded-3xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center text-2xl text-[var(--accent-blue)] shadow-lg">
+          🔍
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-black">رهگیری بلادرنگ مرسولات و استعلام فاکتور</h1>
+        <p className="text-xs text-[var(--text-secondary)] font-medium max-w-md mx-auto">
+          شماره فاکتور یا تلفن همراه را وارد نمایید تا آخرین وضعیت ارسال به صورت زنده استعلام شود
+        </p>
       </div>
 
-      <section className="space-y-4">
-        <LiveMarketArbitrage />
-      </section>
+      <form onSubmit={handleSearchSubmit} className="max-w-xl mx-auto flex gap-2">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="مثال: ORD-419556 یا 09123456789"
+          className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)] shadow-sm"
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-extrabold text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+        >
+          <span>{loading ? "در حال استعلام..." : "استعلام وضعیت فاکتور 🚀"}</span>
+        </button>
+      </form>
 
-      <section className="space-y-4">
-        <ColorGamutSimulator />
-      </section>
+      {errorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold text-center animate-fadeIn">
+          {errorMessage}
+        </div>
+      )}
 
-      <section className="space-y-4">
-        <ProductExplodedView productId={product.id} />
-      </section>
+      <div className="space-y-6">
+        {orders.map((order) => {
+          const currentStep = getStepIndex(order.status);
+          const trackCode = order.trackingCode || order.tracking_code;
+          const rawPhone = order.customer?.phone || order.phone || "";
+          const rawName = order.customer?.fullName || order.customerName || "";
 
-      <section className="space-y-4">
-        <ProductReviews productId={product.id} />
-      </section>
+          return (
+            <div
+              key={order.id}
+              className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-8 animate-fadeIn"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-[var(--text-primary)]">شماره فاکتور:</span>
+                    <span className="font-mono font-black text-base text-[var(--accent-blue)]">
+                      {order.orderNumber || order.id}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-secondary)] font-medium">
+                    تاریخ ثبت: {new Date(order.created_at || Date.now()).toLocaleDateString("fa-IR")}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="px-3.5 py-1.5 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 font-black text-xs">
+                    {order.status === "shipped" ? "تحویل به پست 🚚" : order.status === "delivered" ? "تحویل داده شده ✓" : "در حال آماده‌سازی 📦"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="py-2">
+                <div className="grid grid-cols-5 gap-2 text-center relative">
+                  {trackingSteps.map((step, idx) => {
+                    const isPassed = idx <= currentStep;
+                    const isCurrent = idx === currentStep;
+
+                    return (
+                      <div key={step.key} className="space-y-2 flex flex-col items-center relative z-10">
+                        <div
+                          className={"w-10 h-10 rounded-2xl flex items-center justify-center text-base transition-all duration-500 border " + (
+                            isCurrent
+                              ? "bg-[var(--accent-blue)] border-white text-white shadow-xl shadow-blue-500/40 scale-110 ring-4 ring-blue-500/20"
+                              : isPassed
+                              ? "bg-emerald-500 border-emerald-400 text-white shadow-md"
+                              : "bg-[var(--input-bg)] border-[var(--card-border)] text-slate-500"
+                          )}
+                        >
+                          {step.icon}
+                        </div>
+                        <div>
+                          <span className={"block font-extrabold text-[11px] " + (isPassed ? "text-[var(--text-primary)]" : "text-slate-500")}>
+                            {step.title}
+                          </span>
+                          <span className="text-[9px] text-[var(--text-secondary)] hidden sm:block mt-0.5">
+                            {step.desc}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {trackCode ? (
+                <div className="p-5 rounded-3xl bg-blue-500/10 border border-blue-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">📮</span>
+                      <span className="font-extrabold text-xs text-[var(--text-primary)]">شماره بارنامه پست پیشتاز:</span>
+                      <span className="font-mono font-black text-sm text-[var(--accent-blue)] tracking-wider">
+                        {trackCode}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[var(--text-secondary)] font-medium pr-7">
+                      مرسوله شما با بیمه کامل استودیویی تحویل شرکت ملی پست گردیده است.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={() => copyToClipboard(trackCode)}
+                      className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition cursor-pointer"
+                    >
+                      {copiedCode === trackCode ? "✓ کپی شد" : "کپی بارکد"}
+                    </button>
+                    <a
+                      href={"https://tracking.post.ir/?id=" + trackCode}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] hover:opacity-90 text-white text-xs font-black transition shadow-md flex items-center justify-center gap-1.5"
+                    >
+                      <span>سامانه رهگیری پست</span>
+                      <span>↗</span>
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-medium flex items-center gap-2">
+                  <span>ℹ️</span>
+                  <span>کد رهگیری ۲۴ رقمی پس از تحویل مرسوله به شرکت پست، پیامک و در اینجا نمایش داده خواهد شد.</span>
+                </div>
+              )}
+
+              {/* مشخصات گیرنده با ماسک امنیتی */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+                  <span className="font-bold text-[var(--text-secondary)] block">👤 تحویل‌گیرنده:</span>
+                  <p className="font-black text-[var(--text-primary)]">{maskName(rawName)}</p>
+                  <p className="font-mono text-[var(--text-secondary)] font-bold">{maskPhoneNumber(rawPhone)}</p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+                  <span className="font-bold text-[var(--text-secondary)] block">📍 محدوده ارسال:</span>
+                  <p className="font-medium text-[var(--text-primary)] leading-relaxed">
+                    {order.customer?.province ? "استان " + order.customer.province + "، شهرستان " + (order.customer.city || "") : "نشانی ثبت‌شده در سیستم"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <span className="font-extrabold text-xs text-[var(--text-secondary)] block">📦 اقلام خریداری شده:</span>
+                <div className="space-y-2">
+                  {order.items.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        {item.image && (
+                          <img
+                            src={item.image}
+                            alt=""
+                            className="w-11 h-11 rounded-xl object-contain bg-[var(--modal-bg)] border border-[var(--card-border)] p-1 shrink-0"
+                          />
+                        )}
+                        <div>
+                          <h4 className="font-black text-[var(--text-primary)]">{item.title || item.name}</h4>
+                          <span className="text-[10px] text-[var(--text-secondary)] font-medium">تعداد: {item.quantity} عدد</span>
+                        </div>
+                      </div>
+                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                        {((item.price || 0) * (item.quantity || 1)).toLocaleString("fa-IR")} تومان
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
+                <span className="font-bold text-[var(--text-secondary)]">مبلغ نهایی فاکتور:</span>
+                <span className="font-mono font-black text-base text-emerald-600 dark:text-emerald-400">
+                  {Number(order.finalAmount || order.totalAmount).toLocaleString("fa-IR")} تومان
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
-`;
-writeFile('app/products/[id]/page.tsx', productDetailsPage);
 
-// ۵. بیلد محلی و پوش نهایی به گیت‌هاب
-log("اجرای بیلد محلی برای تایید صحت فایل‌ها...");
+export default function TrackOrderPage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center text-xs font-bold text-slate-400 animate-pulse">در حال بارگذاری فاکتور...</div>}>
+      <TrackOrderContent />
+    </Suspense>
+  );
+}
+`;
+writeFile('app/track-order/page.tsx', trackOrderPageContent);
+
+// =============================================================================
+// ۲. افزودن قابلیت تغییر مستقیم پین‌کد مدیریت در تنظیمات ادمین
+// =============================================================================
+const adminChangePinApi = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const { newPin } = await req.json();
+    const cleanPin = String(newPin || "").trim();
+
+    if (!cleanPin || cleanPin.length < 4) {
+      return NextResponse.json({ success: false, message: "پین‌کد باید حداقل ۴ رقم باشد." }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin
+      .from("admin_users")
+      .update({ password: cleanPin, updated_at: new Date().toISOString() })
+      .or("username.eq.admin,role.eq.superadmin");
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: "پین‌کد ورود با موفقیت تغییر یافت." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message || "خطا در تغییر پین‌کد." }, { status: 500 });
+  }
+}
+`;
+writeFile('app/api/admin/change-pin/route.ts', adminChangePinApi);
+
+// =============================================================================
+// ۳. تست بیلد و پوش مستقیم به گیت‌هاب
+// =============================================================================
+log("تست بیلد محلی برای اطمینان از صحت فایل‌ها...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
-  success("بیلد با موفقیت پاس شد.");
+  success("بیلد با موفقیت کامل انجام شد.");
 } catch (e) {
   console.error("خطای بیلد:", e.message);
   process.exit(1);
 }
 
-log("ارسال تغییرات به گیت‌هاب...");
+log("ارسال و پوش به گیت‌هاب...");
 try {
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix: restore pin 1234 auth, enable product link navigation, isolate arbitrage component"', { stdio: 'inherit' });
-  
+  execSync('git commit -m "feat(privacy): mask sensitive customer info in order tracking and add admin pin change endpoint"', { stdio: 'inherit' });
+
   let branchName = 'main';
   try {
     branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
@@ -544,7 +439,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  success("تغییرات با موفقیت به گیت‌هاب ارسال شد!");
+  success("تغییرات با موفقیت به گیت‌هاب ارسال و روی سرور مستقر شد!");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

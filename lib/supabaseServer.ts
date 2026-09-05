@@ -1,17 +1,24 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hooaobrxgwakqqibcfdy.supabase.co";
-const supabaseServiceKey = 
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
-  "sb_publishable_4W6VSBnjKZzSUTQp13PUpG_hzW7qMeG";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+if (!supabaseUrl) {
+  console.error("FATAL: NEXT_PUBLIC_SUPABASE_URL is missing.");
+}
 
-export default supabaseAdmin;
+// در محیط پروداکشن، اگر کلید Service Role موجود نباشد، نباید با کلید عمومی ادامه داد!
+if (!serviceRoleKey && process.env.NODE_ENV === "production") {
+  throw new Error("SECURITY FAULT: SUPABASE_SERVICE_ROLE_KEY is required for server operations.");
+}
+
+export const supabaseAdmin = createClient(
+  supabaseUrl,
+  serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);

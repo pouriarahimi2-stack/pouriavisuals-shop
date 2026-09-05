@@ -1,80 +1,49 @@
-// File Path: app/api/orders/track/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseServer';
-import { normalizeOrder } from '@/services/orderService';
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get('query');
+    const query = searchParams.get("query")?.trim();
 
-    if (!query || !query.trim()) {
+    if (!query) {
       return NextResponse.json(
-        { success: false, message: 'شناسه سفارش یا شماره تماس الزامی است.', data: [] },
+        { success: false, message: "کد پیگیری یا شماره تماس الزامی است." },
         { status: 400 }
       );
     }
 
-    const cleanQuery = query.trim();
-
-    // ۱. استعلام همه فاکتورها برای ادمین و CRM
-    if (cleanQuery.toLowerCase() === 'all') {
-      try {
-        const { data, error } = await supabaseAdmin
-          .from('orders')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100);
-
-        if (!error && data) {
-          return NextResponse.json({
-            success: true,
-            data: data.map(normalizeOrder),
-          });
-        }
-      } catch {}
-
-      return NextResponse.json({ success: true, data: [] });
+    // مسدودسازی قطعی افشای گروهی فاکتورها (query=all)
+    if (query.toLowerCase() === "all") {
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز. امکان دریافت یکجای فاکتورها وجود ندارد." },
+        { status: 403 }
+      );
     }
 
-    // ۲. استعلام فاکتور مشخص با جستجوی چندگانه
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('orders')
-        .select('*')
-        .or(`order_number.eq.${cleanQuery},id.eq.${cleanQuery},phone.eq.${cleanQuery},tracking_code.eq.${cleanQuery}`)
-        .order('created_at', { ascending: false });
+    const cleanQuery = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString());
 
-      if (!error && data && data.length > 0) {
-        return NextResponse.json({
-          success: true,
-          data: data.map(normalizeOrder),
-          message: 'سفارش یافت شد.',
-        });
-      }
-    } catch {}
+    // استعلام فاکتور و بازگرداندن صرفاً اطلاعات مجاز عمومی مرسوله
+    const { data, error } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_number, status, tracking_code, created_at, items, final_amount")
+      .or(`id.eq.${cleanQuery},order_number.eq.${cleanQuery},tracking_code.eq.${cleanQuery},phone.eq.${cleanQuery}`)
+      .order("created_at", { ascending: false })
+      .limit(5);
 
-    // در صورت وجود در کش لحظه‌ای موقت
-    return NextResponse.json({
-      success: true,
-      data: [
-        normalizeOrder({
-          id: cleanQuery,
-          order_number: cleanQuery,
-          customer_name: 'کاربر سیستم',
-          final_amount: 128500000,
-          total_amount: 128500000,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-        })
-      ],
-      message: 'سفارش در حافظه سیستم تایید شد.',
-    });
-  } catch (error: any) {
+    if (error || !data || data.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "فاکتوری با این مشخصات یافت نشد." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, orders: data });
+  } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: 'خطا در استعلام سفارش.', data: [] },
+      { success: false, message: "خطا در استعلام سفارش." },
       { status: 500 }
     );
   }

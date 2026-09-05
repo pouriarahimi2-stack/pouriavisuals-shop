@@ -1,56 +1,53 @@
-// File Path: lib/session.ts
-import { createHmac } from "crypto";
+import crypto from "crypto";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || "axon_admin_super_secret_session_key_2026_secure_engine";
+const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_core_super_secure_vault_2026_key";
 
-export function signPayload(payload: any): string {
-  try {
-    const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-    const hmac = createHmac("sha256", SESSION_SECRET);
-    hmac.update(data);
-    const signature = hmac.digest("base64url");
-    return `${data}.${signature}`;
-  } catch {
-    const data = Buffer.from(JSON.stringify(payload)).toString("base64");
-    return `AUTH-${data}`;
-  }
+export interface SessionPayload {
+  id?: string;
+  username: string;
+  role: string;
+  full_name?: string;
+  exp: number;
 }
 
-export function verifyPayload(token: string): any | null {
+export function signPayload(payload: Omit<SessionPayload, "exp">, expiresInDays = 7): string {
+  const exp = Date.now() + expiresInDays * 24 * 60 * 60 * 1000;
+  const data: SessionPayload = { ...payload, exp };
+  const jsonStr = JSON.stringify(data);
+  const base64Data = Buffer.from(jsonStr).toString("base64url");
+  const signature = crypto
+    .createHmac("sha256", SESSION_SECRET)
+    .update(base64Data)
+    .digest("base64url");
+
+  return `${base64Data}.${signature}`;
+}
+
+export function verifyPayload(token: string): SessionPayload | null {
   try {
-    if (!token || typeof token !== "string") return null;
+    if (!token || typeof token !== "string" || !token.includes(".")) return null;
 
-    // ۱. بررسی توکن‌های استاندارد با امضای HMAC
-    if (token.includes(".")) {
-      const parts = token.split(".");
-      if (parts.length === 2) {
-        const [data, signature] = parts;
-        const hmac = createHmac("sha256", SESSION_SECRET);
-        hmac.update(data);
-        const expectedSignature = hmac.digest("base64url");
+    const parts = token.split(".");
+    if (parts.length !== 2) return null;
 
-        if (signature === expectedSignature) {
-          const jsonStr = Buffer.from(data, "base64url").toString("utf-8");
-          const parsed = JSON.parse(jsonStr);
+    const [base64Data, signature] = parts;
+    const expectedSignature = crypto
+      .createHmac("sha256", SESSION_SECRET)
+      .update(base64Data)
+      .digest("base64url");
 
-          // بررسی تاریخ انقضای سشن توکن
-          if (parsed && parsed.exp && Date.now() > parsed.exp) {
-            return null;
-          }
-
-          return parsed;
-        }
-      }
+    if (signature !== expectedSignature) {
+      return null;
     }
 
-    // ۲. بررسی توکن‌های فال‌بک
-    if (token.startsWith("AUTH-")) {
-      const base64Data = token.replace("AUTH-", "");
-      const jsonStr = Buffer.from(base64Data, "base64").toString("utf-8");
-      return JSON.parse(jsonStr);
+    const jsonStr = Buffer.from(base64Data, "base64url").toString("utf8");
+    const data: SessionPayload = JSON.parse(jsonStr);
+
+    if (Date.now() > data.exp) {
+      return null;
     }
 
-    return null;
+    return data;
   } catch {
     return null;
   }

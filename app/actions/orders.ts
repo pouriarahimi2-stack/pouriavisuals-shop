@@ -1,7 +1,7 @@
-// File Path: app/actions/orders.ts
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import crypto from "crypto";
 
 export interface OrderItemInput {
   productId: string | number;
@@ -35,38 +35,64 @@ export async function createOrderServer(payload: CreateOrderInput) {
     }
 
     if (!customer.phone || !customer.address || !customer.fullName) {
-      return { success: false, error: "مشخصات گیرنده و آدرس تحویل ناقص است." };
+      return { success: false, error: "مشخصات خریدار و نشانی تحویل مرسوله ناقص است." };
     }
 
     const cleanPhone = customer.phone
       .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
       .replace(/\D/g, "");
 
-    // ۱. استعلام قیمت‌ها و موجودی مستقیم از دیتابیس جهت جلوگیری از دستکاری قیمت کلاینت
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return { success: false, error: "شماره تماس وارد شده معتبر نیست." };
+    }
+
     const productIds = items.map((i) => String(i.productId)).filter(Boolean);
-    const { data: dbProducts } = await supabaseAdmin
+    const { data: dbProducts, error: dbErr } = await supabaseAdmin
       .from("products")
-      .select("id, price, discount_price, stock")
+      .select("id, title, price, discount_price, stock, is_available")
       .in("id", productIds);
 
+    if (dbErr || !dbProducts) {
+      return { success: false, error: "خطا در استعلام اطلاعات محصولات از دیتابیس." };
+    }
+
     let calculatedTotal = 0;
-    const validatedItems = items.map((item) => {
-      const dbProduct = dbProducts?.find((p: any) => String(p.id) === String(item.productId));
-      const unitPrice = dbProduct
-        ? (dbProduct.discount_price && Number(dbProduct.discount_price) > 0
-            ? Number(dbProduct.discount_price)
-            : Number(dbProduct.price))
-        : Number(item.price);
+    const validatedItems = [];
+
+    for (const item of items) {
+      const dbProduct = dbProducts.find((p: any) => String(p.id) === String(item.productId));
+
+      // بستن قطعی رخنه جعل قیمت: اگر کالایی در دیتابیس نباشد، سفارش فوراً رد می‌شود
+      if (!dbProduct) {
+        return {
+          success: false,
+          error: `کالای «${item.title || item.productId}» در سیستم یافت نشد یا معتبر نیست.`,
+        };
+      }
+
+      if (dbProduct.stock !== null && dbProduct.stock !== undefined && dbProduct.stock < (item.quantity || 1)) {
+        return {
+          success: false,
+          error: `موجودی کالای «${dbProduct.title}» در انبار برای این تعداد کافی نیست.`,
+        };
+      }
+
+      const unitPrice =
+        dbProduct.discount_price && Number(dbProduct.discount_price) > 0
+          ? Number(dbProduct.discount_price)
+          : Number(dbProduct.price);
 
       calculatedTotal += unitPrice * Number(item.quantity || 1);
-      return {
-        ...item,
-        productId: String(item.productId),
-        price: unitPrice,
-      };
-    });
 
-    // ۲. اعتبارسنجی سروری کوپن تخفیف
+      validatedItems.push({
+        productId: String(dbProduct.id),
+        title: dbProduct.title,
+        price: unitPrice,
+        quantity: Number(item.quantity || 1),
+        image: item.image || "",
+      });
+    }
+
     let discountAmount = 0;
     if (couponCode) {
       const { data: coupon } = await supabaseAdmin
@@ -96,9 +122,9 @@ export async function createOrderServer(payload: CreateOrderInput) {
     }
 
     const finalPayable = Math.max(0, calculatedTotal - discountAmount + shippingCost);
-    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+    // ساخت شناسه یکتا و بدون تصادم
+    const orderId = `ORD-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 
-    // ۳. ثبت فاکتور رسمی در جدول orders با اسکیمای استاندارد
     const { data: newOrder, error: insertError } = await supabaseAdmin
       .from("orders")
       .insert({
@@ -125,30 +151,27 @@ export async function createOrderServer(payload: CreateOrderInput) {
       .single();
 
     if (insertError || !newOrder) {
-      console.error("Order server creation error:", insertError);
-      return { success: false, error: "خطا در ثبت فاکتور در دیتابیس." };
+      return { success: false, error: "خطا در ثبت سفارش در پایگاه داده." };
     }
 
-    // ۴. کسر خودکار موجودی انبار برای کالاهای خریداری‌شده
-    for (const item of validatedItems) {
-      if (item.productId) {
-        try {
-          const { data: p } = await supabaseAdmin
-            .from("products")
-            .select("stock")
-            .eq("id", item.productId)
-            .maybeSingle();
+    // کسر موجودی انبار
+    for (const it of validatedItems) {
+      try {
+        const { data: p } = await supabaseAdmin
+          .from("products")
+          .select("stock")
+          .eq("id", it.productId)
+          .single();
 
-          if (p && p.stock !== null && p.stock !== undefined) {
-            const nextStock = Math.max(0, Number(p.stock) - Number(item.quantity || 1));
-            await supabaseAdmin
-              .from("products")
-              .update({ stock: nextStock, is_available: nextStock > 0 })
-              .eq("id", item.productId);
-          }
-        } catch (stkErr) {
-          console.warn("Stock decrease warning:", stkErr);
+        if (p && p.stock !== null && p.stock !== undefined) {
+          const nextStock = Math.max(0, Number(p.stock) - Number(it.quantity));
+          await supabaseAdmin
+            .from("products")
+            .update({ stock: nextStock, is_available: nextStock > 0 })
+            .eq("id", it.productId);
         }
+      } catch (stkErr) {
+        console.warn("Stock decrease err:", stkErr);
       }
     }
 
@@ -158,36 +181,6 @@ export async function createOrderServer(payload: CreateOrderInput) {
       totalAmount: finalPayable,
     };
   } catch (err: any) {
-    console.error("Server Action Create Order Error:", err);
-    return { success: false, error: err.message || "خطای غیرمنتظره در پردازش فاکتور." };
-  }
-}
-
-export async function updateOrderStatusServer(orderId: string, status: string, paymentStatus?: string, trackingCode?: string) {
-  try {
-    const updateData: Record<string, any> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (paymentStatus) {
-      updateData.payment_status = paymentStatus;
-    }
-    if (trackingCode) {
-      updateData.tracking_code = trackingCode.trim();
-    }
-
-    const { error } = await supabaseAdmin
-      .from("orders")
-      .update(updateData)
-      .eq("id", orderId);
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+    return { success: false, error: err.message || "خطای پردازش فاکتور." };
   }
 }

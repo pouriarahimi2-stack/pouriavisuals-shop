@@ -1,4 +1,3 @@
-// File Path: app/api/payment/request/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
@@ -9,7 +8,7 @@ export async function POST(req: NextRequest) {
     const { orderId, callbackUrl } = await req.json();
 
     if (!orderId) {
-      return NextResponse.json({ success: false, message: "شناسه فاکتور سفارش الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شناسه فاکتور الزامی است." }, { status: 400 });
     }
 
     const { data: order, error } = await supabaseAdmin
@@ -19,14 +18,22 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error || !order) {
-      return NextResponse.json({ success: false, message: "فاکتور سفارش در سیستم یافت نشد." }, { status: 404 });
+      return NextResponse.json({ success: false, message: "فاکتور در سیستم یافت نشد." }, { status: 404 });
     }
 
     const payableAmount = order.final_amount || order.total_amount;
     const merchantId = process.env.ZARINPAL_MERCHANT_ID;
-    const isSandbox = !merchantId || process.env.NODE_ENV !== "production";
+    const isProduction = process.env.NODE_ENV === "production";
 
-    if (!isSandbox && merchantId) {
+    // امنیت مالی: در محیط پروداکشن به هیچ وجه درگاه تقلبی فعال نمی‌شود!
+    if (isProduction && !merchantId) {
+      return NextResponse.json(
+        { success: false, message: "پیکربندی درگاه پرداخت بانکی شاپرک انجام نشده است." },
+        { status: 503 }
+      );
+    }
+
+    if (merchantId) {
       const zarinpalUrl = "https://api.zarinpal.com/pg/v4/payment/request.json";
       const gatewayRes = await fetch(zarinpalUrl, {
         method: "POST",
@@ -35,7 +42,7 @@ export async function POST(req: NextRequest) {
           merchant_id: merchantId,
           amount: payableAmount,
           callback_url: callbackUrl || `${req.nextUrl.origin}/checkout/payment?orderId=${order.id}`,
-          description: `پرداخت فاکتور سفارش ${order.id}`,
+          description: `پرداخت فاکتور ${order.id}`,
           metadata: { mobile: order.phone },
         }),
       });
@@ -50,6 +57,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // فقط و فقط در محیط لوکال تست (Development)
     const mockAuthority = `AUTH_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     return NextResponse.json({
       success: true,

@@ -1,175 +1,74 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { productService, Product } from "@/services/productService";
-import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
-import { bannerService, Banner } from "@/services/bannerService";
-import { siteInfoService, DEFAULT_HOMEPAGE_LAYOUT_CONFIG, HomepageLayoutConfig } from "@/services/siteInfoService";
-import { useCart } from "@/context/CartContext";
-import Link from "next/link";
-import AIAssistantChat from "@/components/AIAssistantChat";
-import ProductComparisonModal from "@/components/ProductComparisonModal";
-import TechRadarFeed from "@/components/TechRadarFeed";
+import React, { Suspense } from "react";
 import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
-import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
+import ProductList from "@/components/ProductList";
+import TechRadarFeed from "@/components/TechRadarFeed";
+import ContactDock from "@/components/ContactDock";
+import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
+import Link from "next/link";
 
 export default function HomePage() {
-  const { addToCart } = useCart();
-
-  const [products, setProducts] = useState<Product[]>(FLAGSHIP_7_PRODUCTS);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [compareList, setCompareList] = useState<Product[]>([]);
-  const [isCompareOpen, setIsCompareOpen] = useState(false);
-  const [layoutConfig, setLayoutConfig] = useState<HomepageLayoutConfig>(DEFAULT_HOMEPAGE_LAYOUT_CONFIG);
-  const [mounted, setMounted] = useState(false);
-
-  const loadData = async () => {
-    try {
-      const [prods, bans, info] = await Promise.all([
-        productService.getAll(),
-        bannerService.getAll(),
-        siteInfoService.getSiteInfo(),
-      ]);
-      if (prods && prods.length > 0) setProducts(prods);
-      setBanners((bans || []).filter((b: any) => b.is_active !== false && b.isActive !== false));
-      if (info?.homepage_layout_config) {
-        setLayoutConfig(info.homepage_layout_config);
-      }
-    } catch {}
-  };
-
-  useEffect(() => {
-    setMounted(true);
-    loadData();
-
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
-      else loadData();
-    };
-
-    const handleSiteInfoUpdate = (e: any) => {
-      if (e.detail?.homepage_layout_config) {
-        setLayoutConfig(e.detail.homepage_layout_config);
-      }
-    };
-
-    window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("site_info_updated", handleSiteInfoUpdate);
-
-    return () => {
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("site_info_updated", handleSiteInfoUpdate);
-    };
-  }, []);
-
-  const heroCfg = layoutConfig.hero;
-  const showcaseCfg = layoutConfig.showcase3D;
-  const newsTickerCfg = layoutConfig.newsTicker;
-  const blogCfg = layoutConfig.blogSection;
-
-  const heroHeightClasses =
-    heroCfg.heightMode === "cinematic"
-      ? "min-h-[440px] sm:min-h-[520px]"
-      : heroCfg.heightMode === "standard"
-      ? "min-h-[300px] sm:min-h-[360px]"
-      : "min-h-[200px] sm:min-h-[250px]";
-
-  const heroPaddingClasses =
-    heroCfg.verticalPadding === "relaxed"
-      ? "p-8 sm:p-14 lg:p-16"
-      : heroCfg.verticalPadding === "normal"
-      ? "p-6 sm:p-10 lg:p-12"
-      : "p-5 sm:p-8 lg:p-10";
-
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-12 transition-colors duration-300" dir="rtl" suppressHydrationWarning>
-      <main className="pt-1 px-3 sm:px-6 max-w-[1440px] mx-auto space-y-4 sm:space-y-6" suppressHydrationWarning>
-        
-        {/* تیکر اخبار تکنولوژی */}
-        {newsTickerCfg.show && <TechRadarFeed />}
+    <div className="min-h-screen space-y-14 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      {/* نوار آربیتراژ و پایش لحظه‌ای بازار */}
+      <section className="max-w-7xl mx-auto px-4 pt-4">
+        <LiveMarketArbitrage />
+      </section>
 
-        {/* هیرو سکشن ماژولار */}
-        {heroCfg.show && (
-          <section className={`w-full rounded-[2.2rem] sm:rounded-[2.5rem] overflow-hidden glass-morphism shadow-xl border border-[var(--card-border)] relative flex flex-col justify-center transition-all duration-300 ${heroHeightClasses} ${heroPaddingClasses}`}>
-            {heroCfg.show3DCanvas && <Hero3DCanvas />}
-
-            <div className="relative z-10 space-y-2.5 max-w-2xl text-right">
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight text-[var(--text-primary)]">
-                {heroCfg.title}
+      {/* هیرو سکشن مینیمال با بنر پرمیوم */}
+      <section className="max-w-7xl mx-auto px-4">
+        <div className="relative rounded-[2.5rem] bg-gradient-to-b from-[var(--modal-bg)] to-[var(--input-bg)] border border-[var(--card-border)] p-6 sm:p-12 shadow-2xl overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div className="space-y-6 z-10 text-right">
+              <span className="px-3.5 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-black inline-block">
+                ⚡ نسل جدید مانیتورهای ۵K استودیو و تجهیزات تدوین
+              </span>
+              <h1 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight">
+                دقت بی‌نهایت رنگ، <br className="hidden sm:block" />
+                استاندارد حرفه‌ای استودیو
               </h1>
-
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-xl">
-                {heroCfg.subtitle}
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-lg">
+                تامین تخصصی مانیتورهای کالیبره‌شده، کابل‌های تاندربولت و کارت‌های کپچر با ضمانت اصالت طلایی و ارسال اکسپرس به سراسر کشور.
               </p>
-
-              <div className="pt-1">
+              <div className="flex flex-wrap gap-3 pt-2">
                 <Link
-                  href={heroCfg.buttonLink || "/#products"}
-                  className="inline-flex items-center gap-2 bg-[var(--accent-blue)] text-white px-7 py-3 rounded-full font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/25 cursor-pointer"
+                  href="/#products"
+                  className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl shadow-blue-500/25 flex items-center gap-2"
                 >
-                  <span>{heroCfg.buttonText}</span>
-                  <span>←</span>
+                  <span>🛒</span>
+                  <span>مشاهده کاتالوگ و خرید</span>
+                </Link>
+                <Link
+                  href="/products"
+                  className="px-6 py-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
+                >
+                  فیلتر پیشرفته محصولات ←
                 </Link>
               </div>
             </div>
-          </section>
-        )}
 
-        {/* نمایشگاه سه‌بعدی محصولات */}
-        {showcaseCfg.show && (
-          <ProductPerspectiveSlider
-            products={products.slice(0, showcaseCfg.limit || 7)}
-            customTitle={showcaseCfg.title}
-            customSubtitle={showcaseCfg.subtitle}
-            cardScale={showcaseCfg.cardScale}
-          />
-        )}
-
-        {/* مجله سئو */}
-        {blogCfg.show && (
-          <section className="glass-morphism rounded-3xl p-5 sm:p-7 space-y-3">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
-                  {blogCfg.title}
-                </h3>
-                <p className="text-[11px] text-[var(--text-secondary)] font-medium">
-                  {blogCfg.subtitle}
-                </p>
-              </div>
-              {blogCfg.showViewAll && (
-                <Link href="/blog" className="text-xs font-bold text-[var(--accent-blue)] hover:underline">
-                  مشاهده همه مقالات ←
-                </Link>
-              )}
+            <div className="relative h-72 sm:h-96 w-full flex items-center justify-center">
+              <Suspense fallback={<div className="text-xs text-[var(--text-secondary)] animate-pulse">در حال بارگذاری المان سه‌بعدی...</div>}>
+                <Hero3DCanvas />
+              </Suspense>
             </div>
-            <HomeBlogSection count={blogCfg.count || 3} />
-          </section>
-        )}
-      </main>
+          </div>
+        </div>
+      </section>
 
-      <ProductComparisonModal products={compareList} isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} onRemoveProduct={(id) => setCompareList(compareList.filter((item) => item.id !== id))} />
-      <AIAssistantChat />
-    </div>
-  );
-}
+      {/* ویترین اصلی کاتالوگ محصولات */}
+      <section className="max-w-7xl mx-auto px-4">
+        <ProductList />
+      </section>
 
-function HomeBlogSection({ count = 3 }: { count?: number }) {
-  const [posts, setPosts] = useState<any[]>([]);
-  useEffect(() => {
-    fetch("/api/blogs").then((r) => r.json()).then((d) => setPosts((d.data || d.posts || []).slice(0, count))).catch(() => {});
-  }, [count]);
+      {/* فید اخبار و رادار تکنولوژی جهانی */}
+      <section className="max-w-7xl mx-auto px-4 pt-6">
+        <TechRadarFeed />
+      </section>
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-      {posts.map((post) => (
-        <article key={post.id || post.title} className="glass-morphism p-4 rounded-2xl space-y-2 flex flex-col justify-between hover:border-[var(--card-border-hover)] transition duration-300">
-          <h4 className="font-bold text-xs line-clamp-2 text-[var(--text-primary)]">{post.title}</h4>
-          <Link href={"/blog/" + (post.id || "")} className="text-[11px] font-black text-[var(--accent-blue)] hover:underline inline-block pt-2 border-t border-[var(--card-border)]">
-            مطالعه مقاله ←
-          </Link>
-        </article>
-      ))}
+      {/* داک دسترسی سریع ارتباط با ما */}
+      <ContactDock />
     </div>
   );
 }

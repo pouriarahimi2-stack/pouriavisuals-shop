@@ -1,6 +1,6 @@
-// File Path: app/api/blogs/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +38,12 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. ورود به پنل مدیریت الزامی است." }, { status: 401 });
+    }
+
     const body = await req.json();
     const cleanSlug = (body.slug || body.title || `post-${Date.now()}`)
       .trim()

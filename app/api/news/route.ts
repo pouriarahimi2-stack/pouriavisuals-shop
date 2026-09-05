@@ -1,6 +1,6 @@
-// File Path: app/api/news/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +35,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. احراز هویت مدیریت الزامی است." }, { status: 401 });
+    }
+
     const body = await req.json();
     const rawTitle = String(body.title || "خبر جدید").trim();
     const rawSlug = String(body.slug || body.title || `news-${Date.now()}`)

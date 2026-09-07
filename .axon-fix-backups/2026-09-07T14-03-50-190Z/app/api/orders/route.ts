@@ -140,27 +140,6 @@ export async function POST(req: NextRequest) {
 
     if (supabaseAdmin) {
       await supabaseAdmin.from('orders').upsert(orderPayload, { onConflict: 'id' });
-
-      // کسر اتمیک موجودی انبار برای کالاهای خریداری‌شده
-      for (const it of validatedItems) {
-        try {
-          const { data: currentP } = await supabaseAdmin
-            .from('products')
-            .select('stock')
-            .eq('id', it.productId)
-            .maybeSingle();
-
-          if (currentP && currentP.stock !== null && currentP.stock !== undefined) {
-            const newStock = Math.max(0, Number(currentP.stock) - Number(it.quantity || 1));
-            await supabaseAdmin
-              .from('products')
-              .update({ stock: newStock, is_available: newStock > 0 })
-              .eq('id', it.productId);
-          }
-        } catch (stkErr) {
-          console.warn('Stock decrement notice:', stkErr);
-        }
-      }
     }
 
     return NextResponse.json({

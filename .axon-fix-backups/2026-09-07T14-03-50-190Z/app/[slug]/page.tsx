@@ -13,6 +13,7 @@ export default function DynamicCustomPage() {
   const params = useParams();
   const slug = Array.isArray(params.slug) ? params.slug[0] : (params.slug as string);
 
+  // اگر آدرس مربوط به تاییدیه اینماد بود نادیده بگیرد
   if (slug && (slug.endsWith(".txt") || slug.includes("27424534"))) {
     return null;
   }
@@ -43,6 +44,7 @@ export default function DynamicCustomPage() {
 
     const handlePageUpdate = () => loadPage();
     window.addEventListener("page_structure_updated", handlePageUpdate);
+
     return () => {
       window.removeEventListener("page_structure_updated", handlePageUpdate);
     };
@@ -60,7 +62,7 @@ export default function DynamicCustomPage() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center font-sans space-y-4" dir="rtl">
         <h2 className="text-xl font-black text-[var(--text-primary)]">صفحه مورد نظر یافت نشد.</h2>
-        <Link href="/" className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-lg">
+        <Link href="/" className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold">
           صفحه اصلی
         </Link>
       </div>
@@ -105,26 +107,9 @@ function RenderModularBlock({
         </section>
       );
 
-    case "features":
-      return (
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {(block.data.items || [
-            { title: "گارانتی اصالت طلایی", desc: "تضمین ۱۰۰٪ اصالت سخت‌افزار" },
-            { title: "ارسال سریع پیشتاز", desc: "بسته‌بندی اختصاصی ضدضربه" },
-            { title: "کالیبراسیون دقیق", desc: "تست تخصصی تفکیک رنگ" },
-          ]).map((item: any, idx: number) => (
-            <div key={idx} className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 text-center shadow-md">
-              <span className="text-2xl block">💎</span>
-              <h4 className="font-black text-sm text-[var(--text-primary)]">{item.title}</h4>
-              <p className="text-xs text-[var(--text-secondary)]">{item.desc}</p>
-            </div>
-          ))}
-        </section>
-      );
-
     case "faq":
       return (
-        <section className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-3 shadow-md">
+        <section className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-3">
           <h4 className="font-black text-sm text-[var(--accent-blue)]">{block.data.question || "پرسش متداول"}</h4>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{block.data.answer || "پاسخ"}</p>
         </section>
@@ -145,7 +130,7 @@ function RenderModularBlock({
 
     case "text":
       return (
-        <section className="p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] leading-loose text-xs font-medium text-[var(--text-primary)] text-justify shadow-md">
+        <section className="p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] leading-loose text-xs font-medium text-[var(--text-primary)] text-justify">
           <p>{block.data.text}</p>
         </section>
       );

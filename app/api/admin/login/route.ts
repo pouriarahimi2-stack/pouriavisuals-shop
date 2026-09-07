@@ -7,30 +7,32 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const pinOrPassword = String(body.pin || body.password || "").trim();
+    const pinOrPassword = String(body.password || body.pin || "").trim();
     const username = String(body.username || "admin").trim().toLowerCase();
 
     if (!pinOrPassword) {
-      return NextResponse.json({ success: false, message: "رمز عبور یا پین‌کد الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "کلمه عبور الزامی است." }, { status: 400 });
     }
 
-    // استعلام دقیق از جدول ادمین‌ها در دیتابیس
-    const { data: adminUser, error: dbError } = await supabaseAdmin
+    // استعلام مشخصات ادمین از دیتابیس Supabase
+    let { data: adminUser } = await supabaseAdmin
       .from("admin_users")
       .select("*")
       .or("username.eq." + username + ",role.eq.superadmin")
       .limit(1)
       .maybeSingle();
 
-    if (dbError || !adminUser) {
-      return NextResponse.json({ success: false, message: "اطلاعات ورود در دیتابیس یافت نشد." }, { status: 401 });
+    if (!adminUser) {
+      return NextResponse.json({ success: false, message: "کاربری با این مشخصات یافت نشد." }, { status: 401 });
     }
 
-    // اعتبارسنجی انحصاری با مقدار ذخیره‌شده در دیتابیس (بدون شرط هاردکد)
-    const isMatched = adminUser.password === pinOrPassword || adminUser.password_hash === pinOrPassword;
+    // تطبیق مستقیم با رمز ذخیره شده در دیتابیس
+    const isMatched =
+      adminUser.password === pinOrPassword ||
+      adminUser.password_hash === pinOrPassword;
 
     if (!isMatched) {
-      return NextResponse.json({ success: false, message: "کلمه عبور یا پین‌کد وارد شده صحیح نیست." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "کلمه عبور وارد شده نادرست است." }, { status: 401 });
     }
 
     const token = signPayload({
@@ -70,6 +72,6 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: "خطای سرور در احراز هویت." }, { status: 500 });
+    return NextResponse.json({ success: false, message: "خطای پردازش سرور." }, { status: 500 });
   }
 }

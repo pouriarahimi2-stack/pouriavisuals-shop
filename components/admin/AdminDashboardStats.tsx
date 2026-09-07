@@ -1,4 +1,3 @@
-// File Path: components/admin/AdminDashboardStats.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -10,42 +9,21 @@ export default function AdminDashboardStats() {
     activeOrders: 0,
     lowStockCount: 0,
     totalSales: 0,
-    unreadMessages: 0,
-    totalPosts: 0,
   });
   const [loading, setLoading] = useState(true);
 
   const loadStats = async () => {
     try {
-      const [prodsRes, ordersRes, msgsRes, postsRes] = await Promise.all([
-        supabase.from("products").select("id, price, discount_price, stock, is_available"),
+      const [prodsRes, ordersRes] = await Promise.all([
+        supabase.from("products").select("id, price, discount_price, stock"),
         supabase.from("orders").select("id, total_amount, final_amount, status"),
-        supabase.from("contact_messages").select("id, is_read"),
-        supabase.from("posts").select("id"),
       ]);
 
       const prods = prodsRes.data || [];
-      let orders = ordersRes.data || [];
-      const msgs = msgsRes.data || [];
-      const posts = postsRes.data || [];
-
-      if (ordersRes.error || orders.length === 0) {
-        if (typeof window !== "undefined") {
-          try {
-            const localOrders = JSON.parse(
-              localStorage.getItem("axon_orders_registry_cache_v2026") ||
-              localStorage.getItem("admin_orders_cache") ||
-              "[]"
-            );
-            if (Array.isArray(localOrders) && localOrders.length > 0) {
-              orders = localOrders;
-            }
-          } catch {}
-        }
-      }
+      const orders = ordersRes.data || [];
 
       const totalRevenue = orders.reduce((sum, o: any) => {
-        const val = Number(o.final_amount || o.finalAmount || o.total_amount || o.totalAmount || 0);
+        const val = Number(o.final_amount || o.total_amount || 0);
         return sum + (isNaN(val) ? 0 : val);
       }, 0);
 
@@ -54,18 +32,14 @@ export default function AdminDashboardStats() {
         return stockNum < 3;
       }).length;
 
-      const unreadMsgs = msgs.filter((m: any) => !m.is_read).length;
-
       setStats({
         totalProducts: prods.length,
         activeOrders: orders.length,
         lowStockCount: lowStock,
         totalSales: totalRevenue,
-        unreadMessages: unreadMsgs,
-        totalPosts: posts.length,
       });
     } catch (e) {
-      console.error("Error loading realtime dashboard stats:", e);
+      console.error("Stats load error:", e);
     } finally {
       setLoading(false);
     }
@@ -74,21 +48,24 @@ export default function AdminDashboardStats() {
   useEffect(() => {
     loadStats();
 
-    const handleProductsUpdate = () => loadStats();
-    const handleOrdersUpdate = () => loadStats();
-    const handleMessagesUpdate = () => loadStats();
-    const handlePostsUpdate = () => loadStats();
+    // اتصال مستقیم به کانال Realtime CDC سوپابیس برای به‌روزرسانی بدون رفرش
+    const ordersChannel = supabase
+      .channel("realtime-dashboard-orders")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        loadStats();
+      })
+      .subscribe();
 
-    window.addEventListener("products_updated", handleProductsUpdate);
-    window.addEventListener("orders_updated", handleOrdersUpdate);
-    window.addEventListener("contact_messages_updated", handleMessagesUpdate);
-    window.addEventListener("posts_updated", handlePostsUpdate);
+    const prodsChannel = supabase
+      .channel("realtime-dashboard-prods")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        loadStats();
+      })
+      .subscribe();
 
     return () => {
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      window.removeEventListener("orders_updated", handleOrdersUpdate);
-      window.removeEventListener("contact_messages_updated", handleMessagesUpdate);
-      window.removeEventListener("posts_updated", handlePostsUpdate);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(prodsChannel);
     };
   }, []);
 
@@ -102,7 +79,7 @@ export default function AdminDashboardStats() {
         <div className="text-2xl font-black font-mono text-blue-500">
           {loading ? "..." : stats.totalProducts} <span className="text-xs font-bold text-[var(--text-secondary)]">قلم کالا</span>
         </div>
-        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">ثبت‌شده در ویترین فروشگاه</span>
+        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">متصل به پایگاه داده زنده</span>
       </div>
 
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-[var(--accent-blue)] transition">
@@ -113,7 +90,7 @@ export default function AdminDashboardStats() {
         <div className="text-2xl font-black font-mono text-indigo-500">
           {loading ? "..." : stats.activeOrders} <span className="text-xs font-bold text-[var(--text-secondary)]">فاکتور</span>
         </div>
-        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">ثبت‌شده در چرخه پردازش</span>
+        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">به‌روزرسانی وب‌سوکت بلادرنگ</span>
       </div>
 
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-amber-500 transition">
@@ -124,7 +101,7 @@ export default function AdminDashboardStats() {
         <div className="text-2xl font-black font-mono text-amber-500">
           {loading ? "..." : stats.lowStockCount} <span className="text-xs font-bold text-[var(--text-secondary)]">کالا</span>
         </div>
-        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">کمتر از ۳ عدد موجود در انبار</span>
+        <span className="text-[10px] text-[var(--text-secondary)] font-medium block">کمتر از ۳ عدد در انبار</span>
       </div>
 
       <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 shadow-sm relative overflow-hidden group hover:border-emerald-500 transition">

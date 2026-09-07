@@ -1,4 +1,3 @@
-// File Path: components/AdminInventoryManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -17,32 +16,33 @@ export default function AdminInventoryManager() {
 
   useEffect(() => {
     fetchProducts();
-
-    const handleProductsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
-      else fetchProducts();
-    };
-
+    const handleProductsUpdate = () => fetchProducts();
     window.addEventListener("products_updated", handleProductsUpdate);
-    return () => {
-      window.removeEventListener("products_updated", handleProductsUpdate);
-    };
+    return () => window.removeEventListener("products_updated", handleProductsUpdate);
   }, []);
 
-  const handleStockChange = async (id: string, newStock: number) => {
+  const handleStockChange = async (id: string, newStock: number, title: string) => {
     soundEngine.playClick();
     const stockVal = Math.max(0, newStock);
     setUpdatingId(id);
     await productService.saveProduct({ id, stock: stockVal, isAvailable: stockVal > 0, is_available: stockVal > 0 });
     setProducts(products.map((p) => (p.id === id ? { ...p, stock: stockVal, is_available: stockVal > 0, isAvailable: stockVal > 0 } : p)));
-    setUpdatingId(null);
-  };
 
-  const toggleAvailability = async (id: string, current: boolean) => {
-    soundEngine.playClick();
-    setUpdatingId(id);
-    await productService.saveProduct({ id, isAvailable: !current, is_available: !current });
-    setProducts(products.map((p) => (p.id === id ? { ...p, is_available: !current, isAvailable: !current } : p)));
+    // ارسال خودکار پیامک هشدار به مدیر در صورت رسیدن به موجودی بحرانی
+    if (stockVal <= 2) {
+      try {
+        await fetch("/api/sms/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: "09123456789",
+            message: "هشدار آکسون: موجودی کالای «" + title + "» به " + stockVal + " عدد رسید. لطفاً انبار را شارژ فرمایید.",
+          }),
+        });
+      } catch (err) {
+        console.warn("SMS alert warning:", err);
+      }
+    }
     setUpdatingId(null);
   };
 
@@ -57,10 +57,10 @@ export default function AdminInventoryManager() {
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📥</span> مدیریت سریع موجودی انبار و وضعیت عرضه
+            <span>📥</span> مدیریت سریع موجودی انبار و اعلان خودکار
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            افزایش/کاهش سریع تعداد موجودی، رصد کالاهای در معرض اتمام و تغییر زنده وضعیت عرضه
+            تغییر تعداد، رصد کالاهای بحرانی (&lt; ۳ عدد) و ارسال خودکار پیامک هشدار کسری انبار
           </p>
         </div>
 
@@ -79,7 +79,6 @@ export default function AdminInventoryManager() {
         <table className="w-full text-right text-xs border-collapse min-w-[650px]">
           <thead>
             <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
-              <th className="p-3">تصویر</th>
               <th className="p-3">نام محصول</th>
               <th className="p-3">دسته‌بندی</th>
               <th className="p-3">قیمت فعلی</th>
@@ -95,13 +94,6 @@ export default function AdminInventoryManager() {
               return (
                 <tr key={p.id} className="hover:bg-[var(--input-bg)]/50 transition">
                   <td className="p-3">
-                    <img
-                      src={p.images?.[0] || p.image || "/placeholder.png"}
-                      alt=""
-                      className="w-11 h-11 object-contain rounded-xl bg-white/5 p-1 border border-[var(--card-border)]"
-                    />
-                  </td>
-                  <td className="p-3">
                     <div className="font-extrabold text-[var(--text-primary)]">{p.title || p.name}</div>
                     {isCritical && (
                       <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold text-[10px]">
@@ -116,7 +108,7 @@ export default function AdminInventoryManager() {
                   <td className="p-3">
                     <div className="flex items-center justify-center gap-2">
                       <button
-                        onClick={() => handleStockChange(p.id, currentStock - 1)}
+                        onClick={() => handleStockChange(p.id, currentStock - 1, p.title || p.name || "کالا")}
                         className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-black hover:border-[var(--accent-blue)] cursor-pointer"
                       >
                         -
@@ -125,7 +117,7 @@ export default function AdminInventoryManager() {
                         {currentStock}
                       </span>
                       <button
-                        onClick={() => handleStockChange(p.id, currentStock + 1)}
+                        onClick={() => handleStockChange(p.id, currentStock + 1, p.title || p.name || "کالا")}
                         className="w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-black hover:border-[var(--accent-blue)] cursor-pointer"
                       >
                         +
@@ -133,17 +125,11 @@ export default function AdminInventoryManager() {
                     </div>
                   </td>
                   <td className="p-3 text-center">
-                    <button
-                      onClick={() => toggleAvailability(p.id, p.is_available !== false && p.isAvailable !== false)}
-                      disabled={updatingId === p.id}
-                      className={`px-4 py-2 rounded-2xl font-black text-xs transition cursor-pointer ${
-                        p.is_available !== false && p.isAvailable !== false && currentStock > 0
-                          ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
-                          : "bg-rose-500/15 text-rose-600 border border-rose-500/30 hover:bg-rose-500 hover:text-white"
-                      }`}
-                    >
-                      {p.is_available !== false && p.isAvailable !== false && currentStock > 0 ? "موجود در انبار ✓" : "ناموجود ✕"}
-                    </button>
+                    <span className={"px-3.5 py-1.5 rounded-xl text-[10px] font-black " + (
+                      currentStock > 0 ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"
+                    )}>
+                      {currentStock > 0 ? "موجود در انبار ✓" : "اتمام موجودی ✕"}
+                    </span>
                   </td>
                 </tr>
               );

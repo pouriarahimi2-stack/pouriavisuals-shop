@@ -1,34 +1,73 @@
-// File Path: services/productService.ts
 import { supabase } from "@/lib/supabase";
-import { FLAGSHIP_7_PRODUCTS, Product, ProductVariant, MarketBenchmark } from "@/services/productCatalog";
 
-export type { Product, ProductVariant, MarketBenchmark };
-export { FLAGSHIP_7_PRODUCTS };
+export interface ProductVariant {
+  id: string;
+  name: string;
+  colorHex?: string;
+  priceDelta?: number;
+}
+
+export interface MarketBenchmark {
+  storeName: string;
+  price: number;
+  minPrice?: number;
+  maxPrice?: number;
+  warranty: string;
+  isOurStore?: boolean;
+  deliveryTime?: string;
+}
+
+export interface Product {
+  id: string;
+  title: string;
+  name?: string;
+  title_fa?: string;
+  sku?: string;
+  brand?: string;
+  price: number;
+  discountPrice?: number;
+  discount_price?: number;
+  stock?: number;
+  is_available?: boolean;
+  isAvailable?: boolean;
+  is_featured?: boolean;
+  category?: string;
+  category_name?: string;
+  image?: string;
+  images?: string[];
+  description?: string;
+  short_description?: string;
+  highlights?: string[];
+  warranty?: string;
+  badge?: string;
+  meta_title?: string;
+  meta_description?: string;
+  variants?: ProductVariant[];
+  specs?: Record<string, string>;
+  market_comparison?: MarketBenchmark[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+// آرایه خالی سازگار؛ منبع انحصاری فقط و فقط دیتابیس زنده است
+export const FLAGSHIP_7_PRODUCTS: Product[] = [];
 
 export const productService = {
   async getAll(): Promise<Product[]> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-        if (!error && data) {
-          return data.map((p: any) => ({
-            ...p,
-            id: String(p.id),
-            price: Number(p.price || 0),
-            discountPrice: p.discount_price ? Number(p.discount_price) : (p.discountPrice ? Number(p.discountPrice) : undefined),
-            stock: p.stock !== undefined && p.stock !== null ? Number(p.stock) : 10,
-            isAvailable: p.is_available !== false && (p.stock === null || p.stock > 0),
-            is_available: p.is_available !== false && (p.stock === null || p.stock > 0),
-            images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/placeholder.png"],
-            image: (Array.isArray(p.images) && p.images[0]) || p.image || "/placeholder.png",
-          }));
-        }
-      }
-      return [];
+      if (error || !data) return [];
+
+      return data.map((p: any) => ({
+        ...p,
+        id: String(p.id),
+        discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
+        isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+      }));
     } catch {
       return [];
     }
@@ -40,27 +79,20 @@ export const productService = {
 
   async getById(id: string): Promise<Product | null> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .eq("id", id)
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
 
-        if (!error && data) {
-          return {
-            ...data,
-            id: String(data.id),
-            price: Number(data.price || 0),
-            discountPrice: data.discount_price ? Number(data.discount_price) : (data.discountPrice ? Number(data.discountPrice) : undefined),
-            isAvailable: data.is_available !== false && (data.stock === null || data.stock > 0),
-            is_available: data.is_available !== false && (data.stock === null || data.stock > 0),
-            images: Array.isArray(data.images) && data.images.length > 0 ? data.images : [data.image || "/placeholder.png"],
-            image: (Array.isArray(data.images) && data.images[0]) || data.image || "/placeholder.png",
-          };
-        }
-      }
-      return null;
+      if (error || !data) return null;
+
+      return {
+        ...data,
+        id: String(data.id),
+        discountPrice: data.discount_price ? Number(data.discount_price) : undefined,
+        isAvailable: data.is_available !== false && (data.stock === null || data.stock === undefined || data.stock > 0),
+      };
     } catch {
       return null;
     }
@@ -68,44 +100,49 @@ export const productService = {
 
   async saveProduct(product: Partial<Product>): Promise<Product | null> {
     try {
-      const pId = product.id || `prod-${Date.now()}`;
       const payload: Record<string, any> = {
-        id: pId,
         title: product.title || product.name,
-        name: product.title || product.name,
         title_fa: product.title_fa || null,
         sku: product.sku || null,
         brand: product.brand || "Apple",
+        category: product.category || "تجهیزات تخصصی",
         price: Number(product.price || 0),
-        discount_price: product.discountPrice ?? product.discount_price ?? null,
+        discount_price: product.discountPrice ? Number(product.discountPrice) : null,
         stock: product.stock !== undefined ? Number(product.stock) : 10,
         is_available: product.isAvailable ?? product.is_available ?? true,
-        category: product.category || "تجهیزات تخصصی",
+        is_featured: Boolean(product.is_featured),
         image: product.image || (product.images && product.images[0]) || null,
         images: product.images || [],
         description: product.description || null,
         short_description: product.short_description || null,
         highlights: product.highlights || [],
-        warranty: product.warranty || "۱۸ ماه گارانتی اصالت طلایی",
+        warranty: product.warranty || "گارانتی اصالت طلایی",
         badge: product.badge || null,
-        specs: product.specs || {},
-        variants: product.variants || [],
-        market_comparison: product.market_comparison || [],
         meta_title: product.meta_title || product.title,
-        meta_description: product.meta_description || product.description?.slice(0, 140),
-        updated_at: new Date().toISOString(),
+        meta_description: product.meta_description || null,
+        variants: product.variants || [],
+        specs: product.specs || {},
+        market_comparison: product.market_comparison || [],
       };
 
-      if (supabase) {
+      if (product.id) {
         const { data, error } = await supabase
           .from("products")
-          .upsert(payload, { onConflict: "id" })
+          .update(payload)
+          .eq("id", product.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from("products")
+          .insert([payload])
           .select()
           .single();
         if (error) throw error;
         return data;
       }
-      return payload as Product;
     } catch (e) {
       console.error("Save product error:", e);
       return null;
@@ -114,15 +151,10 @@ export const productService = {
 
   async deleteProduct(id: string): Promise<boolean> {
     try {
-      if (supabase) {
-        const { error } = await supabase.from("products").delete().eq("id", id);
-        return !error;
-      }
-      return true;
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      return !error;
     } catch {
       return false;
     }
   },
 };
-
-export default productService;

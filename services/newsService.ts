@@ -1,4 +1,3 @@
-// File Path: services/newsService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface TechNewsItem {
@@ -22,19 +21,15 @@ export const STATIC_DEFAULT_NEWS: TechNewsItem[] = [];
 export const newsService = {
   async getAll(limit = 30): Promise<TechNewsItem[]> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("tech_news")
-          .select("*")
-          .eq("is_published", true)
-          .order("published_at", { ascending: false })
-          .limit(limit);
+      const { data, error } = await supabase
+        .from("tech_news")
+        .select("*")
+        .eq("is_published", true)
+        .order("published_at", { ascending: false })
+        .limit(limit);
 
-        if (!error && data) {
-          return data;
-        }
-      }
-      return [];
+      if (error || !data) return [];
+      return data;
     } catch {
       return [];
     }
@@ -42,23 +37,17 @@ export const newsService = {
 
   async getBySlug(slug: string): Promise<TechNewsItem | null> {
     try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("tech_news")
-          .select("*")
-          .eq("slug", slug)
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from("tech_news")
+        .select("*")
+        .eq("slug", slug)
+        .maybeSingle();
 
-        if (!error && data) return data;
-      }
-      return null;
+      if (error || !data) return null;
+      return data;
     } catch {
       return null;
     }
-  },
-
-  async getPersonalizedNews(): Promise<TechNewsItem[]> {
-    return this.getAll();
   },
 
   async saveNewsItem(item: Partial<TechNewsItem>): Promise<TechNewsItem | null> {
@@ -77,15 +66,10 @@ export const newsService = {
 
   async deleteNewsItem(id: string): Promise<boolean> {
     try {
-      if (supabase) {
-        const { error } = await supabase.from("tech_news").delete().eq("id", id);
-        return !error;
-      }
-      return false;
+      const { error } = await supabase.from("tech_news").delete().eq("id", id);
+      return !error;
     } catch {
       return false;
     }
   },
 };
-
-export default newsService;

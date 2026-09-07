@@ -7,27 +7,43 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. احراز هویت ادمین الزامی است." }, { status: 401 });
     }
 
-    const { newPin } = await req.json();
-    const cleanPin = String(newPin || "").trim();
+    const { currentPassword, newPassword } = await req.json();
+    const cleanCurrent = String(currentPassword || "").trim();
+    const cleanNew = String(newPassword || "").trim();
 
-    if (!cleanPin || cleanPin.length < 4) {
-      return NextResponse.json({ success: false, message: "پین‌کد باید حداقل ۴ رقم باشد." }, { status: 400 });
+    if (!cleanNew || cleanNew.length < 4) {
+      return NextResponse.json({ success: false, message: "رمز عبور جدید باید حداقل ۴ نویسه یا رقم باشد." }, { status: 400 });
     }
 
-    const { error } = await supabaseAdmin
+    const { data: adminUser, error: findError } = await supabaseAdmin
       .from("admin_users")
-      .update({ password: cleanPin, updated_at: new Date().toISOString() })
-      .or("username.eq.admin,role.eq.superadmin");
+      .select("*")
+      .or("username.eq.admin,role.eq.superadmin")
+      .limit(1)
+      .maybeSingle();
 
-    if (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    if (findError || !adminUser) {
+      return NextResponse.json({ success: false, message: "کاربر مدیر در دیتابیس یافت نشد." }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, message: "پین‌کد ورود با موفقیت تغییر یافت." });
+    if (adminUser.password && adminUser.password !== cleanCurrent) {
+      return NextResponse.json({ success: false, message: "رمز عبور/پین‌کد فعلی نادرست است." }, { status: 400 });
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("admin_users")
+      .update({ password: cleanNew, updated_at: new Date().toISOString() })
+      .eq("id", adminUser.id);
+
+    if (updateError) {
+      return NextResponse.json({ success: false, message: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: "کلمه عبور / پین‌کد مدیریت با موفقیت در دیتابیس به‌روزرسانی شد." });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || "خطا در تغییر پین‌کد." }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message || "خطای سرور در تغییر رمز." }, { status: 500 });
   }
 }

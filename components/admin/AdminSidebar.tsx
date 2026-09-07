@@ -44,12 +44,13 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    group: "طراحی و تنظیمات پایه",
+    group: "طراحی و امنیت پایه",
     items: [
       { id: "banners", title: "اسلایدر صفحه نخست", href: "/admin/banners", icon: "🖼️" },
       { id: "menu", title: "منوها و دسته‌بندی‌ها", href: "/admin/menu", icon: "🔗" },
       { id: "styles", title: "هویت بصری و فونت", href: "/admin/styles", icon: "🎨" },
       { id: "site_info", title: "تنظیمات عمومی سایت", href: "/admin/settings", icon: "⚙️" },
+      { id: "change_pin", title: "تغییر رمز و پین مدیریت", href: "/admin/change-pin", icon: "🔑" },
     ],
   },
 ];
@@ -107,11 +108,11 @@ export default function AdminSidebar() {
                       key={item.id}
                       href={item.href}
                       onClick={() => soundEngine.playClick()}
-                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition duration-200 ${
+                      className={"flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition duration-200 " + (
                         isActive
                           ? "bg-[var(--accent-blue)] text-white shadow-md shadow-blue-500/20"
                           : "text-[var(--text-primary)] hover:bg-[var(--input-bg)] border border-transparent"
-                      }`}
+                      )}
                     >
                       <div className="flex items-center gap-2.5">
                         <span className="text-sm">{item.icon}</span>

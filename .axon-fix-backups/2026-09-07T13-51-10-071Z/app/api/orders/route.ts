@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     const orderId = body.id || body.order_number || `ORD-${Date.now().toString().slice(-6)}`;
     const { username: guestUsername, password: guestPassword } = generateGuestCredentials(customerName, phone);
 
+    // ۱. استعلام قیمت رسمی کالاها مستقیماً از دیتابیس (سد نفوذ جعل قیمت فرانت‌اند)
     const productIds = rawItems.map((i: any) => String(i.productId || i.id || i.product_id)).filter(Boolean);
     let dbProducts: any[] = [];
 

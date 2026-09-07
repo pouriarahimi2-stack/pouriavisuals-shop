@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
 
       adminUser = data;
 
+      // در صورتی که جدول ادمین در اولین راه‌اندازی خالی بود:
       if (!adminUser && username === "admin") {
         const { data: allAdmins } = await supabaseAdmin.from("admin_users").select("id").limit(1);
         if (!allAdmins || allAdmins.length === 0) {

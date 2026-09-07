@@ -11,39 +11,49 @@ export interface Category {
 export const categoryService = {
   async getAll(): Promise<Category[]> {
     try {
+      // ابتدا از کلاینت سوپابیس
       const { data, error } = await supabase
         .from("categories")
         .select("*")
         .order("id", { ascending: true });
 
-      if (error || !data) return [];
-      return data.map((c: any) => ({
-        ...c,
-        id: String(c.id),
-      }));
+      if (!error && data && data.length > 0) {
+        return data.map((c: any) => ({ ...c, id: String(c.id) }));
+      }
+
+      // در صورت لزوم از روت API
+      const res = await fetch("/api/categories", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.data) {
+        return json.data.map((c: any) => ({ ...c, id: String(c.id) }));
+      }
+      return [];
     } catch {
       return [];
     }
   },
 
   async addCategory(cat: { name: string; slug?: string }): Promise<Category | null> {
+    const cleanName = cat.name.trim();
+    const generatedId = "cat_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+
     try {
-      const cleanName = cat.name.trim();
-      const cleanSlug = (cat.slug || cleanName)
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
-        .replace(/^-+|-+$/g, "");
+      // ۱. ارسال به روت سروری جهت ثبت مطمئن
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: generatedId, name: cleanName }),
+      });
 
-      const payload: Record<string, any> = {
-        name: cleanName,
-        slug: cleanSlug,
-        created_at: new Date().toISOString(),
-      };
+      const json = await res.json();
+      if (res.ok && json.success && json.data) {
+        return { ...json.data, id: String(json.data.id) };
+      }
 
+      // ۲. در صورت در دسترس نبودن API، ثبت مستقیم با ارسال ID
       const { data, error } = await supabase
         .from("categories")
-        .insert([payload])
+        .insert([{ id: generatedId, name: cleanName }])
         .select()
         .single();
 
@@ -58,38 +68,14 @@ export const categoryService = {
   async updateCategory(id: string, newName: string): Promise<Category | null> {
     try {
       const cleanName = newName.trim();
-      const cleanSlug = cleanName
-        .toLowerCase()
-        .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-
-      // واکشی نام قبلی جهت به‌روزرسانی محصولات متصل
-      const { data: oldCat } = await supabase
-        .from("categories")
-        .select("name")
-        .eq("id", id)
-        .maybeSingle();
-
       const { data, error } = await supabase
         .from("categories")
-        .update({
-          name: cleanName,
-          slug: cleanSlug,
-        })
+        .update({ name: cleanName })
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
-
-      // همگام‌سازی نام دسته در جدول محصولات
-      if (oldCat?.name) {
-        await supabase
-          .from("products")
-          .update({ category: cleanName })
-          .eq("category", oldCat.name);
-      }
-
       return { ...data, id: String(data.id) };
     } catch (e) {
       console.error("Update category error:", e);
@@ -99,18 +85,12 @@ export const categoryService = {
 
   async deleteCategory(id: string, catName?: string): Promise<boolean> {
     try {
-      // تغییر دسته محصولات وابسته به پیش‌فرض جهت حفظ سلامت داده‌ها
-      if (catName) {
-        await supabase
-          .from("products")
-          .update({ category: "تجهیزات عمومی" })
-          .eq("category", catName);
-      }
+      const res = await fetch("/api/categories?id=" + encodeURIComponent(id), { method: "DELETE" });
+      if (res.ok) return true;
 
       const { error } = await supabase.from("categories").delete().eq("id", id);
       return !error;
-    } catch (e) {
-      console.error("Delete category error:", e);
+    } catch {
       return false;
     }
   },

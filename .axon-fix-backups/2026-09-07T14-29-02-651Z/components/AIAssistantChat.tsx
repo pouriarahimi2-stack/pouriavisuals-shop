@@ -16,7 +16,7 @@ export default function AIAssistantChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      text: "سلام! من مشاور هوشمند تکنولوژی آکسون هستم. ⚡\nهر سوالی درباره دستگاه‌ها، مشخصات فنی یا قیمت‌ها دارید بفرمایید تا راهنماییتان کنم.",
+      text: "سلام! من مشاور هوشمند تکنولوژی آکسون هستم. ⚡\nهر سوالی درباره دستگاه‌ها، مشخصات فنی، گجت‌های نوین یا قیمت‌ها دارید بپرسید یا عکس قطعه را بفرستید تا بررسی کنم.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -35,6 +35,7 @@ export default function AIAssistantChat() {
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
+  // سنسور هوشمند تلاقی با فوتر جهت جلوگیری از پوشاندن کارت‌های تماس یا مجوزها
   useEffect(() => {
     const footerEl = document.getElementById("storefront-footer");
     if (!footerEl) return;
@@ -134,10 +135,11 @@ export default function AIAssistantChat() {
     <div className="font-sans select-none" dir="rtl" suppressHydrationWarning>
       {!isOpen && (
         <>
+          {/* دکمه دسکتاپ: با طراحی کپسولی لوکس اپل و سنسور هوشمند جمع شدن در نزدیکی فوتر */}
           <button
             style={{ bottom: `${bottomDesktopPx}px` }}
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}
-            className={`hidden sm:flex fixed left-6 z-40 rounded-full transition-all duration-500 ease-out items-center cursor-pointer border shadow-2xl backdrop-blur-2xl ${
+            className={`hidden sm:flex fixed left-6 z-50 rounded-full transition-all duration-500 ease-out items-center cursor-pointer border shadow-2xl backdrop-blur-2xl ${
               autoHideNearFooter && isNearFooter
                 ? "w-12 h-12 justify-center bg-slate-900/90 border-blue-500/40 text-white hover:scale-110 opacity-80 hover:opacity-100 p-0"
                 : "px-5 py-3.5 gap-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 text-white border-white/20 hover:scale-105 active:scale-95 text-xs font-black shadow-blue-500/25 ring-2 ring-blue-500/20"
@@ -158,6 +160,7 @@ export default function AIAssistantChat() {
             )}
           </button>
 
+          {/* دکمه موبایل: قرارگیری دقیق بالای منوی پایین موبایل با گوی شناور */}
           <button
             style={{ bottom: `${bottomMobilePx}px` }}
             onClick={() => { soundEngine.playClick(); setIsOpen(true); }}

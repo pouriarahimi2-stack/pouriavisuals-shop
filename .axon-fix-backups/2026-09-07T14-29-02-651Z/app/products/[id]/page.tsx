@@ -10,7 +10,6 @@ import ProductReviews from "@/components/ProductReviews";
 import ColorGamutSimulator from "@/components/ColorGamutSimulator";
 import ProductExplodedView from "@/components/ProductExplodedView";
 import Link from "next/link";
-import { formatPrice } from "@/lib/formatters";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -18,7 +17,6 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState<string>("");
-  const [isExplodedOpen, setIsExplodedOpen] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -50,7 +48,7 @@ export default function ProductDetailPage() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center font-sans space-y-4" dir="rtl">
         <h2 className="text-xl font-black">کالای مورد نظر یافت نشد.</h2>
-        <Link href="/" className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md">
+        <Link href="/" className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold">
           بازگشت به فروشگاه
         </Link>
       </div>
@@ -62,28 +60,13 @@ export default function ProductDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-10 space-y-12 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
-      {/* بخش معرفی و خرید کالا */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-10 shadow-2xl">
         <div className="space-y-4">
-          <div className="w-full h-80 sm:h-96 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-4 flex items-center justify-center overflow-hidden relative group">
-            <img src={activeImage || allImages[0]} alt={product.title} className="w-full h-full object-contain group-hover:scale-105 transition duration-500" />
-            
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.playExplodeShift();
-                setIsExplodedOpen(true);
-              }}
-              className="absolute bottom-4 right-4 px-4 py-2 rounded-2xl bg-black/75 hover:bg-blue-600 text-white font-bold text-xs border border-white/20 backdrop-blur-md transition flex items-center gap-1.5 shadow-xl cursor-pointer"
-            >
-              <span>🧬</span>
-              <span>کالبدشکافی ۳D لایه‌ها</span>
-            </button>
+          <div className="w-full h-80 sm:h-96 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-4 flex items-center justify-center overflow-hidden">
+            <img src={activeImage || allImages[0]} alt={product.title} className="w-full h-full object-contain" />
           </div>
-
           {allImages.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+            <div className="flex gap-2 overflow-x-auto pb-2">
               {allImages.map((img, idx) => (
                 <button
                   key={idx}
@@ -91,7 +74,7 @@ export default function ProductDetailPage() {
                     soundEngine.playClick();
                     setActiveImage(img);
                   }}
-                  className={"w-16 h-16 rounded-2xl border p-1 bg-[var(--input-bg)] transition cursor-pointer shrink-0 " + (activeImage === img ? "border-[var(--accent-blue)] ring-2 ring-blue-500/30" : "border-[var(--card-border)]")}
+                  className={"w-16 h-16 rounded-2xl border p-1 bg-[var(--input-bg)] transition " + (activeImage === img ? "border-[var(--accent-blue)] ring-2 ring-blue-500/30" : "border-[var(--card-border)]")}
                 >
                   <img src={img} alt="" className="w-full h-full object-contain" />
                 </button>
@@ -102,15 +85,9 @@ export default function ProductDetailPage() {
 
         <div className="space-y-6 flex flex-col justify-between">
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-xs font-black">
-                {product.category || "تجهیزات استودیویی"}
-              </span>
-              <span className="font-mono text-xs text-[var(--text-secondary)] font-bold">
-                {product.brand || "Apple"}
-              </span>
-            </div>
-
+            <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-xs font-black">
+              {product.category || "تجهیزات استودیویی"}
+            </span>
             <h1 className="text-xl sm:text-3xl font-black leading-snug">{product.title}</h1>
             <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">
               {product.description || "ارائه شده با ضمانت اصالت فیزیکی و پشتیبانی تخصصی استودیو."}
@@ -119,9 +96,9 @@ export default function ProductDetailPage() {
 
           <div className="space-y-4 p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)]">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت رسمی فروشگاه:</span>
+              <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت نهایی:</span>
               <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                {formatPrice(currentPrice)} تومان
+                {currentPrice.toLocaleString("fa-IR")} تومان
               </span>
             </div>
 
@@ -134,10 +111,9 @@ export default function ProductDetailPage() {
                   price: currentPrice,
                   image: activeImage || allImages[0],
                   stock: product.stock ?? 10,
-                  category: product.category,
                 });
               }}
-              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>🛒</span>
               <span>افزودن به سبد خرید</span>
@@ -146,33 +122,21 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* ۱. پایش زنده قیمت بازار با ارسال صحیح پراپ‌ها */}
       <section className="space-y-4">
-        <LiveMarketArbitrage
-          productTitle={product.title}
-          ourPrice={currentPrice}
-          marketBenchmarks={product.market_comparison || []}
-        />
+        <LiveMarketArbitrage />
       </section>
 
-      {/* ۲. شبیه‌ساز ۷ گاموت رنگی با عنوان کالا */}
       <section className="space-y-4">
-        <ColorGamutSimulator productTitle={product.title} />
+        <ColorGamutSimulator />
       </section>
 
-      {/* ۳. نظرات و امتیازدهی خریداران */}
+      <section className="space-y-4">
+        <ProductExplodedView productId={product.id} />
+      </section>
+
       <section className="space-y-4">
         <ProductReviews productId={product.id} />
       </section>
-
-      {/* مدال تعاملی کالبدشکافی ۳D */}
-      <ProductExplodedView
-        productId={product.id}
-        productTitle={product.title}
-        category={product.category}
-        isOpen={isExplodedOpen}
-        onClose={() => setIsExplodedOpen(false)}
-      />
     </div>
   );
 }

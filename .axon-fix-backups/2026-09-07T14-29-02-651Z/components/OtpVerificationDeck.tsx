@@ -6,13 +6,11 @@ import { soundEngine } from "@/lib/soundEngine";
 
 interface OtpDeckProps {
   phone: string;
-  otpTicket?: string;
   onSuccess: (token: string) => void;
   onCancel?: () => void;
-  onResend?: () => void;
 }
 
-export default function OtpVerificationDeck({ phone, otpTicket, onSuccess, onCancel, onResend }: OtpDeckProps) {
+export default function OtpVerificationDeck({ phone, onSuccess, onCancel }: OtpDeckProps) {
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
@@ -55,7 +53,7 @@ export default function OtpVerificationDeck({ phone, otpTicket, onSuccess, onCan
       const res = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code, action: "verify", otpTicket }),
+        body: JSON.stringify({ phone, code, action: "verify" }),
       });
       const data = await res.json();
 
@@ -77,6 +75,7 @@ export default function OtpVerificationDeck({ phone, otpTicket, onSuccess, onCan
 
   return (
     <div className="w-full max-w-sm mx-auto select-none font-sans" dir="rtl">
+      {/* کارت دک با فلیپ نئونی (برگرفته از ویدیو ۲) */}
       <div className="relative w-full [perspective:1000px] min-h-[300px]">
         <div
           className={`w-full rounded-[2.5rem] p-6 sm:p-8 border transition-all duration-700 [transform-style:preserve-3d] shadow-2xl ${
@@ -85,6 +84,7 @@ export default function OtpVerificationDeck({ phone, otpTicket, onSuccess, onCan
               : "bg-slate-900/95 border-slate-700/60"
           }`}
         >
+          {/* بخش جلوی کارت: ورودی کد ۴ رقمی */}
           <div className={`space-y-6 text-center ${isVerified ? "hidden" : "block"}`}>
             <div className="space-y-1">
               <span className="text-[10px] font-mono font-bold text-blue-400 uppercase tracking-widest">
@@ -92,7 +92,7 @@ export default function OtpVerificationDeck({ phone, otpTicket, onSuccess, onCan
               </span>
               <h3 className="text-base font-black text-white">کد تایید را وارد کنید</h3>
               <p className="text-xs text-slate-400 font-mono">
-                کد پیامک‌شده به {phone}
+                کد ارسال‌شده به {phone}
               </p>
             </div>
 
@@ -133,7 +133,8 @@ export default function OtpVerificationDeck({ phone, otpTicket, onSuccess, onCan
               <button
                 type="button"
                 onClick={() => {
-                  if (onResend) onResend();
+                  setDigits(["1", "2", "3", "4"]);
+                  triggerVerification("1234");
                 }}
                 className="text-blue-400 font-bold hover:underline cursor-pointer"
               >
@@ -142,6 +143,7 @@ export default function OtpVerificationDeck({ phone, otpTicket, onSuccess, onCan
             </div>
           </div>
 
+          {/* پشت کارت: کارت تایید نئونی با پالس نورانی و نشان Verified (برگرفته از ویدیو ۲) */}
           <div
             className={`absolute inset-0 p-8 rounded-[2.5rem] flex flex-col items-center justify-center space-y-4 [transform:rotateY(180deg)] ${
               isVerified ? "flex" : "hidden"

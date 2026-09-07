@@ -18,6 +18,14 @@ interface BlogPost {
   image_url?: string;
 }
 
+function sanitizeHtml(raw: string): string {
+  if (!raw) return "";
+  return raw
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/on\w+="[^"]*"/gi, "")
+    .replace(/javascript:[^"']*/gi, "");
+}
+
 export default function SingleBlogPostPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = resolvedParams.id;
@@ -51,11 +59,11 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
           found = allPosts.find((p: any) => String(p.id) === String(id) || p.slug === id) || null;
         } catch {}
 
-        if (!found) {
+        if (!found && typeof window !== "undefined") {
           const localBlogs: BlogPost[] = JSON.parse(
             localStorage.getItem("site_blogs") || "[]"
           );
-          found = localBlogs.find((p) => String(p.id) === String(id)) || null;
+          found = localBlogs.find((p) => String(p.id) === String(id) || (p as any).slug === id) || null;
         }
 
         setPost(found);
@@ -94,10 +102,10 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
   }
 
   const headerImage = post.imageUrl || post.image_url;
+  const safeContent = sanitizeHtml(post.content);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
-      
       <div
         className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 z-50 transition-all duration-150"
         style={{ width: `${scrollProgress}%` }}
@@ -139,11 +147,11 @@ export default function SingleBlogPostPage({ params }: { params: Promise<{ id: s
           )}
         </header>
 
-        {/* فهرست خودکار سئو با پرش هوشمند */}
-        <TableOfContents contentHtml={post.content} />
+        {/* فهرست خودکار سئو با اسکرول هوشمند */}
+        <TableOfContents contentHtml={safeContent} />
 
         <div
-          dangerouslySetInnerHTML={{ __html: post.content }}
+          dangerouslySetInnerHTML={{ __html: safeContent }}
           className="blog-content prose prose-sm max-w-none text-xs md:text-sm leading-loose text-[var(--text-primary)] font-medium space-y-4 text-justify"
         />
 

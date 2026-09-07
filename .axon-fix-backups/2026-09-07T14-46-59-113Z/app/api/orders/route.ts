@@ -1,19 +1,19 @@
 // File Path: app/api/orders/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseServer';
-import { FLAGSHIP_7_PRODUCTS } from '@/services/productCatalog';
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 function generateGuestCredentials(fullName: string, phone: string) {
-  const clean = String(fullName || 'user')
+  const clean = String(fullName || "user")
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '_')
+    .replace(/[^a-z0-9]/g, "_")
     .slice(0, 10);
   const rand = Math.floor(100 + Math.random() * 900);
   return {
-    username: `${clean || 'buyer'}_${rand}`,
+    username: `${clean || "buyer"}_${rand}`,
     password: `${phone.slice(-4)}_${Math.random().toString(36).slice(-4)}`,
   };
 }
@@ -21,11 +21,11 @@ function generateGuestCredentials(fullName: string, phone: string) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const customerName = String(body.customerName || body.customer_name || body.customer?.fullName || body.customer?.name || '').trim();
-    const phone = String(body.phone || body.customer?.phone || '').trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, '');
-    const province = String(body.province || body.customer?.province || 'تهران').trim();
-    const city = String(body.city || body.customer?.city || 'تهران').trim();
-    const address = String(body.address || body.customer?.address || '').trim();
+    const customerName = String(body.customerName || body.customer_name || body.customer?.fullName || body.customer?.name || "").trim();
+    const phone = String(body.phone || body.customer?.phone || "").trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
+    const province = String(body.province || body.customer?.province || "تهران").trim();
+    const city = String(body.city || body.customer?.city || "تهران").trim();
+    const address = String(body.address || body.customer?.address || "").trim();
     const postalCode = body.postalCode || body.postal_code || body.customer?.postalCode || null;
     const rawItems = Array.isArray(body.items) ? body.items : [];
     const couponCode = body.couponCode || body.coupon_code || null;
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     let dbProducts: any[] = [];
 
     if (supabaseAdmin && productIds.length > 0) {
-      const { data } = await supabaseAdmin.from('products').select('*').in('id', productIds);
+      const { data } = await supabaseAdmin.from("products").select("*").in("id", productIds);
       if (data) dbProducts = data;
     }
 
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
         matched = fallbackCatalog.find((p) => String(p.id) === pId);
       }
 
+      // فایروال ضدتقلب: اگر کالایی در دیتابیس یا کاتالوگ معتبر یافت نشود، رد قطعی می‌شود
       if (!matched) {
         return NextResponse.json(
           { success: false, message: `کالای درخواستی با شناسه «${pId}» نامعتبر است.` },
@@ -85,11 +86,11 @@ export async function POST(req: NextRequest) {
       validatedItems.push({
         productId: pId,
         product_id: pId,
-        title: matched.title || matched.name || 'کالای دیجیتال استودیویی',
-        name: matched.title || matched.name || 'کالای دیجیتال استودیویی',
+        title: matched.title || matched.name || "کالای دیجیتال استودیویی",
+        name: matched.title || matched.name || "کالای دیجیتال استودیویی",
         price: officialPrice,
         quantity: qty,
-        image: matched.image || matched.images?.[0] || '',
+        image: matched.image || matched.images?.[0] || "",
       });
     }
 
@@ -97,14 +98,14 @@ export async function POST(req: NextRequest) {
     if (couponCode && supabaseAdmin) {
       try {
         const { data: coupon } = await supabaseAdmin
-          .from('coupons')
-          .select('*')
-          .eq('code', String(couponCode).trim().toUpperCase())
-          .eq('is_active', true)
+          .from("coupons")
+          .select("*")
+          .eq("code", String(couponCode).trim().toUpperCase())
+          .eq("is_active", true)
           .maybeSingle();
 
         if (coupon) {
-          const isPercent = coupon.type === 'percent' || coupon.discount_type === 'percent';
+          const isPercent = coupon.type === "percent" || coupon.discount_type === "percent";
           const val = Number(coupon.value || coupon.discount_value || 0);
           if (isPercent) {
             discountAmount = Math.round((calculatedTotal * val) / 100);
@@ -131,11 +132,11 @@ export async function POST(req: NextRequest) {
       total_amount: calculatedTotal,
       discount_amount: discountAmount,
       final_amount: finalPayable,
-      status: body.status || 'pending',
-      payment_status: body.payment_status || body.paymentStatus || 'pending',
-      payment_method: body.payment_method || body.paymentMethod || 'online',
+      status: body.status || "pending",
+      payment_status: body.payment_status || body.paymentStatus || "pending",
+      payment_method: body.payment_method || body.paymentMethod || "online",
       tracking_code: body.tracking_code || body.trackingCode || null,
-      notes: body.notes || body.customer?.notes || '',
+      notes: body.notes || body.customer?.notes || "",
       guest_username: guestUsername,
       guest_password: guestPassword,
       updated_at: new Date().toISOString(),
@@ -145,36 +146,37 @@ export async function POST(req: NextRequest) {
     if (couponCode) orderPayload.coupon_code = String(couponCode).trim().toUpperCase();
 
     if (supabaseAdmin) {
-      await supabaseAdmin.from('orders').upsert(orderPayload, { onConflict: 'id' });
+      await supabaseAdmin.from("orders").upsert(orderPayload, { onConflict: "id" });
 
+      // کسر اتمیک موجودی انبار برای کالاهای ثبت‌شده
       for (const it of validatedItems) {
         try {
           const { data: currentP } = await supabaseAdmin
-            .from('products')
-            .select('stock')
-            .eq('id', it.productId)
+            .from("products")
+            .select("stock")
+            .eq("id", it.productId)
             .maybeSingle();
 
           if (currentP && currentP.stock !== null && currentP.stock !== undefined) {
             const newStock = Math.max(0, Number(currentP.stock) - Number(it.quantity || 1));
             await supabaseAdmin
-              .from('products')
+              .from("products")
               .update({ stock: newStock, is_available: newStock > 0 })
-              .eq('id', it.productId);
+              .eq("id", it.productId);
           }
         } catch (stkErr) {
-          console.warn('Stock decrement notice:', stkErr);
+          console.warn("Stock decrement notice:", stkErr);
         }
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'فاکتور رسمی با موفقیت اعتبارسنجی و صادر شد.',
+      message: "فاکتور رسمی با موفقیت اعتبارسنجی و صادر شد.",
       data: orderPayload,
     });
   } catch (err: any) {
     console.error("Order Route Error:", err);
-    return NextResponse.json({ success: false, message: err?.message || 'خطا در ثبت فاکتور' }, { status: 500 });
+    return NextResponse.json({ success: false, message: err?.message || "خطا در ثبت فاکتور" }, { status: 500 });
   }
 }

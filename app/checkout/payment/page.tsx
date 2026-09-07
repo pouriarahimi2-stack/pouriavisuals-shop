@@ -1,3 +1,4 @@
+// File Path: app/checkout/payment/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -25,7 +26,6 @@ function PaymentGatewayContent() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    // ۱. دریافت قطعی مبلغ از سشن و سرویس
     let payable = 0;
     try {
       const savedAmount = sessionStorage.getItem("pending_payment_amount");
@@ -76,23 +76,33 @@ function PaymentGatewayContent() {
     setPaying(true);
 
     try {
-      await new Promise((res) => setTimeout(res, 1200));
+      // اعتبارسنجی سروری با روت امن verify
+      const res = await fetch("/api/payment/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          authority: `AUTH_${Date.now().toString().slice(-8)}`,
+        }),
+      });
 
-      if (orderId) {
-        await orderService.updateStatus(orderId, "paid");
+      const resJson = await res.json();
+      if (!res.ok || !resJson.success) {
+        throw new Error(resJson.message || "تراکنش بانکی تایید نشد.");
       }
 
       if (typeof window !== "undefined") {
         localStorage.removeItem("axon_cart_store_v2026");
         localStorage.removeItem("axon_active_coupon_v2026");
         sessionStorage.removeItem("pending_payment_amount");
+        sessionStorage.removeItem("pending_payment_order_id");
       }
 
       soundEngine.playSuccess();
       setPaying(false);
       setPaymentSuccess(true);
-    } catch {
-      setErrorMsg("خطا در پردازش تراکنش بانکی.");
+    } catch (err: any) {
+      setErrorMsg(err.message || "خطا در پردازش تراکنش بانکی.");
       setPaying(false);
     }
   };
@@ -144,7 +154,6 @@ function PaymentGatewayContent() {
   return (
     <div className="min-h-[85vh] py-10 px-4 max-w-lg mx-auto font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
-        
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
           <div className="flex items-center gap-2.5">
             <span className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-lg">
@@ -249,7 +258,6 @@ function PaymentGatewayContent() {
                 type="button"
                 onClick={() => {
                   soundEngine.playClick();
-                  setPass("584920");
                   setOtpTimer(120);
                 }}
                 className="px-4 py-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"

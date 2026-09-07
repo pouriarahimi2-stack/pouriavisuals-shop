@@ -1,4 +1,3 @@
-// File Path: components/AdminMenu.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -12,6 +11,9 @@ export default function AdminMenu() {
   const [newTitle, setNewTitle] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [newCatName, setNewCatName] = useState("");
+
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -88,7 +90,7 @@ export default function AdminMenu() {
 
     if (ok) {
       soundEngine.playSuccess();
-      setStatusMessage({ type: "success", text: "⚡ ساختار منو در دیتابیس ذخیره و در هدر سایت فعال گردید." });
+      setStatusMessage({ type: "success", text: "⚡ ساختار منو در دیتابیس ذخیره و فعال گردید." });
       loadAll();
     } else {
       setStatusMessage({ type: "error", text: "خطا در ذخیره‌سازی منوها در دیتابیس." });
@@ -103,23 +105,47 @@ export default function AdminMenu() {
     soundEngine.playClick();
     const res = await categoryService.addCategory({
       name: newCatName.trim(),
-      slug: newCatName.trim().toLowerCase().replace(/\s+/g, "-"),
     });
 
     if (res) {
       soundEngine.playSuccess();
       setNewCatName("");
       loadAll();
-      setStatusMessage({ type: "success", text: `دسته‌بندی «${res.name}» با موفقیت افزوده شد.` });
+      setStatusMessage({ type: "success", text: "دسته‌بندی «" + res.name + "» با موفقیت افزوده شد." });
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
+  };
+
+  const handleStartEdit = (cat: Category) => {
+    soundEngine.playClick();
+    setEditingCatId(cat.id);
+    setEditingCatName(cat.name);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingCatId || !editingCatName.trim()) return;
+    soundEngine.playClick();
+    const updated = await categoryService.updateCategory(editingCatId, editingCatName.trim());
+    if (updated) {
+      soundEngine.playSuccess();
+      setEditingCatId(null);
+      setEditingCatName("");
+      loadAll();
+      setStatusMessage({ type: "success", text: "دسته‌بندی با موفقیت ویرایش و محصولات همگام شدند." });
       setTimeout(() => setStatusMessage(null), 3000);
     }
   };
 
   const handleDeleteCategory = async (id: string, name: string) => {
-    if (confirm(`آیا از حذف دسته‌بندی "${name}" اطمینان دارید؟`)) {
+    if (confirm("آیا از حذف دسته‌بندی «" + name + "» از پایگاه داده اطمینان دارید؟")) {
       soundEngine.playClick();
-      await categoryService.deleteCategory(id);
-      loadAll();
+      const ok = await categoryService.deleteCategory(id, name);
+      if (ok) {
+        soundEngine.playSuccess();
+        loadAll();
+        setStatusMessage({ type: "success", text: "دسته‌بندی با موفقیت حذف گردید." });
+        setTimeout(() => setStatusMessage(null), 3000);
+      }
     }
   };
 
@@ -130,7 +156,9 @@ export default function AdminMenu() {
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🔗</span> مدیریت پیوندها، منوی هدر و دسته‌بندی‌ها
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">افزودن و ترتیب پیوندهای ناوبری بالای سایت به همراه مدیریت دسته‌های محصولات</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            ویرایش کامل، ایجاد و حذف دسته‌بندی‌های محصولات در دیتابیس به همراه منوهای ناوبری
+          </p>
         </div>
         <button
           onClick={handleSaveAll}
@@ -142,15 +170,113 @@ export default function AdminMenu() {
       </div>
 
       {statusMessage && (
-        <div className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}`}>
+        <div className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30" : "bg-rose-500/15 text-rose-600 border border-rose-500/30")}>
           {statusMessage.text}
         </div>
       )}
 
+      {/* بخش دسته‌بندی‌ها با فول CRUD */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <form onSubmit={handleAddCategory} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit text-xs">
+          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
+            + ثبت دسته‌بندی جدید در دیتابیس
+          </h3>
+
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">نام دسته‌بندی *</label>
+            <input
+              type="text"
+              placeholder="مثلاً: تجهیزات پردازش هوش مصنوعی"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs transition cursor-pointer shadow-md hover:opacity-90"
+          >
+            + ایجاد دسته‌بندی در دیتابیس
+          </button>
+        </form>
+
+        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm text-xs">
+          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
+            📂 دسته‌بندی‌های ثبت‌شده در پایگاه داده ({categories.length})
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto">
+            {categories.map((c) => {
+              const isEditing = editingCatId === c.id;
+
+              return (
+                <div
+                  key={c.id}
+                  className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2 shadow-sm"
+                >
+                  {isEditing ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={editingCatName}
+                        onChange={(e) => setEditingCatName(e.target.value)}
+                        className="flex-1 p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--accent-blue)] text-xs font-bold outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-[11px]"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingCatId(null)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-700 text-white font-bold text-[11px]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{c.name}</h4>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-mono">/{c.slug || c.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(c)}
+                          className="p-1.5 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold transition cursor-pointer"
+                          title="ویرایش نام دسته‌بندی"
+                        >
+                          ✏️ ویرایش
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(c.id, c.name)}
+                          className="p-1.5 px-2.5 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/20 transition cursor-pointer font-bold text-[11px]"
+                          title="حذف دسته‌بندی از دیتابیس"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* بخش لینک‌های منوی هدر */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4 border-t border-[var(--card-border)]">
         <form onSubmit={handleAddItem} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit text-xs">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            + افزودن آیتم جدید به منوی هدر
+            + افزودن پیوند جدید به منوی بالای سایت
           </h3>
 
           <div className="space-y-1">
@@ -169,7 +295,7 @@ export default function AdminMenu() {
             <label className="block text-[11px] font-bold text-[var(--text-secondary)]">آدرس مقصد (URL) *</label>
             <input
               type="text"
-              placeholder="/products یا /#products"
+              placeholder="/products"
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
@@ -190,107 +316,47 @@ export default function AdminMenu() {
             📋 چینش و ترتیب آیتم‌های منو ({items.length})
           </h3>
 
-          <div className="space-y-2 max-h-[460px] overflow-y-auto">
-            {items.length === 0 ? (
-              <p className="text-xs text-center py-8 text-[var(--text-secondary)] font-bold">هیچ آیتمی در منو وجود ندارد.</p>
-            ) : (
-              items.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center font-mono font-black text-xs text-[var(--text-secondary)]">
-                      {idx + 1}
-                    </span>
-                    <div>
-                      <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{item.title}</h4>
-                      <span className="font-mono text-[10px] text-[var(--text-secondary)]">{item.url}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleMove(idx, "up")}
-                      disabled={idx === 0}
-                      className="p-1 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs disabled:opacity-30 cursor-pointer"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMove(idx, "down")}
-                      disabled={idx === items.length - 1}
-                      className="p-1 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs disabled:opacity-30 cursor-pointer"
-                    >
-                      ▼
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveItem(idx)}
-                      className="p-1 px-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* بخش دسته‌بندی‌ها */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4 border-t border-[var(--card-border)]">
-        <form onSubmit={handleAddCategory} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm h-fit text-xs">
-          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            + ثبت دسته‌بندی جدید فروشگاه
-          </h3>
-
-          <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">نام دسته‌بندی *</label>
-            <input
-              type="text"
-              placeholder="مثلاً: تجهیزات نورپردازی"
-              value={newCatName}
-              onChange={(e) => setNewCatName(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs transition cursor-pointer shadow-md"
-          >
-            + ایجاد دسته‌بندی
-          </button>
-        </form>
-
-        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-sm text-xs">
-          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            📂 دسته‌بندی‌های فعال سایت ({categories.length})
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto">
-            {categories.map((c) => (
+          <div className="space-y-2 max-h-[350px] overflow-y-auto">
+            {items.map((item, idx) => (
               <div
-                key={c.id || c.name}
-                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2 shadow-sm"
+                key={idx}
+                className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-4"
               >
-                <div>
-                  <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{c.name}</h4>
-                  <span className="text-[10px] text-[var(--text-secondary)] font-mono">/{c.slug}</span>
+                <div className="flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center font-mono font-black text-xs text-[var(--text-secondary)]">
+                    {idx + 1}
+                  </span>
+                  <div>
+                    <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{item.title}</h4>
+                    <span className="font-mono text-[10px] text-[var(--text-secondary)]">{item.url}</span>
+                  </div>
                 </div>
-                {c.id && (
+
+                <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => handleDeleteCategory(c.id!, c.name)}
-                    className="p-1.5 px-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition cursor-pointer font-bold text-xs"
+                    type="button"
+                    onClick={() => handleMove(idx, "up")}
+                    disabled={idx === 0}
+                    className="p-1 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs disabled:opacity-30 cursor-pointer"
                   >
-                    🗑️
+                    ▲
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => handleMove(idx, "down")}
+                    disabled={idx === items.length - 1}
+                    className="p-1 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs disabled:opacity-30 cursor-pointer"
+                  >
+                    ▼
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(idx)}
+                    className="p-1 px-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             ))}
           </div>

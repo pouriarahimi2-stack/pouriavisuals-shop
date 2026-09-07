@@ -21,7 +21,9 @@ export default function AdminProducts() {
   const [brand, setBrand] = useState("Apple");
   const [category, setCategory] = useState("");
   const [newCatName, setNewCatName] = useState("");
+  const [editCatName, setEditCatName] = useState("");
   const [showAddCat, setShowAddCat] = useState(false);
+  const [showEditCat, setShowEditCat] = useState(false);
   const [description, setDescription] = useState("");
 
   const [priceRaw, setPriceRaw] = useState<number | "">("");
@@ -34,7 +36,6 @@ export default function AdminProducts() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [variants, setVariants] = useState<ProductVariant[]>([]);
-  // حذف داده‌های هاردکد؛ مشخصات به صورت کاملاً پویا و خالی شروع می‌شود
   const [specs, setSpecs] = useState<Array<{ key: string; value: string }>>([]);
 
   const [metaTitle, setMetaTitle] = useState("");
@@ -50,7 +51,7 @@ export default function AdminProducts() {
     ]);
     setProducts(prods || []);
     setCategories(cats || []);
-    if (!category && cats && cats.length > 0) {
+    if (cats && cats.length > 0 && !category) {
       setCategory(cats[0].name);
     }
   };
@@ -75,7 +76,6 @@ export default function AdminProducts() {
     };
   }, []);
 
-  // سئو خودکار: همگام‌سازی تگ‌ها با عنوان و توضیحات کالا
   const handleTitleChange = (val: string) => {
     setTitle(val);
     if (!selectedProduct || metaTitle === title) {
@@ -142,7 +142,6 @@ export default function AdminProducts() {
     setActiveFormTab("general");
   };
 
-  // فشرده‌سازی تصویر و بارگذاری از سیستم یا موبایل
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -184,32 +183,70 @@ export default function AdminProducts() {
     });
   };
 
+  // افزودن سریع دسته‌بندی جدید
   const handleAddCategoryQuick = async () => {
     if (!newCatName.trim()) return;
     soundEngine.playClick();
-    const created = await categoryService.addCategory({
-      name: newCatName.trim(),
-      slug: newCatName.trim().toLowerCase().replace(/\s+/g, "-"),
-    });
+    const created = await categoryService.addCategory({ name: newCatName.trim() });
     if (created) {
+      soundEngine.playSuccess();
       setCategories((prev) => [...prev, created]);
       setCategory(created.name);
       setNewCatName("");
       setShowAddCat(false);
+      setStatusMessage({ type: "success", text: "✓ دسته‌بندی «" + created.name + "» ایجاد گردید." });
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
+  };
+
+  // ویرایش سریع نام دسته‌بندی جاری
+  const handleEditCategoryQuick = async () => {
+    if (!editCatName.trim() || !category) return;
+    soundEngine.playClick();
+    const currentCatObj = categories.find((c) => c.name === category);
+    if (!currentCatObj) return;
+
+    const updated = await categoryService.updateCategory(currentCatObj.id, editCatName.trim());
+    if (updated) {
+      soundEngine.playSuccess();
+      setCategories((prev) => prev.map((c) => (c.id === currentCatObj.id ? updated : c)));
+      setCategory(updated.name);
+      setEditCatName("");
+      setShowEditCat(false);
+      setStatusMessage({ type: "success", text: "✓ نام دسته‌بندی به «" + updated.name + "» تغییر یافت." });
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
+  };
+
+  // حذف سریع دسته‌بندی جاری از دیتابیس
+  const handleDeleteCategoryQuick = async () => {
+    if (!category) return;
+    const currentCatObj = categories.find((c) => c.name === category);
+    if (!currentCatObj) return;
+
+    if (!confirm("آیا از حذف کامل دسته‌بندی «" + category + "» از پایگاه داده اطمینان دارید؟")) return;
+
+    soundEngine.playClick();
+    const ok = await categoryService.deleteCategory(currentCatObj.id, category);
+    if (ok) {
+      soundEngine.playSuccess();
+      const updatedCats = categories.filter((c) => c.id !== currentCatObj.id);
+      setCategories(updatedCats);
+      setCategory(updatedCats[0]?.name || "");
+      setStatusMessage({ type: "success", text: "دسته‌بندی «" + category + "» با موفقیت حذف گردید." });
+      setTimeout(() => setStatusMessage(null), 3000);
     }
   };
 
   const handleDeleteProduct = async (id: string, prodTitle: string) => {
-    if (!confirm(`آیا از حذف کامل محصول «${prodTitle}» اطمینان دارید؟`)) return;
+    if (!confirm("آیا از حذف کامل محصول «" + prodTitle + "» اطمینان دارید؟")) return;
     soundEngine.playClick();
     const ok = await productService.deleteProduct(id);
     if (ok) {
       soundEngine.playSuccess();
-      setStatusMessage({ type: "success", text: "محصول با موفقیت از سیستم حذف شد." });
+      setStatusMessage({ type: "success", text: "محصول با موفقیت از دیتابیس حذف شد." });
       loadData();
       if (selectedProduct?.id === id) handleCreateNew();
-    } else {
-      setStatusMessage({ type: "error", text: "خطا در حذف محصول." });
     }
   };
 
@@ -232,8 +269,6 @@ export default function AdminProducts() {
     });
 
     const validImages = imageUrls.map((u) => u.trim()).filter(Boolean);
-
-    // رفع خطای دیتابیس: تضمین وجود شناسه معتبر (Primary Key ID)
     const productId = selectedProduct?.id || ("prod_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7));
 
     const payload: Partial<Product> = {
@@ -265,7 +300,7 @@ export default function AdminProducts() {
 
     if (result) {
       soundEngine.playSuccess();
-      setStatusMessage({ type: "success", text: "✓ کالا با موفقیت در دیتابیس ثبت و در سایت منتشر شد." });
+      setStatusMessage({ type: "success", text: "✓ کالا با موفقیت در دیتابیس ذخیره و منتشر شد." });
       loadData();
       if (!selectedProduct) setSelectedProduct(result);
     } else {
@@ -291,7 +326,7 @@ export default function AdminProducts() {
             <span>💎</span> مرکز جامع مدیریت کاتالوگ کالا و مشخصات مهندسی
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ویرایش مستقیم، آپلود تصویر از سیستم و موبایل، سئو هوشمند و اتصال ۱۰۰٪ به دیتابیس
+            مدیریت دسته‌ها، آپلود تصویر از سیستم و موبایل، سئو خودکار و اتصال ۱۰۰٪ به دیتابیس
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -322,8 +357,7 @@ export default function AdminProducts() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* کاتالوگ سمت راست با امکان حذف و ویرایش مستقیم */}
+        {/* کاتالوگ سمت راست */}
         <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
           <div className="border-b border-[var(--card-border)] pb-3 flex justify-between items-center">
             <span className="text-xs font-black">📦 کاتالوگ کالاها ({products.length})</span>
@@ -335,7 +369,7 @@ export default function AdminProducts() {
           <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
             {products.length === 0 ? (
               <div className="p-8 text-center text-xs text-[var(--text-secondary)] font-bold">
-                هنوز کالایی در دیتابیس ثبت نشده است. با دکمه «محصول جدید» اولین کالا را ثبت کنید.
+                هنوز کالایی در دیتابیس ثبت نشده است. با دکمه «محصول جدید» کالا اضافه کنید.
               </div>
             ) : (
               products.map((p) => (
@@ -364,7 +398,6 @@ export default function AdminProducts() {
                     </div>
                   </div>
 
-                  {/* دکمه حذف مستقیم از کاتالوگ */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -386,7 +419,6 @@ export default function AdminProducts() {
         <div className="lg:col-span-8">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
             
-            {/* تب‌های منظم و بدون تب اضافی */}
             <div className="flex flex-wrap items-center gap-2 pb-4 border-b border-[var(--card-border)]">
               {[
                 { id: "general", label: "اطلاعات پایه", icon: "📝" },
@@ -438,9 +470,11 @@ export default function AdminProducts() {
                       className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none"
                     />
                   </div>
+
+                  {/* بخش دسته‌بندی با امکان افزودن، ویرایش نام و حذف مستقیم */}
                   <div>
                     <label className="block font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی کالا در فروشگاه</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 items-center">
                       <select
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
@@ -450,30 +484,74 @@ export default function AdminProducts() {
                           <option key={c.id || c.name} value={c.name}>{c.name}</option>
                         ))}
                       </select>
+
                       <button
                         type="button"
-                        onClick={() => setShowAddCat(!showAddCat)}
-                        className="px-3 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+                        onClick={() => { setShowAddCat(!showAddCat); setShowEditCat(false); }}
+                        className="px-3 py-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold cursor-pointer whitespace-nowrap"
                         title="افزودن دسته‌بندی جدید"
                       >
                         + دسته
                       </button>
+
+                      {category && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setShowEditCat(!showEditCat); setEditCatName(category); setShowAddCat(false); }}
+                            className="p-3 rounded-2xl bg-[var(--input-bg)] hover:border-amber-500 border border-[var(--card-border)] text-xs font-bold cursor-pointer"
+                            title="ویرایش نام این دسته"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDeleteCategoryQuick}
+                            className="p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold cursor-pointer"
+                            title="حذف این دسته از دیتابیس"
+                          >
+                            🗑️
+                          </button>
+                        </>
+                      )}
                     </div>
+
+                    {/* پنل افزودن دسته */}
                     {showAddCat && (
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex gap-2 mt-2 animate-fadeIn">
                         <input
                           type="text"
                           value={newCatName}
                           onChange={(e) => setNewCatName(e.target.value)}
                           placeholder="نام دسته‌بندی جدید..."
-                          className="flex-1 p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs"
+                          className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs"
                         />
                         <button
                           type="button"
                           onClick={handleAddCategoryQuick}
-                          className="px-3 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold"
+                          className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer"
                         >
                           ثبت
+                        </button>
+                      </div>
+                    )}
+
+                    {/* پنل ویرایش نام دسته جاری */}
+                    {showEditCat && (
+                      <div className="flex gap-2 mt-2 animate-fadeIn">
+                        <input
+                          type="text"
+                          value={editCatName}
+                          onChange={(e) => setEditCatName(e.target.value)}
+                          placeholder="نام جدید دسته‌بندی..."
+                          className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-amber-500 font-bold text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleEditCategoryQuick}
+                          className="px-4 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black cursor-pointer"
+                        >
+                          ذخیره نام
                         </button>
                       </div>
                     )}
@@ -560,7 +638,6 @@ export default function AdminProducts() {
                   </button>
                 </div>
 
-                {/* پیش‌نمایش بندانگشتی تصاویر آپلودشده */}
                 {imageUrls.length > 0 && (
                   <div className="flex flex-wrap gap-3 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
                     {imageUrls.map((url, idx) => (
@@ -569,7 +646,7 @@ export default function AdminProducts() {
                         <button
                           type="button"
                           onClick={() => setImageUrls(imageUrls.filter((_, i) => i !== idx))}
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold"
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold cursor-pointer"
                         >
                           ✕
                         </button>
@@ -662,7 +739,7 @@ export default function AdminProducts() {
                 
                 {specs.length === 0 ? (
                   <div className="p-6 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center text-[var(--text-secondary)]">
-                    مشخصه‌ای تعریف نشده است. با دکمه بالا مشخصات فنی دلخواه را اضافه کنید.
+                    مشخصه‌ای تعریف نشده است. با دکمه بالا مشخصات دلخواه را وارد کنید.
                   </div>
                 ) : (
                   specs.map((s, idx) => (

@@ -14,7 +14,7 @@ export const productService = {
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           return data.map((p: any) => ({
             ...p,
             id: String(p.id),
@@ -28,14 +28,15 @@ export const productService = {
           }));
         }
       }
-      return [];
+
+      return FLAGSHIP_7_PRODUCTS;
     } catch {
-      return [];
+      return FLAGSHIP_7_PRODUCTS;
     }
   },
 
   getAllSync(): Product[] {
-    return [];
+    return FLAGSHIP_7_PRODUCTS;
   },
 
   async getById(id: string): Promise<Product | null> {
@@ -60,9 +61,9 @@ export const productService = {
           };
         }
       }
-      return null;
+      return FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || null;
     } catch {
-      return null;
+      return FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || null;
     }
   },
 

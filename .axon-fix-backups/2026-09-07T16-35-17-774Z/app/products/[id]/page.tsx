@@ -63,6 +63,7 @@ export default function ProductDetailPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-10 space-y-12 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
+      {/* بخش معرفی و خرید کالا */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-10 shadow-2xl">
         <div className="space-y-4">
           <div className="w-full h-80 sm:h-96 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-4 flex items-center justify-center overflow-hidden relative group">
@@ -145,6 +146,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
+      {/* ۱. پایش زنده قیمت بازار با ارسال صحیح پراپ‌ها */}
       <section className="space-y-4">
         <LiveMarketArbitrage
           productTitle={product.title}
@@ -153,14 +155,17 @@ export default function ProductDetailPage() {
         />
       </section>
 
+      {/* ۲. شبیه‌ساز ۷ گاموت رنگی با عنوان کالا */}
       <section className="space-y-4">
         <ColorGamutSimulator productTitle={product.title} />
       </section>
 
+      {/* ۳. نظرات و امتیازدهی خریداران */}
       <section className="space-y-4">
         <ProductReviews productId={product.id} />
       </section>
 
+      {/* مدال تعاملی کالبدشکافی ۳D */}
       <ProductExplodedView
         productId={product.id}
         productTitle={product.title}

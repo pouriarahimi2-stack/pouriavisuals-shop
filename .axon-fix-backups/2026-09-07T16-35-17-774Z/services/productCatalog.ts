@@ -54,4 +54,5 @@ export interface Product {
   updated_at?: string;
 }
 
+// کاتالوگ کاملاً خالی و پاکسازی‌شده برای درج دیتای واقعی از پنل مدیریت
 export const FLAGSHIP_7_PRODUCTS: Product[] = [];

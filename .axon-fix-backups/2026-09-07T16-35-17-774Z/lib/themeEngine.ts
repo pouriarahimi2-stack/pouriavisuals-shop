@@ -1,4 +1,8 @@
 // File Path: lib/themeEngine.ts
+/**
+ * موتور هوشمند تشخیص خودکار تم تاریک و روشن بر اساس تنظیمات سیستم و ساعت شبانه‌روز
+ */
+
 export const themeEngine = {
   isNightTime(): boolean {
     const hours = new Date().getHours();

@@ -3,30 +3,25 @@
 
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
-import { Product, productService } from "@/services/productService";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productService";
 
 export default function AdminAiSeoAutopilot() {
-  const [products, setProducts] = useState<Product[]>([]);
   const [data, setData] = useState<any>(null);
   const [generating, setGenerating] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState(FLAGSHIP_7_PRODUCTS[1].id);
   const [customKeyword, setCustomKeyword] = useState("");
   const [statusLog, setStatusLog] = useState<string | null>(null);
 
-  useEffect(() => {
-    productService.getAll().then((prods) => {
-      if (prods && prods.length > 0) {
-        setProducts(prods);
-        setSelectedProduct(prods[0].id);
-      }
-    });
+  const fetchIntelligence = async () => {
+    try {
+      const res = await fetch("/api/ai-seo-autopilot");
+      const json = await res.json();
+      if (json.data) setData(json.data);
+    } catch {}
+  };
 
-    fetch("/api/ai-seo-autopilot")
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.data) setData(json.data);
-      })
-      .catch(() => {});
+  useEffect(() => {
+    fetchIntelligence();
   }, []);
 
   const handleStartAutopilotCycle = async () => {
@@ -35,9 +30,9 @@ export default function AdminAiSeoAutopilot() {
     setStatusLog("۱. در حال اتصال به Google Search Console API و استخراج کلمات کلیدی پرکلیک...");
 
     try {
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 1000));
       setStatusLog("۲. در حال خزش رقبای صفحه اول گوگل و استخراج شکاف محتوایی (Content Gap)...");
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 1000));
       setStatusLog("۳. هوش مصنوعی در حال نگارش مقاله ۲۵۰۰ کلمه‌ای، جدول مقایسه و تزریق کارت خرید مستقیم...");
 
       const res = await fetch("/api/ai-seo-autopilot", {
@@ -45,7 +40,7 @@ export default function AdminAiSeoAutopilot() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetKeyword: customKeyword.trim() || undefined,
-          targetProductId: selectedProduct || undefined,
+          targetProductId: selectedProduct,
         }),
       });
 
@@ -104,15 +99,11 @@ export default function AdminAiSeoAutopilot() {
               onChange={(e) => setSelectedProduct(e.target.value)}
               className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer text-[var(--text-primary)]"
             >
-              {products.length === 0 ? (
-                <option value="">محصولی در دیتابیس ثبت نشده است</option>
-              ) : (
-                products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))
-              )}
+              {FLAGSHIP_7_PRODUCTS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -128,7 +119,7 @@ export default function AdminAiSeoAutopilot() {
           </div>
         </div>
 
-        <div className="lg:col-span-2 p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
+        <div className="lg:col-span-2 p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
           <h3 className="font-black text-xs text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             📊 رصد هوشمند کلمات کلیدی با فرصت رشد فروش (GSC Intelligence)
           </h3>
@@ -142,7 +133,7 @@ export default function AdminAiSeoAutopilot() {
                 <div>
                   <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{item.keyword}</h4>
                   <span className="text-[10px] text-[var(--text-secondary)] font-mono">
-                    ایمپرشن گوگل: {item.impressions?.toLocaleString("fa-IR")} | رتبه سرپ: {item.position}
+                    ایمپرشن گوگل: {item.impressions.toLocaleString("fa-IR")} | رتبه سرپ: {item.position}
                   </span>
                 </div>
                 <button

@@ -3,20 +3,21 @@
 
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
-import { Product, productService } from "@/services/productService";
+import { FLAGSHIP_7_PRODUCTS, Product, productService } from "@/services/productService";
 import { siteInfoService } from "@/services/siteInfoService";
 import ProductExplodedView from "@/components/ProductExplodedView";
 
 export default function AdminAiMasterSuite() {
   const [activeSubTab, setActiveSubTab] = useState<"seo_autopilot" | "copilot" | "teardown_ai" | "diagnostics">("seo_autopilot");
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<string>("");
-  const [customKeyword, setCustomKeyword] = useState("");
-  const [seoGenerating, setSeoGenerating] = useState(false);
-  const [seoStatusLog, setSeoStatusLog] = useState<string | null>(null);
+  // استیت‌های اتوپایلوت سئو
   const [gscData, setGscData] = useState<any>(null);
+  const [seoGenerating, setSeoGenerating] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(FLAGSHIP_7_PRODUCTS[1]?.id || "prod-studio-display-5k");
+  const [customKeyword, setCustomKeyword] = useState("");
+  const [seoStatusLog, setSeoStatusLog] = useState<string | null>(null);
 
+  // استیت‌های کوپایلوت هوشمند ادمین
   const [copilotInput, setCopilotInput] = useState("");
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [copilotMessages, setCopilotMessages] = useState<Array<{ role: "admin" | "ai"; text: string }>>([
@@ -26,34 +27,31 @@ export default function AdminAiMasterSuite() {
     },
   ]);
 
-  const [teardownProduct, setTeardownProduct] = useState<string>("");
+  // استیت‌های کالبدشکافی ۳D
+  const [teardownProduct, setTeardownProduct] = useState<string>(FLAGSHIP_7_PRODUCTS[1]?.id || "prod-studio-display-5k");
   const [teardownGenerating, setTeardownGenerating] = useState(false);
   const [teardownResult, setTeardownResult] = useState<any>(null);
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
 
+  // استیت‌های کلید جمینای
   const [apiKey, setApiKey] = useState("");
   const [testingKey, setTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; model?: string } | null>(null);
 
   useEffect(() => {
-    productService.getAll().then((prods) => {
-      if (prods && prods.length > 0) {
-        setProducts(prods);
-        setSelectedProduct(prods[0].id);
-        setTeardownProduct(prods[0].id);
-      }
-    });
-
+    // دریافت اطلاعات سئو
     fetch("/api/ai-seo-autopilot")
       .then((r) => r.json())
       .then((j) => j.data && setGscData(j.data))
       .catch(() => {});
 
+    // دریافت کلید ذخیره‌شده
     siteInfoService.getSiteInfo().then((info) => {
       if (info?.gemini_api_key) setApiKey(info.gemini_api_key);
     });
   }, []);
 
+  // ۱. اجرای چرخه اتوپایلوت سئو
   const handleStartSeoAutopilot = async () => {
     soundEngine.playClick();
     setSeoGenerating(true);
@@ -70,7 +68,7 @@ export default function AdminAiMasterSuite() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetKeyword: customKeyword.trim() || undefined,
-          targetProductId: selectedProduct || undefined,
+          targetProductId: selectedProduct,
         }),
       });
 
@@ -86,6 +84,7 @@ export default function AdminAiMasterSuite() {
     }
   };
 
+  // ۲. ارسال پیام به کوپایلوت ادمین
   const handleSendCopilot = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!copilotInput.trim() || copilotLoading) return;
@@ -125,22 +124,21 @@ export default function AdminAiMasterSuite() {
     }
   };
 
+  // ۳. تولید کالبدشکافی ۳D توسط هوش مصنوعی
   const handleGenerateAiTeardown = async () => {
     soundEngine.playClick();
     setTeardownGenerating(true);
 
-    const prod = products.find((p) => p.id === teardownProduct) || products[0];
-    const pTitle = prod?.title || "تجهیزات و مانیتور حرفه‌ای";
-    const pCategory = prod?.category || "تخصصی";
+    const prod = FLAGSHIP_7_PRODUCTS.find((p) => p.id === teardownProduct) || FLAGSHIP_7_PRODUCTS[1];
 
     try {
       const res = await fetch("/api/ai-teardown", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId: prod?.id || "custom-gear",
-          productTitle: pTitle,
-          category: pCategory,
+          productId: prod.id,
+          productTitle: prod.title,
+          category: prod.category,
         }),
       });
 
@@ -156,6 +154,7 @@ export default function AdminAiMasterSuite() {
     }
   };
 
+  // ۴. تست زنده کلید جمینای
   const handleTestKey = async () => {
     if (!apiKey.trim()) return;
     soundEngine.playClick();
@@ -183,10 +182,11 @@ export default function AdminAiMasterSuite() {
     }
   };
 
-  const currentTeardownProd = products.find((p) => p.id === teardownProduct) || products[0] || null;
+  const currentTeardownProd = FLAGSHIP_7_PRODUCTS.find((p) => p.id === teardownProduct) || FLAGSHIP_7_PRODUCTS[1];
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      {/* هدر مرکز جامع هوش مصنوعی */}
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
@@ -212,6 +212,7 @@ export default function AdminAiMasterSuite() {
         </div>
       </div>
 
+      {/* ناوبری زیرمجموعه ۴ گانه */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] w-fit">
         {[
           { id: "seo_autopilot", label: "🚀 اتوپایلوت رشد سئو (GSC)", icon: "📈" },
@@ -238,6 +239,7 @@ export default function AdminAiMasterSuite() {
         ))}
       </div>
 
+      {/* ۱. ماژول سئوی خودمختار */}
       {activeSubTab === "seo_autopilot" && (
         <div className="space-y-6">
           {seoStatusLog && (
@@ -261,15 +263,11 @@ export default function AdminAiMasterSuite() {
                   onChange={(e) => setSelectedProduct(e.target.value)}
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer text-[var(--text-primary)]"
                 >
-                  {products.length === 0 ? (
-                    <option value="">محصولی در پایگاه داده ثبت نشده است</option>
-                  ) : (
-                    products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))
-                  )}
+                  {FLAGSHIP_7_PRODUCTS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -329,6 +327,7 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
+      {/* ۲. ماژول کوپایلوت بیزینس ادمین */}
       {activeSubTab === "copilot" && (
         <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
           <div className="h-96 overflow-y-auto p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3.5 text-xs">
@@ -374,6 +373,7 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
+      {/* ۳. ماژول کالبدشکافی ۳D سخت‌افزار */}
       {activeSubTab === "teardown_ai" && (
         <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
@@ -392,33 +392,27 @@ export default function AdminAiMasterSuite() {
                 onChange={(e) => setTeardownProduct(e.target.value)}
                 className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
               >
-                {products.length === 0 ? (
-                  <option value="">محصولی یافت نشد</option>
-                ) : (
-                  products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))
-                )}
+                {FLAGSHIP_7_PRODUCTS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
               </select>
 
               <button
                 onClick={handleGenerateAiTeardown}
-                disabled={teardownGenerating || products.length === 0}
+                disabled={teardownGenerating}
                 className="px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50"
               >
                 {teardownGenerating ? "در حال کالبدشکافی..." : "تولید ۶ لایه مهندسی 🔬"}
               </button>
 
-              {currentTeardownProd && (
-                <button
-                  onClick={() => setIs3DModalOpen(true)}
-                  className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs hover:opacity-95 transition shadow-lg cursor-pointer"
-                >
-                  مشاهده در بوم ۳D 🧬
-                </button>
-              )}
+              <button
+                onClick={() => setIs3DModalOpen(true)}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs hover:opacity-95 transition shadow-lg cursor-pointer"
+              >
+                مشاهده در بوم ۳D 🧬
+              </button>
             </div>
           </div>
 
@@ -449,6 +443,7 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
+      {/* ۴. ماژول تست و عیب‌یابی کلید Gemini Pro */}
       {activeSubTab === "diagnostics" && (
         <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
           <div className="border-b border-[var(--card-border)] pb-3">
@@ -498,15 +493,14 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {currentTeardownProd && (
-        <ProductExplodedView
-          productId={currentTeardownProd.id}
-          productTitle={currentTeardownProd.title}
-          category={currentTeardownProd.category}
-          isOpen={is3DModalOpen}
-          onClose={() => setIs3DModalOpen(false)}
-        />
-      )}
+      {/* مدال ۳D کالبدشکافی */}
+      <ProductExplodedView
+        productId={currentTeardownProd.id}
+        productTitle={currentTeardownProd.title}
+        category={currentTeardownProd.category}
+        isOpen={is3DModalOpen}
+        onClose={() => setIs3DModalOpen(false)}
+      />
     </div>
   );
 }

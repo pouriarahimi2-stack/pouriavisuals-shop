@@ -1,6 +1,7 @@
 // File Path: app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -54,16 +55,20 @@ export async function POST(req: NextRequest) {
       if (data) dbProducts = data;
     }
 
+    const fallbackCatalog = Array.isArray(FLAGSHIP_7_PRODUCTS) ? FLAGSHIP_7_PRODUCTS : [];
     let calculatedTotal = 0;
     const validatedItems: any[] = [];
 
     for (const item of rawItems) {
       const pId = String(item.productId || item.id || item.product_id);
       let matched = dbProducts.find((p: any) => String(p.id) === pId);
+      if (!matched) {
+        matched = fallbackCatalog.find((p) => String(p.id) === pId);
+      }
 
       if (!matched) {
         return NextResponse.json(
-          { success: false, message: `کالای درخواستی با شناسه «${pId}» در دیتابیس یافت نشد.` },
+          { success: false, message: `کالای درخواستی با شناسه «${pId}» نامعتبر است.` },
           { status: 400 }
         );
       }

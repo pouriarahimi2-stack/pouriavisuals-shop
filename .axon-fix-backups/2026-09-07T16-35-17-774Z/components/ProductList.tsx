@@ -35,6 +35,7 @@ export default function ProductList() {
 
   return (
     <section className="py-8 space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      {/* سربرگ تمیز بدون تگ‌های انگلیسی و بدون منوی وسط */}
       <div className="border-b border-[var(--card-border)] pb-5 text-right">
         <h2 className="text-2xl sm:text-3xl font-black">کاتالوگ تجهیزات و محصولات</h2>
         <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium mt-1">

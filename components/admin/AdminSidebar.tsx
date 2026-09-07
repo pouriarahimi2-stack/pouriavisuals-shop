@@ -50,7 +50,7 @@ const navGroups: NavGroup[] = [
       { id: "menu", title: "منوها و دسته‌بندی‌ها", href: "/admin/menu", icon: "🔗" },
       { id: "styles", title: "هویت بصری و فونت", href: "/admin/styles", icon: "🎨" },
       { id: "site_info", title: "تنظیمات عمومی سایت", href: "/admin/settings", icon: "⚙️" },
-      { id: "change_pin", title: "تغییر رمز و پین مدیریت", href: "/admin/change-pin", icon: "🔑" },
+      { id: "change_pin", title: "مدیریت حساب و کلمه عبور", href: "/admin/change-pin", icon: "🔐" },
     ],
   },
 ];

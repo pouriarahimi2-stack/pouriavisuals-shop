@@ -5,7 +5,6 @@ import { signPayload, verifyPayload } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-// دریافت اطلاعات فعلی کاربر لاگین‌شده
 export async function GET(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
@@ -18,7 +17,7 @@ export async function GET(req: NextRequest) {
 
     let { data: adminUser } = await supabaseAdmin
       .from("admin_users")
-      .select("id, username, full_name, role, created_at")
+      .select("*")
       .or("username.eq." + targetUsername + ",role.eq.superadmin")
       .limit(1)
       .maybeSingle();
@@ -37,7 +36,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ثبت تغییرات مشخصات کاربری و کلمه عبور
 export async function POST(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
@@ -51,7 +49,7 @@ export async function POST(req: NextRequest) {
     const sessionData = token ? verifyPayload(token) : null;
     const currentUsername = sessionData?.username || "admin";
 
-    // ۱. واکشی کاربر از دیتابیس
+    // ۱. واکشی رکورد مدیر از جدول admin_users
     let { data: adminUser } = await supabaseAdmin
       .from("admin_users")
       .select("*")
@@ -59,7 +57,6 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    // اگر کاربری نبود، رکورد پیش‌فرض ساخته می‌شود
     if (!adminUser) {
       const { data: createdUser } = await supabaseAdmin
         .from("admin_users")
@@ -67,8 +64,7 @@ export async function POST(req: NextRequest) {
           username: "admin",
           password: "1234",
           full_name: "مدیر ارشد آکسون",
-          role: "superadmin",
-          created_at: new Date().toISOString(),
+          role: "superadmin"
         })
         .select()
         .single();
@@ -90,30 +86,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۳. آماده‌سازی فیلدهای آپدیت
+    // ۳. آماده‌سازی فیلدهای منطبق با اسکیمای واقعی جدول دیتابیس (بدون فیلد updated_at)
     const updatedUsername = String(newUsername || adminUser.username || "admin").trim().toLowerCase();
     const updatedFullName = String(newFullName || adminUser.full_name || "مدیر سیستم").trim();
     const updatedPassword = newPassword && String(newPassword).trim().length >= 4
       ? String(newPassword).trim()
       : adminUser.password;
 
+    const updatePayload: Record<string, any> = {
+      username: updatedUsername,
+      password: updatedPassword
+    };
+
+    if (adminUser && "full_name" in adminUser) {
+      updatePayload.full_name = updatedFullName;
+    }
+
     const { data: savedUser, error: updateErr } = await supabaseAdmin
       .from("admin_users")
-      .update({
-        username: updatedUsername,
-        full_name: updatedFullName,
-        password: updatedPassword,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", adminUser.id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (updateErr) {
       return NextResponse.json({ success: false, message: updateErr.message }, { status: 500 });
     }
 
-    // ۴. صدور سشن جدید با نام کاربری به‌روزرسانی‌شده
+    // ۴. صدور سشن جدید با مشخصات به‌روزرسانی‌شده
     const newToken = signPayload({
       id: String(savedUser?.id || adminUser.id),
       username: updatedUsername,
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
     const isProd = process.env.NODE_ENV === "production";
     const response = NextResponse.json({
       success: true,
-      message: "مشخصات حساب کاربری، نام کاربری و رمز عبور با موفقیت به‌روزرسانی شد.",
+      message: "مشخصات حساب کاربری، نام کاربری و کلمه عبور با موفقیت ذخیره شد.",
       user: {
         username: updatedUsername,
         full_name: updatedFullName,
@@ -149,6 +149,6 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || "خطای پردازش حساب." }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message || "خطای پردازش دیتابیس." }, { status: 500 });
   }
 }

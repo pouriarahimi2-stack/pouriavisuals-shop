@@ -84,11 +84,22 @@ class MasterRealtimeEngine {
         config: { broadcast: { ack: false } },
       });
 
+      // شنود تغییرات واقعی ردیف‌های دیتابیس Supabase (Postgres CDC)
       const tables = [
-        "products", "orders", "site_info", "banners", "tech_news",
-        "posts", "contact_messages", "coupons", "menu_items",
-        "categories", "site_pages", "admin_users", "site_styles",
-        "product_reviews"
+        "products",
+        "orders",
+        "site_info",
+        "banners",
+        "tech_news",
+        "posts",
+        "contact_messages",
+        "coupons",
+        "menu_items",
+        "categories",
+        "site_pages",
+        "admin_users",
+        "site_styles",
+        "product_reviews",
       ];
 
       tables.forEach((table) => {
@@ -104,10 +115,17 @@ class MasterRealtimeEngine {
       });
 
       const broadcastEvents = [
-        "products_updated", "site_info_updated", "banners_updated",
-        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
-        "contact_messages_updated", "posts_updated", "admin_users_updated",
-        "product_reviews_updated"
+        "products_updated",
+        "site_info_updated",
+        "banners_updated",
+        "orders_updated",
+        "coupons_updated",
+        "menu_updated",
+        "news_updated",
+        "contact_messages_updated",
+        "posts_updated",
+        "admin_users_updated",
+        "product_reviews_updated",
       ];
 
       broadcastEvents.forEach((ev) => {

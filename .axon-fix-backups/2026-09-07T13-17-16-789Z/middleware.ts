@@ -6,6 +6,7 @@ import { verifyPayload } from "./lib/session";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // محافظت از مسیرهای پیشخوان ادمین
   if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
     const sessionToken =
       req.cookies.get("admin_session_token")?.value ||

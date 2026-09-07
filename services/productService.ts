@@ -7,16 +7,6 @@ export interface ProductVariant {
   priceDelta?: number;
 }
 
-export interface MarketBenchmark {
-  storeName: string;
-  price: number;
-  minPrice?: number;
-  maxPrice?: number;
-  warranty: string;
-  isOurStore?: boolean;
-  deliveryTime?: string;
-}
-
 export interface Product {
   id: string;
   title: string;
@@ -32,21 +22,15 @@ export interface Product {
   isAvailable?: boolean;
   is_featured?: boolean;
   category?: string;
-  category_name?: string;
   image?: string;
   images?: string[];
   description?: string;
-  short_description?: string;
-  highlights?: string[];
   warranty?: string;
-  badge?: string;
-  meta_title?: string;
-  meta_description?: string;
   variants?: ProductVariant[];
   specs?: Record<string, string>;
-  market_comparison?: MarketBenchmark[];
+  meta_title?: string;
+  meta_description?: string;
   created_at?: string;
-  updated_at?: string;
 }
 
 export const FLAGSHIP_7_PRODUCTS: Product[] = [];
@@ -60,7 +44,6 @@ export const productService = {
         .order("created_at", { ascending: false });
 
       if (error || !data) return [];
-
       return data.map((p: any) => ({
         ...p,
         id: String(p.id),
@@ -85,7 +68,6 @@ export const productService = {
         .maybeSingle();
 
       if (error || !data) return null;
-
       return {
         ...data,
         id: String(data.id),
@@ -99,7 +81,10 @@ export const productService = {
 
   async saveProduct(product: Partial<Product>): Promise<Product | null> {
     try {
+      const generatedId = product.id || ("prod_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7));
+      
       const payload: Record<string, any> = {
+        id: generatedId,
         title: product.title || product.name,
         title_fa: product.title_fa || null,
         sku: product.sku || null,
@@ -109,27 +94,24 @@ export const productService = {
         discount_price: product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : null),
         stock: product.stock !== undefined ? Number(product.stock) : 10,
         is_available: product.isAvailable ?? product.is_available ?? true,
-        is_featured: Boolean(product.is_featured),
         image: product.image || (product.images && product.images[0]) || null,
         images: product.images || [],
         description: product.description || null,
-        short_description: product.short_description || null,
-        highlights: product.highlights || [],
         warranty: product.warranty || "گارانتی اصالت طلایی",
-        badge: product.badge || null,
-        meta_title: product.meta_title || product.title,
-        meta_description: product.meta_description || null,
         variants: product.variants || [],
         specs: product.specs || {},
-        market_comparison: product.market_comparison || [],
-        updated_at: new Date().toISOString(),
+        meta_title: product.meta_title || product.title,
+        meta_description: product.meta_description || null,
       };
 
-      if (product.id) {
+      // بررسی وجود رکورد برای تفکیک Update و Insert
+      const { data: existing } = await supabase.from("products").select("id").eq("id", generatedId).maybeSingle();
+
+      if (existing) {
         const { data, error } = await supabase
           .from("products")
           .update(payload)
-          .eq("id", product.id)
+          .eq("id", generatedId)
           .select()
           .single();
         if (error) throw error;
@@ -144,7 +126,7 @@ export const productService = {
         return data;
       }
     } catch (e) {
-      console.error("Save product error:", e);
+      console.error("Save product error in service:", e);
       return null;
     }
   },

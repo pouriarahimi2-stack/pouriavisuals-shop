@@ -49,7 +49,6 @@ export interface Product {
   updated_at?: string;
 }
 
-// آرایه خالی سازگار؛ منبع انحصاری فقط و فقط دیتابیس زنده است
 export const FLAGSHIP_7_PRODUCTS: Product[] = [];
 
 export const productService = {
@@ -107,7 +106,7 @@ export const productService = {
         brand: product.brand || "Apple",
         category: product.category || "تجهیزات تخصصی",
         price: Number(product.price || 0),
-        discount_price: product.discountPrice ? Number(product.discountPrice) : null,
+        discount_price: product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : null),
         stock: product.stock !== undefined ? Number(product.stock) : 10,
         is_available: product.isAvailable ?? product.is_available ?? true,
         is_featured: Boolean(product.is_featured),
@@ -123,6 +122,7 @@ export const productService = {
         variants: product.variants || [],
         specs: product.specs || {},
         market_comparison: product.market_comparison || [],
+        updated_at: new Date().toISOString(),
       };
 
       if (product.id) {

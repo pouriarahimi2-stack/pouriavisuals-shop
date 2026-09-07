@@ -6,18 +6,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("site_styles")
-      .select("*")
-      .eq("id", "default_theme")
-      .maybeSingle();
-
-    if (error) throw error;
-
+    const { data } = await supabaseAdmin.from("site_styles").select("*").limit(1).maybeSingle();
     return NextResponse.json({
       success: true,
       data: data || {
-        id: "default_theme",
         primary_color: "#0071e3",
         secondary_color: "#4f46e5",
         font_family: "Vazirmatn",
@@ -33,12 +25,11 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. ورود به پنل مدیریت الزامی است." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const body = await req.json();
     const payload = {
-      id: "default_theme",
       primary_color: body.primary_color || "#0071e3",
       secondary_color: body.secondary_color || "#4f46e5",
       font_family: body.font_family || "Vazirmatn",
@@ -47,15 +38,15 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabaseAdmin
-      .from("site_styles")
-      .upsert(payload, { onConflict: "id" })
-      .select()
-      .single();
+    const { data: existing } = await supabaseAdmin.from("site_styles").select("id").limit(1);
 
-    if (error) throw error;
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.from("site_styles").update(payload).eq("id", existing[0].id);
+    } else {
+      await supabaseAdmin.from("site_styles").insert([payload]);
+    }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, message: "استایل‌ها و هویت بصری با موفقیت در دیتابیس ثبت شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

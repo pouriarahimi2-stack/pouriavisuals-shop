@@ -54,7 +54,6 @@ export const productService = {
         }));
       }
 
-      // در صورت وجود مشکل در کلاینت، واکشی از روت سرور
       const res = await fetch("/api/products", { cache: "no-store" });
       const json = await res.json();
       if (json.success && json.data) {
@@ -114,7 +113,7 @@ export const productService = {
     };
 
     try {
-      // ۱. ذخیره از طریق API سروری با دسترسی ادمین
+      let saved: any = null;
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -123,44 +122,47 @@ export const productService = {
 
       const json = await res.json();
       if (res.ok && json.success && json.data) {
-        return json.data;
-      }
-
-      // ۲. تلاش ذخیره مستقیم کلاینت در صورت در دسترس نبودن موقت API
-      const dbPayload: Record<string, any> = {
-        id: productId,
-        name: cleanTitle,
-        title: cleanTitle,
-        title_fa: product.title_fa || cleanTitle,
-        sku: product.sku || ("SKU-" + productId.slice(-6).toUpperCase()),
-        brand: product.brand || "Apple",
-        category: product.category || "تجهیزات تخصصی",
-        price: Number(product.price || 0),
-        discount_price: product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : null),
-        stock: product.stock !== undefined ? Number(product.stock) : 10,
-        is_available: product.isAvailable ?? product.is_available ?? true,
-        image: product.image || (product.images && product.images[0]) || null,
-        images: product.images || [],
-        description: product.description || null,
-        warranty: product.warranty || "گارانتی اصالت طلایی",
-        variants: product.variants || [],
-        specs: product.specs || {},
-        meta_title: product.meta_title || cleanTitle,
-        meta_description: product.meta_description || null,
-      };
-
-      const { data: existing } = await supabase.from("products").select("id").eq("id", productId).maybeSingle();
-
-      if (existing) {
-        const { data, error } = await supabase.from("products").update(dbPayload).eq("id", productId).select().single();
-        if (error) throw error;
-        return data;
+        saved = json.data;
       } else {
-        dbPayload.created_at = new Date().toISOString();
-        const { data, error } = await supabase.from("products").insert([dbPayload]).select().single();
-        if (error) throw error;
-        return data;
+        const dbPayload: Record<string, any> = {
+          id: productId,
+          name: cleanTitle,
+          title: cleanTitle,
+          title_fa: product.title_fa || cleanTitle,
+          sku: product.sku || ("SKU-" + productId.slice(-6).toUpperCase()),
+          brand: product.brand || "Apple",
+          category: product.category || "تجهیزات تخصصی",
+          price: Number(product.price || 0),
+          discount_price: product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : null),
+          stock: product.stock !== undefined ? Number(product.stock) : 10,
+          is_available: product.isAvailable ?? product.is_available ?? true,
+          image: product.image || (product.images && product.images[0]) || null,
+          images: product.images || [],
+          description: product.description || null,
+          warranty: product.warranty || "گارانتی اصالت طلایی",
+          variants: product.variants || [],
+          specs: product.specs || {},
+          meta_title: product.meta_title || cleanTitle,
+          meta_description: product.meta_description || null,
+        };
+
+        const { data: existing } = await supabase.from("products").select("id").eq("id", productId).maybeSingle();
+
+        if (existing) {
+          const { data, error } = await supabase.from("products").update(dbPayload).eq("id", productId).select().single();
+          if (!error) saved = data;
+        } else {
+          dbPayload.created_at = new Date().toISOString();
+          const { data, error } = await supabase.from("products").insert([dbPayload]).select().single();
+          if (!error) saved = data;
+        }
       }
+
+      // انتشار زنده رویداد در مرورگر برای جهش لحظه‌ای ویترین کالاها
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("products_updated", { detail: saved }));
+      }
+      return saved;
     } catch (e) {
       console.error("Save product error:", e);
       return null;
@@ -170,10 +172,11 @@ export const productService = {
   async deleteProduct(id: string): Promise<boolean> {
     try {
       const res = await fetch("/api/products?id=" + encodeURIComponent(id), { method: "DELETE" });
-      if (res.ok) return true;
-
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      return !error;
+      const ok = res.ok;
+      if (ok && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("products_updated", { detail: { id, deleted: true } }));
+      }
+      return ok;
     } catch {
       return false;
     }

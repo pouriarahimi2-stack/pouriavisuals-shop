@@ -29,32 +29,15 @@ function findBestMatchingProduct(corpus: string, productList: any[]): any {
     const pFull = `${pId} ${pTitle} ${pTitleFa}`;
 
     if (pId && normCorpus.includes(pId)) score += 50;
-
-    if ((pFull.includes('studio') || pFull.includes('استودیو')) && (normCorpus.includes('studio') || normCorpus.includes('استودیو'))) {
-      score += 30;
-      if (normCorpus.includes('5k') || normCorpus.includes('display') || normCorpus.includes('دیسپلی') || normCorpus.includes('مانیتور')) score += 20;
-    }
-    if ((pFull.includes('macbook') || pFull.includes('مک بوک') || pFull.includes('مکبوک')) && (normCorpus.includes('macbook') || normCorpus.includes('مک بوک') || normCorpus.includes('مکبوک') || normCorpus.includes('m4') || normCorpus.includes('m5'))) {
-      score += 30;
-    }
-    if ((pFull.includes('watch') || pFull.includes('ساعت')) && (normCorpus.includes('watch') || normCorpus.includes('ساعت') || normCorpus.includes('ultra') || normCorpus.includes('اولترا'))) {
-      score += 30;
-    }
-    if ((pFull.includes('ipad') || pFull.includes('آیپد') || pFull.includes('ایپد')) && (normCorpus.includes('ipad') || normCorpus.includes('آیپد') || normCorpus.includes('ایپد') || normCorpus.includes('tandem') || normCorpus.includes('تاندم'))) {
-      score += 30;
-    }
-    if ((pFull.includes('xdr') || pFull.includes('6k') || pFull.includes('pro display')) && (normCorpus.includes('xdr') || normCorpus.includes('6k') || normCorpus.includes('pro display') || normCorpus.includes('پرو دیسپلی'))) {
-      score += 30;
-    }
+    if ((pFull.includes('studio') || pFull.includes('استودیو')) && (normCorpus.includes('studio') || normCorpus.includes('استودیو'))) score += 30;
+    if ((pFull.includes('macbook') || pFull.includes('مک بوک')) && (normCorpus.includes('macbook') || normCorpus.includes('مک بوک'))) score += 30;
+    if ((pFull.includes('watch') || pFull.includes('ساعت')) && (normCorpus.includes('watch') || normCorpus.includes('ساعت'))) score += 30;
+    if ((pFull.includes('ipad') || pFull.includes('آیپد')) && (normCorpus.includes('ipad') || normCorpus.includes('آیپد'))) score += 30;
 
     if (score > highestScore) {
       highestScore = score;
       bestProduct = p;
     }
-  }
-
-  if (!bestProduct && (normCorpus.includes('استودیو') || normCorpus.includes('studio') || normCorpus.includes('5k'))) {
-    bestProduct = productList.find(p => String(p.id).includes('studio') || String(p.title).includes('Studio')) || FLAGSHIP_7_PRODUCTS[1];
   }
 
   return bestProduct;
@@ -73,17 +56,16 @@ export async function POST(req: Request) {
     let products = Array.isArray(FLAGSHIP_7_PRODUCTS) ? [...FLAGSHIP_7_PRODUCTS] : [];
     let siteInfoData: any = null;
 
-    try {
-      if (supabaseAdmin) {
+    if (supabaseAdmin) {
+      try {
         const [prodsRes, infoRes] = await Promise.all([
           supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }),
           supabaseAdmin.from("site_info").select("*").limit(1).maybeSingle(),
         ]);
-
         if (prodsRes.data && prodsRes.data.length > 0) products = prodsRes.data;
         if (infoRes.data) siteInfoData = infoRes.data;
-      }
-    } catch (e) {}
+      } catch {}
+    }
 
     const apiKey =
       siteInfoData?.gemini_api_key ||
@@ -91,19 +73,18 @@ export async function POST(req: Request) {
       process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
     const storeName = siteInfoData?.site_name || siteInfoData?.store_name || "آکسون | Axon Tech";
-    const storePhone = siteInfoData?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
 
     const productCatalogContext = products
       .map(
         (p: any) =>
-          `• [شناسه: ${p.id}] نام: ${p.title || p.name} | قیمت: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان | مشخصات: ${JSON.stringify(p.specs || {})}`
+          `• [شناسه: ${p.id}] نام: ${p.title || p.name} | قیمت: ${Number(p.discount_price || p.price || 0).toLocaleString("fa-IR")} تومان | دسته‌بندی: ${p.category || "تخصصی"}`
       )
       .join("\n");
 
-    const systemInstruction = `تو مشاور هوشمند و مهندس سخت‌افزار پلتفرم ${storeName} هستی.
-اگر کاربر درباره قیمت یا کلمه «چنده» سوال کرد، قیمت دقیق کالا را اعلام کن (مثلا Studio Display دقیقا ۱۲۸,۵۰۰,۰۰۰ تومان).
-تمامی سفارش‌ها دارای ۱۸ ماه گارانتی طلایی و ارسال رایگان پیشتاز هستند.
-کاتالوگ:\n${productCatalogContext}`;
+    const systemInstruction = `تو مشاور هوشمند، مودب و مهندس ارشد پلتفرم ${storeName} هستی.
+اگر کاربر درباره قیمت یا کلمه «چنده» سوال کرد، قیمت دقیق و به روز کالا را با احترام اعلام کن.
+تمامی کالاها دارای ۱۸ ماه گارانتی اصالت طلایی و ارسال رایگان پیشتاز هستند.
+کاتالوگ کالاها:\n${productCatalogContext}`;
 
     let aiResponse = "";
     const cleanKey = apiKey ? String(apiKey).trim() : "";
@@ -113,6 +94,7 @@ export async function POST(req: Request) {
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
         "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
       ];
 
       for (const ep of endpoints) {
@@ -137,42 +119,23 @@ export async function POST(req: Request) {
             aiResponse = text;
             break;
           }
-        } catch (e) {
-          continue;
-        }
+        } catch {}
       }
     }
 
     const normalizedMsg = normalizePersianText(userMessage);
 
-    // پاسخ هوشمند با رفع خطای سینتکس و استفاده از عبارت رسمی فارسی «اینچ»
     if (!aiResponse) {
-      const isPriceQuery =
-        normalizedMsg.includes("قیمت") ||
-        normalizedMsg.includes("چند") ||
-        normalizedMsg.includes("چنده") ||
-        normalizedMsg.includes("نرخ") ||
-        normalizedMsg.includes("هزینه");
-
-      const isStudio =
-        normalizedMsg.includes("studio") ||
-        normalizedMsg.includes("استودیو") ||
-        normalizedMsg.includes("5k");
-
-      if (isPriceQuery && isStudio) {
-        aiResponse = "مانیتور فوق‌العاده **Apple Studio Display 27 اینچ 5K Retina** با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری در حال حاضر با قیمت رسمی **۱۲۸,۵۰۰,۰۰۰ تومان** و ۱۸ ماه گارانتی اصالت طلایی آکسون در انبار موجود است. 🖥️✨";
+      if (normalizedMsg.includes("studio") || normalizedMsg.includes("استودیو") || normalizedMsg.includes("5k")) {
+        aiResponse = "مانیتور پرچمدار **Apple Studio Display 27 اینچ 5K Retina** با شیشه مات نانوتکستچر و کالیبراسیون سخت‌افزاری با قیمت رسمی ۱۲۸,۵۰۰,۰۰۰ تومان و ۱۸ ماه گارانتی اصالت طلایی آکسون در انبار موجود است. 🖥️✨";
       } else if (normalizedMsg.includes("مک بوک") || normalizedMsg.includes("macbook")) {
-        aiResponse = "لپ‌تاپ پرچمدار **MacBook Pro 16 اینچ M4 Max** با رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ۲۰۸,۵۰۰,۰۰۰ تومان و گارانتی طلایی در انبار موجود است.";
+        aiResponse = "لپ‌تاپ قدرتمند **MacBook Pro 16 اینچ با تراشه M4 Max**، رم ۱۲۸ گیگابایت و ۲ ترابایت SSD با قیمت ۲۰۸,۵۰۰,۰۰۰ تومان و گارانتی طلایی آماده تحویل فوری است. 💻⚡";
       } else {
-        aiResponse = `سلام و درود! من مشاور هوشمند فناوری در پلتفرم ${storeName} هستم. چطور می‌توانم در انتخاب سخت‌افزار و تجهیزات دیجیتال راهنماییتان کنم؟`;
+        aiResponse = `سلام و درود! من مشاور هوشمند تجهیزات تصویر و دیجیتال در ${storeName} هستم. چطور می‌توانم در انتخاب سخت‌افزار کمکتان کنم؟`;
       }
     }
 
     const matchedProduct = findBestMatchingProduct(aiResponse + " " + userMessage, products);
-
-    const calculatedPrice = matchedProduct
-      ? Number(matchedProduct.discount_price || matchedProduct.discountPrice || matchedProduct.price || 128500000)
-      : 128500000;
 
     return NextResponse.json({
       success: true,
@@ -182,17 +145,15 @@ export async function POST(req: Request) {
         ? {
             id: String(matchedProduct.id),
             title: matchedProduct.title || matchedProduct.name,
-            price: calculatedPrice,
-            discount_price: calculatedPrice,
-            image: matchedProduct.images?.[0] || matchedProduct.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
+            price: Number(matchedProduct.discount_price || matchedProduct.discountPrice || matchedProduct.price || 0),
+            image: matchedProduct.images?.[0] || matchedProduct.image || "/placeholder.png",
           }
         : null,
     });
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      response: `خطا در پردازش: ${error.message}`,
-      reply: `خطا در پردازش: ${error.message}`,
+      response: "درود بر شما! در خدمتتان هستم، بفرمایید چه کمکی از دست من برمی‌آید؟",
       matchedProduct: null,
     });
   }

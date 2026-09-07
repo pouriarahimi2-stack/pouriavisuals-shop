@@ -8916,6 +8916,137 @@ export const userBehavior = {
 27424534
 </file>
 
+<file path="services/bannerService.ts">
+import { supabase } from "@/lib/supabase";
+import { realtimeEngine } from "@/lib/realtimeSync";
+
+export interface Banner {
+  id: string;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  badge_text?: string;
+  image: string;
+  image_url?: string;
+  link?: string;
+  link_url?: string;
+  button_text?: string;
+  buttonText?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+const LOCAL_BANNERS_KEY = "axon_banners_cache_v2026";
+
+export const bannerService = {
+  async getAll(): Promise<Banner[]> {
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("banners")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          const mapped: Banner[] = data.map((b: any) => ({
+            id: String(b.id),
+            title: b.title || "پیشنهاد ویژه",
+            subtitle: b.subtitle || "",
+            badge: b.badge || b.badge_text || "",
+            badge_text: b.badge || b.badge_text || "",
+            image: b.image || b.image_url || "/placeholder.png",
+            image_url: b.image || b.image_url || "/placeholder.png",
+            link: b.link || b.link_url || "/products",
+            link_url: b.link || b.link_url || "/products",
+            button_text: b.button_text || b.buttonText || "مشاهده و خرید کالا",
+            buttonText: b.button_text || b.buttonText || "مشاهده و خرید کالا",
+            is_active: b.is_active !== false,
+            created_at: b.created_at,
+          }));
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(mapped));
+          }
+          return mapped;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem(LOCAL_BANNERS_KEY);
+        if (local) return JSON.parse(local);
+      }
+
+      return [];
+    } catch (e) {
+      console.error("bannerService.getAll error:", e);
+      return [];
+    }
+  },
+
+  async getActive(): Promise<Banner[]> {
+    const all = await this.getAll();
+    return all.filter((b) => b.is_active !== false);
+  },
+
+  async saveBanner(bannerData: Partial<Banner>): Promise<Banner | null> {
+    try {
+      const id = bannerData.id || `banner_${Date.now()}`;
+      const payload: any = {
+        id,
+        title: bannerData.title?.trim() || "پیشنهاد ویژه",
+        subtitle: bannerData.subtitle?.trim() || null,
+        badge: bannerData.badge?.trim() || bannerData.badge_text?.trim() || null,
+        badge_text: bannerData.badge?.trim() || bannerData.badge_text?.trim() || null,
+        image: bannerData.image || bannerData.image_url || "/placeholder.png",
+        image_url: bannerData.image || bannerData.image_url || "/placeholder.png",
+        link: bannerData.link || bannerData.link_url || "/products",
+        link_url: bannerData.link || bannerData.link_url || "/products",
+        button_text: bannerData.button_text || bannerData.buttonText || "مشاهده و بررسی کالا",
+        is_active: bannerData.is_active !== false,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (supabase) {
+        await supabase.from("banners").upsert(payload, { onConflict: "id" });
+      }
+
+      if (typeof window !== "undefined") {
+        const all = await this.getAll();
+        const updated = [payload, ...all.filter((b) => b.id !== id)];
+        localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(updated));
+        realtimeEngine.broadcastLocally("banners_updated", updated);
+      }
+
+      return payload;
+    } catch (e) {
+      console.error("bannerService.saveBanner error:", e);
+      return null;
+    }
+  },
+
+  async deleteBanner(id: string): Promise<boolean> {
+    try {
+      if (supabase) {
+        await supabase.from("banners").delete().eq("id", id);
+      }
+      if (typeof window !== "undefined") {
+        const all = await this.getAll();
+        const updated = all.filter((b) => b.id !== id);
+        localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(updated));
+        realtimeEngine.broadcastLocally("banners_updated", updated);
+      }
+      return true;
+    } catch (e) {
+      console.error("bannerService.deleteBanner error:", e);
+      return false;
+    }
+  },
+};
+
+export default bannerService;
+</file>
+
 <file path="services/categoryService.ts">
 // File Path: services/categoryService.ts
 import { supabase } from "@/lib/supabase";
@@ -14011,137 +14142,6 @@ export const adminAuthService = {
 };
 
 export default adminAuthService;
-</file>
-
-<file path="services/bannerService.ts">
-import { supabase } from "@/lib/supabase";
-import { realtimeEngine } from "@/lib/realtimeSync";
-
-export interface Banner {
-  id: string;
-  title: string;
-  subtitle?: string;
-  badge?: string;
-  badge_text?: string;
-  image: string;
-  image_url?: string;
-  link?: string;
-  link_url?: string;
-  button_text?: string;
-  buttonText?: string;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
-
-const LOCAL_BANNERS_KEY = "axon_banners_cache_v2026";
-
-export const bannerService = {
-  async getAll(): Promise<Banner[]> {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("banners")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          const mapped: Banner[] = data.map((b: any) => ({
-            id: String(b.id),
-            title: b.title || "پیشنهاد ویژه",
-            subtitle: b.subtitle || "",
-            badge: b.badge || b.badge_text || "",
-            badge_text: b.badge || b.badge_text || "",
-            image: b.image || b.image_url || "/placeholder.png",
-            image_url: b.image || b.image_url || "/placeholder.png",
-            link: b.link || b.link_url || "/products",
-            link_url: b.link || b.link_url || "/products",
-            button_text: b.button_text || b.buttonText || "مشاهده و خرید کالا",
-            buttonText: b.button_text || b.buttonText || "مشاهده و خرید کالا",
-            is_active: b.is_active !== false,
-            created_at: b.created_at,
-          }));
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(mapped));
-          }
-          return mapped;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        const local = localStorage.getItem(LOCAL_BANNERS_KEY);
-        if (local) return JSON.parse(local);
-      }
-
-      return [];
-    } catch (e) {
-      console.error("bannerService.getAll error:", e);
-      return [];
-    }
-  },
-
-  async getActive(): Promise<Banner[]> {
-    const all = await this.getAll();
-    return all.filter((b) => b.is_active !== false);
-  },
-
-  async saveBanner(bannerData: Partial<Banner>): Promise<Banner | null> {
-    try {
-      const id = bannerData.id || `banner_${Date.now()}`;
-      const payload: any = {
-        id,
-        title: bannerData.title?.trim() || "پیشنهاد ویژه",
-        subtitle: bannerData.subtitle?.trim() || null,
-        badge: bannerData.badge?.trim() || bannerData.badge_text?.trim() || null,
-        badge_text: bannerData.badge?.trim() || bannerData.badge_text?.trim() || null,
-        image: bannerData.image || bannerData.image_url || "/placeholder.png",
-        image_url: bannerData.image || bannerData.image_url || "/placeholder.png",
-        link: bannerData.link || bannerData.link_url || "/products",
-        link_url: bannerData.link || bannerData.link_url || "/products",
-        button_text: bannerData.button_text || bannerData.buttonText || "مشاهده و بررسی کالا",
-        is_active: bannerData.is_active !== false,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (supabase) {
-        await supabase.from("banners").upsert(payload, { onConflict: "id" });
-      }
-
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = [payload, ...all.filter((b) => b.id !== id)];
-        localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("banners_updated", updated);
-      }
-
-      return payload;
-    } catch (e) {
-      console.error("bannerService.saveBanner error:", e);
-      return null;
-    }
-  },
-
-  async deleteBanner(id: string): Promise<boolean> {
-    try {
-      if (supabase) {
-        await supabase.from("banners").delete().eq("id", id);
-      }
-      if (typeof window !== "undefined") {
-        const all = await this.getAll();
-        const updated = all.filter((b) => b.id !== id);
-        localStorage.setItem(LOCAL_BANNERS_KEY, JSON.stringify(updated));
-        realtimeEngine.broadcastLocally("banners_updated", updated);
-      }
-      return true;
-    } catch (e) {
-      console.error("bannerService.deleteBanner error:", e);
-      return false;
-    }
-  },
-};
-
-export default bannerService;
 </file>
 
 <file path="services/orderService.ts">
@@ -21584,6 +21584,138 @@ export function formatDateFa(dateStr?: string | null): string {
 }
 </file>
 
+<file path="services/productService.ts">
+import { supabase } from "@/lib/supabase";
+
+export interface Product {
+  id: string;
+  title: string;
+  name?: string;
+  title_fa?: string;
+  price: number;
+  discountPrice?: number;
+  discount_price?: number;
+  stock?: number;
+  is_available?: boolean;
+  isAvailable?: boolean;
+  is_featured?: boolean;
+  category?: string;
+  category_name?: string;
+  image?: string;
+  images?: string[];
+  description?: string;
+  warranty?: string;
+  specs?: Record<string, string>;
+  created_at?: string;
+}
+
+// ساختار خروجی سازگار برای ماژول‌های هوش مصنوعی جهت جلوگیری از خطای بیلد
+export const FLAGSHIP_7_PRODUCTS: Product[] = [
+  { id: "1", title: "Apple Studio Display 27 5K", price: 142000000, category: "مانیتور استودیو", stock: 10, is_available: true },
+  { id: "2", title: "Pro Display XDR 32 6K Retina", price: 310000000, category: "نمایشگر تدوین", stock: 5, is_available: true },
+  { id: "3", title: "Calibrite ColorChecker Display Pro", price: 28500000, category: "ابزار کالیبراسیون", stock: 12, is_available: true }
+];
+
+export const productService = {
+  async getAll(): Promise<Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error || !data || data.length === 0) {
+        return FLAGSHIP_7_PRODUCTS;
+      }
+
+      return data.map((p: any) => ({
+        ...p,
+        id: String(p.id),
+        discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
+        isAvailable: p.is_available !== false && (p.stock === null || p.stock > 0),
+      }));
+    } catch {
+      return FLAGSHIP_7_PRODUCTS;
+    }
+  },
+
+  getAllSync(): Product[] {
+    return FLAGSHIP_7_PRODUCTS;
+  },
+
+  async getById(id: string): Promise<Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (!error && data) {
+        return {
+          ...data,
+          id: String(data.id),
+          discountPrice: data.discount_price ? Number(data.discount_price) : undefined,
+          isAvailable: data.is_available !== false && (data.stock === null || data.stock > 0),
+        };
+      }
+      return FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || null;
+    } catch {
+      return FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || null;
+    }
+  },
+
+  async saveProduct(product: Partial<Product>): Promise<Product | null> {
+    try {
+      const payload: Record<string, any> = {
+        title: product.title || product.name,
+        price: product.price,
+        discount_price: product.discountPrice ?? product.discount_price ?? null,
+        stock: product.stock !== undefined ? Number(product.stock) : 10,
+        is_available: product.isAvailable ?? product.is_available ?? true,
+        category: product.category || "تجهیزات",
+        image: product.image || (product.images && product.images[0]) || null,
+        images: product.images || [],
+        description: product.description || null,
+        specs: product.specs || {},
+        updated_at: new Date().toISOString(),
+      };
+
+      if (product.id) {
+        const { data, error } = await supabase
+          .from("products")
+          .update(payload)
+          .eq("id", product.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from("products")
+          .insert([payload])
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+    } catch (e) {
+      console.error("Save product error:", e);
+      return null;
+    }
+  },
+
+  async deleteProduct(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+};
+</file>
+
 <file path="app/api/orders/route.ts">
 // File Path: app/api/orders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
@@ -21986,138 +22118,6 @@ export default function TechRadarFeed() {
     </section>
   );
 }
-</file>
-
-<file path="services/productService.ts">
-import { supabase } from "@/lib/supabase";
-
-export interface Product {
-  id: string;
-  title: string;
-  name?: string;
-  title_fa?: string;
-  price: number;
-  discountPrice?: number;
-  discount_price?: number;
-  stock?: number;
-  is_available?: boolean;
-  isAvailable?: boolean;
-  is_featured?: boolean;
-  category?: string;
-  category_name?: string;
-  image?: string;
-  images?: string[];
-  description?: string;
-  warranty?: string;
-  specs?: Record<string, string>;
-  created_at?: string;
-}
-
-// ساختار خروجی سازگار برای ماژول‌های هوش مصنوعی جهت جلوگیری از خطای بیلد
-export const FLAGSHIP_7_PRODUCTS: Product[] = [
-  { id: "1", title: "Apple Studio Display 27 5K", price: 142000000, category: "مانیتور استودیو", stock: 10, is_available: true },
-  { id: "2", title: "Pro Display XDR 32 6K Retina", price: 310000000, category: "نمایشگر تدوین", stock: 5, is_available: true },
-  { id: "3", title: "Calibrite ColorChecker Display Pro", price: 28500000, category: "ابزار کالیبراسیون", stock: 12, is_available: true }
-];
-
-export const productService = {
-  async getAll(): Promise<Product[]> {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error || !data || data.length === 0) {
-        return FLAGSHIP_7_PRODUCTS;
-      }
-
-      return data.map((p: any) => ({
-        ...p,
-        id: String(p.id),
-        discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
-        isAvailable: p.is_available !== false && (p.stock === null || p.stock > 0),
-      }));
-    } catch {
-      return FLAGSHIP_7_PRODUCTS;
-    }
-  },
-
-  getAllSync(): Product[] {
-    return FLAGSHIP_7_PRODUCTS;
-  },
-
-  async getById(id: string): Promise<Product | null> {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (!error && data) {
-        return {
-          ...data,
-          id: String(data.id),
-          discountPrice: data.discount_price ? Number(data.discount_price) : undefined,
-          isAvailable: data.is_available !== false && (data.stock === null || data.stock > 0),
-        };
-      }
-      return FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || null;
-    } catch {
-      return FLAGSHIP_7_PRODUCTS.find((p) => p.id === id) || null;
-    }
-  },
-
-  async saveProduct(product: Partial<Product>): Promise<Product | null> {
-    try {
-      const payload: Record<string, any> = {
-        title: product.title || product.name,
-        price: product.price,
-        discount_price: product.discountPrice ?? product.discount_price ?? null,
-        stock: product.stock !== undefined ? Number(product.stock) : 10,
-        is_available: product.isAvailable ?? product.is_available ?? true,
-        category: product.category || "تجهیزات",
-        image: product.image || (product.images && product.images[0]) || null,
-        images: product.images || [],
-        description: product.description || null,
-        specs: product.specs || {},
-        updated_at: new Date().toISOString(),
-      };
-
-      if (product.id) {
-        const { data, error } = await supabase
-          .from("products")
-          .update(payload)
-          .eq("id", product.id)
-          .select()
-          .single();
-        if (error) throw error;
-        return data;
-      } else {
-        const { data, error } = await supabase
-          .from("products")
-          .insert([payload])
-          .select()
-          .single();
-        if (error) throw error;
-        return data;
-      }
-    } catch (e) {
-      console.error("Save product error:", e);
-      return null;
-    }
-  },
-
-  async deleteProduct(id: string): Promise<boolean> {
-    try {
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      return !error;
-    } catch {
-      return false;
-    }
-  },
-};
 </file>
 
 <file path="app/api/admin/login/route.ts">
@@ -25198,6 +25198,129 @@ export default function ProductCard({ product }: { product: any }) {
 }
 </file>
 
+<file path="lib/realtimeSync.ts">
+// File Path: lib/realtimeSync.ts
+import { supabase } from "@/lib/supabase";
+import { RealtimeChannel } from "@supabase/supabase-js";
+import { productService } from "@/services/productService";
+import { siteInfoService } from "@/services/siteInfoService";
+import { bannerService } from "@/services/bannerService";
+
+export function applyFaviconToDOM(url?: string) {
+  if (typeof document === "undefined" || !url) return;
+  try {
+    let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      document.head.appendChild(link);
+    }
+    link.rel = "icon";
+    link.href = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+  } catch {}
+}
+
+export function applyTitleToDOM(title?: string, storeName?: string) {
+  if (typeof document === "undefined") return;
+  try {
+    const sName = storeName || "آکسون";
+    const sTitle = title || "مرجع تخصصی تجهیزات دیجیتال و تصویر";
+    document.title = `${sName} | ${sTitle}`;
+  } catch {}
+}
+
+declare global {
+  interface Window {
+    __AXON_REALTIME_SINGLETON__?: MasterRealtimeEngine;
+  }
+}
+
+class MasterRealtimeEngine {
+  private channel: RealtimeChannel | null = null;
+  private broadcastBus: BroadcastChannel | null = null;
+  private isSubscribed: boolean = false;
+  private isChannelCreated: boolean = false;
+
+  constructor() {
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        this.broadcastBus = new BroadcastChannel("axon_master_bus_v2026");
+        this.broadcastBus.onmessage = (event) => {
+          const { type, data } = event.data || {};
+          if (type) {
+            window.dispatchEvent(new CustomEvent(type, { detail: data }));
+          }
+        };
+      } catch {}
+    }
+  }
+
+  public static getInstance(): MasterRealtimeEngine {
+    if (typeof window !== "undefined") {
+      if (!window.__AXON_REALTIME_SINGLETON__) {
+        window.__AXON_REALTIME_SINGLETON__ = new MasterRealtimeEngine();
+      }
+      return window.__AXON_REALTIME_SINGLETON__;
+    }
+    return new MasterRealtimeEngine();
+  }
+
+  public broadcastLocally(type: string, data: any) {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent(type, { detail: data }));
+    if (this.broadcastBus) {
+      try {
+        this.broadcastBus.postMessage({ type, data });
+      } catch {}
+    }
+    if (this.channel && this.isSubscribed) {
+      try {
+        this.channel.send({ type: "broadcast", event: type, payload: data });
+      } catch {}
+    }
+  }
+
+  public init(): () => void {
+    if (typeof window === "undefined" || this.isChannelCreated) return () => {};
+
+    try {
+      this.isChannelCreated = true;
+      this.channel = supabase.channel("axon_main_stream_v2026", {
+        config: { broadcast: { ack: false } },
+      });
+
+      const eventNames = [
+        "products_updated", "site_info_updated", "banners_updated",
+        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
+        "contact_messages_updated", "posts_updated", "admin_users_updated"
+      ];
+
+      eventNames.forEach((ev) => {
+        this.channel?.on("broadcast", { event: ev }, (payload) => {
+          window.dispatchEvent(new CustomEvent(ev, { detail: payload.payload }));
+        });
+      });
+
+      this.channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          this.isSubscribed = true;
+        }
+      });
+    } catch {}
+
+    return () => {
+      // نگه‌داشتن پایدار ارتباط به عنوان سینگلتون سراسری
+    };
+  }
+}
+
+export function initRealtimeSync(): () => void {
+  return MasterRealtimeEngine.getInstance().init();
+}
+
+export const realtimeEngine = MasterRealtimeEngine.getInstance();
+export default MasterRealtimeEngine;
+</file>
+
 <file path="services/siteInfoService.ts">
 // File Path: services/siteInfoService.ts
 import { supabase } from "@/lib/supabase";
@@ -26003,129 +26126,6 @@ export default siteInfoService;
   </div>
 </body>
 </html>
-</file>
-
-<file path="lib/realtimeSync.ts">
-// File Path: lib/realtimeSync.ts
-import { supabase } from "@/lib/supabase";
-import { RealtimeChannel } from "@supabase/supabase-js";
-import { productService } from "@/services/productService";
-import { siteInfoService } from "@/services/siteInfoService";
-import { bannerService } from "@/services/bannerService";
-
-export function applyFaviconToDOM(url?: string) {
-  if (typeof document === "undefined" || !url) return;
-  try {
-    let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      document.head.appendChild(link);
-    }
-    link.rel = "icon";
-    link.href = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
-  } catch {}
-}
-
-export function applyTitleToDOM(title?: string, storeName?: string) {
-  if (typeof document === "undefined") return;
-  try {
-    const sName = storeName || "آکسون";
-    const sTitle = title || "مرجع تخصصی تجهیزات دیجیتال و تصویر";
-    document.title = `${sName} | ${sTitle}`;
-  } catch {}
-}
-
-declare global {
-  interface Window {
-    __AXON_REALTIME_SINGLETON__?: MasterRealtimeEngine;
-  }
-}
-
-class MasterRealtimeEngine {
-  private channel: RealtimeChannel | null = null;
-  private broadcastBus: BroadcastChannel | null = null;
-  private isSubscribed: boolean = false;
-  private isChannelCreated: boolean = false;
-
-  constructor() {
-    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-      try {
-        this.broadcastBus = new BroadcastChannel("axon_master_bus_v2026");
-        this.broadcastBus.onmessage = (event) => {
-          const { type, data } = event.data || {};
-          if (type) {
-            window.dispatchEvent(new CustomEvent(type, { detail: data }));
-          }
-        };
-      } catch {}
-    }
-  }
-
-  public static getInstance(): MasterRealtimeEngine {
-    if (typeof window !== "undefined") {
-      if (!window.__AXON_REALTIME_SINGLETON__) {
-        window.__AXON_REALTIME_SINGLETON__ = new MasterRealtimeEngine();
-      }
-      return window.__AXON_REALTIME_SINGLETON__;
-    }
-    return new MasterRealtimeEngine();
-  }
-
-  public broadcastLocally(type: string, data: any) {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(new CustomEvent(type, { detail: data }));
-    if (this.broadcastBus) {
-      try {
-        this.broadcastBus.postMessage({ type, data });
-      } catch {}
-    }
-    if (this.channel && this.isSubscribed) {
-      try {
-        this.channel.send({ type: "broadcast", event: type, payload: data });
-      } catch {}
-    }
-  }
-
-  public init(): () => void {
-    if (typeof window === "undefined" || this.isChannelCreated) return () => {};
-
-    try {
-      this.isChannelCreated = true;
-      this.channel = supabase.channel("axon_main_stream_v2026", {
-        config: { broadcast: { ack: false } },
-      });
-
-      const eventNames = [
-        "products_updated", "site_info_updated", "banners_updated",
-        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
-        "contact_messages_updated", "posts_updated", "admin_users_updated"
-      ];
-
-      eventNames.forEach((ev) => {
-        this.channel?.on("broadcast", { event: ev }, (payload) => {
-          window.dispatchEvent(new CustomEvent(ev, { detail: payload.payload }));
-        });
-      });
-
-      this.channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          this.isSubscribed = true;
-        }
-      });
-    } catch {}
-
-    return () => {
-      // نگه‌داشتن پایدار ارتباط به عنوان سینگلتون سراسری
-    };
-  }
-}
-
-export function initRealtimeSync(): () => void {
-  return MasterRealtimeEngine.getInstance().init();
-}
-
-export const realtimeEngine = MasterRealtimeEngine.getInstance();
-export default MasterRealtimeEngine;
 </file>
 
 <file path="components/Header.tsx">
@@ -27224,317 +27224,1351 @@ export default function HomePage() {
 </file>
 
 <file path="fix.js">
-/**
- * AXON CORE - Dynamic Full-Length Password Login & Auth Engine (fix.js)
+#!/usr/bin/env node
+"use strict";
+
+/*
+ * Axon Safe Remediation Engine
+ * Run: node fix.js
+ * Dry run: node fix.js --dry-run
+ * Skip build: node fix.js --skip-build
+ *
+ * Only Node built-ins are used. The script backs up every changed file and
+ * refuses unsafe blind replacements when the expected source structure is absent.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+const { spawnSync } = require("child_process");
 
-function log(msg) {
-  console.log(`\x1b[36m[AXON-CORE]\x1b[0m ${msg}`);
+const ROOT = process.cwd();
+const DRY_RUN = process.argv.includes("--dry-run");
+const SKIP_BUILD = process.argv.includes("--skip-build");
+const STAMP = new Date().toISOString().replace(/[:.]/g, "-");
+const BACKUP_ROOT = path.join(ROOT, ".axon-fix-backups", STAMP);
+const MANIFEST = path.join(BACKUP_ROOT, "manifest.json");
+
+const changed = [];
+const skipped = [];
+const warnings = [];
+const failures = [];
+
+const abs = (p) => path.join(ROOT, p);
+const exists = (p) => fs.existsSync(abs(p));
+const read = (p) => fs.readFileSync(abs(p), "utf8");
+
+function log(s) {
+  console.log(`[AXON-FIX] ${s}`);
 }
 
-function success(msg) {
-  console.log(`\x1b[32m✔ ${msg}\x1b[0m`);
+function warn(s) {
+  warnings.push(s);
+  console.warn(`[AXON-FIX][WARN] ${s}`);
 }
 
-function writeFile(relPath, content) {
-  const fullPath = path.join(process.cwd(), relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+function fail(s) {
+  failures.push(s);
+  console.error(`[AXON-FIX][FAIL] ${s}`);
+}
+
+function ensureParent(p) {
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+}
+
+function backup(p) {
+  const source = abs(p);
+  const target = path.join(BACKUP_ROOT, p);
+
+  ensureParent(target);
+  fs.copyFileSync(source, target);
+
+  return target;
+}
+
+function write(p, content, reason) {
+  const target = abs(p);
+
+  if (!fs.existsSync(target)) {
+    fail(`فایل پیدا نشد: ${p}`);
+    return false;
   }
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  success(`اصلاح شد: ${relPath}`);
+
+  const before = fs.readFileSync(target, "utf8");
+
+  if (before === content) {
+    skipped.push({
+      file: p,
+      reason: "بدون تغییر",
+    });
+
+    return true;
+  }
+
+  if (DRY_RUN) {
+    changed.push({
+      file: p,
+      reason: `${reason} [dry-run]`,
+    });
+
+    return true;
+  }
+
+  backup(p);
+
+  fs.writeFileSync(target, content, "utf8");
+
+  changed.push({
+    file: p,
+    reason,
+  });
+
+  return true;
 }
 
-log("شروع پیاده‌سازی صفحه لاگین جامع با پشتیبانی از هر تعداد رقم رمز عبور و دکمه چشم...");
+function patch(p, transformer, reason, optional = false) {
+  if (!exists(p)) {
+    if (optional) {
+      warn(`فایل اختیاری پیدا نشد: ${p}`);
+    } else {
+      fail(`فایل پیدا نشد: ${p}`);
+    }
 
-// =============================================================================
-// ۱. بازنویسی کامل صفحه ورود ادمین: app/admin/login/page.tsx
-// =============================================================================
-const loginPageContent = `"use client";
+    return false;
+  }
 
-import React, { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { soundEngine } from "@/lib/soundEngine";
-import Link from "next/link";
+  const before = read(p);
 
-function AdminLoginComponent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("redirect") || "/admin";
+  let result;
 
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isVerified, setIsVerified] = useState(false);
+  try {
+    result = transformer(before);
+  } catch (e) {
+    fail(`${p}: ${e.message}`);
+    return false;
+  }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    soundEngine.playClick();
-    setErrorMessage("");
+  if (!result || typeof result.content !== "string") {
+    fail(`${p}: patch معتبر تولید نشد.`);
+    return false;
+  }
 
-    const cleanUser = username.trim().toLowerCase();
-    const cleanPass = password.trim();
+  if (result.assertionFailed) {
+    if (optional) {
+      warn(`${p}: ${result.assertionFailed}`);
+    } else {
+      fail(`${p}: ${result.assertionFailed}`);
+    }
 
-    if (!cleanPass) {
-      setErrorMessage("لطفاً کلمه عبور یا پین‌کد را وارد نمایید.");
+    return false;
+  }
+
+  return write(p, result.content, reason);
+}
+
+const SESSION = `import { createHmac, timingSafeEqual, randomUUID } from "crypto";
+
+export interface SessionPayload {
+  id?: string;
+  username: string;
+  role: string;
+  full_name?: string;
+  exp: number;
+  iat: number;
+  jti: string;
+}
+
+function getSessionSecret(): string {
+  const secret = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET;
+
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      "ADMIN_SESSION_SECRET یا SESSION_SECRET باید در Environment Variables و حداقل 32 کاراکتر باشد."
+    );
+  }
+
+  return secret;
+}
+
+function encode(payload: SessionPayload): string {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+function sign(data: string): string {
+  return createHmac("sha256", getSessionSecret())
+    .update(data)
+    .digest("base64url");
+}
+
+export function signPayload(
+  payload: Omit<SessionPayload, "exp" | "iat" | "jti">,
+  expiresInDays = 7
+): string {
+  const now = Date.now();
+
+  const session: SessionPayload = {
+    ...payload,
+    iat: now,
+    exp: now + expiresInDays * 24 * 60 * 60 * 1000,
+    jti: randomUUID(),
+  };
+
+  const data = encode(session);
+
+  return data + "." + sign(data);
+}
+
+export function verifyPayload(token: string): SessionPayload | null {
+  try {
+    if (!token || typeof token !== "string") {
+      return null;
+    }
+
+    const parts = token.split(".");
+
+    if (parts.length !== 2) {
+      return null;
+    }
+
+    const [data, providedSignature] = parts;
+    const expectedSignature = sign(data);
+
+    const a = Buffer.from(providedSignature, "utf8");
+    const b = Buffer.from(expectedSignature, "utf8");
+
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      return null;
+    }
+
+    const parsed = JSON.parse(
+      Buffer.from(data, "base64url").toString("utf8")
+    );
+
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    if (
+      typeof parsed.username !== "string" ||
+      !parsed.username.trim()
+    ) {
+      return null;
+    }
+
+    if (
+      typeof parsed.role !== "string" ||
+      !parsed.role.trim()
+    ) {
+      return null;
+    }
+
+    if (
+      typeof parsed.exp !== "number" ||
+      Date.now() >= parsed.exp
+    ) {
+      return null;
+    }
+
+    if (
+      typeof parsed.iat !== "number" ||
+      parsed.iat > Date.now() + 60000
+    ) {
+      return null;
+    }
+
+    if (
+      typeof parsed.jti !== "string" ||
+      !parsed.jti
+    ) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+`;
+
+const MIDDLEWARE = `import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { verifyPayload } from "@/lib/session";
+
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  if (
+    pathname.startsWith("/admin") &&
+    !pathname.startsWith("/admin/login")
+  ) {
+    const token =
+      req.cookies.get("admin_session_token")?.value ||
+      req.cookies.get("pv_admin_session")?.value;
+
+    const payload = token ? verifyPayload(token) : null;
+
+    if (!payload || !payload.username || !payload.role) {
+      const loginUrl = new URL("/admin/login", req.url);
+
+      loginUrl.searchParams.set("redirect", pathname);
+
+      const response = NextResponse.redirect(loginUrl);
+
+      response.cookies.delete("admin_session_token");
+      response.cookies.delete("pv_admin_session");
+
+      return response;
+    }
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/admin/:path*"],
+};
+`;
+
+const SUPABASE_CLIENT = `import {
+  createClient,
+  SupabaseClient,
+} from "@supabase/supabase-js";
+
+function required(name: string): string {
+  const value = process.env[name];
+
+  if (!value?.trim()) {
+    throw new Error(
+      "Environment Variable " + name + " is required."
+    );
+  }
+
+  return value.trim();
+}
+
+const supabaseUrl = required(
+  "NEXT_PUBLIC_SUPABASE_URL"
+);
+
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+
+if (!supabaseAnonKey) {
+  throw new Error(
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY یا NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY الزامی است."
+  );
+}
+
+export const supabase: SupabaseClient = createClient(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      persistSession:
+        typeof window !== "undefined",
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: "axon_auth_token_v2026",
+    },
+
+    realtime: {
+      params: {
+        apikey: supabaseAnonKey,
+        eventsPerSecond: 50,
+      },
+    },
+  }
+);
+
+export default supabase;
+`;
+
+const SUPABASE_SERVER = `import { createClient } from "@supabase/supabase-js";
+
+function required(name: string): string {
+  const value = process.env[name];
+
+  if (!value?.trim()) {
+    throw new Error(
+      "Environment Variable " + name + " is required."
+    );
+  }
+
+  return value.trim();
+}
+
+const supabaseUrl = required(
+  "NEXT_PUBLIC_SUPABASE_URL"
+);
+
+const serviceRoleKey = required(
+  "SUPABASE_SERVICE_ROLE_KEY"
+);
+
+export const supabaseAdmin = createClient(
+  supabaseUrl,
+  serviceRoleKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+
+    global: {
+      headers: {
+        "x-axon-server": "true",
+      },
+    },
+  }
+);
+
+export default supabaseAdmin;
+`;
+
+const ADMIN_GUARD = `import { NextRequest } from "next/server";
+import { verifyPayload } from "@/lib/session";
+
+export interface VerifiedAdmin {
+  id?: string;
+  username: string;
+  role: string;
+  full_name?: string;
+  exp: number;
+  iat: number;
+  jti: string;
+}
+
+export function getAdminFromRequest(
+  req: NextRequest
+): VerifiedAdmin | null {
+  const token =
+    req.cookies.get("admin_session_token")?.value ||
+    req.cookies.get("pv_admin_session")?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = verifyPayload(token);
+
+  return payload &&
+    payload.username &&
+    payload.role
+    ? payload
+    : null;
+}
+
+export function verifyAdminSession(
+  req: NextRequest
+): boolean {
+  return Boolean(getAdminFromRequest(req));
+}
+
+export function requireAdminRole(
+  req: NextRequest,
+  allowedRoles: readonly string[]
+): VerifiedAdmin | null {
+  const admin = getAdminFromRequest(req);
+
+  if (
+    !admin ||
+    !allowedRoles.includes(admin.role)
+  ) {
+    return null;
+  }
+
+  return admin;
+}
+`;
+
+function patchAdminUsers() {
+  return patch(
+    "app/api/admin/users/route.ts",
+    (source) => {
+      let out = source;
+
+      if (
+        !out.includes(
+          'from "@/lib/authSecurityHelper"'
+        )
+      ) {
+        return {
+          content: source,
+          assertionFailed:
+            "guard فعلی route پیدا نشد.",
+        };
+      }
+
+      if (
+        !out.includes(
+          'from "@/lib/authSecurity"'
+        )
+      ) {
+        out = out.replace(
+          'import { verifyAdminSession } from "@/lib/authSecurityHelper";',
+          'import { verifyAdminSession } from "@/lib/authSecurityHelper";\nimport { authSecurity } from "@/lib/authSecurity";'
+        );
+      }
+
+      out = out.replace(
+        /password:\s*password\.trim\(\)/g,
+        'password: authSecurity.hashPassword(String(password).trim())'
+      );
+
+      out = out.replace(
+        /password:\s*String\(password\)\.trim\(\)/g,
+        'password: authSecurity.hashPassword(String(password).trim())'
+      );
+
+      out = out.replace(
+        /if\s*\(\s*!username\s*\|\|\s*!password\s*\)/g,
+        'if (typeof username !== "string" || typeof password !== "string" || !username.trim() || !password.trim())'
+      );
+
+      return {
+        content: out,
+      };
+    },
+    "هش کردن رمز مدیران و اعتبارسنجی ورودی",
+    true
+  );
+}
+
+function patchAdminLogin() {
+  return patch(
+    "app/api/admin/login/route.ts",
+    (source) => {
+      let out = source;
+
+      out = out.replace(
+        /\n\s*if\s*\(\s*!isValid\s*\)\s*\{[\s\S]*?cleanUsername\s*===\s*["']admin["'][\s\S]*?\n\s*\}/m,
+        ""
+      );
+
+      out = out.replace(
+        /let\s+dynamicPin\s*=\s*["']1234["'];/g,
+        "let dynamicPin: string | null = null;"
+      );
+
+      out = out.replace(
+        /const\s+dynamicPin\s*=\s*["']1234["'];/g,
+        "let dynamicPin: string | null = null;"
+      );
+
+      out = out.replace(
+        /if\s*\(\s*passMatch\s*\|\|\s*String\(dbAdmin\.password\)\.trim\(\)\s*===\s*cleanPassword\s*\)/g,
+        "if (passMatch)"
+      );
+
+      if (!out.includes("if (!supabaseAdmin)")) {
+        out = out.replace(
+          "export async function POST(req: NextRequest) {",
+          `export async function POST(req: NextRequest) {
+  if (!supabaseAdmin) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "سرویس پایگاه داده در دسترس نیست.",
+      },
+      {
+        status: 503,
+      }
+    );
+  }`
+        );
+      }
+
+      return {
+        content: out,
+      };
+    },
+    "حذف login fallback و plaintext password comparison",
+    true
+  );
+}
+
+function patchAdminSession() {
+  return patch(
+    "app/api/admin/session/route.ts",
+    (source) => ({
+      content: source
+        .replace(
+          /id:\s*payload\.id\s*\|\|\s*["']admin_master["']/g,
+          "id: payload.id"
+        )
+        .replace(
+          /username:\s*payload\.username\s*\|\|\s*["']admin["']/g,
+          "username: payload.username"
+        )
+        .replace(
+          /full_name:\s*payload\.full_name\s*\|\|\s*payload\.username\s*\|\|\s*["']مدیر سیستم["']/g,
+          "full_name: payload.full_name || payload.username"
+        )
+        .replace(
+          /role:\s*payload\.role\s*\|\|\s*["']superadmin["']/g,
+          "role: payload.role"
+        ),
+    }),
+    "حذف identity fallback از session endpoint",
+    true
+  );
+}
+
+function patchChangePin() {
+  return patch(
+    "app/api/admin/change-pin/route.ts",
+    (source) => {
+      let out = source;
+
+      out = out.replace(
+        /const\s+targetUsername\s*=\s*sessionData\?\.username\s*\|\|\s*["']admin["'];/g,
+        'const targetUsername = sessionData?.username;\n    if (!targetUsername) return NextResponse.json({ success: false, message: "سشن مدیر معتبر نیست." }, { status: 401 });'
+      );
+
+      out = out.replace(
+        /if\s*\(\s*!adminUser\s*\)\s*\{\s*adminUser\s*=\s*\{[\s\S]*?role:\s*["']superadmin["']\s*\}\s*;?\s*\}/m,
+        'if (!adminUser) return NextResponse.json({ success: false, message: "حساب مدیر در پایگاه داده یافت نشد." }, { status: 404 });'
+      );
+
+      return {
+        content: out,
+      };
+    },
+    "حذف synthetic superadmin از change-pin",
+    true
+  );
+}
+
+function patchOrderEnumeration() {
+  return patch(
+    "app/api/orders/track/route.ts",
+    (source) => {
+      let out = source;
+
+      if (!out.includes('query === "all"')) {
+        return {
+          content: source,
+        };
+      }
+
+      if (!out.includes("verifyAdminSession")) {
+        out = out.replace(
+          'import { supabaseAdmin } from "@/lib/supabaseServer";',
+          'import { supabaseAdmin } from "@/lib/supabaseServer";\nimport { verifyAdminSession } from "@/lib/authSecurityHelper";'
+        );
+      }
+
+      const marker = 'if (query === "all")';
+
+      if (
+        out.includes(marker) &&
+        !out
+          .slice(
+            out.indexOf(marker),
+            out.indexOf(marker) + 500
+          )
+          .includes("verifyAdminSession(req)")
+      ) {
+        out = out.replace(
+          marker,
+          'if (query === "all") {\n    if (!verifyAdminSession(req)) return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });'
+        );
+      }
+
+      return {
+        content: out,
+      };
+    },
+    "محافظت از enumeration سفارش‌ها",
+    true
+  );
+}
+
+function patchPayment() {
+  return patch(
+    "app/api/payment/request/route.ts",
+    (source) => ({
+      content: source
+        .replace(
+          /const\s+isSandbox\s*=\s*![^;]+;/g,
+          'const isSandbox = process.env.NODE_ENV !== "production";'
+        )
+        .replace(
+          /const\s+authority\s*=\s*["'`]AUTH-[^;]+;/g,
+          "const authority = null;"
+        ),
+    }),
+    "حذف mock authority و جلوگیری از پرداخت جعلی",
+    true
+  );
+}
+
+function patchTheme() {
+  const target = exists("components/ThemeProvider.tsx")
+    ? "components/ThemeProvider.tsx"
+    : exists("ThemeProvider.tsx")
+      ? "ThemeProvider.tsx"
+      : null;
+
+  if (!target) {
+    warn("ThemeProvider پیدا نشد.");
+    return false;
+  }
+
+  return patch(
+    target,
+    (source) => ({
+      content: source.replace(
+        /\n\s*const interval\s*=\s*setInterval\([\s\S]*?\n\s*\},\s*60000\);\s*\n\s*return\s*\(\)\s*=>\s*clearInterval\(interval\);/m,
+        ""
+      ),
+    }),
+    "حذف polling شصت‌ثانیه‌ای theme",
+    true
+  );
+}
+
+function patchAi() {
+  let ok = true;
+
+  if (exists("app/api/ai-assistant/route.ts")) {
+    ok =
+      patch(
+        "app/api/ai-assistant/route.ts",
+        (source) => ({
+          content: source.replace(
+            /NEXT_PUBLIC_GEMINI_API_KEY/g,
+            "GEMINI_API_KEY"
+          ),
+        }),
+        "حذف public Gemini secret از server",
+        true
+      ) && ok;
+  }
+
+  if (exists("app/api/ai-seo-autopilot/route.ts")) {
+    ok =
+      patch(
+        "app/api/ai-seo-autopilot/route.ts",
+        (source) => {
+          let out = source.replace(
+            'import { FLAGSHIP_7_PRODUCTS } from "@/services/productService";\n',
+            ""
+          );
+
+          if (!out.includes("verifyAdminSession")) {
+            out = out.replace(
+              'import { supabaseAdmin } from "@/lib/supabaseServer";',
+              'import { supabaseAdmin } from "@/lib/supabaseServer";\nimport { verifyAdminSession } from "@/lib/authSecurityHelper";'
+            );
+          }
+
+          if (
+            out.includes(
+              "export async function POST(req: NextRequest)"
+            ) &&
+            !out.includes("verifyAdminSession(req)")
+          ) {
+            out = out.replace(
+              "export async function POST(req: NextRequest) {",
+              `export async function POST(req: NextRequest) {
+  if (!verifyAdminSession(req)) return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });`
+            );
+          }
+
+          if (
+            out.includes(
+              "export async function GET(req: NextRequest)"
+            ) &&
+            !out.includes("verifyAdminSession(req)")
+          ) {
+            out = out.replace(
+              "export async function GET(req: NextRequest) {",
+              `export async function GET(req: NextRequest) {
+  if (!verifyAdminSession(req)) return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });`
+            );
+          }
+
+          return {
+            content: out,
+          };
+        },
+        "محافظت AI SEO و حذف catalog هاردکد از endpoint",
+        true
+      ) && ok;
+  }
+
+  return ok;
+}
+
+function patchDiagnosticAi() {
+  const files = [
+    "app/api/test-ai/route.ts",
+    "app/api/ai-teardown/route.ts",
+    "app/products/ai-teardown/route.ts",
+  ];
+
+  let ok = true;
+
+  for (const file of files) {
+    if (!exists(file)) {
+      continue;
+    }
+
+    ok =
+      patch(
+        file,
+        (source) => {
+          let out = source;
+
+          if (
+            !out.includes("verifyAdminSession") &&
+            out.includes(
+              "export async function POST(req: NextRequest)"
+            )
+          ) {
+            const importLine =
+              'import { supabaseAdmin } from "@/lib/supabaseServer";';
+
+            if (out.includes(importLine)) {
+              out = out.replace(
+                importLine,
+                importLine +
+                  '\nimport { verifyAdminSession } from "@/lib/authSecurityHelper";'
+              );
+            }
+
+            out = out.replace(
+              "export async function POST(req: NextRequest) {",
+              `export async function POST(req: NextRequest) {
+  if (!verifyAdminSession(req)) return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });`
+            );
+          }
+
+          return {
+            content: out,
+          };
+        },
+        "محافظت endpointهای تشخیصی/AI داخلی",
+        true
+      ) && ok;
+  }
+
+  return ok;
+}
+
+function writeAdminGuard() {
+  if (exists("lib/adminGuard.ts")) {
+    return write(
+      "lib/adminGuard.ts",
+      ADMIN_GUARD,
+      "یکسان‌سازی guard مرکزی ادمین"
+    );
+  }
+
+  if (DRY_RUN) {
+    changed.push({
+      file: "lib/adminGuard.ts",
+      reason: "ایجاد guard مرکزی [dry-run]",
+    });
+
+    return true;
+  }
+
+  ensureParent(abs("lib/adminGuard.ts"));
+
+  fs.writeFileSync(
+    abs("lib/adminGuard.ts"),
+    ADMIN_GUARD,
+    "utf8"
+  );
+
+  changed.push({
+    file: "lib/adminGuard.ts",
+    reason: "ایجاد guard مرکزی ادمین",
+  });
+
+  return true;
+}
+
+function envExample() {
+  const p = ".env.example";
+
+  const required = [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "ADMIN_SESSION_SECRET",
+    "GEMINI_API_KEY",
+    "ZARINPAL_MERCHANT_ID",
+  ];
+
+  const current = exists(p)
+    ? read(p)
+    : "";
+
+  const keys = new Set(
+    current
+      .split(/\r?\n/)
+      .map((x) => x.split("=")[0].trim())
+      .filter(Boolean)
+  );
+
+  const add = required
+    .filter((x) => !keys.has(x))
+    .map((x) => x + "=");
+
+  if (!add.length && exists(p)) {
+    skipped.push({
+      file: p,
+      reason: "env keys موجودند",
+    });
+
+    return true;
+  }
+
+  const output = [
+    current.trim(),
+    current.trim()
+      ? ""
+      : "# Axon required environment variables",
+    ...add,
+    "",
+  ].join("\n");
+
+  if (exists(p)) {
+    return write(
+      p,
+      output,
+      "مستندسازی environment variables"
+    );
+  }
+
+  if (DRY_RUN) {
+    changed.push({
+      file: p,
+      reason: "ایجاد .env.example [dry-run]",
+    });
+
+    return true;
+  }
+
+  fs.writeFileSync(
+    abs(p),
+    output,
+    "utf8"
+  );
+
+  changed.push({
+    file: p,
+    reason: "ایجاد .env.example",
+  });
+
+  return true;
+}
+
+function realtimeAudit() {
+  if (!exists("lib/realtimeSync.ts")) {
+    return;
+  }
+
+  const source = read("lib/realtimeSync.ts");
+
+  const report = {
+    generatedAt: new Date().toISOString(),
+
+    canonicalSource:
+      "Supabase Postgres + Supabase Realtime",
+
+    supabaseDetected:
+      source.includes("supabase"),
+
+    broadcastChannelDetected:
+      source.includes("BroadcastChannel"),
+
+    customEventDetected:
+      source.includes("CustomEvent"),
+
+    status:
+      source.includes("supabase") &&
+      !source.includes("BroadcastChannel") &&
+      !source.includes("CustomEvent")
+        ? "canonical"
+        : "mixed",
+
+    note:
+      "Local event mechanisms are reported but not removed blindly because all consumers must be migrated together to preserve existing functionality.",
+  };
+
+  const p = "axon-realtime-audit.json";
+
+  if (DRY_RUN) {
+    changed.push({
+      file: p,
+      reason: "ثبت audit realtime [dry-run]",
+    });
+
+    return;
+  }
+
+  fs.writeFileSync(
+    abs(p),
+    JSON.stringify(report, null, 2),
+    "utf8"
+  );
+
+  changed.push({
+    file: p,
+    reason: "ثبت audit معماری realtime",
+  });
+}
+
+function scanHardcodes() {
+  const files = [
+    "lib/session.ts",
+    "lib/supabase.ts",
+    "lib/supabaseServer.ts",
+    "middleware.ts",
+    "app/api/admin/login/route.ts",
+    "app/api/admin/users/route.ts",
+    "app/api/payment/request/route.ts",
+    "app/api/ai-assistant/route.ts",
+  ];
+
+  const checks = [
+    [
+      "session secret fallback",
+      /SESSION_SECRET[^=\n]*\|\|[^;\n]+/,
+    ],
+    [
+      "AUTH fallback",
+      /AUTH-/,
+    ],
+    [
+      "hardcoded admin password",
+      /admin123456/,
+    ],
+    [
+      "hardcoded admin pin",
+      /["'`]1234["'`]/,
+    ],
+    [
+      "Supabase hardcoded URL",
+      /supabase\.co/,
+    ],
+    [
+      "public Gemini secret",
+      /NEXT_PUBLIC_GEMINI_API_KEY/,
+    ],
+  ];
+
+  for (const file of files) {
+    if (!exists(file)) {
+      continue;
+    }
+
+    const source = read(file);
+
+    for (const [name, re] of checks) {
+      if (re.test(source)) {
+        warnings.push(
+          `${file}: ${name}`
+        );
+      }
+    }
+  }
+}
+
+function preflight() {
+  log(
+    "شروع preflight بر اساس snapshot پروژه."
+  );
+
+  [
+    "package.json",
+    "middleware.ts",
+    "lib/session.ts",
+    "lib/supabase.ts",
+    "lib/supabaseServer.ts",
+    "app/api/admin/users/route.ts",
+  ].forEach((p) => {
+    if (!exists(p)) {
+      fail(
+        `فایل کلیدی وجود ندارد: ${p}`
+      );
+    }
+  });
+
+  if (exists("package.json")) {
+    const pkg = JSON.parse(
+      read("package.json")
+    );
+
+    if (
+      !pkg.dependencies?.[
+        "@supabase/supabase-js"
+      ]
+    ) {
+      fail(
+        "@supabase/supabase-js پیدا نشد."
+      );
+    }
+
+    if (
+      !pkg.dependencies?.[
+        "@google/generative-ai"
+      ]
+    ) {
+      warn(
+        "@google/generative-ai در dependencies نیست."
+      );
+    }
+  }
+
+  const secret =
+    process.env.ADMIN_SESSION_SECRET ||
+    process.env.SESSION_SECRET;
+
+  if (!secret) {
+    warn(
+      "ADMIN_SESSION_SECRET/SSESSION_SECRET در shell فعلی تنظیم نیست؛ runtime login عمداً fail-closed خواهد شد تا secret واقعی تنظیم شود."
+    );
+  } else if (secret.length < 32) {
+    fail(
+      "session secret کمتر از 32 کاراکتر است."
+    );
+  }
+}
+
+function runBuild() {
+  if (DRY_RUN || SKIP_BUILD) {
+    return;
+  }
+
+  const manager =
+    exists("pnpm-lock.yaml")
+      ? ["pnpm", ["build"]]
+      : exists("yarn.lock")
+        ? ["yarn", ["build"]]
+        : exists("package-lock.json")
+          ? ["npm", ["run", "build"]]
+          : exists("bun.lock")
+            ? ["bun", ["run", "build"]]
+            : exists("bun.lockb")
+              ? ["bun", ["run", "build"]]
+              : null;
+
+  if (!manager) {
+    warn(
+      "lockfile پیدا نشد؛ build خودکار اجرا نشد."
+    );
+
+    return;
+  }
+
+  log(
+    `اجرای build: ${manager[0]} ${manager[1].join(" ")}`
+  );
+
+  const result = spawnSync(
+    manager[0],
+    manager[1],
+    {
+      cwd: ROOT,
+      stdio: "inherit",
+      shell: process.platform === "win32",
+      env: process.env,
+    }
+  );
+
+  if (result.status !== 0) {
+    fail(
+      `build شکست خورد: ${result.status ?? "unknown"}`
+    );
+  }
+}
+
+function manifest() {
+  if (DRY_RUN) {
+    return;
+  }
+
+  fs.mkdirSync(
+    BACKUP_ROOT,
+    {
+      recursive: true,
+    }
+  );
+
+  fs.writeFileSync(
+    MANIFEST,
+    JSON.stringify(
+      {
+        generatedAt:
+          new Date().toISOString(),
+        changed,
+        skipped,
+        warnings,
+        failures,
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+}
+
+function summary() {
+  console.log(
+    "\n================ AXON REMEDIATION ================"
+  );
+
+  console.log(
+    `Mode: ${DRY_RUN ? "DRY-RUN" : "APPLY"}`
+  );
+
+  console.log(
+    `Changed: ${changed.length}`
+  );
+
+  console.log(
+    `Skipped: ${skipped.length}`
+  );
+
+  console.log(
+    `Warnings: ${warnings.length}`
+  );
+
+  console.log(
+    `Failures: ${failures.length}`
+  );
+
+  if (!DRY_RUN) {
+    console.log(
+      `Backup: ${path.relative(ROOT, BACKUP_ROOT)}`
+    );
+  }
+
+  if (warnings.length) {
+    console.log("\nWarnings:");
+
+    warnings.forEach((x) => {
+      console.log("  ! " + x);
+    });
+  }
+
+  if (failures.length) {
+    console.log("\nFailures:");
+
+    failures.forEach((x) => {
+      console.log("  X " + x);
+    });
+  }
+
+  console.log(
+    "\nاین ابزار source-level remediation است؛ تست واقعی browser/UI، Supabase Realtime، concurrency و gateway پرداخت باید در runtime نیز اجرا شود."
+  );
+
+  console.log(
+    "===================================================\n"
+  );
+}
+
+function main() {
+  try {
+    preflight();
+
+    if (failures.length) {
+      summary();
+      process.exitCode = 1;
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: cleanUser,
-          password: cleanPass,
-          pin: cleanPass,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        soundEngine.playSuccess();
-        setIsVerified(true);
-        // هدایت مستقیم و قطعی به پیشخوان
-        setTimeout(() => {
-          window.location.href = redirectPath;
-        }, 600);
-      } else {
-        setErrorMessage(data.message || "نام کاربری یا کلمه عبور نادرست است.");
-        setIsVerified(false);
-      }
-    } catch {
-      setErrorMessage("خطا در برقراری ارتباط با سرور.");
-      setIsVerified(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 font-sans select-none text-white relative overflow-hidden" dir="rtl">
-      {/* هاله‌های نور پس‌زمینه */}
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
-
-      <div className="relative w-full max-w-md p-8 sm:p-10 rounded-[2.5rem] bg-slate-900/90 border border-slate-800 backdrop-blur-2xl shadow-2xl space-y-6">
-        
-        {isVerified ? (
-          <div className="py-12 text-center space-y-4 animate-fadeIn">
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-4xl shadow-lg shadow-emerald-500/20">
-              ✓
-            </div>
-            <h2 className="text-lg font-black text-emerald-400">احراز هویت با موفقیت تایید شد</h2>
-            <p className="text-xs text-slate-400">در حال انتقال به پیشخوان مدیریت...</p>
-          </div>
-        ) : (
-          <>
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 mx-auto rounded-3xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-2xl text-blue-400 shadow-md">
-                🛡️
-              </div>
-              <h1 className="text-lg font-black tracking-tight">ورود به پیشخوان مدیریت آکسون</h1>
-              <p className="text-xs text-slate-400 font-medium">
-                شناسه و کلمه عبور اختصاصی خود را وارد نمایید
-              </p>
-            </div>
-
-            {errorMessage && (
-              <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold text-center animate-shake">
-                ⚠️ {errorMessage}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-300 block">نام کاربری (Username):</label>
-                <input
-                  type="text"
-                  required
-                  dir="ltr"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin"
-                  className="w-full p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700 text-xs font-mono font-bold outline-none focus:border-blue-500 transition text-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-300 block">کلمه عبور یا پین‌کد (هر تعداد رقم):</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="کلمه عبور خود را وارد کنید..."
-                    className="w-full p-3.5 pl-12 rounded-2xl bg-slate-800/80 border border-slate-700 text-xs font-mono font-bold outline-none focus:border-blue-500 transition text-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 hover:text-white transition cursor-pointer"
-                    title="نمایش / پنهان‌سازی"
-                  >
-                    {showPassword ? "🙈" : "👁️"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition shadow-xl shadow-blue-600/30 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <span>{loading ? "در حال اعتبارسنجی..." : "ورود به سیستم 🚀"}</span>
-                </button>
-              </div>
-            </form>
-
-            <div className="pt-2 border-t border-slate-800/80 text-center">
-              <Link href="/" className="text-[11px] text-slate-400 hover:text-white transition">
-                ← بازگشت به صفحه اصلی سایت
-              </Link>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default function AdminLoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-xs text-slate-400">در حال بارگذاری...</div>}>
-      <AdminLoginComponent />
-    </Suspense>
-  );
-}
-`;
-writeFile('app/admin/login/page.tsx', loginPageContent);
-
-// =============================================================================
-// ۲. اصلاح دقیق API لاگین (app/api/admin/login/route.ts)
-// =============================================================================
-const loginApiSafe = `import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { signPayload } from "@/lib/session";
-
-export const dynamic = "force-dynamic";
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const pinOrPassword = String(body.password || body.pin || "").trim();
-    const username = String(body.username || "admin").trim().toLowerCase();
-
-    if (!pinOrPassword) {
-      return NextResponse.json({ success: false, message: "کلمه عبور الزامی است." }, { status: 400 });
+    if (!DRY_RUN) {
+      fs.mkdirSync(
+        BACKUP_ROOT,
+        {
+          recursive: true,
+        }
+      );
     }
 
-    // استعلام مشخصات ادمین از دیتابیس Supabase
-    let { data: adminUser } = await supabaseAdmin
-      .from("admin_users")
-      .select("*")
-      .or("username.eq." + username + ",role.eq.superadmin")
-      .limit(1)
-      .maybeSingle();
+    write(
+      "lib/session.ts",
+      SESSION,
+      "ارتقای session به HMAC واقعی و حذف fallback ناامن"
+    );
 
-    if (!adminUser) {
-      return NextResponse.json({ success: false, message: "کاربری با این مشخصات یافت نشد." }, { status: 401 });
+    write(
+      "middleware.ts",
+      MIDDLEWARE,
+      "حذف bypass احراز هویت middleware"
+    );
+
+    write(
+      "lib/supabase.ts",
+      SUPABASE_CLIENT,
+      "حذف Supabase credential hardcode"
+    );
+
+    write(
+      "lib/supabaseServer.ts",
+      SUPABASE_SERVER,
+      "حذف server credential fallback"
+    );
+
+    writeAdminGuard();
+
+    patchAdminUsers();
+
+    patchAdminLogin();
+
+    patchAdminSession();
+
+    patchChangePin();
+
+    patchOrderEnumeration();
+
+    patchPayment();
+
+    patchTheme();
+
+    patchAi();
+
+    patchDiagnosticAi();
+
+    envExample();
+
+    realtimeAudit();
+
+    scanHardcodes();
+
+    runBuild();
+
+    manifest();
+
+    summary();
+
+    if (failures.length) {
+      process.exitCode = 1;
     }
+  } catch (e) {
+    fail(
+      e instanceof Error
+        ? e.stack || e.message
+        : String(e)
+    );
 
-    // تطبیق مستقیم با رمز ذخیره شده در دیتابیس
-    const isMatched =
-      adminUser.password === pinOrPassword ||
-      adminUser.password_hash === pinOrPassword;
+    manifest();
 
-    if (!isMatched) {
-      return NextResponse.json({ success: false, message: "کلمه عبور وارد شده نادرست است." }, { status: 401 });
-    }
+    summary();
 
-    const token = signPayload({
-      id: String(adminUser.id),
-      username: adminUser.username,
-      role: adminUser.role || "superadmin",
-      full_name: adminUser.full_name || adminUser.username,
-    });
-
-    const isProd = process.env.NODE_ENV === "production";
-    const response = NextResponse.json({
-      success: true,
-      message: "ورود با موفقیت انجام شد.",
-      redirectUrl: "/admin",
-      user: {
-        id: adminUser.id,
-        username: adminUser.username,
-        role: adminUser.role || "superadmin",
-      },
-    });
-
-    response.cookies.set("admin_session_token", token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
-    });
-
-    response.cookies.set("pv_admin_session", token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
-    });
-
-    return response;
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: "خطای پردازش سرور." }, { status: 500 });
+    process.exitCode = 1;
   }
 }
-`;
-writeFile('app/api/admin/login/route.ts', loginApiSafe);
 
-// =============================================================================
-// ۳. تست بیلد و پوش مستقیم به گیت‌هاب
-// =============================================================================
-log("در حال اجرای تست بیلد محلی...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  success("بیلد با موفقیت پاس شد.");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-log("ارسال تغییرات به گیت‌هاب...");
-try {
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(auth): unified username/password login with any password length, show/hide eye toggle and eliminate fake verified"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  success("تغییرات به گیت‌هاب ارسال و روی سرور لایو نشست!");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
-}
+main();
 </file>
 
 </files>

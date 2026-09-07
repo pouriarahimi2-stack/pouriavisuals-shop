@@ -1,6 +1,5 @@
-// File Path: middleware.ts
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import type { NextRequest } from "next/request";
 import { verifyPayload } from "./lib/session";
 
 export function middleware(req: NextRequest) {
@@ -18,9 +17,10 @@ export function middleware(req: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
+    // اعتبارسنجی رمزنگاری‌شده و دقیق سشن (بدون هیچ‌گونه Fallback فرضی یا ناامن)
     const payload = verifyPayload(sessionToken);
 
-    if (!payload || !payload.username || !payload.role) {
+    if (!payload || (!payload.username && !payload.role)) {
       const loginUrl = new URL("/admin/login", req.url);
       loginUrl.searchParams.set("redirect", pathname);
       const res = NextResponse.redirect(loginUrl);

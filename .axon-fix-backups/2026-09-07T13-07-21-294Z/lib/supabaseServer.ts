@@ -1,4 +1,3 @@
-// File Path: lib/supabaseServer.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "https://mock.supabase.co";
@@ -8,7 +7,7 @@ let clientInstance: SupabaseClient | null = null;
 
 function getSupabaseAdmin(): SupabaseClient {
   if (!clientInstance) {
-    clientInstance = createClient(supabaseUrl, serviceRoleKey || "service_role_build_key", {
+    clientInstance = createClient(supabaseUrl, serviceRoleKey || "temp_key_for_build_time", {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -28,5 +27,3 @@ export const supabaseAdmin = new Proxy({} as SupabaseClient, {
     return value;
   },
 });
-
-export default supabaseAdmin;

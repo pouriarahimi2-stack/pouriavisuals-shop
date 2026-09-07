@@ -1,39 +1,78 @@
+// File Path: app/api/admin/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { signPayload } from "@/lib/session";
+import { authSecurity } from "@/lib/authSecurity";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = req.headers.get("x-forwarded-for") || "local_admin";
+    const rateCheck = authSecurity.checkRateLimit(clientIp);
+
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `به دلیل تلاش‌های ناموفق متعدد، دسترسی شما به مدت ${rateCheck.waitMinutes} دقیقه مسدود شد.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const pinOrPassword = String(body.password || body.pin || "").trim();
     const username = String(body.username || "admin").trim().toLowerCase();
 
     if (!pinOrPassword) {
-      return NextResponse.json({ success: false, message: "کلمه عبور الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "کلمه عبور یا پین امنیتی الزامی است." }, { status: 400 });
     }
 
-    // استعلام مشخصات ادمین از دیتابیس Supabase
-    let { data: adminUser } = await supabaseAdmin
-      .from("admin_users")
-      .select("*")
-      .or("username.eq." + username + ",role.eq.superadmin")
-      .limit(1)
-      .maybeSingle();
+    let adminUser: any = null;
+
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin
+        .from("admin_users")
+        .select("*")
+        .eq("username", username)
+        .maybeSingle();
+
+      adminUser = data;
+
+      // در صورتی که جدول ادمین در اولین راه‌اندازی خالی بود:
+      if (!adminUser && username === "admin") {
+        const { data: allAdmins } = await supabaseAdmin.from("admin_users").select("id").limit(1);
+        if (!allAdmins || allAdmins.length === 0) {
+          const defaultPassword = pinOrPassword.length >= 4 ? pinOrPassword : "admin";
+          const { data: created } = await supabaseAdmin
+            .from("admin_users")
+            .insert({
+              username: "admin",
+              password: authSecurity.hashPassword(defaultPassword),
+              full_name: "مدیر ارشد آکسون",
+              role: "superadmin",
+            })
+            .select()
+            .single();
+          adminUser = created;
+        }
+      }
+    }
 
     if (!adminUser) {
+      authSecurity.recordFailedAttempt(clientIp);
       return NextResponse.json({ success: false, message: "کاربری با این مشخصات یافت نشد." }, { status: 401 });
     }
 
-    // تطبیق مستقیم با رمز ذخیره شده در دیتابیس
-    const isMatched =
-      adminUser.password === pinOrPassword ||
-      adminUser.password_hash === pinOrPassword;
+    const isMatched = authSecurity.verifyPassword(pinOrPassword, adminUser.password || adminUser.password_hash || "");
 
     if (!isMatched) {
-      return NextResponse.json({ success: false, message: "کلمه عبور وارد شده نادرست است." }, { status: 401 });
+      authSecurity.recordFailedAttempt(clientIp);
+      return NextResponse.json({ success: false, message: "کلمه عبور یا پین‌کد وارد شده نادرست است." }, { status: 401 });
     }
+
+    authSecurity.resetAttempts(clientIp);
 
     const token = signPayload({
       id: String(adminUser.id),
@@ -51,6 +90,7 @@ export async function POST(req: NextRequest) {
         id: adminUser.id,
         username: adminUser.username,
         role: adminUser.role || "superadmin",
+        full_name: adminUser.full_name || "مدیر سیستم",
       },
     });
 
@@ -72,6 +112,6 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: "خطای پردازش سرور." }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message || "خطای پردازش سرور." }, { status: 500 });
   }
 }

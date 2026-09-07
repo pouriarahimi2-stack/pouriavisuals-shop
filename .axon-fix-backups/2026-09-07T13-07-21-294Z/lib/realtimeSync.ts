@@ -1,6 +1,9 @@
 // File Path: lib/realtimeSync.ts
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { productService } from "@/services/productService";
+import { siteInfoService } from "@/services/siteInfoService";
+import { bannerService } from "@/services/bannerService";
 
 export function applyFaviconToDOM(url?: string) {
   if (typeof document === "undefined" || !url) return;
@@ -34,7 +37,7 @@ class MasterRealtimeEngine {
   private channel: RealtimeChannel | null = null;
   private broadcastBus: BroadcastChannel | null = null;
   private isSubscribed: boolean = false;
-  private isInitialized: boolean = false;
+  private isChannelCreated: boolean = false;
 
   constructor() {
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
@@ -76,59 +79,21 @@ class MasterRealtimeEngine {
   }
 
   public init(): () => void {
-    if (typeof window === "undefined" || this.isInitialized) return () => {};
+    if (typeof window === "undefined" || this.isChannelCreated) return () => {};
 
     try {
-      this.isInitialized = true;
-      this.channel = supabase.channel("axon_db_live_stream_v2026", {
+      this.isChannelCreated = true;
+      this.channel = supabase.channel("axon_main_stream_v2026", {
         config: { broadcast: { ack: false } },
       });
 
-      // شنود تغییرات واقعی ردیف‌های دیتابیس Supabase (Postgres CDC)
-      const tables = [
-        "products",
-        "orders",
-        "site_info",
-        "banners",
-        "tech_news",
-        "posts",
-        "contact_messages",
-        "coupons",
-        "menu_items",
-        "categories",
-        "site_pages",
-        "admin_users",
-        "site_styles",
-        "product_reviews",
+      const eventNames = [
+        "products_updated", "site_info_updated", "banners_updated",
+        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
+        "contact_messages_updated", "posts_updated", "admin_users_updated"
       ];
 
-      tables.forEach((table) => {
-        this.channel?.on(
-          "postgres_changes" as any,
-          { event: "*", schema: "public", table },
-          (payload: any) => {
-            const eventName = `${table}_updated`;
-            window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
-            window.dispatchEvent(new CustomEvent("db_mutation_received", { detail: { table, payload } }));
-          }
-        );
-      });
-
-      const broadcastEvents = [
-        "products_updated",
-        "site_info_updated",
-        "banners_updated",
-        "orders_updated",
-        "coupons_updated",
-        "menu_updated",
-        "news_updated",
-        "contact_messages_updated",
-        "posts_updated",
-        "admin_users_updated",
-        "product_reviews_updated",
-      ];
-
-      broadcastEvents.forEach((ev) => {
+      eventNames.forEach((ev) => {
         this.channel?.on("broadcast", { event: ev }, (payload) => {
           window.dispatchEvent(new CustomEvent(ev, { detail: payload.payload }));
         });
@@ -139,11 +104,11 @@ class MasterRealtimeEngine {
           this.isSubscribed = true;
         }
       });
-    } catch (e) {
-      console.warn("Realtime initialization notice:", e);
-    }
+    } catch {}
 
-    return () => {};
+    return () => {
+      // نگه‌داشتن پایدار ارتباط به عنوان سینگلتون سراسری
+    };
   }
 }
 

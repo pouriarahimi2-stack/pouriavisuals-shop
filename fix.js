@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Professional Blog Management, Direct Edit/Delete & AI SEO Suite (fix.js)
+ * AXON CORE - Dynamic Customizable 3D Contact Dock Engine & Realtime Sync (fix.js)
  */
 
 const fs = require('fs');
@@ -14,12 +14,127 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ به‌روزرسانی شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-BLOG]\x1b[0m استقرار دکمه‌های حذف/ویرایش مستقیم در کارت‌ها و هوش مصنوعی پیشرفته سئو...");
+console.log("\x1b[36m[AXON-DOCK]\x1b[0m داینامیک‌سازی کامل کلیدهای داک ارتباطی، اتصال به دیتابیس و همگام‌سازی بلادرنگ...");
 
 // =============================================================================
-// ۱. ارتقای روت سروری app/api/blogs/route.ts با دسترسی کامل CRUD ادمین
+// ۱. بازنویسی components/ContactDock.tsx به ساختار کاملاً پویا و زنده
 // =============================================================================
-const blogsApiRoute = `import { NextRequest, NextResponse } from "next/server";
+const contactDockComponent = `"use client";
+
+import React, { useState, useEffect } from "react";
+import { soundEngine } from "@/lib/soundEngine";
+import { siteInfoService } from "@/services/siteInfoService";
+import { supabase } from "@/lib/supabase";
+
+export interface DockKeyItem {
+  id: string;
+  letter: string;
+  title: string;
+  url: string;
+}
+
+const DEFAULT_DOCK_KEYS: DockKeyItem[] = [
+  { id: "k1", letter: "C", title: "تماس تلفنی", url: "tel:02188888888" },
+  { id: "k2", letter: "O", title: "سفارش‌ها", url: "/track-order" },
+  { id: "k3", letter: "N", title: "اخبار سخت‌افزار", url: "/news" },
+  { id: "k4", letter: "T", title: "تلگرام پشتیبانی", url: "https://t.me/axoncore" },
+  { id: "k5", letter: "A", title: "درباره استودیو", url: "/about" },
+  { id: "k6", letter: "C", title: "مشاوره آنلاین", url: "/contact" },
+  { id: "k7", letter: "T", title: "محصولات برتر", url: "/products" },
+];
+
+export default function ContactDock() {
+  const [dockKeys, setDockKeys] = useState<DockKeyItem[]>(DEFAULT_DOCK_KEYS);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  const loadDockSettings = async () => {
+    try {
+      const info = await siteInfoService.getSiteInfo();
+      if (info && (info as any).contact_dock_items && Array.isArray((info as any).contact_dock_items) && (info as any).contact_dock_items.length > 0) {
+        setDockKeys((info as any).contact_dock_items);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadDockSettings();
+
+    // شنونده رویدادهای محلی
+    const handleUpdate = (e: any) => {
+      if (e.detail?.contact_dock_items && Array.isArray(e.detail.contact_dock_items)) {
+        setDockKeys(e.detail.contact_dock_items);
+      } else {
+        loadDockSettings();
+      }
+    };
+    window.addEventListener("site_info_updated", handleUpdate);
+
+    // وب‌سوکت بلادرنگ CDC دیتابیس Supabase
+    const channel = supabase
+      .channel("realtime-dock-keys")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
+        loadDockSettings();
+      })
+      .subscribe();
+
+    return () => {
+      window.removeEventListener("site_info_updated", handleUpdate);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  if (dockKeys.length === 0) return null;
+
+  return (
+    <div className="flex flex-col items-center justify-center space-y-3 font-sans select-none py-4" dir="rtl">
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-[var(--accent-blue)] animate-pulse" />
+        <span className="text-xs font-black text-[var(--text-primary)]">شبکه‌های ارتباطی و اجتماعی استودیو:</span>
+      </div>
+
+      <div className="p-2.5 px-4 rounded-full bg-slate-950/80 border border-slate-800/80 shadow-2xl backdrop-blur-2xl flex items-center gap-2 relative overflow-visible">
+        {dockKeys.map((k) => {
+          const isHovered = hoveredKey === k.id;
+          return (
+            <div key={k.id} className="relative group">
+              <a
+                href={k.url || "#"}
+                target={k.url?.startsWith("http") ? "_blank" : "_self"}
+                rel="noreferrer"
+                onMouseEnter={() => {
+                  soundEngine.playClick();
+                  setHoveredKey(k.id);
+                }}
+                onMouseLeave={() => setHoveredKey(null)}
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-slate-900/90 border border-slate-700/60 hover:border-[var(--accent-blue)] text-white hover:text-[var(--accent-blue)] flex items-center justify-center font-black text-sm transition-all duration-300 hover:scale-110 hover:-translate-y-1 shadow-lg shadow-black/40 cursor-pointer"
+              >
+                <span>{k.letter}</span>
+              </a>
+
+              {/* تولتیپ سه بعدی عنوان کلید */}
+              {isHovered && (
+                <div className="absolute -bottom-9 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-700 text-white text-[10px] font-bold whitespace-nowrap shadow-xl animate-fadeIn z-50 pointer-events-none">
+                  {k.title}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <span className="text-[10px] text-slate-400 font-medium">
+        روی کلیدها نگه دارید تا فلیپ سه‌بعدی فعال شود
+      </span>
+    </div>
+  );
+}
+`;
+writeFile('components/ContactDock.tsx', contactDockComponent);
+
+// =============================================================================
+// ۲. به‌روزرسانی روت سروری app/api/site-info/route.ts برای پذیرش contact_dock_items
+// =============================================================================
+const siteInfoApiContent = `import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
@@ -27,13 +142,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("posts")
+    const { data } = await supabaseAdmin
+      .from("site_info")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-    if (error) throw error;
-    return NextResponse.json({ success: true, data: data || [], posts: data || [] });
+    return NextResponse.json({ success: true, data });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -46,723 +162,172 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const cleanTitle = String(body.title || "").trim();
-
-    if (!cleanTitle) {
-      return NextResponse.json({ success: false, message: "عنوان مقاله الزامی است." }, { status: 400 });
-    }
-
-    const postId = String(body.id || ("post_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6)));
-    const cleanSlug = String(body.slug || cleanTitle)
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\\u0600-\\u06FF]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+    const { data: existing } = await supabaseAdmin.from("site_info").select("id").limit(1);
 
     const payload: Record<string, any> = {
-      id: postId,
-      title: cleanTitle,
-      slug: cleanSlug,
-      content: body.content || "",
-      category: body.category || "مقاله تخصصی",
-      image_url: body.image_url || body.imageUrl || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-      meta_description: body.meta_description || body.metaDescription || cleanTitle,
-      is_published: body.is_published !== false && body.isPublished !== false,
+      ...body,
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabaseAdmin.from("posts").select("id").eq("id", postId).maybeSingle();
-
-    if (existing) {
-      const { data, error } = await supabaseAdmin.from("posts").update(payload).eq("id", postId).select().single();
-      if (error) throw error;
-      return NextResponse.json({ success: true, message: "مقاله با موفقیت به‌روزرسانی شد.", data, post: data });
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.from("site_info").update(payload).eq("id", existing[0].id);
     } else {
-      payload.created_at = new Date().toISOString();
-      const { data, error } = await supabaseAdmin.from("posts").insert([payload]).select().single();
-      if (error) throw error;
-      return NextResponse.json({ success: true, message: "مقاله جدید با موفقیت منتشر گردید.", data, post: data });
-    }
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      await supabaseAdmin.from("site_info").insert([payload]);
     }
 
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه مقاله الزامی است." }, { status: 400 });
-    }
-
-    const { error } = await supabaseAdmin.from("posts").delete().eq("id", id);
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, message: "مقاله با موفقیت از پایگاه داده حذف شد." });
+    return NextResponse.json({ success: true, message: "تنظیمات با موفقیت ذخیره شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 `;
-writeFile('app/api/blogs/route.ts', blogsApiRoute);
+writeFile('app/api/site-info/route.ts', siteInfoApiContent);
 
 // =============================================================================
-// ۲. بازنویسی components/AdminBlogManager.tsx با دکمه‌های مستقیم و هوش مصنوعی سئو
+// ۳. افزودن ماژول مدیریت کلیدهای داک در صفحه تنظیمات ادمین (components/AdminSiteInfo.tsx)
 // =============================================================================
-const blogManagerFixed = `"use client";
+const adminSiteInfoFile = path.join(process.cwd(), 'components/AdminSiteInfo.tsx');
+let adminSiteInfoContent = fs.readFileSync(adminSiteInfoFile, 'utf8');
 
-import React, { useState, useEffect, useRef } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
-import { productService, Product } from "@/services/productService";
-import { supabase } from "@/lib/supabase";
+if (!adminSiteInfoContent.includes('contact_dock_items')) {
+  // تزریق استیت و قابلیت مدیریت داک کلیدها در کامپوننت
+  adminSiteInfoContent = adminSiteInfoContent.replace(
+    'export default function AdminSiteInfo() {',
+    `export default function AdminSiteInfo() {
+  const [dockKeys, setDockKeys] = useState<Array<{ id: string; letter: string; title: string; url: string }>>([
+    { id: "k1", letter: "C", title: "تماس تلفنی", url: "tel:02188888888" },
+    { id: "k2", letter: "O", title: "سفارش‌ها", url: "/track-order" },
+    { id: "k3", letter: "N", title: "اخبار سخت‌افزار", url: "/news" },
+    { id: "k4", letter: "T", title: "تلگرام", url: "https://t.me/axoncore" },
+    { id: "k5", letter: "A", title: "درباره ما", url: "/about" },
+    { id: "k6", letter: "C", title: "مشاوره آنلاین", url: "/contact" },
+    { id: "k7", letter: "T", title: "محصولات", url: "/products" },
+  ]);
+  const [newKeyLetter, setNewKeyLetter] = useState("");
+  const [newKeyTitle, setNewKeyTitle] = useState("");
+  const [newKeyUrl, setNewKeyUrl] = useState("");`
+  );
 
-export interface BlogPost {
-  id: string;
-  title: string;
-  slug: string;
-  content: string;
-  category?: string;
-  imageUrl?: string;
-  image_url?: string;
-  metaDescription?: string;
-  meta_description?: string;
-  isPublished?: boolean;
-  is_published?: boolean;
-  createdAt?: string;
-  created_at?: string;
-}
+  // واکشی کلیدها از دیتابیس در useEffect
+  adminSiteInfoContent = adminSiteInfoContent.replace(
+    'if (data) {',
+    `if (data) {
+        if ((data as any).contact_dock_items && Array.isArray((data as any).contact_dock_items)) {
+          setDockKeys((data as any).contact_dock_items);
+        }`
+  );
 
-export default function AdminBlogManager() {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
+  // الحاق کلیدها به payload ذخیره
+  adminSiteInfoContent = adminSiteInfoContent.replace(
+    'const payload = {',
+    `const payload = {
+        contact_dock_items: dockKeys,`
+  );
 
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [category, setCategory] = useState("راهنمای خرید و بررسی");
-  const [imageUrl, setImageUrl] = useState("");
-  const [metaDescription, setMetaDescription] = useState("");
-  const [isPublished, setIsPublished] = useState(true);
-
-  const [availableFonts, setAvailableFonts] = useState<CustomFontItem[]>([]);
-  const [selectedFontFamily, setSelectedFontFamily] = useState("Vazirmatn");
-  const [selectedFontWeight, setSelectedFontWeight] = useState(400);
-
-  const [wordCount, setWordCount] = useState(0);
-  const [charCount, setCharCount] = useState(0);
-  const [readTime, setReadTime] = useState(1);
-
-  // بخش دستیار هوش مصنوعی
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiCustomTopic, setAiCustomTopic] = useState("");
-  const [aiTargetKeyword, setAiTargetKeyword] = useState("");
-  const [aiSelectedProductId, setAiSelectedProductId] = useState<string>("all");
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
-
-  const [saving, setSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const editorRef = useRef<HTMLDivElement>(null);
-  const fontUploadInputRef = useRef<HTMLInputElement>(null);
-
-  const fetchPosts = async () => {
-    try {
-      const [res, prods] = await Promise.all([
-        fetch("/api/blogs", { cache: "no-store" }),
-        productService.getAll(),
-      ]);
-      const data = await res.json();
-      if (data.data || data.posts) {
-        setPosts(data.data || data.posts || []);
-      }
-      if (prods) setProducts(prods);
-    } catch (e) {
-      console.error("Error loading blog posts:", e);
-    }
-  };
-
-  useEffect(() => {
-    fetchPosts();
-    setAvailableFonts(fontEngine.getAllFonts());
-
-    // اتصال بلادرنگ به تغییرات مقالات در دیتابیس
-    const channel = supabase
-      .channel("realtime-blog-posts")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
-        fetchPosts();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const updateStats = () => {
-    if (!editorRef.current) return;
-    const text = editorRef.current.innerText || "";
-    const words = text.trim().split(/\\s+/).filter(Boolean).length;
-    const chars = text.length;
-    setWordCount(words);
-    setCharCount(chars);
-    setReadTime(Math.max(1, Math.ceil(words / 220)));
-  };
-
-  const handleSelectPost = (p: BlogPost) => {
-    soundEngine.playClick();
-    setSelectedPost(p);
-    setTitle(p.title);
-    setSlug(p.slug);
-    setCategory(p.category || "راهنمای خرید و بررسی");
-    setImageUrl(p.imageUrl || p.image_url || "");
-    setMetaDescription(p.metaDescription || p.meta_description || "");
-    setIsPublished(p.isPublished !== false && p.is_published !== false);
-
-    if (editorRef.current) {
-      editorRef.current.innerHTML = p.content || "";
-      setTimeout(updateStats, 100);
-    }
-  };
-
-  const handleCreateNew = () => {
-    soundEngine.playClick();
-    setSelectedPost(null);
-    setTitle("");
-    setSlug("");
-    setCategory("راهنمای خرید و بررسی");
-    setImageUrl("");
-    setMetaDescription("");
-    setIsPublished(true);
-
-    if (editorRef.current) {
-      editorRef.current.innerHTML = "<h2>مقدمه و بررسی تخصصی</h2><p>متن تحلیل خود را اینجا آغاز کنید یا از دکمه «تولید مقاله با هوش مصنوعی» استفاده نمایید...</p>";
-      setTimeout(updateStats, 100);
-    }
-  };
-
-  const exec = (command: string, value: string | undefined = undefined) => {
-    soundEngine.playClick();
-    document.execCommand(command, false, value);
-    updateStats();
-  };
-
-  const handleFontChange = (fontFamily: string) => {
-    soundEngine.playClick();
-    setSelectedFontFamily(fontFamily);
-    if (editorRef.current) {
-      editorRef.current.style.fontFamily = \`'\${fontFamily}', sans-serif\`;
-    }
-  };
-
-  const handleWeightChange = (weight: number) => {
-    soundEngine.playClick();
-    setSelectedFontWeight(weight);
-    if (editorRef.current) {
-      editorRef.current.style.fontWeight = String(weight);
-    }
-  };
-
-  // حذف مستقیم مقاله از دیتابیس
-  const handleDeletePost = async (id: string, postTitle: string) => {
-    if (!confirm(\`آیا از حذف کامل مقاله «\${postTitle}» از پایگاه داده اطمینان دارید؟\`)) return;
-    soundEngine.playClick();
-    try {
-      const res = await fetch(\`/api/blogs?id=\${encodeURIComponent(id)}\`, { method: "DELETE" });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "✓ مقاله با موفقیت از سیستم حذف گردید." });
-        if (selectedPost?.id === id) handleCreateNew();
-        fetchPosts();
-      } else {
-        alert(json.message || "خطا در حذف مقاله.");
-      }
-    } catch {
-      alert("خطا در برقراری ارتباط با سرور.");
-    } finally {
-      setTimeout(() => setStatusMessage(null), 3000);
-    }
-  };
-
-  // تولید مقاله سئو رنک ۱ با هوش مصنوعی و تزریق دکمه‌های خرید
-  const handleGenerateAiSeoArticle = async () => {
-    soundEngine.playClick();
-    setIsAiGenerating(true);
-
-    let targetProducts = products;
-    if (aiSelectedProductId !== "all") {
-      targetProducts = products.filter((p) => String(p.id) === String(aiSelectedProductId));
-    }
-
-    try {
-      const prompt = \`به عنوان متخصص ارشد سئو فنی و تولید محتوا برای فروشگاه تخصصی آکسون (مرجع مانیتورهای 5K و سخت‌افزار استودیو):
-موضوع: \${aiCustomTopic || "بررسی و راهنمای خرید مانیتورهای حرفه‌ای تدوین"}
-کلمه کلیدی هدف سئو: \${aiTargetKeyword || "خرید مانیتور 5K"}
-محصولات مرتبط برای لینک‌دهی: \${targetProducts.map(p => p.title).join(", ")}
-
-یک مقاله ۲۵۰۰ کلمه‌ای، فوق تخصصی با ساختار تمیز HTML (شامل H2, H3, پاراگراف‌های جاستیفای، جدول مقایسه مشخصات فنی و کال تو اکشن خرید) بنویس.
-همچنین یک عنوان جذاب H1 و یک متادسکریپشن ۱۵۰ کاراکتری ارائه بده.\`;
-
-      const res = await fetch("/api/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role: "admin",
-          prompt,
-          targetTopic: aiCustomTopic,
-          productsData: targetProducts,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success && data.response) {
-        soundEngine.playSuccess();
-        const raw = data.response;
-
-        const generatedTitle = aiCustomTopic.trim() || (targetProducts[0]?.title ? \`راهنمای خرید و بررسی تخصصی \${targetProducts[0].title}\` : "راهنمای جامع تجهیزات استودیویی");
-        setTitle(generatedTitle);
-        setSlug(generatedTitle.toLowerCase().replace(/[^a-z0-9\\u0600-\\u06FF]+/g, "-"));
-        setMetaDescription(\`بررسی تخصصی، مقایسه گاموت رنگی و راهنمای خرید \${generatedTitle} با ضمانت اصالت طلایی و ارسال سریع در فروشگاه آکسون.\`);
-
-        if (editorRef.current) {
-          editorRef.current.innerHTML = raw;
-          updateStats();
-        }
-
-        setIsAiModalOpen(false);
-        setStatusMessage({ type: "success", text: "✓ مقاله رنک ۱ گوگل با استانداردهای کامل سئو و متادیتا در ویراستار بارگذاری شد." });
-      }
-    } catch {
-      alert("خطا در ارتباط با هوش مصنوعی.");
-    } finally {
-      setIsAiGenerating(false);
-      setTimeout(() => setStatusMessage(null), 4000);
-    }
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const contentHtml = editorRef.current?.innerHTML || "";
-
-    if (!title.trim() || !contentHtml.trim()) {
-      setStatusMessage({ type: "error", text: "عنوان و محتوای مقاله الزامی هستند." });
-      return;
-    }
-
-    setSaving(true);
-    setStatusMessage(null);
-
-    const cleanSlug = slug.trim()
-      ? slug.trim().toLowerCase().replace(/\\s+/g, "-")
-      : title.trim().toLowerCase().replace(/\\s+/g, "-");
-
-    const payload = {
-      id: selectedPost?.id,
-      title: title.trim(),
-      slug: cleanSlug,
-      content: contentHtml,
-      category,
-      imageUrl: imageUrl.trim() || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-      image_url: imageUrl.trim() || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-      metaDescription: metaDescription.trim() || title.trim(),
-      meta_description: metaDescription.trim() || title.trim(),
-      isPublished,
-      is_published: isPublished,
-    };
-
-    try {
-      const res = await fetch("/api/blogs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "✓ مقاله با موفقیت در دیتابیس ذخیره و در مجله سایت منتشر شد." });
-        fetchPosts();
-        if (!selectedPost && data.data) {
-          setSelectedPost(data.data);
-        }
-      } else {
-        setStatusMessage({ type: "error", text: data.message || "خطا در ذخیره‌سازی مقاله." });
-      }
-    } catch {
-      setStatusMessage({ type: "error", text: "خطا در برقراری ارتباط با سرور." });
-    } finally {
-      setSaving(false);
-      setTimeout(() => setStatusMessage(null), 3500);
-    }
-  };
-
-  return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <input type="file" ref={fontUploadInputRef} accept=".woff2,.woff,.ttf,.otf" className="hidden" />
-
-      {/* سربرگ بخش نگارش مقالات */}
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📚</span> ویراستار مقالات سئو با هوش مصنوعی و تایپوگرافی جهانی
-          </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تولید خودکار مقالات رنک ۱ گوگل با لینک‌دهی داخلی، اسکیما مارک‌آپ، مدیریت مستقیم و ذخیره در دیتابیس
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => { soundEngine.playClick(); setIsAiModalOpen(true); }}
-            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs transition shadow-lg flex items-center gap-2 cursor-pointer"
-          >
-            <span>🤖</span>
-            <span>تولید مقاله با هوش مصنوعی (رنک ۱ گوگل)</span>
-          </button>
-
-          <button
-            onClick={handleCreateNew}
-            className="px-5 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer"
-          >
-            + نگارش دستی
-          </button>
-        </div>
-      </div>
-
-      {statusMessage && (
-        <div className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30" : "bg-rose-500/15 text-rose-600 border border-rose-500/30")}>
-          {statusMessage.text}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* ستون سمت راست: لیست مقالات با دکمه‌های مستقیم ویرایش (✏️) و حذف (🗑️) */}
-        <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
+  // افزودن بخش گرافیکی مدیریت کلیدهای داک در فرم
+  const dockUiSection = `
+        {/* بخش مدیریت کلیدهای داک سه‌بعدی ارتباطی */}
+        <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-4 text-xs">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-            <h3 className="text-xs font-black">
-              📑 مقالات منتشر شده ({posts.length})
-            </h3>
-            <button onClick={handleCreateNew} className="text-[11px] text-[var(--accent-blue)] font-bold hover:underline cursor-pointer">
-              + مقاله جدید
+            <div>
+              <h4 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-1.5">
+                <span>🎛️</span>
+                <span>مدیریت کلیدهای داک سه‌بعدی ارتباطی (CONTACT Dock)</span>
+              </h4>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                تنظیم حروف، لینک‌ها، عنوان‌ها و افزایش یا کاهش تعداد کلیدهای ارتباطی
+              </p>
+            </div>
+            <span className="font-mono font-bold text-xs bg-[var(--modal-bg)] px-3 py-1 rounded-xl border border-[var(--card-border)]">
+              {dockKeys.length} کلید فعال
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 bg-[var(--modal-bg)] p-3 rounded-2xl border border-[var(--card-border)]">
+            <input
+              type="text"
+              maxLength={2}
+              placeholder="حرف کلید (مثلا C)"
+              value={newKeyLetter}
+              onChange={(e) => setNewKeyLetter(e.target.value.toUpperCase())}
+              className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-black text-center text-xs uppercase"
+            />
+            <input
+              type="text"
+              placeholder="عنوان کلید (تولتیپ)"
+              value={newKeyTitle}
+              onChange={(e) => setNewKeyTitle(e.target.value)}
+              className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
+            />
+            <input
+              type="text"
+              placeholder="پیوند مقصد (URL)"
+              value={newKeyUrl}
+              onChange={(e) => setNewKeyUrl(e.target.value)}
+              className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (!newKeyLetter.trim()) return;
+                soundEngine.playClick();
+                const newK = {
+                  id: "key_" + Date.now(),
+                  letter: newKeyLetter.trim(),
+                  title: newKeyTitle.trim() || "پیوند",
+                  url: newKeyUrl.trim() || "#",
+                };
+                setDockKeys([...dockKeys, newK]);
+                setNewKeyLetter("");
+                setNewKeyTitle("");
+                setNewKeyUrl("");
+              }}
+              className="p-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer hover:opacity-90 shadow-sm"
+            >
+              + افزودن کلید
             </button>
           </div>
 
-          <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
-            {posts.length === 0 ? (
-              <p className="text-xs text-center py-12 text-slate-400 font-bold">هنوز مقاله‌ای ثبت نشده است.</p>
-            ) : (
-              posts.map((p) => (
-                <div
-                  key={p.id}
-                  className={"p-3 rounded-2xl border transition flex items-center justify-between gap-2 " + (
-                    selectedPost?.id === p.id
-                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-sm"
-                      : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                  )}
-                >
-                  <div
-                    onClick={() => handleSelectPost(p)}
-                    className="overflow-hidden flex-1 cursor-pointer space-y-1"
-                  >
-                    <h4 className="text-xs font-black truncate">{p.title}</h4>
-                    <span className="text-[10px] text-[var(--accent-blue)] font-bold block">{p.category || "مقاله تخصصی"}</span>
-                  </div>
-
-                  {/* دکمه‌های مستقیم ویرایش و حذف در کارت */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectPost(p)}
-                      className="p-1.5 px-2 rounded-xl bg-[var(--modal-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition cursor-pointer"
-                      title="ویرایش مقاله"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePost(p.id, p.title);
-                      }}
-                      className="p-1.5 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
-                      title="حذف کامل از دیتابیس"
-                    >
-                      🗑️
-                    </button>
+          <div className="space-y-2">
+            {dockKeys.map((k, idx) => (
+              <div key={k.id || idx} className="flex items-center justify-between p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                <div className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 text-white flex items-center justify-center font-black text-xs">
+                    {k.letter}
+                  </span>
+                  <div>
+                    <span className="font-bold text-xs block">{k.title}</span>
+                    <span className="font-mono text-[10px] text-slate-400 block" dir="ltr">{k.url}</span>
                   </div>
                 </div>
-              ))
-            )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setDockKeys(dockKeys.filter((_, i) => i !== idx));
+                  }}
+                  className="p-1.5 px-2.5 rounded-xl bg-rose-500/15 text-rose-500 hover:bg-rose-500 hover:text-white transition font-bold text-xs cursor-pointer"
+                >
+                  ✕ حذف
+                </button>
+              </div>
+            ))}
           </div>
         </div>
+  `;
 
-        {/* ستون سمت چپ: بوم نگارش، ویرایش و نوار ابزار پیشرفته */}
-        <div className="lg:col-span-8">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">عنوان اصلی مقاله (H1) *</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: مقایسه جامع مانیتورهای ۵K و ۴K برای تدوین"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">دسته‌بندی موضوعی</label>
-                <input
-                  type="text"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="مثال: راهنمای خرید و بررسی تخصصی"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نامک انگلیسی آدرس (Slug)</label>
-                <input
-                  type="text"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  placeholder="5k-vs-4k-monitors-editing"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">تصویر شاخص مقاله (URL)</label>
-                <input
-                  type="text"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block font-bold text-[var(--text-secondary)] mb-1.5">توضیحات متای سئو (Meta Description)</label>
-              <input
-                type="text"
-                value={metaDescription}
-                onChange={(e) => setMetaDescription(e.target.value)}
-                placeholder="خلاصه جذاب برای گوگل (حداکثر ۱۶۰ کاراکتر)..."
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            {/* نوار ابزار پیشرفته */}
-            <div className="space-y-3 border-t border-[var(--card-border)] pt-4">
-              <div className="flex flex-wrap justify-between items-center gap-2">
-                <span className="font-bold text-[var(--text-secondary)]">🎛️ نوار ابزار پیشرفته و تایپوگرافی لایو:</span>
-                <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--text-secondary)]">
-                  <span>کلمات: <strong>{wordCount}</strong></span>
-                  <span>کاراکترها: <strong>{charCount}</strong></span>
-                  <span>زمان مطالعه: <strong>~{readTime} دقیقه</strong></span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 p-3.5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
-                <select
-                  value={selectedFontFamily}
-                  onChange={(e) => handleFontChange(e.target.value)}
-                  className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none"
-                >
-                  {availableFonts.map((f) => (
-                    <option key={f.id} value={f.fontFamily}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedFontWeight}
-                  onChange={(e) => handleWeightChange(Number(e.target.value))}
-                  className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none font-mono"
-                >
-                  <option value={100}>100 - نازک (Thin)</option>
-                  <option value={300}>300 - روشن (Light)</option>
-                  <option value={400}>400 - عادی (Regular)</option>
-                  <option value={500}>500 - متوسط (Medium)</option>
-                  <option value={600}>600 - نیمه‌ضخیم (SemiBold)</option>
-                  <option value={700}>700 - ضخیم (Bold)</option>
-                  <option value={800}>800 - خیلی ضخیم (ExtraBold)</option>
-                  <option value={900}>900 - توپر (Black)</option>
-                </select>
-
-                <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
-
-                <button type="button" onClick={() => exec("bold")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-xs" title="Bold"><b>B</b></button>
-                <button type="button" onClick={() => exec("italic")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] italic text-xs" title="Italic"><i>I</i></button>
-                <button type="button" onClick={() => exec("underline")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] underline text-xs" title="Underline"><u>U</u></button>
-
-                <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
-
-                <div className="flex items-center gap-1 bg-[var(--modal-bg)] p-1 rounded-xl border border-[var(--card-border)]">
-                  <span className="text-[10px] font-bold px-1">رنگ:</span>
-                  <input type="color" onChange={(e) => exec("foreColor", e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none" />
-                </div>
-
-                <button type="button" onClick={() => exec("justifyRight")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="راست‌چین">👉</button>
-                <button type="button" onClick={() => exec("justifyFull")} className="p-2 px-3 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs" title="Justify">≡ جاستیفای</button>
-              </div>
-            </div>
-
-            {/* بوم نگارش مقاله */}
-            <div className="space-y-1.5">
-              <label className="font-bold text-[var(--text-secondary)] block">محیط نگارش زنده سند (WYSIWYG Live Canvas):</label>
-              <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={updateStats}
-                className="w-full min-h-[420px] max-h-[600px] overflow-y-auto p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-loose text-xs focus:border-[var(--accent-blue)] shadow-inner text-[var(--text-primary)] transition-all"
-                style={{
-                  textAlign: "justify",
-                  fontFamily: \`'\${selectedFontFamily}', sans-serif\`,
-                  fontWeight: selectedFontWeight,
-                }}
-              />
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
-              <input
-                type="checkbox"
-                id="blogPublishedCheckbox"
-                checked={isPublished}
-                onChange={(e) => setIsPublished(e.target.checked)}
-                className="w-5 h-5 rounded-lg text-[var(--accent-blue)] cursor-pointer"
-              />
-              <label htmlFor="blogPublishedCheckbox" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
-                مقاله فعال و در مجله تخصصی سایت منتشر شود
-              </label>
-            </div>
-
-            <div className="flex gap-3 pt-4 border-t border-[var(--card-border)]">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 shadow-xl shadow-blue-500/25 disabled:opacity-50"
-              >
-                {saving ? "در حال ذخیره‌سازی در دیتابیس..." : "💾 ذخیره و انتشار کامل مقاله در مجله"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      {/* مدال هوش مصنوعی تولید مقالات رنک ۱ گوگل با کلمات کلیدی */}
-      {isAiModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-xl w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-5 text-xs shadow-2xl text-[var(--text-primary)]">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🚀</span>
-                <h3 className="font-black text-sm text-[var(--accent-blue)]">دستیار فوق هوشمند نگارش مقاله رنک ۱ گوگل</h3>
-              </div>
-              <button
-                onClick={() => setIsAiModalOpen(false)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">
-                  کالای هدف جهت تزریق دکمه خرید مستقیم و مشخصات فنی:
-                </label>
-                <select
-                  value={aiSelectedProductId}
-                  onChange={(e) => setAiSelectedProductId(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer"
-                >
-                  <option value="all">🌟 تمامی محصولات فروشگاه (مقاله جامع مقایسه‌ای)</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      📦 {p.title || p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">
-                  موضوع و سرفصل مقاله:
-                </label>
-                <input
-                  type="text"
-                  value={aiCustomTopic}
-                  onChange={(e) => setAiCustomTopic(e.target.value)}
-                  placeholder="مثال: مقایسه جامع مانیتورهای ۵K و ۴K برای ادیتورها و کالریست‌ها در سال ۲۰۲۶"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">
-                  کلمه کلیدی اصلی سئو (Focus Keyword):
-                </label>
-                <input
-                  type="text"
-                  value={aiTargetKeyword}
-                  onChange={(e) => setAiTargetKeyword(e.target.value)}
-                  placeholder="مثال: خرید مانیتور تدوین رنگ 5K"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 leading-relaxed font-medium">
-                ⚡ هوش مصنوعی مقاله را با چگالی استاندارد کلمات کلیدی، عناوین جذاب، اسلاگ، تگ‌های معنایی و جدول مقایسه تولید و در ویراستار قرار خواهد داد.
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
-              <button
-                type="button"
-                onClick={() => setIsAiModalOpen(false)}
-                className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
-              >
-                انصراف
-              </button>
-              <button
-                type="button"
-                disabled={isAiGenerating}
-                onClick={handleGenerateAiSeoArticle}
-                className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-md cursor-pointer disabled:opacity-50"
-              >
-                {isAiGenerating ? "در حال تولید مهندسی‌شده مقاله..." : "نگارش هوشمند سئو 🚀"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+  adminSiteInfoContent = adminSiteInfoContent.replace(
+    '<div className="flex gap-3 pt-4',
+    dockUiSection + '\n<div className="flex gap-3 pt-4'
   );
+
+  writeFile('components/AdminSiteInfo.tsx', adminSiteInfoContent);
 }
-`;
-writeFile('components/AdminBlogManager.tsx', blogManagerFixed);
 
 // =============================================================================
-// ۳. تست بیلد و پوش مستقیم به گیت‌هاب
+// ۴. تست بیلد و پوش به گیت‌هاب
 // =============================================================================
-console.log("تست بیلد کامل (npm run build)...");
+console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -775,7 +340,7 @@ console.log("ارسال تغییرات به گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(blog): direct card edit/delete controls, full db crud & advanced ai seo suite"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(dock): full dynamic 3D contact dock management, realtime CDC & database sync"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -784,7 +349,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بخش مجله و هوش مصنوعی سئو با موفقیت روی سرور لایو مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ سامانه داک ارتباطی پویا با موفقیت روی سرور لایو مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

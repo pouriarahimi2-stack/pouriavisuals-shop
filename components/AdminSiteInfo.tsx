@@ -6,6 +6,18 @@ import { soundEngine } from "@/lib/soundEngine";
 import { applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
 export default function AdminSiteInfo() {
+  const [dockKeys, setDockKeys] = useState<Array<{ id: string; letter: string; title: string; url: string }>>([
+    { id: "k1", letter: "C", title: "تماس تلفنی", url: "tel:02188888888" },
+    { id: "k2", letter: "O", title: "سفارش‌ها", url: "/track-order" },
+    { id: "k3", letter: "N", title: "اخبار سخت‌افزار", url: "/news" },
+    { id: "k4", letter: "T", title: "تلگرام", url: "https://t.me/axoncore" },
+    { id: "k5", letter: "A", title: "درباره ما", url: "/about" },
+    { id: "k6", letter: "C", title: "مشاوره آنلاین", url: "/contact" },
+    { id: "k7", letter: "T", title: "محصولات", url: "/products" },
+  ]);
+  const [newKeyLetter, setNewKeyLetter] = useState("");
+  const [newKeyTitle, setNewKeyTitle] = useState("");
+  const [newKeyUrl, setNewKeyUrl] = useState("");
   const [siteName, setSiteName] = useState("");
   const [tagline, setTagline] = useState("");
   const [phone, setPhone] = useState("");

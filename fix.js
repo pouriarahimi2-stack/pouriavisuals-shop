@@ -1,5 +1,5 @@
 /**
- * AXON CORE - 3D Mechanical Flip Contact Dock & Admin Manager (fix.js)
+ * AXON CORE - Force Sync & Direct Push Engine (fix.js)
  */
 
 const fs = require('fs');
@@ -11,14 +11,12 @@ function writeFile(relPath, content) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ به‌روزرسانی شد: ${relPath}\x1b[0m`);
+  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-FIX]\x1b[0m بازگردانی فلیپ سه‌بعدی کلیدها، اصلاح ترتیب LTR و پنل مدیریت کامل...");
+console.log("\x1b[36m[AXON-PUSH]\x1b[0m اعمال فلیپ ۳D، چینش LTR و پنل مدیریت داک...");
 
-// =============================================================================
-// ۱. بازنویسی components/ContactDock.tsx: فلیپ سه‌بعدی، افکت مکانیکی و اصلاح ترتیب LTR
-// =============================================================================
+// ۱. بازنویسی components/ContactDock.tsx
 const contactDockComponent = `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -102,7 +100,6 @@ export default function ContactDock() {
         <span className="text-xs font-black text-[var(--text-primary)]">شبکه‌های ارتباطی و اجتماعی استودیو:</span>
       </div>
 
-      {/* کپسول نگهدارنده کلیدها: حتماً با dir="ltr" تا حروف CONTACT برعکس نشوند */}
       <div
         className="p-2 sm:p-2.5 px-3 sm:px-4 rounded-full bg-slate-950/95 border border-slate-800 shadow-[0_15px_35px_rgba(0,0,0,0.8)] backdrop-blur-2xl flex items-center justify-center gap-1.5 sm:gap-2 relative"
         dir="ltr"
@@ -127,19 +124,16 @@ export default function ContactDock() {
                 }
               }}
             >
-              {/* بدنه مکانیکی سه‌بعدی دوطرفه با انیمیشن روان چرخش */}
               <div
                 className="w-full h-full relative transition-transform duration-500 ease-out [transform-style:preserve-3d] rounded-2xl"
                 style={{
                   transform: isFlipped ? "rotateY(180deg) translateZ(8px)" : "rotateY(0deg)",
                 }}
               >
-                {/* روی کلید (حرف انگلیسی با استایل کیبورد مکانیکی) */}
                 <div className="absolute inset-0 [backface-visibility:hidden] flex items-center justify-center rounded-2xl bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 border border-slate-700/80 text-white font-black text-xs sm:text-sm shadow-[0_5px_12px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.2)]">
                   {k.letter}
                 </div>
 
-                {/* پشت کلید (فلیپ سه‌بعدی با نئون، آیکون و برچسب) */}
                 <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] flex flex-col items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black border border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.7)] p-0.5">
                   <span className="text-xs">{k.icon || "🔗"}</span>
                   <span className="text-[8px] font-bold truncate max-w-[34px] leading-tight text-center">
@@ -148,7 +142,6 @@ export default function ContactDock() {
                 </div>
               </div>
 
-              {/* عنوان هاور سه بعدی */}
               {isFlipped && (
                 <div
                   className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-xl bg-slate-900/95 border border-slate-700 text-white text-[10px] font-bold whitespace-nowrap shadow-2xl z-50 pointer-events-none animate-fadeIn"
@@ -171,13 +164,11 @@ export default function ContactDock() {
 `;
 writeFile('components/ContactDock.tsx', contactDockComponent);
 
-// =============================================================================
-// ۲. بازنویسی کامل و بدون نقص components/AdminSiteInfo.tsx به همراه پنل مدیریت داک
-// =============================================================================
+// ۲. بازنویسی components/AdminSiteInfo.tsx با پنل مدیریت داک
 const adminSiteInfoComponent = `"use client";
 
 import React, { useState, useEffect } from "react";
-import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { siteInfoService, MaintenanceMode } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminSiteInfo() {
@@ -200,7 +191,6 @@ export default function AdminSiteInfo() {
   const [whatsapp, setWhatsapp] = useState("");
   const [youtube, setYoutube] = useState("");
 
-  // استیت‌های اختصاصی داک سه‌بعدی
   const [dockKeys, setDockKeys] = useState<Array<{ id: string; letter: string; title: string; icon?: string; url: string }>>([
     { id: "k1", letter: "C", title: "تماس تلفنی", icon: "📞", url: "tel:09376110200" },
     { id: "k2", letter: "O", title: "رهگیری سفارشات", icon: "📦", url: "/track-order" },
@@ -318,7 +308,6 @@ export default function AdminSiteInfo() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
@@ -344,8 +333,6 @@ export default function AdminSiteInfo() {
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
-        
-        {/* بخش ویژه: مدیریت داک سه‌بعدی ارتباطی با پیش‌نمایش زنده */}
         <div className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-4">
             <div>
@@ -362,9 +349,8 @@ export default function AdminSiteInfo() {
             </span>
           </div>
 
-          {/* پیش‌نمایش زنده در خود فرم ادمین */}
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-2">
-            <span className="text-[10px] text-slate-400 font-bold block">پیش‌نمایش تعاملی (ماوس را روی کلیدها ببرید تا بچرخند):</span>
+            <span className="text-[10px] text-slate-400 font-bold block">پیش‌نمایش تعاملی (ماوس را روی کلیدها ببرید):</span>
             <div className="flex items-center justify-center gap-2" dir="ltr">
               {dockKeys.map((k) => (
                 <div key={k.id} className="w-10 h-10 rounded-2xl bg-slate-900 border border-slate-700 text-white flex items-center justify-center font-black text-xs hover:scale-110 hover:border-blue-500 transition">
@@ -374,10 +360,9 @@ export default function AdminSiteInfo() {
             </div>
           </div>
 
-          {/* فرم افزودن کلید جدید */}
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
             <div>
-              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">حرف کلید (Letter):</label>
+              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">حرف کلید:</label>
               <input
                 type="text"
                 maxLength={2}
@@ -432,7 +417,6 @@ export default function AdminSiteInfo() {
             </div>
           </div>
 
-          {/* لیست کلیدهای فعلی با قابلیت ویرایش مستقیم و حذف */}
           <div className="space-y-2">
             {dockKeys.map((k, idx) => (
               <div key={k.id || idx} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3">
@@ -446,21 +430,18 @@ export default function AdminSiteInfo() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveKey(idx)}
-                    className="p-1.5 px-3 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
-                  >
-                    🗑️ حذف
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveKey(idx)}
+                  className="p-1.5 px-3 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
+                >
+                  🗑️ حذف
+                </button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* بخش اطلاعات تماس و نشانی */}
         <div className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
           <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
             🏢 اطلاعات سازمانی و راه‌های ارتباطی
@@ -494,7 +475,6 @@ export default function AdminSiteInfo() {
           </div>
         </div>
 
-        {/* دکمه ذخیره نهایی */}
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
@@ -511,9 +491,7 @@ export default function AdminSiteInfo() {
 `;
 writeFile('components/AdminSiteInfo.tsx', adminSiteInfoComponent);
 
-// =============================================================================
-// ۳. تست بیلد و پوش به گیت‌هاب
-// =============================================================================
+// ۳. تست بیلد و ارسال قطعی به گیت‌هاب
 console.log("تست بیلد کامل نرم‌افزار (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -523,11 +501,11 @@ try {
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به گیت‌هاب...");
+console.log("ارسال قطعی تغییرات به گیت‌هاب و تریگر دیپلوی ورسل...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(dock): restore 3D flip physics, enforce LTR key order & embed dedicated dock manager"', { stdio: 'inherit' });
+  execSync('git commit -m "fix(dock): complete 3D mechanical flip dock, fix LTR order and embed admin manager"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -536,7 +514,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ داک سه‌بعدی و پنل اختصاصی مدیریت آن با موفقیت مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ تغییرات با موفقیت Push شد و ورسل در حال دیپلوی است!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { siteInfoService, MaintenanceMode } from "@/services/siteInfoService";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminSiteInfo() {
@@ -24,7 +24,6 @@ export default function AdminSiteInfo() {
   const [whatsapp, setWhatsapp] = useState("");
   const [youtube, setYoutube] = useState("");
 
-  // استیت‌های اختصاصی داک سه‌بعدی
   const [dockKeys, setDockKeys] = useState<Array<{ id: string; letter: string; title: string; icon?: string; url: string }>>([
     { id: "k1", letter: "C", title: "تماس تلفنی", icon: "📞", url: "tel:09376110200" },
     { id: "k2", letter: "O", title: "رهگیری سفارشات", icon: "📦", url: "/track-order" },
@@ -142,7 +141,6 @@ export default function AdminSiteInfo() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
@@ -168,8 +166,6 @@ export default function AdminSiteInfo() {
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
-        
-        {/* بخش ویژه: مدیریت داک سه‌بعدی ارتباطی با پیش‌نمایش زنده */}
         <div className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-4">
             <div>
@@ -186,9 +182,8 @@ export default function AdminSiteInfo() {
             </span>
           </div>
 
-          {/* پیش‌نمایش زنده در خود فرم ادمین */}
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-2">
-            <span className="text-[10px] text-slate-400 font-bold block">پیش‌نمایش تعاملی (ماوس را روی کلیدها ببرید تا بچرخند):</span>
+            <span className="text-[10px] text-slate-400 font-bold block">پیش‌نمایش تعاملی (ماوس را روی کلیدها ببرید):</span>
             <div className="flex items-center justify-center gap-2" dir="ltr">
               {dockKeys.map((k) => (
                 <div key={k.id} className="w-10 h-10 rounded-2xl bg-slate-900 border border-slate-700 text-white flex items-center justify-center font-black text-xs hover:scale-110 hover:border-blue-500 transition">
@@ -198,10 +193,9 @@ export default function AdminSiteInfo() {
             </div>
           </div>
 
-          {/* فرم افزودن کلید جدید */}
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
             <div>
-              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">حرف کلید (Letter):</label>
+              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">حرف کلید:</label>
               <input
                 type="text"
                 maxLength={2}
@@ -256,7 +250,6 @@ export default function AdminSiteInfo() {
             </div>
           </div>
 
-          {/* لیست کلیدهای فعلی با قابلیت ویرایش مستقیم و حذف */}
           <div className="space-y-2">
             {dockKeys.map((k, idx) => (
               <div key={k.id || idx} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3">
@@ -270,21 +263,18 @@ export default function AdminSiteInfo() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveKey(idx)}
-                    className="p-1.5 px-3 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
-                  >
-                    🗑️ حذف
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveKey(idx)}
+                  className="p-1.5 px-3 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
+                >
+                  🗑️ حذف
+                </button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* بخش اطلاعات تماس و نشانی */}
         <div className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
           <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
             🏢 اطلاعات سازمانی و راه‌های ارتباطی
@@ -318,7 +308,6 @@ export default function AdminSiteInfo() {
           </div>
         </div>
 
-        {/* دکمه ذخیره نهایی */}
         <div className="flex gap-3 pt-2">
           <button
             type="submit"

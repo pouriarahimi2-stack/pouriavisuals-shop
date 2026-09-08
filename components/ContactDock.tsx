@@ -81,7 +81,6 @@ export default function ContactDock() {
         <span className="text-xs font-black text-[var(--text-primary)]">شبکه‌های ارتباطی و اجتماعی استودیو:</span>
       </div>
 
-      {/* کپسول نگهدارنده کلیدها: حتماً با dir="ltr" تا حروف CONTACT برعکس نشوند */}
       <div
         className="p-2 sm:p-2.5 px-3 sm:px-4 rounded-full bg-slate-950/95 border border-slate-800 shadow-[0_15px_35px_rgba(0,0,0,0.8)] backdrop-blur-2xl flex items-center justify-center gap-1.5 sm:gap-2 relative"
         dir="ltr"
@@ -106,19 +105,16 @@ export default function ContactDock() {
                 }
               }}
             >
-              {/* بدنه مکانیکی سه‌بعدی دوطرفه با انیمیشن روان چرخش */}
               <div
                 className="w-full h-full relative transition-transform duration-500 ease-out [transform-style:preserve-3d] rounded-2xl"
                 style={{
                   transform: isFlipped ? "rotateY(180deg) translateZ(8px)" : "rotateY(0deg)",
                 }}
               >
-                {/* روی کلید (حرف انگلیسی با استایل کیبورد مکانیکی) */}
                 <div className="absolute inset-0 [backface-visibility:hidden] flex items-center justify-center rounded-2xl bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 border border-slate-700/80 text-white font-black text-xs sm:text-sm shadow-[0_5px_12px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.2)]">
                   {k.letter}
                 </div>
 
-                {/* پشت کلید (فلیپ سه‌بعدی با نئون، آیکون و برچسب) */}
                 <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] flex flex-col items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black border border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.7)] p-0.5">
                   <span className="text-xs">{k.icon || "🔗"}</span>
                   <span className="text-[8px] font-bold truncate max-w-[34px] leading-tight text-center">
@@ -127,7 +123,6 @@ export default function ContactDock() {
                 </div>
               </div>
 
-              {/* عنوان هاور سه بعدی */}
               {isFlipped && (
                 <div
                   className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-xl bg-slate-900/95 border border-slate-700 text-white text-[10px] font-bold whitespace-nowrap shadow-2xl z-50 pointer-events-none animate-fadeIn"

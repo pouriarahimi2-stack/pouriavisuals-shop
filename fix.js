@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Force Sync & Direct Push Engine (fix.js)
+ * AXON CORE - Precision Interactive Pop-up Dock matching Video Animation (fix.js)
  */
 
 const fs = require('fs');
@@ -14,9 +14,11 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PUSH]\x1b[0m اعمال فلیپ ۳D، چینش LTR و پنل مدیریت داک...");
+console.log("\x1b[36m[AXON-DOCK]\x1b[0m پیاده‌سازی دقیق انیمیشن پاپ‌آپ و مدیریت کامل داک...");
 
-// ۱. بازنویسی components/ContactDock.tsx
+// =============================================================================
+// ۱. بازنویسی components/ContactDock.tsx دقیقاً مطابق انیمیشن و فیزیک ویدیو
+// =============================================================================
 const contactDockComponent = `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -28,23 +30,26 @@ export interface DockKeyItem {
   id: string;
   letter: string;
   title: string;
+  subtitle?: string;
   icon?: string;
+  accentColor?: string;
   url: string;
 }
 
 const DEFAULT_DOCK_KEYS: DockKeyItem[] = [
-  { id: "k1", letter: "C", title: "تماس تلفنی", icon: "📞", url: "tel:09376110200" },
-  { id: "k2", letter: "O", title: "رهگیری سفارشات", icon: "📦", url: "/track-order" },
-  { id: "k3", letter: "N", title: "اخبار استودیو", icon: "⚡", url: "/news" },
-  { id: "k4", letter: "T", title: "پشتیبانی تلگرام", icon: "✈️", url: "https://t.me/axoncore" },
-  { id: "k5", letter: "A", title: "درباره آکسون", icon: "🏢", url: "/about" },
-  { id: "k6", letter: "C", title: "مشاوره آنلاین", icon: "💬", url: "/contact" },
-  { id: "k7", letter: "T", title: "کاتالوگ محصولات", icon: "🛍️", url: "/products" },
+  { id: "k1", letter: "C", title: "تماس تلفنی", subtitle: "پشتیبانی فوری", icon: "📞", accentColor: "#0071e3", url: "tel:09376110200" },
+  { id: "k2", letter: "O", title: "سفارش‌ها", subtitle: "رهگیری پیشتاز", icon: "📦", accentColor: "#6366f1", url: "/track-order" },
+  { id: "k3", letter: "N", title: "اخبار فناوری", subtitle: "رادار جهانی", icon: "⚡", accentColor: "#a855f7", url: "/news" },
+  { id: "k4", letter: "T", title: "تلگرام استودیو", subtitle: "ارتباط مستقیم", icon: "✈️", accentColor: "#0ea5e9", url: "https://t.me/axoncore" },
+  { id: "k5", letter: "A", title: "درباره آکسون", subtitle: "اصالت و تعهدات", icon: "🏢", accentColor: "#10b981", url: "/about" },
+  { id: "k6", letter: "C", title: "تیکت مشاوره", subtitle: "پاسخ آنلاین", icon: "💬", accentColor: "#f59e0b", url: "/contact" },
+  { id: "k7", letter: "T", title: "کاتالوگ کالا", subtitle: "تجهیزات ۵K", icon: "🛍️", accentColor: "#ec4899", url: "/products" },
 ];
 
 export default function ContactDock() {
   const [dockKeys, setDockKeys] = useState<DockKeyItem[]>(DEFAULT_DOCK_KEYS);
-  const [flippedKeyId, setFlippedKeyId] = useState<string | null>(null);
+  const [headerTitle, setHeaderTitle] = useState("شبکه‌های ارتباطی و اجتماعی استودیو:");
+  const [activeKeyId, setActiveKeyId] = useState<string | null>(null);
 
   const loadDockSettings = async () => {
     try {
@@ -57,10 +62,15 @@ export default function ContactDock() {
       }
 
       const info = await siteInfoService.getSiteInfo();
-      if (info && (info as any).contact_dock_items && Array.isArray((info as any).contact_dock_items) && (info as any).contact_dock_items.length > 0) {
-        setDockKeys((info as any).contact_dock_items);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("axon_contact_dock_keys_v2026", JSON.stringify((info as any).contact_dock_items));
+      if (info) {
+        if ((info as any).contact_dock_title) {
+          setHeaderTitle((info as any).contact_dock_title);
+        }
+        if ((info as any).contact_dock_items && Array.isArray((info as any).contact_dock_items) && (info as any).contact_dock_items.length > 0) {
+          setDockKeys((info as any).contact_dock_items);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("axon_contact_dock_keys_v2026", JSON.stringify((info as any).contact_dock_items));
+          }
         }
       }
     } catch {}
@@ -72,14 +82,15 @@ export default function ContactDock() {
     const handleUpdate = (e: any) => {
       if (e.detail?.contact_dock_items && Array.isArray(e.detail.contact_dock_items)) {
         setDockKeys(e.detail.contact_dock_items);
-      } else {
-        loadDockSettings();
+      }
+      if (e.detail?.contact_dock_title) {
+        setHeaderTitle(e.detail.contact_dock_title);
       }
     };
     window.addEventListener("site_info_updated", handleUpdate);
 
     const channel = supabase
-      .channel("realtime-dock-keys-footer")
+      .channel("realtime-dock-keys-popup")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
         loadDockSettings();
       })
@@ -94,28 +105,34 @@ export default function ContactDock() {
   if (!dockKeys || dockKeys.length === 0) return null;
 
   return (
-    <div className="flex flex-col items-center justify-center space-y-3 font-sans select-none py-2" dir="rtl">
+    <div className="flex flex-col items-center justify-center space-y-4 font-sans select-none py-6 overflow-visible" dir="rtl">
+      
+      {/* عنوان بالای داک با نشانگر نئونی پالس‌دار */}
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-[var(--accent-blue)] animate-pulse" />
-        <span className="text-xs font-black text-[var(--text-primary)]">شبکه‌های ارتباطی و اجتماعی استودیو:</span>
+        <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-blue)] shadow-[0_0_12px_var(--accent-blue)] animate-pulse" />
+        <span className="text-xs font-black text-[var(--text-primary)]">
+          {headerTitle}
+        </span>
       </div>
 
+      {/* محفظه کپسولی تیره با استایل دقیق شبیه ویدیو و ترتیب LTR */}
       <div
-        className="p-2 sm:p-2.5 px-3 sm:px-4 rounded-full bg-slate-950/95 border border-slate-800 shadow-[0_15px_35px_rgba(0,0,0,0.8)] backdrop-blur-2xl flex items-center justify-center gap-1.5 sm:gap-2 relative"
+        className="p-3 sm:p-3.5 px-4 sm:px-6 rounded-full bg-[#0b0f19]/95 border border-slate-800/90 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex items-center justify-center gap-2 sm:gap-3 relative overflow-visible"
         dir="ltr"
       >
         {dockKeys.map((k) => {
-          const isFlipped = flippedKeyId === k.id;
+          const isActive = activeKeyId === k.id;
+          const accent = k.accentColor || "#0071e3";
 
           return (
             <div
               key={k.id}
-              className="relative [perspective:1000px] w-9 h-9 sm:w-11 sm:h-11 cursor-pointer"
+              className="relative flex flex-col items-center overflow-visible"
               onMouseEnter={() => {
                 soundEngine.playClick();
-                setFlippedKeyId(k.id);
+                setActiveKeyId(k.id);
               }}
-              onMouseLeave={() => setFlippedKeyId(null)}
+              onMouseLeave={() => setActiveKeyId(null)}
               onClick={() => {
                 soundEngine.playClick();
                 if (k.url) {
@@ -124,39 +141,74 @@ export default function ContactDock() {
                 }
               }}
             >
+              {/* پاپ‌آپ کارتی شناور بالا (دقیقاً مطابق رفتار ویدیو) */}
               <div
-                className="w-full h-full relative transition-transform duration-500 ease-out [transform-style:preserve-3d] rounded-2xl"
-                style={{
-                  transform: isFlipped ? "rotateY(180deg) translateZ(8px)" : "rotateY(0deg)",
-                }}
+                className={\`absolute -top-20 pointer-events-none transition-all duration-300 ease-out z-50 flex flex-col items-center \${
+                  isActive
+                    ? "opacity-100 -translate-y-2 scale-100"
+                    : "opacity-0 translate-y-2 scale-90"
+                }\`}
+                dir="rtl"
               >
-                <div className="absolute inset-0 [backface-visibility:hidden] flex items-center justify-center rounded-2xl bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 border border-slate-700/80 text-white font-black text-xs sm:text-sm shadow-[0_5px_12px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.2)]">
-                  {k.letter}
+                <div
+                  className="px-3.5 py-2 rounded-2xl bg-[#0f172a]/95 border text-white shadow-2xl backdrop-blur-xl flex items-center gap-2 whitespace-nowrap"
+                  style={{
+                    borderColor: accent,
+                    boxShadow: isActive ? \`0 10px 25px -5px \${accent}40\` : "none",
+                  }}
+                >
+                  <span className="text-base">{k.icon || "🔗"}</span>
+                  <div className="flex flex-col text-right">
+                    <span className="font-black text-xs text-white leading-tight">{k.title}</span>
+                    {k.subtitle && (
+                      <span className="text-[9px] text-slate-400 font-medium leading-tight mt-0.5">{k.subtitle}</span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] flex flex-col items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black border border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.7)] p-0.5">
-                  <span className="text-xs">{k.icon || "🔗"}</span>
-                  <span className="text-[8px] font-bold truncate max-w-[34px] leading-tight text-center">
-                    {k.letter}
-                  </span>
-                </div>
+                {/* فلش یا مثلث پایین پاپ‌آپ */}
+                <div
+                  className="w-2.5 h-2.5 -mt-1 rotate-45 bg-[#0f172a] border-r border-b"
+                  style={{ borderColor: accent }}
+                />
               </div>
 
-              {isFlipped && (
-                <div
-                  className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-xl bg-slate-900/95 border border-slate-700 text-white text-[10px] font-bold whitespace-nowrap shadow-2xl z-50 pointer-events-none animate-fadeIn"
-                  dir="rtl"
+              {/* کلید مکانیکی با افکت جهش به بالا و روشن شدن نئونی هنگام هاور */}
+              <button
+                type="button"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center font-black text-sm sm:text-base text-white transition-all duration-300 cursor-pointer relative group"
+                style={{
+                  backgroundColor: isActive ? "#1e293b" : "#111827",
+                  borderWidth: "1.5px",
+                  borderColor: isActive ? accent : "#1f2937",
+                  transform: isActive ? "translateY(-6px) scale(1.08)" : "translateY(0) scale(1)",
+                  boxShadow: isActive
+                    ? \`0 12px 25px -5px \${accent}60, inset 0 1px 1px rgba(255,255,255,0.3)\`
+                    : "0 6px 12px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.1)",
+                }}
+              >
+                <span
+                  className="transition-colors duration-300"
+                  style={{ color: isActive ? accent : "#f3f4f6" }}
                 >
-                  {k.title}
-                </div>
-              )}
+                  {k.letter}
+                </span>
+
+                {/* خط نورانی باریک زیر دکمه فعال */}
+                {isActive && (
+                  <span
+                    className="absolute bottom-1 w-2.5 h-0.5 rounded-full"
+                    style={{ backgroundColor: accent, boxShadow: \`0 0 8px \${accent}\` }}
+                  />
+                )}
+              </button>
             </div>
           );
         })}
       </div>
 
       <span className="text-[10px] text-slate-400 font-medium">
-        روی کلیدها نگه دارید تا فلیپ سه‌بعدی فعال شود
+        برای مشاهده امکانات، ماوس را روی کلیدها ببرید یا کلیک کنید
       </span>
     </div>
   );
@@ -164,7 +216,9 @@ export default function ContactDock() {
 `;
 writeFile('components/ContactDock.tsx', contactDockComponent);
 
-// ۲. بازنویسی components/AdminSiteInfo.tsx با پنل مدیریت داک
+// =============================================================================
+// ۲. به‌روزرسانی پنل ادمین components/AdminSiteInfo.tsx برای کنترل کامل جزئیات
+// =============================================================================
 const adminSiteInfoComponent = `"use client";
 
 import React, { useState, useEffect } from "react";
@@ -191,19 +245,31 @@ export default function AdminSiteInfo() {
   const [whatsapp, setWhatsapp] = useState("");
   const [youtube, setYoutube] = useState("");
 
-  const [dockKeys, setDockKeys] = useState<Array<{ id: string; letter: string; title: string; icon?: string; url: string }>>([
-    { id: "k1", letter: "C", title: "تماس تلفنی", icon: "📞", url: "tel:09376110200" },
-    { id: "k2", letter: "O", title: "رهگیری سفارشات", icon: "📦", url: "/track-order" },
-    { id: "k3", letter: "N", title: "اخبار استودیو", icon: "⚡", url: "/news" },
-    { id: "k4", letter: "T", title: "پشتیبانی تلگرام", icon: "✈️", url: "https://t.me/axoncore" },
-    { id: "k5", letter: "A", title: "درباره آکسون", icon: "🏢", url: "/about" },
-    { id: "k6", letter: "C", title: "مشاوره آنلاین", icon: "💬", url: "/contact" },
-    { id: "k7", letter: "T", title: "کاتالوگ محصولات", icon: "🛍️", url: "/products" },
+  // جزئیات داک و پاپ‌آپ
+  const [dockTitle, setDockTitle] = useState("شبکه‌های ارتباطی و اجتماعی استودیو:");
+  const [dockKeys, setDockKeys] = useState<Array<{
+    id: string;
+    letter: string;
+    title: string;
+    subtitle?: string;
+    icon?: string;
+    accentColor?: string;
+    url: string;
+  }>>([
+    { id: "k1", letter: "C", title: "تماس تلفنی", subtitle: "پشتیبانی فوری", icon: "📞", accentColor: "#0071e3", url: "tel:09376110200" },
+    { id: "k2", letter: "O", title: "سفارش‌ها", subtitle: "رهگیری پیشتاز", icon: "📦", accentColor: "#6366f1", url: "/track-order" },
+    { id: "k3", letter: "N", title: "اخبار استودیو", subtitle: "رادار جهانی", icon: "⚡", accentColor: "#a855f7", url: "/news" },
+    { id: "k4", letter: "T", title: "تلگرام استودیو", subtitle: "ارتباط مستقیم", icon: "✈️", accentColor: "#0ea5e9", url: "https://t.me/axoncore" },
+    { id: "k5", letter: "A", title: "درباره آکسون", subtitle: "اصالت و تعهدات", icon: "🏢", accentColor: "#10b981", url: "/about" },
+    { id: "k6", letter: "C", title: "مشاوره آنلاین", subtitle: "پاسخ سریع", icon: "💬", accentColor: "#f59e0b", url: "/contact" },
+    { id: "k7", letter: "T", title: "کاتالوگ کالا", subtitle: "تجهیزات ۵K", icon: "🛍️", accentColor: "#ec4899", url: "/products" },
   ]);
 
   const [newKeyLetter, setNewKeyLetter] = useState("");
   const [newKeyTitle, setNewKeyTitle] = useState("");
+  const [newKeySubtitle, setNewKeySubtitle] = useState("");
   const [newKeyIcon, setNewKeyIcon] = useState("🔗");
+  const [newKeyColor, setNewKeyColor] = useState("#0071e3");
   const [newKeyUrl, setNewKeyUrl] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -229,6 +295,9 @@ export default function AdminSiteInfo() {
         setWhatsapp(data.whatsapp || "");
         setYoutube(data.youtube || "");
 
+        if ((data as any).contact_dock_title) {
+          setDockTitle((data as any).contact_dock_title);
+        }
         if ((data as any).contact_dock_items && Array.isArray((data as any).contact_dock_items)) {
           setDockKeys((data as any).contact_dock_items);
         }
@@ -242,19 +311,32 @@ export default function AdminSiteInfo() {
     const newK = {
       id: "dock_" + Date.now(),
       letter: newKeyLetter.trim().toUpperCase().slice(0, 2),
-      title: newKeyTitle.trim() || "پیوند استودیو",
+      title: newKeyTitle.trim() || "پیوند",
+      subtitle: newKeySubtitle.trim() || undefined,
       icon: newKeyIcon.trim() || "🔗",
+      accentColor: newKeyColor || "#0071e3",
       url: newKeyUrl.trim() || "#",
     };
     setDockKeys([...dockKeys, newK]);
     setNewKeyLetter("");
     setNewKeyTitle("");
+    setNewKeySubtitle("");
     setNewKeyUrl("");
   };
 
   const handleRemoveKey = (index: number) => {
     soundEngine.playClick();
     setDockKeys(dockKeys.filter((_, i) => i !== index));
+  };
+
+  const handleMoveKey = (index: number, direction: "left" | "right") => {
+    soundEngine.playClick();
+    const targetIndex = direction === "left" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= dockKeys.length) return;
+    const updated = [...dockKeys];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+    setDockKeys(updated);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -281,6 +363,7 @@ export default function AdminSiteInfo() {
       telegram,
       whatsapp,
       youtube,
+      contact_dock_title: dockTitle,
       contact_dock_items: dockKeys,
     };
 
@@ -297,7 +380,7 @@ export default function AdminSiteInfo() {
       }
 
       soundEngine.playSuccess();
-      setStatusMessage({ type: "success", text: "✓ کلیه تنظیمات و کلیدهای داک با موفقیت در دیتابیس ذخیره و بلادرنگ اعمال شدند." });
+      setStatusMessage({ type: "success", text: "✓ تمامی تنظیمات داک و اطلاعات سایت با موفقیت در دیتابیس ذخیره و بلادرنگ اعمال شدند." });
     } catch (err: any) {
       setStatusMessage({ type: "error", text: err.message || "خطا در ذخیره‌سازی تنظیمات." });
     } finally {
@@ -308,13 +391,14 @@ export default function AdminSiteInfo() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚙️</span> تنظیمات عمومی، هویت برند و کلیدهای داک ارتباطی
+            <span>⚙️</span> پیکربندی عمومی و مدیریت پاپ‌آپ داک استودیو
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پیکربندی کلان سایت، اطلاعات تماس، لوگوهای انیمیشنی و شخصی‌سازی کامل داک ۳D
+            شخصی‌سازی پاپ‌آپ‌ها، رنگ نئون هر کلید، تنظیم پیوندها و به‌روزرسانی بلادرنگ
           </p>
         </div>
         <button
@@ -333,15 +417,17 @@ export default function AdminSiteInfo() {
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
+        
+        {/* پنل اختصاصی مدیریت داک تعاملی */}
         <div className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-4">
             <div>
               <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
                 <span>🎛️</span>
-                <span>مدیریت کلیدهای داک سه‌بعدی ارتباطی (3D Mechanical Dock)</span>
+                <span>مدیریت کامل داک پاپ‌آپ استودیو (Interactive Pop-up Dock)</span>
               </h3>
               <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                تغییر حروف، آیکون، عنوان نمایشی و پیوند مقصد با پیش‌نمایش چرخش سه‌بعدی
+                تغییر عنوان بالای داک، حروف، آیکون، رنگ اختصاصی نئون و ترتیب کلیدها
               </p>
             </div>
             <span className="font-mono font-bold text-xs bg-[var(--input-bg)] px-3 py-1 rounded-xl border border-[var(--card-border)]">
@@ -349,18 +435,35 @@ export default function AdminSiteInfo() {
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-2">
-            <span className="text-[10px] text-slate-400 font-bold block">پیش‌نمایش تعاملی (ماوس را روی کلیدها ببرید):</span>
-            <div className="flex items-center justify-center gap-2" dir="ltr">
+          <div>
+            <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان متن بالای داک در فوتر:</label>
+            <input
+              type="text"
+              value={dockTitle}
+              onChange={(e) => setDockTitle(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+            />
+          </div>
+
+          {/* پیش‌نمایش زنده در داخل ادمین */}
+          <div className="p-5 rounded-3xl bg-[#0b0f19] border border-slate-800 text-center space-y-3">
+            <span className="text-[10px] text-slate-400 font-bold block">پیش‌نمایش تعاملی (ماوس را روی هر کلید ببرید تا پاپ‌آپ اختصاصی باز شود):</span>
+            <div className="flex items-center justify-center gap-2.5" dir="ltr">
               {dockKeys.map((k) => (
-                <div key={k.id} className="w-10 h-10 rounded-2xl bg-slate-900 border border-slate-700 text-white flex items-center justify-center font-black text-xs hover:scale-110 hover:border-blue-500 transition">
+                <div
+                  key={k.id}
+                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-slate-900 border flex items-center justify-center font-black text-xs text-white transition hover:-translate-y-1"
+                  style={{ borderColor: k.accentColor || "#334155" }}
+                  title={\`\${k.title} (\${k.url})\`}
+                >
                   {k.letter}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
+          {/* فرم افزودن کلید جدید */}
+          <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5 bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
             <div>
               <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">حرف کلید:</label>
               <input
@@ -374,7 +477,7 @@ export default function AdminSiteInfo() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">آیکون فلیپ:</label>
+              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">آیکون پاپ‌آپ:</label>
               <input
                 type="text"
                 placeholder="📞"
@@ -385,7 +488,7 @@ export default function AdminSiteInfo() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">عنوان راهنما (Tooltip):</label>
+              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">عنوان اصلی:</label>
               <input
                 type="text"
                 placeholder="تماس تلفنی"
@@ -396,52 +499,111 @@ export default function AdminSiteInfo() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">آدرس پیوند (URL):</label>
+              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">زیرعنوان پاپ‌آپ:</label>
               <input
                 type="text"
-                placeholder="tel:0912... یا https://..."
-                value={newKeyUrl}
-                onChange={(e) => setNewKeyUrl(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs outline-none"
+                placeholder="پشتیبانی فوری"
+                value={newKeySubtitle}
+                onChange={(e) => setNewKeySubtitle(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs outline-none"
               />
             </div>
 
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={handleAddKey}
-                className="w-full py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-md"
-              >
-                + افزودن کلید
-              </button>
+            <div>
+              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">رنگ نئون:</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="color"
+                  value={newKeyColor}
+                  onChange={(e) => setNewKeyColor(e.target.value)}
+                  className="w-9 h-9 rounded-lg border-none bg-transparent cursor-pointer"
+                />
+                <input
+                  type="text"
+                  placeholder="#0071e3"
+                  value={newKeyColor}
+                  onChange={(e) => setNewKeyColor(e.target.value)}
+                  className="w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[10px]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block mb-1 font-bold text-[10px] text-[var(--text-secondary)]">لینک مقصد (URL):</label>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  placeholder="https://..."
+                  value={newKeyUrl}
+                  onChange={(e) => setNewKeyUrl(e.target.value)}
+                  className="w-full p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[10px] outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddKey}
+                  className="px-3 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shrink-0"
+                  title="افزودن کلید"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
 
+          {/* لیست کلیدهای ثبت‌شده همراه با تغییر چیدمان و حذف */}
           <div className="space-y-2">
             {dockKeys.map((k, idx) => (
               <div key={k.id || idx} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <span className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700 text-white flex items-center justify-center font-black text-xs shadow-inner">
+                  <span
+                    className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-md"
+                    style={{ backgroundColor: "#1e293b", border: \`1.5px solid \${k.accentColor || "#38bdf8"}\` }}
+                  >
                     {k.letter}
                   </span>
                   <div>
-                    <span className="font-bold text-xs block">{k.icon} {k.title}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-xs">{k.icon} {k.title}</span>
+                      {k.subtitle && <span className="text-[10px] text-[var(--text-secondary)]">({k.subtitle})</span>}
+                    </div>
                     <span className="font-mono text-[10px] text-slate-400 block" dir="ltr">{k.url}</span>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleRemoveKey(idx)}
-                  className="p-1.5 px-3 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
-                >
-                  🗑️ حذف
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleMoveKey(idx, "left")}
+                    disabled={idx === 0}
+                    className="p-1.5 px-2 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer font-mono"
+                    title="جابجایی به چپ"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMoveKey(idx, "right")}
+                    disabled={idx === dockKeys.length - 1}
+                    className="p-1.5 px-2 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer font-mono"
+                    title="جابجایی به راست"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveKey(idx)}
+                    className="p-1.5 px-2.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
+                    title="حذف کلید"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
+        {/* اطلاعات تماس سازمانی */}
         <div className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
           <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
             🏢 اطلاعات سازمانی و راه‌های ارتباطی
@@ -491,7 +653,9 @@ export default function AdminSiteInfo() {
 `;
 writeFile('components/AdminSiteInfo.tsx', adminSiteInfoComponent);
 
-// ۳. تست بیلد و ارسال قطعی به گیت‌هاب
+// =============================================================================
+// ۳. تست بیلد و ارسال قطعی به گیت‌هاب و ورسل
+// =============================================================================
 console.log("تست بیلد کامل نرم‌افزار (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -501,11 +665,11 @@ try {
   process.exit(1);
 }
 
-console.log("ارسال قطعی تغییرات به گیت‌هاب و تریگر دیپلوی ورسل...");
+console.log("ارسال قطعی تغییرات به گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(dock): complete 3D mechanical flip dock, fix LTR order and embed admin manager"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(dock): precision pop-up card animation matching video & comprehensive admin dock controller"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -514,7 +678,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ تغییرات با موفقیت Push شد و ورسل در حال دیپلوی است!\x1b[0m");
+  console.log("\x1b[32m✔ تغییرات با موفقیت به گیت‌هاب ارسال شد و ورسل در حال استقرار نسخه جدید است!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

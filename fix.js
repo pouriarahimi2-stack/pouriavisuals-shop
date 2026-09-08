@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Instant Realtime CDC Synchronization for Products (fix.js)
+ * AXON CORE - Enterprise Accounting, Tax Engine & WMS Overhaul (fix.js)
  */
 
 const fs = require('fs');
@@ -14,383 +14,584 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ به‌روزرسانی شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-REALTIME]\x1b[0m فعال‌سازی وب‌سوکت بلادرنگ CDC برای محصولات بدون نیاز به رفرش...");
+console.log("\x1b[36m[AXON-ACCOUNTING]\x1b[0m پیاده‌سازی سیستم حسابداری پیشرفته، انبارگردانی و گزارش مالیاتی...");
 
 // =============================================================================
-// ۱. ارتقای services/productService.ts: انتشار سراسری تغییرات در شبکه کلاینت
+// ۱. ساخت روت سروری امن حسابداری و محاسبات مالی: app/api/accounting/route.ts
 // =============================================================================
-const realProductService = `import { supabase } from "@/lib/supabase";
+const accountingApiRoute = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
-export interface ProductVariant {
-  id: string;
-  name: string;
-  colorHex?: string;
-  priceDelta?: number;
-}
+export const dynamic = "force-dynamic";
 
-export interface Product {
-  id: string;
-  title: string;
-  name?: string;
-  title_fa?: string;
-  sku?: string;
-  brand?: string;
-  price: number;
-  discountPrice?: number;
-  discount_price?: number;
-  stock?: number;
-  is_available?: boolean;
-  isAvailable?: boolean;
-  is_featured?: boolean;
-  category?: string;
-  image?: string;
-  images?: string[];
-  description?: string;
-  warranty?: string;
-  variants?: ProductVariant[];
-  specs?: Record<string, string>;
-  meta_title?: string;
-  meta_description?: string;
-  created_at?: string;
-}
-
-export const FLAGSHIP_7_PRODUCTS: Product[] = [];
-
-export const productService = {
-  async getAll(): Promise<Product[]> {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        return data.map((p: any) => ({
-          ...p,
-          id: String(p.id),
-          title: p.title || p.name,
-          name: p.name || p.title,
-          discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
-          isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
-        }));
-      }
-
-      const res = await fetch("/api/products", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && json.data) {
-        return json.data.map((p: any) => ({
-          ...p,
-          id: String(p.id),
-          title: p.title || p.name,
-          name: p.name || p.title,
-          discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
-          isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
-        }));
-      }
-
-      return [];
-    } catch {
-      return [];
+export async function GET(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
-  },
 
-  getAllSync(): Product[] {
-    return [];
-  },
+    // ۱. دریافت کالاها و سفارش‌ها با دسترسی ادمین
+    const [prodsRes, ordersRes] = await Promise.all([
+      supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }),
+      supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false }),
+    ]);
 
-  async getById(id: string): Promise<Product | null> {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+    const products = prodsRes.data || [];
+    const orders = ordersRes.data || [];
 
-      if (!error && data) {
-        return {
-          ...data,
-          id: String(data.id),
-          title: data.title || data.name,
-          name: data.name || data.title,
-          discountPrice: data.discount_price ? Number(data.discount_price) : undefined,
-          isAvailable: data.is_available !== false && (data.stock === null || data.stock === undefined || data.stock > 0),
-        };
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
+    // ۲. محاسبه عملکرد ماهانه (۳۰ روز گذشته)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  async saveProduct(product: Partial<Product>): Promise<Product | null> {
-    const cleanTitle = String(product.title || product.name || "").trim();
-    const productId = product.id || ("prod_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7));
+    const monthlyOrders = orders.filter((o) => {
+      const orderDate = new Date(o.created_at || Date.now());
+      return orderDate >= thirtyDaysAgo && o.status !== "cancelled";
+    });
 
-    const payload = {
-      ...product,
-      id: productId,
-      name: cleanTitle,
-      title: cleanTitle,
-    };
+    // ۳. تشکیل ماتریس مالی و بهای تمام‌شده به ازای هر محصول
+    const productFinancials = products.map((p) => {
+      let unitsSoldMonthly = 0;
+      let totalRevenueMonthly = 0;
 
-    try {
-      let saved: any = null;
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      monthlyOrders.forEach((o) => {
+        const items = o.items || [];
+        items.forEach((item: any) => {
+          if (String(item.productId || item.product_id) === String(p.id)) {
+            const qty = Number(item.quantity || 1);
+            unitsSoldMonthly += qty;
+            totalRevenueMonthly += Number(item.price || p.price || 0) * qty;
+          }
+        });
       });
 
-      const json = await res.json();
-      if (res.ok && json.success && json.data) {
-        saved = json.data;
-      } else {
-        const dbPayload: Record<string, any> = {
-          id: productId,
-          name: cleanTitle,
-          title: cleanTitle,
-          title_fa: product.title_fa || cleanTitle,
-          sku: product.sku || ("SKU-" + productId.slice(-6).toUpperCase()),
-          brand: product.brand || "Apple",
-          category: product.category || "تجهیزات تخصصی",
-          price: Number(product.price || 0),
-          discount_price: product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : null),
-          stock: product.stock !== undefined ? Number(product.stock) : 10,
-          is_available: product.isAvailable ?? product.is_available ?? true,
-          image: product.image || (product.images && product.images[0]) || null,
-          images: product.images || [],
-          description: product.description || null,
-          warranty: product.warranty || "گارانتی اصالت طلایی",
-          variants: product.variants || [],
-          specs: product.specs || {},
-          meta_title: product.meta_title || cleanTitle,
-          meta_description: product.meta_description || null,
-        };
+      const sellingPrice = Number(p.discountPrice || p.discount_price || p.price || 0);
+      // قیمت خرید واحد (پیش‌فرض برآورد هوشمند در صورت عدم ثبت دستی: ۷۰٪ نرخ فروش)
+      const purchasePrice = Number(p.purchase_price || p.purchasePrice || Math.round(sellingPrice * 0.7));
+      
+      // ۱۰٪ مالیات بر ارزش افزوده روی فروش ناخالص
+      const vatPerUnit = Math.round(sellingPrice * 0.1);
+      // بهای خالص فروش منهای مالیات
+      const netSellingRevenuePerUnit = sellingPrice - vatPerUnit;
+      // سود خالص هر واحد
+      const netProfitPerUnit = Math.max(0, netSellingRevenuePerUnit - purchasePrice);
 
-        const { data: existing } = await supabase.from("products").select("id").eq("id", productId).maybeSingle();
+      const totalPurchaseCostMonthly = unitsSoldMonthly * purchasePrice;
+      const totalVatMonthly = Math.round(totalRevenueMonthly * 0.1);
+      const totalNetProfitMonthly = Math.max(0, (totalRevenueMonthly - totalVatMonthly) - totalPurchaseCostMonthly);
+      const profitMarginPercent = sellingPrice > 0 ? Math.round((netProfitPerUnit / sellingPrice) * 100) : 0;
 
-        if (existing) {
-          const { data, error } = await supabase.from("products").update(dbPayload).eq("id", productId).select().single();
-          if (!error) saved = data;
-        } else {
-          dbPayload.created_at = new Date().toISOString();
-          const { data, error } = await supabase.from("products").insert([dbPayload]).select().single();
-          if (!error) saved = data;
-        }
-      }
+      return {
+        id: String(p.id),
+        title: p.title || p.name || "کالای بدون عنوان",
+        category: p.category || "تجهیزات",
+        stock: p.stock !== undefined && p.stock !== null ? Number(p.stock) : 0,
+        isAvailable: p.is_available !== false,
+        sellingPrice,
+        purchasePrice,
+        vatPerUnit,
+        netProfitPerUnit,
+        profitMarginPercent,
+        unitsSoldMonthly,
+        totalRevenueMonthly,
+        totalPurchaseCostMonthly,
+        totalVatMonthly,
+        totalNetProfitMonthly,
+      };
+    });
 
-      // انتشار زنده رویداد در مرورگر برای جهش لحظه‌ای ویترین کالاها
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("products_updated", { detail: saved }));
-      }
-      return saved;
-    } catch (e) {
-      console.error("Save product error:", e);
-      return null;
+    // خلاصه تراز مالی کل استودیو
+    const summary = {
+      totalInventoryAssets: productFinancials.reduce((acc, p) => acc + (p.stock * p.purchasePrice), 0),
+      totalMonthlySalesGross: productFinancials.reduce((acc, p) => acc + p.totalRevenueMonthly, 0),
+      totalMonthlyVAT: productFinancials.reduce((acc, p) => acc + p.totalVatMonthly, 0),
+      totalMonthlyNetProfit: productFinancials.reduce((acc, p) => acc + p.totalNetProfitMonthly, 0),
+      totalUnitsSold: productFinancials.reduce((acc, p) => acc + p.unitsSoldMonthly, 0),
+    };
+
+    return NextResponse.json({
+      success: true,
+      summary,
+      productFinancials,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
-  },
 
-  async deleteProduct(id: string): Promise<boolean> {
+    const body = await req.json();
+    const { productId, purchasePrice, stockDelta, supplier, referenceNote } = body;
+
+    if (!productId) {
+      return NextResponse.json({ success: false, message: "شناسه کالا الزامی است." }, { status: 400 });
+    }
+
+    // ۱. دریافت کالا
+    const { data: product } = await supabaseAdmin.from("products").select("*").eq("id", productId).single();
+    if (!product) {
+      return NextResponse.json({ success: false, message: "کالا یافت نشد." }, { status: 404 });
+    }
+
+    const currentStock = Number(product.stock || 0);
+    const newStock = Math.max(0, currentStock + Number(stockDelta || 0));
+    const newPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : (product.purchase_price || 0);
+
+    // ۲. آپدیت کالا در دیتابیس
+    await supabaseAdmin.from("products").update({
+      stock: newStock,
+      purchase_price: newPurchasePrice,
+      is_available: newStock > 0,
+      updated_at: new Date().toISOString(),
+    }).eq("id", productId);
+
+    // ۳. لاگ سوابق انبارداری در صورت وجود جدول
     try {
-      const res = await fetch("/api/products?id=" + encodeURIComponent(id), { method: "DELETE" });
-      const ok = res.ok;
-      if (ok && typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("products_updated", { detail: { id, deleted: true } }));
-      }
-      return ok;
-    } catch {
-      return false;
-    }
-  },
-};
+      await supabaseAdmin.from("inventory_logs").insert([{
+        id: "log_" + Date.now(),
+        product_id: productId,
+        product_title: product.title || product.name,
+        change_type: Number(stockDelta || 0) >= 0 ? "restock" : "adjustment",
+        quantity: Math.abs(Number(stockDelta || 0)),
+        cost_price: newPurchasePrice,
+        supplier: supplier || "تأمین‌کننده رسمی",
+        reference_note: referenceNote || "ثبت سیستمی انبارگردانی",
+        created_at: new Date().toISOString(),
+      }]);
+    } catch {}
+
+    return NextResponse.json({ success: true, message: "تراکنش انبار و بهای خرید در دیتابیس ذخیره شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
 `;
-writeFile('services/productService.ts', realProductService);
+writeFile('app/api/accounting/route.ts', accountingApiRoute);
 
 // =============================================================================
-// ۲. اصلاح app/products/page.tsx: اتصال وب‌سوکت Realtime CDC جهت به‌روزرسانی بدون رفرش
+// ۲. بازنویسی کامپوننت components/AdminInventoryManager.tsx به پنل پیشرفته حسابداری
 // =============================================================================
-const productsCatalogPage = `"use client";
+const accountingDashboardComponent = `"use client";
 
 import React, { useState, useEffect } from "react";
-import ProductCard from "@/components/ProductCard";
-import { productService, Product } from "@/services/productService";
-import { categoryService, Category } from "@/services/categoryService";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 
-export default function ProductsCatalogPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [onlyAvailable, setOnlyAvailable] = useState(false);
-  const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc">("newest");
+interface FinancialItem {
+  id: string;
+  title: string;
+  category: string;
+  stock: number;
+  isAvailable: boolean;
+  sellingPrice: number;
+  purchasePrice: number;
+  vatPerUnit: number;
+  netProfitPerUnit: number;
+  profitMarginPercent: number;
+  unitsSoldMonthly: number;
+  totalRevenueMonthly: number;
+  totalPurchaseCostMonthly: number;
+  totalVatMonthly: number;
+  totalNetProfitMonthly: number;
+}
 
-  const loadData = async () => {
+export default function AdminInventoryManager() {
+  const [items, setItems] = useState<FinancialItem[]>([]);
+  const [summary, setSummary] = useState({
+    totalInventoryAssets: 0,
+    totalMonthlySalesGross: 0,
+    totalMonthlyVAT: 0,
+    totalMonthlyNetProfit: 0,
+    totalUnitsSold: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [activeModalItem, setActiveModalItem] = useState<FinancialItem | null>(null);
+
+  // فرم ورود بار به انبار
+  const [stockDelta, setStockDelta] = useState<number>(10);
+  const [costPriceInput, setCostPriceInput] = useState<number>(0);
+  const [supplierInput, setSupplierInput] = useState("");
+  const [noteInput, setNoteInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchAccountingData = async () => {
     try {
-      const [prodsData, catsData] = await Promise.all([
-        productService.getAll(),
-        categoryService.getAll(),
-      ]);
-      setProducts(prodsData || []);
-      setCategories(catsData || []);
-    } catch (err) {
-      console.error("Error loading products:", err);
+      const res = await fetch("/api/accounting", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success) {
+        setItems(json.productFinancials || []);
+        setSummary(json.summary || {});
+      }
+    } catch (e) {
+      console.error("Accounting data error:", e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    fetchAccountingData();
 
-    // رویداد محلی
-    const handleProductsUpdate = () => loadData();
-    window.addEventListener("products_updated", handleProductsUpdate);
+    // اتصال بلادرنگ به تغییرات موجودی و سفارش‌ها
+    const chProds = supabase.channel("accounting-realtime-prods")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => fetchAccountingData())
+      .subscribe();
 
-    // وب‌سوکت بلادرنگ دیتابیس Supabase Realtime CDC
-    const channel = supabase
-      .channel("realtime-products-catalog")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        loadData();
-      })
+    const chOrders = supabase.channel("accounting-realtime-orders")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchAccountingData())
       .subscribe();
 
     return () => {
-      window.removeEventListener("products_updated", handleProductsUpdate);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(chProds);
+      supabase.removeChannel(chOrders);
     };
   }, []);
 
-  const handleCategorySelect = (catName: string) => {
+  const openWarehouseModal = (item: FinancialItem) => {
     soundEngine.playClick();
-    setSelectedCategory(catName);
+    setActiveModalItem(item);
+    setCostPriceInput(item.purchasePrice);
+    setStockDelta(10);
+    setSupplierInput("نمایندگی رسمی اپل / دبی");
+    setNoteInput("پارت ورودی جدید با فاکتور رسمی");
   };
 
-  const filtered = products.filter((p) => {
-    const matchesSearch =
-      (p.title || p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.title_fa || "").toLowerCase().includes(searchQuery.toLowerCase());
+  const handleStockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeModalItem) return;
 
-    const matchesCategory =
-      selectedCategory === "all" ||
-      p.category === selectedCategory;
+    soundEngine.playClick();
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/accounting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: activeModalItem.id,
+          purchasePrice: costPriceInput,
+          stockDelta,
+          supplier: supplierInput,
+          referenceNote: noteInput,
+        }),
+      });
 
-    const matchesAvail =
-      !onlyAvailable ||
-      (p.is_available !== false && (p.stock === undefined || p.stock === null || p.stock > 0));
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        alert("✓ سند ورود به انبار و بهای تمام‌شده با موفقیت در دیتابیس ثبت شد.");
+        setActiveModalItem(null);
+        fetchAccountingData();
+      } else {
+        alert(json.message || "خطا در ثبت سند.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    return matchesSearch && matchesCategory && matchesAvail;
-  });
+  // صدور فایل اکسل حسابرسی استاندارد
+  const exportToExcel = () => {
+    soundEngine.playClick();
+    const headers = [
+      "شناسه کالا",
+      "نام محصول",
+      "دسته‌بندی",
+      "موجودی انبار",
+      "بهای خرید واحد (تومان)",
+      "بهای فروش واحد (تومان)",
+      "مالیات بر ارزش افزوده ۱۰٪ واحد",
+      "سود خالص هر واحد",
+      "حاشیه سود ٪",
+      "تعداد فروش ۳۰ روزه",
+      "فروش ناخالص ماهانه (تومان)",
+      "مالیات ۱۰٪ ماهانه (تومان)",
+      "سود خالص ماهانه (تومان)"
+    ];
 
-  filtered.sort((a, b) => {
-    const priceA = Number(a.discountPrice || a.price || 0);
-    const priceB = Number(b.discountPrice || b.price || 0);
+    const rows = items.map((i) => [
+      i.id,
+      '"' + i.title.replace(/"/g, '""') + '"',
+      i.category,
+      i.stock,
+      i.purchasePrice,
+      i.sellingPrice,
+      i.vatPerUnit,
+      i.netProfitPerUnit,
+      i.profitMarginPercent + "%",
+      i.unitsSoldMonthly,
+      i.totalRevenueMonthly,
+      i.totalVatMonthly,
+      i.totalNetProfitMonthly
+    ]);
 
-    if (sortBy === "price_asc") return priceA - priceB;
-    if (sortBy === "price_desc") return priceB - priceA;
-    return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-  });
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\\r\\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "گزارش_حسابرسی_و_انبارداری_آکسون_" + new Date().toLocaleDateString("fa-IR").replace(/\\//g, "-") + ".csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const filtered = items.filter(
+    (i) => i.title.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
-      <div className="text-center space-y-3">
-        <h1 className="text-2xl sm:text-4xl font-black tracking-tight">کاتالوگ تجهیزات دیجیتال، مانیتورهای ۵K و استودیو</h1>
-        <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-xl mx-auto font-medium leading-relaxed">
-          به‌روزرسانی لحظه‌ای موجودی و کالاها مستقیماً از انبار استودیو
-        </p>
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      
+      {/* هدر ماژول حسابداری و انبار */}
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>📊</span> سیستم جامع حسابداری، بهای تمام‌شده و انبارداری متمرکز
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            محاسبه خودکار ۱۰٪ مالیات ارزش افزوده، بهای خرید، سود خالص هر کالا و صدور ترازنامه رسمی
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={exportToExcel}
+            className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5"
+          >
+            <span>📥</span>
+            <span>صدور خروجی رسمی Excel / CSV</span>
+          </button>
+          <button
+            onClick={fetchAccountingData}
+            className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer"
+            title="به‌روزرسانی محاسبات"
+          >
+            🔄
+          </button>
+        </div>
       </div>
 
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 text-xs scrollbar-none">
-            <button
-              onClick={() => handleCategorySelect("all")}
-              className={"px-4 py-2.5 rounded-2xl font-bold cursor-pointer transition whitespace-nowrap " + (
-                selectedCategory === "all" ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-              )}
-            >
-              همه کالاها ({products.length})
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => handleCategorySelect(cat.name)}
-                className={"px-4 py-2.5 rounded-2xl font-bold cursor-pointer transition whitespace-nowrap " + (
-                  selectedCategory === cat.name ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-                )}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
+      {/* کارت‌های شاخص‌های مالی و سودآوری */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5 shadow-sm">
+          <span className="text-[var(--text-secondary)] font-bold block">ارزش سرمایه موجود در انبار:</span>
+          <span className="text-xl font-black font-mono text-[var(--accent-blue)] block">
+            {summary.totalInventoryAssets.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
+          </span>
+          <span className="text-[10px] text-slate-400 font-medium">بر مبنای بهای خرید (COGS)</span>
+        </div>
 
-          <div className="w-full md:w-80">
+        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5 shadow-sm">
+          <span className="text-[var(--text-secondary)] font-bold block">گردش فروش ۳۰ روزه:</span>
+          <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400 block">
+            {summary.totalMonthlySalesGross.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
+          </span>
+          <span className="text-[10px] text-slate-400 font-medium">تیراژ: {summary.totalUnitsSold} کالا فروخته شده</span>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5 shadow-sm">
+          <span className="text-[var(--text-secondary)] font-bold block">مالیات بر ارزش افزوده (۱۰٪):</span>
+          <span className="text-xl font-black font-mono text-amber-500 block">
+            {summary.totalMonthlyVAT.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
+          </span>
+          <span className="text-[10px] text-slate-400 font-medium">تعهد مالیاتی ثبت‌شده ۳۰ روزه</span>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-emerald-500/30 space-y-1.5 shadow-sm bg-emerald-500/5">
+          <span className="text-emerald-600 dark:text-emerald-400 font-black block">سود خالص عملیاتی ۳۰ روزه:</span>
+          <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 block">
+            {summary.totalMonthlyNetProfit.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
+          </span>
+          <span className="text-[10px] text-emerald-500 font-medium">پس از کسر خرید و کسر ۱۰٪ مالیات</span>
+        </div>
+      </div>
+
+      {/* جستجو و جدول جامع حسابداری کالاها */}
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-4">
+        <div className="flex justify-between items-center gap-4">
+          <h3 className="font-black text-xs text-[var(--text-primary)]">
+            📋 ماتریس بهای تمام‌شده، مالیات و انبارگردانی ({items.length} قلم کالا)
+          </h3>
+          <div className="w-72">
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 جستجو در نام، مدل یا مشخصات..."
-              className="w-full px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
+              placeholder="🔍 جستجو در اقلام انبار..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
             />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-[var(--card-border)] text-xs">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="onlyAvailCheckbox"
-              checked={onlyAvailable}
-              onChange={(e) => setOnlyAvailable(e.target.checked)}
-              className="w-4 h-4 rounded-lg cursor-pointer text-[var(--accent-blue)]"
-            />
-            <label htmlFor="onlyAvailCheckbox" className="font-bold cursor-pointer">
-              فقط کالاهای موجود در انبار
-            </label>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[var(--text-secondary)] font-bold">مرتب‌سازی:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-            >
-              <option value="newest">جدیدترین محصولات</option>
-              <option value="price_asc">ارزان‌ترین به گران‌ترین</option>
-              <option value="price_desc">گران‌ترین به ارزان‌ترین</option>
-            </select>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-xs border-collapse min-w-[950px]">
+            <thead>
+              <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3 text-[11px]">
+                <th className="p-3">نام محصول</th>
+                <th className="p-3 text-center">موجودی انبار</th>
+                <th className="p-3">بهای خرید واحد</th>
+                <th className="p-3">نرخ فروش واحد</th>
+                <th className="p-3 text-center">مالیات ۱۰٪</th>
+                <th className="p-3">سود خالص واحد</th>
+                <th className="p-3 text-center">فروش ماه</th>
+                <th className="p-3">سود کل ماهانه</th>
+                <th className="p-3 text-center">انبارگردانی</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--card-border)] font-medium">
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">در حال پردازش تراز مالی و استعلام بلادرنگ انبار...</td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">کالایی یافت نشد.</td>
+                </tr>
+              ) : (
+                filtered.map((item) => (
+                  <tr key={item.id} className="hover:bg-[var(--input-bg)]/60 transition">
+                    <td className="p-3">
+                      <div className="font-black text-[var(--text-primary)]">{item.title}</div>
+                      <span className="text-[10px] text-[var(--text-secondary)]">{item.category}</span>
+                    </td>
+                    <td className="p-3 text-center font-mono font-bold">
+                      <span className={"px-2.5 py-1 rounded-xl " + (item.stock < 3 ? "bg-rose-500/15 text-rose-500 font-black" : "bg-emerald-500/15 text-emerald-600")}>
+                        {item.stock} عدد
+                      </span>
+                    </td>
+                    <td className="p-3 font-mono font-bold text-slate-400">
+                      {item.purchasePrice.toLocaleString("fa-IR")} ت
+                    </td>
+                    <td className="p-3 font-mono font-black text-[var(--text-primary)]">
+                      {item.sellingPrice.toLocaleString("fa-IR")} ت
+                    </td>
+                    <td className="p-3 text-center font-mono text-amber-500 font-bold">
+                      {item.vatPerUnit.toLocaleString("fa-IR")} ت
+                    </td>
+                    <td className="p-3 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                      {item.netProfitPerUnit.toLocaleString("fa-IR")} ت
+                      <span className="text-[9px] text-slate-400 mr-1">({item.profitMarginPercent}%)</span>
+                    </td>
+                    <td className="p-3 text-center font-mono font-bold">
+                      {item.unitsSoldMonthly} عدد
+                    </td>
+                    <td className="p-3 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                      {item.totalNetProfitMonthly.toLocaleString("fa-IR")} ت
+                    </td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => openWarehouseModal(item)}
+                        className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white font-black text-[11px] transition cursor-pointer"
+                      >
+                        📦 ثبت ورود بار
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {loading && products.length === 0 ? (
-        <div className="min-h-[40vh] flex items-center justify-center">
-          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="p-16 text-center rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-secondary)]">
-          کالایی مطابق با فیلترهای انتخابی شما یافت نشد.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+      {/* مدال ثبت پارت ورودی انبارگردانی */}
+      {activeModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
+          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <h3 className="font-black text-sm">سند انبارداری و ثبت بهای خرید: {activeModalItem.title}</h3>
+              <button onClick={() => setActiveModalItem(null)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleStockSubmit} className="space-y-4">
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تعداد ورودی به انبار (+ واحد):</label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={stockDelta}
+                  onChange={(e) => setStockDelta(Number(e.target.value))}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">بهای خرید هر واحد فاکتور (تومان):</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={costPriceInput}
+                  onChange={(e) => setCostPriceInput(Number(e.target.value))}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام تأمین‌کننده / منبع بار:</label>
+                <input
+                  type="text"
+                  value={supplierInput}
+                  onChange={(e) => setSupplierInput(e.target.value)}
+                  placeholder="مثال: واردکننده رسمی، انبار مرکزی..."
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره بارنامه یا یادداشت مرجع:</label>
+                <input
+                  type="text"
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  placeholder="مثال: فاکتور خرید ۹۸۵۴ پارت جدید..."
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-medium outline-none"
+                />
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] leading-relaxed text-blue-400 font-medium">
+                ⚡ با ثبت این سند، موجودی انبار به میزان {stockDelta} عدد افزایش یافته و مبنای سود خالص و مالیات ۱۰٪ در ترازنامه به‌روزرسانی می‌شود.
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? "در حال ثبت سند مالی..." : "ثبت قطعی در انبار و کاردکس کالا 🔒"}
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>
   );
 }
 `;
-writeFile('app/products/page.tsx', productsCatalogPage);
+writeFile('components/AdminInventoryManager.tsx', accountingDashboardComponent);
 
 // =============================================================================
-// ۳. تست بیلد کامل و استقرار روی گیت‌هاب
+// ۳. به‌روزرسانی نام ماژول در سایدبار: components/admin/AdminSidebar.tsx
 // =============================================================================
-console.log("تست بیلد کامل (npm run build)...");
+const sidebarFile = path.join(process.cwd(), 'components/admin/AdminSidebar.tsx');
+let sidebarContent = fs.readFileSync(sidebarFile, 'utf8');
+sidebarContent = sidebarContent.replace(
+  /\{\s*id:\s*"inventory",\s*title:\s*"[^"]*",/g,
+  '{ id: "inventory", title: "حسابداری، سود و انبارداری",'
+);
+writeFile('components/admin/AdminSidebar.tsx', sidebarContent);
+
+// =============================================================================
+// ۴. اعتبارسنجی بیلد و پوش به گیت‌هاب
+// =============================================================================
+console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -403,7 +604,7 @@ console.log("ارسال تغییرات به گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(realtime): instant zero-refresh product sync via Supabase CDC webhooks and client events"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(accounting): enterprise financial ledger, 10% VAT engine, WMS stock audit and excel export"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -412,7 +613,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ سیستم همگام‌سازی بلادرنگ (Zero-Refresh) با موفقیت روی سرور مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ سامانه یکپارچه حسابداری و انبارداری با موفقیت روی سرور مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

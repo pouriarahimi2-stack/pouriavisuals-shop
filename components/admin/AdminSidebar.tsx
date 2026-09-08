@@ -22,7 +22,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: "dashboard", title: "داشبورد و آمار زنده", href: "/admin", icon: "📊" },
       { id: "products", title: "کاتالوگ کالاها", href: "/admin/products", icon: "📦" },
-      { id: "inventory", title: "موجودی و انبار", href: "/admin/inventory", icon: "📥" },
+      { id: "inventory", title: "حسابداری، سود و انبارداری", href: "/admin/inventory", icon: "📥" },
       { id: "orders", title: "سفارش‌ها و فاکتورها", href: "/admin/orders", icon: "📄" },
       { id: "coupons", title: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
     ],

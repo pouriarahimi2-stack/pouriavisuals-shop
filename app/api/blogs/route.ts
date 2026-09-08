@@ -12,77 +12,79 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-
-    const mappedPosts = (data || []).map((p: any) => ({
-      id: String(p.id),
-      title: p.title,
-      slug: p.slug,
-      content: p.content,
-      category: p.category || "راهنمای خرید و بررسی",
-      imageUrl: p.image_url,
-      image_url: p.image_url,
-      metaDescription: p.meta_description,
-      meta_description: p.meta_description,
-      metaKeywords: p.meta_keywords,
-      isPublished: p.is_published !== false,
-      is_published: p.is_published !== false,
-      viewsCount: Number(p.views_count || 0),
-      createdAt: p.created_at,
-      created_at: p.created_at,
-    }));
-
-    return NextResponse.json({ success: true, posts: mappedPosts, data: mappedPosts });
-  } catch (error: any) {
-    console.error("API Blogs GET Error:", error);
-    return NextResponse.json({ success: false, posts: [], data: [], error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, data: data || [], posts: data || [] });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. ورود به پنل مدیریت الزامی است." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const body = await req.json();
-    const cleanSlug = (body.slug || body.title || `post-${Date.now()}`)
+    const cleanTitle = String(body.title || "").trim();
+
+    if (!cleanTitle) {
+      return NextResponse.json({ success: false, message: "عنوان مقاله الزامی است." }, { status: 400 });
+    }
+
+    const postId = String(body.id || ("post_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6)));
+    const cleanSlug = String(body.slug || cleanTitle)
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
       .replace(/^-+|-+$/g, "");
 
     const payload: Record<string, any> = {
-      title: body.title.trim(),
+      id: postId,
+      title: cleanTitle,
       slug: cleanSlug,
-      content: body.content,
-      category: body.category || "راهنمای خرید و بررسی",
-      image_url: body.imageUrl || body.image_url || null,
-      meta_description: body.metaDescription || body.meta_description || null,
-      meta_keywords: body.metaKeywords || body.meta_keywords || null,
-      is_published: body.isPublished !== false && body.is_published !== false,
+      content: body.content || "",
+      category: body.category || "مقاله تخصصی",
+      image_url: body.image_url || body.imageUrl || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+      meta_description: body.meta_description || body.metaDescription || cleanTitle,
+      is_published: body.is_published !== false && body.isPublished !== false,
       updated_at: new Date().toISOString(),
     };
 
-    if (body.id && !String(body.id).startsWith("temp_") && !String(body.id).startsWith("post-")) {
-      const { data, error } = await supabaseAdmin
-        .from("posts")
-        .update(payload)
-        .eq("id", body.id)
-        .select()
-        .single();
+    const { data: existing } = await supabaseAdmin.from("posts").select("id").eq("id", postId).maybeSingle();
+
+    if (existing) {
+      const { data, error } = await supabaseAdmin.from("posts").update(payload).eq("id", postId).select().single();
       if (error) throw error;
-      return NextResponse.json({ success: true, post: data });
+      return NextResponse.json({ success: true, message: "مقاله با موفقیت به‌روزرسانی شد.", data, post: data });
     } else {
-      const { data, error } = await supabaseAdmin
-        .from("posts")
-        .insert([payload])
-        .select()
-        .single();
+      payload.created_at = new Date().toISOString();
+      const { data, error } = await supabaseAdmin.from("posts").insert([payload]).select().single();
       if (error) throw error;
-      return NextResponse.json({ success: true, post: data });
+      return NextResponse.json({ success: true, message: "مقاله جدید با موفقیت منتشر گردید.", data, post: data });
     }
-  } catch (error: any) {
-    console.error("API Blogs POST Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه مقاله الزامی است." }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin.from("posts").delete().eq("id", id);
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, message: "مقاله با موفقیت از پایگاه داده حذف شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

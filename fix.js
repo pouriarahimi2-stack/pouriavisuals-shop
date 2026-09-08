@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Enterprise CRM System, Customer Lifecycle & Security Engine (fix.js)
+ * AXON CORE - Full Support Ticket & Messaging System with Edit, Delete & Realtime CDC (fix.js)
  */
 
 const fs = require('fs');
@@ -14,176 +14,151 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ به‌روزرسانی شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-CRM]\x1b[0m استقرار سامانه جامع مدیریت ارتباط با مشتریان (Enterprise CRM)...");
+console.log("\x1b[36m[AXON-TICKETING]\x1b[0m استقرار سامانه تیکتینگ دوطرفه، ویرایش پیام‌ها و اتصال بلادرنگ به دیتابیس...");
 
 // =============================================================================
-// ۱. ساخت روت سروری امن CRM: app/api/crm/route.ts
+// ۱. بازنویسی روت سروری app/api/contact/route.ts با متدهای GET, POST, PATCH, PUT, DELETE
 // =============================================================================
-const crmApiRoute = `import { NextRequest, NextResponse } from "next/server";
+const contactApiRoute = `import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { sendSMS } from "@/services/smsService";
 
 export const dynamic = "force-dynamic";
 
-// واکشی کل اطلاعات CRM همراه با ادغام سفارشات ثبت‌شده
+// دریافت پیام‌ها (ویژه ادمین)
 export async function GET(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
-    // ۱. دریافت مشتریان ذخیره‌شده در جدول crm_customers
-    let crmCustomers: any[] = [];
-    const { data: dbCrm, error: crmErr } = await supabaseAdmin
-      .from("crm_customers")
+    const { data, error } = await supabaseAdmin
+      .from("contact_messages")
       .select("*")
-      .order("updated_at", { ascending: false });
+      .order("created_at", { ascending: false });
 
-    if (!crmErr && dbCrm) {
-      crmCustomers = dbCrm;
-    }
-
-    // ۲. بررسی سفارش‌ها جهت کشف خریداران جدید و همگام‌سازی خودکار (Auto-Sync)
-    const { data: orders } = await supabaseAdmin
-      .from("orders")
-      .select("customer_name, phone, address, postal_code, final_amount, total_amount, created_at, status")
-      .neq("status", "cancelled");
-
-    const ordersByPhone = new Map<string, { totalSpent: number; count: number; name: string; address: string; postal: string }>();
-
-    (orders || []).forEach((o: any) => {
-      const phone = String(o.phone || "").trim();
-      if (!phone) return;
-      const amount = Number(o.final_amount || o.total_amount || 0);
-
-      if (ordersByPhone.has(phone)) {
-        const item = ordersByPhone.get(phone)!;
-        item.totalSpent += amount;
-        item.count += 1;
-        if (o.customer_name) item.name = o.customer_name;
-        if (o.address) item.address = o.address;
-      } else {
-        ordersByPhone.set(phone, {
-          totalSpent: amount,
-          count: 1,
-          name: o.customer_name || "خریدار محترم",
-          address: o.address || "",
-          postal: o.postal_code || "",
-        });
-      }
-    });
-
-    // ۳. ادغام و همگام‌سازی دوطرفه
-    const finalMap = new Map<string, any>();
-
-    // اول مشتریان ثبت‌شده در CRM
-    crmCustomers.forEach((c) => {
-      const orderStat = ordersByPhone.get(c.phone);
-      const spent = orderStat ? Math.max(c.total_spent || 0, orderStat.totalSpent) : (c.total_spent || 0);
-      const count = orderStat ? Math.max(c.order_count || 0, orderStat.count) : (c.order_count || 0);
-      
-      let stage = c.lifecycle_stage || "lead";
-      if (spent > 100000000) stage = "vip";
-      else if (count >= 3) stage = "active";
-      else if (count >= 1) stage = "prospect";
-
-      finalMap.set(c.phone, {
-        ...c,
-        total_spent: spent,
-        order_count: count,
-        lifecycle_stage: stage,
-      });
-    });
-
-    // اضافه کردن خریدارانی که هنوز در crm_customers ذخیره نشده‌اند
-    ordersByPhone.forEach((val, phone) => {
-      if (!finalMap.has(phone)) {
-        let stage = "prospect";
-        if (val.totalSpent > 100000000) stage = "vip";
-        else if (val.count >= 2) stage = "active";
-
-        const newProfile = {
-          id: "crm_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-          full_name: val.name,
-          phone: phone,
-          address: val.address,
-          postal_code: val.postal,
-          total_spent: val.totalSpent,
-          order_count: val.count,
-          lifecycle_stage: stage,
-          tags: [stage === "vip" ? "الماس VIP" : "خریدار آنلاین"],
-          internal_notes: "ثبت خودکار از طریق فاکتور فروشگاهی",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        finalMap.set(phone, newProfile);
-
-        // ذخیره نامحسوس در جدول دیتابیس CRM
-        supabaseAdmin.from("crm_customers").insert([newProfile]).then();
-      }
-    });
-
-    return NextResponse.json({
-      success: true,
-      customers: Array.from(finalMap.values()),
-    });
+    if (error) throw error;
+    return NextResponse.json({ success: true, data: data || [] });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
-// ایجاد دستی مشتری جدید یا ویرایش پرونده
+// ثبت تیکت جدید توسط کاربر از سایت
 export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { full_name, phone, email, subject, message } = body;
+
+    const cleanPhone = String(phone || "").trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\\D/g, "");
+    if (!cleanPhone || cleanPhone.length !== 11) {
+      return NextResponse.json({ success: false, message: "شماره موبایل ۱۱ رقمی الزامی است." }, { status: 400 });
+    }
+
+    const ticketId = "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+
+    const payload: Record<string, any> = {
+      id: ticketId,
+      full_name: String(full_name || "کاربر سایت").trim(),
+      phone: cleanPhone,
+      email: email ? String(email).trim() : null,
+      subject: String(subject || "درخواست مشاوره تخصصی").trim(),
+      message: String(message || "").trim(),
+      status: "pending",
+      is_read: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabaseAdmin.from("contact_messages").insert([payload]).select().single();
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, message: "تیکت شما با موفقیت ثبت شد و پاسخ به زودی پیامک خواهد شد.", data });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+// پاسخگویی ادمین به تیکت + ارسال پیامک SMS
+export async function PATCH(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const body = await req.json();
-    const { id, full_name, phone, email, province, city, address, postal_code, lifecycle_stage, tags, internal_notes } = body;
+    const { id, admin_reply, status } = body;
 
-    const cleanPhone = String(phone || "").trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\\D/g, "");
-
-    if (!cleanPhone || cleanPhone.length !== 11) {
-      return NextResponse.json({ success: false, message: "شماره تلفن همراه ۱۱ رقمی معتبر الزامی است." }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه تیکت الزامی است." }, { status: 400 });
     }
 
-    const cleanName = String(full_name || "مشتری جدید").trim();
-    const customerId = id || ("crm_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
+    // واکشی پیام جهت دریافت شماره کاربر
+    const { data: ticket } = await supabaseAdmin.from("contact_messages").select("*").eq("id", id).single();
+    if (!ticket) {
+      return NextResponse.json({ success: false, message: "تیکت یافت نشد." }, { status: 404 });
+    }
 
-    const payload: Record<string, any> = {
-      id: customerId,
-      full_name: cleanName,
-      phone: cleanPhone,
-      email: email ? String(email).trim() : null,
-      province: province || "تهران",
-      city: city || "تهران",
-      address: address ? String(address).trim() : null,
-      postal_code: postal_code ? String(postal_code).trim() : null,
-      lifecycle_stage: lifecycle_stage || "lead",
-      tags: Array.isArray(tags) ? tags : ["مخاطب حضوری"],
-      internal_notes: internal_notes ? String(internal_notes).trim() : null,
+    const replyClean = String(admin_reply || "").trim();
+    const updatePayload: Record<string, any> = {
+      admin_reply: replyClean,
+      status: status || "answered",
+      is_read: true,
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabaseAdmin.from("crm_customers").select("id").eq("phone", cleanPhone).maybeSingle();
+    const { data, error } = await supabaseAdmin.from("contact_messages").update(updatePayload).eq("id", id).select().single();
+    if (error) throw error;
 
-    if (existing) {
-      const { data, error } = await supabaseAdmin.from("crm_customers").update(payload).eq("id", existing.id).select().single();
-      if (error) throw error;
-      return NextResponse.json({ success: true, message: "پرونده مشتری با موفقیت به‌روزرسانی شد.", data });
-    } else {
-      payload.created_at = new Date().toISOString();
-      const { data, error } = await supabaseAdmin.from("crm_customers").insert([payload]).select().single();
-      if (error) throw error;
-      return NextResponse.json({ success: true, message: "مشتری جدید در پایگاه داده CRM ثبت گردید.", data });
+    // ارسال خودکار پیامک حاوی پاسخ به شماره همراه خریدار
+    if (ticket.phone && replyClean) {
+      try {
+        const smsMsg = \`سلام \${ticket.full_name} عزیز، پاسخ تیکت شما در آکسون ثبت شد:\\n\${replyClean}\\naxoncore.ir\`;
+        await sendSMS(ticket.phone, smsMsg);
+      } catch (smsErr) {
+        console.warn("SMS sending error:", smsErr);
+      }
     }
+
+    return NextResponse.json({ success: true, message: "پاسخ با موفقیت در دیتابیس ثبت و پیامک برای کاربر ارسال شد.", data });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
-// حذف مشتری از CRM
+// ویرایش متن پیام کاربر یا متن پاسخ مدیر (Edit functionality)
+export async function PUT(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { id, message, admin_reply, subject } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه تیکت الزامی است." }, { status: 400 });
+    }
+
+    const updates: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (message !== undefined) updates.message = String(message).trim();
+    if (admin_reply !== undefined) updates.admin_reply = String(admin_reply).trim();
+    if (subject !== undefined) updates.subject = String(subject).trim();
+
+    const { data, error } = await supabaseAdmin.from("contact_messages").update(updates).eq("id", id).select().single();
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, message: "تغییرات پیام در دیتابیس با موفقیت به‌روزرسانی شد.", data });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+// حذف تیکت از دیتابیس
 export async function DELETE(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
@@ -192,555 +167,467 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    const phone = searchParams.get("phone");
 
-    if (!id && !phone) {
-      return NextResponse.json({ success: false, message: "شناسه یا شماره تماس مشتری الزامی است." }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه پیام الزامی است." }, { status: 400 });
     }
 
-    let query = supabaseAdmin.from("crm_customers").delete();
-    if (id) query = query.eq("id", id);
-    else if (phone) query = query.eq("phone", phone);
-
-    const { error } = await query;
+    const { error } = await supabaseAdmin.from("contact_messages").delete().eq("id", id);
     if (error) throw error;
 
-    return NextResponse.json({ success: true, message: "پرونده مشتری با موفقیت از سیستم CRM حذف گردید." });
+    return NextResponse.json({ success: true, message: "تیکت با موفقیت حذف گردید." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 `;
-writeFile('app/api/crm/route.ts', crmApiRoute);
+writeFile('app/api/contact/route.ts', contactApiRoute);
 
 // =============================================================================
-// ۲. بازنویسی کامل پنل گرافیکی components/admin/AdminCustomers.tsx به یک CRM کامل
+// ۲. بازنویسی پنل گرافیکی تیکت‌ها: components/admin/ContactMessagesManager.tsx
 // =============================================================================
-const enterpriseCrmComponent = `"use client";
+const contactUiComponent = `"use client";
 
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 
-export interface CrmCustomer {
+export interface ContactMessage {
   id: string;
   full_name: string;
   phone: string;
   email?: string;
-  province?: string;
-  city?: string;
-  address?: string;
-  postal_code?: string;
-  lifecycle_stage: "lead" | "prospect" | "active" | "vip" | "at_risk";
-  tags: string[];
-  total_spent: number;
-  order_count: number;
-  internal_notes?: string;
+  subject?: string;
+  message: string;
+  admin_reply?: string;
+  status: "pending" | "answered" | "closed";
+  is_read: boolean;
   created_at?: string;
   updated_at?: string;
 }
 
-export default function AdminCustomers() {
-  const [customers, setCustomers] = useState<CrmCustomer[]>([]);
+export default function ContactMessagesManager() {
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
+  const [replyText, setReplyText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sendingReply, setSendingReply] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [selectedStage, setSelectedStage] = useState<string>("all");
 
-  // وضعیت‌های مدال پرونده و فرم
-  const [editingCustomer, setEditingCustomer] = useState<Partial<CrmCustomer> | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
-  const [activeSmsCustomer, setActiveSmsCustomer] = useState<CrmCustomer | null>(null);
-  const [smsText, setSmsText] = useState("");
-  const [rewardCouponCode, setRewardCouponCode] = useState("");
-  const [sendingSms, setSendingSms] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  // حالت‌های ویرایش پیام اصلی یا ویرایش پاسخ مدیر
+  const [isEditingUserMessage, setIsEditingUserMessage] = useState(false);
+  const [editUserMessageText, setEditUserMessageText] = useState("");
+  const [isEditingAdminReply, setIsEditingAdminReply] = useState(false);
+  const [editAdminReplyText, setEditAdminReplyText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
-  const fetchCrmData = async () => {
+  const fetchMessages = async () => {
     try {
-      const res = await fetch("/api/crm", { cache: "no-store" });
+      const res = await fetch("/api/contact", { cache: "no-store" });
       const json = await res.json();
-      if (json.success && json.customers) {
-        setCustomers(json.customers);
+      if (json.success && json.data) {
+        setMessages(json.data);
+        if (selectedMessage) {
+          const current = json.data.find((m: ContactMessage) => m.id === selectedMessage.id);
+          if (current) setSelectedMessage(current);
+        }
       }
     } catch (e) {
-      console.error("CRM fetch error:", e);
+      console.error("Error fetching messages:", e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCrmData();
+    fetchMessages();
 
-    // اتصال وب‌سوکت بلادرنگ به جدول CRM و فاکتورها
-    const crmCh = supabase.channel("realtime-crm")
-      .on("postgres_changes", { event: "*", schema: "public", table: "crm_customers" }, () => fetchCrmData())
-      .subscribe();
-
-    const ordersCh = supabase.channel("realtime-crm-orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchCrmData())
+    // وب‌سوکت بلادرنگ دیتابیس Supabase Realtime CDC برای دریافت پیام‌ها بدون رفرش
+    const channel = supabase
+      .channel("realtime-contact-messages")
+      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => {
+        fetchMessages();
+      })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(crmCh);
-      supabase.removeChannel(ordersCh);
+      supabase.removeChannel(channel);
     };
   }, []);
 
-  const handleOpenNewCustomer = () => {
+  const handleSelectMessage = async (msg: ContactMessage) => {
     soundEngine.playClick();
-    setEditingCustomer({
-      full_name: "",
-      phone: "",
-      email: "",
-      province: "تهران",
-      city: "تهران",
-      address: "",
-      postal_code: "",
-      lifecycle_stage: "lead",
-      tags: ["ثبت دستی"],
-      internal_notes: "",
-    });
-    setIsModalOpen(true);
-  };
+    setSelectedMessage(msg);
+    setReplyText(msg.admin_reply || "");
+    setIsEditingUserMessage(false);
+    setIsEditingAdminReply(false);
 
-  const handleOpenEditCustomer = (c: CrmCustomer) => {
-    soundEngine.playClick();
-    setEditingCustomer({ ...c });
-    setIsModalOpen(true);
-  };
-
-  const handleSaveCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCustomer || !editingCustomer.phone || !editingCustomer.full_name) return;
-
-    soundEngine.playClick();
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/crm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingCustomer),
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        alert("✓ " + json.message);
-        setIsModalOpen(false);
-        fetchCrmData();
-      } else {
-        alert(json.message || "خطا در ذخیره اطلاعات.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteCustomer = async (c: CrmCustomer) => {
-    if (!confirm(\`آیا از حذف پرونده «\${c.full_name}» از سامانه CRM اطمینان دارید؟\`)) return;
-    soundEngine.playClick();
-    try {
-      const res = await fetch(\`/api/crm?id=\${encodeURIComponent(c.id)}&phone=\${encodeURIComponent(c.phone)}\`, {
-        method: "DELETE",
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        alert("پرونده با موفقیت حذف شد.");
-        fetchCrmData();
-      }
-    } catch {
-      alert("خطا در حذف پرونده.");
-    }
-  };
-
-  // تولید سریع کد تخفیف یکتا و درج در متن پیامک
-  const handleGenerateRewardCoupon = async (c: CrmCustomer) => {
-    soundEngine.playClick();
-    const code = "VIP-" + Math.random().toString(36).substring(2, 7).toUpperCase();
-    setRewardCouponCode(code);
-    setSmsText(\`\${c.full_name} عزیز، به پاس همراهی ارزشمند شما با آکسون، کد تخفیف اختصاصی \${code} با اعتبار ۷ روزه تقدیم می‌گردد. axoncore.ir\`);
-  };
-
-  const handleSendSms = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeSmsCustomer || !smsText.trim()) return;
-
-    soundEngine.playClick();
-    setSendingSms(true);
-    try {
-      // اگر کد تخفیف ایجاد شده بود، کوپن را در جدول coupons دیتابیس فعال می‌کند
-      if (rewardCouponCode) {
-        await fetch("/api/site-info", {
-          method: "POST",
+    // علامت‌گذاری به عنوان خوانده‌شده
+    if (!msg.is_read) {
+      try {
+        await fetch("/api/contact", {
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "create_coupon",
-            code: rewardCouponCode,
-            value: 15, // 15 درصد
-            type: "percent",
-          }),
+          body: JSON.stringify({ id: msg.id, is_read: true }),
         });
-      }
+        setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, is_read: true } : m)));
+      } catch {}
+    }
+  };
 
-      const res = await fetch("/api/sms/send", {
-        method: "POST",
+  // ارسال پاسخ جدید توسط مدیر + ارسال خودکار پیامک
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMessage || !replyText.trim()) return;
+
+    soundEngine.playClick();
+    setSendingReply(true);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phone: activeSmsCustomer.phone,
-          message: smsText.trim(),
+          id: selectedMessage.id,
+          admin_reply: replyText.trim(),
+          status: "answered",
         }),
       });
 
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        alert("✓ پیامک بازاریابی و کد تخفیف اختصاصی با موفقیت ارسال گردید.");
-        setIsSmsModalOpen(false);
-        setSmsText("");
-        setRewardCouponCode("");
+        alert("✓ پاسخ در دیتابیس ثبت و پیامک اطلاع‌رسانی برای خریدار ارسال گردید.");
+        fetchMessages();
       } else {
-        alert(json.message || "خطا در ارسال پیامک.");
+        alert(json.message || "خطا در ارسال پاسخ.");
       }
     } finally {
-      setSendingSms(false);
+      setSendingReply(false);
     }
   };
 
-  const getStageBadge = (stage: CrmCustomer["lifecycle_stage"]) => {
-    switch (stage) {
-      case "vip":
-        return <span className="px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 font-black text-[10px]">💎 VIP الماس</span>;
-      case "active":
-        return <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-black text-[10px]">🟢 خریدار فعال</span>;
-      case "prospect":
-        return <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-[10px]">🟡 در حال مذاکره</span>;
-      case "at_risk":
-        return <span className="px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-black text-[10px]">🔴 ریسک ریزش</span>;
-      default:
-        return <span className="px-3 py-1 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-300 font-black text-[10px]">⚪ سرنخ (Lead)</span>;
+  // ذخیره ویرایش متن پیام اصلی کاربر
+  const handleSaveEditedUserMessage = async () => {
+    if (!selectedMessage || !editUserMessageText.trim()) return;
+    soundEngine.playClick();
+    setSavingEdit(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedMessage.id,
+          message: editUserMessageText.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setIsEditingUserMessage(false);
+        fetchMessages();
+      }
+    } finally {
+      setSavingEdit(false);
     }
   };
 
-  const filtered = customers.filter((c) => {
-    const matchSearch = c.full_name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
-    const matchStage = selectedStage === "all" || c.lifecycle_stage === selectedStage;
-    return matchSearch && matchStage;
+  // ذخیره ویرایش متن پاسخ مدیر
+  const handleSaveEditedAdminReply = async () => {
+    if (!selectedMessage || !editAdminReplyText.trim()) return;
+    soundEngine.playClick();
+    setSavingEdit(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedMessage.id,
+          admin_reply: editAdminReplyText.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setIsEditingAdminReply(false);
+        fetchMessages();
+      }
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // حذف تیکت از دیتابیس
+  const handleDeleteMessage = async (id: string) => {
+    if (!confirm("آیا از حذف این تیکت و تمام سوابق آن از پایگاه داده اطمینان دارید؟")) return;
+    soundEngine.playClick();
+    try {
+      const res = await fetch(\`/api/contact?id=\${encodeURIComponent(id)}\`, { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setSelectedMessage(null);
+        fetchMessages();
+      }
+    } catch {
+      alert("خطا در حذف تیکت.");
+    }
+  };
+
+  const filtered = messages.filter((m) => {
+    const matchSearch =
+      m.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      m.phone.includes(search) ||
+      (m.subject || "").toLowerCase().includes(search.toLowerCase());
+
+    if (filterStatus === "pending") return matchSearch && m.status === "pending";
+    if (filterStatus === "answered") return matchSearch && m.status === "answered";
+    return matchSearch;
   });
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* سربرگ سامانه سازمانی CRM */}
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* هدر ماژول پیام‌ها و تیکت‌ها */}
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>👥</span> سامانه هوشمند مدیریت ارتباط با مشتریان (Enterprise CRM)
+            <span>📩</span> مرکز مدیریت تیکت‌های مشاوره و پیام‌های بلادرنگ
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پایش چرخه عمر مشتریان، ارزش مادام‌العمر (LTV)، ثبت دستی و ارسال پیامک بازاریابی هدفمند
+            پاسخگویی آنی، ارسال خودکار پیامک، قابلیت ویرایش دوطرفه پیام‌ها و حذف از پایگاه داده
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex gap-2">
           <button
-            onClick={handleOpenNewCustomer}
-            className="px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center gap-1.5"
-          >
-            <span>➕</span>
-            <span>افزودن دستی مخاطب</span>
-          </button>
-          <button
-            onClick={fetchCrmData}
-            className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer"
-            title="همگام‌سازی بلادرنگ"
-          >
-            🔄
-          </button>
-        </div>
-      </div>
-
-      {/* خط لوله و فیلترهای استراتژیک مرحله مشتری */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
-        <div className="flex gap-2 overflow-x-auto w-full sm:w-auto pb-1 text-xs scrollbar-none">
-          {[
-            { id: "all", label: "همه مخاطبان", count: customers.length },
-            { id: "vip", label: "💎 VIP الماس", count: customers.filter(c => c.lifecycle_stage === "vip").length },
-            { id: "active", label: "🟢 خریداران فعال", count: customers.filter(c => c.lifecycle_stage === "active").length },
-            { id: "prospect", label: "🟡 در حال مذاکره", count: customers.filter(c => c.lifecycle_stage === "prospect").length },
-            { id: "lead", label: "⚪ سرنخ‌ها", count: customers.filter(c => c.lifecycle_stage === "lead").length },
-            { id: "at_risk", label: "🔴 ریسک ریزش", count: customers.filter(c => c.lifecycle_stage === "at_risk").length },
-          ].map((st) => (
-            <button
-              key={st.id}
-              onClick={() => { soundEngine.playClick(); setSelectedStage(st.id); }}
-              className={"px-3.5 py-2 rounded-2xl font-bold transition whitespace-nowrap cursor-pointer " + (
-                selectedStage === st.id ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-              )}
-            >
-              {st.label} ({st.count})
-            </button>
-          ))}
-        </div>
-
-        <div className="w-full sm:w-72">
-          <input
-            type="text"
-            placeholder="🔍 جستجو در نام، موبایل، نشانی..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
-          />
-        </div>
-      </div>
-
-      {/* جدول پیشرفته پرونده‌های CRM */}
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl overflow-x-auto">
-        <table className="w-full text-right text-xs border-collapse min-w-[900px]">
-          <thead>
-            <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
-              <th className="p-3.5">نام و نام خانوادگی</th>
-              <th className="p-3.5">شماره تماس</th>
-              <th className="p-3.5 text-center">مرحله چرخه عمر</th>
-              <th className="p-3.5 text-center">تعداد فاکتور</th>
-              <th className="p-3.5">حجم کل خرید (LTV)</th>
-              <th className="p-3.5">موقعیت و شهر</th>
-              <th className="p-3.5 text-center">عملیات CRM</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--card-border)] font-medium">
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">در حال بارگذاری پایگاه داده مخاطبان CRM...</td>
-              </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">مخاطبی در این دسته‌بندی یافت نشد.</td>
-              </tr>
-            ) : (
-              filtered.map((c) => (
-                <tr key={c.id} className="hover:bg-[var(--input-bg)]/60 transition">
-                  <td className="p-3.5">
-                    <div className="font-black text-[var(--text-primary)]">{c.full_name}</div>
-                    <div className="flex gap-1 mt-1">
-                      {(c.tags || []).map((t, idx) => (
-                        <span key={idx} className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] text-slate-400">
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="p-3.5 font-mono text-[var(--accent-blue)] font-bold">{c.phone}</td>
-                  <td className="p-3.5 text-center">{getStageBadge(c.lifecycle_stage)}</td>
-                  <td className="p-3.5 font-mono text-center font-bold">{c.order_count || 0} سفارش</td>
-                  <td className="p-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                    {(c.total_spent || 0).toLocaleString("fa-IR")} تومان
-                  </td>
-                  <td className="p-3.5 text-slate-400 font-medium">
-                    {c.province || "تهران"}، {c.city || "تهران"}
-                  </td>
-                  <td className="p-3.5 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setActiveSmsCustomer(c);
-                          handleGenerateRewardCoupon(c);
-                          setIsSmsModalOpen(true);
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-slate-950 font-bold text-[11px] transition cursor-pointer"
-                        title="ارسال پیامک و کد تخفیف"
-                      >
-                        🎁 پیامک / کوپن
-                      </button>
-
-                      <button
-                        onClick={() => handleOpenEditCustomer(c)}
-                        className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] transition cursor-pointer"
-                        title="ویرایش پرونده"
-                      >
-                        ✏️ پرونده
-                      </button>
-
-                      <button
-                        onClick={() => handleDeleteCustomer(c)}
-                        className="p-1.5 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-500 border border-rose-500/20 text-[11px] transition cursor-pointer"
-                        title="حذف از CRM"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+            onClick={() => { soundEngine.playClick(); setFilterStatus("all"); }}
+            className={"px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer " + (
+              filterStatus === "all" ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)]"
             )}
-          </tbody>
-        </table>
+          >
+            همه ({messages.length})
+          </button>
+          <button
+            onClick={() => { soundEngine.playClick(); setFilterStatus("pending"); }}
+            className={"px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer " + (
+              filterStatus === "pending" ? "bg-amber-500 text-slate-950 font-black" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-amber-500"
+            )}
+          >
+            در انتظار پاسخ ({messages.filter((m) => m.status === "pending").length})
+          </button>
+        </div>
       </div>
 
-      {/* مدال ایجاد / ویرایش پرونده کامل مشتری */}
-      {isModalOpen && editingCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-xl w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h3 className="font-black text-sm">
-                {editingCustomer.id ? "ویرایش پرونده مشتری در CRM" : "ثبت پرونده مشتری جدید"}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* لیست تیکت‌ها در سمت راست */}
+        <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 h-[640px] flex flex-col justify-between shadow-xl">
+          <div className="space-y-3">
+            <div className="border-b border-[var(--card-border)] pb-2">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="🔍 جستجو در تیکت‌ها..."
+                className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
             </div>
 
-            <form onSubmit={handleSaveCustomer} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingCustomer.full_name || ""}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, full_name: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره تلفن همراه (۱۱ رقم) *</label>
-                  <input
-                    type="tel"
-                    required
-                    maxLength={11}
-                    value={editingCustomer.phone || ""}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">پست الکترونیک (ایمیل)</label>
-                  <input
-                    type="email"
-                    value={editingCustomer.email || ""}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">مرحله چرخه عمر مخاطب</label>
-                  <select
-                    value={editingCustomer.lifecycle_stage || "lead"}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, lifecycle_stage: e.target.value as any })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+            <div className="space-y-2 overflow-y-auto max-h-[530px] pr-1">
+              {loading ? (
+                <p className="text-xs text-center py-12 text-slate-400 font-bold">در حال دریافت تیکت‌ها...</p>
+              ) : filtered.length === 0 ? (
+                <p className="text-xs text-center py-12 text-slate-400 font-bold">پیامی یافت نشد.</p>
+              ) : (
+                filtered.map((msg) => (
+                  <div
+                    key={msg.id}
+                    onClick={() => handleSelectMessage(msg)}
+                    className={"p-3.5 rounded-2xl border transition cursor-pointer space-y-1.5 " + (
+                      selectedMessage?.id === msg.id
+                        ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-sm"
+                        : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                    )}
                   >
-                    <option value="lead">سرنخ اولیه (Lead)</option>
-                    <option value="prospect">در حال مشاوره و مذاکره (Prospect)</option>
-                    <option value="active">خریدار عادی و فعال (Active)</option>
-                    <option value="vip">💎 مشتری ویژه الماس (VIP)</option>
-                    <option value="at_risk">در معرض ریزش (At Risk)</option>
-                  </select>
-                </div>
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-black text-xs text-[var(--text-primary)] truncate max-w-[170px]">
+                        {msg.full_name}
+                      </h4>
+                      <span className={"px-2 py-0.5 rounded-md text-[9px] font-bold " + (
+                        msg.status === "answered"
+                          ? "bg-emerald-500/15 text-emerald-500"
+                          : "bg-amber-500/15 text-amber-500 animate-pulse"
+                      )}>
+                        {msg.status === "answered" ? "پاسخ داده شده ✓" : "در انتظار"}
+                      </span>
+                    </div>
 
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">استان</label>
-                  <input
-                    type="text"
-                    value={editingCustomer.province || "تهران"}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, province: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
-                  />
-                </div>
+                    <p className="text-[11px] text-[var(--text-secondary)] font-medium truncate">
+                      {msg.subject || "درخواست مشاوره"}
+                    </p>
 
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شهرستان / شهر</label>
-                  <input
-                    type="text"
-                    value={editingCustomer.city || "تهران"}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, city: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
-                  />
-                </div>
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono">
+                      <span>{msg.phone}</span>
+                      <span>{msg.created_at ? new Date(msg.created_at).toLocaleDateString("fa-IR") : ""}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نشانی دقیق پستی</label>
-                  <textarea
-                    rows={2}
-                    value={editingCustomer.address || ""}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, address: e.target.value })}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
-                  />
-                </div>
+        {/* پنل نمایش، پاسخ و ویرایش پیام در سمت چپ */}
+        <div className="lg:col-span-8 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] h-[640px] flex flex-col justify-between shadow-xl">
+          {selectedMessage ? (
+            <div className="space-y-4 flex-1 flex flex-col justify-between overflow-y-auto">
+              
+              {/* هدر تیکت انتخاب‌شده */}
+              <div className="space-y-3 border-b border-[var(--card-border)] pb-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-black text-sm text-[var(--text-primary)]">
+                      {selectedMessage.subject || "درخواست مشاوره تخصصی"}
+                    </h3>
+                    <div className="flex items-center gap-3 mt-1 text-xs">
+                      <span className="font-bold text-[var(--accent-blue)]">{selectedMessage.full_name}</span>
+                      <span className="font-mono text-slate-400 font-bold">{selectedMessage.phone}</span>
+                      {selectedMessage.email && <span className="font-mono text-slate-400">{selectedMessage.email}</span>}
+                    </div>
+                  </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">یادداشت‌های محرمانه داخلی کارشناس فروش:</label>
-                  <textarea
-                    rows={3}
-                    value={editingCustomer.internal_notes || ""}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, internal_notes: e.target.value })}
-                    placeholder="شرح تماس، نیازمندی‌ها، کالاهای مورد علاقه مشتری..."
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
-                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDeleteMessage(selectedMessage.id)}
+                      className="p-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
+                      title="حذف تیکت از دیتابیس"
+                    >
+                      🗑️ حذف
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
-              >
-                {submitting ? "در حال ذخیره‌سازی در پایگاه داده..." : "ذخیره پرونده در دیتابیس CRM 🔒"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+              {/* کادر متن پیام کاربر با قابلیت ویرایش */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-[var(--text-secondary)]">💬 متن پیام کاربر:</span>
+                  <button
+                    onClick={() => {
+                      setIsEditingUserMessage(!isEditingUserMessage);
+                      setEditUserMessageText(selectedMessage.message);
+                    }}
+                    className="text-[11px] text-[var(--accent-blue)] font-bold hover:underline cursor-pointer"
+                  >
+                    {isEditingUserMessage ? "انصراف از ویرایش" : "✏️ ویرایش متن پیام"}
+                  </button>
+                </div>
 
-      {/* مدال ارسال پیامک هوشمند و تولید کوپن وفاداری */}
-      {isSmsModalOpen && activeSmsCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h3 className="font-black text-sm">ارسال پیامک پاداش و کد تخفیف: {activeSmsCustomer.full_name}</h3>
-              <button onClick={() => setIsSmsModalOpen(false)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
-            </div>
+                {isEditingUserMessage ? (
+                  <div className="space-y-2">
+                    <textarea
+                      rows={3}
+                      value={editUserMessageText}
+                      onChange={(e) => setEditUserMessageText(e.target.value)}
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)] text-xs font-medium outline-none leading-relaxed"
+                    />
+                    <button
+                      onClick={handleSaveEditedUserMessage}
+                      disabled={savingEdit}
+                      className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs cursor-pointer"
+                    >
+                      {savingEdit ? "در حال ذخیره..." : "ذخیره تغییرات در دیتابیس ✓"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed font-medium whitespace-pre-line text-justify">
+                    {selectedMessage.message}
+                  </div>
+                )}
+              </div>
 
-            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex justify-between items-center">
-              <span className="font-bold text-amber-500">کد تخفیف اختصاصی تولیدشده:</span>
-              <span className="font-mono font-black text-sm">{rewardCouponCode || "---"}</span>
-            </div>
+              {/* کادر پاسخ قبلی مدیر در صورت وجود با امکان ویرایش */}
+              {selectedMessage.admin_reply && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-emerald-500">✓ پاسخ ثبت‌شده مدیریت:</span>
+                    <button
+                      onClick={() => {
+                        setIsEditingAdminReply(!isEditingAdminReply);
+                        setEditAdminReplyText(selectedMessage.admin_reply || "");
+                      }}
+                      className="text-[11px] text-amber-500 font-bold hover:underline cursor-pointer"
+                    >
+                      {isEditingAdminReply ? "انصراف" : "✏️ ویرایش پاسخ"}
+                    </button>
+                  </div>
 
-            <form onSubmit={handleSendSms} className="space-y-4">
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن پیامک بازاریابی:</label>
+                  {isEditingAdminReply ? (
+                    <div className="space-y-2">
+                      <textarea
+                        rows={3}
+                        value={editAdminReplyText}
+                        onChange={(e) => setEditAdminReplyText(e.target.value)}
+                        className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-amber-500 text-xs font-medium outline-none leading-relaxed"
+                      />
+                      <button
+                        onClick={handleSaveEditedAdminReply}
+                        disabled={savingEdit}
+                        className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs cursor-pointer"
+                      >
+                        {savingEdit ? "در حال به‌روزرسانی..." : "به‌روزرسانی پاسخ در دیتابیس ✓"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs leading-relaxed font-medium whitespace-pre-line text-emerald-600 dark:text-emerald-400">
+                      {selectedMessage.admin_reply}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* فرم درج پاسخ جدید و ارسال پیامک */}
+              <form onSubmit={handleSendReply} className="space-y-3 pt-3 border-t border-[var(--card-border)]">
+                <label className="block text-xs font-bold text-[var(--text-secondary)]">
+                  ارسال پاسخ رسمی مدیریت (به همراه پیامک خودکار به شماره {selectedMessage.phone}):
+                </label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   required
-                  value={smsText}
-                  onChange={(e) => setSmsText(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="پاسخ کارشناسی خود را اینجا بنویسید..."
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium outline-none focus:border-[var(--accent-blue)] leading-relaxed text-[var(--text-primary)]"
                 />
-              </div>
-
-              <button
-                type="submit"
-                disabled={sendingSms}
-                className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
-              >
-                {sendingSms ? "در حال ارسال پیامک..." : "ارسال پیامک و فعال‌سازی کوپن در دیتابیس 🚀"}
-              </button>
-            </form>
-          </div>
+                <button
+                  type="submit"
+                  disabled={sendingReply}
+                  className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span>{sendingReply ? "در حال ارسال پیامک و ثبت در دیتابیس..." : "ثبت پاسخ در دیتابیس و ارسال پیامک به خریدار 🚀"}</span>
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center space-y-2 text-slate-400 text-xs font-bold">
+              <span className="text-3xl">✉️</span>
+              <span>یک پیام را از لیست سمت راست جهت مشاهده، پاسخ، ویرایش یا حذف انتخاب فرمایید.</span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
 `;
-writeFile('components/admin/AdminCustomers.tsx', enterpriseCrmComponent);
+writeFile('components/admin/ContactMessagesManager.tsx', contactUiComponent);
 
 // =============================================================================
-// ۳. تست بیلد کامل و پوش به گیت‌هاب
+// ۳. تست بیلد کامل و پوش به مخزن گیت‌هاب
 // =============================================================================
-console.log("تست بیلد نهایی پروژه (npm run build)...");
+console.log("تست بیلد کامل نرم‌افزار (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -753,7 +640,7 @@ console.log("ارسال تغییرات به گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(crm): enterprise customer relationship management, lifecycle pipeline, notes & reward coupons"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(ticketing): bidirectional message editing, reply updates, SMS gateway & realtime CDC sync"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -762,7 +649,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ سامانه حرفه‌ای CRM با موفقیت روی سرور لایو مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ سامانه تیکتینگ و پیام‌ها با موفقیت روی سرور لایو مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

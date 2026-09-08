@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Enterprise Accounting, Tax Engine & WMS Overhaul (fix.js)
+ * AXON CORE - Enterprise CRM System, Customer Lifecycle & Security Engine (fix.js)
  */
 
 const fs = require('fs');
@@ -14,111 +14,125 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ به‌روزرسانی شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-ACCOUNTING]\x1b[0m پیاده‌سازی سیستم حسابداری پیشرفته، انبارگردانی و گزارش مالیاتی...");
+console.log("\x1b[36m[AXON-CRM]\x1b[0m استقرار سامانه جامع مدیریت ارتباط با مشتریان (Enterprise CRM)...");
 
 // =============================================================================
-// ۱. ساخت روت سروری امن حسابداری و محاسبات مالی: app/api/accounting/route.ts
+// ۱. ساخت روت سروری امن CRM: app/api/crm/route.ts
 // =============================================================================
-const accountingApiRoute = `import { NextRequest, NextResponse } from "next/server";
+const crmApiRoute = `import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
+// واکشی کل اطلاعات CRM همراه با ادغام سفارشات ثبت‌شده
 export async function GET(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
-    // ۱. دریافت کالاها و سفارش‌ها با دسترسی ادمین
-    const [prodsRes, ordersRes] = await Promise.all([
-      supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }),
-      supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false }),
-    ]);
+    // ۱. دریافت مشتریان ذخیره‌شده در جدول crm_customers
+    let crmCustomers: any[] = [];
+    const { data: dbCrm, error: crmErr } = await supabaseAdmin
+      .from("crm_customers")
+      .select("*")
+      .order("updated_at", { ascending: false });
 
-    const products = prodsRes.data || [];
-    const orders = ordersRes.data || [];
+    if (!crmErr && dbCrm) {
+      crmCustomers = dbCrm;
+    }
 
-    // ۲. محاسبه عملکرد ماهانه (۳۰ روز گذشته)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // ۲. بررسی سفارش‌ها جهت کشف خریداران جدید و همگام‌سازی خودکار (Auto-Sync)
+    const { data: orders } = await supabaseAdmin
+      .from("orders")
+      .select("customer_name, phone, address, postal_code, final_amount, total_amount, created_at, status")
+      .neq("status", "cancelled");
 
-    const monthlyOrders = orders.filter((o) => {
-      const orderDate = new Date(o.created_at || Date.now());
-      return orderDate >= thirtyDaysAgo && o.status !== "cancelled";
-    });
+    const ordersByPhone = new Map<string, { totalSpent: number; count: number; name: string; address: string; postal: string }>();
 
-    // ۳. تشکیل ماتریس مالی و بهای تمام‌شده به ازای هر محصول
-    const productFinancials = products.map((p) => {
-      let unitsSoldMonthly = 0;
-      let totalRevenueMonthly = 0;
+    (orders || []).forEach((o: any) => {
+      const phone = String(o.phone || "").trim();
+      if (!phone) return;
+      const amount = Number(o.final_amount || o.total_amount || 0);
 
-      monthlyOrders.forEach((o) => {
-        const items = o.items || [];
-        items.forEach((item: any) => {
-          if (String(item.productId || item.product_id) === String(p.id)) {
-            const qty = Number(item.quantity || 1);
-            unitsSoldMonthly += qty;
-            totalRevenueMonthly += Number(item.price || p.price || 0) * qty;
-          }
+      if (ordersByPhone.has(phone)) {
+        const item = ordersByPhone.get(phone)!;
+        item.totalSpent += amount;
+        item.count += 1;
+        if (o.customer_name) item.name = o.customer_name;
+        if (o.address) item.address = o.address;
+      } else {
+        ordersByPhone.set(phone, {
+          totalSpent: amount,
+          count: 1,
+          name: o.customer_name || "خریدار محترم",
+          address: o.address || "",
+          postal: o.postal_code || "",
         });
-      });
-
-      const sellingPrice = Number(p.discountPrice || p.discount_price || p.price || 0);
-      // قیمت خرید واحد (پیش‌فرض برآورد هوشمند در صورت عدم ثبت دستی: ۷۰٪ نرخ فروش)
-      const purchasePrice = Number(p.purchase_price || p.purchasePrice || Math.round(sellingPrice * 0.7));
-      
-      // ۱۰٪ مالیات بر ارزش افزوده روی فروش ناخالص
-      const vatPerUnit = Math.round(sellingPrice * 0.1);
-      // بهای خالص فروش منهای مالیات
-      const netSellingRevenuePerUnit = sellingPrice - vatPerUnit;
-      // سود خالص هر واحد
-      const netProfitPerUnit = Math.max(0, netSellingRevenuePerUnit - purchasePrice);
-
-      const totalPurchaseCostMonthly = unitsSoldMonthly * purchasePrice;
-      const totalVatMonthly = Math.round(totalRevenueMonthly * 0.1);
-      const totalNetProfitMonthly = Math.max(0, (totalRevenueMonthly - totalVatMonthly) - totalPurchaseCostMonthly);
-      const profitMarginPercent = sellingPrice > 0 ? Math.round((netProfitPerUnit / sellingPrice) * 100) : 0;
-
-      return {
-        id: String(p.id),
-        title: p.title || p.name || "کالای بدون عنوان",
-        category: p.category || "تجهیزات",
-        stock: p.stock !== undefined && p.stock !== null ? Number(p.stock) : 0,
-        isAvailable: p.is_available !== false,
-        sellingPrice,
-        purchasePrice,
-        vatPerUnit,
-        netProfitPerUnit,
-        profitMarginPercent,
-        unitsSoldMonthly,
-        totalRevenueMonthly,
-        totalPurchaseCostMonthly,
-        totalVatMonthly,
-        totalNetProfitMonthly,
-      };
+      }
     });
 
-    // خلاصه تراز مالی کل استودیو
-    const summary = {
-      totalInventoryAssets: productFinancials.reduce((acc, p) => acc + (p.stock * p.purchasePrice), 0),
-      totalMonthlySalesGross: productFinancials.reduce((acc, p) => acc + p.totalRevenueMonthly, 0),
-      totalMonthlyVAT: productFinancials.reduce((acc, p) => acc + p.totalVatMonthly, 0),
-      totalMonthlyNetProfit: productFinancials.reduce((acc, p) => acc + p.totalNetProfitMonthly, 0),
-      totalUnitsSold: productFinancials.reduce((acc, p) => acc + p.unitsSoldMonthly, 0),
-    };
+    // ۳. ادغام و همگام‌سازی دوطرفه
+    const finalMap = new Map<string, any>();
+
+    // اول مشتریان ثبت‌شده در CRM
+    crmCustomers.forEach((c) => {
+      const orderStat = ordersByPhone.get(c.phone);
+      const spent = orderStat ? Math.max(c.total_spent || 0, orderStat.totalSpent) : (c.total_spent || 0);
+      const count = orderStat ? Math.max(c.order_count || 0, orderStat.count) : (c.order_count || 0);
+      
+      let stage = c.lifecycle_stage || "lead";
+      if (spent > 100000000) stage = "vip";
+      else if (count >= 3) stage = "active";
+      else if (count >= 1) stage = "prospect";
+
+      finalMap.set(c.phone, {
+        ...c,
+        total_spent: spent,
+        order_count: count,
+        lifecycle_stage: stage,
+      });
+    });
+
+    // اضافه کردن خریدارانی که هنوز در crm_customers ذخیره نشده‌اند
+    ordersByPhone.forEach((val, phone) => {
+      if (!finalMap.has(phone)) {
+        let stage = "prospect";
+        if (val.totalSpent > 100000000) stage = "vip";
+        else if (val.count >= 2) stage = "active";
+
+        const newProfile = {
+          id: "crm_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+          full_name: val.name,
+          phone: phone,
+          address: val.address,
+          postal_code: val.postal,
+          total_spent: val.totalSpent,
+          order_count: val.count,
+          lifecycle_stage: stage,
+          tags: [stage === "vip" ? "الماس VIP" : "خریدار آنلاین"],
+          internal_notes: "ثبت خودکار از طریق فاکتور فروشگاهی",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        finalMap.set(phone, newProfile);
+
+        // ذخیره نامحسوس در جدول دیتابیس CRM
+        supabaseAdmin.from("crm_customers").insert([newProfile]).then();
+      }
+    });
 
     return NextResponse.json({
       success: true,
-      summary,
-      productFinancials,
+      customers: Array.from(finalMap.values()),
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
+// ایجاد دستی مشتری جدید یا ویرایش پرونده
 export async function POST(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
@@ -126,438 +140,546 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { productId, purchasePrice, stockDelta, supplier, referenceNote } = body;
+    const { id, full_name, phone, email, province, city, address, postal_code, lifecycle_stage, tags, internal_notes } = body;
 
-    if (!productId) {
-      return NextResponse.json({ success: false, message: "شناسه کالا الزامی است." }, { status: 400 });
+    const cleanPhone = String(phone || "").trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\\D/g, "");
+
+    if (!cleanPhone || cleanPhone.length !== 11) {
+      return NextResponse.json({ success: false, message: "شماره تلفن همراه ۱۱ رقمی معتبر الزامی است." }, { status: 400 });
     }
 
-    // ۱. دریافت کالا
-    const { data: product } = await supabaseAdmin.from("products").select("*").eq("id", productId).single();
-    if (!product) {
-      return NextResponse.json({ success: false, message: "کالا یافت نشد." }, { status: 404 });
-    }
+    const cleanName = String(full_name || "مشتری جدید").trim();
+    const customerId = id || ("crm_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
 
-    const currentStock = Number(product.stock || 0);
-    const newStock = Math.max(0, currentStock + Number(stockDelta || 0));
-    const newPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : (product.purchase_price || 0);
-
-    // ۲. آپدیت کالا در دیتابیس
-    await supabaseAdmin.from("products").update({
-      stock: newStock,
-      purchase_price: newPurchasePrice,
-      is_available: newStock > 0,
+    const payload: Record<string, any> = {
+      id: customerId,
+      full_name: cleanName,
+      phone: cleanPhone,
+      email: email ? String(email).trim() : null,
+      province: province || "تهران",
+      city: city || "تهران",
+      address: address ? String(address).trim() : null,
+      postal_code: postal_code ? String(postal_code).trim() : null,
+      lifecycle_stage: lifecycle_stage || "lead",
+      tags: Array.isArray(tags) ? tags : ["مخاطب حضوری"],
+      internal_notes: internal_notes ? String(internal_notes).trim() : null,
       updated_at: new Date().toISOString(),
-    }).eq("id", productId);
+    };
 
-    // ۳. لاگ سوابق انبارداری در صورت وجود جدول
-    try {
-      await supabaseAdmin.from("inventory_logs").insert([{
-        id: "log_" + Date.now(),
-        product_id: productId,
-        product_title: product.title || product.name,
-        change_type: Number(stockDelta || 0) >= 0 ? "restock" : "adjustment",
-        quantity: Math.abs(Number(stockDelta || 0)),
-        cost_price: newPurchasePrice,
-        supplier: supplier || "تأمین‌کننده رسمی",
-        reference_note: referenceNote || "ثبت سیستمی انبارگردانی",
-        created_at: new Date().toISOString(),
-      }]);
-    } catch {}
+    const { data: existing } = await supabaseAdmin.from("crm_customers").select("id").eq("phone", cleanPhone).maybeSingle();
 
-    return NextResponse.json({ success: true, message: "تراکنش انبار و بهای خرید در دیتابیس ذخیره شد." });
+    if (existing) {
+      const { data, error } = await supabaseAdmin.from("crm_customers").update(payload).eq("id", existing.id).select().single();
+      if (error) throw error;
+      return NextResponse.json({ success: true, message: "پرونده مشتری با موفقیت به‌روزرسانی شد.", data });
+    } else {
+      payload.created_at = new Date().toISOString();
+      const { data, error } = await supabaseAdmin.from("crm_customers").insert([payload]).select().single();
+      if (error) throw error;
+      return NextResponse.json({ success: true, message: "مشتری جدید در پایگاه داده CRM ثبت گردید.", data });
+    }
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+// حذف مشتری از CRM
+export async function DELETE(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    const phone = searchParams.get("phone");
+
+    if (!id && !phone) {
+      return NextResponse.json({ success: false, message: "شناسه یا شماره تماس مشتری الزامی است." }, { status: 400 });
+    }
+
+    let query = supabaseAdmin.from("crm_customers").delete();
+    if (id) query = query.eq("id", id);
+    else if (phone) query = query.eq("phone", phone);
+
+    const { error } = await query;
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, message: "پرونده مشتری با موفقیت از سیستم CRM حذف گردید." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 `;
-writeFile('app/api/accounting/route.ts', accountingApiRoute);
+writeFile('app/api/crm/route.ts', crmApiRoute);
 
 // =============================================================================
-// ۲. بازنویسی کامپوننت components/AdminInventoryManager.tsx به پنل پیشرفته حسابداری
+// ۲. بازنویسی کامل پنل گرافیکی components/admin/AdminCustomers.tsx به یک CRM کامل
 // =============================================================================
-const accountingDashboardComponent = `"use client";
+const enterpriseCrmComponent = `"use client";
 
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 
-interface FinancialItem {
+export interface CrmCustomer {
   id: string;
-  title: string;
-  category: string;
-  stock: number;
-  isAvailable: boolean;
-  sellingPrice: number;
-  purchasePrice: number;
-  vatPerUnit: number;
-  netProfitPerUnit: number;
-  profitMarginPercent: number;
-  unitsSoldMonthly: number;
-  totalRevenueMonthly: number;
-  totalPurchaseCostMonthly: number;
-  totalVatMonthly: number;
-  totalNetProfitMonthly: number;
+  full_name: string;
+  phone: string;
+  email?: string;
+  province?: string;
+  city?: string;
+  address?: string;
+  postal_code?: string;
+  lifecycle_stage: "lead" | "prospect" | "active" | "vip" | "at_risk";
+  tags: string[];
+  total_spent: number;
+  order_count: number;
+  internal_notes?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export default function AdminInventoryManager() {
-  const [items, setItems] = useState<FinancialItem[]>([]);
-  const [summary, setSummary] = useState({
-    totalInventoryAssets: 0,
-    totalMonthlySalesGross: 0,
-    totalMonthlyVAT: 0,
-    totalMonthlyNetProfit: 0,
-    totalUnitsSold: 0,
-  });
+export default function AdminCustomers() {
+  const [customers, setCustomers] = useState<CrmCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeModalItem, setActiveModalItem] = useState<FinancialItem | null>(null);
+  const [selectedStage, setSelectedStage] = useState<string>("all");
 
-  // فرم ورود بار به انبار
-  const [stockDelta, setStockDelta] = useState<number>(10);
-  const [costPriceInput, setCostPriceInput] = useState<number>(0);
-  const [supplierInput, setSupplierInput] = useState("");
-  const [noteInput, setNoteInput] = useState("");
+  // وضعیت‌های مدال پرونده و فرم
+  const [editingCustomer, setEditingCustomer] = useState<Partial<CrmCustomer> | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
+  const [activeSmsCustomer, setActiveSmsCustomer] = useState<CrmCustomer | null>(null);
+  const [smsText, setSmsText] = useState("");
+  const [rewardCouponCode, setRewardCouponCode] = useState("");
+  const [sendingSms, setSendingSms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchAccountingData = async () => {
+  const fetchCrmData = async () => {
     try {
-      const res = await fetch("/api/accounting", { cache: "no-store" });
+      const res = await fetch("/api/crm", { cache: "no-store" });
       const json = await res.json();
-      if (json.success) {
-        setItems(json.productFinancials || []);
-        setSummary(json.summary || {});
+      if (json.success && json.customers) {
+        setCustomers(json.customers);
       }
     } catch (e) {
-      console.error("Accounting data error:", e);
+      console.error("CRM fetch error:", e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAccountingData();
+    fetchCrmData();
 
-    // اتصال بلادرنگ به تغییرات موجودی و سفارش‌ها
-    const chProds = supabase.channel("accounting-realtime-prods")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => fetchAccountingData())
+    // اتصال وب‌سوکت بلادرنگ به جدول CRM و فاکتورها
+    const crmCh = supabase.channel("realtime-crm")
+      .on("postgres_changes", { event: "*", schema: "public", table: "crm_customers" }, () => fetchCrmData())
       .subscribe();
 
-    const chOrders = supabase.channel("accounting-realtime-orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchAccountingData())
+    const ordersCh = supabase.channel("realtime-crm-orders")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchCrmData())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(chProds);
-      supabase.removeChannel(chOrders);
+      supabase.removeChannel(crmCh);
+      supabase.removeChannel(ordersCh);
     };
   }, []);
 
-  const openWarehouseModal = (item: FinancialItem) => {
+  const handleOpenNewCustomer = () => {
     soundEngine.playClick();
-    setActiveModalItem(item);
-    setCostPriceInput(item.purchasePrice);
-    setStockDelta(10);
-    setSupplierInput("نمایندگی رسمی اپل / دبی");
-    setNoteInput("پارت ورودی جدید با فاکتور رسمی");
+    setEditingCustomer({
+      full_name: "",
+      phone: "",
+      email: "",
+      province: "تهران",
+      city: "تهران",
+      address: "",
+      postal_code: "",
+      lifecycle_stage: "lead",
+      tags: ["ثبت دستی"],
+      internal_notes: "",
+    });
+    setIsModalOpen(true);
   };
 
-  const handleStockSubmit = async (e: React.FormEvent) => {
+  const handleOpenEditCustomer = (c: CrmCustomer) => {
+    soundEngine.playClick();
+    setEditingCustomer({ ...c });
+    setIsModalOpen(true);
+  };
+
+  const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeModalItem) return;
+    if (!editingCustomer || !editingCustomer.phone || !editingCustomer.full_name) return;
 
     soundEngine.playClick();
     setSubmitting(true);
     try {
-      const res = await fetch("/api/accounting", {
+      const res = await fetch("/api/crm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: activeModalItem.id,
-          purchasePrice: costPriceInput,
-          stockDelta,
-          supplier: supplierInput,
-          referenceNote: noteInput,
-        }),
+        body: JSON.stringify(editingCustomer),
       });
-
       const json = await res.json();
-      if (json.success) {
+      if (res.ok && json.success) {
         soundEngine.playSuccess();
-        alert("✓ سند ورود به انبار و بهای تمام‌شده با موفقیت در دیتابیس ثبت شد.");
-        setActiveModalItem(null);
-        fetchAccountingData();
+        alert("✓ " + json.message);
+        setIsModalOpen(false);
+        fetchCrmData();
       } else {
-        alert(json.message || "خطا در ثبت سند.");
+        alert(json.message || "خطا در ذخیره اطلاعات.");
       }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // صدور فایل اکسل حسابرسی استاندارد
-  const exportToExcel = () => {
+  const handleDeleteCustomer = async (c: CrmCustomer) => {
+    if (!confirm(\`آیا از حذف پرونده «\${c.full_name}» از سامانه CRM اطمینان دارید؟\`)) return;
     soundEngine.playClick();
-    const headers = [
-      "شناسه کالا",
-      "نام محصول",
-      "دسته‌بندی",
-      "موجودی انبار",
-      "بهای خرید واحد (تومان)",
-      "بهای فروش واحد (تومان)",
-      "مالیات بر ارزش افزوده ۱۰٪ واحد",
-      "سود خالص هر واحد",
-      "حاشیه سود ٪",
-      "تعداد فروش ۳۰ روزه",
-      "فروش ناخالص ماهانه (تومان)",
-      "مالیات ۱۰٪ ماهانه (تومان)",
-      "سود خالص ماهانه (تومان)"
-    ];
-
-    const rows = items.map((i) => [
-      i.id,
-      '"' + i.title.replace(/"/g, '""') + '"',
-      i.category,
-      i.stock,
-      i.purchasePrice,
-      i.sellingPrice,
-      i.vatPerUnit,
-      i.netProfitPerUnit,
-      i.profitMarginPercent + "%",
-      i.unitsSoldMonthly,
-      i.totalRevenueMonthly,
-      i.totalVatMonthly,
-      i.totalNetProfitMonthly
-    ]);
-
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\\r\\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "گزارش_حسابرسی_و_انبارداری_آکسون_" + new Date().toLocaleDateString("fa-IR").replace(/\\//g, "-") + ".csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const res = await fetch(\`/api/crm?id=\${encodeURIComponent(c.id)}&phone=\${encodeURIComponent(c.phone)}\`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        alert("پرونده با موفقیت حذف شد.");
+        fetchCrmData();
+      }
+    } catch {
+      alert("خطا در حذف پرونده.");
+    }
   };
 
-  const filtered = items.filter(
-    (i) => i.title.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase())
-  );
+  // تولید سریع کد تخفیف یکتا و درج در متن پیامک
+  const handleGenerateRewardCoupon = async (c: CrmCustomer) => {
+    soundEngine.playClick();
+    const code = "VIP-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+    setRewardCouponCode(code);
+    setSmsText(\`\${c.full_name} عزیز، به پاس همراهی ارزشمند شما با آکسون، کد تخفیف اختصاصی \${code} با اعتبار ۷ روزه تقدیم می‌گردد. axoncore.ir\`);
+  };
+
+  const handleSendSms = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSmsCustomer || !smsText.trim()) return;
+
+    soundEngine.playClick();
+    setSendingSms(true);
+    try {
+      // اگر کد تخفیف ایجاد شده بود، کوپن را در جدول coupons دیتابیس فعال می‌کند
+      if (rewardCouponCode) {
+        await fetch("/api/site-info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "create_coupon",
+            code: rewardCouponCode,
+            value: 15, // 15 درصد
+            type: "percent",
+          }),
+        });
+      }
+
+      const res = await fetch("/api/sms/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: activeSmsCustomer.phone,
+          message: smsText.trim(),
+        }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        alert("✓ پیامک بازاریابی و کد تخفیف اختصاصی با موفقیت ارسال گردید.");
+        setIsSmsModalOpen(false);
+        setSmsText("");
+        setRewardCouponCode("");
+      } else {
+        alert(json.message || "خطا در ارسال پیامک.");
+      }
+    } finally {
+      setSendingSms(false);
+    }
+  };
+
+  const getStageBadge = (stage: CrmCustomer["lifecycle_stage"]) => {
+    switch (stage) {
+      case "vip":
+        return <span className="px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 font-black text-[10px]">💎 VIP الماس</span>;
+      case "active":
+        return <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-black text-[10px]">🟢 خریدار فعال</span>;
+      case "prospect":
+        return <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-[10px]">🟡 در حال مذاکره</span>;
+      case "at_risk":
+        return <span className="px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-black text-[10px]">🔴 ریسک ریزش</span>;
+      default:
+        return <span className="px-3 py-1 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-300 font-black text-[10px]">⚪ سرنخ (Lead)</span>;
+    }
+  };
+
+  const filtered = customers.filter((c) => {
+    const matchSearch = c.full_name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
+    const matchStage = selectedStage === "all" || c.lifecycle_stage === selectedStage;
+    return matchSearch && matchStage;
+  });
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* هدر ماژول حسابداری و انبار */}
+      {/* سربرگ سامانه سازمانی CRM */}
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📊</span> سیستم جامع حسابداری، بهای تمام‌شده و انبارداری متمرکز
+            <span>👥</span> سامانه هوشمند مدیریت ارتباط با مشتریان (Enterprise CRM)
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            محاسبه خودکار ۱۰٪ مالیات ارزش افزوده، بهای خرید، سود خالص هر کالا و صدور ترازنامه رسمی
+            پایش چرخه عمر مشتریان، ارزش مادام‌العمر (LTV)، ثبت دستی و ارسال پیامک بازاریابی هدفمند
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={exportToExcel}
-            className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5"
+            onClick={handleOpenNewCustomer}
+            className="px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center gap-1.5"
           >
-            <span>📥</span>
-            <span>صدور خروجی رسمی Excel / CSV</span>
+            <span>➕</span>
+            <span>افزودن دستی مخاطب</span>
           </button>
           <button
-            onClick={fetchAccountingData}
+            onClick={fetchCrmData}
             className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer"
-            title="به‌روزرسانی محاسبات"
+            title="همگام‌سازی بلادرنگ"
           >
             🔄
           </button>
         </div>
       </div>
 
-      {/* کارت‌های شاخص‌های مالی و سودآوری */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5 shadow-sm">
-          <span className="text-[var(--text-secondary)] font-bold block">ارزش سرمایه موجود در انبار:</span>
-          <span className="text-xl font-black font-mono text-[var(--accent-blue)] block">
-            {summary.totalInventoryAssets.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
-          </span>
-          <span className="text-[10px] text-slate-400 font-medium">بر مبنای بهای خرید (COGS)</span>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5 shadow-sm">
-          <span className="text-[var(--text-secondary)] font-bold block">گردش فروش ۳۰ روزه:</span>
-          <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400 block">
-            {summary.totalMonthlySalesGross.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
-          </span>
-          <span className="text-[10px] text-slate-400 font-medium">تیراژ: {summary.totalUnitsSold} کالا فروخته شده</span>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-1.5 shadow-sm">
-          <span className="text-[var(--text-secondary)] font-bold block">مالیات بر ارزش افزوده (۱۰٪):</span>
-          <span className="text-xl font-black font-mono text-amber-500 block">
-            {summary.totalMonthlyVAT.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
-          </span>
-          <span className="text-[10px] text-slate-400 font-medium">تعهد مالیاتی ثبت‌شده ۳۰ روزه</span>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-emerald-500/30 space-y-1.5 shadow-sm bg-emerald-500/5">
-          <span className="text-emerald-600 dark:text-emerald-400 font-black block">سود خالص عملیاتی ۳۰ روزه:</span>
-          <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 block">
-            {summary.totalMonthlyNetProfit.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
-          </span>
-          <span className="text-[10px] text-emerald-500 font-medium">پس از کسر خرید و کسر ۱۰٪ مالیات</span>
-        </div>
-      </div>
-
-      {/* جستجو و جدول جامع حسابداری کالاها */}
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-4">
-        <div className="flex justify-between items-center gap-4">
-          <h3 className="font-black text-xs text-[var(--text-primary)]">
-            📋 ماتریس بهای تمام‌شده، مالیات و انبارگردانی ({items.length} قلم کالا)
-          </h3>
-          <div className="w-72">
-            <input
-              type="text"
-              placeholder="🔍 جستجو در اقلام انبار..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs border-collapse min-w-[950px]">
-            <thead>
-              <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3 text-[11px]">
-                <th className="p-3">نام محصول</th>
-                <th className="p-3 text-center">موجودی انبار</th>
-                <th className="p-3">بهای خرید واحد</th>
-                <th className="p-3">نرخ فروش واحد</th>
-                <th className="p-3 text-center">مالیات ۱۰٪</th>
-                <th className="p-3">سود خالص واحد</th>
-                <th className="p-3 text-center">فروش ماه</th>
-                <th className="p-3">سود کل ماهانه</th>
-                <th className="p-3 text-center">انبارگردانی</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--card-border)] font-medium">
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">در حال پردازش تراز مالی و استعلام بلادرنگ انبار...</td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">کالایی یافت نشد.</td>
-                </tr>
-              ) : (
-                filtered.map((item) => (
-                  <tr key={item.id} className="hover:bg-[var(--input-bg)]/60 transition">
-                    <td className="p-3">
-                      <div className="font-black text-[var(--text-primary)]">{item.title}</div>
-                      <span className="text-[10px] text-[var(--text-secondary)]">{item.category}</span>
-                    </td>
-                    <td className="p-3 text-center font-mono font-bold">
-                      <span className={"px-2.5 py-1 rounded-xl " + (item.stock < 3 ? "bg-rose-500/15 text-rose-500 font-black" : "bg-emerald-500/15 text-emerald-600")}>
-                        {item.stock} عدد
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-slate-400">
-                      {item.purchasePrice.toLocaleString("fa-IR")} ت
-                    </td>
-                    <td className="p-3 font-mono font-black text-[var(--text-primary)]">
-                      {item.sellingPrice.toLocaleString("fa-IR")} ت
-                    </td>
-                    <td className="p-3 text-center font-mono text-amber-500 font-bold">
-                      {item.vatPerUnit.toLocaleString("fa-IR")} ت
-                    </td>
-                    <td className="p-3 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                      {item.netProfitPerUnit.toLocaleString("fa-IR")} ت
-                      <span className="text-[9px] text-slate-400 mr-1">({item.profitMarginPercent}%)</span>
-                    </td>
-                    <td className="p-3 text-center font-mono font-bold">
-                      {item.unitsSoldMonthly} عدد
-                    </td>
-                    <td className="p-3 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                      {item.totalNetProfitMonthly.toLocaleString("fa-IR")} ت
-                    </td>
-                    <td className="p-3 text-center">
-                      <button
-                        onClick={() => openWarehouseModal(item)}
-                        className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white font-black text-[11px] transition cursor-pointer"
-                      >
-                        📦 ثبت ورود بار
-                      </button>
-                    </td>
-                  </tr>
-                ))
+      {/* خط لوله و فیلترهای استراتژیک مرحله مشتری */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
+        <div className="flex gap-2 overflow-x-auto w-full sm:w-auto pb-1 text-xs scrollbar-none">
+          {[
+            { id: "all", label: "همه مخاطبان", count: customers.length },
+            { id: "vip", label: "💎 VIP الماس", count: customers.filter(c => c.lifecycle_stage === "vip").length },
+            { id: "active", label: "🟢 خریداران فعال", count: customers.filter(c => c.lifecycle_stage === "active").length },
+            { id: "prospect", label: "🟡 در حال مذاکره", count: customers.filter(c => c.lifecycle_stage === "prospect").length },
+            { id: "lead", label: "⚪ سرنخ‌ها", count: customers.filter(c => c.lifecycle_stage === "lead").length },
+            { id: "at_risk", label: "🔴 ریسک ریزش", count: customers.filter(c => c.lifecycle_stage === "at_risk").length },
+          ].map((st) => (
+            <button
+              key={st.id}
+              onClick={() => { soundEngine.playClick(); setSelectedStage(st.id); }}
+              className={"px-3.5 py-2 rounded-2xl font-bold transition whitespace-nowrap cursor-pointer " + (
+                selectedStage === st.id ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
               )}
-            </tbody>
-          </table>
+            >
+              {st.label} ({st.count})
+            </button>
+          ))}
+        </div>
+
+        <div className="w-full sm:w-72">
+          <input
+            type="text"
+            placeholder="🔍 جستجو در نام، موبایل، نشانی..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
+          />
         </div>
       </div>
 
-      {/* مدال ثبت پارت ورودی انبارگردانی */}
-      {activeModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl">
+      {/* جدول پیشرفته پرونده‌های CRM */}
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl overflow-x-auto">
+        <table className="w-full text-right text-xs border-collapse min-w-[900px]">
+          <thead>
+            <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
+              <th className="p-3.5">نام و نام خانوادگی</th>
+              <th className="p-3.5">شماره تماس</th>
+              <th className="p-3.5 text-center">مرحله چرخه عمر</th>
+              <th className="p-3.5 text-center">تعداد فاکتور</th>
+              <th className="p-3.5">حجم کل خرید (LTV)</th>
+              <th className="p-3.5">موقعیت و شهر</th>
+              <th className="p-3.5 text-center">عملیات CRM</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--card-border)] font-medium">
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">در حال بارگذاری پایگاه داده مخاطبان CRM...</td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">مخاطبی در این دسته‌بندی یافت نشد.</td>
+              </tr>
+            ) : (
+              filtered.map((c) => (
+                <tr key={c.id} className="hover:bg-[var(--input-bg)]/60 transition">
+                  <td className="p-3.5">
+                    <div className="font-black text-[var(--text-primary)]">{c.full_name}</div>
+                    <div className="flex gap-1 mt-1">
+                      {(c.tags || []).map((t, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] text-slate-400">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="p-3.5 font-mono text-[var(--accent-blue)] font-bold">{c.phone}</td>
+                  <td className="p-3.5 text-center">{getStageBadge(c.lifecycle_stage)}</td>
+                  <td className="p-3.5 font-mono text-center font-bold">{c.order_count || 0} سفارش</td>
+                  <td className="p-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                    {(c.total_spent || 0).toLocaleString("fa-IR")} تومان
+                  </td>
+                  <td className="p-3.5 text-slate-400 font-medium">
+                    {c.province || "تهران"}، {c.city || "تهران"}
+                  </td>
+                  <td className="p-3.5 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setActiveSmsCustomer(c);
+                          handleGenerateRewardCoupon(c);
+                          setIsSmsModalOpen(true);
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-slate-950 font-bold text-[11px] transition cursor-pointer"
+                        title="ارسال پیامک و کد تخفیف"
+                      >
+                        🎁 پیامک / کوپن
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenEditCustomer(c)}
+                        className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] transition cursor-pointer"
+                        title="ویرایش پرونده"
+                      >
+                        ✏️ پرونده
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteCustomer(c)}
+                        className="p-1.5 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-500 border border-rose-500/20 text-[11px] transition cursor-pointer"
+                        title="حذف از CRM"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* مدال ایجاد / ویرایش پرونده کامل مشتری */}
+      {isModalOpen && editingCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+          <div className="max-w-xl w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h3 className="font-black text-sm">سند انبارداری و ثبت بهای خرید: {activeModalItem.title}</h3>
-              <button onClick={() => setActiveModalItem(null)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
+              <h3 className="font-black text-sm">
+                {editingCustomer.id ? "ویرایش پرونده مشتری در CRM" : "ثبت پرونده مشتری جدید"}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
             </div>
 
-            <form onSubmit={handleStockSubmit} className="space-y-4">
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تعداد ورودی به انبار (+ واحد):</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  value={stockDelta}
-                  onChange={(e) => setStockDelta(Number(e.target.value))}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
+            <form onSubmit={handleSaveCustomer} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingCustomer.full_name || ""}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, full_name: e.target.value })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+                  />
+                </div>
 
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">بهای خرید هر واحد فاکتور (تومان):</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={costPriceInput}
-                  onChange={(e) => setCostPriceInput(Number(e.target.value))}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
+                <div>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره تلفن همراه (۱۱ رقم) *</label>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={11}
+                    value={editingCustomer.phone || ""}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
+                  />
+                </div>
 
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام تأمین‌کننده / منبع بار:</label>
-                <input
-                  type="text"
-                  value={supplierInput}
-                  onChange={(e) => setSupplierInput(e.target.value)}
-                  placeholder="مثال: واردکننده رسمی، انبار مرکزی..."
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
-                />
-              </div>
+                <div>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">پست الکترونیک (ایمیل)</label>
+                  <input
+                    type="email"
+                    value={editingCustomer.email || ""}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره بارنامه یا یادداشت مرجع:</label>
-                <input
-                  type="text"
-                  value={noteInput}
-                  onChange={(e) => setNoteInput(e.target.value)}
-                  placeholder="مثال: فاکتور خرید ۹۸۵۴ پارت جدید..."
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-medium outline-none"
-                />
-              </div>
+                <div>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">مرحله چرخه عمر مخاطب</label>
+                  <select
+                    value={editingCustomer.lifecycle_stage || "lead"}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, lifecycle_stage: e.target.value as any })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                  >
+                    <option value="lead">سرنخ اولیه (Lead)</option>
+                    <option value="prospect">در حال مشاوره و مذاکره (Prospect)</option>
+                    <option value="active">خریدار عادی و فعال (Active)</option>
+                    <option value="vip">💎 مشتری ویژه الماس (VIP)</option>
+                    <option value="at_risk">در معرض ریزش (At Risk)</option>
+                  </select>
+                </div>
 
-              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] leading-relaxed text-blue-400 font-medium">
-                ⚡ با ثبت این سند، موجودی انبار به میزان {stockDelta} عدد افزایش یافته و مبنای سود خالص و مالیات ۱۰٪ در ترازنامه به‌روزرسانی می‌شود.
+                <div>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">استان</label>
+                  <input
+                    type="text"
+                    value={editingCustomer.province || "تهران"}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, province: e.target.value })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شهرستان / شهر</label>
+                  <input
+                    type="text"
+                    value={editingCustomer.city || "تهران"}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, city: e.target.value })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نشانی دقیق پستی</label>
+                  <textarea
+                    rows={2}
+                    value={editingCustomer.address || ""}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, address: e.target.value })}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">یادداشت‌های محرمانه داخلی کارشناس فروش:</label>
+                  <textarea
+                    rows={3}
+                    value={editingCustomer.internal_notes || ""}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, internal_notes: e.target.value })}
+                    placeholder="شرح تماس، نیازمندی‌ها، کالاهای مورد علاقه مشتری..."
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
+                  />
+                </div>
               </div>
 
               <button
@@ -565,7 +687,45 @@ export default function AdminInventoryManager() {
                 disabled={submitting}
                 className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
               >
-                {submitting ? "در حال ثبت سند مالی..." : "ثبت قطعی در انبار و کاردکس کالا 🔒"}
+                {submitting ? "در حال ذخیره‌سازی در پایگاه داده..." : "ذخیره پرونده در دیتابیس CRM 🔒"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* مدال ارسال پیامک هوشمند و تولید کوپن وفاداری */}
+      {isSmsModalOpen && activeSmsCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <h3 className="font-black text-sm">ارسال پیامک پاداش و کد تخفیف: {activeSmsCustomer.full_name}</h3>
+              <button onClick={() => setIsSmsModalOpen(false)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex justify-between items-center">
+              <span className="font-bold text-amber-500">کد تخفیف اختصاصی تولیدشده:</span>
+              <span className="font-mono font-black text-sm">{rewardCouponCode || "---"}</span>
+            </div>
+
+            <form onSubmit={handleSendSms} className="space-y-4">
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن پیامک بازاریابی:</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={smsText}
+                  onChange={(e) => setSmsText(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={sendingSms}
+                className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
+              >
+                {sendingSms ? "در حال ارسال پیامک..." : "ارسال پیامک و فعال‌سازی کوپن در دیتابیس 🚀"}
               </button>
             </form>
           </div>
@@ -575,21 +735,10 @@ export default function AdminInventoryManager() {
   );
 }
 `;
-writeFile('components/AdminInventoryManager.tsx', accountingDashboardComponent);
+writeFile('components/admin/AdminCustomers.tsx', enterpriseCrmComponent);
 
 // =============================================================================
-// ۳. به‌روزرسانی نام ماژول در سایدبار: components/admin/AdminSidebar.tsx
-// =============================================================================
-const sidebarFile = path.join(process.cwd(), 'components/admin/AdminSidebar.tsx');
-let sidebarContent = fs.readFileSync(sidebarFile, 'utf8');
-sidebarContent = sidebarContent.replace(
-  /\{\s*id:\s*"inventory",\s*title:\s*"[^"]*",/g,
-  '{ id: "inventory", title: "حسابداری، سود و انبارداری",'
-);
-writeFile('components/admin/AdminSidebar.tsx', sidebarContent);
-
-// =============================================================================
-// ۴. اعتبارسنجی بیلد و پوش به گیت‌هاب
+// ۳. تست بیلد کامل و پوش به گیت‌هاب
 // =============================================================================
 console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
@@ -604,7 +753,7 @@ console.log("ارسال تغییرات به گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(accounting): enterprise financial ledger, 10% VAT engine, WMS stock audit and excel export"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(crm): enterprise customer relationship management, lifecycle pipeline, notes & reward coupons"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -613,7 +762,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ سامانه یکپارچه حسابداری و انبارداری با موفقیت روی سرور مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ سامانه حرفه‌ای CRM با موفقیت روی سرور لایو مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

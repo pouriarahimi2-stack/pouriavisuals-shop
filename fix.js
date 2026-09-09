@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Live E-Commerce Integration with CartContext & Supabase Products (fix.js)
+ * AXON CORE - Puck Enterprise Upgrades: Category Filtering, Flash Countdown & Enhanced Controls
  */
 
 const fs = require('fs');
@@ -14,12 +14,12 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PUCK-LIVE-SHOP]\x1b[0m اتصال ویجت‌های Puck به محصولات دیتابیس و سبد خرید سراسری...");
+console.log("\x1b[36m[AXON-PUCK-PRO]\x1b[0m ارتقای کتابخانه کامپوننت‌ها به امکانات تجاری...");
 
 // =============================================================================
-// بازنویسی کامپوننت ProductGrid در lib/puckConfig.tsx با اتصال واقعی به محصولات و CartContext
+// ۱. ارتقای lib/puckConfig.tsx با فیلتر دسته‌بندی و بلوک تایمر جشنواره
 // =============================================================================
-const livePuckConfigCode = `import React, { useState, useEffect } from "react";
+const enterprisePuckConfig = `import React, { useState, useEffect } from "react";
 import type { Config } from "@measured/puck";
 import Link from "next/link";
 import { productService, Product } from "@/services/productService";
@@ -44,9 +44,18 @@ export type ComponentProps = {
   ProductGrid: {
     heading: string;
     subtitle: string;
+    category: string;
     limit: number;
     columns: number;
     showPriceBadge: boolean;
+    bgColor: string;
+  };
+  CountdownTimer: {
+    badge: string;
+    title: string;
+    targetDate: string;
+    buttonText: string;
+    buttonUrl: string;
     bgColor: string;
   };
   FeaturesGrid: {
@@ -85,18 +94,21 @@ export type ComponentProps = {
   };
 };
 
-// کامپوننت داخلی رندر ویترین محصولات متصل به دیتابیس
-function LiveProductGridRenderer({ heading, subtitle, limit, columns, showPriceBadge, bgColor }: any) {
+function LiveProductGridRenderer({ heading, subtitle, category, limit, columns, showPriceBadge, bgColor }: any) {
   const [products, setProducts] = useState<Product[]>([]);
   const { addToCart } = useCart();
 
   useEffect(() => {
     productService.getAll().then((data) => {
       if (data && data.length > 0) {
-        setProducts(data.slice(0, limit || 6));
+        let filtered = data;
+        if (category && category !== "all") {
+          filtered = data.filter((p) => (p.category || "").toLowerCase().includes(category.toLowerCase()));
+        }
+        setProducts(filtered.slice(0, limit || 6));
       }
     });
-  }, [limit]);
+  }, [category, limit]);
 
   const colClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : columns === 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
 
@@ -156,11 +168,61 @@ function LiveProductGridRenderer({ heading, subtitle, limit, columns, showPriceB
   );
 }
 
+function LiveCountdownRenderer({ badge, title, targetDate, buttonText, buttonUrl, bgColor }: any) {
+  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({ hours: 12, minutes: 45, seconds: 30 });
+
+  useEffect(() => {
+    const end = targetDate ? new Date(targetDate).getTime() : Date.now() + 24 * 3600 * 1000;
+    const timer = setInterval(() => {
+      const diff = Math.max(0, end - Date.now());
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ hours, minutes, seconds });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  return (
+    <section style={{ backgroundColor: bgColor || "#111827" }} className="w-full py-10 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
+      <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="space-y-2 text-center md:text-right">
+          {badge && <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-black border border-rose-500/30 inline-block">{badge}</span>}
+          <h2 className="text-xl sm:text-2xl font-black">{title || "فرصت محدود جشنواره ویژه"}</h2>
+        </div>
+
+        <div className="flex items-center gap-3 font-mono font-black" dir="ltr">
+          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+            <span className="text-2xl block text-rose-400">{String(timeLeft.hours).padStart(2, '0')}</span>
+            <span className="text-[9px] font-sans text-slate-400">ساعت</span>
+          </div>
+          <span className="text-xl text-rose-400">:</span>
+          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+            <span className="text-2xl block text-rose-400">{String(timeLeft.minutes).padStart(2, '0')}</span>
+            <span className="text-[9px] font-sans text-slate-400">دقیقه</span>
+          </div>
+          <span className="text-xl text-rose-400">:</span>
+          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+            <span className="text-2xl block text-rose-400">{String(timeLeft.seconds).padStart(2, '0')}</span>
+            <span className="text-[9px] font-sans text-slate-400">ثانیه</span>
+          </div>
+        </div>
+
+        {buttonText && (
+          <Link href={buttonUrl || "/products"} className="px-6 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition shadow-lg shadow-rose-600/30 whitespace-nowrap">
+            {buttonText} ←
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export const puckConfig: Config<ComponentProps> = {
   categories: {
     shop: {
       title: "فروشگاه و محصولات",
-      components: ["ProductGrid", "HeroBlock"]
+      components: ["ProductGrid", "CountdownTimer", "HeroBlock"]
     },
     content: {
       title: "محتوا و اعتمادسازی",
@@ -177,6 +239,17 @@ export const puckConfig: Config<ComponentProps> = {
       fields: {
         heading: { type: "text", label: "عنوان ویترین" },
         subtitle: { type: "text", label: "زیرعنوان ویترین" },
+        category: {
+          type: "select",
+          label: "فیلتر دسته کالا",
+          options: [
+            { label: "همه کالاها", value: "all" },
+            { label: "مانیتور و تصویر", value: "مانیتور" },
+            { label: "لپ‌تاپ و مک‌بوک", value: "مک" },
+            { label: "ساعت هوشمند", value: "ساعت" },
+            { label: "تبلت و آیپد", value: "آیپد" },
+          ]
+        },
         limit: { type: "number", label: "حداکثر تعداد کالا" },
         columns: { type: "number", label: "تعداد ستون‌ها (۲، ۳ یا ۴)" },
         showPriceBadge: {
@@ -189,12 +262,34 @@ export const puckConfig: Config<ComponentProps> = {
       defaultProps: {
         heading: "پرفروش‌ترین تجهیزات تصویر و مانیتورها",
         subtitle: "تأمین مستقیم و تحویل با بسته‌بندی ایمن هوانوردی",
+        category: "all",
         limit: 6,
         columns: 3,
         showPriceBadge: true,
         bgColor: "#07090e",
       },
       render: (props) => <LiveProductGridRenderer {...props} />,
+    },
+
+    CountdownTimer: {
+      label: "تایمر معکوس جشنواره فروش",
+      fields: {
+        badge: { type: "text", label: "بج برچسب بالا" },
+        title: { type: "text", label: "تیتر پیشنهاد ویژه" },
+        targetDate: { type: "text", label: "تاریخ پایان (فرمت: YYYY-MM-DDTHH:mm:ss)" },
+        buttonText: { type: "text", label: "متن دکمه خرید" },
+        buttonUrl: { type: "text", label: "لینک دکمه" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        badge: "⚡ پیشنهاد شگفت‌انگیز",
+        title: "تخفیف ویژه مانیتورهای استودیو تا پایان امشب",
+        targetDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 19),
+        buttonText: "مشاهده پیشنهادها",
+        buttonUrl: "/products",
+        bgColor: "#0f172a",
+      },
+      render: (props) => <LiveCountdownRenderer {...props} />,
     },
 
     HeroBlock: {
@@ -399,10 +494,10 @@ export const puckConfig: Config<ComponentProps> = {
   },
 };
 `;
-writeFile('lib/puckConfig.tsx', livePuckConfigCode);
+writeFile('lib/puckConfig.tsx', enterprisePuckConfig);
 
 // =============================================================================
-// تست بیلد نهایی پروژه و انتشار در Vercel
+// ۲. بیلد کامل و دیپلوی به ورسل
 // =============================================================================
 console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
@@ -417,7 +512,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(puck-shop): live product catalog integration with CartContext & direct addToCart actions"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(puck-enterprise): add countdown timer, category filter for product grid and enhanced e-commerce tools"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -426,7 +521,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ اکوسیستم کامل Puck با اتصال زنده به سبد خرید و محصولات با موفقیت مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ ارتقای تجاری Puck با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

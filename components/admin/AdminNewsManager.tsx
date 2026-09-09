@@ -1,9 +1,23 @@
-// File Path: components/admin/AdminNewsManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { newsService, TechNewsItem } from "@/services/newsService";
 import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
+
+export interface TechNewsItem {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  content: string;
+  category: "hardware" | "gadgets" | "ai" | "gaming";
+  source_name: string;
+  image_url: string;
+  tags: string[];
+  is_published: boolean;
+  trending_score?: number;
+  published_at?: string;
+}
 
 export default function AdminNewsManager() {
   const [news, setNews] = useState<TechNewsItem[]>([]);
@@ -13,32 +27,38 @@ export default function AdminNewsManager() {
   const [slug, setSlug] = useState("");
   const [summary, setSummary] = useState("");
   const [content, setContent] = useState("");
-  const [category, setCategory] = useState<TechNewsItem["category"]>("gadgets");
+  const [category, setCategory] = useState<TechNewsItem["category"]>("hardware");
   const [sourceName, setSourceName] = useState("Global Tech Wire");
   const [imageUrl, setImageUrl] = useState("");
-  const [tags, setTags] = useState("تکنولوژی, سخت افزار, مانیتور");
+  const [tags, setTags] = useState("تکنولوژی, سخت افزار, مانیتور 5K");
   const [isPublished, setIsPublished] = useState(true);
 
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const fetchNews = async () => {
-    const data = await newsService.getAll();
-    setNews(data || []);
+    try {
+      const res = await fetch("/api/news", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setNews(json.data);
+      }
+    } catch {}
   };
 
   useEffect(() => {
     fetchNews();
 
-    const handleNewsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setNews(e.detail);
-      else fetchNews();
-    };
+    const channel = supabase
+      .channel("realtime-tech-news")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => {
+        fetchNews();
+      })
+      .subscribe();
 
-    window.addEventListener("news_updated", handleNewsUpdate);
     return () => {
-      window.removeEventListener("news_updated", handleNewsUpdate);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -63,13 +83,14 @@ export default function AdminNewsManager() {
     setSlug("");
     setSummary("");
     setContent("");
-    setCategory("gadgets");
-    setSourceName("Global Tech Wire");
+    setCategory("hardware");
+    setSourceName("آکسون تک");
     setImageUrl("");
-    setTags("گجت, سخت افزار, مانیتور");
+    setTags("مانیتور, سخت افزار, استودیو");
     setIsPublished(true);
   };
 
+  // فعال‌سازی ربات خزش و ترجمه فوری اخبار ترند
   const handleSyncWorldNews = async () => {
     soundEngine.playClick();
     setSyncing(true);
@@ -79,14 +100,14 @@ export default function AdminNewsManager() {
       const data = await res.json();
       if (data.success) {
         soundEngine.playSuccess();
-        setStatusMsg("⚡ همگام‌سازی ترندهای جهانی و ترجمه اخبار با موفقیت انجام شد.");
+        setStatusMsg({ type: "success", text: "⚡ " + data.message });
         fetchNews();
       }
     } catch {
-      setStatusMsg("خطا در همگام‌سازی اخبار.");
+      setStatusMsg({ type: "error", text: "خطا در خزش و ترجمه اخبار جهانی." });
     } finally {
       setSyncing(false);
-      setTimeout(() => setStatusMsg(null), 3500);
+      setTimeout(() => setStatusMsg(null), 4000);
     }
   };
 
@@ -96,7 +117,7 @@ export default function AdminNewsManager() {
 
     soundEngine.playClick();
     setSaving(true);
-    const payload: Partial<TechNewsItem> = {
+    const payload = {
       id: selectedNews?.id,
       title: title.trim(),
       slug: slug.trim() || undefined,
@@ -109,46 +130,65 @@ export default function AdminNewsManager() {
       is_published: isPublished,
     };
 
-    const res = await newsService.saveNewsItem(payload);
-    setSaving(false);
+    try {
+      const res = await fetch("/api/news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
 
-    if (res) {
-      soundEngine.playSuccess();
-      setStatusMsg("✅ خبر با موفقیت ذخیره و در بخش «جدیدترین اخبار حوزه تکنولوژی» منتشر شد.");
-      fetchNews();
-      if (!selectedNews) setSelectedNews(res);
+      if (res.ok && data.success) {
+        soundEngine.playSuccess();
+        setStatusMsg({ type: "success", text: "✓ خبر با موفقیت در دیتابیس ثبت و در سایت منتشر شد." });
+        fetchNews();
+        if (!selectedNews && data.data) setSelectedNews(data.data);
+      }
+    } finally {
+      setSaving(false);
+      setTimeout(() => setStatusMsg(null), 3500);
     }
-    setTimeout(() => setStatusMsg(null), 3500);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این خبر اطمینان دارید؟")) return;
+  const handleDelete = async (id: string, newsTitle: string) => {
+    if (!confirm(`آیا از حذف کامل خبر «${newsTitle}» از پایگاه داده اطمینان دارید؟`)) return;
     soundEngine.playClick();
-    await newsService.deleteNewsItem(id);
-    handleCreateNew();
-    fetchNews();
+    try {
+      const res = await fetch(`/api/news?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        soundEngine.playSuccess();
+        setStatusMsg({ type: "success", text: "✓ خبر با موفقیت از سیستم حذف شد." });
+        if (selectedNews?.id === id) handleCreateNew();
+        fetchNews();
+      }
+    } catch {
+      alert("خطا در حذف خبر.");
+    }
   };
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      
+      {/* هدر بخش مدیریت اخبار */}
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📡</span> مرکز مدیریت جدیدترین اخبار حوزه تکنولوژی
+            <span>📡</span> ربات هوشمند رادار اخبار تکنولوژی و سئو
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پایش خودکار هر ۶ ساعت از منابع جهانی، ترجمه به فارسی، پاکسازی خودکار و ویرایش دستی
+            پایش خودکار ترندهای جهان، ترجمه هوشمند، انقضای ۷ روزه و مدیریت دستی کامل
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           <button
             onClick={handleSyncWorldNews}
             disabled={syncing}
             className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg disabled:opacity-50 flex items-center gap-1.5"
           >
-            <span>🔄</span>
-            <span>{syncing ? "در حال دریافت و ترجمه..." : "پایش فوری اخبار جهان"}</span>
+            <span>🤖</span>
+            <span>{syncing ? "در حال دریافت و ترجمه ترندها..." : "پایش و ترجمه فوری اخبار جهان"}</span>
           </button>
           <button
             onClick={handleCreateNew}
@@ -160,42 +200,85 @@ export default function AdminNewsManager() {
       </div>
 
       {statusMsg && (
-        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
-          {statusMsg}
+        <div className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (statusMsg.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600")}>
+          {statusMsg.text}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-2 h-[640px] overflow-y-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* ستون راست: لیست اخبار با دکمه‌های مستقیم ویرایش و حذف */}
+        <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--card-border)] space-y-3 h-fit shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <h3 className="text-xs font-black">
               📰 اخبار فعال ({news.length})
             </h3>
-            <span className="text-[10px] font-mono text-emerald-500 font-bold">
-              ۷ روز اعتبار خودکار
+            <span className="text-[10px] font-mono text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-lg">
+              انقضای ۷ روزه ✓
             </span>
           </div>
-          {news.map((item) => (
-            <div
-              key={item.id || item.slug}
-              onClick={() => handleSelectNews(item)}
-              className={`p-3 rounded-2xl border transition cursor-pointer flex items-center gap-3 ${
-                selectedNews?.id === item.id
-                  ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
-                  : "border-[var(--card-border)] bg-[var(--input-bg)]"
-              }`}
-            >
-              <img src={item.image_url} alt="" className="w-12 h-12 object-cover rounded-xl shrink-0 border border-[var(--card-border)]" />
-              <div className="overflow-hidden flex-1 space-y-1">
-                <h4 className="font-bold text-xs truncate">{item.title}</h4>
-                <span className="text-[10px] text-[var(--accent-blue)] font-bold block">{item.category}</span>
-              </div>
-            </div>
-          ))}
+
+          <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
+            {news.length === 0 ? (
+              <p className="text-xs text-center py-12 text-slate-400 font-bold">اخباری یافت نشد. دکمه پایش را بزنید.</p>
+            ) : (
+              news.map((item) => (
+                <div
+                  key={item.id}
+                  className={"p-3 rounded-2xl border transition flex items-center justify-between gap-2 " + (
+                    selectedNews?.id === item.id
+                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-sm"
+                      : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                  )}
+                >
+                  <div
+                    onClick={() => handleSelectNews(item)}
+                    className="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer"
+                  >
+                    <img
+                      src={item.image_url}
+                      alt=""
+                      className="w-12 h-12 object-cover rounded-xl shrink-0 border border-[var(--card-border)]"
+                    />
+                    <div className="overflow-hidden space-y-1">
+                      <h4 className="font-bold text-xs truncate">{item.title}</h4>
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <span className="text-[var(--accent-blue)] font-bold">{item.category}</span>
+                        <span className="text-slate-400 font-mono">({item.source_name})</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectNews(item)}
+                      className="p-1.5 px-2 rounded-xl bg-[var(--modal-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition cursor-pointer"
+                      title="ویرایش خبر"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(item.id, item.title);
+                      }}
+                      className="p-1.5 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
+                      title="حذف از دیتابیس"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        <div className="lg:col-span-2">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
+        {/* ستون چپ: فرم ادیتور کامل خبر */}
+        <div className="lg:col-span-8">
+          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-xl text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className="block font-bold text-[var(--text-secondary)] mb-1">تیتر خبر *</label>
@@ -204,7 +287,7 @@ export default function AdminNewsManager() {
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
@@ -213,12 +296,12 @@ export default function AdminNewsManager() {
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] cursor-pointer"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] cursor-pointer outline-none"
                 >
                   <option value="hardware">سخت‌افزار و مانیتور</option>
-                  <option value="gadgets">گجت‌ها و دیوایس‌ها</option>
-                  <option value="ai">هوش مصنوعی</option>
-                  <option value="gaming">گیمینگ و کنسول</option>
+                  <option value="gadgets">گجت‌ها و تجهیزات استودیو</option>
+                  <option value="ai">هوش مصنوعی و پردازش</option>
+                  <option value="gaming">گیمینگ و تصویر</option>
                 </select>
               </div>
 
@@ -228,48 +311,48 @@ export default function AdminNewsManager() {
                   type="text"
                   value={sourceName}
                   onChange={(e) => setSourceName(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">آدرس تصویر خبر (URL)</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">آدرس تصویر شاخص خبر (URL)</label>
                 <input
                   type="text"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[var(--text-primary)]"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">خلاصه گزارش (Meta Description)</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">خلاصه گزارش (Meta Description سئو)</label>
                 <textarea
                   rows={2}
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium outline-none leading-relaxed"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">متن کامل خبر (پشتیبانی از HTML)</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">متن کامل خبر (پشتیبانی از تگ‌های HTML)</label>
                 <textarea
                   rows={6}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium leading-relaxed"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium leading-loose outline-none"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">برچسب‌ها (با کاما جدا کنید)</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">برچسب‌ها و کلمات کلیدی (با کاما جدا کنید)</label>
                 <input
                   type="text"
                   value={tags}
                   onChange={(e) => setTags(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)]"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none"
                 />
               </div>
             </div>
@@ -278,19 +361,10 @@ export default function AdminNewsManager() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-lg disabled:opacity-50"
+                className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-lg hover:opacity-90 disabled:opacity-50"
               >
-                {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار خبر"}
+                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار خبر در سایت"}
               </button>
-              {selectedNews?.id && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(selectedNews.id)}
-                  className="px-5 py-3.5 rounded-2xl bg-rose-500/15 text-rose-600 font-bold cursor-pointer"
-                >
-                  حذف ✕
-                </button>
-              )}
             </div>
           </form>
         </div>

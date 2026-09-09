@@ -18,14 +18,16 @@ export default function AdminAiMasterSuite() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "copilot",
-      text: "سلام مدیر گرامی. ماتریس ۴ پلتفرم بازار ایران (دیجی‌کالا، ترب، ایمالز، باسلام و رقبای گوگل) و موتور استراتژی رشد اختصاصی فعال هستند. چه اقدامی مدنظر شماست؟",
+      text: "سلام مدیر گرامی. ماتریس پایش ۴ پلتفرم بازار ایران و استعلام اختصاصی هر کالای دلخواه فعال است. چه محصولی را برای استعلام قیمت و تأمین‌کننده بررسی کنیم؟",
       time: new Date().toLocaleTimeString("fa-IR")
     }
   ]);
   const [inputQuery, setInputQuery] = useState("");
   const [isCopilotThinking, setIsCopilotThinking] = useState(false);
 
-  // استیت‌های پایش ۴ پلتفرم بازار
+  // استیت‌های پایش اختصاصی کالا در بازار
+  const [marketSearchKeyword, setMarketSearchKeyword] = useState("مانیتور استودیو دیسپلی");
+  const [activeSearchedLabel, setActiveSearchedLabel] = useState("مانیتور استودیو دیسپلی");
   const [marketData, setMarketData] = useState<any>(null);
   const [activeMarketPlatform, setActiveMarketPlatform] = useState<"digikala" | "torob" | "emalls" | "basalam" | "google">("digikala");
   const [loadingMarket, setLoadingMarket] = useState(false);
@@ -58,20 +60,25 @@ export default function AdminAiMasterSuite() {
       if (prods && prods.length > 0) setSelectedProductId(prods[0].id);
     });
     fetchSeoInsights();
-    fetchLiveMarketMatrix();
+    handleSearchMarket("مانیتور استودیو دیسپلی");
   }, []);
 
-  const fetchLiveMarketMatrix = async () => {
+  const handleSearchMarket = async (keywordOverride?: string) => {
+    const kw = (keywordOverride !== undefined ? keywordOverride : marketSearchKeyword).trim() || "مانیتور";
+    soundEngine.playClick();
     setLoadingMarket(true);
+    setActiveSearchedLabel(kw);
+
     try {
       const res = await fetch("/api/ai-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "fetch_market_matrix" })
+        body: JSON.stringify({ action: "fetch_market_matrix", customKeyword: kw })
       });
       const json = await res.json();
       if (json.success && json.marketData) {
         setMarketData(json.marketData);
+        soundEngine.playSuccess();
       }
     } catch {} finally {
       setLoadingMarket(false);
@@ -154,7 +161,6 @@ export default function AdminAiMasterSuite() {
     }
   };
 
-  // ایجاد استراتژی رشد سفارشی با درصد و بازه دلخواه مدیر
   const handleGenerateCustomGrowthStrategy = async () => {
     soundEngine.playClick();
     setGeneratingStrategy(true);
@@ -175,7 +181,7 @@ export default function AdminAiMasterSuite() {
         soundEngine.playSuccess();
         const userMsg: ChatMessage = {
           role: "user",
-          text: `تدوین استراتژی رشد ${targetGrowthPct} درصدی در بازه زمانی ${targetMonths} ماهه با بررسی کل انبار و بازار`,
+          text: `تدوین استراتژی رشد ${targetGrowthPct} درصدی در بازه ${targetMonths} ماهه بر مبنای موجودی انبار`,
           time: new Date().toLocaleTimeString("fa-IR")
         };
         const copilotMsg: ChatMessage = {
@@ -195,7 +201,7 @@ export default function AdminAiMasterSuite() {
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* سربرگ هوش مصنوعی */}
+      {/* هدر هوش مصنوعی */}
       <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
@@ -204,21 +210,21 @@ export default function AdminAiMasterSuite() {
           <div>
             <h2 className="text-base sm:text-lg font-black">مرکز جامع هوش مصنوعی و اتوپایلوت آکسون (AI Master Suite)</h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-              پایش ۴ پلتفرم بازار (دیجی‌کالا، ترب، ایمالز، باسلام و گوگل)، استراتژی رشد با درصد دلخواه و تحلیل کاتالوگ
+              استعلام اختصاصی کالا در دیجی‌کالا، ترب، ایمالز و باسلام با لینک مستقیم خرید از تأمین‌کننده
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-black">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>پایش ۴ پلتفرم بازار: فعال ✓</span>
+          <span>پایش لحظه‌ای بازار: متصل ✓</span>
         </div>
       </div>
 
       {/* تب‌های اصلی */}
       <div className="flex gap-2 overflow-x-auto p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs scrollbar-none">
         {[
-          { id: "copilot", label: "💬 کوپایلوت بازار و استراتژی رشد" },
+          { id: "copilot", label: "💬 کوپایلوت بازار، تأمین‌کننده و استراتژی رشد" },
           { id: "seo", label: "📈 اتوپایلوت رشد سئو (GSC)" },
           { id: "teardown", label: "🔬 کالبدشکافی ۳D و متالورژی" },
           { id: "api_key", label: "🔑 تست و ذخیره امن کلیدهای AI" },
@@ -240,41 +246,68 @@ export default function AdminAiMasterSuite() {
         })}
       </div>
 
-      {/* تب ۱: کوپایلوت و ماتریس ۴ پلتفرم بازار */}
+      {/* تب ۱: کوپایلوت بازار و استعلام دستی و اختصاصی کالا */}
       {activeTab === "copilot" && (
         <div className="space-y-6">
           
-          {/* بخش ۱: ماتریس ۴ کارته استعلام زنده بازار با پیوند مستقیم خرید تأمین‌کننده */}
-          <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-3">
+          {/* بخش ۱: ماتریس استعلام کالا با فیلد جستجوی مستقیم کالا */}
+          <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5">
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-[var(--card-border)] pb-4">
               <div>
                 <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
-                  <span>📊</span>
-                  <span>رصدخانه لحظه‌ای قیمت‌ها و پرفروش‌های ۴ پلتفرم بزرگ ایران</span>
+                  <span>🔎</span>
+                  <span>استعلام اختصاصی کالا در ۴ پلتفرم بزرگ و لینک مستقیم خرید تأمین‌کننده</span>
                 </h3>
                 <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  برای مشاهده محصولات پرفروش، نرخ لحظه‌ای و لینک خرید مستقیم از تأمین‌کننده، روی هر کارت کلیک کنید:
+                  نام هر محصولی را وارد کنید تا نرخ کف بازار، فروشنده و لینک مستقیم صفحه خرید استخراج شود:
                 </p>
               </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    fetchHistory();
+                    setIsHistoryOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold text-[var(--accent-blue)] flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>📜</span>
+                  <span>تاریخچه گفتگوها</span>
+                </button>
+              </div>
+            </div>
+
+            {/* نوار جستجوی اختصاصی کالای مدنظر مدیر */}
+            <div className="flex flex-col sm:flex-row gap-2.5 bg-[var(--input-bg)] p-3 rounded-2xl border border-[var(--card-border)]">
+              <input
+                type="text"
+                value={marketSearchKeyword}
+                onChange={(e) => setMarketSearchKeyword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSearchMarket(); }}
+                placeholder="نام محصول مدنظر جهت استعلام قیمت و تأمین‌کننده (مثلاً: مانیتور استودیو دیسپلی، مک‌بوک پرو، کابل تاندربولت...)"
+                className="flex-1 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+              />
               <button
                 type="button"
-                onClick={fetchLiveMarketMatrix}
+                onClick={() => handleSearchMarket()}
                 disabled={loadingMarket}
-                className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50 shrink-0 flex items-center justify-center gap-1.5"
               >
-                <span>🔄</span>
-                <span>استعلام مجدد بازار</span>
+                <span>🔍</span>
+                <span>{loadingMarket ? "در حال استعلام لحظه‌ای..." : "استعلام آنی کالا در بازار"}</span>
               </button>
             </div>
 
-            {/* کارت‌های گزینش پلتفرم */}
+            {/* کارت‌های پلتفرم‌ها با تعداد واقعی */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               {[
-                { id: "digikala", name: "دیجی‌کالا", icon: "🛍️", count: marketData?.digikala?.length || 0, color: "text-rose-500" },
-                { id: "torob", name: "تُرب", icon: "🔍", count: marketData?.torob?.length || 0, color: "text-amber-500" },
-                { id: "emalls", name: "ایمالز", icon: "⚖️", count: marketData?.emalls?.length || 0, color: "text-blue-500" },
-                { id: "basalam", name: "باسلام", icon: "🛒", count: marketData?.basalam?.length || 0, color: "text-emerald-500" },
-                { id: "google", name: "رتبه ۱ گوگل", icon: "🌐", count: marketData?.googleTopRank?.length || 0, color: "text-purple-500" },
+                { id: "digikala", name: "دیجی‌کالا", icon: "🛍️", count: marketData?.digikala?.length || 0 },
+                { id: "torob", name: "تُرب", icon: "🔍", count: marketData?.torob?.length || 0 },
+                { id: "emalls", name: "ایمالز", icon: "⚖️", count: marketData?.emalls?.length || 0 },
+                { id: "basalam", name: "باسلام", icon: "🛒", count: marketData?.basalam?.length || 0 },
+                { id: "google", name: "رتبه ۱ گوگل", icon: "🌐", count: marketData?.googleTopRank?.length || 0 },
               ].map((p) => {
                 const isCur = activeMarketPlatform === p.id;
                 return (
@@ -292,7 +325,7 @@ export default function AdminAiMasterSuite() {
                   >
                     <div className="flex justify-between items-center">
                       <span className="text-xl">{p.icon}</span>
-                      <span className="font-mono text-xs font-bold opacity-80">{p.count} کالا</span>
+                      <span className="font-mono text-xs font-bold opacity-80">{p.count} پیشنهاد</span>
                     </div>
                     <span className="font-black text-xs block">{p.name}</span>
                   </div>
@@ -300,14 +333,17 @@ export default function AdminAiMasterSuite() {
               })}
             </div>
 
-            {/* لیست اقلام پلتفرم انتخاب شده به همراه لینک خرید تأمین‌کننده */}
-            <div className="p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
-              <span className="text-xs font-black text-[var(--text-primary)] block">
-                کالاهای پرفروش و تأمین‌کنندگان فعال در: <strong className="text-[var(--accent-blue)]">{activeMarketPlatform.toUpperCase()}</strong>
-              </span>
+            {/* لیست دقیق اقلام با لینک مستقیم صفحه اختصاصی محصول و خرید از تأمین‌کننده */}
+            <div className="p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+              <div className="flex justify-between items-center text-xs font-black">
+                <span>
+                  پیشنهادها و تأمین‌کنندگان کالای «<strong className="text-[var(--accent-blue)]">{activeSearchedLabel}</strong>» در پلتفرم <strong className="text-emerald-500 uppercase">{activeMarketPlatform}</strong>:
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">استعلام ساعت: {new Date().toLocaleTimeString("fa-IR")}</span>
+              </div>
 
               {loadingMarket ? (
-                <div className="py-8 text-center text-slate-400 font-bold text-xs">در حال استخراج زنده قیمت‌ها...</div>
+                <div className="py-10 text-center text-slate-400 font-bold text-xs">در حال واکشی صفحه محصول و لینک تأمین‌کنندگان...</div>
               ) : (
                 <div className="space-y-2">
                   {((marketData?.[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform]) || []).map((item: any) => (
@@ -315,7 +351,7 @@ export default function AdminAiMasterSuite() {
                       <div className="space-y-1 overflow-hidden">
                         <h4 className="font-bold text-xs text-[var(--text-primary)] leading-tight">{item.title}</h4>
                         <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                          <span>تأمین‌کننده: <strong className="text-[var(--text-primary)]">{item.sellerName}</strong></span>
+                          <span>تأمین‌کننده / فروشنده: <strong className="text-[var(--text-primary)]">{item.sellerName}</strong></span>
                           {item.rating && <span>• {item.rating}</span>}
                         </div>
                       </div>
@@ -328,9 +364,10 @@ export default function AdminAiMasterSuite() {
                           href={item.purchaseUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[10px] hover:opacity-90 shadow-sm"
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] shadow-md transition flex items-center gap-1.5"
                         >
-                          خرید از تأمین‌کننده 🔗
+                          <span>خرید مستقیم از تأمین‌کننده</span>
+                          <span>🔗</span>
                         </a>
                       </div>
                     </div>
@@ -340,22 +377,22 @@ export default function AdminAiMasterSuite() {
             </div>
           </div>
 
-          {/* بخش ۲: موتور تدوین استراتژی رشد داینامیک با درصد دلخواه */}
+          {/* بخش ۲: موتور تدوین استراتژی رشد داینامیک */}
           <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[var(--card-border)] pb-3">
               <div>
                 <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
                   <span>🎯</span>
-                  <span>موتور تدوین استراتژی رشد فروش هدفمند (Growth Strategist)</span>
+                  <span>موتور تدوین استراتژی رشد فروش هدفمند (Growth Engine)</span>
                 </h3>
                 <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  درصد رشد و افق زمانی دلخواه خود را تعیین کنید تا با تحلیل تمام محصولات و انبار، استراتژی تدوین شود:
+                  تعیین هدف رشد (مثلاً ۱۰٪، ۵۰٪، ۱۰۰٪، ۳۰۰٪) با تحلیل سبد کالایی و موجودی انبار:
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
-                  <span className="text-[10px] font-bold text-slate-400">هدف رشد:</span>
+                  <span className="text-[10px] font-bold text-slate-400">درصد هدف:</span>
                   <input
                     type="number"
                     min="5"
@@ -387,12 +424,12 @@ export default function AdminAiMasterSuite() {
                   disabled={generatingStrategy}
                   className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer disabled:opacity-50"
                 >
-                  {generatingStrategy ? "در حال تحلیل انبار..." : "تدوین استراتژی رشد 📈"}
+                  {generatingStrategy ? "در حال تدوین استراتژی..." : "تدوین استراتژی رشد 📈"}
                 </button>
               </div>
             </div>
 
-            {/* کادر چت کوپایلوت و آرشیو پیام‌ها */}
+            {/* کادر چت و تحلیل‌های زنده کوپایلوت */}
             <div className="h-[420px] overflow-y-auto space-y-4 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
               {messages.map((m, idx) => (
                 <div
@@ -420,7 +457,7 @@ export default function AdminAiMasterSuite() {
               {isCopilotThinking && (
                 <div className="flex items-center gap-2 p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] w-fit text-xs font-bold text-[var(--accent-blue)] animate-pulse">
                   <span>🧠</span>
-                  <span>کوپایلوت در حال تحلیل تمام کالاها، انبار و تقاضای بازار است...</span>
+                  <span>کوپایلوت در حال پایش بازار و تدوین پاسخ است...</span>
                 </div>
               )}
             </div>
@@ -431,7 +468,7 @@ export default function AdminAiMasterSuite() {
                 required
                 value={inputQuery}
                 onChange={(e) => setInputQuery(e.target.value)}
-                placeholder="هر پرسش تخصصی درباره فروش، کمپین یا قیمت‌گذاری بپرسید..."
+                placeholder="هر پرسشی درباره خرید از تأمین‌کننده، حاشیه سود یا فروش بپرسید..."
                 className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
               />
               <button
@@ -447,12 +484,74 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {/* تب‌های دیگر (سئو، کالبدشکافی و کلید) با ساختار پایدار قبلی */}
+      {/* مدال تاریخچه گفتگوها */}
+      {isHistoryOpen && (
+        <div
+          onClick={() => setIsHistoryOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans"
+          dir="rtl"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 shadow-2xl space-y-4 text-xs text-[var(--text-primary)]"
+          >
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📜</span>
+                <div>
+                  <h3 className="font-black text-sm">تاریخچه گفتگوهای کوپایلوت</h3>
+                  <p className="text-[10px] text-[var(--text-secondary)]">نگهداری حداکثر ۲۰ نشست در بازه ۱۴ روزه</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {loadingHistory ? (
+                <div className="text-center py-8 text-slate-400 font-bold">در حال واکشی تاریخچه‌ها...</div>
+              ) : historyList.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 font-bold">هنوز گفتگویی در دیتابیس ثبت نشده است.</div>
+              ) : (
+                historyList.map((session) => (
+                  <div
+                    key={session.id}
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setCurrentSessionId(session.id);
+                      setMessages(session.messages);
+                      setIsHistoryOpen(false);
+                    }}
+                    className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
+                      currentSessionId === session.id
+                        ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black"
+                        : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                    )}
+                  >
+                    <div className="overflow-hidden space-y-0.5">
+                      <h4 className="font-bold truncate text-[var(--text-primary)]">{session.title}</h4>
+                      <span className="font-mono text-[9px] text-slate-400">
+                        {new Date(session.updated_at).toLocaleString("fa-IR")}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* تب سئو */}
       {activeTab === "seo" && (
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <h3 className="font-black text-sm text-[var(--accent-blue)]">رصد هوشمند کلمات کلیدی و فرصت‌های رنک ۱ گوگل</h3>
-            <button onClick={fetchSeoInsights} disabled={loadingSeo} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold">🔄 به‌روزرسانی</button>
+            <button onClick={fetchSeoInsights} disabled={loadingSeo} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer">🔄 به‌روزرسانی</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]"><span>کلیک‌های ارگانیک:</span> <strong className="block text-lg font-mono text-[var(--accent-blue)]">{seoData?.totalOrganicClicks || 3840}</strong></div>

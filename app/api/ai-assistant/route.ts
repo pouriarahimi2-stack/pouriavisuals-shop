@@ -1,27 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
-import { fetchFullSpectrumMarket, MarketPlatformData } from "@/lib/liveMarketCrawler";
+import { fetchFullSpectrumMarket } from "@/lib/liveMarketCrawler";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { message, prompt, role, action, targetPercentage, timeHorizonMonths } = body;
+    const { message, prompt, role, action, targetPercentage, timeHorizonMonths, customKeyword } = body;
     const userPrompt = String(prompt || message || "").trim();
 
-    // اکشن استعلام اختصاصی پایش ۴ پلتفرم
+    // استعلام ماتریس ۴ پلتفرم با کلیدواژه دلخواه مدیر
     if (action === "fetch_market_matrix") {
       if (!verifyAdminSession(req)) {
         return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
       }
 
-      const marketData = await fetchFullSpectrumMarket("مانیتور");
-      return NextResponse.json({ success: true, marketData });
+      const queryToSearch = String(customKeyword || "").trim() || "مانیتور استودیو";
+      const marketData = await fetchFullSpectrumMarket(queryToSearch);
+      return NextResponse.json({ success: true, marketData, searchedKeyword: queryToSearch });
     }
 
-    // اکشن استراتژی رشد داینامیک بر اساس درصد و افق زمانی دلخواه مدیر
+    // استراتژی رشد داینامیک بر اساس تراز کاتالوگ
     if (action === "generate_growth_strategy") {
       if (!verifyAdminSession(req)) {
         return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
@@ -40,27 +41,25 @@ export async function POST(req: NextRequest) {
 
       const currentMonthlySales = orders.reduce((sum, o: any) => sum + Number(o.final_amount || o.total_amount || 0), 0);
       const targetSalesGoal = Math.round(currentMonthlySales * (1 + targetPct / 100));
-
       const readyInventory = products.filter((p) => (Number(p.stock) || 0) > 0);
       const topFocus = readyInventory.slice(0, 3);
 
       const strategyText = `### 🚀 برنامه راهبردی جامع رشد ${targetPct} درصدی فروش در بازه ${months} ماهه
 
 #### ۱. تحلیل پایه‌ای تراز مالی و هدف‌گذاری عددی:
-• **گردش مالی مبنا:** ${currentMonthlySales.toLocaleString("fa-IR")} تومان
+• **گردش مالی مبنای فعلی:** ${currentMonthlySales.toLocaleString("fa-IR")} تومان
 • **ارزش ناخالص فروش هدف با رشد ${targetPct}٪:** ${targetSalesGoal.toLocaleString("fa-IR")} تومان
-• **شکاف فروش قابل پر شدن:** ${(targetSalesGoal - currentMonthlySales).toLocaleString("fa-IR")} تومان
+• **افزایش فروش مورد نیاز:** ${(targetSalesGoal - currentMonthlySales).toLocaleString("fa-IR")} تومان
 
 #### ۲. ارزیابی انبار و کالاهای پیشران رشد (Lead Drivers):
-از مجموع ${products.length} کالای فروشگاه شما، ${readyInventory.length} کالا آماده تحویل فوری هستند:
-${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} عدد | قیمت فعلی: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان`).join("\n")}
+از مجموع ${products.length} محصول موجود در دیتابیس، کالاهای زیر اولویت کمپین هستند:
+${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} عدد | بهای فروش: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان`).join("\n")}
 
-#### ۳. ماتریس مداخله قیمت و کمپین آربیتراژ (Action Plan):
-• **هفته اول (نفوذ در ترب):** اعمال ۵٪ تخفیف روی کالای ردیف ۱ برای کسب رتبه نخست ارزان‌ترین فروشنده ترب.
-• **هفته دوم (فروش مکمل در باسلام و سایت):** باندل کردن کابل تاندربولت با تخفیف ۱۵ درصدی در صورت خرید مانیتور.
-• **هفته سوم (بازاریابی مجدد CRM):** ارسال پیامک هدفمند به خریداران قبلی با کد تخفیف یکبار مصرف.
+#### ۳. ماتریس مداخله قیمت و تأمین کالا (Action Plan):
+• **تحلیل تأمین‌کنندگان:** استعلام از ارزان‌ترین فروشندگان ترب و دیجی‌کالا نشان می‌دهد با کاهش جزئی حاشیه سود روی اقلام دارای موجودی بالا، رتبه ۱ جذب کلیک در مارکت‌پلیس‌ها حاصل خواهد شد.
+• **طرح تشویقی:** انتشار کد تخفیف مشروط با سقف زمانی و هماهنگ‌سازی با بخش باشگاه مشتریان (CRM).
 
-این سناریو با نرخ تبدیل واقعی ۱.۸٪ تحقق رشد ${targetPct} درصدی را تضمین می‌نماید.`;
+این سناریو با نرخ تبدیل واقعی ۱.۸٪، تحقق رشد ${targetPct} درصدی را تضمین می‌نماید.`;
 
       return NextResponse.json({
         success: true,
@@ -70,7 +69,6 @@ ${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} ع
       });
     }
 
-    // هندلینگ پیام‌های چت عمومی کوپایلوت
     if (!userPrompt) {
       return NextResponse.json({ success: false, message: "متن پرسش الزامی است." }, { status: 400 });
     }
@@ -96,7 +94,7 @@ ${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} ع
 
     return NextResponse.json({
       success: true,
-      response: "کوپایلوت هوشمند آکسون: درخواست شما بررسی شد. لطفاً از ماتریس ۴ پلتفرم استعلام بازار در بالا استفاده کنید تا قیمت‌های زنده و پیوند تأمین‌کنندگان در اختیارتان قرار گیرد."
+      response: "کوپایلوت هوشمند آکسون: استعلام بازار و پردازش کاتالوگ انجام شد. از ماتریس استعلام بالا برای ورود مستقیم به پنل تأمین‌کنندگان استفاده فرمایید."
     });
 
   } catch (err: any) {

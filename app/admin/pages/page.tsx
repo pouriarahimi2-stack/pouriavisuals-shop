@@ -1,7 +1,8 @@
 "use client";
+
 import React from "react";
-import PageBuilder from "@/components/admin/PageBuilder";
+import AdminModularPages from "@/components/admin/AdminModularPages";
 
 export default function AdminPagesRoute() {
-  return <PageBuilder />;
+  return <AdminModularPages />;
 }

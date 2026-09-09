@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
-import { PageBlock } from "@/lib/modularBuilderTypes";
 import { seedHomePageIfMissing } from "@/lib/seedHomePage";
 
 export const dynamic = "force-dynamic";
 
-// واکشی کل صفحات ساخته‌شده
 export async function GET(req: NextRequest) {
-  await seedHomePageIfMissing();
   try {
+    await seedHomePageIfMissing();
+
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
 
@@ -36,7 +35,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ایجاد یا ویرایش صفحه و بلوک‌ها همراه با تریگر وب‌سوکت CDC
 export async function POST(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
@@ -66,10 +64,10 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString()
     };
 
-    const { data: existing } = await supabaseAdmin.from("modular_pages").select("id").eq("id", pageId).maybeSingle();
+    const { data: existing } = await supabaseAdmin.from("modular_pages").select("id").eq("slug", cleanSlug).maybeSingle();
 
     if (existing) {
-      const { error } = await supabaseAdmin.from("modular_pages").update(payload).eq("id", pageId);
+      const { error } = await supabaseAdmin.from("modular_pages").update(payload).eq("id", existing.id);
       if (error) throw error;
     } else {
       payload["created_at"] = new Date().toISOString();
@@ -77,13 +75,12 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
     }
 
-    return NextResponse.json({ success: true, message: "صفحه ماژولار با موفقیت ذخیره شد.", page: payload });
+    return NextResponse.json({ success: true, message: "صفحه ماژولار با موفقیت ذخیره و در سراسر سایت منتشر شد.", page: payload });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
-// حذف کامل صفحه
 export async function DELETE(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
@@ -92,11 +89,17 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    if (!id) {
+    const slug = searchParams.get("slug");
+
+    if (!id && !slug) {
       return NextResponse.json({ success: false, message: "شناسه صفحه الزامی است." }, { status: 400 });
     }
 
-    const { error } = await supabaseAdmin.from("modular_pages").delete().eq("id", id);
+    let query = supabaseAdmin.from("modular_pages").delete();
+    if (id) query = query.eq("id", id);
+    else if (slug) query = query.eq("slug", slug);
+
+    const { error } = await query;
     if (error) throw error;
 
     return NextResponse.json({ success: true, message: "صفحه با موفقیت حذف گردید." });

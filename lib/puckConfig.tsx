@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Config } from "@measured/puck";
 import Link from "next/link";
 
@@ -17,6 +17,13 @@ export type ComponentProps = {
     paddingTop: number;
     paddingBottom: number;
   };
+  ProductGrid: {
+    heading: string;
+    subtitle: string;
+    columns: number;
+    showPriceBadge: boolean;
+    bgColor: string;
+  };
   FeaturesGrid: {
     heading: string;
     item1Title: string;
@@ -28,6 +35,16 @@ export type ComponentProps = {
     bgColor: string;
     paddingTop: number;
     paddingBottom: number;
+  };
+  FaqAccordion: {
+    heading: string;
+    q1: string;
+    a1: string;
+    q2: string;
+    a2: string;
+    q3: string;
+    a3: string;
+    bgColor: string;
   };
   CtaBanner: {
     title: string;
@@ -45,12 +62,16 @@ export type ComponentProps = {
 
 export const puckConfig: Config<ComponentProps> = {
   categories: {
-    layout: {
-      title: "بلوک‌های اصلی لایه‌بندی",
-      components: ["HeroBlock", "FeaturesGrid", "CtaBanner"]
+    shop: {
+      title: "فروشگاه و محصولات",
+      components: ["ProductGrid", "HeroBlock"]
     },
-    custom: {
-      title: "المان‌های پیشرفته و کد",
+    content: {
+      title: "محتوا و اعتمادسازی",
+      components: ["FeaturesGrid", "FaqAccordion", "CtaBanner"]
+    },
+    advanced: {
+      title: "پیشرفته و کدنویسی",
       components: ["CustomHtml"]
     }
   },
@@ -128,6 +149,65 @@ export const puckConfig: Config<ComponentProps> = {
         );
       },
     },
+
+    ProductGrid: {
+      label: "ویترین کالاهای منتخب فروشگاه",
+      fields: {
+        heading: { type: "text", label: "عنوان ویترین" },
+        subtitle: { type: "text", label: "زیرعنوان ویترین" },
+        columns: { type: "number", label: "تعداد ستون‌ها (۲، ۳ یا ۴)" },
+        showPriceBadge: {
+          type: "radio",
+          label: "نمایش بج قیمت تضمینی",
+          options: [
+            { label: "بله", value: true },
+            { label: "خیر", value: false }
+          ]
+        },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        heading: "پرفروش‌ترین مانیتورها و تجهیزات ۵K",
+        subtitle: "تحویل فوری در سراسر کشور با بیمه نامه رسمی",
+        columns: 3,
+        showPriceBadge: true,
+        bgColor: "#07090e",
+      },
+      render: ({ heading, subtitle, columns, showPriceBadge, bgColor }) => {
+        const colClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : columns === 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
+        return (
+          <section style={{ backgroundColor: bgColor || "#07090e" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <div className="text-center space-y-1">
+                <h2 className="text-2xl font-black">{heading}</h2>
+                <p className="text-xs text-slate-400">{subtitle}</p>
+              </div>
+
+              <div className={`grid ${colClass} gap-6 pt-4`}>
+                {[1, 2, 3].map((item) => (
+                  <div key={item} className="p-5 rounded-3xl bg-white/5 border border-white/10 space-y-3 hover:border-sky-500/40 transition flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="w-full h-44 rounded-2xl bg-black/40 flex items-center justify-center text-4xl border border-white/5">
+                        🖥️
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold">Apple Studio Display 27 5K</span>
+                        {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">تخفیف ویژه</span>}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t border-white/10">
+                      <span className="font-mono text-emerald-400 font-black text-xs">۱۲۸,۵۰۰,۰۰۰ تومان</span>
+                      <Link href="/products" className="px-4 py-2 rounded-xl bg-sky-500 text-white font-bold text-xs hover:bg-sky-400 transition">خرید کالا ←</Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      },
+    },
+
     FeaturesGrid: {
       label: "گرید ۳ ستونه مزایا و ویژگی‌ها",
       fields: {
@@ -181,6 +261,58 @@ export const puckConfig: Config<ComponentProps> = {
         );
       },
     },
+
+    FaqAccordion: {
+      label: "پرسش و پاسخ آکاردئونی (FAQ)",
+      fields: {
+        heading: { type: "text", label: "تیتر بخش پرسش‌ها" },
+        q1: { type: "text", label: "سوال اول" },
+        a1: { type: "textarea", label: "پاسخ اول" },
+        q2: { type: "text", label: "سوال دوم" },
+        a2: { type: "textarea", label: "پاسخ دوم" },
+        q3: { type: "text", label: "سوال سوم" },
+        a3: { type: "textarea", label: "پاسخ سوم" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        heading: "پرسش‌های متداول مشتریان و استودیوها",
+        q1: "آیا مانیتورها دارای گارانتی تعویض هستند؟",
+        a1: "بله، تمام مانیتورهای ۵K دارای ۱۸ ماه گارانتی طلایی تعویض بی قید و شرط می‌باشند.",
+        q2: "نحوه ارسال تجهیزات حساس به شهرستان چگونه است؟",
+        a2: "بسته‌بندی ضربه‌گیر ویژه هوانوردی به همراه بیمه کامل مرسوله توسط پست پیشتاز اختصاصی.",
+        q3: "امکان تست حضوری مانیتور وجود دارد؟",
+        a3: "بله، با هماهنگی قبلی در دفتر مرکزی امکان تست کالیبراسیون پنل وجود دارد.",
+        bgColor: "#020617",
+      },
+      render: ({ heading, q1, a1, q2, a2, q3, a3, bgColor }) => {
+        const [open, setOpen] = useState<number | null>(0);
+        const list = [
+          { q: q1, a: a1 },
+          { q: q2, a: a2 },
+          { q: q3, a: a3 },
+        ].filter(x => x.q);
+
+        return (
+          <section style={{ backgroundColor: bgColor || "#020617" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {heading && <h2 className="text-2xl font-black text-center mb-8">{heading}</h2>}
+              <div className="space-y-3">
+                {list.map((it, idx) => (
+                  <div key={idx} onClick={() => setOpen(open === idx ? null : idx)} className="p-5 rounded-2xl bg-white/5 border border-white/10 cursor-pointer transition">
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span>{it.q}</span>
+                      <span className="text-sky-400">{open === idx ? "▲" : "▼"}</span>
+                    </div>
+                    {open === idx && <p className="mt-3 pt-3 border-t border-white/10 text-xs text-slate-300 leading-relaxed">{it.a}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      }
+    },
+
     CtaBanner: {
       label: "فراخوان عمل و کمپین (CTA)",
       fields: {
@@ -215,6 +347,7 @@ export const puckConfig: Config<ComponentProps> = {
         );
       },
     },
+
     CustomHtml: {
       label: "کد خام اختصاصی (HTML / CSS / SVG)",
       fields: {

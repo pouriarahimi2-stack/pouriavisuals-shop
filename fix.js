@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Puck Front-End Live Rendering Integration (fix.js)
+ * AXON CORE - Complete Puck E-Commerce Component Suite (fix.js)
  */
 
 const fs = require('fs');
@@ -14,66 +14,390 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PUCK-RENDERER]\x1b[0m استقرار موتور رندر اختصاصی Puck برای صفحات لایو و لندینگ‌ها...");
+console.log("\x1b[36m[AXON-PUCK-EXPANSION]\x1b[0m افزودن ویترین محصولات، پرسش و پاسخ، و اسلایدرها به مخزن Puck...");
 
 // =============================================================================
-// ۱. ارتقای components/modular/ModularPageRenderer.tsx به موتور بومی Render پکیج Puck
+// بازنویسی جامع lib/puckConfig.tsx با ویجت‌های کامل فروشگاهی
 // =============================================================================
-const modernPuckRenderer = `"use client";
+const fullPuckConfig = `import React, { useState } from "react";
+import type { Config } from "@measured/puck";
+import Link from "next/link";
 
-import React, { useState, useEffect } from "react";
-import { Render } from "@measured/puck";
-import { puckConfig } from "@/lib/puckConfig";
-import { supabase } from "@/lib/supabase";
-
-interface Props {
-  initialPage: any;
-  slug: string;
-}
-
-export default function ModularPageRenderer({ initialPage, slug }: Props) {
-  const [page, setPage] = useState<any>(initialPage);
-
-  const fetchPage = async () => {
-    try {
-      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && json.page) {
-        setPage(json.page);
-      }
-    } catch {}
+export type ComponentProps = {
+  HeroBlock: {
+    badge: string;
+    title: string;
+    subtitle: string;
+    primaryBtnText: string;
+    primaryBtnUrl: string;
+    secondaryBtnText: string;
+    secondaryBtnUrl: string;
+    imageUrl: string;
+    bgColor: string;
+    textColor: string;
+    paddingTop: number;
+    paddingBottom: number;
   };
+  ProductGrid: {
+    heading: string;
+    subtitle: string;
+    columns: number;
+    showPriceBadge: boolean;
+    bgColor: string;
+  };
+  FeaturesGrid: {
+    heading: string;
+    item1Title: string;
+    item1Desc: string;
+    item2Title: string;
+    item2Desc: string;
+    item3Title: string;
+    item3Desc: string;
+    bgColor: string;
+    paddingTop: number;
+    paddingBottom: number;
+  };
+  FaqAccordion: {
+    heading: string;
+    q1: string;
+    a1: string;
+    q2: string;
+    a2: string;
+    q3: string;
+    a3: string;
+    bgColor: string;
+  };
+  CtaBanner: {
+    title: string;
+    subtitle: string;
+    btnText: string;
+    btnUrl: string;
+    bgColor: string;
+  };
+  CustomHtml: {
+    code: string;
+    paddingTop: number;
+    paddingBottom: number;
+  };
+};
 
-  useEffect(() => {
-    const channel = supabase
-      .channel(\`realtime-puck-render-\${slug}\`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
-        fetchPage();
-      })
-      .subscribe();
+export const puckConfig: Config<ComponentProps> = {
+  categories: {
+    shop: {
+      title: "فروشگاه و محصولات",
+      components: ["ProductGrid", "HeroBlock"]
+    },
+    content: {
+      title: "محتوا و اعتمادسازی",
+      components: ["FeaturesGrid", "FaqAccordion", "CtaBanner"]
+    },
+    advanced: {
+      title: "پیشرفته و کدنویسی",
+      components: ["CustomHtml"]
+    }
+  },
+  components: {
+    HeroBlock: {
+      label: "هیرو بنر بزرگ استودیویی",
+      fields: {
+        badge: { type: "text", label: "برچسب بالا (Badge)" },
+        title: { type: "text", label: "تیتر اصلی هیرو" },
+        subtitle: { type: "textarea", label: "متن توضیحات زیرعنوان" },
+        primaryBtnText: { type: "text", label: "متن دکمه اول" },
+        primaryBtnUrl: { type: "text", label: "لینک دکمه اول" },
+        secondaryBtnText: { type: "text", label: "متن دکمه دوم" },
+        secondaryBtnUrl: { type: "text", label: "لینک دکمه دوم" },
+        imageUrl: { type: "text", label: "آدرس تصویر شاخص" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+        textColor: { type: "text", label: "رنگ متن" },
+        paddingTop: { type: "number", label: "فاصله از بالا (px)" },
+        paddingBottom: { type: "number", label: "فاصله از پایین (px)" },
+      },
+      defaultProps: {
+        badge: "🚀 مرجع تخصصی مانیتورهای ۵K",
+        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+        primaryBtnText: "کاتالوگ مانیتورها",
+        primaryBtnUrl: "/products",
+        secondaryBtnText: "درخواست مشاوره",
+        secondaryBtnUrl: "/contact",
+        imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+        bgColor: "#020617",
+        textColor: "#ffffff",
+        paddingTop: 60,
+        paddingBottom: 60,
+      },
+      render: ({ badge, title, subtitle, primaryBtnText, primaryBtnUrl, secondaryBtnText, secondaryBtnUrl, imageUrl, bgColor, textColor, paddingTop, paddingBottom }) => {
+        return (
+          <section
+            style={{ backgroundColor: bgColor || "#020617", color: textColor || "#fff", paddingTop: \`\${paddingTop || 60}px\`, paddingBottom: \`\${paddingBottom || 60}px\` }}
+            className="w-full text-center px-4 font-sans select-none relative"
+            dir="rtl"
+          >
+            <div className="max-w-5xl mx-auto space-y-6">
+              {badge && (
+                <span className="inline-block px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">
+                  {badge}
+                </span>
+              )}
+              <h1 className="text-3xl sm:text-5xl font-black leading-tight">
+                {title}
+              </h1>
+              {subtitle && (
+                <p className="text-sm sm:text-base opacity-80 max-w-2xl mx-auto leading-relaxed">
+                  {subtitle}
+                </p>
+              )}
+              <div className="flex flex-wrap justify-center gap-3 pt-4">
+                {primaryBtnText && (
+                  <Link href={primaryBtnUrl || "/products"} className="px-8 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-xl transition">
+                    {primaryBtnText}
+                  </Link>
+                )}
+                {secondaryBtnText && (
+                  <Link href={secondaryBtnUrl || "/contact"} className="px-8 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-xs transition">
+                    {secondaryBtnText}
+                  </Link>
+                )}
+              </div>
+              {imageUrl && (
+                <div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden mt-8 shadow-2xl border border-white/10">
+                  <img src={imageUrl} alt="" className="w-full h-auto object-cover max-h-[480px]" />
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      },
+    },
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [slug]);
+    ProductGrid: {
+      label: "ویترین کالاهای منتخب فروشگاه",
+      fields: {
+        heading: { type: "text", label: "عنوان ویترین" },
+        subtitle: { type: "text", label: "زیرعنوان ویترین" },
+        columns: { type: "number", label: "تعداد ستون‌ها (۲، ۳ یا ۴)" },
+        showPriceBadge: {
+          type: "radio",
+          label: "نمایش بج قیمت تضمینی",
+          options: [
+            { label: "بله", value: true },
+            { label: "خیر", value: false }
+          ]
+        },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        heading: "پرفروش‌ترین مانیتورها و تجهیزات ۵K",
+        subtitle: "تحویل فوری در سراسر کشور با بیمه نامه رسمی",
+        columns: 3,
+        showPriceBadge: true,
+        bgColor: "#07090e",
+      },
+      render: ({ heading, subtitle, columns, showPriceBadge, bgColor }) => {
+        const colClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : columns === 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
+        return (
+          <section style={{ backgroundColor: bgColor || "#07090e" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <div className="text-center space-y-1">
+                <h2 className="text-2xl font-black">{heading}</h2>
+                <p className="text-xs text-slate-400">{subtitle}</p>
+              </div>
 
-  if (!page || !page.puck_data) {
-    return null;
-  }
+              <div className={\`grid \${colClass} gap-6 pt-4\`}>
+                {[1, 2, 3].map((item) => (
+                  <div key={item} className="p-5 rounded-3xl bg-white/5 border border-white/10 space-y-3 hover:border-sky-500/40 transition flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="w-full h-44 rounded-2xl bg-black/40 flex items-center justify-center text-4xl border border-white/5">
+                        🖥️
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold">Apple Studio Display 27 5K</span>
+                        {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">تخفیف ویژه</span>}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t border-white/10">
+                      <span className="font-mono text-emerald-400 font-black text-xs">۱۲۸,۵۰۰,۰۰۰ تومان</span>
+                      <Link href="/products" className="px-4 py-2 rounded-xl bg-sky-500 text-white font-bold text-xs hover:bg-sky-400 transition">خرید کالا ←</Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      },
+    },
 
-  return (
-    <div className="w-full min-h-screen font-sans select-none overflow-x-hidden" dir="rtl">
-      <Render config={puckConfig} data={page.puck_data} />
-    </div>
-  );
-}
+    FeaturesGrid: {
+      label: "گرید ۳ ستونه مزایا و ویژگی‌ها",
+      fields: {
+        heading: { type: "text", label: "عنوان بخش" },
+        item1Title: { type: "text", label: "عنوان ویژگی ۱" },
+        item1Desc: { type: "textarea", label: "توضیح ویژگی ۱" },
+        item2Title: { type: "text", label: "عنوان ویژگی ۲" },
+        item2Desc: { type: "textarea", label: "توضیح ویژگی ۲" },
+        item3Title: { type: "text", label: "عنوان ویژگی ۳" },
+        item3Desc: { type: "textarea", label: "توضیح ویژگی ۳" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+        paddingTop: { type: "number", label: "فاصله بالا (px)" },
+        paddingBottom: { type: "number", label: "فاصله پایین (px)" },
+      },
+      defaultProps: {
+        heading: "استانداردهای مهندسی آکسون استودیو",
+        item1Title: "گارانتی ۱۸ ماهه طلایی",
+        item1Desc: "تعویض بدون قید و شرط برای تمامی نمایشگرهای مسترینگ.",
+        item2Title: "کالیبراسیون ۳D LUT",
+        item2Desc: "تراز رنگ اختصاصی مطابق با گاموت‌های سینمایی DCI-P3.",
+        item3Title: "بسته‌بندی ایمن هوانوردی",
+        item3Desc: "محافظت کامل فیزیکی در برابر ضربه و شوک حین ارسال پیشتاز.",
+        bgColor: "#090d16",
+        paddingTop: 50,
+        paddingBottom: 50,
+      },
+      render: ({ heading, item1Title, item1Desc, item2Title, item2Desc, item3Title, item3Desc, bgColor, paddingTop, paddingBottom }) => {
+        return (
+          <section
+            style={{ backgroundColor: bgColor || "#090d16", paddingTop: \`\${paddingTop || 50}px\`, paddingBottom: \`\${paddingBottom || 50}px\` }}
+            className="w-full px-4 font-sans select-none text-white"
+            dir="rtl"
+          >
+            <div className="max-w-7xl mx-auto space-y-8">
+              {heading && <h2 className="text-2xl font-black text-center">{heading}</h2>}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[
+                  { t: item1Title, d: item1Desc, icon: "🛡️" },
+                  { t: item2Title, d: item2Desc, icon: "⚡" },
+                  { t: item3Title, d: item3Desc, icon: "📦" },
+                ].map((item, i) => (
+                  <div key={i} className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2 hover:border-sky-500/40 transition">
+                    <span className="text-3xl block">{item.icon}</span>
+                    <h3 className="font-bold text-sm">{item.t}</h3>
+                    <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.d}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      },
+    },
+
+    FaqAccordion: {
+      label: "پرسش و پاسخ آکاردئونی (FAQ)",
+      fields: {
+        heading: { type: "text", label: "تیتر بخش پرسش‌ها" },
+        q1: { type: "text", label: "سوال اول" },
+        a1: { type: "textarea", label: "پاسخ اول" },
+        q2: { type: "text", label: "سوال دوم" },
+        a2: { type: "textarea", label: "پاسخ دوم" },
+        q3: { type: "text", label: "سوال سوم" },
+        a3: { type: "textarea", label: "پاسخ سوم" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        heading: "پرسش‌های متداول مشتریان و استودیوها",
+        q1: "آیا مانیتورها دارای گارانتی تعویض هستند؟",
+        a1: "بله، تمام مانیتورهای ۵K دارای ۱۸ ماه گارانتی طلایی تعویض بی قید و شرط می‌باشند.",
+        q2: "نحوه ارسال تجهیزات حساس به شهرستان چگونه است؟",
+        a2: "بسته‌بندی ضربه‌گیر ویژه هوانوردی به همراه بیمه کامل مرسوله توسط پست پیشتاز اختصاصی.",
+        q3: "امکان تست حضوری مانیتور وجود دارد؟",
+        a3: "بله، با هماهنگی قبلی در دفتر مرکزی امکان تست کالیبراسیون پنل وجود دارد.",
+        bgColor: "#020617",
+      },
+      render: ({ heading, q1, a1, q2, a2, q3, a3, bgColor }) => {
+        const [open, setOpen] = useState<number | null>(0);
+        const list = [
+          { q: q1, a: a1 },
+          { q: q2, a: a2 },
+          { q: q3, a: a3 },
+        ].filter(x => x.q);
+
+        return (
+          <section style={{ backgroundColor: bgColor || "#020617" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {heading && <h2 className="text-2xl font-black text-center mb-8">{heading}</h2>}
+              <div className="space-y-3">
+                {list.map((it, idx) => (
+                  <div key={idx} onClick={() => setOpen(open === idx ? null : idx)} className="p-5 rounded-2xl bg-white/5 border border-white/10 cursor-pointer transition">
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span>{it.q}</span>
+                      <span className="text-sky-400">{open === idx ? "▲" : "▼"}</span>
+                    </div>
+                    {open === idx && <p className="mt-3 pt-3 border-t border-white/10 text-xs text-slate-300 leading-relaxed">{it.a}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      }
+    },
+
+    CtaBanner: {
+      label: "فراخوان عمل و کمپین (CTA)",
+      fields: {
+        title: { type: "text", label: "تیتر فراخوان" },
+        subtitle: { type: "textarea", label: "متن زیرعنوان" },
+        btnText: { type: "text", label: "متن دکمه" },
+        btnUrl: { type: "text", label: "لینک دکمه" },
+        bgColor: { type: "text", label: "رنگ باکس" },
+      },
+      defaultProps: {
+        title: "به یک مشاوره تخصصی برای استودیو نیاز دارید؟",
+        subtitle: "کارشناسان آکسون متناسب با نرم‌افزار شما مانیتور مناسب را پیشنهاد می‌دهند.",
+        btnText: "ثبت تیکت مشاوره",
+        btnUrl: "/contact",
+        bgColor: "#1e1b4b",
+      },
+      render: ({ title, subtitle, btnText, btnUrl, bgColor }) => {
+        return (
+          <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none" dir="rtl">
+            <div style={{ backgroundColor: bgColor || "#1e1b4b" }} className="p-8 sm:p-12 rounded-3xl text-center space-y-4 border border-blue-500/30 text-white shadow-2xl">
+              <h2 className="text-2xl font-black">{title}</h2>
+              {subtitle && <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto">{subtitle}</p>}
+              {btnText && (
+                <div className="pt-2">
+                  <Link href={btnUrl || "/contact"} className="inline-block px-8 py-3 rounded-xl bg-white text-slate-950 font-black text-xs hover:bg-slate-100 transition shadow-lg">
+                    {btnText}
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+
+    CustomHtml: {
+      label: "کد خام اختصاصی (HTML / CSS / SVG)",
+      fields: {
+        code: { type: "textarea", label: "کد اختصاصی" },
+        paddingTop: { type: "number", label: "فاصله از بالا" },
+        paddingBottom: { type: "number", label: "فاصله از پایین" },
+      },
+      defaultProps: {
+        code: "<div class='p-6 text-center text-sky-400 font-mono text-xs border border-sky-500/20 rounded-2xl'>کدهای دلخواه HTML / CSS را اینجا وارد کنید</div>",
+        paddingTop: 20,
+        paddingBottom: 20,
+      },
+      render: ({ code, paddingTop, paddingBottom }) => {
+        return (
+          <div style={{ paddingTop: \`\${paddingTop || 20}px\`, paddingBottom: \`\${paddingBottom || 20}px\` }} className="max-w-7xl mx-auto px-4">
+            <div dangerouslySetInnerHTML={{ __html: code || "" }} />
+          </div>
+        );
+      },
+    },
+  },
+};
 `;
-writeFile('components/modular/ModularPageRenderer.tsx', modernPuckRenderer);
+writeFile('lib/puckConfig.tsx', fullPuckConfig);
 
 // =============================================================================
-// ۲. تست بیلد نهایی و ارسال به گیت‌هاب و ورسل
+// تست بیلد و ارسال به گیت‌هاب
 // =============================================================================
-console.log("تست بیلد نهایی پروژه (npm run build)...");
+console.log("تست بیلد کامل (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -82,11 +406,11 @@ try {
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگر دیپلوی ورسل...");
+console.log("ارسال تغییرات به مخزن گیت‌هاب و استقرار لایو ورسل...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(puck-renderer): integrate native Puck <Render /> for lightning-fast public pages and realtime CDC updates"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(puck-catalog): full e-commerce component suite including ProductGrid, FaqAccordion, Features and custom HTML"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -95,7 +419,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ چرخه کامل Puck (از ویرایشگر ادمین تا رندر لایو سایت) مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ مجموعه کامل کامپوننت‌های Puck با موفقیت مستقر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

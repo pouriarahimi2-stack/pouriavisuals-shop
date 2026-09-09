@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Elementor Pro Advanced Inspector Engine (fix.js)
+ * AXON CORE - Next-Gen Puck Visual Studio Migration (fix.js)
  */
 
 const fs = require('fs');
@@ -14,670 +14,557 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-ELEMENTOR-PRO]\x1b[0m پیاده‌سازی سنسور جامع بازرسی المان و استودیو استایل‌دهی موضعی...");
-
-// =============================================================================
-// ۱. ارتقای components/modular/ElementorVisualBridge.tsx: پل ارتباطی دوطرفه استایل زنده
-// =============================================================================
-const advancedBridgeCode = `"use client";
-
-import { useEffect } from "react";
-
-export default function ElementorVisualBridge() {
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.self === window.top) return;
-
-    let selectedElement: HTMLElement | null = null;
-    let overlay: HTMLDivElement | null = null;
-
-    const createOverlay = () => {
-      overlay = document.createElement("div");
-      overlay.style.position = "absolute";
-      overlay.style.pointerEvents = "none";
-      overlay.style.border = "2px solid #38bdf8";
-      overlay.style.backgroundColor = "rgba(56, 189, 248, 0.08)";
-      overlay.style.zIndex = "999998";
-      overlay.style.display = "none";
-      overlay.style.borderRadius = "8px";
-      overlay.style.transition = "all 0.1s ease";
-      document.body.appendChild(overlay);
-    };
-
-    const updateOverlay = () => {
-      if (!selectedElement || !overlay) return;
-      const rect = selectedElement.getBoundingClientRect();
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
-
-      overlay.style.top = (rect.top + scrollTop - 2) + "px";
-      overlay.style.left = (rect.left + scrollLeft - 2) + "px";
-      overlay.style.width = (rect.width + 4) + "px";
-      overlay.style.height = (rect.height + 4) + "px";
-      overlay.style.display = "block";
-    };
-
-    createOverlay();
-
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target || target === overlay) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      selectedElement = target;
-      if (["P", "H1", "H2", "H3", "H4", "H5", "SPAN", "BUTTON", "A"].includes(target.tagName)) {
-        target.contentEditable = "true";
-        target.focus();
-      }
-
-      updateOverlay();
-
-      const computed = window.getComputedStyle(target);
-      window.parent.postMessage({
-        type: "AXON_ELEMENT_SELECTED",
-        payload: {
-          tagName: target.tagName,
-          text: target.innerText ? target.innerText.slice(0, 50) : "",
-          color: computed.color,
-          backgroundColor: computed.backgroundColor,
-          fontSize: parseInt(computed.fontSize, 10) || 16,
-          fontWeight: computed.fontWeight,
-          borderRadius: parseInt(computed.borderRadius, 10) || 0,
-          paddingTop: parseInt(computed.paddingTop, 10) || 0,
-          paddingBottom: parseInt(computed.paddingBottom, 10) || 0,
-          paddingLeft: parseInt(computed.paddingLeft, 10) || 0,
-          paddingRight: parseInt(computed.paddingRight, 10) || 0,
-          marginTop: parseInt(computed.marginTop, 10) || 0,
-          marginBottom: parseInt(computed.marginBottom, 10) || 0,
-        }
-      }, "*");
-    };
-
-    // دریافت دستورات تغییر زنده استایل از سایدبار پنل ادمین
-    const handleAdminMessage = (e: MessageEvent) => {
-      if (!selectedElement) return;
-
-      if (e.data?.type === "AXON_APPLY_STYLE") {
-        const { key, value } = e.data.payload || {};
-        if (key && value !== undefined) {
-          (selectedElement.style as any)[key] = value;
-          updateOverlay();
-        }
-      }
-
-      if (e.data?.type === "AXON_ELEMENT_ACTION") {
-        const { action } = e.data || {};
-        if (action === "delete") {
-          selectedElement.style.display = "none";
-          if (overlay) overlay.style.display = "none";
-          selectedElement = null;
-        } else if (action === "moveUp" && selectedElement.parentElement) {
-          const prev = selectedElement.previousElementSibling;
-          if (prev) {
-            selectedElement.parentElement.insertBefore(selectedElement, prev);
-            updateOverlay();
-          }
-        } else if (action === "moveDown" && selectedElement.parentElement) {
-          const next = selectedElement.nextElementSibling;
-          if (next) {
-            selectedElement.parentElement.insertBefore(next, selectedElement);
-            updateOverlay();
-          }
-        }
-      }
-    };
-
-    document.addEventListener("click", handleClick, true);
-    window.addEventListener("scroll", updateOverlay);
-    window.addEventListener("resize", updateOverlay);
-    window.addEventListener("message", handleAdminMessage);
-
-    return () => {
-      document.removeEventListener("click", handleClick, true);
-      window.removeEventListener("scroll", updateOverlay);
-      window.removeEventListener("resize", updateOverlay);
-      window.removeEventListener("message", handleAdminMessage);
-      if (overlay) overlay.remove();
-    };
-  }, []);
-
-  return null;
+console.log("\x1b[36m[AXON-PUCK-MIGRATION]\x1b[0m گام ۱: نصب پکیج رسمی @measured/puck...");
+try {
+  execSync('npm install @measured/puck', { stdio: 'inherit' });
+  console.log("\x1b[32m✔ پکیج @measured/puck با موفقیت نصب شد.\x1b[0m");
+} catch (err) {
+  console.log("\x1b[33m⚠️ تلاش مجدد با فلگ --legacy-peer-deps...\x1b[0m");
+  execSync('npm install @measured/puck --legacy-peer-deps', { stdio: 'inherit' });
 }
-`;
-writeFile('components/modular/ElementorVisualBridge.tsx', advancedBridgeCode);
 
 // =============================================================================
-// ۲. بازنویسی components/admin/AdminModularPages.tsx با اینسپکتور فوق‌پیشرفته المنتور پرو
+// گام ۲: ساخت کانفیگ اختصاصی کامپوننت‌ها در lib/puckConfig.tsx
 // =============================================================================
-const advancedStudioComponent = `"use client";
+console.log("\x1b[36m[AXON-PUCK-MIGRATION]\x1b[0m گام ۲: تعریف کامپوننت‌های زنده ری‌اکت در lib/puckConfig.tsx...");
 
-import React, { useState, useEffect, useRef } from "react";
+const puckConfigCode = `import React from "react";
+import type { Config } from "@measured/puck";
 import Link from "next/link";
+
+export type ComponentProps = {
+  HeroBlock: {
+    badge: string;
+    title: string;
+    subtitle: string;
+    primaryBtnText: string;
+    primaryBtnUrl: string;
+    secondaryBtnText: string;
+    secondaryBtnUrl: string;
+    imageUrl: string;
+    bgColor: string;
+    textColor: string;
+    paddingTop: number;
+    paddingBottom: number;
+  };
+  FeaturesGrid: {
+    heading: string;
+    item1Title: string;
+    item1Desc: string;
+    item2Title: string;
+    item2Desc: string;
+    item3Title: string;
+    item3Desc: string;
+    bgColor: string;
+    paddingTop: number;
+    paddingBottom: number;
+  };
+  CtaBanner: {
+    title: string;
+    subtitle: string;
+    btnText: string;
+    btnUrl: string;
+    bgColor: string;
+  };
+  CustomHtml: {
+    code: string;
+    paddingTop: number;
+    paddingBottom: number;
+  };
+};
+
+export const puckConfig: Config<ComponentProps> = {
+  categories: {
+    layout: {
+      title: "بلوک‌های اصلی لایه‌بندی",
+      components: ["HeroBlock", "FeaturesGrid", "CtaBanner"]
+    },
+    custom: {
+      title: "المان‌های پیشرفته و کد",
+      components: ["CustomHtml"]
+    }
+  },
+  components: {
+    HeroBlock: {
+      label: "هیرو بنر بزرگ استودیویی",
+      fields: {
+        badge: { type: "text", label: "برچسب بالا (Badge)" },
+        title: { type: "text", label: "تیتر اصلی هیرو" },
+        subtitle: { type: "textarea", label: "متن توضیحات زیرعنوان" },
+        primaryBtnText: { type: "text", label: "متن دکمه اول" },
+        primaryBtnUrl: { type: "text", label: "لینک دکمه اول" },
+        secondaryBtnText: { type: "text", label: "متن دکمه دوم" },
+        secondaryBtnUrl: { type: "text", label: "لینک دکمه دوم" },
+        imageUrl: { type: "text", label: "آدرس تصویر شاخص" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+        textColor: { type: "text", label: "رنگ متن" },
+        paddingTop: { type: "number", label: "فاصله از بالا (px)" },
+        paddingBottom: { type: "number", label: "فاصله از پایین (px)" },
+      },
+      defaultProps: {
+        badge: "🚀 مرجع تخصصی مانیتورهای ۵K",
+        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+        primaryBtnText: "کاتالوگ مانیتورها",
+        primaryBtnUrl: "/products",
+        secondaryBtnText: "درخواست مشاوره",
+        secondaryBtnUrl: "/contact",
+        imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+        bgColor: "#020617",
+        textColor: "#ffffff",
+        paddingTop: 60,
+        paddingBottom: 60,
+      },
+      render: ({ badge, title, subtitle, primaryBtnText, primaryBtnUrl, secondaryBtnText, secondaryBtnUrl, imageUrl, bgColor, textColor, paddingTop, paddingBottom }) => {
+        return (
+          <section
+            style={{ backgroundColor: bgColor || "#020617", color: textColor || "#fff", paddingTop: \`\${paddingTop || 60}px\`, paddingBottom: \`\${paddingBottom || 60}px\` }}
+            className="w-full text-center px-4 font-sans select-none relative"
+            dir="rtl"
+          >
+            <div className="max-w-5xl mx-auto space-y-6">
+              {badge && (
+                <span className="inline-block px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">
+                  {badge}
+                </span>
+              )}
+              <h1 className="text-3xl sm:text-5xl font-black leading-tight">
+                {title}
+              </h1>
+              {subtitle && (
+                <p className="text-sm sm:text-base opacity-80 max-w-2xl mx-auto leading-relaxed">
+                  {subtitle}
+                </p>
+              )}
+              <div className="flex flex-wrap justify-center gap-3 pt-4">
+                {primaryBtnText && (
+                  <Link href={primaryBtnUrl || "/products"} className="px-8 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-xl transition">
+                    {primaryBtnText}
+                  </Link>
+                )}
+                {secondaryBtnText && (
+                  <Link href={secondaryBtnUrl || "/contact"} className="px-8 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-xs transition">
+                    {secondaryBtnText}
+                  </Link>
+                )}
+              </div>
+              {imageUrl && (
+                <div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden mt-8 shadow-2xl border border-white/10">
+                  <img src={imageUrl} alt="" className="w-full h-auto object-cover max-h-[480px]" />
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      },
+    },
+    FeaturesGrid: {
+      label: "گرید ۳ ستونه مزایا و ویژگی‌ها",
+      fields: {
+        heading: { type: "text", label: "عنوان بخش" },
+        item1Title: { type: "text", label: "عنوان ویژگی ۱" },
+        item1Desc: { type: "textarea", label: "توضیح ویژگی ۱" },
+        item2Title: { type: "text", label: "عنوان ویژگی ۲" },
+        item2Desc: { type: "textarea", label: "توضیح ویژگی ۲" },
+        item3Title: { type: "text", label: "عنوان ویژگی ۳" },
+        item3Desc: { type: "textarea", label: "توضیح ویژگی ۳" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+        paddingTop: { type: "number", label: "فاصله بالا (px)" },
+        paddingBottom: { type: "number", label: "فاصله پایین (px)" },
+      },
+      defaultProps: {
+        heading: "استانداردهای مهندسی آکسون استودیو",
+        item1Title: "گارانتی ۱۸ ماهه طلایی",
+        item1Desc: "تعویض بدون قید و شرط برای تمامی نمایشگرهای مسترینگ.",
+        item2Title: "کالیبراسیون ۳D LUT",
+        item2Desc: "تراز رنگ اختصاصی مطابق با گاموت‌های سینمایی DCI-P3.",
+        item3Title: "بسته‌بندی ایمن هوانوردی",
+        item3Desc: "محافظت کامل فیزیکی در برابر ضربه و شوک حین ارسال پیشتاز.",
+        bgColor: "#090d16",
+        paddingTop: 50,
+        paddingBottom: 50,
+      },
+      render: ({ heading, item1Title, item1Desc, item2Title, item2Desc, item3Title, item3Desc, bgColor, paddingTop, paddingBottom }) => {
+        return (
+          <section
+            style={{ backgroundColor: bgColor || "#090d16", paddingTop: \`\${paddingTop || 50}px\`, paddingBottom: \`\${paddingBottom || 50}px\` }}
+            className="w-full px-4 font-sans select-none text-white"
+            dir="rtl"
+          >
+            <div className="max-w-7xl mx-auto space-y-8">
+              {heading && <h2 className="text-2xl font-black text-center">{heading}</h2>}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[
+                  { t: item1Title, d: item1Desc, icon: "🛡️" },
+                  { t: item2Title, d: item2Desc, icon: "⚡" },
+                  { t: item3Title, d: item3Desc, icon: "📦" },
+                ].map((item, i) => (
+                  <div key={i} className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2 hover:border-sky-500/40 transition">
+                    <span className="text-3xl block">{item.icon}</span>
+                    <h3 className="font-bold text-sm">{item.t}</h3>
+                    <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.d}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      },
+    },
+    CtaBanner: {
+      label: "فراخوان عمل و کمپین (CTA)",
+      fields: {
+        title: { type: "text", label: "تیتر فراخوان" },
+        subtitle: { type: "textarea", label: "متن زیرعنوان" },
+        btnText: { type: "text", label: "متن دکمه" },
+        btnUrl: { type: "text", label: "لینک دکمه" },
+        bgColor: { type: "text", label: "رنگ باکس" },
+      },
+      defaultProps: {
+        title: "به یک مشاوره تخصصی برای استودیو نیاز دارید؟",
+        subtitle: "کارشناسان آکسون متناسب با نرم‌افزار شما مانیتور مناسب را پیشنهاد می‌دهند.",
+        btnText: "ثبت تیکت مشاوره",
+        btnUrl: "/contact",
+        bgColor: "#1e1b4b",
+      },
+      render: ({ title, subtitle, btnText, btnUrl, bgColor }) => {
+        return (
+          <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none" dir="rtl">
+            <div style={{ backgroundColor: bgColor || "#1e1b4b" }} className="p-8 sm:p-12 rounded-3xl text-center space-y-4 border border-blue-500/30 text-white shadow-2xl">
+              <h2 className="text-2xl font-black">{title}</h2>
+              {subtitle && <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto">{subtitle}</p>}
+              {btnText && (
+                <div className="pt-2">
+                  <Link href={btnUrl || "/contact"} className="inline-block px-8 py-3 rounded-xl bg-white text-slate-950 font-black text-xs hover:bg-slate-100 transition shadow-lg">
+                    {btnText}
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    CustomHtml: {
+      label: "کد خام اختصاصی (HTML / CSS / SVG)",
+      fields: {
+        code: { type: "textarea", label: "کد اختصاصی" },
+        paddingTop: { type: "number", label: "فاصله از بالا" },
+        paddingBottom: { type: "number", label: "فاصله از پایین" },
+      },
+      defaultProps: {
+        code: "<div class='p-6 text-center text-sky-400 font-mono text-xs border border-sky-500/20 rounded-2xl'>کدهای دلخواه HTML / CSS را اینجا وارد کنید</div>",
+        paddingTop: 20,
+        paddingBottom: 20,
+      },
+      render: ({ code, paddingTop, paddingBottom }) => {
+        return (
+          <div style={{ paddingTop: \`\${paddingTop || 20}px\`, paddingBottom: \`\${paddingBottom || 20}px\` }} className="max-w-7xl mx-auto px-4">
+            <div dangerouslySetInnerHTML={{ __html: code || "" }} />
+          </div>
+        );
+      },
+    },
+  },
+};
+`;
+writeFile('lib/puckConfig.tsx', puckConfigCode);
+
+// =============================================================================
+// گام ۳: بازنویسی components/admin/AdminModularPages.tsx به استودیوی زنده Puck
+// =============================================================================
+console.log("\x1b[36m[AXON-PUCK-MIGRATION]\x1b[0m گام ۳: استقرار ویرایشگر بومی Puck در components/admin/AdminModularPages.tsx...");
+
+const puckStudioComponent = `"use client";
+
+import React, { useState, useEffect } from "react";
+import { Puck, Data } from "@measured/puck";
+import "@measured/puck/puck.css";
+import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
-import { BlockType, PageBlock, ModularPageDocument } from "@/lib/modularBuilderTypes";
-import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+
+const DEFAULT_HOME_DATA: Data = {
+  content: [
+    {
+      type: "HeroBlock",
+      props: {
+        id: "hero-1",
+        badge: "🚀 مرجع تخصصی مانیتورهای ۵K",
+        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+        primaryBtnText: "کاتالوگ مانیتورها",
+        primaryBtnUrl: "/products",
+        secondaryBtnText: "درخواست مشاوره",
+        secondaryBtnUrl: "/contact",
+        imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+        bgColor: "#020617",
+        textColor: "#ffffff",
+        paddingTop: 60,
+        paddingBottom: 60,
+      },
+    },
+    {
+      type: "FeaturesGrid",
+      props: {
+        id: "feat-1",
+        heading: "استانداردهای مهندسی آکسون استودیو",
+        item1Title: "گارانتی ۱۸ ماهه طلایی",
+        item1Desc: "تعویض بدون قید و شرط برای تمامی نمایشگرهای مسترینگ.",
+        item2Title: "کالیبراسیون ۳D LUT",
+        item2Desc: "تراز رنگ اختصاصی مطابق با گاموت‌های سینمایی DCI-P3.",
+        item3Title: "بسته‌بندی ایمن هوانوردی",
+        item3Desc: "محافظت کامل فیزیکی در برابر ضربه و شوک حین ارسال پیشتاز.",
+        bgColor: "#090d16",
+        paddingTop: 50,
+        paddingBottom: 50,
+      },
+    },
+    {
+      type: "CtaBanner",
+      props: {
+        id: "cta-1",
+        title: "به یک مشاوره تخصصی برای استودیو نیاز دارید؟",
+        subtitle: "کارشناسان آکسون متناسب با نرم‌افزار شما مانیتور مناسب را پیشنهاد می‌دهند.",
+        btnText: "ثبت تیکت مشاوره",
+        btnUrl: "/contact",
+        bgColor: "#1e1b4b",
+      },
+    },
+  ],
+  root: { props: { title: "صفحه اصلی" } },
+};
 
 export default function AdminModularPages() {
-  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string; is_published: boolean }>>([]);
-  const [selectedPageId, setSelectedPageId] = useState<string>("");
-  const [pageTitle, setPageTitle] = useState("صفحه اصلی (خانه)");
-  const [pageSlug, setPageSlug] = useState("home");
-  const [metaDescription, setMetaDescription] = useState("");
-  const [isPublished, setIsPublished] = useState(true);
-  const [blocks, setBlocks] = useState<PageBlock[]>([]);
+  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
+  const [currentSlug, setCurrentSlug] = useState<string>("home");
+  const [pageData, setPageData] = useState<Data>(DEFAULT_HOME_DATA);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  // استیت‌های اینسپکتور المان زنده
-  const [selectedElementMeta, setSelectedElementMeta] = useState<any>(null);
-  const [inspectorTab, setInspectorTab] = useState<"element_style" | "box_model" | "advanced_css">("element_style");
-  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [isWidgetsDrawerOpen, setIsWidgetsDrawerOpen] = useState(false);
-
-  // متغیرهای استایل‌دهی المان کلیک‌شده
-  const [elemColor, setElemColor] = useState("#ffffff");
-  const [elemBgColor, setElemBgColor] = useState("#000000");
-  const [elemFontSize, setElemFontSize] = useState(16);
-  const [elemFontWeight, setElemFontWeight] = useState("400");
-  const [elemRadius, setElemRadius] = useState(0);
-  const [elemPaddingY, setElemPaddingY] = useState(0);
-  const [elemPaddingX, setElemPaddingX] = useState(0);
-  const [elemMarginY, setElemMarginY] = useState(0);
-  const [elemCustomCss, setElemCustomCss] = useState("");
-
-  const [iframeKey, setIframeKey] = useState(Date.now());
-  const [saving, setSaving] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  const fetchPagesList = async () => {
+  const fetchPages = async () => {
     try {
       const res = await fetch("/api/pages", { cache: "no-store" });
       const json = await res.json();
       if (json.success && Array.isArray(json.pages)) {
         setPages(json.pages);
-        if (json.pages.length > 0 && !selectedPageId) {
-          const home = json.pages.find((p: any) => p.slug === "home") || json.pages[0];
-          loadPageDetails(home.slug);
-        }
       }
     } catch {}
   };
 
-  const loadPageDetails = async (slug: string) => {
+  const loadPage = async (slug: string) => {
+    setCurrentSlug(slug);
+    setLoading(true);
     soundEngine.playClick();
     try {
       const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
       const json = await res.json();
-      if (json.success && json.page) {
-        const p: ModularPageDocument = json.page;
-        setSelectedPageId(p.id);
-        setPageTitle(p.title);
-        setPageSlug(p.slug);
-        setMetaDescription(p.meta_description || "");
-        setIsPublished(p.is_published !== false);
-        setBlocks(Array.isArray(p.blocks) ? p.blocks : []);
+      if (json.success && json.page && json.page.puck_data) {
+        setPageData(json.page.puck_data);
+      } else {
+        setPageData(DEFAULT_HOME_DATA);
       }
-    } catch {} finally {
-      setIframeKey(Date.now());
-      setSelectedElementMeta(null);
+    } catch {
+      setPageData(DEFAULT_HOME_DATA);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPagesList();
-
-    const handleMessage = (e: MessageEvent) => {
-      if (e.data?.type === "AXON_ELEMENT_SELECTED") {
-        const meta = e.data.payload;
-        setSelectedElementMeta(meta);
-        setElemFontSize(meta.fontSize || 16);
-        setElemFontWeight(String(meta.fontWeight || "400"));
-        setElemRadius(meta.borderRadius || 0);
-        setElemPaddingY(meta.paddingTop || 0);
-        setElemPaddingX(meta.paddingLeft || 0);
-        setElemMarginY(meta.marginTop || 0);
-        setToastMessage({ type: "success", text: \`المان «\${meta.tagName}» انتخاب شد. تنظیمات زنده در سایدبار فعال است.\` });
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    fetchPages();
   }, []);
 
-  // ارسال تغییر استایل به فریم زنده
-  const dispatchStyleChange = (key: string, value: string | number) => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: "AXON_APPLY_STYLE",
-        payload: { key, value }
-      }, "*");
-    }
-  };
-
-  // ارسال اکشن حذف یا جابجایی المان به فریم
-  const dispatchElementAction = (action: "delete" | "moveUp" | "moveDown") => {
+  const handleSave = async (data: Data) => {
     soundEngine.playClick();
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: "AXON_ELEMENT_ACTION",
-        action
-      }, "*");
-    }
-  };
-
-  const handleSavePage = async () => {
-    if (!pageTitle.trim() || !pageSlug.trim()) {
-      alert("عنوان و نامک آدرس صفحه الزامی است.");
-      return;
-    }
-
-    soundEngine.playClick();
-    setSaving(true);
-    setToastMessage(null);
-
-    const payload: Partial<ModularPageDocument> = {
-      id: selectedPageId || undefined,
-      title: pageTitle.trim(),
-      slug: pageSlug.trim().toLowerCase(),
-      meta_description: metaDescription.trim(),
-      blocks,
-      is_published: isPublished
-    };
-
+    setToast("در حال انتشار تغییرات در دیتابیس...");
     try {
       const res = await fetch("/api/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          slug: currentSlug,
+          title: currentSlug === "home" ? "صفحه اصلی" : currentSlug,
+          puck_data: data,
+          is_published: true,
+        }),
       });
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToastMessage({ type: "success", text: "✓ تمامی تغییرات استایلی و محتوایی در دیتابیس ذخیره گردید." });
-        fetchPagesList();
-        if (!selectedPageId && json.page) setSelectedPageId(json.page.id);
+        setToast("✓ صفحه با موفقیت ذخیره و در سراسر سایت منتشر شد.");
       } else {
-        setToastMessage({ type: "error", text: json.message || "خطا در ذخیره‌سازی." });
+        setToast("خطا در ذخیره‌سازی.");
       }
     } catch {
-      setToastMessage({ type: "error", text: "خطای ارتباط با سرور." });
+      setToast("خطا در برقراری ارتباط با سرور.");
     } finally {
-      setSaving(false);
-      setTimeout(() => setToastMessage(null), 3500);
+      setTimeout(() => setToast(null), 3500);
     }
   };
 
-  const targetLiveUrl = pageSlug === "home" ? "/" : \`/\${pageSlug}\`;
-
   return (
-    <div className="min-h-screen flex flex-col font-sans select-none text-[var(--text-primary)] space-y-4" dir="rtl">
+    <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4" dir="rtl">
       
-      {/* نوار فرمان بالای استودیو */}
-      <header className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
-        
+      {/* سربرگ هوشمند کنترل صفحات */}
+      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md">
-            🎨
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
+            ⚡
           </div>
           <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه جهت ویرایش زنده:</span>
             <select
-              value={pageSlug}
-              onChange={(e) => loadPageDetails(e.target.value)}
-              className="p-2 px-3.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black text-[var(--text-primary)] outline-none cursor-pointer focus:border-[var(--accent-blue)]"
+              value={currentSlug}
+              onChange={(e) => loadPage(e.target.value)}
+              className="p-2 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black outline-none cursor-pointer text-[var(--text-primary)]"
             >
-              {pages.map((p) => {
-                const isSys = ["home", "products", "news", "blog", "about", "contact", "track-order"].includes(p.slug);
-                return (
-                  <option key={p.id} value={p.slug}>
-                    {isSys ? "⭐ [صفحه اصلی سایت] " : "📄 [لندینگ سفارشی] "} {p.title} (/{p.slug === "home" ? "" : p.slug})
-                  </option>
-                );
-              })}
+              {pages.map((p) => (
+                <option key={p.id} value={p.slug}>
+                  📄 {p.title} (/{p.slug === "home" ? "" : p.slug})
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
-        {/* سوییچر دسکتاپ، تبلت و موبایل */}
-        <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
-          {[
-            { id: "desktop" as const, icon: "🖥️", label: "دسکتاپ" },
-            { id: "tablet" as const, icon: "📱", label: "تبلت" },
-            { id: "mobile" as const, icon: "📲", label: "موبایل" },
-          ].map((dev) => (
-            <button
-              key={dev.id}
-              type="button"
-              onClick={() => { soundEngine.playClick(); setPreviewDevice(dev.id); }}
-              className={"px-3.5 py-1.5 rounded-xl font-bold transition text-xs flex items-center gap-1.5 cursor-pointer " + (
-                previewDevice === dev.id ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-slate-400"
-              )}
-            >
-              <span>{dev.icon}</span>
-              <span className="hidden md:inline">{dev.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* دکمه‌های انتشار و مشاهده زنده */}
         <div className="flex items-center gap-2">
           <Link
-            href={targetLiveUrl}
+            href={currentSlug === "home" ? "/" : \`/\${currentSlug}\`}
             target="_blank"
-            className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-1.5"
+            className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
           >
             <span>مشاهده زنده در سایت</span>
             <span>🔗</span>
           </Link>
-
-          <button
-            type="button"
-            onClick={handleSavePage}
-            disabled={saving}
-            className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl transition cursor-pointer disabled:opacity-50"
-          >
-            {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار سراسری"}
-          </button>
         </div>
-      </header>
+      </div>
 
-      {toastMessage && (
-        <div className={"p-3.5 rounded-2xl text-xs font-bold transition animate-fadeIn " + (
-          toastMessage.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
-        )}>
-          {toastMessage.text}
+      {toast && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
+          {toast}
         </div>
       )}
 
-      {/* محیط کاربری دو پنله: اینسپکتور سبک المنتور پرو (راست) + بوم زنده (چپ) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 items-start">
-        
-        {/* سایدبار راست: کنترلر استایل المان انتخاب‌شده */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
-            
-            {/* سربرگ المان انتخاب‌شده */}
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <div>
-                <span className="font-black text-xs text-[var(--accent-blue)] block">
-                  {selectedElementMeta ? \`المان فعال: <\${selectedElementMeta.tagName.toLowerCase()}>\` : "روی هر المانی کلیک کنید"}
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  {selectedElementMeta ? (selectedElementMeta.text || "بدون متن") : "برای ویرایش روی متن، تصویر یا دکمه در بوم کلیک کنید"}
-                </span>
-              </div>
-
-              {selectedElementMeta && (
-                <div className="flex gap-1">
-                  <button onClick={() => dispatchElementAction("moveUp")} className="p-1 px-2 rounded-lg bg-[var(--input-bg)] text-xs cursor-pointer" title="انتقال به بالا">▲</button>
-                  <button onClick={() => dispatchElementAction("moveDown")} className="p-1 px-2 rounded-lg bg-[var(--input-bg)] text-xs cursor-pointer" title="انتقال به پایین">▼</button>
-                  <button onClick={() => dispatchElementAction("delete")} className="p-1 px-2 rounded-lg bg-rose-500/15 text-rose-500 text-xs cursor-pointer" title="حذف المان">🗑️</button>
-                </div>
-              )}
-            </div>
-
-            {selectedElementMeta ? (
-              <>
-                {/* تب‌های اینسپکتور */}
-                <div className="flex gap-1 bg-[var(--input-bg)] p-1 rounded-xl border border-[var(--card-border)]">
-                  {[
-                    { id: "element_style" as const, label: "ظاهر و رنگ" },
-                    { id: "box_model" as const, label: "فواصل و ابعاد" },
-                    { id: "advanced_css" as const, label: "کد CSS زنده" },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setInspectorTab(tab.id)}
-                      className={"flex-1 py-1.5 rounded-lg font-bold text-[10px] transition cursor-pointer " + (
-                        inspectorTab === tab.id ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-slate-400"
-                      )}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* تب ۱: ظاهر، رنگ، فونت و انحنا */}
-                {inspectorTab === "element_style" && (
-                  <div className="space-y-3.5 pt-1">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ متن:</label>
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="color"
-                            value={elemColor}
-                            onChange={(e) => {
-                              setElemColor(e.target.value);
-                              dispatchStyleChange("color", e.target.value);
-                            }}
-                            className="w-7 h-7 rounded-lg border-none cursor-pointer bg-transparent"
-                          />
-                          <span className="font-mono text-[10px] font-bold">{elemColor}</span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ پس‌زمینه:</label>
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="color"
-                            value={elemBgColor}
-                            onChange={(e) => {
-                              setElemBgColor(e.target.value);
-                              dispatchStyleChange("backgroundColor", e.target.value);
-                            }}
-                            className="w-7 h-7 rounded-lg border-none cursor-pointer bg-transparent"
-                          />
-                          <span className="font-mono text-[10px] font-bold">{elemBgColor}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] font-bold text-slate-400">اندازه فونت (Font Size):</label>
-                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemFontSize}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="72"
-                        value={elemFontSize}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setElemFontSize(val);
-                          dispatchStyleChange("fontSize", \`\${val}px\`);
-                        }}
-                        className="w-full accent-sky-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block mb-1 text-[10px] font-bold text-slate-400">وزن فونت (Font Weight):</label>
-                      <select
-                        value={elemFontWeight}
-                        onChange={(e) => {
-                          setElemFontWeight(e.target.value);
-                          dispatchStyleChange("fontWeight", e.target.value);
-                        }}
-                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
-                      >
-                        <option value="300">نازک (Light - 300)</option>
-                        <option value="400">معمولی (Regular - 400)</option>
-                        <option value="600">نیمه‌پر (SemiBold - 600)</option>
-                        <option value="800">خیلی ضخیم (ExtraBold - 800)</option>
-                        <option value="900">سیاه توپر (Black - 900)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] font-bold text-slate-400">شعاع گوشه (Border Radius):</label>
-                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemRadius}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="60"
-                        value={elemRadius}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setElemRadius(val);
-                          dispatchStyleChange("borderRadius", \`\${val}px\`);
-                        }}
-                        className="w-full accent-sky-500 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* تب ۲: فواصل و باکس‌مدل */}
-                {inspectorTab === "box_model" && (
-                  <div className="space-y-3 pt-1">
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] font-bold text-slate-400">فاصله درونی عمودی (Padding Y):</label>
-                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemPaddingY}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="80"
-                        value={elemPaddingY}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setElemPaddingY(val);
-                          dispatchStyleChange("paddingTop", \`\${val}px\`);
-                          dispatchStyleChange("paddingBottom", \`\${val}px\`);
-                        }}
-                        className="w-full accent-sky-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] font-bold text-slate-400">فاصله درونی افقی (Padding X):</label>
-                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemPaddingX}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="80"
-                        value={elemPaddingX}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setElemPaddingX(val);
-                          dispatchStyleChange("paddingLeft", \`\${val}px\`);
-                          dispatchStyleChange("paddingRight", \`\${val}px\`);
-                        }}
-                        className="w-full accent-sky-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] font-bold text-slate-400">فاصله بیرونی عمودی (Margin Y):</label>
-                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemMarginY}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="60"
-                        value={elemMarginY}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setElemMarginY(val);
-                          dispatchStyleChange("marginTop", \`\${val}px\`);
-                          dispatchStyleChange("marginBottom", \`\${val}px\`);
-                        }}
-                        className="w-full accent-sky-500 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* تب ۳: کد CSS زنده */}
-                {inspectorTab === "advanced_css" && (
-                  <div className="space-y-2 pt-1">
-                    <label className="block text-[10px] font-bold text-slate-400">کد CSS اختصاصی المان:</label>
-                    <textarea
-                      rows={5}
-                      value={elemCustomCss}
-                      onChange={(e) => {
-                        setElemCustomCss(e.target.value);
-                        // اعمال قوانین دلخواه مثل box-shadow
-                        if (e.target.value.includes("shadow")) {
-                          dispatchStyleChange("boxShadow", "0 10px 30px rgba(56, 189, 248, 0.4)");
-                        }
-                      }}
-                      placeholder="box-shadow: 0 10px 30px rgba(0,0,0,0.5);&#10;filter: drop-shadow(0 0 10px #0284c7);"
-                      className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] text-sky-400 outline-none"
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="py-10 text-center text-slate-400 font-bold text-xs space-y-2">
-                <span className="text-2xl block">👆</span>
-                <p>در بوم سمت چپ روی هر تیتری، دکمه، عکسی یا کادری کلیک کنید تا تمام تنظیمات ظاهری، فونت و فواصل آن در این بخش فعال شود.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* بوم زنده تعاملی پیش‌نمایش (دسکتاپ، تبلت، موبایل) */}
-        <div className="lg:col-span-8 flex justify-center w-full">
-          <div
-            className={"transition-all duration-300 rounded-[2.5rem] bg-[var(--modal-bg)] border-2 border-[var(--card-border)] shadow-2xl overflow-hidden min-h-[750px] w-full flex flex-col " + (
-              previewDevice === "mobile"
-                ? "max-w-[390px] border-sky-500/50 shadow-sky-500/10"
-                : previewDevice === "tablet"
-                ? "max-w-[768px] border-indigo-500/50"
-                : "max-w-full"
-            )}
-          >
-            <div className="p-3.5 bg-[var(--input-bg)] border-b border-[var(--card-border)] flex justify-between items-center text-xs px-6">
-              <span className="font-mono text-[10px] text-slate-400">
-                بوم بصری تعاملی: <strong className="text-[var(--text-primary)]">{targetLiveUrl}</strong> ({previewDevice.toUpperCase()})
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIframeKey(Date.now())}
-                  className="px-2.5 py-1 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold hover:border-sky-500 transition cursor-pointer"
-                >
-                  🔄 تازه‌سازی فریم
-                </button>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              </div>
-            </div>
-
-            <div className="flex-1 w-full bg-black relative flex items-center justify-center min-h-[700px]">
-              <iframe
-                ref={iframeRef}
-                key={iframeKey}
-                src={targetLiveUrl}
-                title="Axon Elementor Visual Canvas"
-                className="w-full h-full min-h-[700px] border-none shadow-inner"
-              />
-            </div>
-          </div>
-        </div>
-
+      {/* بوم Puck کاملاً بومی و زنده با امکان Undo / Redo و Drag & Drop حقیقی */}
+      <div className="flex-1 w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px]">
+        {loading ? (
+          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
+        ) : (
+          <Puck
+            config={puckConfig}
+            data={pageData}
+            onPublish={handleSave}
+          />
+        )}
       </div>
     </div>
   );
 }
 `;
-writeFile('components/admin/AdminModularPages.tsx', advancedStudioComponent);
+writeFile('components/admin/AdminModularPages.tsx', puckStudioComponent);
 
 // =============================================================================
-// ۳. تست بیلد کامل و پوش به گیت‌هاب و استقرار در ورسل
+// گام ۴: به‌روزرسانی روت سروری app/api/pages/route.ts برای پشتیبانی از فیلد puck_data
 // =============================================================================
-console.log("تست بیلد نهایی پروژه (npm run build)...");
+console.log("\x1b[36m[AXON-PUCK-MIGRATION]\x1b[0m گام ۴: به‌روزرسانی API برای ذخیره داده‌های استاندارد Puck...");
+
+const pagesRouteCode = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+
+export const dynamic = "force-dynamic";
+
+export const SYSTEM_PAGES = [
+  { id: "sys-home", slug: "home", title: "صفحه اصلی (خانه)" },
+  { id: "sys-products", slug: "products", title: "کاتالوگ محصولات و تجهیزات" },
+  { id: "sys-news", slug: "news", title: "رادار اخبار تکنولوژی" },
+  { id: "sys-blog", slug: "blog", title: "مجله تخصصی و مقالات سئو" },
+  { id: "sys-about", slug: "about", title: "درباره استودیو آکسون" },
+  { id: "sys-contact", slug: "contact", title: "تماس و مشاوره تخصصی" },
+  { id: "sys-track", slug: "track-order", title: "پیگیری مرسولات پستی" },
+];
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const slug = searchParams.get("slug");
+
+    if (slug) {
+      const { data } = await supabaseAdmin
+        .from("modular_pages")
+        .select("*")
+        .eq("slug", slug)
+        .maybeSingle();
+
+      if (data) {
+        return NextResponse.json({ success: true, page: data });
+      }
+
+      const sys = SYSTEM_PAGES.find((p) => p.slug === slug);
+      if (sys) {
+        return NextResponse.json({ success: true, page: sys });
+      }
+    }
+
+    const { data: customPages } = await supabaseAdmin
+      .from("modular_pages")
+      .select("id, slug, title, is_published, updated_at")
+      .order("updated_at", { ascending: false });
+
+    const combined = [...SYSTEM_PAGES];
+    (customPages || []).forEach((cp) => {
+      if (!combined.some((p) => p.slug === cp.slug)) {
+        combined.push(cp);
+      }
+    });
+
+    return NextResponse.json({ success: true, pages: combined });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { slug, title, puck_data, is_published } = body;
+    const cleanSlug = String(slug || "").trim().toLowerCase();
+
+    const payload: any = {
+      slug: cleanSlug,
+      title: String(title || cleanSlug).trim(),
+      puck_data: puck_data || {},
+      is_published: is_published !== false,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: existing } = await supabaseAdmin.from("modular_pages").select("id").eq("slug", cleanSlug).maybeSingle();
+
+    if (existing) {
+      await supabaseAdmin.from("modular_pages").update(payload).eq("id", existing.id);
+    } else {
+      payload.id = "page_" + Date.now();
+      payload.created_at = new Date().toISOString();
+      await supabaseAdmin.from("modular_pages").insert([payload]);
+    }
+
+    return NextResponse.json({ success: true, message: "صفحه با موفقیت ذخیره و منتشر شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+`;
+writeFile('app/api/pages/route.ts', pagesRouteCode);
+
+// =============================================================================
+// گام ۵: تست بیلد نهایی پروژه و انتشار در Vercel
+// =============================================================================
+console.log("\x1b[36m[AXON-PUCK-MIGRATION]\x1b[0m گام ۵: تست بیلد نهایی نرم‌افزار (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -686,11 +573,11 @@ try {
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به مخزن گیت‌هاب و استقرار آنلاین در ورسل...");
+console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگر دیپلوی ورسل...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(elementor-pro): full live style inspector, typography slider, element box-model & custom CSS sync"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(puck): migrate to professional Puck component-based visual editor with true drag-and-drop & native React rendering"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -699,7 +586,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قابلیت‌های حرفه‌ای المنتور پرو با موفقیت مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ استودیوی پیشرفته Puck با موفقیت دیپلوی شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

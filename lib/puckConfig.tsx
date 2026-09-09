@@ -4,8 +4,14 @@ import Link from "next/link";
 import { productService, Product } from "@/services/productService";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
+import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
 
 export type ComponentProps = {
+  Hero3DBlock: {
+    topBadge: string;
+    showControls: boolean;
+    bgColor: string;
+  };
   HeroBlock: {
     badge: string;
     title: string;
@@ -289,6 +295,10 @@ function LiveCountdownRenderer({ badge, title, targetDate, buttonText, buttonUrl
 
 export const puckConfig: Config<ComponentProps> = {
   categories: {
+    "3d": {
+      title: "کانواس و المان‌های ۳D",
+      components: ["Hero3DBlock"]
+    },
     shop: {
       title: "فروشگاه و محصولات",
       components: ["ProductGrid", "ProductComparison", "CountdownTimer", "HeroBlock"]
@@ -303,6 +313,36 @@ export const puckConfig: Config<ComponentProps> = {
     }
   },
   components: {
+    Hero3DBlock: {
+      label: "هیرو ۳D تعاملی با کانوَس",
+      fields: {
+        topBadge: { type: "text", label: "بج بالای کانوَس" },
+        showControls: {
+          type: "radio",
+          label: "نمایش تعاملی کنترل ۳D",
+          options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }]
+        },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" }
+      },
+      defaultProps: {
+        topBadge: "🌟 تجربه نسل آینده مانیتورهای ۵K",
+        showControls: true,
+        bgColor: "#07090e"
+      },
+      render: ({ topBadge, bgColor }) => (
+        <div style={{ backgroundColor: bgColor || "#07090e" }} className="w-full relative overflow-hidden py-4 font-sans select-none" dir="rtl">
+          {topBadge && (
+            <div className="text-center pt-4">
+              <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-black inline-block">
+                {topBadge}
+              </span>
+            </div>
+          )}
+          <Hero3DCanvas />
+        </div>
+      )
+    },
+
     ProductGrid: {
       label: "ویترین زنده محصولات دیتابیس",
       fields: {

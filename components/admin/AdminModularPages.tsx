@@ -7,57 +7,98 @@ import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
 import Link from "next/link";
 
-const DEFAULT_HOME_DATA: Data = {
-  content: [
-    {
-      type: "HeroBlock",
-      props: {
-        id: "hero-1",
-        badge: "🚀 مرجع تخصصی مانیتورهای ۵K",
-        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
-        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
-        primaryBtnText: "کاتالوگ مانیتورها",
-        primaryBtnUrl: "/products",
-        secondaryBtnText: "درخواست مشاوره",
-        secondaryBtnUrl: "/contact",
-        imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-        bgColor: "#020617",
-        textColor: "#ffffff",
-        paddingTop: 60,
-        paddingBottom: 60,
+const PRESET_TEMPLATES: Record<string, Data> = {
+  festival_sale: {
+    content: [
+      {
+        type: "CountdownTimer",
+        props: {
+          id: "timer-pres-1",
+          badge: "🔥 تخفیف شگفت‌انگیز ۲۴ ساعته",
+          title: "جشنواره مانیتورهای مرجع رنگ و استودیو",
+          targetDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 19),
+          buttonText: "مشاهده پیشنهادهای شگفت‌انگیز",
+          buttonUrl: "/products",
+          bgColor: "#0f172a"
+        }
       },
-    },
-    {
-      type: "ProductComparison",
-      props: {
-        id: "comp-1",
-        heading: "مقایسه فنی دو مانیتور مرجع تدوین",
-        subtitle: "تفکیک رنگ‌ها بر مبنای استاندارد DCI-P3 و اتصالات تاندربولت",
-        product1Id: "prod-studio-display-5k",
-        product2Id: "prod-pro-display-xdr",
-        bgColor: "#090d16",
+      {
+        type: "ProductGrid",
+        props: {
+          id: "grid-pres-1",
+          heading: "کالاهای منتخب با تخفیف طلایی",
+          subtitle: "تعداد محدود به همراه ارسال رایگان پیشتاز",
+          category: "all",
+          limit: 6,
+          columns: 3,
+          showPriceBadge: true,
+          bgColor: "#07090e",
+          cardGlass: true
+        }
+      },
+      {
+        type: "CtaBanner",
+        props: {
+          id: "cta-pres-1",
+          title: "نیاز به مشاوره قبل از ثبت نهایی فاکتور دارید؟",
+          subtitle: "کارشناسان فنی ما به صورت مستقیم پاسخگوی شما هستند.",
+          btnText: "ارسال پیام در واتساپ یا تماس",
+          btnUrl: "/contact",
+          bgColor: "#1e1b4b",
+          glowEffect: true
+        }
       }
-    },
-    {
-      type: "CountdownTimer",
-      props: {
-        id: "timer-1",
-        badge: "⚡ آفر محدود",
-        title: "تخفیف ویژه مانیتورهای ۵K استودیو",
-        targetDate: new Date(Date.now() + 48 * 3600 * 1000).toISOString().slice(0, 19),
-        buttonText: "مشاهده کاتالوگ و خرید",
-        buttonUrl: "/products",
-        bgColor: "#0f172a"
+    ],
+    root: { props: { title: "کمپین جشنواره فروش" } }
+  },
+  flagship_showcase: {
+    content: [
+      {
+        type: "Hero3DBlock",
+        props: {
+          id: "hero3d-pres-1",
+          topBadge: "🚀 پرچمدار تکنولوژی بصری ۲۰۲۶",
+          showControls: true,
+          bgColor: "#07090e"
+        }
+      },
+      {
+        type: "ProductComparison",
+        props: {
+          id: "comp-pres-1",
+          heading: "مقایسه فنی دو مانیتور استودیویی",
+          subtitle: "بررسی تراز رنگ، روشنایی نیت و تاندربولت",
+          product1Id: "prod-studio-display-5k",
+          product2Id: "prod-pro-display-xdr",
+          bgColor: "#090d16"
+        }
+      },
+      {
+        type: "FeaturesGrid",
+        props: {
+          id: "feat-pres-1",
+          heading: "تعهدات طلایی آکسون",
+          item1Title: "۱۸ ماه تعویض کامل",
+          item1Desc: "گارانتی معتبر شرکتی بی قید و شرط.",
+          item2Title: "کالیبراسیون ۳D LUT",
+          item2Desc: "تنظیم تراز دقیق سینمایی قبل از تحویل.",
+          item3Title: "بسته‌بندی ایمن هوانوردی",
+          item3Desc: "ارسال سریع پیشتاز با پوشش کامل بیمه مرسوله.",
+          bgColor: "#07090e",
+          paddingTop: 50,
+          paddingBottom: 50,
+          hoverLift: true
+        }
       }
-    }
-  ],
-  root: { props: { title: "صفحه اصلی" } },
+    ],
+    root: { props: { title: "معرفی پرچمدار استودیو" } }
+  }
 };
 
 export default function AdminModularPages() {
   const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
-  const [pageData, setPageData] = useState<Data>(DEFAULT_HOME_DATA);
+  const [pageData, setPageData] = useState<Data>(PRESET_TEMPLATES.flagship_showcase);
   const [revisions, setRevisions] = useState<Array<{ id: string; created_at: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [viewportWidth, setViewportWidth] = useState<"100%" | "768px" | "390px">("100%");
@@ -93,11 +134,11 @@ export default function AdminModularPages() {
       if (json.success && json.page && json.page.puck_data) {
         setPageData(json.page.puck_data);
       } else {
-        setPageData(DEFAULT_HOME_DATA);
+        setPageData(PRESET_TEMPLATES.flagship_showcase);
       }
       fetchRevisions(slug);
     } catch {
-      setPageData(DEFAULT_HOME_DATA);
+      setPageData(PRESET_TEMPLATES.flagship_showcase);
     } finally {
       setLoading(false);
     }
@@ -107,6 +148,17 @@ export default function AdminModularPages() {
     fetchPages();
     fetchRevisions("home");
   }, []);
+
+  const handleApplyPreset = (presetKey: string) => {
+    if (!confirm("آیا تمایل دارید ساختار این صفحه را با قالب آماده جایگزین کنید؟")) return;
+    soundEngine.playSuccess();
+    const t = PRESET_TEMPLATES[presetKey];
+    if (t) {
+      setPageData(t);
+      setToast("✓ قالب آماده با موفقیت روی بوم لود شد.");
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
 
   const handleSave = async (data: Data) => {
     soundEngine.playClick();
@@ -137,33 +189,10 @@ export default function AdminModularPages() {
     }
   };
 
-  const handleRollback = async (revisionId: string) => {
-    if (!confirm("آیا از بازگردانی چیدمان به این نسخه اطمینان دارید؟")) return;
-    soundEngine.playClick();
-    setToast("در حال بازگردانی به نسخه انتخابی...");
-    try {
-      const res = await fetch("/api/pages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: currentSlug, restoreRevisionId: revisionId }),
-      });
-      const json = await res.json();
-      if (json.success && json.restoredData) {
-        soundEngine.playSuccess();
-        setPageData(json.restoredData);
-        setToast("✓ صفحه با موفقیت به نسخه قبلی بازگردانده شد.");
-      }
-    } catch {
-      setToast("خطا در بازگردانی نسخه.");
-    } finally {
-      setTimeout(() => setToast(null), 3500);
-    }
-  };
-
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4" dir="rtl">
       
-      {/* نوار ابزار بالای استودیو */}
+      {/* نوار ابزار اصلی بالای استودیو */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
@@ -185,28 +214,26 @@ export default function AdminModularPages() {
           </div>
         </div>
 
-        {/* منوی تاریخچه نسخه‌ها */}
-        {revisions.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[var(--text-secondary)] font-bold">🕒 نسخه‌های قبل:</span>
-            <select
-              onChange={(e) => {
-                if (e.target.value) handleRollback(e.target.value);
-              }}
-              defaultValue=""
-              className="p-1.5 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold outline-none cursor-pointer text-slate-300"
-            >
-              <option value="" disabled>انتخاب جهت بازگردانی...</option>
-              {revisions.map((r, idx) => (
-                <option key={r.id} value={r.id}>
-                  نسخه {idx + 1} ({new Date(r.created_at).toLocaleTimeString("fa-IR")})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* لود قالب‌های آماده با ۱ کلیک */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--text-secondary)] font-bold">🎯 لود قالب آماده:</span>
+          <button
+            type="button"
+            onClick={() => handleApplyPreset("flagship_showcase")}
+            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-sky-400 hover:border-sky-500 transition cursor-pointer"
+          >
+            🌟 معرفی پرچمدار ۳D
+          </button>
+          <button
+            type="button"
+            onClick={() => handleApplyPreset("festival_sale")}
+            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-rose-400 hover:border-rose-500 transition cursor-pointer"
+          >
+            🔥 جشنواره تخفیف ۲۴ ساعته
+          </button>
+        </div>
 
-        {/* سوییچر اندازه فریم بوم */}
+        {/* سوییچر اندازه فریم بوم (دسکتاپ، تبلت و موبایل) */}
         <div className="flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)]">
           {[
             { id: "100%", label: "دسکتاپ", icon: "🖥️" },

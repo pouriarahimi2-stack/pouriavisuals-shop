@@ -58,6 +58,7 @@ export default function AdminModularPages() {
   const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
   const [pageData, setPageData] = useState<Data>(DEFAULT_HOME_DATA);
+  const [revisions, setRevisions] = useState<Array<{ id: string; created_at: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [viewportWidth, setViewportWidth] = useState<"100%" | "768px" | "390px">("100%");
   const [toast, setToast] = useState<string | null>(null);
@@ -68,6 +69,16 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success && Array.isArray(json.pages)) {
         setPages(json.pages);
+      }
+    } catch {}
+  };
+
+  const fetchRevisions = async (slug: string) => {
+    try {
+      const res = await fetch(`/api/pages?slug=${encodeURIComponent(slug)}&revisions=true`, { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.revisions)) {
+        setRevisions(json.revisions);
       }
     } catch {}
   };
@@ -84,6 +95,7 @@ export default function AdminModularPages() {
       } else {
         setPageData(DEFAULT_HOME_DATA);
       }
+      fetchRevisions(slug);
     } catch {
       setPageData(DEFAULT_HOME_DATA);
     } finally {
@@ -93,6 +105,7 @@ export default function AdminModularPages() {
 
   useEffect(() => {
     fetchPages();
+    fetchRevisions("home");
   }, []);
 
   const handleSave = async (data: Data) => {
@@ -112,7 +125,8 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToast("✓ صفحه با موفقیت ذخیره و در سراسر سایت منتشر شد.");
+        setToast("✓ صفحه با موفقیت ذخیره شد و اسنپ‌شات نسخه ثبت گردید.");
+        fetchRevisions(currentSlug);
       } else {
         setToast("خطا در ذخیره‌سازی.");
       }
@@ -123,10 +137,33 @@ export default function AdminModularPages() {
     }
   };
 
+  const handleRollback = async (revisionId: string) => {
+    if (!confirm("آیا از بازگردانی چیدمان به این نسخه اطمینان دارید؟")) return;
+    soundEngine.playClick();
+    setToast("در حال بازگردانی به نسخه انتخابی...");
+    try {
+      const res = await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: currentSlug, restoreRevisionId: revisionId }),
+      });
+      const json = await res.json();
+      if (json.success && json.restoredData) {
+        soundEngine.playSuccess();
+        setPageData(json.restoredData);
+        setToast("✓ صفحه با موفقیت به نسخه قبلی بازگردانده شد.");
+      }
+    } catch {
+      setToast("خطا در بازگردانی نسخه.");
+    } finally {
+      setTimeout(() => setToast(null), 3500);
+    }
+  };
+
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4" dir="rtl">
       
-      {/* نوار بالای استودیو همراه با سوییچر ریسپانسیو و مدیریت مسیرها */}
+      {/* نوار ابزار بالای استودیو */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
@@ -148,7 +185,28 @@ export default function AdminModularPages() {
           </div>
         </div>
 
-        {/* سوییچر اندازه فریم بوم (دسکتاپ، تبلت و موبایل) */}
+        {/* منوی تاریخچه نسخه‌ها */}
+        {revisions.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--text-secondary)] font-bold">🕒 نسخه‌های قبل:</span>
+            <select
+              onChange={(e) => {
+                if (e.target.value) handleRollback(e.target.value);
+              }}
+              defaultValue=""
+              className="p-1.5 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold outline-none cursor-pointer text-slate-300"
+            >
+              <option value="" disabled>انتخاب جهت بازگردانی...</option>
+              {revisions.map((r, idx) => (
+                <option key={r.id} value={r.id}>
+                  نسخه {idx + 1} ({new Date(r.created_at).toLocaleTimeString("fa-IR")})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* سوییچر اندازه فریم بوم */}
         <div className="flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)]">
           {[
             { id: "100%", label: "دسکتاپ", icon: "🖥️" },
@@ -187,7 +245,7 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم Puck تعاملی با کنترل عرض فیزیکی */}
+      {/* بوم تعاملی Puck */}
       <div className="flex-1 w-full flex justify-center items-start">
         <div
           style={{ width: viewportWidth, maxWidth: "100%", transition: "width 0.3s ease" }}

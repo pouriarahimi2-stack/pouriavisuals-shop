@@ -18,6 +18,19 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
+    const getRevisions = searchParams.get("revisions");
+
+    // واکشی تاریخچه نسخه‌های یک صفحه
+    if (slug && getRevisions === "true") {
+      const { data: revs } = await supabaseAdmin
+        .from("page_revisions")
+        .select("id, created_at")
+        .eq("page_slug", slug)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      return NextResponse.json({ success: true, revisions: revs || [] });
+    }
 
     if (slug) {
       const { data } = await supabaseAdmin
@@ -61,8 +74,26 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { slug, title, puck_data, is_published } = body;
+    const { slug, title, puck_data, is_published, restoreRevisionId } = body;
     const cleanSlug = String(slug || "").trim().toLowerCase();
+
+    // اگر درخواست بازیابی نسخه قبلی باشد
+    if (restoreRevisionId) {
+      const { data: rev } = await supabaseAdmin
+        .from("page_revisions")
+        .select("puck_data")
+        .eq("id", restoreRevisionId)
+        .maybeSingle();
+
+      if (rev && rev.puck_data) {
+        await supabaseAdmin
+          .from("modular_pages")
+          .update({ puck_data: rev.puck_data, updated_at: new Date().toISOString() })
+          .eq("slug", cleanSlug);
+
+        return NextResponse.json({ success: true, message: "صفحه با موفقیت به نسخه انتخابی بازگردانی شد.", restoredData: rev.puck_data });
+      }
+    }
 
     const payload: any = {
       slug: cleanSlug,
@@ -82,7 +113,16 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.from("modular_pages").insert([payload]);
     }
 
-    return NextResponse.json({ success: true, message: "صفحه با موفقیت ذخیره و منتشر شد." });
+    // ثبت اسنپ‌شات در تاریخچه نسخه‌ها
+    if (puck_data) {
+      try {
+        await supabaseAdmin.from("page_revisions").insert([
+          { page_slug: cleanSlug, puck_data }
+        ]);
+      } catch {}
+    }
+
+    return NextResponse.json({ success: true, message: "صفحه با موفقیت ذخیره و اسنپ‌شات نسخه ثبت شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

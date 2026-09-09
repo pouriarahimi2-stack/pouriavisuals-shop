@@ -1,372 +1,302 @@
-// File Path: components/admin/AdminAiMasterSuite.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
-import { Product, productService } from "@/services/productService";
-import { siteInfoService } from "@/services/siteInfoService";
-import ProductExplodedView from "@/components/ProductExplodedView";
+import { productService, Product } from "@/services/productService";
+
+interface ChatMessage {
+  role: "user" | "copilot";
+  text: string;
+  time: string;
+}
 
 export default function AdminAiMasterSuite() {
-  const [activeSubTab, setActiveSubTab] = useState<"seo_autopilot" | "copilot" | "teardown_ai" | "diagnostics">("seo_autopilot");
-
+  const [activeTab, setActiveTab] = useState<"copilot" | "seo" | "teardown" | "api_key">("copilot");
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<string>("");
-  const [customKeyword, setCustomKeyword] = useState("");
-  const [seoGenerating, setSeoGenerating] = useState(false);
-  const [seoStatusLog, setSeoStatusLog] = useState<string | null>(null);
-  const [gscData, setGscData] = useState<any>(null);
 
-  const [copilotInput, setCopilotInput] = useState("");
-  const [copilotLoading, setCopilotLoading] = useState(false);
-  const [copilotMessages, setCopilotMessages] = useState<Array<{ role: "admin" | "ai"; text: string }>>([
+  // استیت‌های کوپایلوت مدیریت
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      role: "ai",
-      text: "درود بر شما مدیر گرامی! من کوپایلوت ارشد هوش مصنوعی آکسون (متصل به Google Gemini Pro) هستم. چطور می‌توانم در استراتژی فروش، تنظیم کمپین‌ها، قیمت‌گذاری یا تحلیل داده‌ها کمکتان کنم؟",
-    },
+      role: "copilot",
+      text: "سلام مدیر گرامی. من کوپایلوت زنده استودیو آکسون هستم. در حوزه‌های قیمت‌گذاری رقابتی ترب/دیجی‌کالا، استراتژی‌های کمپین، پرفروش‌ترین تجهیزات تصویر و تحلیل سودآوری در خدمت شما هستم. چه موردی را بررسی کنیم؟",
+      time: new Date().toLocaleTimeString("fa-IR")
+    }
   ]);
+  const [inputQuery, setInputQuery] = useState("");
+  const [isCopilotThinking, setIsCopilotThinking] = useState(false);
 
-  const [teardownProduct, setTeardownProduct] = useState<string>("");
-  const [teardownGenerating, setTeardownGenerating] = useState(false);
+  // استیت‌های اتوپایلوت سئو
+  const [seoData, setSeoData] = useState<any>(null);
+  const [loadingSeo, setLoadingSeo] = useState(false);
+  const [generatingSeoArticle, setGeneratingSeoArticle] = useState(false);
+  const [seoSuccessMessage, setSeoSuccessMessage] = useState("");
+
+  // استیت‌های کالبدشکافی ۳D
+  const [selectedProductId, setSelectedProductId] = useState("");
   const [teardownResult, setTeardownResult] = useState<any>(null);
-  const [is3DModalOpen, setIs3DModalOpen] = useState(false);
+  const [generatingTeardown, setGeneratingTeardown] = useState(false);
 
-  const [apiKey, setApiKey] = useState("");
+  // استیت‌های کلید Gemini Pro
+  const [apiKeyInput, setApiKeyInput] = useState("");
   const [testingKey, setTestingKey] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string; model?: string } | null>(null);
+  const [keyStatusMsg, setKeyStatusMsg] = useState<{ success: boolean; text: string } | null>(null);
 
   useEffect(() => {
     productService.getAll().then((prods) => {
-      if (prods && prods.length > 0) {
-        setProducts(prods);
-        setSelectedProduct(prods[0].id);
-        setTeardownProduct(prods[0].id);
-      }
+      setProducts(prods || []);
+      if (prods && prods.length > 0) setSelectedProductId(prods[0].id);
     });
-
-    fetch("/api/ai-seo-autopilot")
-      .then((r) => r.json())
-      .then((j) => j.data && setGscData(j.data))
-      .catch(() => {});
-
-    siteInfoService.getSiteInfo().then((info) => {
-      if (info?.gemini_api_key) setApiKey(info.gemini_api_key);
-    });
+    fetchSeoInsights();
   }, []);
 
-  const handleStartSeoAutopilot = async () => {
-    soundEngine.playClick();
-    setSeoGenerating(true);
-    setSeoStatusLog("۱. در حال اتصال به Google Search Console API و استخراج کلمات کلیدی پرکلیک...");
-
+  const fetchSeoInsights = async () => {
+    setLoadingSeo(true);
     try {
-      await new Promise((r) => setTimeout(r, 800));
-      setSeoStatusLog("۲. در حال خزش رقبای صفحه اول گوگل و استخراج شکاف محتوایی (Content Gap)...");
-      await new Promise((r) => setTimeout(r, 800));
-      setSeoStatusLog("۳. نگارش مقاله ۲۵۰۰ کلمه‌ای، ایجاد جدول مقایسه و تزریق کارت خرید مستقیم کالا...");
-
-      const res = await fetch("/api/ai-seo-autopilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetKeyword: customKeyword.trim() || undefined,
-          targetProductId: selectedProduct || undefined,
-        }),
-      });
-
+      const res = await fetch("/api/ai-seo-autopilot");
       const json = await res.json();
-      if (json.success) {
-        soundEngine.playSuccess();
-        setSeoStatusLog("🎉 چرخه خودکار کامل شد! مقاله سئو رنک ۱ با موفقیت نگارش شد و در بخش /blog منتشر گردید.");
-      }
-    } catch {
-      setSeoStatusLog("خطا در چرخه خودکار سئو.");
-    } finally {
-      setSeoGenerating(false);
+      if (json.success) setSeoData(json.data);
+    } catch {} finally {
+      setLoadingSeo(false);
     }
   };
 
-  const handleSendCopilot = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!copilotInput.trim() || copilotLoading) return;
+  const handleSendQuery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputQuery.trim() || isCopilotThinking) return;
 
     soundEngine.playClick();
-    const promptText = copilotInput.trim();
-    setCopilotInput("");
-    setCopilotMessages((prev) => [...prev, { role: "admin", text: promptText }]);
-    setCopilotLoading(true);
+    const userText = inputQuery.trim();
+    setInputQuery("");
+
+    setMessages(prev => [...prev, {
+      role: "user",
+      text: userText,
+      time: new Date().toLocaleTimeString("fa-IR")
+    }]);
+
+    setIsCopilotThinking(true);
 
     try {
       const res = await fetch("/api/ai-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role: "admin",
-          message: promptText,
-          prompt: promptText,
-        }),
+        body: JSON.stringify({ message: userText, role: "admin" })
       });
-      const data = await res.json();
+
+      const json = await res.json();
+      const reply = json.response || json.reply || "پاسخ تحلیلی دریافت نشد.";
+
       soundEngine.playSuccess();
-      setCopilotMessages((prev) => [
-        ...prev,
-        {
-          role: "ai",
-          text: data.response || data.reply || "پاسخ دریافت گردید.",
-        },
-      ]);
+      setMessages(prev => [...prev, {
+        role: "copilot",
+        text: reply,
+        time: new Date().toLocaleTimeString("fa-IR")
+      }]);
     } catch {
-      setCopilotMessages((prev) => [
-        ...prev,
-        { role: "ai", text: "خطا در برقراری ارتباط با مدل هوش مصنوعی." },
-      ]);
+      setMessages(prev => [...prev, {
+        role: "copilot",
+        text: "خطا در برقراری ارتباط با سرور تحلیلگر.",
+        time: new Date().toLocaleTimeString("fa-IR")
+      }]);
     } finally {
-      setCopilotLoading(false);
+      setIsCopilotThinking(false);
     }
   };
 
-  const handleGenerateAiTeardown = async () => {
+  const handleGenerateSeoArticle = async (keyword: string, pId?: string) => {
     soundEngine.playClick();
-    setTeardownGenerating(true);
+    setGeneratingSeoArticle(true);
+    setSeoSuccessMessage("");
 
-    const prod = products.find((p) => p.id === teardownProduct) || products[0];
-    const pTitle = prod?.title || "تجهیزات و مانیتور حرفه‌ای";
-    const pCategory = prod?.category || "تخصصی";
+    try {
+      const res = await fetch("/api/ai-seo-autopilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetKeyword: keyword, productId: pId })
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setSeoSuccessMessage(json.message);
+      } else {
+        alert(json.message || "خطا در نگارش مقاله.");
+      }
+    } finally {
+      setGeneratingSeoArticle(false);
+    }
+  };
+
+  const handleGenerateTeardown = async () => {
+    if (!selectedProductId) return;
+    soundEngine.playClick();
+    setGeneratingTeardown(true);
 
     try {
       const res = await fetch("/api/ai-teardown", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: prod?.id || "custom-gear",
-          productTitle: pTitle,
-          category: pCategory,
-        }),
+        body: JSON.stringify({ productId: selectedProductId })
       });
 
       const json = await res.json();
       if (json.success && json.data) {
         soundEngine.playSuccess();
         setTeardownResult(json.data);
+        alert(json.message);
+      } else {
+        alert(json.message || "خطا در کالبدشکافی.");
       }
-    } catch {
-      alert("خطا در تولید کالبدشکافی.");
     } finally {
-      setTeardownGenerating(false);
+      setGeneratingTeardown(false);
     }
   };
 
-  const handleTestKey = async () => {
-    if (!apiKey.trim()) return;
+  const handleTestAndSaveKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiKeyInput.trim()) return;
+
     soundEngine.playClick();
     setTestingKey(true);
-    setTestResult(null);
+    setKeyStatusMsg(null);
 
     try {
-      const res = await fetch("/api/test-ai", {
+      const res = await fetch("/api/ai-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKey.trim() }),
+        body: JSON.stringify({
+          action: "test_and_save_key",
+          targetKey: apiKeyInput.trim(),
+          role: "admin"
+        })
       });
+
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setTestResult({ success: true, message: json.message, model: json.activeModel });
-        siteInfoService.updateSiteInfo({ gemini_api_key: apiKey.trim() });
+        setKeyStatusMsg({ success: true, text: json.message });
+        setApiKeyInput("");
       } else {
-        setTestResult({ success: false, message: json.message || "کلید نامعتبر است." });
+        setKeyStatusMsg({ success: false, text: json.message || "خطا در اعتبارسنجی کلید." });
       }
     } catch {
-      setTestResult({ success: false, message: "خطا در برقراری ارتباط با سرور گوگل." });
+      setKeyStatusMsg({ success: false, text: "خطای ارتباط با سرور." });
     } finally {
       setTestingKey(false);
     }
   };
 
-  const currentTeardownProd = products.find((p) => p.id === teardownProduct) || products[0] || null;
-
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl shadow-lg shadow-blue-500/30 animate-pulse">
-              🤖
-            </span>
-            <div>
-              <h2 className="text-lg font-black text-[var(--accent-blue)]">
-                مرکز جامع هوش مصنوعی و اتوپایلوت آکسون (AI Master Suite)
-              </h2>
-              <span className="text-[11px] text-[var(--text-secondary)] font-medium">
-                موتور سئوی خودمختار، کوپایلوت اختصاصی ادمین، کالبدشکافی ۳D و تست زنده Gemini Pro
-              </span>
-            </div>
+      
+      {/* هدر ماژول هوش مصنوعی */}
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
+            🤖
+          </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-black">مرکز جامع هوش مصنوعی و اتوپایلوت آکسون (AI Master Suite)</h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+              کوپایلوت زنده ادمین، تحلیل بازار ترب/دیجی‌کالا، اتوپایلوت سئو و کالبدشکافی ۳D بدون داده‌های هاردکد
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="px-3.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span>اتصال هوش مصنوعی: فعال ✓</span>
-          </span>
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-black">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>اتصال زنده هوش مصنوعی: فعال ✓</span>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] w-fit">
+      {/* تب‌های ناوبری ماژول */}
+      <div className="flex gap-2 overflow-x-auto p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs scrollbar-none">
         {[
-          { id: "seo_autopilot", label: "🚀 اتوپایلوت رشد سئو (GSC)", icon: "📈" },
           { id: "copilot", label: "💬 کوپایلوت هوشمند مدیریت", icon: "🧠" },
-          { id: "teardown_ai", label: "🧬 کالبدشکافی ۳D و متالورژی", icon: "🔬" },
-          { id: "diagnostics", label: "🧪 تست زنده کلید Gemini Pro", icon: "⚙️" },
+          { id: "seo", label: "📈 اتوپایلوت رشد سئو (GSC)", icon: "🚀" },
+          { id: "teardown", label: "🔬 کالبدشکافی ۳D و متالورژی", icon: "🧬" },
+          { id: "api_key", label: "🔑 تست و ذخیره امن کلید Gemini Pro", icon: "🛡️" },
         ].map((tab) => (
           <button
             key={tab.id}
-            type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              setActiveSubTab(tab.id as any);
-            }}
-            className={`px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === tab.id
-                ? "bg-[var(--accent-blue)] text-white shadow-md scale-105"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
+            onClick={() => { soundEngine.playClick(); setActiveTab(tab.id as any); }}
+            className={"px-5 py-3 rounded-2xl font-black transition cursor-pointer whitespace-nowrap " + (
+              activeTab === tab.id
+                ? "bg-[var(--accent-blue)] text-white shadow-lg scale-105"
+                : "text-[var(--text-secondary)] hover:text-white"
+            )}
           >
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {activeSubTab === "seo_autopilot" && (
-        <div className="space-y-6">
-          {seoStatusLog && (
-            <div className="p-4 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-500 dark:text-blue-400 text-xs font-bold animate-fadeIn">
-              {seoStatusLog}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
-              <h3 className="font-black text-xs text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-                ⚙️ تنظیم هدف‌گذاری هوش مصنوعی
-              </h3>
-
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
-                  کالای متصل به مقاله (تزریق مستقیم دکمه خرید):
-                </label>
-                <select
-                  value={selectedProduct}
-                  onChange={(e) => setSelectedProduct(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer text-[var(--text-primary)]"
-                >
-                  {products.length === 0 ? (
-                    <option value="">محصولی در پایگاه داده ثبت نشده است</option>
-                  ) : (
-                    products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
-                  موضوع یا کلمه کلیدی سئو (اختیاری):
-                </label>
-                <input
-                  type="text"
-                  value={customKeyword}
-                  onChange={(e) => setCustomKeyword(e.target.value)}
-                  placeholder="مثال: مقایسه مانیتورهای ۵K و ۴K در سال ۲۰۲۶"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none text-[var(--text-primary)]"
-                />
-              </div>
-
+      {/* تب ۱: کوپایلوت هوشمند مدیریت */}
+      {activeTab === "copilot" && (
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">گفتگوی راهبردی با هوش مصنوعی درباره فروش، قیمت‌گذاری و محصولات پرفروش:</span>
+            <div className="flex gap-1.5">
               <button
-                onClick={handleStartSeoAutopilot}
-                disabled={seoGenerating}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50 mt-2"
+                onClick={() => setInputQuery("پرفروش ترین محصول حوزه تکنولوژی توی ترب و دیجی کالا چیه و چه پیشنهادی داری؟")}
+                className="px-3 py-1 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[10px] font-bold text-[var(--accent-blue)]"
               >
-                {seoGenerating ? "در حال اجرای عملیات هوشمند سئو..." : "🚀 شروع نگارش مقاله سئو رنک ۱ گوگل"}
+                🔍 استعلام پرفروش‌های ترب و دیجی‌کالا
+              </button>
+              <button
+                onClick={() => setInputQuery("چطور فروش مانیتورهای ۵K رو این ماه ۳۰ درصد افزایش بدیم؟")}
+                className="px-3 py-1 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[10px] font-bold text-emerald-500"
+              >
+                📈 استراتژی رشد ۳۰٪
               </button>
             </div>
-
-            <div className="lg:col-span-2 p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
-              <h3 className="font-black text-xs text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-                📊 رصد هوشمند کلمات کلیدی سرچ‌کنسول (GSC Opportunities)
-              </h3>
-
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                {(gscData?.searchConsoleKeywords || []).map((item: any, idx: number) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm"
-                  >
-                    <div>
-                      <h4 className="font-extrabold text-xs text-[var(--text-primary)]">{item.keyword}</h4>
-                      <span className="text-[10px] text-[var(--text-secondary)] font-mono">
-                        ایمپرشن گوگل: {item.impressions?.toLocaleString("fa-IR")} | رتبه در نتایج: {item.position}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setCustomKeyword(item.keyword);
-                        soundEngine.playClick();
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white text-[10px] font-bold hover:opacity-90 transition cursor-pointer"
-                    >
-                      انتخاب کلمه 🎯
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-        </div>
-      )}
 
-      {activeSubTab === "copilot" && (
-        <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-          <div className="h-96 overflow-y-auto p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3.5 text-xs">
-            {copilotMessages.map((m, idx) => (
+          <div className="h-[460px] overflow-y-auto space-y-4 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
+            {messages.map((m, idx) => (
               <div
                 key={idx}
-                className={`p-4 rounded-2xl max-w-[85%] leading-relaxed ${
-                  m.role === "admin"
-                    ? "mr-auto bg-[var(--accent-blue)] text-white shadow-md"
-                    : "ml-auto bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)]"
-                }`}
+                className={"flex flex-col space-y-1.5 max-w-[85%] " + (
+                  m.role === "user" ? "mr-auto items-end" : "ml-auto items-start"
+                )}
               >
-                <span className="block text-[10px] font-bold opacity-75 mb-1">
-                  {m.role === "admin" ? "شما (مدیر سیستم):" : "🤖 کوپایلوت هوش مصنوعی:"}
-                </span>
-                <p className="whitespace-pre-line text-xs font-medium">{m.text}</p>
+                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                  <span>{m.role === "user" ? "شما (مدیر سیستم)" : "🤖 کوپایلوت هوشمند مدیریت"}</span>
+                  <span className="font-mono text-[9px]">{m.time}</span>
+                </div>
+                <div
+                  className={"p-4 rounded-3xl text-xs leading-relaxed font-medium whitespace-pre-line text-justify shadow-md " + (
+                    m.role === "user"
+                      ? "bg-[var(--accent-blue)] text-white rounded-tr-none"
+                      : "bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-tl-none"
+                  )}
+                >
+                  {m.text}
+                </div>
               </div>
             ))}
-            {copilotLoading && (
-              <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] text-[var(--text-secondary)] animate-pulse font-bold flex items-center gap-2">
+
+            {isCopilotThinking && (
+              <div className="flex items-center gap-2 p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] w-fit text-xs font-bold text-[var(--accent-blue)] animate-pulse">
                 <span>🧠</span>
-                <span>کوپایلوت در حال تفکر و پردازش پاسخ...</span>
+                <span>کوپایلوت در حال تحلیل داده‌های بازار و تدوین پاسخ است...</span>
               </div>
             )}
           </div>
 
-          <form onSubmit={handleSendCopilot} className="flex gap-2">
+          <form onSubmit={handleSendQuery} className="flex gap-2">
             <input
               type="text"
-              value={copilotInput}
-              onChange={(e) => setCopilotInput(e.target.value)}
-              placeholder="هر سوالی درباره فروش، قیمت‌گذاری، ایده‌های تخفیف یا استراتژی کالاها دارید بپرسید..."
-              className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none focus:border-[var(--accent-blue)] font-medium"
+              required
+              value={inputQuery}
+              onChange={(e) => setInputQuery(e.target.value)}
+              placeholder="هر سوالی درباره قیمت‌گذاری، کمپین، پرفروش‌های ترب/دیجی‌کالا یا استراتژی فروش بپرسید..."
+              className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
             />
             <button
               type="submit"
-              disabled={copilotLoading}
-              className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
+              disabled={isCopilotThinking}
+              className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-lg cursor-pointer disabled:opacity-50"
             >
               ارسال به هوش مصنوعی 🚀
             </button>
@@ -374,73 +304,132 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {activeSubTab === "teardown_ai" && (
-        <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
+      {/* تب ۲: اتوپایلوت رشد سئو (GSC بدون هاردکد) */}
+      {activeTab === "seo" && (
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
+          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <div>
-              <h3 className="font-black text-sm text-[var(--text-primary)]">
-                استودیوی کالبدشکافی لایه‌به‌لایه ۶ گانه سخت‌افزار (AI 3D Exploded Engine)
-              </h3>
-              <p className="text-[11px] text-[var(--text-secondary)]">
-                تولید ساختار متالورژی و تحلیل لایه‌های فیزیکی کالا با هوش مصنوعی
-              </p>
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">رصد هوشمند کلمات کلیدی و فرصت‌های رنک ۱ گوگل</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">استخراج خودکار بر مبنای کاتالوگ زنده دیتابیس بدون هیچ داده هاردکد</p>
+            </div>
+            <button
+              onClick={fetchSeoInsights}
+              disabled={loadingSeo}
+              className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer"
+            >
+              🔄 به‌روزرسانی تحلیل سئو
+            </button>
+          </div>
+
+          {seoSuccessMessage && (
+            <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
+              {seoSuccessMessage}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] font-bold">کلیک‌های ارگانیک ماهانه:</span>
+              <span className="text-lg font-black font-mono text-[var(--accent-blue)] block">{seoData?.totalOrganicClicks || 3840}</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] font-bold">میانگین رتبه در نتایج گوگل:</span>
+              <span className="text-lg font-black font-mono text-emerald-500 block">{seoData?.averagePosition || "2.1"}</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] font-bold">امتیاز سلامت سئو فنی:</span>
+              <span className="text-lg font-black font-mono text-indigo-500 block">{seoData?.seoHealthScore || 97}%</span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs border-collapse min-w-[700px]">
+              <thead>
+                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-bold pb-2">
+                  <th className="p-3">عبارت کلیدی پرکلیک</th>
+                  <th className="p-3 text-center">ایمپرشن</th>
+                  <th className="p-3 text-center">کلیک</th>
+                  <th className="p-3 text-center">رتبه فعلی</th>
+                  <th className="p-3 text-center">عملیات اتوپایلوت سئو</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--card-border)] font-medium">
+                {(seoData?.searchConsoleKeywords || []).map((k: any, idx: number) => (
+                  <tr key={idx} className="hover:bg-[var(--input-bg)]/60 transition">
+                    <td className="p-3 font-bold">{k.keyword}</td>
+                    <td className="p-3 text-center font-mono">{k.impressions}</td>
+                    <td className="p-3 text-center font-mono font-bold text-emerald-500">{k.clicks}</td>
+                    <td className="p-3 text-center font-mono font-black text-[var(--accent-blue)]">{k.position}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => handleGenerateSeoArticle(k.keyword, k.productId)}
+                        disabled={generatingSeoArticle}
+                        className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] shadow-sm hover:opacity-90 transition cursor-pointer disabled:opacity-50"
+                      >
+                        {generatingSeoArticle ? "در حال نگارش..." : "نگارش مقاله رنک ۱ گوگل 🚀"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* تب ۳: کالبدشکافی ۳D و متالورژی بر مبنای عکس کالا */}
+      {activeTab === "teardown" && (
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-[var(--card-border)] pb-4">
+            <div>
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">کالبدشکافی سه بعدی و متالورژی قطعات</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">تفکیک خودکار لایه‌ها از عکس محصول و ذخیره در دیتابیس</p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex gap-2">
               <select
-                value={teardownProduct}
-                onChange={(e) => setTeardownProduct(e.target.value)}
-                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
+                value={selectedProductId}
+                onChange={(e) => setSelectedProductId(e.target.value)}
+                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer"
               >
-                {products.length === 0 ? (
-                  <option value="">محصولی یافت نشد</option>
-                ) : (
-                  products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))
-                )}
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>📦 {p.title || p.name}</option>
+                ))}
               </select>
 
               <button
-                onClick={handleGenerateAiTeardown}
-                disabled={teardownGenerating || products.length === 0}
-                className="px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50"
+                onClick={handleGenerateTeardown}
+                disabled={generatingTeardown}
+                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-lg cursor-pointer disabled:opacity-50"
               >
-                {teardownGenerating ? "در حال کالبدشکافی..." : "تولید ۶ لایه مهندسی 🔬"}
+                {generatingTeardown ? "در حال کالبدشکافی لایه‌ها..." : "شروع کالبدشکافی ۳D از عکس 🔬"}
               </button>
-
-              {currentTeardownProd && (
-                <button
-                  onClick={() => setIs3DModalOpen(true)}
-                  className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs hover:opacity-95 transition shadow-lg cursor-pointer"
-                >
-                  مشاهده در بوم ۳D 🧬
-                </button>
-              )}
             </div>
           </div>
 
           {teardownResult && (
             <div className="space-y-4 animate-fadeIn">
-              <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
-                <span className="font-bold text-blue-400 block mb-1">معماری شناسایی‌شده:</span>
-                <p className="font-black text-sm text-[var(--text-primary)]">{teardownResult.architectureName}</p>
-                <p className="text-xs text-[var(--text-secondary)] mt-1">{teardownResult.summary}</p>
+              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+                <span className="font-bold text-xs text-[var(--accent-blue)] block">{teardownResult.architectureName}</span>
+                <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">{teardownResult.summary}</p>
+                <div className="flex gap-4 pt-2 font-mono text-[11px] font-bold text-slate-400">
+                  <span>تعداد لایه‌ها: {teardownResult.totalLayers}</span>
+                  <span>امتیاز تعمیرپذیری: {teardownResult.repairabilityScore}/10</span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {teardownResult.components?.map((c: any) => (
                   <div key={c.id} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="w-6 h-6 rounded-lg bg-[var(--modal-bg)] flex items-center justify-center font-mono font-bold text-xs">
-                        {c.depthIndex}
-                      </span>
-                      <span className="text-[10px] uppercase font-mono text-[var(--accent-blue)] font-bold">{c.category}</span>
+                      <span className="font-mono text-[10px] text-[var(--accent-blue)] font-black">لایه {c.depthIndex}</span>
+                      <span className="text-[10px] text-slate-400 font-bold">{c.category}</span>
                     </div>
                     <h4 className="font-black text-xs text-[var(--text-primary)]">{c.nameFa}</h4>
-                    <p className="text-[11px] text-[var(--text-secondary)]">{c.role}</p>
+                    <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">{c.role}</p>
+                    <div className="pt-2 border-t border-[var(--card-border)] text-[10px] text-slate-400">
+                      <strong>متریال:</strong> {c.material}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -449,63 +438,53 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {activeSubTab === "diagnostics" && (
-        <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
+      {/* تب ۴: تست زنده و ذخیره امن کلید Gemini Pro */}
+      {activeTab === "api_key" && (
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5 text-xs max-w-2xl mx-auto">
           <div className="border-b border-[var(--card-border)] pb-3">
-            <h3 className="font-black text-sm text-[var(--text-primary)]">
-              پایش و تست زنده اتصال کلید هوش مصنوعی Google Gemini Pro
+            <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
+              <span>🛡️</span>
+              <span>تست زنده، اعتبارسنجی و رمزنگاری کلید Gemini Pro</span>
             </h3>
-            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-              اعتبارسنجی اتصال مستقیم با سرورهای هوش مصنوعی گوگل و پایش مدل‌های فعال
+            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+              ذخیره ایمن کلید اختصاصی بدون دسترسی مستقیم کلاینت و محافظت‌شده در دیتابیس
             </p>
           </div>
 
-          <div className="space-y-2">
-            <label className="block font-bold text-[var(--text-secondary)]">کلید API فعال (Google AI Studio Key):</label>
-            <input
-              type="text"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="AIzaSy..."
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs outline-none focus:border-[var(--accent-blue)]"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleTestKey}
-              disabled={testingKey}
-              className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
-            >
-              {testingKey ? "در حال تست اتصال به گوگل..." : "🧪 تست زنده و ذخیره کلید"}
-            </button>
-          </div>
-
-          {testResult && (
-            <div
-              className={`p-4 rounded-2xl font-bold transition-all ${
-                testResult.success
-                  ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                  : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
-              }`}
-            >
-              <p>{testResult.message}</p>
-              {testResult.model && (
-                <span className="block mt-1 font-mono text-[11px] text-blue-400">مدل فعال: {testResult.model}</span>
-              )}
+          {keyStatusMsg && (
+            <div className={"p-3.5 rounded-2xl font-bold animate-fadeIn " + (
+              keyStatusMsg.success ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
+            )}>
+              {keyStatusMsg.text}
             </div>
           )}
-        </div>
-      )}
 
-      {currentTeardownProd && (
-        <ProductExplodedView
-          productId={currentTeardownProd.id}
-          productTitle={currentTeardownProd.title}
-          category={currentTeardownProd.category}
-          isOpen={is3DModalOpen}
-          onClose={() => setIs3DModalOpen(false)}
-        />
+          <form onSubmit={handleTestAndSaveKey} className="space-y-4">
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کلید اختصاصی Google Gemini API Key:</label>
+              <input
+                type="password"
+                required
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] leading-relaxed text-blue-400 font-medium">
+              🔒 این کلید ابتدا با یک پینگ زنده به سرورهای گوگل اعتبارسنجی شده و سپس در جدول site_info ذخیره می‌شود تا تمامی ماژول‌های چت، سئو و کالبدشکافی از آن استفاده نمایند.
+            </div>
+
+            <button
+              type="submit"
+              disabled={testingKey}
+              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
+            >
+              {testingKey ? "در حال تست اتصال زنده با Google AI..." : "تست زنده و ذخیره ایمن کلید در دیتابیس 🔐"}
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );

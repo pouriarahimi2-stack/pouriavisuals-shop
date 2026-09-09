@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { Config } from "@measured/puck";
 import Link from "next/link";
+import { productService, Product } from "@/services/productService";
+import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
 
 export type ComponentProps = {
   HeroBlock: {
@@ -20,6 +23,7 @@ export type ComponentProps = {
   ProductGrid: {
     heading: string;
     subtitle: string;
+    limit: number;
     columns: number;
     showPriceBadge: boolean;
     bgColor: string;
@@ -60,6 +64,77 @@ export type ComponentProps = {
   };
 };
 
+// کامپوننت داخلی رندر ویترین محصولات متصل به دیتابیس
+function LiveProductGridRenderer({ heading, subtitle, limit, columns, showPriceBadge, bgColor }: any) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const { addToCart } = useCart();
+
+  useEffect(() => {
+    productService.getAll().then((data) => {
+      if (data && data.length > 0) {
+        setProducts(data.slice(0, limit || 6));
+      }
+    });
+  }, [limit]);
+
+  const colClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : columns === 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
+
+  return (
+    <section style={{ backgroundColor: bgColor || "#07090e" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-black">{heading || "محصولات برگزیده استودیو"}</h2>
+          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        </div>
+
+        <div className={`grid ${colClass} gap-6 pt-4`}>
+          {products.map((p) => {
+            const priceVal = Number(p.discountPrice || p.discount_price || p.price || 0);
+            return (
+              <div key={p.id} className="p-5 rounded-3xl bg-white/5 border border-white/10 space-y-3 hover:border-sky-500/40 transition flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="w-full h-48 rounded-2xl bg-black/40 overflow-hidden flex items-center justify-center p-2 border border-white/5">
+                    <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain hover:scale-105 transition duration-300" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold truncate">{p.title || p.name}</span>
+                      {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">گارانتی طلایی</span>}
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">{p.category || "تجهیزات تخصصی"}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-white/10">
+                  <span className="font-mono text-emerald-400 font-black text-xs">
+                    {priceVal.toLocaleString("fa-IR")} تومان
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playAddToCart();
+                      addToCart({
+                        id: p.id,
+                        title: p.title,
+                        price: priceVal,
+                        image: p.images?.[0] || p.image,
+                        stock: p.stock ?? 10
+                      });
+                    }}
+                    className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs transition cursor-pointer shadow-md"
+                  >
+                    خرید مستقیم 🛒
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export const puckConfig: Config<ComponentProps> = {
   categories: {
     shop: {
@@ -76,6 +151,31 @@ export const puckConfig: Config<ComponentProps> = {
     }
   },
   components: {
+    ProductGrid: {
+      label: "ویترین زنده محصولات دیتابیس",
+      fields: {
+        heading: { type: "text", label: "عنوان ویترین" },
+        subtitle: { type: "text", label: "زیرعنوان ویترین" },
+        limit: { type: "number", label: "حداکثر تعداد کالا" },
+        columns: { type: "number", label: "تعداد ستون‌ها (۲، ۳ یا ۴)" },
+        showPriceBadge: {
+          type: "radio",
+          label: "نمایش برچسب گارانتی",
+          options: [{ label: "بله", value: true }, { label: "خیر", value: false }]
+        },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        heading: "پرفروش‌ترین تجهیزات تصویر و مانیتورها",
+        subtitle: "تأمین مستقیم و تحویل با بسته‌بندی ایمن هوانوردی",
+        limit: 6,
+        columns: 3,
+        showPriceBadge: true,
+        bgColor: "#07090e",
+      },
+      render: (props) => <LiveProductGridRenderer {...props} />,
+    },
+
     HeroBlock: {
       label: "هیرو بنر بزرگ استودیویی",
       fields: {
@@ -106,106 +206,28 @@ export const puckConfig: Config<ComponentProps> = {
         paddingTop: 60,
         paddingBottom: 60,
       },
-      render: ({ badge, title, subtitle, primaryBtnText, primaryBtnUrl, secondaryBtnText, secondaryBtnUrl, imageUrl, bgColor, textColor, paddingTop, paddingBottom }) => {
-        return (
-          <section
-            style={{ backgroundColor: bgColor || "#020617", color: textColor || "#fff", paddingTop: `${paddingTop || 60}px`, paddingBottom: `${paddingBottom || 60}px` }}
-            className="w-full text-center px-4 font-sans select-none relative"
-            dir="rtl"
-          >
-            <div className="max-w-5xl mx-auto space-y-6">
-              {badge && (
-                <span className="inline-block px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">
-                  {badge}
-                </span>
-              )}
-              <h1 className="text-3xl sm:text-5xl font-black leading-tight">
-                {title}
-              </h1>
-              {subtitle && (
-                <p className="text-sm sm:text-base opacity-80 max-w-2xl mx-auto leading-relaxed">
-                  {subtitle}
-                </p>
-              )}
-              <div className="flex flex-wrap justify-center gap-3 pt-4">
-                {primaryBtnText && (
-                  <Link href={primaryBtnUrl || "/products"} className="px-8 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-xl transition">
-                    {primaryBtnText}
-                  </Link>
-                )}
-                {secondaryBtnText && (
-                  <Link href={secondaryBtnUrl || "/contact"} className="px-8 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-xs transition">
-                    {secondaryBtnText}
-                  </Link>
-                )}
-              </div>
-              {imageUrl && (
-                <div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden mt-8 shadow-2xl border border-white/10">
-                  <img src={imageUrl} alt="" className="w-full h-auto object-cover max-h-[480px]" />
-                </div>
-              )}
+      render: ({ badge, title, subtitle, primaryBtnText, primaryBtnUrl, secondaryBtnText, secondaryBtnUrl, imageUrl, bgColor, textColor, paddingTop, paddingBottom }) => (
+        <section
+          style={{ backgroundColor: bgColor || "#020617", color: textColor || "#fff", paddingTop: `${paddingTop || 60}px`, paddingBottom: `${paddingBottom || 60}px` }}
+          className="w-full text-center px-4 font-sans select-none relative"
+          dir="rtl"
+        >
+          <div className="max-w-5xl mx-auto space-y-6">
+            {badge && <span className="inline-block px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">{badge}</span>}
+            <h1 className="text-3xl sm:text-5xl font-black leading-tight">{title}</h1>
+            {subtitle && <p className="text-sm sm:text-base opacity-80 max-w-2xl mx-auto leading-relaxed">{subtitle}</p>}
+            <div className="flex flex-wrap justify-center gap-3 pt-4">
+              {primaryBtnText && <Link href={primaryBtnUrl || "/products"} className="px-8 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-xl transition">{primaryBtnText}</Link>}
+              {secondaryBtnText && <Link href={secondaryBtnUrl || "/contact"} className="px-8 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-xs transition">{secondaryBtnText}</Link>}
             </div>
-          </section>
-        );
-      },
-    },
-
-    ProductGrid: {
-      label: "ویترین کالاهای منتخب فروشگاه",
-      fields: {
-        heading: { type: "text", label: "عنوان ویترین" },
-        subtitle: { type: "text", label: "زیرعنوان ویترین" },
-        columns: { type: "number", label: "تعداد ستون‌ها (۲، ۳ یا ۴)" },
-        showPriceBadge: {
-          type: "radio",
-          label: "نمایش بج قیمت تضمینی",
-          options: [
-            { label: "بله", value: true },
-            { label: "خیر", value: false }
-          ]
-        },
-        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
-      },
-      defaultProps: {
-        heading: "پرفروش‌ترین مانیتورها و تجهیزات ۵K",
-        subtitle: "تحویل فوری در سراسر کشور با بیمه نامه رسمی",
-        columns: 3,
-        showPriceBadge: true,
-        bgColor: "#07090e",
-      },
-      render: ({ heading, subtitle, columns, showPriceBadge, bgColor }) => {
-        const colClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : columns === 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
-        return (
-          <section style={{ backgroundColor: bgColor || "#07090e" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <div className="text-center space-y-1">
-                <h2 className="text-2xl font-black">{heading}</h2>
-                <p className="text-xs text-slate-400">{subtitle}</p>
+            {imageUrl && (
+              <div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden mt-8 shadow-2xl border border-white/10">
+                <img src={imageUrl} alt="" className="w-full h-auto object-cover max-h-[480px]" />
               </div>
-
-              <div className={`grid ${colClass} gap-6 pt-4`}>
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className="p-5 rounded-3xl bg-white/5 border border-white/10 space-y-3 hover:border-sky-500/40 transition flex flex-col justify-between">
-                    <div className="space-y-3">
-                      <div className="w-full h-44 rounded-2xl bg-black/40 flex items-center justify-center text-4xl border border-white/5">
-                        🖥️
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold">Apple Studio Display 27 5K</span>
-                        {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">تخفیف ویژه</span>}
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center pt-3 border-t border-white/10">
-                      <span className="font-mono text-emerald-400 font-black text-xs">۱۲۸,۵۰۰,۰۰۰ تومان</span>
-                      <Link href="/products" className="px-4 py-2 rounded-xl bg-sky-500 text-white font-bold text-xs hover:bg-sky-400 transition">خرید کالا ←</Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        );
-      },
+            )}
+          </div>
+        </section>
+      ),
     },
 
     FeaturesGrid: {
@@ -234,32 +256,26 @@ export const puckConfig: Config<ComponentProps> = {
         paddingTop: 50,
         paddingBottom: 50,
       },
-      render: ({ heading, item1Title, item1Desc, item2Title, item2Desc, item3Title, item3Desc, bgColor, paddingTop, paddingBottom }) => {
-        return (
-          <section
-            style={{ backgroundColor: bgColor || "#090d16", paddingTop: `${paddingTop || 50}px`, paddingBottom: `${paddingBottom || 50}px` }}
-            className="w-full px-4 font-sans select-none text-white"
-            dir="rtl"
-          >
-            <div className="max-w-7xl mx-auto space-y-8">
-              {heading && <h2 className="text-2xl font-black text-center">{heading}</h2>}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                  { t: item1Title, d: item1Desc, icon: "🛡️" },
-                  { t: item2Title, d: item2Desc, icon: "⚡" },
-                  { t: item3Title, d: item3Desc, icon: "📦" },
-                ].map((item, i) => (
-                  <div key={i} className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2 hover:border-sky-500/40 transition">
-                    <span className="text-3xl block">{item.icon}</span>
-                    <h3 className="font-bold text-sm">{item.t}</h3>
-                    <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.d}</p>
-                  </div>
-                ))}
-              </div>
+      render: ({ heading, item1Title, item1Desc, item2Title, item2Desc, item3Title, item3Desc, bgColor, paddingTop, paddingBottom }) => (
+        <section style={{ backgroundColor: bgColor || "#090d16", paddingTop: `${paddingTop || 50}px`, paddingBottom: `${paddingBottom || 50}px` }} className="w-full px-4 font-sans select-none text-white" dir="rtl">
+          <div className="max-w-7xl mx-auto space-y-8">
+            {heading && <h2 className="text-2xl font-black text-center">{heading}</h2>}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { t: item1Title, d: item1Desc, icon: "🛡️" },
+                { t: item2Title, d: item2Desc, icon: "⚡" },
+                { t: item3Title, d: item3Desc, icon: "📦" },
+              ].map((item, i) => (
+                <div key={i} className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2 hover:border-sky-500/40 transition">
+                  <span className="text-3xl block">{item.icon}</span>
+                  <h3 className="font-bold text-sm">{item.t}</h3>
+                  <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.d}</p>
+                </div>
+              ))}
             </div>
-          </section>
-        );
-      },
+          </div>
+        </section>
+      ),
     },
 
     FaqAccordion: {
@@ -286,12 +302,7 @@ export const puckConfig: Config<ComponentProps> = {
       },
       render: ({ heading, q1, a1, q2, a2, q3, a3, bgColor }) => {
         const [open, setOpen] = useState<number | null>(0);
-        const list = [
-          { q: q1, a: a1 },
-          { q: q2, a: a2 },
-          { q: q3, a: a3 },
-        ].filter(x => x.q);
-
+        const list = [{ q: q1, a: a1 }, { q: q2, a: a2 }, { q: q3, a: a3 }].filter(x => x.q);
         return (
           <section style={{ backgroundColor: bgColor || "#020617" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
             <div className="max-w-4xl mx-auto space-y-6">
@@ -329,23 +340,21 @@ export const puckConfig: Config<ComponentProps> = {
         btnUrl: "/contact",
         bgColor: "#1e1b4b",
       },
-      render: ({ title, subtitle, btnText, btnUrl, bgColor }) => {
-        return (
-          <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none" dir="rtl">
-            <div style={{ backgroundColor: bgColor || "#1e1b4b" }} className="p-8 sm:p-12 rounded-3xl text-center space-y-4 border border-blue-500/30 text-white shadow-2xl">
-              <h2 className="text-2xl font-black">{title}</h2>
-              {subtitle && <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto">{subtitle}</p>}
-              {btnText && (
-                <div className="pt-2">
-                  <Link href={btnUrl || "/contact"} className="inline-block px-8 py-3 rounded-xl bg-white text-slate-950 font-black text-xs hover:bg-slate-100 transition shadow-lg">
-                    {btnText}
-                  </Link>
-                </div>
-              )}
-            </div>
+      render: ({ title, subtitle, btnText, btnUrl, bgColor }) => (
+        <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none" dir="rtl">
+          <div style={{ backgroundColor: bgColor || "#1e1b4b" }} className="p-8 sm:p-12 rounded-3xl text-center space-y-4 border border-blue-500/30 text-white shadow-2xl">
+            <h2 className="text-2xl font-black">{title}</h2>
+            {subtitle && <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto">{subtitle}</p>}
+            {btnText && (
+              <div className="pt-2">
+                <Link href={btnUrl || "/contact"} className="inline-block px-8 py-3 rounded-xl bg-white text-slate-950 font-black text-xs hover:bg-slate-100 transition shadow-lg">
+                  {btnText}
+                </Link>
+              </div>
+            )}
           </div>
-        );
-      },
+        </div>
+      ),
     },
 
     CustomHtml: {
@@ -360,13 +369,11 @@ export const puckConfig: Config<ComponentProps> = {
         paddingTop: 20,
         paddingBottom: 20,
       },
-      render: ({ code, paddingTop, paddingBottom }) => {
-        return (
-          <div style={{ paddingTop: `${paddingTop || 20}px`, paddingBottom: `${paddingBottom || 20}px` }} className="max-w-7xl mx-auto px-4">
-            <div dangerouslySetInnerHTML={{ __html: code || "" }} />
-          </div>
-        );
-      },
+      render: ({ code, paddingTop, paddingBottom }) => (
+        <div style={{ paddingTop: `${paddingTop || 20}px`, paddingBottom: `${paddingBottom || 20}px` }} className="max-w-7xl mx-auto px-4">
+          <div dangerouslySetInnerHTML={{ __html: code || "" }} />
+        </div>
+      ),
     },
   },
 };

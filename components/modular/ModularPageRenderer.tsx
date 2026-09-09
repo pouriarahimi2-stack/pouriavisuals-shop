@@ -1,25 +1,4 @@
-/**
- * AXON CORE - Modular Page Builder Phase 3: Realtime Dynamic Front-End Renderer (fix.js)
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(process.cwd(), relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[36m[AXON-BUILDER-PHASE3]\x1b[0m استقرار موتور رندر بلادرنگ فرانت‌اند و لندینگ‌های داینامیک...");
-
-// =============================================================================
-// ۱. ساخت موتور رندر اختصاصی بلوک‌ها: components/modular/ModularPageRenderer.tsx
-// =============================================================================
-const rendererComponent = `"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -37,7 +16,7 @@ export default function ModularPageRenderer({ initialPage, slug }: Props) {
 
   const fetchPage = async () => {
     try {
-      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
+      const res = await fetch(`/api/pages?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
       const json = await res.json();
       if (json.success && json.page) {
         setPage(json.page);
@@ -50,7 +29,7 @@ export default function ModularPageRenderer({ initialPage, slug }: Props) {
   useEffect(() => {
     // گوش دادن بلادرنگ به تغییرات جدول modular_pages
     const channel = supabase
-      .channel(\`realtime-modular-page-\${slug}\`)
+      .channel(`realtime-modular-page-${slug}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, (payload: any) => {
         if (payload.new && payload.new.slug === slug) {
           setPage(payload.new as ModularPageDocument);
@@ -95,8 +74,8 @@ function renderBlock(
       : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
 
   const paddingStyle = {
-    paddingTop: \`\${styles.paddingY ?? 12}rem\`,
-    paddingBottom: \`\${styles.paddingY ?? 12}rem\`,
+    paddingTop: `${styles.paddingY ?? 12}rem`,
+    paddingBottom: `${styles.paddingY ?? 12}rem`,
     backgroundColor: styles.bgColor || "transparent",
     color: styles.textColor || "inherit",
     textAlign: styles.textAlign || "right",
@@ -338,87 +317,4 @@ function renderBlock(
     default:
       return null;
   }
-}
-`;
-writeFile('components/modular/ModularPageRenderer.tsx', rendererComponent);
-
-// =============================================================================
-// ۲. مسیر اختصاصی رندرینگ لندینگ‌ها و صفحات پویا: app/[slug]/page.tsx
-// =============================================================================
-const dynamicLandingPage = `import { Metadata } from "next";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import ModularPageRenderer from "@/components/modular/ModularPageRenderer";
-import { notFound } from "next/navigation";
-
-export const dynamic = "force-dynamic";
-
-interface Props {
-  params: Promise<{ slug: string }>;
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  const { data: page } = await supabaseAdmin
-    .from("modular_pages")
-    .select("title, meta_description")
-    .eq("slug", slug)
-    .eq("is_published", true)
-    .maybeSingle();
-
-  if (!page) return { title: "صفحه یافت نشد | آکسون" };
-
-  return {
-    title: \`\${page.title} | آکسون استودیو\`,
-    description: page.meta_description || "صفحه لندینگ تخصصی فروشگاه آکسون",
-  };
-}
-
-export default async function DynamicModularPage({ params }: Props) {
-  const { slug } = await params;
-
-  // واکشی داده‌های صفحه از Supabase
-  const { data: page } = await supabaseAdmin
-    .from("modular_pages")
-    .select("*")
-    .eq("slug", slug)
-    .eq("is_published", true)
-    .maybeSingle();
-
-  if (!page) {
-    notFound();
-  }
-
-  return <ModularPageRenderer initialPage={page} slug={slug} />;
-}
-`;
-writeFile('app/[slug]/page.tsx', dynamicLandingPage);
-
-// =============================================================================
-// ۳. تست بیلد نهایی و ارسال به گیت‌هاب و ورسل
-// =============================================================================
-console.log("تست بیلد کامل نرم‌افزار (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-console.log("ارسال قطعی تغییرات فاز ۳ به گیت‌هاب و تریگر دیپلوی ورسل...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(modular-builder): phase 3 - realtime front-end dynamic renderer & [slug] landing generator"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ فاز ۳ صفحه ساز ماژولار با موفقیت مستقر شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

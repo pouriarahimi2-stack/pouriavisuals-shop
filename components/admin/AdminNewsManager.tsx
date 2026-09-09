@@ -15,7 +15,6 @@ export interface TechNewsItem {
   image_url: string;
   tags: string[];
   is_published: boolean;
-  trending_score?: number;
   published_at?: string;
 }
 
@@ -31,8 +30,8 @@ export default function AdminNewsManager() {
   const [sourceName, setSourceName] = useState("Global Tech Wire");
   const [imageUrl, setImageUrl] = useState("");
   const [tags, setTags] = useState("تکنولوژی, سخت افزار, مانیتور 5K");
-  const [isPublished, setIsPublished] = useState(true);
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -41,17 +40,22 @@ export default function AdminNewsManager() {
     try {
       const res = await fetch("/api/news", { cache: "no-store" });
       const json = await res.json();
-      if (json.success && json.data) {
+      if (json.success && Array.isArray(json.data)) {
         setNews(json.data);
       }
-    } catch {}
+    } catch (e) {
+      console.error("Fetch news error:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchNews();
 
+    // سوکت زنده: به محض ایجاد، حذف یا تغییر خبر در دیتابیس، لیست بدون رفرش به‌روز می‌شود
     const channel = supabase
-      .channel("realtime-tech-news")
+      .channel("realtime-admin-news-feed")
       .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => {
         fetchNews();
       })
@@ -67,13 +71,12 @@ export default function AdminNewsManager() {
     setSelectedNews(n);
     setTitle(n.title);
     setSlug(n.slug);
-    setSummary(n.summary);
-    setContent(n.content);
-    setCategory(n.category);
-    setSourceName(n.source_name);
-    setImageUrl(n.image_url);
-    setTags((n.tags || []).join(", "));
-    setIsPublished(n.is_published !== false);
+    setSummary(n.summary || "");
+    setContent(n.content || "");
+    setCategory(n.category || "hardware");
+    setSourceName(n.source_name || "Global Tech Wire");
+    setImageUrl(n.image_url || "");
+    setTags(Array.isArray(n.tags) ? n.tags.join(", ") : "تکنولوژی");
   };
 
   const handleCreateNew = () => {
@@ -87,24 +90,25 @@ export default function AdminNewsManager() {
     setSourceName("آکسون تک");
     setImageUrl("");
     setTags("مانیتور, سخت افزار, استودیو");
-    setIsPublished(true);
   };
 
-  // فعال‌سازی ربات خزش و ترجمه فوری اخبار ترند
-  const handleSyncWorldNews = async () => {
+  const handleTriggerAutonomousSync = async () => {
     soundEngine.playClick();
     setSyncing(true);
     setStatusMsg(null);
+
     try {
       const res = await fetch("/api/news/sync", { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
+      const json = await res.json();
+      if (json.success) {
         soundEngine.playSuccess();
-        setStatusMsg({ type: "success", text: "⚡ " + data.message });
-        fetchNews();
+        setStatusMsg({ type: "success", text: "⚡ " + json.message });
+        await fetchNews();
+      } else {
+        setStatusMsg({ type: "error", text: "خطا در خزش و پایش اخبار." });
       }
     } catch {
-      setStatusMsg({ type: "error", text: "خطا در خزش و ترجمه اخبار جهانی." });
+      setStatusMsg({ type: "error", text: "خطای ارتباط با سرور." });
     } finally {
       setSyncing(false);
       setTimeout(() => setStatusMsg(null), 4000);
@@ -117,6 +121,7 @@ export default function AdminNewsManager() {
 
     soundEngine.playClick();
     setSaving(true);
+
     const payload = {
       id: selectedNews?.id,
       title: title.trim(),
@@ -127,7 +132,6 @@ export default function AdminNewsManager() {
       source_name: sourceName.trim(),
       image_url: imageUrl.trim() || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      is_published: isPublished,
     };
 
     try {
@@ -136,13 +140,13 @@ export default function AdminNewsManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const json = await res.json();
 
-      if (res.ok && data.success) {
+      if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setStatusMsg({ type: "success", text: "✓ خبر با موفقیت در دیتابیس ثبت و در سایت منتشر شد." });
-        fetchNews();
-        if (!selectedNews && data.data) setSelectedNews(data.data);
+        setStatusMsg({ type: "success", text: "✓ خبر با موفقیت در دیتابیس ثبت و بلادرنگ منتشر گردید." });
+        await fetchNews();
+        if (!selectedNews && json.data) setSelectedNews(json.data);
       }
     } finally {
       setSaving(false);
@@ -151,16 +155,16 @@ export default function AdminNewsManager() {
   };
 
   const handleDelete = async (id: string, newsTitle: string) => {
-    if (!confirm(`آیا از حذف کامل خبر «${newsTitle}» از پایگاه داده اطمینان دارید؟`)) return;
+    if (!confirm(`آیا از حذف کامل خبر «${newsTitle}» از دیتابیس اطمینان دارید؟`)) return;
     soundEngine.playClick();
     try {
       const res = await fetch(`/api/news?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const json = await res.json();
+      if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setStatusMsg({ type: "success", text: "✓ خبر با موفقیت از سیستم حذف شد." });
+        setStatusMsg({ type: "success", text: "✓ خبر با موفقیت از دیتابیس حذف گردید." });
         if (selectedNews?.id === id) handleCreateNew();
-        fetchNews();
+        await fetchNews();
       }
     } catch {
       alert("خطا در حذف خبر.");
@@ -170,25 +174,25 @@ export default function AdminNewsManager() {
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* هدر بخش مدیریت اخبار */}
+      {/* هدر ماژول اخبار */}
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>📡</span> ربات هوشمند رادار اخبار تکنولوژی و سئو
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            پایش خودکار ترندهای جهان، ترجمه هوشمند، انقضای ۷ روزه و مدیریت دستی کامل
+            پایش خودکار ترندهای جهان، ترجمه هوشمند، انقضای ۷ روزه و به‌روزرسانی زنده سوکت
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2.5">
           <button
-            onClick={handleSyncWorldNews}
+            onClick={handleTriggerAutonomousSync}
             disabled={syncing}
             className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg disabled:opacity-50 flex items-center gap-1.5"
           >
             <span>🤖</span>
-            <span>{syncing ? "در حال دریافت و ترجمه ترندها..." : "پایش و ترجمه فوری اخبار جهان"}</span>
+            <span>{syncing ? "در حال دریافت و ترجمه..." : "پایش و ترجمه فوری اخبار جهان"}</span>
           </button>
           <button
             onClick={handleCreateNew}
@@ -207,7 +211,7 @@ export default function AdminNewsManager() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* ستون راست: لیست اخبار با دکمه‌های مستقیم ویرایش و حذف */}
+        {/* ستون راست: لیست اخبار فعال */}
         <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--card-border)] space-y-3 h-fit shadow-xl">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
             <h3 className="text-xs font-black">
@@ -219,8 +223,18 @@ export default function AdminNewsManager() {
           </div>
 
           <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
-            {news.length === 0 ? (
-              <p className="text-xs text-center py-12 text-slate-400 font-bold">اخباری یافت نشد. دکمه پایش را بزنید.</p>
+            {loading ? (
+              <p className="text-xs text-center py-12 text-slate-400 font-bold">در حال استعلام لحظه‌ای دیتابیس...</p>
+            ) : news.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-bold space-y-3">
+                <p>اخباری یافت نشد.</p>
+                <button
+                  onClick={handleTriggerAutonomousSync}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                >
+                  استخراج خودکار الان
+                </button>
+              </div>
             ) : (
               news.map((item) => (
                 <div
@@ -238,7 +252,7 @@ export default function AdminNewsManager() {
                     <img
                       src={item.image_url}
                       alt=""
-                      className="w-12 h-12 object-cover rounded-xl shrink-0 border border-[var(--card-border)]"
+                      className="w-12 h-12 object-cover rounded-xl shrink-0 border border-[var(--card-border)] bg-black/10"
                     />
                     <div className="overflow-hidden space-y-1">
                       <h4 className="font-bold text-xs truncate">{item.title}</h4>
@@ -276,7 +290,7 @@ export default function AdminNewsManager() {
           </div>
         </div>
 
-        {/* ستون چپ: فرم ادیتور کامل خبر */}
+        {/* ستون چپ: فرم ادیتور و نگارش دستی */}
         <div className="lg:col-span-8">
           <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-xl text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -287,6 +301,7 @@ export default function AdminNewsManager() {
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  placeholder="مثال: رونمایی از نمایشگر جدید 5K اپل با درگاه تاندربولت ۵"
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
@@ -332,6 +347,7 @@ export default function AdminNewsManager() {
                   rows={2}
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
+                  placeholder="توضیحات خلاصه خبر جهت ایندکس گوگل..."
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium outline-none leading-relaxed"
                 />
               </div>
@@ -342,6 +358,7 @@ export default function AdminNewsManager() {
                   rows={6}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
+                  placeholder="شرح کامل گزارش و جزئیات تخصصی فناوری..."
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)] font-medium leading-loose outline-none"
                 />
               </div>
@@ -352,6 +369,7 @@ export default function AdminNewsManager() {
                   type="text"
                   value={tags}
                   onChange={(e) => setTags(e.target.value)}
+                  placeholder="سخت افزار, مانیتور 5K, تاندربولت 5"
                   className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] outline-none"
                 />
               </div>
@@ -363,7 +381,7 @@ export default function AdminNewsManager() {
                 disabled={saving}
                 className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow-lg hover:opacity-90 disabled:opacity-50"
               >
-                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار خبر در سایت"}
+                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار خبر در دیتابیس"}
               </button>
             </div>
           </form>

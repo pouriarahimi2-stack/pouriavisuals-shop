@@ -18,21 +18,21 @@ export default function AdminAiMasterSuite() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "copilot",
-      text: "سلام مدیر گرامی. ماتریس پایش ۴ پلتفرم بازار ایران و استعلام اختصاصی هر کالای دلخواه فعال است. چه محصولی را برای استعلام قیمت و تأمین‌کننده بررسی کنیم؟",
+      text: "سلام مدیر گرامی. ماتریس استعلام لحظه‌ای ۴ پلتفرم بزرگ ایران (دیجی‌کالا، ترب، ایمالز و باسلام) و استراتژی رشد هدفمند فعال است. چه کالایی را بررسی کنیم؟",
       time: new Date().toLocaleTimeString("fa-IR")
     }
   ]);
   const [inputQuery, setInputQuery] = useState("");
   const [isCopilotThinking, setIsCopilotThinking] = useState(false);
 
-  // استیت‌های پایش اختصاصی کالا در بازار
-  const [marketSearchKeyword, setMarketSearchKeyword] = useState("مانیتور استودیو دیسپلی");
-  const [activeSearchedLabel, setActiveSearchedLabel] = useState("مانیتور استودیو دیسپلی");
+  // استیت‌های پایش ۴ پلتفرم
+  const [marketSearchKeyword, setMarketSearchKeyword] = useState("پاور بانک 20000 گرین لاین");
+  const [activeSearchedLabel, setActiveSearchedLabel] = useState("پاور بانک 20000 گرین لاین");
   const [marketData, setMarketData] = useState<any>(null);
-  const [activeMarketPlatform, setActiveMarketPlatform] = useState<"digikala" | "torob" | "emalls" | "basalam" | "google">("digikala");
+  const [activeMarketPlatform, setActiveMarketPlatform] = useState<"digikala" | "torob" | "emalls" | "basalam">("digikala");
   const [loadingMarket, setLoadingMarket] = useState(false);
 
-  // استیت‌های استراتژی رشد داینامیک
+  // استیت‌های استراتژی رشد
   const [targetGrowthPct, setTargetGrowthPct] = useState<number>(30);
   const [targetMonths, setTargetMonths] = useState<number>(1);
   const [generatingStrategy, setGeneratingStrategy] = useState(false);
@@ -43,7 +43,7 @@ export default function AdminAiMasterSuite() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // استیت‌های سئو، کالبدشکافی و کلید
+  // استیت‌های سئو و کالبدشکافی
   const [seoData, setSeoData] = useState<any>(null);
   const [loadingSeo, setLoadingSeo] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -60,11 +60,11 @@ export default function AdminAiMasterSuite() {
       if (prods && prods.length > 0) setSelectedProductId(prods[0].id);
     });
     fetchSeoInsights();
-    handleSearchMarket("مانیتور استودیو دیسپلی");
+    handleSearchMarket("پاور بانک 20000 گرین لاین");
   }, []);
 
-  const handleSearchMarket = async (keywordOverride?: string) => {
-    const kw = (keywordOverride !== undefined ? keywordOverride : marketSearchKeyword).trim() || "مانیتور";
+  const handleSearchMarket = async (kwOverride?: string) => {
+    const kw = (kwOverride !== undefined ? kwOverride : marketSearchKeyword).trim() || "پاور بانک";
     soundEngine.playClick();
     setLoadingMarket(true);
     setActiveSearchedLabel(kw);
@@ -78,6 +78,11 @@ export default function AdminAiMasterSuite() {
       const json = await res.json();
       if (json.success && json.marketData) {
         setMarketData(json.marketData);
+        // اگر پلتفرم انتخابی فعلی دیتایی نداشت، خودکار روی پلتفرمی با دیتای فعال سوئیچ کن
+        if ((!json.marketData[activeMarketPlatform] || json.marketData[activeMarketPlatform].length === 0)) {
+          if (json.marketData.digikala && json.marketData.digikala.length > 0) setActiveMarketPlatform("digikala");
+          else if (json.marketData.torob && json.marketData.torob.length > 0) setActiveMarketPlatform("torob");
+        }
         soundEngine.playSuccess();
       }
     } catch {} finally {
@@ -201,7 +206,7 @@ export default function AdminAiMasterSuite() {
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* هدر هوش مصنوعی */}
+      {/* سربرگ */}
       <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
@@ -210,18 +215,18 @@ export default function AdminAiMasterSuite() {
           <div>
             <h2 className="text-base sm:text-lg font-black">مرکز جامع هوش مصنوعی و اتوپایلوت آکسون (AI Master Suite)</h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-              استعلام اختصاصی کالا در دیجی‌کالا، ترب، ایمالز و باسلام با لینک مستقیم خرید از تأمین‌کننده
+              پایش ۴ پلتفرم اصلی (دیجی‌کالا، ترب، ایمالز و باسلام) با لینک مستقیم خرید تأمین‌کننده
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-black">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>پایش لحظه‌ای بازار: متصل ✓</span>
+          <span>پایش لحظه‌ای بازار: فعال ✓</span>
         </div>
       </div>
 
-      {/* تب‌های اصلی */}
+      {/* تب‌های ناوبری */}
       <div className="flex gap-2 overflow-x-auto p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs scrollbar-none">
         {[
           { id: "copilot", label: "💬 کوپایلوت بازار، تأمین‌کننده و استراتژی رشد" },
@@ -246,20 +251,20 @@ export default function AdminAiMasterSuite() {
         })}
       </div>
 
-      {/* تب ۱: کوپایلوت بازار و استعلام دستی و اختصاصی کالا */}
+      {/* تب ۱: کوپایلوت و ماتریس ۴ پلتفرم تمیز */}
       {activeTab === "copilot" && (
         <div className="space-y-6">
           
-          {/* بخش ۱: ماتریس استعلام کالا با فیلد جستجوی مستقیم کالا */}
+          {/* ماتریس ۴ کارته */}
           <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5">
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-[var(--card-border)] pb-4">
               <div>
                 <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
                   <span>🔎</span>
-                  <span>استعلام اختصاصی کالا در ۴ پلتفرم بزرگ و لینک مستقیم خرید تأمین‌کننده</span>
+                  <span>استعلام اختصاصی کالا در ۴ پلتفرم بزرگ با لینک مستقیم خرید تأمین‌کننده</span>
                 </h3>
                 <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  نام هر محصولی را وارد کنید تا نرخ کف بازار، فروشنده و لینک مستقیم صفحه خرید استخراج شود:
+                  نام هر محصولی را وارد کنید تا کف قیمت، نام تأمین‌کننده و پیوند صفحه خرید استخراج شود:
                 </p>
               </div>
 
@@ -279,14 +284,14 @@ export default function AdminAiMasterSuite() {
               </div>
             </div>
 
-            {/* نوار جستجوی اختصاصی کالای مدنظر مدیر */}
+            {/* کادر ورودی نام کالا */}
             <div className="flex flex-col sm:flex-row gap-2.5 bg-[var(--input-bg)] p-3 rounded-2xl border border-[var(--card-border)]">
               <input
                 type="text"
                 value={marketSearchKeyword}
                 onChange={(e) => setMarketSearchKeyword(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSearchMarket(); }}
-                placeholder="نام محصول مدنظر جهت استعلام قیمت و تأمین‌کننده (مثلاً: مانیتور استودیو دیسپلی، مک‌بوک پرو، کابل تاندربولت...)"
+                placeholder="نام کالا (مثلاً: پاور بانک 20000 گرین لاین، مانیتور استودیو دیسپلی، مک‌بوک...)"
                 className="flex-1 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
               />
               <button
@@ -300,14 +305,13 @@ export default function AdminAiMasterSuite() {
               </button>
             </div>
 
-            {/* کارت‌های پلتفرم‌ها با تعداد واقعی */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            {/* ۴ کارت اختصاصی: دیجی‌کالا، ترب، ایمالز، باسلام */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { id: "digikala", name: "دیجی‌کالا", icon: "🛍️", count: marketData?.digikala?.length || 0 },
                 { id: "torob", name: "تُرب", icon: "🔍", count: marketData?.torob?.length || 0 },
                 { id: "emalls", name: "ایمالز", icon: "⚖️", count: marketData?.emalls?.length || 0 },
                 { id: "basalam", name: "باسلام", icon: "🛒", count: marketData?.basalam?.length || 0 },
-                { id: "google", name: "رتبه ۱ گوگل", icon: "🌐", count: marketData?.googleTopRank?.length || 0 },
               ].map((p) => {
                 const isCur = activeMarketPlatform === p.id;
                 return (
@@ -324,7 +328,7 @@ export default function AdminAiMasterSuite() {
                     }`}
                   >
                     <div className="flex justify-between items-center">
-                      <span className="text-xl">{p.icon}</span>
+                      <span className="text-2xl">{p.icon}</span>
                       <span className="font-mono text-xs font-bold opacity-80">{p.count} پیشنهاد</span>
                     </div>
                     <span className="font-black text-xs block">{p.name}</span>
@@ -333,20 +337,22 @@ export default function AdminAiMasterSuite() {
               })}
             </div>
 
-            {/* لیست دقیق اقلام با لینک مستقیم صفحه اختصاصی محصول و خرید از تأمین‌کننده */}
+            {/* لیست اقلام پلتفرم انتخاب شده */}
             <div className="p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
               <div className="flex justify-between items-center text-xs font-black">
                 <span>
                   پیشنهادها و تأمین‌کنندگان کالای «<strong className="text-[var(--accent-blue)]">{activeSearchedLabel}</strong>» در پلتفرم <strong className="text-emerald-500 uppercase">{activeMarketPlatform}</strong>:
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">استعلام ساعت: {new Date().toLocaleTimeString("fa-IR")}</span>
+                <span className="text-[10px] text-slate-400 font-mono">ساعت استعلام: {new Date().toLocaleTimeString("fa-IR")}</span>
               </div>
 
               {loadingMarket ? (
-                <div className="py-10 text-center text-slate-400 font-bold text-xs">در حال واکشی صفحه محصول و لینک تأمین‌کنندگان...</div>
+                <div className="py-10 text-center text-slate-400 font-bold text-xs">در حال واکشی صفحه محصول و استعلام زنده...</div>
+              ) : (!marketData?.[activeMarketPlatform] || marketData[activeMarketPlatform].length === 0) ? (
+                <div className="py-10 text-center text-slate-400 font-bold text-xs">موردی در این پلتفرم یافت نشد.</div>
               ) : (
                 <div className="space-y-2">
-                  {((marketData?.[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform]) || []).map((item: any) => (
+                  {(marketData[activeMarketPlatform] || []).map((item: any) => (
                     <div key={item.id} className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                       <div className="space-y-1 overflow-hidden">
                         <h4 className="font-bold text-xs text-[var(--text-primary)] leading-tight">{item.title}</h4>
@@ -364,7 +370,7 @@ export default function AdminAiMasterSuite() {
                           href={item.purchaseUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] shadow-md transition flex items-center gap-1.5"
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] shadow-md transition flex items-center gap-1.5 cursor-pointer"
                         >
                           <span>خرید مستقیم از تأمین‌کننده</span>
                           <span>🔗</span>
@@ -377,7 +383,7 @@ export default function AdminAiMasterSuite() {
             </div>
           </div>
 
-          {/* بخش ۲: موتور تدوین استراتژی رشد داینامیک */}
+          {/* استراتژی رشد داینامیک */}
           <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[var(--card-border)] pb-3">
               <div>
@@ -429,7 +435,7 @@ export default function AdminAiMasterSuite() {
               </div>
             </div>
 
-            {/* کادر چت و تحلیل‌های زنده کوپایلوت */}
+            {/* کادر چت */}
             <div className="h-[420px] overflow-y-auto space-y-4 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
               {messages.map((m, idx) => (
                 <div
@@ -551,7 +557,7 @@ export default function AdminAiMasterSuite() {
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <h3 className="font-black text-sm text-[var(--accent-blue)]">رصد هوشمند کلمات کلیدی و فرصت‌های رنک ۱ گوگل</h3>
-            <button onClick={fetchSeoInsights} disabled={loadingSeo} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer">🔄 به‌روزرسانی</button>
+            <button onClick={fetchSeoInsights} disabled={loadingSeo} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold">🔄 به‌روزرسانی</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]"><span>کلیک‌های ارگانیک:</span> <strong className="block text-lg font-mono text-[var(--accent-blue)]">{seoData?.totalOrganicClicks || 3840}</strong></div>

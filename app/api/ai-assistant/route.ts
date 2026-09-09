@@ -11,18 +11,18 @@ export async function POST(req: NextRequest) {
     const { message, prompt, role, action, targetPercentage, timeHorizonMonths, customKeyword } = body;
     const userPrompt = String(prompt || message || "").trim();
 
-    // استعلام ماتریس ۴ پلتفرم با کلیدواژه دلخواه مدیر
+    // استعلام اختصاصی ۴ پلتفرم
     if (action === "fetch_market_matrix") {
       if (!verifyAdminSession(req)) {
         return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
       }
 
-      const queryToSearch = String(customKeyword || "").trim() || "مانیتور استودیو";
+      const queryToSearch = String(customKeyword || "").trim() || "پاور بانک";
       const marketData = await fetchFullSpectrumMarket(queryToSearch);
       return NextResponse.json({ success: true, marketData, searchedKeyword: queryToSearch });
     }
 
-    // استراتژی رشد داینامیک بر اساس تراز کاتالوگ
+    // استراتژی رشد داینامیک
     if (action === "generate_growth_strategy") {
       if (!verifyAdminSession(req)) {
         return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
@@ -46,20 +46,20 @@ export async function POST(req: NextRequest) {
 
       const strategyText = `### 🚀 برنامه راهبردی جامع رشد ${targetPct} درصدی فروش در بازه ${months} ماهه
 
-#### ۱. تحلیل پایه‌ای تراز مالی و هدف‌گذاری عددی:
-• **گردش مالی مبنای فعلی:** ${currentMonthlySales.toLocaleString("fa-IR")} تومان
-• **ارزش ناخالص فروش هدف با رشد ${targetPct}٪:** ${targetSalesGoal.toLocaleString("fa-IR")} تومان
-• **افزایش فروش مورد نیاز:** ${(targetSalesGoal - currentMonthlySales).toLocaleString("fa-IR")} تومان
+#### ۱. تحلیل تراز فروش و هدف‌گذاری عددی:
+• **فروش مبنا:** ${currentMonthlySales.toLocaleString("fa-IR")} تومان
+• **فروش هدف با رشد ${targetPct}٪:** ${targetSalesGoal.toLocaleString("fa-IR")} تومان
+• **میزان جهش ریالی مورد نیاز:** ${(targetSalesGoal - currentMonthlySales).toLocaleString("fa-IR")} تومان
 
-#### ۲. ارزیابی انبار و کالاهای پیشران رشد (Lead Drivers):
-از مجموع ${products.length} محصول موجود در دیتابیس، کالاهای زیر اولویت کمپین هستند:
-${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} عدد | بهای فروش: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان`).join("\n")}
+#### ۲. کالاهای پیشران رشد در انبار:
+از کل ${products.length} محصول موجود، کالاهای زیر با موجودی فوری اولویت کمپین هستند:
+${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} عدد | نرخ فعلی: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان`).join("\n")}
 
-#### ۳. ماتریس مداخله قیمت و تأمین کالا (Action Plan):
-• **تحلیل تأمین‌کنندگان:** استعلام از ارزان‌ترین فروشندگان ترب و دیجی‌کالا نشان می‌دهد با کاهش جزئی حاشیه سود روی اقلام دارای موجودی بالا، رتبه ۱ جذب کلیک در مارکت‌پلیس‌ها حاصل خواهد شد.
-• **طرح تشویقی:** انتشار کد تخفیف مشروط با سقف زمانی و هماهنگ‌سازی با بخش باشگاه مشتریان (CRM).
+#### ۳. برنامه اقدام قیمتی و جذب سهم بازار:
+• **همگام‌سازی با ترب و دیجی‌کالا:** کاهش ۲ تا ۵ درصدی حاشیه سود روی کالاهای ردیف اول، جایگاه شما را به صدر پیشنهادات ترب می‌رساند.
+• **طرح تشویقی:** صدور کوپن تخفیف اختصاصی با مهلت ۷ روزه و ارسال پیامک هدفمند از پنل CRM.
 
-این سناریو با نرخ تبدیل واقعی ۱.۸٪، تحقق رشد ${targetPct} درصدی را تضمین می‌نماید.`;
+این رویکرد عملیاتی، تحقق رشد ${targetPct} درصدی را تضمین خواهد کرد.`;
 
       return NextResponse.json({
         success: true,
@@ -94,7 +94,7 @@ ${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} ع
 
     return NextResponse.json({
       success: true,
-      response: "کوپایلوت هوشمند آکسون: استعلام بازار و پردازش کاتالوگ انجام شد. از ماتریس استعلام بالا برای ورود مستقیم به پنل تأمین‌کنندگان استفاده فرمایید."
+      response: "کوپایلوت هوشمند آکسون: درخواست شما بررسی شد. از پنل استعلام ۴ پلتفرم بالا برای ورود مستقیم به لینک خرید تأمین‌کننده استفاده فرمایید."
     });
 
   } catch (err: any) {

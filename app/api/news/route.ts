@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { ensureFreshAutonomousNews } from "@/lib/techNewsHarvester";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // پایش خودکار و بدون دخالت انسان در هر درخواست ورودی
+    await ensureFreshAutonomousNews();
+
     const { data, error } = await supabaseAdmin
       .from("tech_news")
       .select("*")
+      .eq("is_published", true)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -35,7 +40,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "تیتر خبر الزامی است." }, { status: 400 });
     }
 
-    // تولید شناسه استاندارد UUID معتبر جهت جلوگیری از خطای 22P02
     const newsId = body.id && body.id.length > 10 ? body.id : randomUUID();
     const cleanSlug = String(body.slug || cleanTitle)
       .trim()
@@ -61,13 +65,13 @@ export async function POST(req: NextRequest) {
     if (body.id) {
       const { data, error } = await supabaseAdmin.from("tech_news").update(payload).eq("id", body.id).select().single();
       if (error) throw error;
-      return NextResponse.json({ success: true, message: "خبر ویرایش شد.", data });
+      return NextResponse.json({ success: true, message: "خبر با موفقیت به‌روزرسانی شد.", data });
     } else {
       payload.published_at = new Date().toISOString();
       payload.created_at = new Date().toISOString();
       const { data, error } = await supabaseAdmin.from("tech_news").insert([payload]).select().single();
       if (error) throw error;
-      return NextResponse.json({ success: true, message: "خبر منتشر شد.", data });
+      return NextResponse.json({ success: true, message: "خبر با موفقیت منتشر گردید.", data });
     }
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
@@ -90,7 +94,7 @@ export async function DELETE(req: NextRequest) {
     const { error } = await supabaseAdmin.from("tech_news").delete().eq("id", id);
     if (error) throw error;
 
-    return NextResponse.json({ success: true, message: "خبر حذف شد." });
+    return NextResponse.json({ success: true, message: "خبر با موفقیت از سیستم حذف گردید." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

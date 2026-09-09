@@ -11,7 +11,7 @@ interface ChatMessage {
 }
 
 export default function AdminAiMasterSuite() {
-  const [activeTab, setActiveTab] = useState<"copilot" | "seo" | "teardown" | "api_key">("seo");
+  const [activeTab, setActiveTab] = useState<"copilot" | "seo" | "teardown" | "api_key">("copilot");
   const [products, setProducts] = useState<Product[]>([]);
 
   // استیت‌های کوپایلوت
@@ -24,84 +24,25 @@ export default function AdminAiMasterSuite() {
   ]);
   const [inputQuery, setInputQuery] = useState("");
   const [isCopilotThinking, setIsCopilotThinking] = useState(false);
-  // استیت‌های اختصاصی تاریخچه گفتگوها
+
+  // استیت‌های تاریخچه نشست‌ها
   const [currentSessionId, setCurrentSessionId] = useState<string>("");
   const [historyList, setHistoryList] = useState<Array<{ id: string; title: string; messages: ChatMessage[]; updated_at: string }>>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  const fetchHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const res = await fetch("/api/ai-assistant/history", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && Array.isArray(json.history)) {
-        setHistoryList(json.history);
-      }
-    } catch {} finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const autoSaveSession = async (updatedMessages: ChatMessage[]) => {
-    try {
-      const res = await fetch("/api/ai-assistant/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: currentSessionId || undefined,
-          messages: updatedMessages
-        })
-      });
-      const json = await res.json();
-      if (json.success && json.sessionId) {
-        setCurrentSessionId(json.sessionId);
-      }
-    } catch {}
-  };
-
-  const handleSelectHistorySession = (session: { id: string; messages: ChatMessage[] }) => {
-    soundEngine.playClick();
-    setCurrentSessionId(session.id);
-    setMessages(session.messages);
-    setIsHistoryOpen(false);
-  };
-
-  const handleStartNewChat = () => {
-    soundEngine.playClick();
-    setCurrentSessionId("");
-    setMessages([
-      {
-        role: "copilot",
-        text: "گفتگوی جدید آغاز شد. چه موردی را برای رشد کسب‌وکار و فروش بررسی کنیم؟",
-        time: new Date().toLocaleTimeString("fa-IR")
-      }
-    ]);
-  };
-
-  const handleDeleteHistorySession = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    soundEngine.playClick();
-    try {
-      await fetch("/api/ai-assistant/history?id=" + encodeURIComponent(id), { method: "DELETE" });
-      setHistoryList(prev => prev.filter(item => item.id !== id));
-      if (currentSessionId === id) handleStartNewChat();
-    } catch {}
-  };
-
-
-  // استیت‌های سئو بدون هاردکد
+  // استیت‌های سئو
   const [seoData, setSeoData] = useState<any>(null);
   const [loadingSeo, setLoadingSeo] = useState(false);
   const [generatingSeoArticle, setGeneratingSeoArticle] = useState(false);
   const [seoSuccessMessage, setSeoSuccessMessage] = useState("");
 
-  // استیت‌های کالبدشکافی ۳D
+  // استیت‌های کالبدشکافی
   const [selectedProductId, setSelectedProductId] = useState("");
   const [teardownResult, setTeardownResult] = useState<any>(null);
   const [generatingTeardown, setGeneratingTeardown] = useState(false);
 
-  // استیت‌های چند سرویس‌دهنده AI
+  // استیت‌های کلید هوش مصنوعی
   const [aiProvider, setAiProvider] = useState("gemini");
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [baseUrlInput, setBaseUrlInput] = useState("");
@@ -127,6 +68,66 @@ export default function AdminAiMasterSuite() {
     }
   };
 
+  const fetchHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await fetch("/api/ai-assistant/history", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.history)) {
+        setHistoryList(json.history);
+      }
+    } catch {} finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const autoSaveSession = async (allMessages: ChatMessage[]) => {
+    try {
+      const res = await fetch("/api/ai-assistant/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: currentSessionId || undefined,
+          messages: allMessages
+        })
+      });
+      const json = await res.json();
+      if (json.success && json.sessionId) {
+        setCurrentSessionId(json.sessionId);
+      }
+    } catch {}
+  };
+
+  const handleSelectHistorySession = (session: { id: string; messages: ChatMessage[] }) => {
+    soundEngine.playClick();
+    setCurrentSessionId(session.id);
+    setMessages(session.messages);
+    setIsHistoryOpen(false);
+  };
+
+  const handleStartNewChat = () => {
+    soundEngine.playClick();
+    setCurrentSessionId("");
+    setMessages([
+      {
+        role: "copilot",
+        text: "گفتگوی جدید آغاز شد. چه موردی را برای فروش یا تحلیل بازار بررسی کنیم؟",
+        time: new Date().toLocaleTimeString("fa-IR")
+      }
+    ]);
+  };
+
+  const handleDeleteHistorySession = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    soundEngine.playClick();
+    try {
+      await fetch("/api/ai-assistant/history?id=" + encodeURIComponent(id), { method: "DELETE" });
+      setHistoryList(prev => prev.filter(item => item.id !== id));
+      if (currentSessionId === id) handleStartNewChat();
+    } catch {}
+  };
+
+  // رفع کامل خطای ReferenceError: reply is not defined
   const handleSendQuery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputQuery.trim() || isCopilotThinking) return;
@@ -135,12 +136,14 @@ export default function AdminAiMasterSuite() {
     const userText = inputQuery.trim();
     setInputQuery("");
 
-    const updated = [...messages, { role: "user" as const, text: userText, time: new Date().toLocaleTimeString("fa-IR") }, { role: "copilot" as const, text: reply, time: new Date().toLocaleTimeString("fa-IR") }]; autoSaveSession(updated); setMessages(prev => [...prev, {
+    const userMessage: ChatMessage = {
       role: "user",
       text: userText,
       time: new Date().toLocaleTimeString("fa-IR")
-    }]);
+    };
 
+    const newMessagesList = [...messages, userMessage];
+    setMessages(newMessagesList);
     setIsCopilotThinking(true);
 
     try {
@@ -151,14 +154,20 @@ export default function AdminAiMasterSuite() {
       });
 
       const json = await res.json();
-      const reply = json.response || json.reply || "پاسخ دریافت نشد.";
+      const assistantReply: string = json.response || json.reply || "پاسخ دریافت نشد.";
 
-      soundEngine.playSuccess();
-      setMessages(prev => [...prev, {
+      const copilotMessage: ChatMessage = {
         role: "copilot",
-        text: reply,
+        text: assistantReply,
         time: new Date().toLocaleTimeString("fa-IR")
-      }]);
+      };
+
+      const updatedHistory = [...newMessagesList, copilotMessage];
+      setMessages(updatedHistory);
+      soundEngine.playSuccess();
+
+      // ذخیره ایمن در دیتابیس
+      autoSaveSession(updatedHistory);
     } catch {
       setMessages(prev => [...prev, {
         role: "copilot",
@@ -257,7 +266,7 @@ export default function AdminAiMasterSuite() {
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
-      {/* هدر ماژول */}
+      {/* سربرگ هوش مصنوعی */}
       <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
@@ -277,11 +286,11 @@ export default function AdminAiMasterSuite() {
         </div>
       </div>
 
-      {/* تب‌های ناوبری با اصلاح کامل هاور و رنگ متن بدون پنهان شدن */}
+      {/* تب‌های ناوبری اصلی با رنگ‌های کاملاً پایدار */}
       <div className="flex gap-2 overflow-x-auto p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs scrollbar-none">
         {[
-          { id: "seo", label: "📈 اتوپایلوت رشد سئو (GSC)" },
           { id: "copilot", label: "💬 کوپایلوت هوشمند مدیریت" },
+          { id: "seo", label: "📈 اتوپایلوت رشد سئو (GSC)" },
           { id: "teardown", label: "🔬 کالبدشکافی ۳D و متالورژی" },
           { id: "api_key", label: "🔑 تست و ذخیره امن کلیدهای AI" },
         ].map((tab) => {
@@ -302,7 +311,181 @@ export default function AdminAiMasterSuite() {
         })}
       </div>
 
-      {/* تب ۱: اتوپایلوت رشد سئو ۱۰۰٪ واقعی بدون رندوم */}
+      {/* تب ۱: کوپایلوت هوشمند مدیریت به همراه دکمه تاریخچه و میانبرها */}
+      {activeTab === "copilot" && (
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
+          
+          <div className="flex flex-wrap justify-between items-center gap-3 border-b border-[var(--card-border)] pb-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  fetchHistory();
+                  setIsHistoryOpen(true);
+                }}
+                className="px-4 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-black text-[var(--accent-blue)] flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <span>📜</span>
+                <span>تاریخچه گفتگوها (حداکثر ۲۰ نشست)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleStartNewChat}
+                className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-emerald-500 border border-[var(--card-border)] text-xs font-bold text-emerald-500 cursor-pointer"
+              >
+                + گفتگوی جدید
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setInputQuery("پرفروش ترین محصول حوزه تکنولوژی توی ترب و دیجی کالا چیه و چه پیشنهادی داری؟")}
+                className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold text-[var(--accent-blue)] cursor-pointer"
+              >
+                🔍 استعلام پرفروش‌های ترب و دیجی‌کالا
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputQuery("استراتژی رشد ۳۰٪ فروش رو با توجه به کل محصولات موجود تحلیل کن")}
+                className="px-3.5 py-2 rounded-2xl bg-[var(--input-bg)] hover:border-emerald-500 border border-[var(--card-border)] text-xs font-bold text-emerald-500 cursor-pointer"
+              >
+                📈 استراتژی رشد ۳۰٪
+              </button>
+            </div>
+          </div>
+
+          <div className="h-[460px] overflow-y-auto space-y-4 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
+            {messages.map((m, idx) => (
+              <div
+                key={idx}
+                className={"flex flex-col space-y-1.5 max-w-[85%] " + (
+                  m.role === "user" ? "mr-auto items-end" : "ml-auto items-start"
+                )}
+              >
+                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                  <span>{m.role === "user" ? "شما (مدیر سیستم)" : "🤖 کوپایلوت هوشمند مدیریت"}</span>
+                  <span className="font-mono text-[9px]">{m.time}</span>
+                </div>
+                <div
+                  className={"p-4 rounded-3xl text-xs leading-relaxed font-medium whitespace-pre-line text-justify shadow-md " + (
+                    m.role === "user"
+                      ? "bg-[var(--accent-blue)] text-white rounded-tr-none"
+                      : "bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-tl-none"
+                  )}
+                >
+                  {m.text}
+                </div>
+              </div>
+            ))}
+
+            {isCopilotThinking && (
+              <div className="flex items-center gap-2 p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] w-fit text-xs font-bold text-[var(--accent-blue)] animate-pulse">
+                <span>🧠</span>
+                <span>کوپایلوت در حال تحلیل تمام محصولات و داده‌های زنده بازار است...</span>
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handleSendQuery} className="flex gap-2">
+            <input
+              type="text"
+              required
+              value={inputQuery}
+              onChange={(e) => setInputQuery(e.target.value)}
+              placeholder="هر سوالی درباره قیمت‌گذاری، کمپین، پرفروش‌های ترب/دیجی‌کالا یا استراتژی فروش بپرسید..."
+              className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
+            />
+            <button
+              type="submit"
+              disabled={isCopilotThinking}
+              className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-lg cursor-pointer disabled:opacity-50"
+            >
+              ارسال به هوش مصنوعی 🚀
+            </button>
+          </form>
+
+          {/* مدال تاریخچه گفتگوها */}
+          {isHistoryOpen && (
+            <div
+              onClick={() => setIsHistoryOpen(false)}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+              dir="rtl"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 shadow-2xl space-y-4 text-xs text-[var(--text-primary)]"
+              >
+                <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📜</span>
+                    <div>
+                      <h3 className="font-black text-sm">تاریخچه گفتگوهای کوپایلوت</h3>
+                      <p className="text-[10px] text-[var(--text-secondary)]">نگهداری حداکثر ۲۰ نشست در بازه ۱۴ روزه</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsHistoryOpen(false)}
+                    className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {loadingHistory ? (
+                    <div className="text-center py-8 text-slate-400 font-bold">در حال واکشی تاریخچه‌ها...</div>
+                  ) : historyList.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 font-bold">هنوز گفتگویی در دیتابیس ثبت نشده است.</div>
+                  ) : (
+                    historyList.map((session) => (
+                      <div
+                        key={session.id}
+                        onClick={() => handleSelectHistorySession(session)}
+                        className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
+                          currentSessionId === session.id
+                            ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black"
+                            : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                        )}
+                      >
+                        <div className="overflow-hidden space-y-0.5">
+                          <h4 className="font-bold truncate text-[var(--text-primary)]">{session.title}</h4>
+                          <span className="font-mono text-[9px] text-slate-400">
+                            {new Date(session.updated_at).toLocaleString("fa-IR")}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteHistorySession(session.id, e)}
+                          className="p-1 px-2 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white transition text-xs font-bold"
+                          title="حذف نشست"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    handleStartNewChat();
+                    setIsHistoryOpen(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md"
+                >
+                  + شروع گفتگوی جدید
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* تب ۲: اتوپایلوت سئو */}
       {activeTab === "seo" && (
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-4">
@@ -378,157 +561,7 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {/* تب ۲: کوپایلوت هوشمند مدیریت با استعلام واقعی ترب و رشد ۳۰٪ */}
-      {activeTab === "copilot" && (
-        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
-          <div className="flex flex-wrap justify-between items-center gap-2 border-b border-[var(--card-border)] pb-3">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">پرسش و تحلیل راهبردی با داده‌های زنده بازار و کاتالوگ فروشگاه:</span>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setInputQuery("پرفروش ترین محصول حوزه تکنولوژی توی ترب و دیجی کالا چیه و چه پیشنهادی داری؟")}
-                className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold text-[var(--accent-blue)] cursor-pointer"
-              >
-                🔍 استعلام پرفروش‌های ترب و دیجی‌کالا
-              </button>
-              <button
-                type="button"
-                onClick={() => setInputQuery("استراتژی رشد ۳۰٪ فروش رو با توجه به کل محصولات موجود تحلیل کن")}
-                className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] hover:border-emerald-500 border border-[var(--card-border)] text-xs font-bold text-emerald-500 cursor-pointer"
-              >
-                📈 استراتژی رشد ۳۰٪
-              </button>
-            </div>
-          </div>
-
-          <div className="h-[460px] overflow-y-auto space-y-4 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
-            {messages.map((m, idx) => (
-              <div
-                key={idx}
-                className={"flex flex-col space-y-1.5 max-w-[85%] " + (
-                  m.role === "user" ? "mr-auto items-end" : "ml-auto items-start"
-                )}
-              >
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                  <span>{m.role === "user" ? "شما (مدیر سیستم)" : "🤖 کوپایلوت هوشمند مدیریت"}</span>
-                  <span className="font-mono text-[9px]">{m.time}</span>
-                </div>
-                <div
-                  className={"p-4 rounded-3xl text-xs leading-relaxed font-medium whitespace-pre-line text-justify shadow-md " + (
-                    m.role === "user"
-                      ? "bg-[var(--accent-blue)] text-white rounded-tr-none"
-                      : "bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-tl-none"
-                  )}
-                >
-                  {m.text}
-                </div>
-              </div>
-            ))}
-
-            {isCopilotThinking && (
-              <div className="flex items-center gap-2 p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] w-fit text-xs font-bold text-[var(--accent-blue)] animate-pulse">
-                <span>🧠</span>
-                <span>کوپایلوت در حال تحلیل تمام محصولات و داده‌های زنده بازار است...</span>
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={handleSendQuery} className="flex gap-2">
-            <input
-              type="text"
-              required
-              value={inputQuery}
-              onChange={(e) => setInputQuery(e.target.value)}
-              placeholder="هر سوالی درباره قیمت‌گذاری، کمپین، پرفروش‌های ترب/دیجی‌کالا یا استراتژی فروش بپرسید..."
-              className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
-            />
-            <button
-              type="submit"
-              disabled={isCopilotThinking}
-              className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-lg cursor-pointer disabled:opacity-50"
-            >
-              ارسال به هوش مصنوعی 🚀
-            </button>
-          </form>
-        </div>
-      )}
-      {/* مدال تاریخچه گفتگوها با نگهداری ۱۴ روزه */}
-      {isHistoryOpen && (
-        <div
-          onClick={() => setIsHistoryOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
-          dir="rtl"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 shadow-2xl space-y-4 text-xs"
-          >
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📜</span>
-                <div>
-                  <h3 className="font-black text-sm">تاریخچه گفتگوهای کوپایلوت</h3>
-                  <p className="text-[10px] text-[var(--text-secondary)]">نگهداری حداکثر ۲۰ نشست در بازه ۱۴ روزه</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsHistoryOpen(false)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {loadingHistory ? (
-                <div className="text-center py-8 text-slate-400 font-bold">در حال واکشی تاریخچه‌ها...</div>
-              ) : historyList.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 font-bold">هنوز گفتگویی در دیتابیس ثبت نشده است.</div>
-              ) : (
-                historyList.map((session) => (
-                  <div
-                    key={session.id}
-                    onClick={() => handleSelectHistorySession(session)}
-                    className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
-                      currentSessionId === session.id
-                        ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black"
-                        : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                    )}
-                  >
-                    <div className="overflow-hidden space-y-0.5">
-                      <h4 className="font-bold truncate text-[var(--text-primary)]">{session.title}</h4>
-                      <span className="font-mono text-[9px] text-slate-400">
-                        {new Date(session.updated_at).toLocaleString("fa-IR")}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeleteHistorySession(session.id, e)}
-                      className="p-1 px-2 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white transition text-xs font-bold"
-                      title="حذف نشست"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <button
-              onClick={() => {
-                handleStartNewChat();
-                setIsHistoryOpen(false);
-              }}
-              className="w-full py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md"
-            >
-              + شروع گفتگوی جدید
-            </button>
-          </div>
-        </div>
-      )}
-
-
-      {/* تب ۳: کالبدشکافی ۳D و متالورژی بر مبنای عکس کالا */}
+      {/* تب ۳: کالبدشکافی ۳D */}
       {activeTab === "teardown" && (
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-[var(--card-border)] pb-4">
@@ -541,7 +574,7 @@ export default function AdminAiMasterSuite() {
               <select
                 value={selectedProductId}
                 onChange={(e) => setSelectedProductId(e.target.value)}
-                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer"
+                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer text-[var(--text-primary)]"
               >
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>📦 {p.title || p.name}</option>
@@ -590,16 +623,16 @@ export default function AdminAiMasterSuite() {
         </div>
       )}
 
-      {/* تب ۴: تست زنده و ذخیره امن کلیدهای چندگانه AI */}
+      {/* تب ۴: تست زنده کلیدها */}
       {activeTab === "api_key" && (
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5 text-xs max-w-2xl mx-auto">
           <div className="border-b border-[var(--card-border)] pb-3">
             <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
               <span>🛡️</span>
-              <span>تست زنده، اعتبارسنجی و ذخیره امن کلیدهای AI (چند سرویس‌دهنده)</span>
+              <span>تست زنده، اعتبارسنجی و ذخیره امن کلیدهای AI</span>
             </h3>
             <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-              پشتیبانی از Gemini Pro، OpenAI، OpenRouter و سرورهای سفارشی با تست زنده پینگ و سهمیه
+              پشتیبانی از Gemini Pro، OpenAI، OpenRouter با تست سلامت اتصال و سهمیه قبل از ذخیره
             </p>
           </div>
 
@@ -619,8 +652,8 @@ export default function AdminAiMasterSuite() {
                 onChange={(e) => setAiProvider(e.target.value)}
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer text-[var(--text-primary)]"
               >
-                <option value="gemini">Google Gemini (پیشنهادی - مدل 1.5 Flash)</option>
-                <option value="openrouter">OpenRouter (پوشش تمام مدل‌های جهان)</option>
+                <option value="gemini">Google Gemini (مدل 1.5 Flash - پیشنهادی)</option>
+                <option value="openrouter">OpenRouter (پوشش تمام مدل‌ها)</option>
                 <option value="openai">OpenAI (ChatGPT 4o-mini)</option>
               </select>
             </div>
@@ -639,7 +672,7 @@ export default function AdminAiMasterSuite() {
 
             {aiProvider !== "gemini" && (
               <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">آدرس اختصاصی Base URL (اختیاری):</label>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">آدرس Base URL (اختیاری):</label>
                 <input
                   type="text"
                   value={baseUrlInput}
@@ -650,16 +683,12 @@ export default function AdminAiMasterSuite() {
               </div>
             )}
 
-            <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] leading-relaxed text-blue-400 font-medium">
-              🔒 کلید واردشده قبل از ذخیره تست زنده می‌شود. اگر اعتبار نداشته باشد یا سهمیه تمام شده باشد، سیستم فوراً پیام خطا داده و کلید نامعتبر را ذخیره نخواهد کرد.
-            </div>
-
             <button
               type="submit"
               disabled={testingKey}
               className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
             >
-              {testingKey ? "در حال تست زنده اتصال با سرور هوش مصنوعی..." : "تست زنده و ذخیره امن کلید در دیتابیس 🔐"}
+              {testingKey ? "در حال تست اتصال زنده با هوش مصنوعی..." : "تست زنده و ذخیره امن کلید در دیتابیس 🔐"}
             </button>
           </form>
         </div>

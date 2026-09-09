@@ -15,11 +15,21 @@ export default function AdminModularPages() {
   const [isPublished, setIsPublished] = useState(true);
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
 
-  // استیت‌های استودیو المنتور
+  // استیت‌های پنل بازرسی المنتور
   const [activeEditingBlockId, setActiveEditingBlockId] = useState<string | null>(null);
   const [inspectorTab, setInspectorTab] = useState<"content" | "style" | "advanced">("content");
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [isWidgetsDrawerOpen, setIsWidgetsDrawerOpen] = useState(true);
+
+  // استیت‌های باکس‌مدل و تایپوگرافی موضعی
+  const [paddingTop, setPaddingTop] = useState<number>(40);
+  const [paddingBottom, setPaddingBottom] = useState<number>(40);
+  const [paddingX, setPaddingX] = useState<number>(20);
+  const [marginTop, setMarginTop] = useState<number>(0);
+  const [marginBottom, setMarginBottom] = useState<number>(0);
+  const [borderRadius, setBorderRadius] = useState<number>(24);
+  const [fontSize, setFontSize] = useState<number>(16);
+  const [customCssBlock, setCustomCssBlock] = useState<string>("");
 
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -51,17 +61,30 @@ export default function AdminModularPages() {
         setIsPublished(p.is_published !== false);
         setBlocks(Array.isArray(p.blocks) ? p.blocks : []);
         if (p.blocks && p.blocks.length > 0) {
-          setActiveEditingBlockId(p.blocks[0].id);
+          selectBlockForInspect(p.blocks[0]);
         }
       }
     } catch {}
+  };
+
+  const selectBlockForInspect = (b: PageBlock) => {
+    setActiveEditingBlockId(b.id);
+    const s = b.styles as any || {};
+    setPaddingTop(s.paddingTop ?? 40);
+    setPaddingBottom(s.paddingBottom ?? 40);
+    setPaddingX(s.paddingX ?? 20);
+    setMarginTop(s.marginTop ?? 0);
+    setMarginBottom(s.marginBottom ?? 0);
+    setBorderRadius(s.borderRadiusNum ?? 24);
+    setFontSize(s.fontSize ?? 16);
+    setCustomCssBlock(b.data?.customCss || "");
   };
 
   useEffect(() => {
     fetchPagesList();
 
     const channel = supabase
-      .channel("realtime-elementor-studio")
+      .channel("realtime-elementor-pro-studio")
       .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
         fetchPagesList();
       })
@@ -80,11 +103,13 @@ export default function AdminModularPages() {
     setPageSlug(newSlug);
     setMetaDescription("");
     setIsPublished(true);
-    setBlocks([
+    const initialList = [
       createDefaultBlock("hero_banner"),
       createDefaultBlock("features_grid"),
       createDefaultBlock("cta_banner")
-    ]);
+    ];
+    setBlocks(initialList);
+    selectBlockForInspect(initialList[0]);
   };
 
   function createDefaultBlock(type: BlockType): PageBlock {
@@ -100,7 +125,7 @@ export default function AdminModularPages() {
         return {
           id, type, title: "هیرو بنر بزرگ", isVisible: true,
           styles: { paddingY: 14, maxWidth: "7xl", bgColor: "#020617", textColor: "#ffffff", textAlign: "center" },
-          data: { badge: "🚀 مرجع مانیتورهای ۵K", headline: "واقعیت رنگ‌ها بدون مصالحه", subheadline: "تأمین، کالیبراسیون و واردات مانیتورهای استودیویی Apple و LG.", imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200", primaryBtnText: "خرید مانیتورها", primaryBtnUrl: "/products", secondaryBtnText: "مشاوره فنی", secondaryBtnUrl: "/contact" }
+          data: { badge: "🚀 مرجع مانیتورهای ۵K", headline: "دیدن واقعیت رنگ‌ها بدون مصالحه", subheadline: "تأمین، کالیبراسیون و واردات مانیتورهای استودیویی Apple و LG.", imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200", primaryBtnText: "خرید مانیتورها", primaryBtnUrl: "/products", secondaryBtnText: "مشاوره فنی", secondaryBtnUrl: "/contact" }
         };
       case "features_grid":
         return {
@@ -145,7 +170,7 @@ export default function AdminModularPages() {
     soundEngine.playClick();
     const newBlock = createDefaultBlock(type);
     setBlocks([...blocks, newBlock]);
-    setActiveEditingBlockId(newBlock.id);
+    selectBlockForInspect(newBlock);
   };
 
   const handleMoveBlock = (index: number, direction: "up" | "down") => {
@@ -158,9 +183,36 @@ export default function AdminModularPages() {
     setBlocks(list);
   };
 
+  // به‌روزرسانی مستقیم استایل‌ها و باکس‌مدل
+  const updateActiveBlockStyles = (key: string, value: any) => {
+    if (!activeEditingBlockId) return;
+    setBlocks(blocks.map(b => {
+      if (b.id === activeEditingBlockId) {
+        return {
+          ...b,
+          styles: { ...b.styles, [key]: value }
+        };
+      }
+      return b;
+    }));
+  };
+
+  // به‌روزرسانی محتوای متنی مستقیم در بوم
+  const handleInlineTextEdit = (blockId: string, dataKey: string, newText: string) => {
+    setBlocks(blocks.map(b => {
+      if (b.id === blockId) {
+        return {
+          ...b,
+          data: { ...b.data, [dataKey]: newText }
+        };
+      }
+      return b;
+    }));
+  };
+
   const handleSavePage = async () => {
     if (!pageTitle.trim() || !pageSlug.trim()) {
-      alert("عنوان و مسیر (Slug) الزامی هستند.");
+      alert("عنوان و نامک آدرس (Slug) الزامی است.");
       return;
     }
 
@@ -186,7 +238,7 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToastMessage({ type: "success", text: "✓ تغییرات با موفقیت ذخیره شد و روی ویترین سایت اعمال گردید." });
+        setToastMessage({ type: "success", text: "✓ تغییرات با موفقیت در دیتابیس ذخیره شد و روی ویترین سایت اعمال گردید." });
         fetchPagesList();
         if (!selectedPageId && json.page) setSelectedPageId(json.page.id);
       } else {
@@ -205,10 +257,8 @@ export default function AdminModularPages() {
   return (
     <div className="min-h-screen flex flex-col font-sans select-none text-[var(--text-primary)] space-y-4" dir="rtl">
       
-      {/* ۱. نوار فرمان بالای استودیوی المنتور (Top App Bar) */}
+      {/* نوار فرمان بالای استودیوی المنتور */}
       <header className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
-        
-        {/* انتخاب صفحه در قالب منوی شیک */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md">
             🏗️
@@ -216,7 +266,7 @@ export default function AdminModularPages() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] text-sky-400 font-bold uppercase">Elementor Pro Studio</span>
-              <span className="text-[10px] text-slate-400">• مسیر: /{pageSlug === "home" ? "" : pageSlug}</span>
+              <span className="text-[10px] text-slate-400">• مسیر لایو: /{pageSlug === "home" ? "" : pageSlug}</span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <select
@@ -225,7 +275,7 @@ export default function AdminModularPages() {
                 className="p-1.5 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black text-[var(--text-primary)] outline-none cursor-pointer"
               >
                 {pages.map((p) => (
-                  <option key={p.id} value={p.slug}>📄 {p.title} ({p.slug === "home" ? "صفحه نخست /" : "/" + p.slug})</option>
+                  <option key={p.id} value={p.slug}>📄 {p.title} ({p.slug === "home" ? "صفحه اصلی /" : "/" + p.slug})</option>
                 ))}
               </select>
 
@@ -240,7 +290,7 @@ export default function AdminModularPages() {
           </div>
         </div>
 
-        {/* دکمه‌های ریسپانسیو دسکتاپ، تبلت و موبایل */}
+        {/* سوییچر دیوایس‌ها */}
         <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
           {[
             { id: "desktop" as const, icon: "🖥️", label: "دسکتاپ" },
@@ -261,7 +311,7 @@ export default function AdminModularPages() {
           ))}
         </div>
 
-        {/* دکمه‌های اکشن: مشاهده زنده در سایت و دکمه ذخیره انتشار */}
+        {/* دکمه‌های انتشار و مشاهده زنده */}
         <div className="flex items-center gap-2">
           <Link
             href={pageSlug === "home" ? "/" : `/${pageSlug}`}
@@ -291,16 +341,16 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* ۲. محیط کاری ۲ پنله: پنل تنظیمات و ویجت‌ها (راست) + بوم زنده ویژوال (چپ) */}
+      {/* محیط کاربری ۲ پنله المنتور */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 items-start">
         
-        {/* پنل ویجت‌ها و تنظیمات اینسپکتور (سایدبار ۴ ستونه) */}
+        {/* پنل اینسپکتور و ویجت‌ها (سایدبار راست) */}
         <div className="lg:col-span-4 space-y-4">
           
-          {/* جعبه ویجت‌های افزودنی */}
+          {/* جعبه ویجت‌ها */}
           <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
-              <span className="font-black text-xs text-[var(--accent-blue)]">📦 مخزن ویجت‌ها و المان‌ها:</span>
+              <span className="font-black text-xs text-[var(--accent-blue)]">📦 مخزن ویجت‌ها:</span>
               <button
                 type="button"
                 onClick={() => setIsWidgetsDrawerOpen(!isWidgetsDrawerOpen)}
@@ -313,7 +363,7 @@ export default function AdminModularPages() {
             {isWidgetsDrawerOpen && (
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {[
-                  { type: "header_nav" as const, label: "هدر و نوبار", icon: "🧭" },
+                  { type: "header_nav" as const, label: "هدر ناوبری", icon: "🧭" },
                   { type: "hero_banner" as const, label: "هیرو بنر", icon: "🌟" },
                   { type: "product_showcase" as const, label: "ویترین کالا", icon: "🛍️" },
                   { type: "features_grid" as const, label: "مزایا و فیچرها", icon: "⚡" },
@@ -336,18 +386,18 @@ export default function AdminModularPages() {
             )}
           </div>
 
-          {/* ساختار لایه‌ها (Navigator Tree) */}
+          {/* ناوبر ساختار لایه‌ها */}
           <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
               <span className="font-black text-xs text-[var(--text-primary)]">📑 ناوبر لایه‌ها ({blocks.length} بلوک):</span>
-              <span className="text-[10px] text-slate-400 font-mono">چیدمان عمودی</span>
+              <span className="text-[10px] text-slate-400 font-mono">Reorder</span>
             </div>
 
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
               {blocks.map((b, idx) => (
                 <div
                   key={b.id}
-                  onClick={() => { soundEngine.playClick(); setActiveEditingBlockId(b.id); }}
+                  onClick={() => { soundEngine.playClick(); selectBlockForInspect(b); }}
                   className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
                     activeEditingBlockId === b.id
                       ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black shadow-sm"
@@ -369,16 +419,16 @@ export default function AdminModularPages() {
             </div>
           </div>
 
-          {/* اینسپکتور ۳ تب المنتور (Content / Style / Advanced Code) */}
+          {/* پنل بازرسی ۳ تب المنتور (Content / Style / Advanced) */}
           {activeBlock && (
             <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
               <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
-                <span className="font-black text-xs text-[var(--accent-blue)]">🎛️ ویرایش بلوک: {activeBlock.title}</span>
+                <span className="font-black text-xs text-[var(--accent-blue)]">🎛️ اینسپکتور: {activeBlock.title}</span>
                 <div className="flex gap-1 bg-[var(--input-bg)] p-1 rounded-xl border border-[var(--card-border)]">
                   {[
                     { id: "content" as const, label: "محتوا" },
-                    { id: "style" as const, label: "استایل" },
-                    { id: "advanced" as const, label: "کد اختصاصی" },
+                    { id: "style" as const, label: "استایل و فواصل" },
+                    { id: "advanced" as const, label: "کد CSS زنده" },
                   ].map((tab) => (
                     <button
                       key={tab.id}
@@ -409,6 +459,15 @@ export default function AdminModularPages() {
 
                   {activeBlock.type === "hero_banner" && (
                     <>
+                      <div>
+                        <label className="block mb-1 text-[11px] font-bold text-slate-400">بج بالای تیتر:</label>
+                        <input
+                          type="text"
+                          value={activeBlock.data.badge || ""}
+                          onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, badge: e.target.value } } : b))}
+                          className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
+                        />
+                      </div>
                       <div>
                         <label className="block mb-1 text-[11px] font-bold text-slate-400">تیتر اصلی هیرو (Headline):</label>
                         <input
@@ -471,66 +530,96 @@ export default function AdminModularPages() {
                 </div>
               )}
 
-              {/* تب استایل و ابعاد */}
+              {/* تب استایل، فاصله‌گذاری جعبه‌ای (Box Model) و ابعاد */}
               {inspectorTab === "style" && (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* باکس‌مدل فاصله‌گذاری ۴ جهته المنتور */}
+                  <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+                    <span className="font-bold text-[10px] text-slate-400 block">فاصله‌گذاری داخلی پدینگ (Padding - px):</span>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <label className="text-[9px] text-slate-500 block">بالا (Top)</label>
+                        <input
+                          type="number"
+                          value={paddingTop}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setPaddingTop(v);
+                            updateActiveBlockStyles("paddingTop", v);
+                          }}
+                          className="w-full p-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs text-center"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-500 block">پایین (Bottom)</label>
+                        <input
+                          type="number"
+                          value={paddingBottom}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setPaddingBottom(v);
+                            updateActiveBlockStyles("paddingBottom", v);
+                          }}
+                          className="w-full p-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs text-center"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-500 block">افقی (Sides)</label>
+                        <input
+                          type="number"
+                          value={paddingX}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setPaddingX(v);
+                            updateActiveBlockStyles("paddingX", v);
+                          }}
+                          className="w-full p-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs text-center"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* کنترل شعاع گوشه‌ها و رنگ‌ها */}
                   <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">انحنای گوشه (Radius):</label>
+                      <input
+                        type="number"
+                        value={borderRadius}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setBorderRadius(v);
+                          updateActiveBlockStyles("borderRadiusNum", v);
+                        }}
+                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
+                      />
+                    </div>
                     <div>
                       <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ پس‌زمینه:</label>
                       <input
                         type="text"
                         value={activeBlock.styles.bgColor || "#020617"}
-                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, bgColor: e.target.value } } : b))}
-                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[10px]"
+                        onChange={(e) => updateActiveBlockStyles("bgColor", e.target.value)}
+                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
                       />
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ متن:</label>
-                      <input
-                        type="text"
-                        value={activeBlock.styles.textColor || "#ffffff"}
-                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, textColor: e.target.value } } : b))}
-                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[10px]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block mb-1 text-[10px] font-bold text-slate-400">پدینگ عمودی (Y):</label>
-                      <input
-                        type="number"
-                        value={activeBlock.styles.paddingY || 10}
-                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, paddingY: Number(e.target.value) } } : b))}
-                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[10px]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-[10px] font-bold text-slate-400">عرض کانتینر:</label>
-                      <select
-                        value={activeBlock.styles.maxWidth || "7xl"}
-                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, maxWidth: e.target.value as any } } : b))}
-                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[10px]"
-                      >
-                        <option value="full">تمام‌عرض</option>
-                        <option value="7xl">استاندارد (7XL)</option>
-                        <option value="5xl">جمع‌وجور (5XL)</option>
-                      </select>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* تب کد اختصاصی HTML / CSS */}
+              {/* تب کد اختصاصی CSS / HTML */}
               {inspectorTab === "advanced" && (
                 <div className="space-y-3">
                   <div>
-                    <label className="block mb-1 text-[11px] font-bold text-slate-400">کد سفارشی HTML / SVG / اسکریپت:</label>
+                    <label className="block mb-1 text-[11px] font-bold text-slate-400">کدهای سفارشی CSS برای این بلوک:</label>
                     <textarea
                       rows={5}
-                      value={activeBlock.data.htmlContent || ""}
-                      onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, htmlContent: e.target.value } } : b))}
-                      placeholder="<div>کدهای سفارشی شما...</div>"
+                      value={customCssBlock}
+                      onChange={(e) => {
+                        setCustomCssBlock(e.target.value);
+                        setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, customCss: e.target.value } } : b));
+                      }}
+                      placeholder="selector { box-shadow: 0 0 30px #0284c7; }"
                       className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] leading-relaxed text-sky-400"
                     />
                   </div>
@@ -540,7 +629,7 @@ export default function AdminModularPages() {
           )}
         </div>
 
-        {/* ۳. بوم زنده ویژوال مرکزی (WYSIWYG Live Canvas) */}
+        {/* بوم پیش‌نمایش زنده و تعاملی المنتور (WYSIWYG Live Canvas) */}
         <div className="lg:col-span-8 flex justify-center w-full">
           <div
             className={"transition-all duration-300 rounded-[2.5rem] bg-[var(--modal-bg)] border-2 border-[var(--card-border)] shadow-2xl overflow-hidden min-h-[700px] w-full " + (
@@ -551,75 +640,121 @@ export default function AdminModularPages() {
                 : "max-w-full"
             )}
           >
-            {/* سربرگ بوم زنده */}
+            {/* سربرگ استاتوس بوم زنده */}
             <div className="p-3.5 bg-[var(--input-bg)] border-b border-[var(--card-border)] flex justify-between items-center text-xs px-6">
-              <span className="font-mono text-[10px] text-slate-400">پیش‌نمایش تعاملی: {previewDevice.toUpperCase()}</span>
-              <span className="font-bold text-xs text-sky-400">● بوم بلادرنگ فعال است</span>
+              <span className="font-mono text-[10px] text-slate-400">شبیه‌ساز المنتور: {previewDevice.toUpperCase()}</span>
+              <span className="font-bold text-xs text-sky-400">● ویرایش درجا (Inline Editing) فعال است</span>
             </div>
 
-            {/* محتوای رندر شده زنده روی بوم */}
+            {/* محتوای زنده روی بوم با قابلیت کلیک و تایپ مستقیم در متن */}
             <div className="p-6 space-y-6">
               {blocks.length === 0 ? (
                 <div className="py-24 text-center text-slate-400 font-bold text-xs">
                   بوم خالی است. از پنل سمت راست بلوک اضافه کنید.
                 </div>
               ) : (
-                blocks.map((b) => (
-                  <div
-                    key={b.id}
-                    onClick={() => { soundEngine.playClick(); setActiveEditingBlockId(b.id); }}
-                    className={"p-6 rounded-3xl transition border-2 cursor-pointer relative group " + (
-                      activeEditingBlockId === b.id
-                        ? "border-[var(--accent-blue)] bg-sky-500/5 shadow-xl"
-                        : "border-transparent hover:border-sky-500/30 bg-[var(--input-bg)]"
-                    )}
-                    style={{
-                      backgroundColor: b.styles.bgColor || "transparent",
-                      color: b.styles.textColor || "inherit",
-                      paddingTop: `${(b.styles.paddingY || 10) * 2}px`,
-                      paddingBottom: `${(b.styles.paddingY || 10) * 2}px`
-                    }}
-                  >
-                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-white font-mono text-[9px] opacity-0 group-hover:opacity-100 transition">
-                      {b.type}
-                    </span>
+                blocks.map((b) => {
+                  const s = b.styles as any || {};
+                  return (
+                    <div
+                      key={b.id}
+                      onClick={() => { soundEngine.playClick(); selectBlockForInspect(b); }}
+                      className={"rounded-3xl transition border-2 cursor-pointer relative group " + (
+                        activeEditingBlockId === b.id
+                          ? "border-[var(--accent-blue)] bg-sky-500/5 shadow-xl"
+                          : "border-transparent hover:border-sky-500/30 bg-[var(--input-bg)]"
+                      )}
+                      style={{
+                        backgroundColor: s.bgColor || "transparent",
+                        color: s.textColor || "inherit",
+                        paddingTop: `${s.paddingTop ?? 32}px`,
+                        paddingBottom: `${s.paddingBottom ?? 32}px`,
+                        paddingLeft: `${s.paddingX ?? 16}px`,
+                        paddingRight: `${s.paddingX ?? 16}px`,
+                        borderRadius: `${s.borderRadiusNum ?? 24}px`,
+                      }}
+                    >
+                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-white font-mono text-[9px] opacity-0 group-hover:opacity-100 transition">
+                        {b.type}
+                      </span>
 
-                    {b.type === "hero_banner" && (
-                      <div className="text-center space-y-3">
-                        <span className="px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 text-[10px] font-bold">
-                          {b.data.badge || "بج هیرو"}
-                        </span>
-                        <h2 className="text-xl sm:text-2xl font-black">{b.data.headline || "تیتر اصلی"}</h2>
-                        <p className="text-xs opacity-75 max-w-lg mx-auto">{b.data.subheadline}</p>
-                        {b.data.imageUrl && (
-                          <div className="w-full h-44 rounded-2xl overflow-hidden mt-3">
-                            <img src={b.data.imageUrl} alt="" className="w-full h-full object-cover" />
-                          </div>
-                        )}
-                      </div>
-                    )}
+                      {/* هیرو بنر با قابلیت ویرایش زنده تیتر روی بوم */}
+                      {b.type === "hero_banner" && (
+                        <div className="text-center space-y-3">
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => handleInlineTextEdit(b.id, "badge", e.currentTarget.textContent || "")}
+                            className="px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 text-[10px] font-bold outline-none border border-transparent hover:border-sky-500/40 inline-block"
+                          >
+                            {b.data.badge || "بج هیرو"}
+                          </span>
 
-                    {b.type === "cta_banner" && (
-                      <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-900/40 to-indigo-900/40 text-center space-y-2 border border-blue-500/20">
-                        <h3 className="font-black text-sm">{b.data.title}</h3>
-                        <p className="text-xs opacity-80">{b.data.subtitle}</p>
-                      </div>
-                    )}
+                          <h2
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => handleInlineTextEdit(b.id, "headline", e.currentTarget.textContent || "")}
+                            className="text-xl sm:text-3xl font-black outline-none border border-transparent hover:border-sky-500/40 rounded-xl p-1"
+                          >
+                            {b.data.headline || "تیتر اصلی"}
+                          </h2>
 
-                    {b.type === "rich_text" && (
-                      <div
-                        dangerouslySetInnerHTML={{ __html: b.data.htmlContent || "محتوای سفارشی..." }}
-                        className="prose dark:prose-invert max-w-none text-xs"
-                      />
-                    )}
+                          <p
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => handleInlineTextEdit(b.id, "subheadline", e.currentTarget.textContent || "")}
+                            className="text-xs opacity-80 max-w-lg mx-auto outline-none border border-transparent hover:border-sky-500/40 rounded-xl p-1 leading-relaxed"
+                          >
+                            {b.data.subheadline || "توضیحات هیرو"}
+                          </p>
 
-                    {b.type !== "hero_banner" && b.type !== "cta_banner" && b.type !== "rich_text" && (
-                      <div className="p-4 rounded-2xl border border-dashed border-white/10 text-center text-xs">
-                        {b.title} ({b.type})
-                      </div>
-                    )}
-                  </div>
-                ))
+                          {b.data.imageUrl && (
+                            <div className="w-full h-44 rounded-2xl overflow-hidden mt-3 shadow-md">
+                              <img src={b.data.imageUrl} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* فراخوان عمل */}
+                      {b.type === "cta_banner" && (
+                        <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-900/40 to-indigo-900/40 text-center space-y-2 border border-blue-500/20">
+                          <h3
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => handleInlineTextEdit(b.id, "title", e.currentTarget.textContent || "")}
+                            className="font-black text-sm outline-none"
+                          >
+                            {b.data.title}
+                          </h3>
+                          <p
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => handleInlineTextEdit(b.id, "subtitle", e.currentTarget.textContent || "")}
+                            className="text-xs opacity-80 outline-none"
+                          >
+                            {b.data.subtitle}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* متن آزاد یا کد اختصاصی */}
+                      {b.type === "rich_text" && (
+                        <div
+                          dangerouslySetInnerHTML={{ __html: b.data.htmlContent || "محتوای سفارشی..." }}
+                          className="prose dark:prose-invert max-w-none text-xs"
+                        />
+                      )}
+
+                      {/* سایر بلوک‌ها */}
+                      {b.type !== "hero_banner" && b.type !== "cta_banner" && b.type !== "rich_text" && (
+                        <div className="p-4 rounded-2xl border border-dashed border-white/10 text-center text-xs">
+                          {b.title} ({b.type})
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

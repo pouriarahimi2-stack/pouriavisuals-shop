@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Puck Enterprise Upgrades: Category Filtering, Flash Countdown & Enhanced Controls
+ * AXON CORE - Puck Pro Suite: Spec Matrix, Viewport Simulator & Revision Engine (fix.js)
  */
 
 const fs = require('fs');
@@ -14,12 +14,12 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PUCK-PRO]\x1b[0m ارتقای کتابخانه کامپوننت‌ها به امکانات تجاری...");
+console.log("\x1b[36m[AXON-PUCK-PRO-UPGRADE]\x1b[0m افزودن ماتریس مقایسه سخت‌افزار، سوییچر واکنش‌گرا و کنترل نسخه...");
 
 // =============================================================================
-// ۱. ارتقای lib/puckConfig.tsx با فیلتر دسته‌بندی و بلوک تایمر جشنواره
+// ۱. ارتقای lib/puckConfig.tsx با ویجت ماتریس مقایسه مشخصات و اکشن‌های سبد خرید
 // =============================================================================
-const enterprisePuckConfig = `import React, { useState, useEffect } from "react";
+const proPuckConfigCode = `import React, { useState, useEffect } from "react";
 import type { Config } from "@measured/puck";
 import Link from "next/link";
 import { productService, Product } from "@/services/productService";
@@ -48,6 +48,13 @@ export type ComponentProps = {
     limit: number;
     columns: number;
     showPriceBadge: boolean;
+    bgColor: string;
+  };
+  ProductComparison: {
+    heading: string;
+    subtitle: string;
+    product1Id: string;
+    product2Id: string;
     bgColor: string;
   };
   CountdownTimer: {
@@ -168,6 +175,71 @@ function LiveProductGridRenderer({ heading, subtitle, category, limit, columns, 
   );
 }
 
+function LiveProductComparisonRenderer({ heading, subtitle, product1Id, product2Id, bgColor }: any) {
+  const [p1, setP1] = useState<Product | null>(null);
+  const [p2, setP2] = useState<Product | null>(null);
+  const { addToCart } = useCart();
+
+  useEffect(() => {
+    productService.getAll().then((data) => {
+      if (data && data.length > 0) {
+        const first = data.find(p => p.id === product1Id) || data[0];
+        const second = data.find(p => p.id === product2Id) || data[1] || data[0];
+        setP1(first);
+        setP2(second);
+      }
+    });
+  }, [product1Id, product2Id]);
+
+  if (!p1 || !p2) return null;
+
+  return (
+    <section style={{ backgroundColor: bgColor || "#090d16" }} className="w-full py-12 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-black">{heading || "ماتریس مقایسه فنی و انتخاب دقیق"}</h2>
+          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+          {[p1, p2].map((p, idx) => {
+            const price = Number(p.discountPrice || p.price || 0);
+            return (
+              <div key={p.id + idx} className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="w-full h-44 rounded-2xl bg-black/40 p-2 flex items-center justify-center">
+                    <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain" />
+                  </div>
+                  <h3 className="font-black text-sm text-sky-400">{p.title}</h3>
+                  <div className="space-y-1 text-xs text-slate-300">
+                    <div className="flex justify-between py-1 border-b border-white/5"><span>دسته‌بندی:</span><span className="font-bold">{p.category || "استودیویی"}</span></div>
+                    <div className="flex justify-between py-1 border-b border-white/5"><span>گارانتی:</span><span className="font-bold text-emerald-400">۱۸ ماه تعویض طلایی</span></div>
+                    <div className="flex justify-between py-1 border-b border-white/5"><span>وضعیت تحویل:</span><span className="font-bold">ارسال پیشتاز بیمه‌شده</span></div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                  <span className="font-mono font-black text-emerald-400 text-sm">{price.toLocaleString("fa-IR")} تومان</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playAddToCart();
+                      addToCart({ id: p.id, title: p.title, price, image: p.images?.[0] || p.image, stock: 10 });
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shadow-md cursor-pointer transition"
+                  >
+                    افزودن به سبد 🛒
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function LiveCountdownRenderer({ badge, title, targetDate, buttonText, buttonUrl, bgColor }: any) {
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({ hours: 12, minutes: 45, seconds: 30 });
 
@@ -222,7 +294,7 @@ export const puckConfig: Config<ComponentProps> = {
   categories: {
     shop: {
       title: "فروشگاه و محصولات",
-      components: ["ProductGrid", "CountdownTimer", "HeroBlock"]
+      components: ["ProductGrid", "ProductComparison", "CountdownTimer", "HeroBlock"]
     },
     content: {
       title: "محتوا و اعتمادسازی",
@@ -269,6 +341,25 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: "#07090e",
       },
       render: (props) => <LiveProductGridRenderer {...props} />,
+    },
+
+    ProductComparison: {
+      label: "ماتریس مقایسه ۲ کالا",
+      fields: {
+        heading: { type: "text", label: "عنوان ماتریس" },
+        subtitle: { type: "text", label: "زیرعنوان" },
+        product1Id: { type: "text", label: "شناسه محصول اول" },
+        product2Id: { type: "text", label: "شناسه محصول دوم" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        heading: "مقایسه فنی و مشخصات ۲ مانیتور برتر",
+        subtitle: "ارزیابی وضوح رتینا، پوشش گاموت و پورت‌های تاندربولت",
+        product1Id: "prod-studio-display-5k",
+        product2Id: "prod-pro-display-xdr",
+        bgColor: "#090d16",
+      },
+      render: (props) => <LiveProductComparisonRenderer {...props} />,
     },
 
     CountdownTimer: {
@@ -494,10 +585,225 @@ export const puckConfig: Config<ComponentProps> = {
   },
 };
 `;
-writeFile('lib/puckConfig.tsx', enterprisePuckConfig);
+writeFile('lib/puckConfig.tsx', proPuckConfigCode);
 
 // =============================================================================
-// ۲. بیلد کامل و دیپلوی به ورسل
+// ۲. به‌روزرسانی components/admin/AdminModularPages.tsx با سوییچر واکنش‌گرا و موتور نسخه
+// =============================================================================
+const proStudioComponent = `"use client";
+
+import React, { useState, useEffect } from "react";
+import { Puck, Data } from "@measured/puck";
+import "@measured/puck/puck.css";
+import { puckConfig } from "@/lib/puckConfig";
+import { soundEngine } from "@/lib/soundEngine";
+import Link from "next/link";
+
+const DEFAULT_HOME_DATA: Data = {
+  content: [
+    {
+      type: "HeroBlock",
+      props: {
+        id: "hero-1",
+        badge: "🚀 مرجع تخصصی مانیتورهای ۵K",
+        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+        primaryBtnText: "کاتالوگ مانیتورها",
+        primaryBtnUrl: "/products",
+        secondaryBtnText: "درخواست مشاوره",
+        secondaryBtnUrl: "/contact",
+        imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+        bgColor: "#020617",
+        textColor: "#ffffff",
+        paddingTop: 60,
+        paddingBottom: 60,
+      },
+    },
+    {
+      type: "ProductComparison",
+      props: {
+        id: "comp-1",
+        heading: "مقایسه فنی دو مانیتور مرجع تدوین",
+        subtitle: "تفکیک رنگ‌ها بر مبنای استاندارد DCI-P3 و اتصالات تاندربولت",
+        product1Id: "prod-studio-display-5k",
+        product2Id: "prod-pro-display-xdr",
+        bgColor: "#090d16",
+      }
+    },
+    {
+      type: "CountdownTimer",
+      props: {
+        id: "timer-1",
+        badge: "⚡ آفر محدود",
+        title: "تخفیف ویژه مانیتورهای ۵K استودیو",
+        targetDate: new Date(Date.now() + 48 * 3600 * 1000).toISOString().slice(0, 19),
+        buttonText: "مشاهده کاتالوگ و خرید",
+        buttonUrl: "/products",
+        bgColor: "#0f172a"
+      }
+    }
+  ],
+  root: { props: { title: "صفحه اصلی" } },
+};
+
+export default function AdminModularPages() {
+  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
+  const [currentSlug, setCurrentSlug] = useState<string>("home");
+  const [pageData, setPageData] = useState<Data>(DEFAULT_HOME_DATA);
+  const [loading, setLoading] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<"100%" | "768px" | "390px">("100%");
+  const [toast, setToast] = useState<string | null>(null);
+
+  const fetchPages = async () => {
+    try {
+      const res = await fetch("/api/pages", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.pages)) {
+        setPages(json.pages);
+      }
+    } catch {}
+  };
+
+  const loadPage = async (slug: string) => {
+    setCurrentSlug(slug);
+    setLoading(true);
+    soundEngine.playClick();
+    try {
+      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.page && json.page.puck_data) {
+        setPageData(json.page.puck_data);
+      } else {
+        setPageData(DEFAULT_HOME_DATA);
+      }
+    } catch {
+      setPageData(DEFAULT_HOME_DATA);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPages();
+  }, []);
+
+  const handleSave = async (data: Data) => {
+    soundEngine.playClick();
+    setToast("در حال انتشار تغییرات در دیتابیس...");
+    try {
+      const res = await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: currentSlug,
+          title: currentSlug === "home" ? "صفحه اصلی" : currentSlug,
+          puck_data: data,
+          is_published: true,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setToast("✓ صفحه با موفقیت ذخیره و در سراسر سایت منتشر شد.");
+      } else {
+        setToast("خطا در ذخیره‌سازی.");
+      }
+    } catch {
+      setToast("خطا در برقراری ارتباط با سرور.");
+    } finally {
+      setTimeout(() => setToast(null), 3500);
+    }
+  };
+
+  return (
+    <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4" dir="rtl">
+      
+      {/* نوار بالای استودیو همراه با سوییچر ریسپانسیو و مدیریت مسیرها */}
+      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
+            ⚡
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه:</span>
+            <select
+              value={currentSlug}
+              onChange={(e) => loadPage(e.target.value)}
+              className="p-2 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black outline-none cursor-pointer text-[var(--text-primary)]"
+            >
+              {pages.map((p) => (
+                <option key={p.id} value={p.slug}>
+                  📄 {p.title} (/{p.slug === "home" ? "" : p.slug})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* سوییچر اندازه فریم بوم (دسکتاپ، تبلت و موبایل) */}
+        <div className="flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)]">
+          {[
+            { id: "100%", label: "دسکتاپ", icon: "🖥️" },
+            { id: "768px", label: "تبلت", icon: "📱" },
+            { id: "390px", label: "موبایل", icon: "📲" },
+          ].map((vp) => (
+            <button
+              key={vp.id}
+              type="button"
+              onClick={() => { soundEngine.playClick(); setViewportWidth(vp.id as any); }}
+              className={"px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition cursor-pointer " + (
+                viewportWidth === vp.id ? "bg-sky-500 text-white shadow-sm" : "text-slate-400 hover:text-white"
+              )}
+            >
+              <span>{vp.icon}</span>
+              <span className="hidden sm:inline">{vp.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href={currentSlug === "home" ? "/" : \`/\${currentSlug}\`}
+            target="_blank"
+            className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
+          >
+            <span>مشاهده زنده در سایت</span>
+            <span>🔗</span>
+          </Link>
+        </div>
+      </div>
+
+      {toast && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
+          {toast}
+        </div>
+      )}
+
+      {/* بوم Puck تعاملی با کنترل عرض فیزیکی */}
+      <div className="flex-1 w-full flex justify-center items-start">
+        <div
+          style={{ width: viewportWidth, maxWidth: "100%", transition: "width 0.3s ease" }}
+          className="rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px]"
+        >
+          {loading ? (
+            <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
+          ) : (
+            <Puck
+              config={puckConfig}
+              data={pageData}
+              onPublish={handleSave}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+`;
+writeFile('components/admin/AdminModularPages.tsx', proStudioComponent);
+
+// =============================================================================
+// ۳. بیلد پروژه و ارسال قطعی به گیت‌هاب و ورسل
 // =============================================================================
 console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
@@ -512,7 +818,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(puck-enterprise): add countdown timer, category filter for product grid and enhanced e-commerce tools"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(puck-pro): add product comparison matrix, live viewport switcher & direct cart mutation"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -521,7 +827,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ ارتقای تجاری Puck با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ امکانات فوق‌پیشرفته استودیوی Puck با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

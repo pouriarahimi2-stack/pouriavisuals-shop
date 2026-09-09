@@ -28,32 +28,28 @@ const DEFAULT_HOME_DATA: Data = {
       },
     },
     {
-      type: "FeaturesGrid",
+      type: "ProductComparison",
       props: {
-        id: "feat-1",
-        heading: "استانداردهای مهندسی آکسون استودیو",
-        item1Title: "گارانتی ۱۸ ماهه طلایی",
-        item1Desc: "تعویض بدون قید و شرط برای تمامی نمایشگرهای مسترینگ.",
-        item2Title: "کالیبراسیون ۳D LUT",
-        item2Desc: "تراز رنگ اختصاصی مطابق با گاموت‌های سینمایی DCI-P3.",
-        item3Title: "بسته‌بندی ایمن هوانوردی",
-        item3Desc: "محافظت کامل فیزیکی در برابر ضربه و شوک حین ارسال پیشتاز.",
+        id: "comp-1",
+        heading: "مقایسه فنی دو مانیتور مرجع تدوین",
+        subtitle: "تفکیک رنگ‌ها بر مبنای استاندارد DCI-P3 و اتصالات تاندربولت",
+        product1Id: "prod-studio-display-5k",
+        product2Id: "prod-pro-display-xdr",
         bgColor: "#090d16",
-        paddingTop: 50,
-        paddingBottom: 50,
-      },
+      }
     },
     {
-      type: "CtaBanner",
+      type: "CountdownTimer",
       props: {
-        id: "cta-1",
-        title: "به یک مشاوره تخصصی برای استودیو نیاز دارید؟",
-        subtitle: "کارشناسان آکسون متناسب با نرم‌افزار شما مانیتور مناسب را پیشنهاد می‌دهند.",
-        btnText: "ثبت تیکت مشاوره",
-        btnUrl: "/contact",
-        bgColor: "#1e1b4b",
-      },
-    },
+        id: "timer-1",
+        badge: "⚡ آفر محدود",
+        title: "تخفیف ویژه مانیتورهای ۵K استودیو",
+        targetDate: new Date(Date.now() + 48 * 3600 * 1000).toISOString().slice(0, 19),
+        buttonText: "مشاهده کاتالوگ و خرید",
+        buttonUrl: "/products",
+        bgColor: "#0f172a"
+      }
+    }
   ],
   root: { props: { title: "صفحه اصلی" } },
 };
@@ -63,6 +59,7 @@ export default function AdminModularPages() {
   const [currentSlug, setCurrentSlug] = useState<string>("home");
   const [pageData, setPageData] = useState<Data>(DEFAULT_HOME_DATA);
   const [loading, setLoading] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<"100%" | "768px" | "390px">("100%");
   const [toast, setToast] = useState<string | null>(null);
 
   const fetchPages = async () => {
@@ -129,14 +126,14 @@ export default function AdminModularPages() {
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4" dir="rtl">
       
-      {/* سربرگ هوشمند کنترل صفحات */}
+      {/* نوار بالای استودیو همراه با سوییچر ریسپانسیو و مدیریت مسیرها */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
             ⚡
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه جهت ویرایش زنده:</span>
+            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه:</span>
             <select
               value={currentSlug}
               onChange={(e) => loadPage(e.target.value)}
@@ -149,6 +146,27 @@ export default function AdminModularPages() {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* سوییچر اندازه فریم بوم (دسکتاپ، تبلت و موبایل) */}
+        <div className="flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)]">
+          {[
+            { id: "100%", label: "دسکتاپ", icon: "🖥️" },
+            { id: "768px", label: "تبلت", icon: "📱" },
+            { id: "390px", label: "موبایل", icon: "📲" },
+          ].map((vp) => (
+            <button
+              key={vp.id}
+              type="button"
+              onClick={() => { soundEngine.playClick(); setViewportWidth(vp.id as any); }}
+              className={"px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition cursor-pointer " + (
+                viewportWidth === vp.id ? "bg-sky-500 text-white shadow-sm" : "text-slate-400 hover:text-white"
+              )}
+            >
+              <span>{vp.icon}</span>
+              <span className="hidden sm:inline">{vp.label}</span>
+            </button>
+          ))}
         </div>
 
         <div className="flex items-center gap-2">
@@ -169,17 +187,22 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم Puck کاملاً بومی و زنده با امکان Undo / Redo و Drag & Drop حقیقی */}
-      <div className="flex-1 w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px]">
-        {loading ? (
-          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
-        ) : (
-          <Puck
-            config={puckConfig}
-            data={pageData}
-            onPublish={handleSave}
-          />
-        )}
+      {/* بوم Puck تعاملی با کنترل عرض فیزیکی */}
+      <div className="flex-1 w-full flex justify-center items-start">
+        <div
+          style={{ width: viewportWidth, maxWidth: "100%", transition: "width 0.3s ease" }}
+          className="rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px]"
+        >
+          {loading ? (
+            <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
+          ) : (
+            <Puck
+              config={puckConfig}
+              data={pageData}
+              onPublish={handleSave}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -29,6 +29,13 @@ export type ComponentProps = {
     showPriceBadge: boolean;
     bgColor: string;
   };
+  ProductComparison: {
+    heading: string;
+    subtitle: string;
+    product1Id: string;
+    product2Id: string;
+    bgColor: string;
+  };
   CountdownTimer: {
     badge: string;
     title: string;
@@ -147,6 +154,71 @@ function LiveProductGridRenderer({ heading, subtitle, category, limit, columns, 
   );
 }
 
+function LiveProductComparisonRenderer({ heading, subtitle, product1Id, product2Id, bgColor }: any) {
+  const [p1, setP1] = useState<Product | null>(null);
+  const [p2, setP2] = useState<Product | null>(null);
+  const { addToCart } = useCart();
+
+  useEffect(() => {
+    productService.getAll().then((data) => {
+      if (data && data.length > 0) {
+        const first = data.find(p => p.id === product1Id) || data[0];
+        const second = data.find(p => p.id === product2Id) || data[1] || data[0];
+        setP1(first);
+        setP2(second);
+      }
+    });
+  }, [product1Id, product2Id]);
+
+  if (!p1 || !p2) return null;
+
+  return (
+    <section style={{ backgroundColor: bgColor || "#090d16" }} className="w-full py-12 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-black">{heading || "ماتریس مقایسه فنی و انتخاب دقیق"}</h2>
+          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+          {[p1, p2].map((p, idx) => {
+            const price = Number(p.discountPrice || p.price || 0);
+            return (
+              <div key={p.id + idx} className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="w-full h-44 rounded-2xl bg-black/40 p-2 flex items-center justify-center">
+                    <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain" />
+                  </div>
+                  <h3 className="font-black text-sm text-sky-400">{p.title}</h3>
+                  <div className="space-y-1 text-xs text-slate-300">
+                    <div className="flex justify-between py-1 border-b border-white/5"><span>دسته‌بندی:</span><span className="font-bold">{p.category || "استودیویی"}</span></div>
+                    <div className="flex justify-between py-1 border-b border-white/5"><span>گارانتی:</span><span className="font-bold text-emerald-400">۱۸ ماه تعویض طلایی</span></div>
+                    <div className="flex justify-between py-1 border-b border-white/5"><span>وضعیت تحویل:</span><span className="font-bold">ارسال پیشتاز بیمه‌شده</span></div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                  <span className="font-mono font-black text-emerald-400 text-sm">{price.toLocaleString("fa-IR")} تومان</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playAddToCart();
+                      addToCart({ id: p.id, title: p.title, price, image: p.images?.[0] || p.image, stock: 10 });
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shadow-md cursor-pointer transition"
+                  >
+                    افزودن به سبد 🛒
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function LiveCountdownRenderer({ badge, title, targetDate, buttonText, buttonUrl, bgColor }: any) {
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({ hours: 12, minutes: 45, seconds: 30 });
 
@@ -201,7 +273,7 @@ export const puckConfig: Config<ComponentProps> = {
   categories: {
     shop: {
       title: "فروشگاه و محصولات",
-      components: ["ProductGrid", "CountdownTimer", "HeroBlock"]
+      components: ["ProductGrid", "ProductComparison", "CountdownTimer", "HeroBlock"]
     },
     content: {
       title: "محتوا و اعتمادسازی",
@@ -248,6 +320,25 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: "#07090e",
       },
       render: (props) => <LiveProductGridRenderer {...props} />,
+    },
+
+    ProductComparison: {
+      label: "ماتریس مقایسه ۲ کالا",
+      fields: {
+        heading: { type: "text", label: "عنوان ماتریس" },
+        subtitle: { type: "text", label: "زیرعنوان" },
+        product1Id: { type: "text", label: "شناسه محصول اول" },
+        product2Id: { type: "text", label: "شناسه محصول دوم" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        heading: "مقایسه فنی و مشخصات ۲ مانیتور برتر",
+        subtitle: "ارزیابی وضوح رتینا، پوشش گاموت و پورت‌های تاندربولت",
+        product1Id: "prod-studio-display-5k",
+        product2Id: "prod-pro-display-xdr",
+        bgColor: "#090d16",
+      },
+      render: (props) => <LiveProductComparisonRenderer {...props} />,
     },
 
     CountdownTimer: {

@@ -1,25 +1,4 @@
-/**
- * AXON CORE - Modular Page Builder Phase 2: Visual Block Editor & Inspector (fix.js)
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(process.cwd(), relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[36m[AXON-BUILDER-PHASE2]\x1b[0m ساخت ویرایشگر بلوکی پیشرفته (سبک المنتور) در پنل مدیریت...");
-
-// =============================================================================
-// بازنویسی components/admin/AdminModularPages.tsx
-// =============================================================================
-const visualEditorComponent = `"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
@@ -54,7 +33,7 @@ export default function AdminModularPages() {
 
   const loadPageDetails = async (slug: string) => {
     try {
-      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
+      const res = await fetch(`/api/pages?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
       const json = await res.json();
       if (json.success && json.page) {
         const p: ModularPageDocument = json.page;
@@ -456,11 +435,11 @@ export default function AdminModularPages() {
                   <div
                     key={b.id}
                     onClick={() => { soundEngine.playClick(); setActiveEditingBlockId(b.id); }}
-                    className={\`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 \${
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 ${
                       isActive
                         ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-md"
                         : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                    } \${!b.isVisible ? "opacity-50" : ""}\`}
+                    } ${!b.isVisible ? "opacity-50" : ""}`}
                   >
                     <div className="space-y-0.5 overflow-hidden">
                       <span className="font-mono text-[9px] text-[var(--accent-blue)] font-bold block uppercase">{b.type}</span>
@@ -785,36 +764,4 @@ export default function AdminModularPages() {
       </div>
     </div>
   );
-}
-`;
-writeFile('components/admin/AdminModularPages.tsx', visualEditorComponent);
-
-// =============================================================================
-// تست بیلد نهایی و ارسال به گیت‌هاب و ورسل
-// =============================================================================
-console.log("تست بیلد کامل نرم‌افزار (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-console.log("ارسال قطعی تغییرات به مخزن گیت‌هاب و تریگر دیپلوی ورسل...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(modular-builder): phase 2 - elementor-style block layers editor, visual inspector & realtime storage"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ فاز ۲ صفحه ساز ماژولار با موفقیت روی سرور لایو مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

@@ -1,100 +1,58 @@
-import { Metadata } from "next";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import ModularPageRenderer from "@/components/modular/ModularPageRenderer";
+import React from "react";
+import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
+import ProductList from "@/components/ProductList";
+import TechRadarFeed from "@/components/TechRadarFeed";
+import ProductExplodedView from "@/components/ProductExplodedView";
+import ColorGamutSimulator from "@/components/ColorGamutSimulator";
+import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
 import { productService } from "@/services/productService";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const { data: page } = await supabaseAdmin
-    .from("modular_pages")
-    .select("title, meta_description")
-    .eq("slug", "home")
-    .eq("is_published", true)
-    .maybeSingle();
-
-  return {
-    title: page?.title ? `${page.title} | آکسون استودیو` : "آکسون | مرجع تخصصی مانیتورهای ۵K و تجهیزات تدوین",
-    description: page?.meta_description || "واردات و کالیبراسیون تخصصی نمایشگرهای مرجع رنگ و تجهیزات استودیویی با ۱۸ ماه گارانتی طلایی",
-  };
-}
-
 export default async function HomePage() {
-  // ۱. بررسی وجود ساختار ماژولار برای صفحه اصلی
-  const { data: modularHome } = await supabaseAdmin
-    .from("modular_pages")
-    .select("*")
-    .eq("slug", "home")
-    .eq("is_published", true)
-    .maybeSingle();
-
-  // اگر صفحه ماژولار با اسلاگ home در پنل ادمین تنظیم شده باشد، رندرر بلادرنگ لود می‌شود
-  if (modularHome && modularHome.blocks && modularHome.blocks.length > 0) {
-    return <ModularPageRenderer initialPage={modularHome} slug="home" />;
-  }
-
-  // ۲. چیدمان پیش‌فرض در صورت عدم تنظیم صفحه ماژولار
   const products = await productService.getAll();
+  const sampleProduct = products[0] || {
+    id: "prod-studio-display-5k",
+    title: "Apple Studio Display 27 5K Retina",
+    price: 128500000,
+    category: "مانیتور استودیو"
+  };
 
   return (
-    <div className="min-h-screen font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      {/* هیرو بخش پیش‌فرض */}
-      <section className="py-20 px-4 max-w-7xl mx-auto text-center space-y-6">
-        <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">
-          🚀 مرجع مانیتورهای استودیویی و رتینا ۵K
-        </span>
-        <h1 className="text-4xl sm:text-6xl font-black leading-tight">
-          تجهیزات تخصصی تصویر، تدوین و پردازش رنگ
-        </h1>
-        <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-2xl mx-auto leading-relaxed font-medium">
-          تأمین مستقیم مانیتورهای Apple Studio Display و پنل‌های کالیبره‌شده Nano-OLED با ضمانت اصالت فیزیکی.
-        </p>
-        <div className="flex justify-center gap-4 pt-4">
-          <Link
-            href="/products"
-            className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs sm:text-sm hover:opacity-90 shadow-xl transition"
-          >
-            مشاهده کاتالوگ فروشگاه
-          </Link>
-          <Link
-            href="/admin/pages"
-            className="px-8 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs sm:text-sm hover:border-[var(--accent-blue)] transition"
-          >
-            صفحه ساز ماژولار (ادمین) ⚙️
-          </Link>
-        </div>
-      </section>
+    <div className="w-full flex flex-col font-sans select-none text-[var(--text-primary)] space-y-12 md:space-y-16 overflow-x-hidden" dir="rtl">
+      {/* ۱. هیرو بنر سه‌بعدی و مدرن */}
+      <Hero3DCanvas />
 
-      {/* ویترین محصولات */}
-      <section className="py-12 px-4 max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
-          <h2 className="text-lg sm:text-xl font-black">منتخب محصولات استودیو</h2>
-          <Link href="/products" className="text-xs font-bold text-[var(--accent-blue)]">
-            مشاهده همه ←
-          </Link>
-        </div>
+      {/* ۲. اسلایدر سه‌بعدی پرسپکتیو و بنرهای اصلی صفحه نخست */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <ProductPerspectiveSlider />
+      </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {products.slice(0, 4).map((prod) => (
-            <div
-              key={prod.id}
-              className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-3 shadow-md"
-            >
-              <div className="w-full h-44 rounded-2xl overflow-hidden bg-[var(--input-bg)]">
-                <img src={prod.image || prod.images?.[0] || "/placeholder.png"} alt={prod.title} className="w-full h-full object-cover" />
-              </div>
-              <h3 className="font-bold text-xs truncate">{prod.title}</h3>
-              <div className="flex justify-between items-center text-xs font-mono">
-                <span className="font-black text-emerald-500">{Number(prod.discount_price || prod.price).toLocaleString("fa-IR")} ت</span>
-                <Link href={`/products/${prod.id}`} className="text-[var(--accent-blue)] font-bold text-[11px]">
-                  خرید ←
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* ۳. ویترین اصلی کاتالوگ محصولات با دسته‌بندی‌ها */}
+      <div id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <ProductList initialProducts={products} />
+      </div>
+
+      {/* ۴. کالبدشکافی سه‌بعدی سخت‌افزار (Exploded View) */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <ProductExplodedView productTitle={sampleProduct.title || "Apple Studio Display 5K"} />
+      </div>
+
+      {/* ۵. شبیه‌ساز پیشرفته گاموت رنگی و تفکیک بیش از ۱ میلیارد رنگ */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <ColorGamutSimulator productTitle={sampleProduct.title || "نمایشگر رتینا ۵K"} />
+      </div>
+
+      {/* ۶. پایش لحظه‌ای و تطبیق قیمت با ۵ پلتفرم بزرگ بازار */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <LiveMarketArbitrage productTitle={sampleProduct.title || "Apple Studio Display"} ourPrice={Number(sampleProduct.price || 128500000)} />
+      </div>
+
+      {/* ۷. رادار زنده اخبار تکنولوژی و سخت‌افزار */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pb-12">
+        <TechRadarFeed />
+      </div>
     </div>
   );
 }

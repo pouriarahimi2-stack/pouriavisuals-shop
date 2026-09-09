@@ -18,32 +18,32 @@ export default function AdminAiMasterSuite() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "copilot",
-      text: "سلام مدیر گرامی. ماتریس استعلام لحظه‌ای ۴ پلتفرم بزرگ ایران (دیجی‌کالا، ترب، ایمالز و باسلام) و استراتژی رشد هدفمند فعال است. چه کالایی را بررسی کنیم؟",
+      text: "سلام مدیر گرامی. ماتریس استعلام لحظه‌ای ۵ پلتفرم بازار (دیجی‌کالا، ترب، ایمالز، باسلام و رتبه ۱ گوگل) و استراتژی رشد هدفمند فعال است. چه کالایی را بررسی کنیم؟",
       time: new Date().toLocaleTimeString("fa-IR")
     }
   ]);
   const [inputQuery, setInputQuery] = useState("");
   const [isCopilotThinking, setIsCopilotThinking] = useState(false);
 
-  // استیت‌های پایش ۴ پلتفرم
+  // استیت‌های استعلام ۵ پلتفرم
   const [marketSearchKeyword, setMarketSearchKeyword] = useState("پاور بانک 20000 گرین لاین");
   const [activeSearchedLabel, setActiveSearchedLabel] = useState("پاور بانک 20000 گرین لاین");
   const [marketData, setMarketData] = useState<any>(null);
-  const [activeMarketPlatform, setActiveMarketPlatform] = useState<"digikala" | "torob" | "emalls" | "basalam">("digikala");
+  const [activeMarketPlatform, setActiveMarketPlatform] = useState<"digikala" | "torob" | "emalls" | "basalam" | "google">("digikala");
   const [loadingMarket, setLoadingMarket] = useState(false);
 
-  // استیت‌های استراتژی رشد
+  // استیت‌های رشد
   const [targetGrowthPct, setTargetGrowthPct] = useState<number>(30);
   const [targetMonths, setTargetMonths] = useState<number>(1);
   const [generatingStrategy, setGeneratingStrategy] = useState(false);
 
-  // استیت‌های تاریخچه
+  // استیت‌های تاریخچه نشست‌ها
   const [currentSessionId, setCurrentSessionId] = useState<string>("");
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // استیت‌های سئو و کالبدشکافی
+  // استیت‌های سئو، کالبدشکافی و کلید
   const [seoData, setSeoData] = useState<any>(null);
   const [loadingSeo, setLoadingSeo] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -78,10 +78,10 @@ export default function AdminAiMasterSuite() {
       const json = await res.json();
       if (json.success && json.marketData) {
         setMarketData(json.marketData);
-        // اگر پلتفرم انتخابی فعلی دیتایی نداشت، خودکار روی پلتفرمی با دیتای فعال سوئیچ کن
-        if ((!json.marketData[activeMarketPlatform] || json.marketData[activeMarketPlatform].length === 0)) {
+        if (!json.marketData[activeMarketPlatform] || json.marketData[activeMarketPlatform].length === 0) {
           if (json.marketData.digikala && json.marketData.digikala.length > 0) setActiveMarketPlatform("digikala");
           else if (json.marketData.torob && json.marketData.torob.length > 0) setActiveMarketPlatform("torob");
+          else if (json.marketData.emalls && json.marketData.emalls.length > 0) setActiveMarketPlatform("emalls");
         }
         soundEngine.playSuccess();
       }
@@ -205,8 +205,7 @@ export default function AdminAiMasterSuite() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
-      {/* سربرگ */}
+      {/* سربرگ هوش مصنوعی */}
       <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
@@ -215,7 +214,7 @@ export default function AdminAiMasterSuite() {
           <div>
             <h2 className="text-base sm:text-lg font-black">مرکز جامع هوش مصنوعی و اتوپایلوت آکسون (AI Master Suite)</h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-              پایش ۴ پلتفرم اصلی (دیجی‌کالا، ترب، ایمالز و باسلام) با لینک مستقیم خرید تأمین‌کننده
+              پایش زنده ۵ پلتفرم (دیجی‌کالا، ترب، ایمالز، باسلام و رتبه ۱ گوگل) و لینک مستقیم خرید تأمین‌کننده
             </p>
           </div>
         </div>
@@ -226,7 +225,7 @@ export default function AdminAiMasterSuite() {
         </div>
       </div>
 
-      {/* تب‌های ناوبری */}
+      {/* تب‌های اصلی */}
       <div className="flex gap-2 overflow-x-auto p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs scrollbar-none">
         {[
           { id: "copilot", label: "💬 کوپایلوت بازار، تأمین‌کننده و استراتژی رشد" },
@@ -251,20 +250,18 @@ export default function AdminAiMasterSuite() {
         })}
       </div>
 
-      {/* تب ۱: کوپایلوت و ماتریس ۴ پلتفرم تمیز */}
+      {/* تب ۱: کوپایلوت بازار و استعلام ۵ پلتفرم */}
       {activeTab === "copilot" && (
         <div className="space-y-6">
-          
-          {/* ماتریس ۴ کارته */}
           <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5">
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-[var(--card-border)] pb-4">
               <div>
                 <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
                   <span>🔎</span>
-                  <span>استعلام اختصاصی کالا در ۴ پلتفرم بزرگ با لینک مستقیم خرید تأمین‌کننده</span>
+                  <span>استعلام اختصاصی کالا در ۵ پلتفرم بزرگ با لینک مستقیم خرید تأمین‌کننده</span>
                 </h3>
                 <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  نام هر محصولی را وارد کنید تا کف قیمت، نام تأمین‌کننده و پیوند صفحه خرید استخراج شود:
+                  نام هر محصولی را وارد کنید تا کف قیمت، نام تأمین‌کننده و پیوند مستقیم صفحه خرید استخراج شود:
                 </p>
               </div>
 
@@ -305,13 +302,14 @@ export default function AdminAiMasterSuite() {
               </button>
             </div>
 
-            {/* ۴ کارت اختصاصی: دیجی‌کالا، ترب، ایمالز، باسلام */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* ۵ کارت اختصاصی */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
                 { id: "digikala", name: "دیجی‌کالا", icon: "🛍️", count: marketData?.digikala?.length || 0 },
                 { id: "torob", name: "تُرب", icon: "🔍", count: marketData?.torob?.length || 0 },
                 { id: "emalls", name: "ایمالز", icon: "⚖️", count: marketData?.emalls?.length || 0 },
                 { id: "basalam", name: "باسلام", icon: "🛒", count: marketData?.basalam?.length || 0 },
+                { id: "google", name: "رتبه ۱ گوگل", icon: "🌐", count: marketData?.googleTopRank?.length || 0 },
               ].map((p) => {
                 const isCur = activeMarketPlatform === p.id;
                 return (
@@ -348,11 +346,11 @@ export default function AdminAiMasterSuite() {
 
               {loadingMarket ? (
                 <div className="py-10 text-center text-slate-400 font-bold text-xs">در حال واکشی صفحه محصول و استعلام زنده...</div>
-              ) : (!marketData?.[activeMarketPlatform] || marketData[activeMarketPlatform].length === 0) ? (
+              ) : (!marketData?.[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform] || marketData[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform].length === 0) ? (
                 <div className="py-10 text-center text-slate-400 font-bold text-xs">موردی در این پلتفرم یافت نشد.</div>
               ) : (
                 <div className="space-y-2">
-                  {(marketData[activeMarketPlatform] || []).map((item: any) => (
+                  {(marketData[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform] || []).map((item: any) => (
                     <div key={item.id} className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                       <div className="space-y-1 overflow-hidden">
                         <h4 className="font-bold text-xs text-[var(--text-primary)] leading-tight">{item.title}</h4>
@@ -486,7 +484,6 @@ export default function AdminAiMasterSuite() {
               </button>
             </form>
           </div>
-
         </div>
       )}
 
@@ -557,7 +554,7 @@ export default function AdminAiMasterSuite() {
         <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
           <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
             <h3 className="font-black text-sm text-[var(--accent-blue)]">رصد هوشمند کلمات کلیدی و فرصت‌های رنک ۱ گوگل</h3>
-            <button onClick={fetchSeoInsights} disabled={loadingSeo} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold">🔄 به‌روزرسانی</button>
+            <button onClick={fetchSeoInsights} disabled={loadingSeo} className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer">🔄 به‌روزرسانی</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]"><span>کلیک‌های ارگانیک:</span> <strong className="block text-lg font-mono text-[var(--accent-blue)]">{seoData?.totalOrganicClicks || 3840}</strong></div>

@@ -11,7 +11,6 @@ export async function POST(req: NextRequest) {
     const { message, prompt, role, action, targetPercentage, timeHorizonMonths, customKeyword } = body;
     const userPrompt = String(prompt || message || "").trim();
 
-    // استعلام اختصاصی ۴ پلتفرم
     if (action === "fetch_market_matrix") {
       if (!verifyAdminSession(req)) {
         return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
@@ -22,7 +21,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, marketData, searchedKeyword: queryToSearch });
     }
 
-    // استراتژی رشد داینامیک
     if (action === "generate_growth_strategy") {
       if (!verifyAdminSession(req)) {
         return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
@@ -44,22 +42,19 @@ export async function POST(req: NextRequest) {
       const readyInventory = products.filter((p) => (Number(p.stock) || 0) > 0);
       const topFocus = readyInventory.slice(0, 3);
 
-      const strategyText = `### 🚀 برنامه راهبردی جامع رشد ${targetPct} درصدی فروش در بازه ${months} ماهه
+      const strategyText = `### 🚀 برنامه راهبردی رشد ${targetPct} درصدی فروش در بازه ${months} ماهه
 
-#### ۱. تحلیل تراز فروش و هدف‌گذاری عددی:
+#### ۱. تحلیل پایه‌ای تراز مالی:
 • **فروش مبنا:** ${currentMonthlySales.toLocaleString("fa-IR")} تومان
 • **فروش هدف با رشد ${targetPct}٪:** ${targetSalesGoal.toLocaleString("fa-IR")} تومان
-• **میزان جهش ریالی مورد نیاز:** ${(targetSalesGoal - currentMonthlySales).toLocaleString("fa-IR")} تومان
+• **شکاف قابل پر شدن:** ${(targetSalesGoal - currentMonthlySales).toLocaleString("fa-IR")} تومان
 
-#### ۲. کالاهای پیشران رشد در انبار:
-از کل ${products.length} محصول موجود، کالاهای زیر با موجودی فوری اولویت کمپین هستند:
-${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} عدد | نرخ فعلی: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان`).join("\n")}
+#### ۲. کالاهای پیشران موجود در انبار:
+${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} عدد | قیمت فعلی: ${Number(p.discount_price || p.price).toLocaleString("fa-IR")} تومان`).join("\n")}
 
-#### ۳. برنامه اقدام قیمتی و جذب سهم بازار:
-• **همگام‌سازی با ترب و دیجی‌کالا:** کاهش ۲ تا ۵ درصدی حاشیه سود روی کالاهای ردیف اول، جایگاه شما را به صدر پیشنهادات ترب می‌رساند.
-• **طرح تشویقی:** صدور کوپن تخفیف اختصاصی با مهلت ۷ روزه و ارسال پیامک هدفمند از پنل CRM.
-
-این رویکرد عملیاتی، تحقق رشد ${targetPct} درصدی را تضمین خواهد کرد.`;
+#### ۳. برنامه اقدام:
+• کاهش ۲ الی ۵ درصدی قیمت روی کالای پیشران اول جهت کسب رتبه ۱ ارزان‌ترین فروشنده در ترب.
+• باندلینگ با حاشیه سود مناسب و ارسال پیامک از طریق CRM.`;
 
       return NextResponse.json({
         success: true,
@@ -81,9 +76,7 @@ ${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} ع
         const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: userPrompt }] }]
-          })
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: userPrompt }] }] })
         });
 
         const json = await geminiRes.json();
@@ -94,7 +87,7 @@ ${topFocus.map((p, i) => `${i + 1}. **${p.title}** | موجودی: ${p.stock} ع
 
     return NextResponse.json({
       success: true,
-      response: "کوپایلوت هوشمند آکسون: درخواست شما بررسی شد. از پنل استعلام ۴ پلتفرم بالا برای ورود مستقیم به لینک خرید تأمین‌کننده استفاده فرمایید."
+      response: "کوپایلوت هوشمند آکسون: درخواست دریافت شد. از ماتریس استعلام ۵ پلتفرم برای ورود مستقیم به پنل تأمین‌کنندگان استفاده کنید."
     });
 
   } catch (err: any) {

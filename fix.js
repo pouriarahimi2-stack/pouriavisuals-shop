@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Definitive Modular Page Builder & Auto-Seed Fix (fix.js)
+ * AXON CORE - Elementor-Grade Visual Studio Builder & Custom Code Injector (fix.js)
  */
 
 const fs = require('fs');
@@ -14,297 +14,662 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-BUILDER-INTEGRATION]\x1b[0m اتصال مسیر ادمین به AdminModularPages و تضمین سید خودکار صفحات...");
+console.log("\x1b[36m[AXON-ELEMENTOR-STUDIO]\x1b[0m بازطراحی صفحه ساز به استودیوی ویژوال المنتور با کد اختصاصی و بوم زنده...");
 
 // =============================================================================
-// ۱. اتصال قطعی صفحه مدیریت app/admin/pages/page.tsx به AdminModularPages
+// بازنویسی کامل components/admin/AdminModularPages.tsx به استودیوی حرفه‌ای المنتور
 // =============================================================================
-const adminPagesPageCode = `"use client";
+const elementorStudioComponent = `"use client";
 
-import React from "react";
-import AdminModularPages from "@/components/admin/AdminModularPages";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { soundEngine } from "@/lib/soundEngine";
+import { BlockType, PageBlock, ModularPageDocument } from "@/lib/modularBuilderTypes";
+import { supabase } from "@/lib/supabase";
 
-export default function AdminPagesRoute() {
-  return <AdminModularPages />;
-}
-`;
-writeFile('app/admin/pages/page.tsx', adminPagesPageCode);
+export default function AdminModularPages() {
+  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string; is_published: boolean }>>([]);
+  const [selectedPageId, setSelectedPageId] = useState<string>("");
+  const [pageTitle, setPageTitle] = useState("");
+  const [pageSlug, setPageSlug] = useState("home");
+  const [metaDescription, setMetaDescription] = useState("");
+  const [isPublished, setIsPublished] = useState(true);
+  const [blocks, setBlocks] = useState<PageBlock[]>([]);
 
-// =============================================================================
-// ۲. تضمین سید اولیه و خودکار صفحه اصلی با ساختار کامل بلوک‌ها در دیتابیس
-// =============================================================================
-const seedHomePageCode = `import { supabaseAdmin } from "@/lib/supabaseServer";
+  // استیت‌های استودیو المنتور
+  const [activeEditingBlockId, setActiveEditingBlockId] = useState<string | null>(null);
+  const [inspectorTab, setInspectorTab] = useState<"content" | "style" | "advanced">("content");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [isWidgetsDrawerOpen, setIsWidgetsDrawerOpen] = useState(true);
 
-export async function seedHomePageIfMissing() {
-  try {
-    const { data: existing } = await supabaseAdmin
-      .from("modular_pages")
-      .select("id, blocks")
-      .eq("slug", "home")
-      .maybeSingle();
+  const [saving, setSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-    if (!existing || !existing.blocks || existing.blocks.length === 0) {
-      const defaultBlocks = [
-        {
-          id: "blk_home_header",
-          type: "header_nav",
-          title: "هدر و نوبار سراسری سایت",
-          isVisible: true,
-          styles: { paddingY: 4, maxWidth: "7xl", bgColor: "#0f172a", textColor: "#ffffff" },
-          data: {
-            brandName: "AXON CORE",
-            logoText: "آکسون استودیو",
-            navLinks: [
-              { label: "صفحه اصلی", url: "/" },
-              { label: "محصولات", url: "/products" },
-              { label: "اخبار فناوری", url: "/news" },
-              { label: "مجله تخصصی", url: "/blog" },
-              { label: "تماس و مشاوره", url: "/contact" }
-            ],
-            ctaButtonText: "ورود به کاتالوگ",
-            ctaButtonUrl: "/products"
-          }
-        },
-        {
-          id: "blk_home_hero",
-          type: "hero_banner",
-          title: "هیرو بنر بزرگ صفحه اصلی",
-          isVisible: true,
-          styles: { paddingY: 16, maxWidth: "7xl", bgColor: "#020617", textColor: "#ffffff", textAlign: "center" },
-          data: {
-            badge: "🚀 مرجع تخصصی مانیتورهای ۵K و استودیو",
-            headline: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
-            subheadline: "تأمین، واردات و کالیبراسیون سخت‌افزاری مانیتورهای استودیویی Apple و LG با ۱۸ ماه گارانتی طلایی.",
-            primaryBtnText: "خرید مانیتورهای استودیو",
-            primaryBtnUrl: "/products",
-            secondaryBtnText: "درخواست مشاوره فنی",
-            secondaryBtnUrl: "/contact",
-            imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200"
-          }
-        },
-        {
-          id: "blk_home_features",
-          type: "features_grid",
-          title: "گرید مزایای رقابتی آکسون",
-          isVisible: true,
-          styles: { paddingY: 12, maxWidth: "7xl", bgColor: "#090d16", textColor: "#ffffff" },
-          data: {
-            heading: "چرا حرفه‌ای‌های تدوین آکسون را برمی‌گزینند؟",
-            items: [
-              { icon: "🛡️", title: "گارانتی طلایی تعویض", desc: "۱۸ ماه پوشش جامع تعویض بی قید و شرط برای تمامی نمایشگرهای مرجع." },
-              { icon: "⚡", title: "کالیبراسیون ۳D LUT", desc: "تراز رنگ پایدار با گاموت‌های سینمایی DCI-P3 و Rec.2020 قبل از تحویل." },
-              { icon: "📦", title: "بسته‌بندی گرید هوانوردی", desc: "محافظت کامل فیزیکی در برابر تکانه‌ها و ارتعاشات حمل‌ونقل." }
-            ]
-          }
-        },
-        {
-          id: "blk_home_products",
-          type: "product_showcase",
-          title: "ویترین کالاهای پرچمدار استودیو",
-          isVisible: true,
-          styles: { paddingY: 12, maxWidth: "7xl", bgColor: "#020617", textColor: "#ffffff" },
-          data: {
-            heading: "پرفروش‌ترین مانیتورها و تجهیزات تصویر",
-            viewAllText: "مشاهده تمام کالاها ←",
-            viewAllUrl: "/products"
-          }
-        },
-        {
-          id: "blk_home_faq",
-          type: "accordion_faq",
-          title: "پرسش‌های متداول (FAQ)",
-          isVisible: true,
-          styles: { paddingY: 12, maxWidth: "5xl", bgColor: "#0b0f19", textColor: "#ffffff" },
-          data: {
-            heading: "پرسش‌های پرتکرار مشتریان",
-            questions: [
-              { q: "آیا مانیتورها دارای گارانتی تعویض هستند؟", a: "بله، تمام مانیتورهای ۵K دارای ۱۸ ماه گارانتی طلایی تعویض بی قید و شرط می‌باشند." },
-              { q: "امکان تست حضوری و بررسی کالیبراسیون وجود دارد؟", a: "بله، در استودیوی شیراز با هماهنگی قبلی می‌توانید کیفیت رنگ پنل‌ها را از نزدیک ارزیابی کنید." }
-            ]
-          }
-        },
-        {
-          id: "blk_home_cta",
-          type: "cta_banner",
-          title: "فراخوان عمل و کمپین مشاوره",
-          isVisible: true,
-          styles: { paddingY: 12, maxWidth: "7xl", bgColor: "#1e1b4b", textColor: "#ffffff", textAlign: "center" },
-          data: {
-            title: "به یک مشاوره تخصصی برای استودیوی خود نیاز دارید؟",
-            subtitle: "کارشناسان فنی آکسون شما را در انتخاب کابل تاندربولت، مانیتور و پایه هیدرولیک یاری می‌کنند.",
-            btnText: "ثبت تیکت مشاوره آنلاین",
-            btnUrl: "/contact"
-          }
-        },
-        {
-          id: "blk_home_footer",
-          type: "footer_block",
-          title: "فوتر سراسری سایت",
-          isVisible: true,
-          styles: { paddingY: 8, maxWidth: "7xl", bgColor: "#020617", textColor: "#94a3b8" },
-          data: {
-            copyrightText: "تمامی حقوق مادی و معنوی برای آکسون استودیو محفوظ است © 2026",
-            supportPhone: "09376110200"
-          }
+  const fetchPagesList = async () => {
+    try {
+      const res = await fetch("/api/pages", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.pages)) {
+        setPages(json.pages);
+        if (json.pages.length > 0 && !selectedPageId) {
+          const home = json.pages.find((p: any) => p.slug === "home") || json.pages[0];
+          loadPageDetails(home.slug);
         }
-      ];
-
-      const payload = {
-        id: existing?.id || "page_home_root",
-        slug: "home",
-        title: "صفحه اصلی وب‌سایت",
-        meta_description: "مرجع تخصصی مانیتورهای ۵K و تجهیزات تصویر آکسون با گارانتی طلایی",
-        blocks: defaultBlocks,
-        is_published: true,
-        updated_at: new Date().toISOString()
-      };
-
-      if (existing) {
-        await supabaseAdmin.from("modular_pages").update(payload).eq("id", existing.id);
-      } else {
-        payload["created_at"] = new Date().toISOString();
-        await supabaseAdmin.from("modular_pages").insert([payload]);
       }
+    } catch {}
+  };
+
+  const loadPageDetails = async (slug: string) => {
+    try {
+      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.page) {
+        const p: ModularPageDocument = json.page;
+        setSelectedPageId(p.id);
+        setPageTitle(p.title);
+        setPageSlug(p.slug);
+        setMetaDescription(p.meta_description || "");
+        setIsPublished(p.is_published !== false);
+        setBlocks(Array.isArray(p.blocks) ? p.blocks : []);
+        if (p.blocks && p.blocks.length > 0) {
+          setActiveEditingBlockId(p.blocks[0].id);
+        }
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchPagesList();
+
+    const channel = supabase
+      .channel("realtime-elementor-studio")
+      .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
+        fetchPagesList();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const handleCreateNewPage = () => {
+    soundEngine.playClick();
+    const newSlug = "landing-" + Math.random().toString(36).substring(2, 6);
+    setSelectedPageId("");
+    setPageTitle("صفحه جدید");
+    setPageSlug(newSlug);
+    setMetaDescription("");
+    setIsPublished(true);
+    setBlocks([
+      createDefaultBlock("hero_banner"),
+      createDefaultBlock("features_grid"),
+      createDefaultBlock("cta_banner")
+    ]);
+  };
+
+  function createDefaultBlock(type: BlockType): PageBlock {
+    const id = "blk_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    switch (type) {
+      case "header_nav":
+        return {
+          id, type, title: "هدر ناوبری", isVisible: true,
+          styles: { paddingY: 4, maxWidth: "7xl", bgColor: "#0f172a", textColor: "#ffffff" },
+          data: { brandName: "AXON CORE", logoText: "آکسون استودیو", navLinks: [{ label: "صفحه اصلی", url: "/" }, { label: "محصولات", url: "/products" }, { label: "تماس", url: "/contact" }], ctaButtonText: "ورود به کاتالوگ", ctaButtonUrl: "/products" }
+        };
+      case "hero_banner":
+        return {
+          id, type, title: "هیرو بنر بزرگ", isVisible: true,
+          styles: { paddingY: 14, maxWidth: "7xl", bgColor: "#020617", textColor: "#ffffff", textAlign: "center" },
+          data: { badge: "🚀 مرجع مانیتورهای ۵K", headline: "واقعیت رنگ‌ها بدون مصالحه", subheadline: "تأمین، کالیبراسیون و واردات مانیتورهای استودیویی Apple و LG.", imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200", primaryBtnText: "خرید مانیتورها", primaryBtnUrl: "/products", secondaryBtnText: "مشاوره فنی", secondaryBtnUrl: "/contact" }
+        };
+      case "features_grid":
+        return {
+          id, type, title: "مزایا و ویژگی‌ها", isVisible: true,
+          styles: { paddingY: 10, maxWidth: "7xl", bgColor: "#090d16", textColor: "#ffffff" },
+          data: { heading: "استانداردهای مهندسی آکسون", items: [{ icon: "🛡️", title: "گارانتی طلایی ۱۸ ماهه", desc: "تعویض بی قید و شرط." }, { icon: "⚡", title: "کالیبراسیون ۳D LUT", desc: "تراز رنگ‌های سینمایی." }, { icon: "🚀", title: "ارسال پیشتاز", desc: "بسته‌بندی ضربه‌گیر ویژه." }] }
+        };
+      case "product_showcase":
+        return {
+          id, type, title: "ویترین محصولات", isVisible: true,
+          styles: { paddingY: 10, maxWidth: "7xl", bgColor: "#020617", textColor: "#ffffff" },
+          data: { heading: "پرفروش‌ترین تجهیزات استودیو", viewAllText: "مشاهده همه کالاها ←", viewAllUrl: "/products" }
+        };
+      case "accordion_faq":
+        return {
+          id, type, title: "پرسش و پاسخ (FAQ)", isVisible: true,
+          styles: { paddingY: 10, maxWidth: "5xl", bgColor: "#0b0f19", textColor: "#ffffff" },
+          data: { heading: "پرسش‌های پرتکرار", questions: [{ q: "آیا مانیتورها دارای گارانتی هستند؟", a: "بله، دارای ۱۸ ماه گارانتی طلایی تعویض می‌باشند." }] }
+        };
+      case "cta_banner":
+        return {
+          id, type, title: "فراخوان عمل (CTA)", isVisible: true,
+          styles: { paddingY: 10, maxWidth: "7xl", bgColor: "#1e1b4b", textColor: "#ffffff", textAlign: "center" },
+          data: { title: "نیاز به مشاوره اختصاصی چیدمان دارید؟", subtitle: "کارشناسان آکسون شما را در انتخاب مانیتور راهنمایی می‌کنند.", btnText: "شروع مشاوره آنلاین", btnUrl: "/contact" }
+        };
+      case "rich_text":
+        return {
+          id, type, title: "کد اختصاصی / متن سئو", isVisible: true,
+          styles: { paddingY: 6, maxWidth: "5xl", bgColor: "#020617", textColor: "#ffffff" },
+          data: { htmlContent: "<div class='p-4 border border-sky-500/30 rounded-2xl'>کد HTML یا استایل اختصاصی شما...</div>" }
+        };
+      case "footer_block":
+        return {
+          id, type, title: "فوتر صفحه", isVisible: true,
+          styles: { paddingY: 8, maxWidth: "7xl", bgColor: "#020617", textColor: "#94a3b8" },
+          data: { copyrightText: "تمامی حقوق برای آکسون محفوظ است © 2026", supportPhone: "09376110200" }
+        };
     }
-  } catch (err) {
-    console.warn("seedHomePage notice:", err);
   }
-}
-`;
-writeFile('lib/seedHomePage.ts', seedHomePageCode);
 
-// =============================================================================
-// ۳. روت سروری app/api/pages/route.ts با تضمین بارگذاری و حذف و ویرایش
-// =============================================================================
-const pagesApiRouteCode = `import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
-import { seedHomePageIfMissing } from "@/lib/seedHomePage";
+  const handleAddBlock = (type: BlockType) => {
+    soundEngine.playClick();
+    const newBlock = createDefaultBlock(type);
+    setBlocks([...blocks, newBlock]);
+    setActiveEditingBlockId(newBlock.id);
+  };
 
-export const dynamic = "force-dynamic";
+  const handleMoveBlock = (index: number, direction: "up" | "down") => {
+    soundEngine.playClick();
+    const target = direction === "up" ? index - 1 : index + 1;
+    if (target < 0 || target >= blocks.length) return;
+    const list = [...blocks];
+    const [item] = list.splice(index, 1);
+    list.splice(target, 0, item);
+    setBlocks(list);
+  };
 
-export async function GET(req: NextRequest) {
-  try {
-    await seedHomePageIfMissing();
-
-    const { searchParams } = new URL(req.url);
-    const slug = searchParams.get("slug");
-
-    if (slug) {
-      const { data, error } = await supabaseAdmin
-        .from("modular_pages")
-        .select("*")
-        .eq("slug", slug)
-        .maybeSingle();
-
-      if (error) throw error;
-      return NextResponse.json({ success: true, page: data });
+  const handleSavePage = async () => {
+    if (!pageTitle.trim() || !pageSlug.trim()) {
+      alert("عنوان و مسیر (Slug) الزامی هستند.");
+      return;
     }
 
-    const { data: list, error } = await supabaseAdmin
-      .from("modular_pages")
-      .select("id, slug, title, meta_description, is_published, updated_at")
-      .order("updated_at", { ascending: false });
+    soundEngine.playClick();
+    setSaving(true);
+    setToastMessage(null);
 
-    if (error) throw error;
-    return NextResponse.json({ success: true, pages: list || [] });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const { id, slug, title, meta_description, blocks, is_published } = body;
-
-    const cleanSlug = String(slug || "").trim().toLowerCase()
-      .replace(/[^a-z0-9\\u0600-\\u06FF\\-_]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-
-    if (!cleanSlug || !title) {
-      return NextResponse.json({ success: false, message: "عنوان صفحه و آدرس (Slug) الزامی است." }, { status: 400 });
-    }
-
-    const pageId = id || ("page_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
-
-    const payload = {
-      id: pageId,
-      slug: cleanSlug,
-      title: String(title).trim(),
-      meta_description: meta_description ? String(meta_description).trim() : null,
-      blocks: Array.isArray(blocks) ? blocks : [],
-      is_published: is_published !== false,
-      updated_at: new Date().toISOString()
+    const payload: Partial<ModularPageDocument> = {
+      id: selectedPageId || undefined,
+      title: pageTitle.trim(),
+      slug: pageSlug.trim().toLowerCase(),
+      meta_description: metaDescription.trim(),
+      blocks,
+      is_published: isPublished
     };
 
-    const { data: existing } = await supabaseAdmin.from("modular_pages").select("id").eq("slug", cleanSlug).maybeSingle();
-
-    if (existing) {
-      const { error } = await supabaseAdmin.from("modular_pages").update(payload).eq("id", existing.id);
-      if (error) throw error;
-    } else {
-      payload["created_at"] = new Date().toISOString();
-      const { error } = await supabaseAdmin.from("modular_pages").insert([payload]);
-      if (error) throw error;
+    try {
+      const res = await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setToastMessage({ type: "success", text: "✓ تغییرات با موفقیت ذخیره شد و روی ویترین سایت اعمال گردید." });
+        fetchPagesList();
+        if (!selectedPageId && json.page) setSelectedPageId(json.page.id);
+      } else {
+        setToastMessage({ type: "error", text: json.message || "خطا در ذخیره." });
+      }
+    } catch {
+      setToastMessage({ type: "error", text: "خطای ارتباط با سرور." });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setToastMessage(null), 3500);
     }
+  };
 
-    return NextResponse.json({ success: true, message: "صفحه ماژولار با موفقیت ذخیره و در سراسر سایت منتشر شد.", page: payload });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
+  const activeBlock = blocks.find(b => b.id === activeEditingBlockId);
 
-export async function DELETE(req: NextRequest) {
-  try {
-    if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-    }
+  return (
+    <div className="min-h-screen flex flex-col font-sans select-none text-[var(--text-primary)] space-y-4" dir="rtl">
+      
+      {/* ۱. نوار فرمان بالای استودیوی المنتور (Top App Bar) */}
+      <header className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+        
+        {/* انتخاب صفحه در قالب منوی شیک */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md">
+            🏗️
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-sky-400 font-bold uppercase">Elementor Pro Studio</span>
+              <span className="text-[10px] text-slate-400">• مسیر: /{pageSlug === "home" ? "" : pageSlug}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <select
+                value={pageSlug}
+                onChange={(e) => loadPageDetails(e.target.value)}
+                className="p-1.5 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black text-[var(--text-primary)] outline-none cursor-pointer"
+              >
+                {pages.map((p) => (
+                  <option key={p.id} value={p.slug}>📄 {p.title} ({p.slug === "home" ? "صفحه نخست /" : "/" + p.slug})</option>
+                ))}
+              </select>
 
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-    const slug = searchParams.get("slug");
+              <button
+                type="button"
+                onClick={handleCreateNewPage}
+                className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--accent-blue)] cursor-pointer"
+              >
+                + ساخت صفحه جدید
+              </button>
+            </div>
+          </div>
+        </div>
 
-    if (!id && !slug) {
-      return NextResponse.json({ success: false, message: "شناسه صفحه الزامی است." }, { status: 400 });
-    }
+        {/* دکمه‌های ریسپانسیو دسکتاپ، تبلت و موبایل */}
+        <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
+          {[
+            { id: "desktop" as const, icon: "🖥️", label: "دسکتاپ" },
+            { id: "tablet" as const, icon: "📱", label: "تبلت" },
+            { id: "mobile" as const, icon: "📲", label: "موبایل" },
+          ].map((dev) => (
+            <button
+              key={dev.id}
+              type="button"
+              onClick={() => setPreviewDevice(dev.id)}
+              className={"px-3 py-1.5 rounded-xl font-bold transition text-xs flex items-center gap-1 cursor-pointer " + (
+                previewDevice === dev.id ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-slate-400"
+              )}
+            >
+              <span>{dev.icon}</span>
+              <span className="hidden md:inline">{dev.label}</span>
+            </button>
+          ))}
+        </div>
 
-    let query = supabaseAdmin.from("modular_pages").delete();
-    if (id) query = query.eq("id", id);
-    else if (slug) query = query.eq("slug", slug);
+        {/* دکمه‌های اکشن: مشاهده زنده در سایت و دکمه ذخیره انتشار */}
+        <div className="flex items-center gap-2">
+          <Link
+            href={pageSlug === "home" ? "/" : \`/\${pageSlug}\`}
+            target="_blank"
+            className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-1.5"
+          >
+            <span>مشاهده زنده در سایت</span>
+            <span>🔗</span>
+          </Link>
 
-    const { error } = await query;
-    if (error) throw error;
+          <button
+            type="button"
+            onClick={handleSavePage}
+            disabled={saving}
+            className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl transition cursor-pointer disabled:opacity-50"
+          >
+            {saving ? "در حال انتشار..." : "💾 ذخیره و انتشار سراسری"}
+          </button>
+        </div>
+      </header>
 
-    return NextResponse.json({ success: true, message: "صفحه با موفقیت حذف گردید." });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
+      {toastMessage && (
+        <div className={"p-3.5 rounded-2xl text-xs font-bold transition animate-fadeIn " + (
+          toastMessage.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
+        )}>
+          {toastMessage.text}
+        </div>
+      )}
+
+      {/* ۲. محیط کاری ۲ پنله: پنل تنظیمات و ویجت‌ها (راست) + بوم زنده ویژوال (چپ) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 items-start">
+        
+        {/* پنل ویجت‌ها و تنظیمات اینسپکتور (سایدبار ۴ ستونه) */}
+        <div className="lg:col-span-4 space-y-4">
+          
+          {/* جعبه ویجت‌های افزودنی */}
+          <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
+              <span className="font-black text-xs text-[var(--accent-blue)]">📦 مخزن ویجت‌ها و المان‌ها:</span>
+              <button
+                type="button"
+                onClick={() => setIsWidgetsDrawerOpen(!isWidgetsDrawerOpen)}
+                className="text-[10px] text-slate-400 font-bold"
+              >
+                {isWidgetsDrawerOpen ? "بستن مخزن ▲" : "نمایش مخزن ▼"}
+              </button>
+            </div>
+
+            {isWidgetsDrawerOpen && (
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {[
+                  { type: "header_nav" as const, label: "هدر و نوبار", icon: "🧭" },
+                  { type: "hero_banner" as const, label: "هیرو بنر", icon: "🌟" },
+                  { type: "product_showcase" as const, label: "ویترین کالا", icon: "🛍️" },
+                  { type: "features_grid" as const, label: "مزایا و فیچرها", icon: "⚡" },
+                  { type: "accordion_faq" as const, label: "پرسش‌ها (FAQ)", icon: "❓" },
+                  { type: "cta_banner" as const, label: "فراخوان (CTA)", icon: "🎯" },
+                  { type: "rich_text" as const, label: "کد اختصاصی / متن", icon: "💻" },
+                  { type: "footer_block" as const, label: "فوتر", icon: "🔻" },
+                ].map((w) => (
+                  <button
+                    key={w.type}
+                    type="button"
+                    onClick={() => handleAddBlock(w.type)}
+                    className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm hover:scale-102"
+                  >
+                    <span>{w.icon}</span>
+                    <span>+ {w.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ساختار لایه‌ها (Navigator Tree) */}
+          <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
+              <span className="font-black text-xs text-[var(--text-primary)]">📑 ناوبر لایه‌ها ({blocks.length} بلوک):</span>
+              <span className="text-[10px] text-slate-400 font-mono">چیدمان عمودی</span>
+            </div>
+
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {blocks.map((b, idx) => (
+                <div
+                  key={b.id}
+                  onClick={() => { soundEngine.playClick(); setActiveEditingBlockId(b.id); }}
+                  className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
+                    activeEditingBlockId === b.id
+                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black shadow-sm"
+                      : "border-[var(--card-border)] bg-[var(--input-bg)]"
+                  )}
+                >
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <span className="font-mono text-[10px] text-slate-400 font-bold">{idx + 1}.</span>
+                    <span className="text-xs truncate">{b.title}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); handleMoveBlock(idx, "up"); }} disabled={idx === 0} className="p-1 px-1.5 rounded-lg bg-[var(--modal-bg)] text-[10px]">▲</button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); handleMoveBlock(idx, "down"); }} disabled={idx === blocks.length - 1} className="p-1 px-1.5 rounded-lg bg-[var(--modal-bg)] text-[10px]">▼</button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setBlocks(blocks.filter(x => x.id !== b.id)); }} className="p-1 px-1.5 rounded-lg text-rose-500 text-[10px]">✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* اینسپکتور ۳ تب المنتور (Content / Style / Advanced Code) */}
+          {activeBlock && (
+            <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
+              <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
+                <span className="font-black text-xs text-[var(--accent-blue)]">🎛️ ویرایش بلوک: {activeBlock.title}</span>
+                <div className="flex gap-1 bg-[var(--input-bg)] p-1 rounded-xl border border-[var(--card-border)]">
+                  {[
+                    { id: "content" as const, label: "محتوا" },
+                    { id: "style" as const, label: "استایل" },
+                    { id: "advanced" as const, label: "کد اختصاصی" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setInspectorTab(tab.id)}
+                      className={"px-2.5 py-1 rounded-lg font-bold text-[10px] transition cursor-pointer " + (
+                        inspectorTab === tab.id ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-slate-400"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* تب محتوا */}
+              {inspectorTab === "content" && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block mb-1 text-[11px] font-bold text-slate-400">نام این بلوک در پنل:</label>
+                    <input
+                      type="text"
+                      value={activeBlock.title}
+                      onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, title: e.target.value } : b))}
+                      className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+                    />
+                  </div>
+
+                  {activeBlock.type === "hero_banner" && (
+                    <>
+                      <div>
+                        <label className="block mb-1 text-[11px] font-bold text-slate-400">تیتر اصلی هیرو (Headline):</label>
+                        <input
+                          type="text"
+                          value={activeBlock.data.headline || ""}
+                          onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, headline: e.target.value } } : b))}
+                          className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black"
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1 text-[11px] font-bold text-slate-400">زیرعنوان توضیحات:</label>
+                        <textarea
+                          rows={2}
+                          value={activeBlock.data.subheadline || ""}
+                          onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, subheadline: e.target.value } } : b))}
+                          className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1 text-[11px] font-bold text-slate-400">آدرس تصویر (URL):</label>
+                        <input
+                          type="text"
+                          value={activeBlock.data.imageUrl || ""}
+                          onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, imageUrl: e.target.value } } : b))}
+                          className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {activeBlock.type === "cta_banner" && (
+                    <>
+                      <div>
+                        <label className="block mb-1 text-[11px] font-bold text-slate-400">عنوان کمپین:</label>
+                        <input
+                          type="text"
+                          value={activeBlock.data.title || ""}
+                          onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, title: e.target.value } } : b))}
+                          className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="متن دکمه"
+                          value={activeBlock.data.btnText || ""}
+                          onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, btnText: e.target.value } } : b))}
+                          className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
+                        />
+                        <input
+                          type="text"
+                          placeholder="لینک دکمه"
+                          value={activeBlock.data.btnUrl || ""}
+                          onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, btnUrl: e.target.value } } : b))}
+                          className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* تب استایل و ابعاد */}
+              {inspectorTab === "style" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ پس‌زمینه:</label>
+                      <input
+                        type="text"
+                        value={activeBlock.styles.bgColor || "#020617"}
+                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, bgColor: e.target.value } } : b))}
+                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[10px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ متن:</label>
+                      <input
+                        type="text"
+                        value={activeBlock.styles.textColor || "#ffffff"}
+                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, textColor: e.target.value } } : b))}
+                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[10px]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">پدینگ عمودی (Y):</label>
+                      <input
+                        type="number"
+                        value={activeBlock.styles.paddingY || 10}
+                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, paddingY: Number(e.target.value) } } : b))}
+                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[10px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">عرض کانتینر:</label>
+                      <select
+                        value={activeBlock.styles.maxWidth || "7xl"}
+                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, maxWidth: e.target.value as any } } : b))}
+                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[10px]"
+                      >
+                        <option value="full">تمام‌عرض</option>
+                        <option value="7xl">استاندارد (7XL)</option>
+                        <option value="5xl">جمع‌وجور (5XL)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* تب کد اختصاصی HTML / CSS */}
+              {inspectorTab === "advanced" && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block mb-1 text-[11px] font-bold text-slate-400">کد سفارشی HTML / SVG / اسکریپت:</label>
+                    <textarea
+                      rows={5}
+                      value={activeBlock.data.htmlContent || ""}
+                      onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, htmlContent: e.target.value } } : b))}
+                      placeholder="<div>کدهای سفارشی شما...</div>"
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] leading-relaxed text-sky-400"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ۳. بوم زنده ویژوال مرکزی (WYSIWYG Live Canvas) */}
+        <div className="lg:col-span-8 flex justify-center w-full">
+          <div
+            className={"transition-all duration-300 rounded-[2.5rem] bg-[var(--modal-bg)] border-2 border-[var(--card-border)] shadow-2xl overflow-hidden min-h-[700px] w-full " + (
+              previewDevice === "mobile"
+                ? "max-w-[390px] border-sky-500/50 shadow-sky-500/10"
+                : previewDevice === "tablet"
+                ? "max-w-[768px] border-indigo-500/50"
+                : "max-w-full"
+            )}
+          >
+            {/* سربرگ بوم زنده */}
+            <div className="p-3.5 bg-[var(--input-bg)] border-b border-[var(--card-border)] flex justify-between items-center text-xs px-6">
+              <span className="font-mono text-[10px] text-slate-400">پیش‌نمایش تعاملی: {previewDevice.toUpperCase()}</span>
+              <span className="font-bold text-xs text-sky-400">● بوم بلادرنگ فعال است</span>
+            </div>
+
+            {/* محتوای رندر شده زنده روی بوم */}
+            <div className="p-6 space-y-6">
+              {blocks.length === 0 ? (
+                <div className="py-24 text-center text-slate-400 font-bold text-xs">
+                  بوم خالی است. از پنل سمت راست بلوک اضافه کنید.
+                </div>
+              ) : (
+                blocks.map((b) => (
+                  <div
+                    key={b.id}
+                    onClick={() => { soundEngine.playClick(); setActiveEditingBlockId(b.id); }}
+                    className={"p-6 rounded-3xl transition border-2 cursor-pointer relative group " + (
+                      activeEditingBlockId === b.id
+                        ? "border-[var(--accent-blue)] bg-sky-500/5 shadow-xl"
+                        : "border-transparent hover:border-sky-500/30 bg-[var(--input-bg)]"
+                    )}
+                    style={{
+                      backgroundColor: b.styles.bgColor || "transparent",
+                      color: b.styles.textColor || "inherit",
+                      paddingTop: \`\${(b.styles.paddingY || 10) * 2}px\`,
+                      paddingBottom: \`\${(b.styles.paddingY || 10) * 2}px\`
+                    }}
+                  >
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-white font-mono text-[9px] opacity-0 group-hover:opacity-100 transition">
+                      {b.type}
+                    </span>
+
+                    {b.type === "hero_banner" && (
+                      <div className="text-center space-y-3">
+                        <span className="px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 text-[10px] font-bold">
+                          {b.data.badge || "بج هیرو"}
+                        </span>
+                        <h2 className="text-xl sm:text-2xl font-black">{b.data.headline || "تیتر اصلی"}</h2>
+                        <p className="text-xs opacity-75 max-w-lg mx-auto">{b.data.subheadline}</p>
+                        {b.data.imageUrl && (
+                          <div className="w-full h-44 rounded-2xl overflow-hidden mt-3">
+                            <img src={b.data.imageUrl} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {b.type === "cta_banner" && (
+                      <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-900/40 to-indigo-900/40 text-center space-y-2 border border-blue-500/20">
+                        <h3 className="font-black text-sm">{b.data.title}</h3>
+                        <p className="text-xs opacity-80">{b.data.subtitle}</p>
+                      </div>
+                    )}
+
+                    {b.type === "rich_text" && (
+                      <div
+                        dangerouslySetInnerHTML={{ __html: b.data.htmlContent || "محتوای سفارشی..." }}
+                        className="prose dark:prose-invert max-w-none text-xs"
+                      />
+                    )}
+
+                    {b.type !== "hero_banner" && b.type !== "cta_banner" && b.type !== "rich_text" && (
+                      <div className="p-4 rounded-2xl border border-dashed border-white/10 text-center text-xs">
+                        {b.title} ({b.type})
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
 }
 `;
-writeFile('app/api/pages/route.ts', pagesApiRouteCode);
+writeFile('components/admin/AdminModularPages.tsx', elementorStudioComponent);
 
 // =============================================================================
-// ۴. بیلد کامل و پوش قطعی به گیت‌هاب و ورسل
+// بیلد و پوش قطعی به گیت‌هاب و ورسل
 // =============================================================================
-console.log("تست بیلد نهایی پروژه (npm run build)...");
+console.log("تست بیلد کامل (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بیلد با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
+  console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
 } catch (e) {
   console.error("خطای بیلد:", e.message);
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به گیت‌هاب و استقرار لایو در ورسل...");
+console.log("ارسال تغییرات به گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(modular-builder): link admin route to AdminModularPages, ensure automatic homepage seed and realtime controls"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(elementor-studio): visual live canvas, 3-tab inspector, custom code injection & responsive switcher"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -313,7 +678,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه ساز ماژولار فعال شد و ورسل در حال دیپلوی است!\x1b[0m");
+  console.log("\x1b[32m✔ استودیوی المنتور پرو با موفقیت دیپلوی شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

@@ -1,25 +1,4 @@
-/**
- * AXON CORE - Clean Syntax ElementorVisualBridge & Build Fix (fix.js)
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(process.cwd(), relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[36m[AXON-FIX]\x1b[0m اصلاح سینتکس ElementorVisualBridge و بیلد تمیز...");
-
-// =============================================================================
-// ۱. نگارش بدون خطای سینتکس کامپوننت components/modular/ElementorVisualBridge.tsx
-// =============================================================================
-const cleanBridgeCode = `"use client";
+"use client";
 
 import { useEffect } from "react";
 
@@ -203,36 +182,4 @@ export default function ElementorVisualBridge() {
   }, []);
 
   return null;
-}
-`;
-writeFile('components/modular/ElementorVisualBridge.tsx', cleanBridgeCode);
-
-// =============================================================================
-// ۲. بیلد کامل و پوش به گیت‌هاب و استقرار ورسل
-// =============================================================================
-console.log("تست مجدد بیلد نهایی پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگر دیپلوی ورسل...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(syntax): clean string concatenation in ElementorVisualBridge and pass build"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ پروژه با موفقیت مستقر شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

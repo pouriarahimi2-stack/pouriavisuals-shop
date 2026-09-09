@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import ElementorVisualBridge from "@/components/modular/ElementorVisualBridge";
 import { initRealtimeSync } from "@/lib/realtimeSync";
 import { siteInfoService, SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
 import { fontEngine } from "@/lib/fontEngine";
@@ -95,6 +96,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       <Footer />
       <CartDrawer />
       <MobileBottomNav />
+      <ElementorVisualBridge />
     </>
   );
 }

@@ -66,6 +66,20 @@ export default function AdminModularPages() {
     }
   };
 
+  
+  useEffect(() => {
+    const handleFrameMessage = (e: MessageEvent) => {
+      if (e.data?.type === "AXON_ELEMENT_SELECTED") {
+        setToastMessage({ type: "success", text: `المان «${e.data.tagName}» انتخاب شد. می‌توانید آن را بزرگ/کوچک، جابجا یا حذف کنید.` });
+      }
+      if (e.data?.type === "AXON_ELEMENT_MUTATED") {
+        setToastMessage({ type: "success", text: "تغییر اندازه / جابجایی المان با موفقیت در فریم اعمال شد." });
+      }
+    };
+    window.addEventListener("message", handleFrameMessage);
+    return () => window.removeEventListener("message", handleFrameMessage);
+  }, []);
+
   useEffect(() => {
     fetchPagesList();
 

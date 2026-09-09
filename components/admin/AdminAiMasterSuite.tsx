@@ -24,6 +24,71 @@ export default function AdminAiMasterSuite() {
   ]);
   const [inputQuery, setInputQuery] = useState("");
   const [isCopilotThinking, setIsCopilotThinking] = useState(false);
+  // استیت‌های اختصاصی تاریخچه گفتگوها
+  const [currentSessionId, setCurrentSessionId] = useState<string>("");
+  const [historyList, setHistoryList] = useState<Array<{ id: string; title: string; messages: ChatMessage[]; updated_at: string }>>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const fetchHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await fetch("/api/ai-assistant/history", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.history)) {
+        setHistoryList(json.history);
+      }
+    } catch {} finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const autoSaveSession = async (updatedMessages: ChatMessage[]) => {
+    try {
+      const res = await fetch("/api/ai-assistant/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: currentSessionId || undefined,
+          messages: updatedMessages
+        })
+      });
+      const json = await res.json();
+      if (json.success && json.sessionId) {
+        setCurrentSessionId(json.sessionId);
+      }
+    } catch {}
+  };
+
+  const handleSelectHistorySession = (session: { id: string; messages: ChatMessage[] }) => {
+    soundEngine.playClick();
+    setCurrentSessionId(session.id);
+    setMessages(session.messages);
+    setIsHistoryOpen(false);
+  };
+
+  const handleStartNewChat = () => {
+    soundEngine.playClick();
+    setCurrentSessionId("");
+    setMessages([
+      {
+        role: "copilot",
+        text: "گفتگوی جدید آغاز شد. چه موردی را برای رشد کسب‌وکار و فروش بررسی کنیم؟",
+        time: new Date().toLocaleTimeString("fa-IR")
+      }
+    ]);
+  };
+
+  const handleDeleteHistorySession = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    soundEngine.playClick();
+    try {
+      await fetch("/api/ai-assistant/history?id=" + encodeURIComponent(id), { method: "DELETE" });
+      setHistoryList(prev => prev.filter(item => item.id !== id));
+      if (currentSessionId === id) handleStartNewChat();
+    } catch {}
+  };
+
 
   // استیت‌های سئو بدون هاردکد
   const [seoData, setSeoData] = useState<any>(null);
@@ -70,7 +135,7 @@ export default function AdminAiMasterSuite() {
     const userText = inputQuery.trim();
     setInputQuery("");
 
-    setMessages(prev => [...prev, {
+    const updated = [...messages, { role: "user" as const, text: userText, time: new Date().toLocaleTimeString("fa-IR") }, { role: "copilot" as const, text: reply, time: new Date().toLocaleTimeString("fa-IR") }]; autoSaveSession(updated); setMessages(prev => [...prev, {
       role: "user",
       text: userText,
       time: new Date().toLocaleTimeString("fa-IR")
@@ -387,6 +452,81 @@ export default function AdminAiMasterSuite() {
           </form>
         </div>
       )}
+      {/* مدال تاریخچه گفتگوها با نگهداری ۱۴ روزه */}
+      {isHistoryOpen && (
+        <div
+          onClick={() => setIsHistoryOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+          dir="rtl"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 shadow-2xl space-y-4 text-xs"
+          >
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📜</span>
+                <div>
+                  <h3 className="font-black text-sm">تاریخچه گفتگوهای کوپایلوت</h3>
+                  <p className="text-[10px] text-[var(--text-secondary)]">نگهداری حداکثر ۲۰ نشست در بازه ۱۴ روزه</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {loadingHistory ? (
+                <div className="text-center py-8 text-slate-400 font-bold">در حال واکشی تاریخچه‌ها...</div>
+              ) : historyList.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 font-bold">هنوز گفتگویی در دیتابیس ثبت نشده است.</div>
+              ) : (
+                historyList.map((session) => (
+                  <div
+                    key={session.id}
+                    onClick={() => handleSelectHistorySession(session)}
+                    className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
+                      currentSessionId === session.id
+                        ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black"
+                        : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                    )}
+                  >
+                    <div className="overflow-hidden space-y-0.5">
+                      <h4 className="font-bold truncate text-[var(--text-primary)]">{session.title}</h4>
+                      <span className="font-mono text-[9px] text-slate-400">
+                        {new Date(session.updated_at).toLocaleString("fa-IR")}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteHistorySession(session.id, e)}
+                      className="p-1 px-2 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white transition text-xs font-bold"
+                      title="حذف نشست"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                handleStartNewChat();
+                setIsHistoryOpen(false);
+              }}
+              className="w-full py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md"
+            >
+              + شروع گفتگوی جدید
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* تب ۳: کالبدشکافی ۳D و متالورژی بر مبنای عکس کالا */}
       {activeTab === "teardown" && (

@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Clean Syntax ElementorVisualBridge & Build Fix (fix.js)
+ * AXON CORE - Elementor Pro Advanced Inspector Engine (fix.js)
  */
 
 const fs = require('fs');
@@ -14,12 +14,12 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-FIX]\x1b[0m اصلاح سینتکس ElementorVisualBridge و بیلد تمیز...");
+console.log("\x1b[36m[AXON-ELEMENTOR-PRO]\x1b[0m پیاده‌سازی سنسور جامع بازرسی المان و استودیو استایل‌دهی موضعی...");
 
 // =============================================================================
-// ۱. نگارش بدون خطای سینتکس کامپوننت components/modular/ElementorVisualBridge.tsx
+// ۱. ارتقای components/modular/ElementorVisualBridge.tsx: پل ارتباطی دوطرفه استایل زنده
 // =============================================================================
-const cleanBridgeCode = `"use client";
+const advancedBridgeCode = `"use client";
 
 import { useEffect } from "react";
 
@@ -30,187 +30,654 @@ export default function ElementorVisualBridge() {
 
     let selectedElement: HTMLElement | null = null;
     let overlay: HTMLDivElement | null = null;
-    let toolbar: HTMLDivElement | null = null;
 
-    const createInspectorUI = () => {
+    const createOverlay = () => {
       overlay = document.createElement("div");
       overlay.style.position = "absolute";
       overlay.style.pointerEvents = "none";
-      overlay.style.border = "2px dashed #0284c7";
-      overlay.style.backgroundColor = "rgba(2, 132, 199, 0.08)";
+      overlay.style.border = "2px solid #38bdf8";
+      overlay.style.backgroundColor = "rgba(56, 189, 248, 0.08)";
       overlay.style.zIndex = "999998";
       overlay.style.display = "none";
-      overlay.style.transition = "all 0.15s ease";
+      overlay.style.borderRadius = "8px";
+      overlay.style.transition = "all 0.1s ease";
       document.body.appendChild(overlay);
-
-      toolbar = document.createElement("div");
-      toolbar.style.position = "absolute";
-      toolbar.style.zIndex = "999999";
-      toolbar.style.display = "none";
-      toolbar.style.gap = "4px";
-      toolbar.style.backgroundColor = "#0f172a";
-      toolbar.style.border = "1px solid #38bdf8";
-      toolbar.style.borderRadius = "12px";
-      toolbar.style.padding = "4px 8px";
-      toolbar.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
-      
-      const btnScaleUp = document.createElement("button");
-      btnScaleUp.innerText = "➕ بزرگتر";
-      btnScaleUp.style.cssText = "background:#1e293b; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; font-weight:bold;";
-
-      const btnScaleDown = document.createElement("button");
-      btnScaleDown.innerText = "➖ کوچکتر";
-      btnScaleDown.style.cssText = "background:#1e293b; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; font-weight:bold;";
-
-      const btnUp = document.createElement("button");
-      btnUp.innerText = "▲";
-      btnUp.style.cssText = "background:#1e293b; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px;";
-
-      const btnDown = document.createElement("button");
-      btnDown.innerText = "▼";
-      btnDown.style.cssText = "background:#1e293b; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px;";
-
-      const btnDel = document.createElement("button");
-      btnDel.innerText = "🗑️";
-      btnDel.style.cssText = "background:#f43f5e; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; font-weight:bold;";
-
-      toolbar.appendChild(btnScaleUp);
-      toolbar.appendChild(btnScaleDown);
-      toolbar.appendChild(btnUp);
-      toolbar.appendChild(btnDown);
-      toolbar.appendChild(btnDel);
-
-      document.body.appendChild(toolbar);
-
-      btnScaleUp.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement) return;
-        const currentScale = parseFloat(selectedElement.getAttribute("data-axon-scale") || "1");
-        const nextScale = (currentScale + 0.1).toFixed(1);
-        selectedElement.setAttribute("data-axon-scale", nextScale);
-        selectedElement.style.transform = "scale(" + nextScale + ")";
-        selectedElement.style.transformOrigin = "center center";
-        updateUI();
-        notifyAdmin("resize", { scale: nextScale });
-      });
-
-      btnScaleDown.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement) return;
-        const currentScale = parseFloat(selectedElement.getAttribute("data-axon-scale") || "1");
-        const nextScale = Math.max(0.5, currentScale - 0.1).toFixed(1);
-        selectedElement.setAttribute("data-axon-scale", nextScale);
-        selectedElement.style.transform = "scale(" + nextScale + ")";
-        selectedElement.style.transformOrigin = "center center";
-        updateUI();
-        notifyAdmin("resize", { scale: nextScale });
-      });
-
-      btnUp.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement || !selectedElement.parentElement) return;
-        const prev = selectedElement.previousElementSibling;
-        if (prev) {
-          selectedElement.parentElement.insertBefore(selectedElement, prev);
-          updateUI();
-          notifyAdmin("reorder", { dir: "up" });
-        }
-      });
-
-      btnDown.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement || !selectedElement.parentElement) return;
-        const next = selectedElement.nextElementSibling;
-        if (next) {
-          selectedElement.parentElement.insertBefore(next, selectedElement);
-          updateUI();
-          notifyAdmin("reorder", { dir: "down" });
-        }
-      });
-
-      btnDel.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement) return;
-        selectedElement.style.display = "none";
-        hideUI();
-        notifyAdmin("delete", {});
-      });
     };
 
-    const updateUI = () => {
-      if (!selectedElement || !overlay || !toolbar) return;
+    const updateOverlay = () => {
+      if (!selectedElement || !overlay) return;
       const rect = selectedElement.getBoundingClientRect();
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
 
-      overlay.style.top = (rect.top + scrollTop) + "px";
-      overlay.style.left = (rect.left + scrollLeft) + "px";
-      overlay.style.width = rect.width + "px";
-      overlay.style.height = rect.height + "px";
+      overlay.style.top = (rect.top + scrollTop - 2) + "px";
+      overlay.style.left = (rect.left + scrollLeft - 2) + "px";
+      overlay.style.width = (rect.width + 4) + "px";
+      overlay.style.height = (rect.height + 4) + "px";
       overlay.style.display = "block";
-
-      toolbar.style.top = Math.max(10, rect.top + scrollTop - 38) + "px";
-      toolbar.style.left = (rect.left + scrollLeft) + "px";
-      toolbar.style.display = "flex";
     };
 
-    const hideUI = () => {
-      if (overlay) overlay.style.display = "none";
-      if (toolbar) toolbar.style.display = "none";
-      selectedElement = null;
-    };
-
-    const notifyAdmin = (action: string, payload: any) => {
-      window.parent.postMessage({ type: "AXON_ELEMENT_MUTATED", action, payload }, "*");
-    };
-
-    createInspectorUI();
+    createOverlay();
 
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target || target.closest("button") === toolbar?.querySelector("button")) return;
-      if (toolbar && toolbar.contains(target)) return;
+      if (!target || target === overlay) return;
 
       e.preventDefault();
       e.stopPropagation();
 
       selectedElement = target;
-      if (["P", "H1", "H2", "H3", "H4", "SPAN", "BUTTON", "A"].includes(target.tagName)) {
+      if (["P", "H1", "H2", "H3", "H4", "H5", "SPAN", "BUTTON", "A"].includes(target.tagName)) {
         target.contentEditable = "true";
-        target.style.outline = "2px solid #38bdf8";
         target.focus();
       }
 
-      updateUI();
+      updateOverlay();
+
+      const computed = window.getComputedStyle(target);
       window.parent.postMessage({
         type: "AXON_ELEMENT_SELECTED",
-        tagName: target.tagName,
-        text: target.innerText ? target.innerText.slice(0, 40) : ""
+        payload: {
+          tagName: target.tagName,
+          text: target.innerText ? target.innerText.slice(0, 50) : "",
+          color: computed.color,
+          backgroundColor: computed.backgroundColor,
+          fontSize: parseInt(computed.fontSize, 10) || 16,
+          fontWeight: computed.fontWeight,
+          borderRadius: parseInt(computed.borderRadius, 10) || 0,
+          paddingTop: parseInt(computed.paddingTop, 10) || 0,
+          paddingBottom: parseInt(computed.paddingBottom, 10) || 0,
+          paddingLeft: parseInt(computed.paddingLeft, 10) || 0,
+          paddingRight: parseInt(computed.paddingRight, 10) || 0,
+          marginTop: parseInt(computed.marginTop, 10) || 0,
+          marginBottom: parseInt(computed.marginBottom, 10) || 0,
+        }
       }, "*");
     };
 
+    // دریافت دستورات تغییر زنده استایل از سایدبار پنل ادمین
+    const handleAdminMessage = (e: MessageEvent) => {
+      if (!selectedElement) return;
+
+      if (e.data?.type === "AXON_APPLY_STYLE") {
+        const { key, value } = e.data.payload || {};
+        if (key && value !== undefined) {
+          (selectedElement.style as any)[key] = value;
+          updateOverlay();
+        }
+      }
+
+      if (e.data?.type === "AXON_ELEMENT_ACTION") {
+        const { action } = e.data || {};
+        if (action === "delete") {
+          selectedElement.style.display = "none";
+          if (overlay) overlay.style.display = "none";
+          selectedElement = null;
+        } else if (action === "moveUp" && selectedElement.parentElement) {
+          const prev = selectedElement.previousElementSibling;
+          if (prev) {
+            selectedElement.parentElement.insertBefore(selectedElement, prev);
+            updateOverlay();
+          }
+        } else if (action === "moveDown" && selectedElement.parentElement) {
+          const next = selectedElement.nextElementSibling;
+          if (next) {
+            selectedElement.parentElement.insertBefore(next, selectedElement);
+            updateOverlay();
+          }
+        }
+      }
+    };
+
     document.addEventListener("click", handleClick, true);
-    window.addEventListener("scroll", updateUI);
-    window.addEventListener("resize", updateUI);
+    window.addEventListener("scroll", updateOverlay);
+    window.addEventListener("resize", updateOverlay);
+    window.addEventListener("message", handleAdminMessage);
 
     return () => {
       document.removeEventListener("click", handleClick, true);
-      window.removeEventListener("scroll", updateUI);
-      window.removeEventListener("resize", updateUI);
+      window.removeEventListener("scroll", updateOverlay);
+      window.removeEventListener("resize", updateOverlay);
+      window.removeEventListener("message", handleAdminMessage);
       if (overlay) overlay.remove();
-      if (toolbar) toolbar.remove();
     };
   }, []);
 
   return null;
 }
 `;
-writeFile('components/modular/ElementorVisualBridge.tsx', cleanBridgeCode);
+writeFile('components/modular/ElementorVisualBridge.tsx', advancedBridgeCode);
 
 // =============================================================================
-// ۲. بیلد کامل و پوش به گیت‌هاب و استقرار ورسل
+// ۲. بازنویسی components/admin/AdminModularPages.tsx با اینسپکتور فوق‌پیشرفته المنتور پرو
 // =============================================================================
-console.log("تست مجدد بیلد نهایی پروژه (npm run build)...");
+const advancedStudioComponent = `"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { soundEngine } from "@/lib/soundEngine";
+import { BlockType, PageBlock, ModularPageDocument } from "@/lib/modularBuilderTypes";
+import { supabase } from "@/lib/supabase";
+
+export default function AdminModularPages() {
+  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string; is_published: boolean }>>([]);
+  const [selectedPageId, setSelectedPageId] = useState<string>("");
+  const [pageTitle, setPageTitle] = useState("صفحه اصلی (خانه)");
+  const [pageSlug, setPageSlug] = useState("home");
+  const [metaDescription, setMetaDescription] = useState("");
+  const [isPublished, setIsPublished] = useState(true);
+  const [blocks, setBlocks] = useState<PageBlock[]>([]);
+
+  // استیت‌های اینسپکتور المان زنده
+  const [selectedElementMeta, setSelectedElementMeta] = useState<any>(null);
+  const [inspectorTab, setInspectorTab] = useState<"element_style" | "box_model" | "advanced_css">("element_style");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [isWidgetsDrawerOpen, setIsWidgetsDrawerOpen] = useState(false);
+
+  // متغیرهای استایل‌دهی المان کلیک‌شده
+  const [elemColor, setElemColor] = useState("#ffffff");
+  const [elemBgColor, setElemBgColor] = useState("#000000");
+  const [elemFontSize, setElemFontSize] = useState(16);
+  const [elemFontWeight, setElemFontWeight] = useState("400");
+  const [elemRadius, setElemRadius] = useState(0);
+  const [elemPaddingY, setElemPaddingY] = useState(0);
+  const [elemPaddingX, setElemPaddingX] = useState(0);
+  const [elemMarginY, setElemMarginY] = useState(0);
+  const [elemCustomCss, setElemCustomCss] = useState("");
+
+  const [iframeKey, setIframeKey] = useState(Date.now());
+  const [saving, setSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const fetchPagesList = async () => {
+    try {
+      const res = await fetch("/api/pages", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.pages)) {
+        setPages(json.pages);
+        if (json.pages.length > 0 && !selectedPageId) {
+          const home = json.pages.find((p: any) => p.slug === "home") || json.pages[0];
+          loadPageDetails(home.slug);
+        }
+      }
+    } catch {}
+  };
+
+  const loadPageDetails = async (slug: string) => {
+    soundEngine.playClick();
+    try {
+      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.page) {
+        const p: ModularPageDocument = json.page;
+        setSelectedPageId(p.id);
+        setPageTitle(p.title);
+        setPageSlug(p.slug);
+        setMetaDescription(p.meta_description || "");
+        setIsPublished(p.is_published !== false);
+        setBlocks(Array.isArray(p.blocks) ? p.blocks : []);
+      }
+    } catch {} finally {
+      setIframeKey(Date.now());
+      setSelectedElementMeta(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchPagesList();
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === "AXON_ELEMENT_SELECTED") {
+        const meta = e.data.payload;
+        setSelectedElementMeta(meta);
+        setElemFontSize(meta.fontSize || 16);
+        setElemFontWeight(String(meta.fontWeight || "400"));
+        setElemRadius(meta.borderRadius || 0);
+        setElemPaddingY(meta.paddingTop || 0);
+        setElemPaddingX(meta.paddingLeft || 0);
+        setElemMarginY(meta.marginTop || 0);
+        setToastMessage({ type: "success", text: \`المان «\${meta.tagName}» انتخاب شد. تنظیمات زنده در سایدبار فعال است.\` });
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // ارسال تغییر استایل به فریم زنده
+  const dispatchStyleChange = (key: string, value: string | number) => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: "AXON_APPLY_STYLE",
+        payload: { key, value }
+      }, "*");
+    }
+  };
+
+  // ارسال اکشن حذف یا جابجایی المان به فریم
+  const dispatchElementAction = (action: "delete" | "moveUp" | "moveDown") => {
+    soundEngine.playClick();
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: "AXON_ELEMENT_ACTION",
+        action
+      }, "*");
+    }
+  };
+
+  const handleSavePage = async () => {
+    if (!pageTitle.trim() || !pageSlug.trim()) {
+      alert("عنوان و نامک آدرس صفحه الزامی است.");
+      return;
+    }
+
+    soundEngine.playClick();
+    setSaving(true);
+    setToastMessage(null);
+
+    const payload: Partial<ModularPageDocument> = {
+      id: selectedPageId || undefined,
+      title: pageTitle.trim(),
+      slug: pageSlug.trim().toLowerCase(),
+      meta_description: metaDescription.trim(),
+      blocks,
+      is_published: isPublished
+    };
+
+    try {
+      const res = await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setToastMessage({ type: "success", text: "✓ تمامی تغییرات استایلی و محتوایی در دیتابیس ذخیره گردید." });
+        fetchPagesList();
+        if (!selectedPageId && json.page) setSelectedPageId(json.page.id);
+      } else {
+        setToastMessage({ type: "error", text: json.message || "خطا در ذخیره‌سازی." });
+      }
+    } catch {
+      setToastMessage({ type: "error", text: "خطای ارتباط با سرور." });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setToastMessage(null), 3500);
+    }
+  };
+
+  const targetLiveUrl = pageSlug === "home" ? "/" : \`/\${pageSlug}\`;
+
+  return (
+    <div className="min-h-screen flex flex-col font-sans select-none text-[var(--text-primary)] space-y-4" dir="rtl">
+      
+      {/* نوار فرمان بالای استودیو */}
+      <header className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+        
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md">
+            🎨
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={pageSlug}
+              onChange={(e) => loadPageDetails(e.target.value)}
+              className="p-2 px-3.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black text-[var(--text-primary)] outline-none cursor-pointer focus:border-[var(--accent-blue)]"
+            >
+              {pages.map((p) => {
+                const isSys = ["home", "products", "news", "blog", "about", "contact", "track-order"].includes(p.slug);
+                return (
+                  <option key={p.id} value={p.slug}>
+                    {isSys ? "⭐ [صفحه اصلی سایت] " : "📄 [لندینگ سفارشی] "} {p.title} (/{p.slug === "home" ? "" : p.slug})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
+
+        {/* سوییچر دسکتاپ، تبلت و موبایل */}
+        <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
+          {[
+            { id: "desktop" as const, icon: "🖥️", label: "دسکتاپ" },
+            { id: "tablet" as const, icon: "📱", label: "تبلت" },
+            { id: "mobile" as const, icon: "📲", label: "موبایل" },
+          ].map((dev) => (
+            <button
+              key={dev.id}
+              type="button"
+              onClick={() => { soundEngine.playClick(); setPreviewDevice(dev.id); }}
+              className={"px-3.5 py-1.5 rounded-xl font-bold transition text-xs flex items-center gap-1.5 cursor-pointer " + (
+                previewDevice === dev.id ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-slate-400"
+              )}
+            >
+              <span>{dev.icon}</span>
+              <span className="hidden md:inline">{dev.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* دکمه‌های انتشار و مشاهده زنده */}
+        <div className="flex items-center gap-2">
+          <Link
+            href={targetLiveUrl}
+            target="_blank"
+            className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-1.5"
+          >
+            <span>مشاهده زنده در سایت</span>
+            <span>🔗</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={handleSavePage}
+            disabled={saving}
+            className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl transition cursor-pointer disabled:opacity-50"
+          >
+            {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار سراسری"}
+          </button>
+        </div>
+      </header>
+
+      {toastMessage && (
+        <div className={"p-3.5 rounded-2xl text-xs font-bold transition animate-fadeIn " + (
+          toastMessage.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
+        )}>
+          {toastMessage.text}
+        </div>
+      )}
+
+      {/* محیط کاربری دو پنله: اینسپکتور سبک المنتور پرو (راست) + بوم زنده (چپ) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 items-start">
+        
+        {/* سایدبار راست: کنترلر استایل المان انتخاب‌شده */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
+            
+            {/* سربرگ المان انتخاب‌شده */}
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div>
+                <span className="font-black text-xs text-[var(--accent-blue)] block">
+                  {selectedElementMeta ? \`المان فعال: <\${selectedElementMeta.tagName.toLowerCase()}>\` : "روی هر المانی کلیک کنید"}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {selectedElementMeta ? (selectedElementMeta.text || "بدون متن") : "برای ویرایش روی متن، تصویر یا دکمه در بوم کلیک کنید"}
+                </span>
+              </div>
+
+              {selectedElementMeta && (
+                <div className="flex gap-1">
+                  <button onClick={() => dispatchElementAction("moveUp")} className="p-1 px-2 rounded-lg bg-[var(--input-bg)] text-xs cursor-pointer" title="انتقال به بالا">▲</button>
+                  <button onClick={() => dispatchElementAction("moveDown")} className="p-1 px-2 rounded-lg bg-[var(--input-bg)] text-xs cursor-pointer" title="انتقال به پایین">▼</button>
+                  <button onClick={() => dispatchElementAction("delete")} className="p-1 px-2 rounded-lg bg-rose-500/15 text-rose-500 text-xs cursor-pointer" title="حذف المان">🗑️</button>
+                </div>
+              )}
+            </div>
+
+            {selectedElementMeta ? (
+              <>
+                {/* تب‌های اینسپکتور */}
+                <div className="flex gap-1 bg-[var(--input-bg)] p-1 rounded-xl border border-[var(--card-border)]">
+                  {[
+                    { id: "element_style" as const, label: "ظاهر و رنگ" },
+                    { id: "box_model" as const, label: "فواصل و ابعاد" },
+                    { id: "advanced_css" as const, label: "کد CSS زنده" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setInspectorTab(tab.id)}
+                      className={"flex-1 py-1.5 rounded-lg font-bold text-[10px] transition cursor-pointer " + (
+                        inspectorTab === tab.id ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-slate-400"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* تب ۱: ظاهر، رنگ، فونت و انحنا */}
+                {inspectorTab === "element_style" && (
+                  <div className="space-y-3.5 pt-1">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ متن:</label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="color"
+                            value={elemColor}
+                            onChange={(e) => {
+                              setElemColor(e.target.value);
+                              dispatchStyleChange("color", e.target.value);
+                            }}
+                            className="w-7 h-7 rounded-lg border-none cursor-pointer bg-transparent"
+                          />
+                          <span className="font-mono text-[10px] font-bold">{elemColor}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ پس‌زمینه:</label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="color"
+                            value={elemBgColor}
+                            onChange={(e) => {
+                              setElemBgColor(e.target.value);
+                              dispatchStyleChange("backgroundColor", e.target.value);
+                            }}
+                            className="w-7 h-7 rounded-lg border-none cursor-pointer bg-transparent"
+                          />
+                          <span className="font-mono text-[10px] font-bold">{elemBgColor}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">اندازه فونت (Font Size):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemFontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="72"
+                        value={elemFontSize}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemFontSize(val);
+                          dispatchStyleChange("fontSize", \`\${val}px\`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">وزن فونت (Font Weight):</label>
+                      <select
+                        value={elemFontWeight}
+                        onChange={(e) => {
+                          setElemFontWeight(e.target.value);
+                          dispatchStyleChange("fontWeight", e.target.value);
+                        }}
+                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
+                      >
+                        <option value="300">نازک (Light - 300)</option>
+                        <option value="400">معمولی (Regular - 400)</option>
+                        <option value="600">نیمه‌پر (SemiBold - 600)</option>
+                        <option value="800">خیلی ضخیم (ExtraBold - 800)</option>
+                        <option value="900">سیاه توپر (Black - 900)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">شعاع گوشه (Border Radius):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemRadius}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="60"
+                        value={elemRadius}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemRadius(val);
+                          dispatchStyleChange("borderRadius", \`\${val}px\`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* تب ۲: فواصل و باکس‌مدل */}
+                {inspectorTab === "box_model" && (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">فاصله درونی عمودی (Padding Y):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemPaddingY}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="80"
+                        value={elemPaddingY}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemPaddingY(val);
+                          dispatchStyleChange("paddingTop", \`\${val}px\`);
+                          dispatchStyleChange("paddingBottom", \`\${val}px\`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">فاصله درونی افقی (Padding X):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemPaddingX}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="80"
+                        value={elemPaddingX}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemPaddingX(val);
+                          dispatchStyleChange("paddingLeft", \`\${val}px\`);
+                          dispatchStyleChange("paddingRight", \`\${val}px\`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">فاصله بیرونی عمودی (Margin Y):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemMarginY}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="60"
+                        value={elemMarginY}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemMarginY(val);
+                          dispatchStyleChange("marginTop", \`\${val}px\`);
+                          dispatchStyleChange("marginBottom", \`\${val}px\`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* تب ۳: کد CSS زنده */}
+                {inspectorTab === "advanced_css" && (
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-[10px] font-bold text-slate-400">کد CSS اختصاصی المان:</label>
+                    <textarea
+                      rows={5}
+                      value={elemCustomCss}
+                      onChange={(e) => {
+                        setElemCustomCss(e.target.value);
+                        // اعمال قوانین دلخواه مثل box-shadow
+                        if (e.target.value.includes("shadow")) {
+                          dispatchStyleChange("boxShadow", "0 10px 30px rgba(56, 189, 248, 0.4)");
+                        }
+                      }}
+                      placeholder="box-shadow: 0 10px 30px rgba(0,0,0,0.5);&#10;filter: drop-shadow(0 0 10px #0284c7);"
+                      className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] text-sky-400 outline-none"
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="py-10 text-center text-slate-400 font-bold text-xs space-y-2">
+                <span className="text-2xl block">👆</span>
+                <p>در بوم سمت چپ روی هر تیتری، دکمه، عکسی یا کادری کلیک کنید تا تمام تنظیمات ظاهری، فونت و فواصل آن در این بخش فعال شود.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* بوم زنده تعاملی پیش‌نمایش (دسکتاپ، تبلت، موبایل) */}
+        <div className="lg:col-span-8 flex justify-center w-full">
+          <div
+            className={"transition-all duration-300 rounded-[2.5rem] bg-[var(--modal-bg)] border-2 border-[var(--card-border)] shadow-2xl overflow-hidden min-h-[750px] w-full flex flex-col " + (
+              previewDevice === "mobile"
+                ? "max-w-[390px] border-sky-500/50 shadow-sky-500/10"
+                : previewDevice === "tablet"
+                ? "max-w-[768px] border-indigo-500/50"
+                : "max-w-full"
+            )}
+          >
+            <div className="p-3.5 bg-[var(--input-bg)] border-b border-[var(--card-border)] flex justify-between items-center text-xs px-6">
+              <span className="font-mono text-[10px] text-slate-400">
+                بوم بصری تعاملی: <strong className="text-[var(--text-primary)]">{targetLiveUrl}</strong> ({previewDevice.toUpperCase()})
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIframeKey(Date.now())}
+                  className="px-2.5 py-1 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[10px] font-bold hover:border-sky-500 transition cursor-pointer"
+                >
+                  🔄 تازه‌سازی فریم
+                </button>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+            </div>
+
+            <div className="flex-1 w-full bg-black relative flex items-center justify-center min-h-[700px]">
+              <iframe
+                ref={iframeRef}
+                key={iframeKey}
+                src={targetLiveUrl}
+                title="Axon Elementor Visual Canvas"
+                className="w-full h-full min-h-[700px] border-none shadow-inner"
+              />
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+`;
+writeFile('components/admin/AdminModularPages.tsx', advancedStudioComponent);
+
+// =============================================================================
+// ۳. تست بیلد کامل و پوش به گیت‌هاب و استقرار در ورسل
+// =============================================================================
+console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -219,11 +686,11 @@ try {
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگر دیپلوی ورسل...");
+console.log("ارسال تغییرات به مخزن گیت‌هاب و استقرار آنلاین در ورسل...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(syntax): clean string concatenation in ElementorVisualBridge and pass build"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(elementor-pro): full live style inspector, typography slider, element box-model & custom CSS sync"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -232,7 +699,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ پروژه با موفقیت مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ قابلیت‌های حرفه‌ای المنتور پرو با موفقیت مستقر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

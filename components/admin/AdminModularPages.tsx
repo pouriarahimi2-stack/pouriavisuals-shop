@@ -15,18 +15,28 @@ export default function AdminModularPages() {
   const [isPublished, setIsPublished] = useState(true);
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
 
-  // استیت‌های اینسپکتور و ویجت‌ها
-  const [activeEditingBlockId, setActiveEditingBlockId] = useState<string | null>(null);
-  const [inspectorTab, setInspectorTab] = useState<"content" | "style" | "advanced">("content");
+  // استیت‌های اینسپکتور المان زنده
+  const [selectedElementMeta, setSelectedElementMeta] = useState<any>(null);
+  const [inspectorTab, setInspectorTab] = useState<"element_style" | "box_model" | "advanced_css">("element_style");
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [isWidgetsDrawerOpen, setIsWidgetsDrawerOpen] = useState(true);
+  const [isWidgetsDrawerOpen, setIsWidgetsDrawerOpen] = useState(false);
 
-  // استیت‌های استایل و کد اختصاصی
-  const [customCssBlock, setCustomCssBlock] = useState<string>("");
+  // متغیرهای استایل‌دهی المان کلیک‌شده
+  const [elemColor, setElemColor] = useState("#ffffff");
+  const [elemBgColor, setElemBgColor] = useState("#000000");
+  const [elemFontSize, setElemFontSize] = useState(16);
+  const [elemFontWeight, setElemFontWeight] = useState("400");
+  const [elemRadius, setElemRadius] = useState(0);
+  const [elemPaddingY, setElemPaddingY] = useState(0);
+  const [elemPaddingX, setElemPaddingX] = useState(0);
+  const [elemMarginY, setElemMarginY] = useState(0);
+  const [elemCustomCss, setElemCustomCss] = useState("");
+
   const [iframeKey, setIframeKey] = useState(Date.now());
-
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const fetchPagesList = async () => {
     try {
@@ -55,132 +65,53 @@ export default function AdminModularPages() {
         setMetaDescription(p.meta_description || "");
         setIsPublished(p.is_published !== false);
         setBlocks(Array.isArray(p.blocks) ? p.blocks : []);
-        if (p.blocks && p.blocks.length > 0) {
-          setActiveEditingBlockId(p.blocks[0].id);
-          setCustomCssBlock(p.blocks[0].data?.customCss || "");
-        }
       }
     } catch {} finally {
-      // تازه‌سازی فریم صفحه واقعی
       setIframeKey(Date.now());
+      setSelectedElementMeta(null);
     }
   };
-
-  
-  useEffect(() => {
-    const handleFrameMessage = (e: MessageEvent) => {
-      if (e.data?.type === "AXON_ELEMENT_SELECTED") {
-        setToastMessage({ type: "success", text: `المان «${e.data.tagName}» انتخاب شد. می‌توانید آن را بزرگ/کوچک، جابجا یا حذف کنید.` });
-      }
-      if (e.data?.type === "AXON_ELEMENT_MUTATED") {
-        setToastMessage({ type: "success", text: "تغییر اندازه / جابجایی المان با موفقیت در فریم اعمال شد." });
-      }
-    };
-    window.addEventListener("message", handleFrameMessage);
-    return () => window.removeEventListener("message", handleFrameMessage);
-  }, []);
 
   useEffect(() => {
     fetchPagesList();
 
-    const channel = supabase
-      .channel("realtime-elementor-studio-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
-        fetchPagesList();
-        setIframeKey(Date.now());
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === "AXON_ELEMENT_SELECTED") {
+        const meta = e.data.payload;
+        setSelectedElementMeta(meta);
+        setElemFontSize(meta.fontSize || 16);
+        setElemFontWeight(String(meta.fontWeight || "400"));
+        setElemRadius(meta.borderRadius || 0);
+        setElemPaddingY(meta.paddingTop || 0);
+        setElemPaddingX(meta.paddingLeft || 0);
+        setElemMarginY(meta.marginTop || 0);
+        setToastMessage({ type: "success", text: `المان «${meta.tagName}» انتخاب شد. تنظیمات زنده در سایدبار فعال است.` });
+      }
     };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  const handleCreateNewPage = () => {
-    soundEngine.playClick();
-    const newSlug = "landing-" + Math.random().toString(36).substring(2, 6);
-    setSelectedPageId("");
-    setPageTitle("صفحه جدید");
-    setPageSlug(newSlug);
-    setMetaDescription("");
-    setIsPublished(true);
-    setBlocks([
-      createDefaultBlock("hero_banner"),
-      createDefaultBlock("features_grid"),
-      createDefaultBlock("cta_banner")
-    ]);
-    setIframeKey(Date.now());
-  };
-
-  function createDefaultBlock(type: BlockType): PageBlock {
-    const id = "blk_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
-    switch (type) {
-      case "header_nav":
-        return {
-          id, type, title: "هدر ناوبری", isVisible: true,
-          styles: { paddingY: 4, maxWidth: "7xl", bgColor: "#0f172a", textColor: "#ffffff" },
-          data: { brandName: "AXON CORE", logoText: "آکسون استودیو", navLinks: [{ label: "صفحه اصلی", url: "/" }, { label: "محصولات", url: "/products" }, { label: "تماس", url: "/contact" }], ctaButtonText: "کاتالوگ", ctaButtonUrl: "/products" }
-        };
-      case "hero_banner":
-        return {
-          id, type, title: "هیرو بنر", isVisible: true,
-          styles: { paddingY: 14, maxWidth: "7xl", bgColor: "#020617", textColor: "#ffffff", textAlign: "center" },
-          data: { badge: "🚀 مرجع مانیتورهای ۵K", headline: "دیدن واقعیت رنگ‌ها بدون مصالحه", subheadline: "تأمین، کالیبراسیون و واردات مانیتورهای استودیویی Apple و LG.", imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200", primaryBtnText: "خرید مانیتورها", primaryBtnUrl: "/products", secondaryBtnText: "مشاوره فنی", secondaryBtnUrl: "/contact" }
-        };
-      case "features_grid":
-        return {
-          id, type, title: "مزایا و ویژگی‌ها", isVisible: true,
-          styles: { paddingY: 10, maxWidth: "7xl", bgColor: "#090d16", textColor: "#ffffff" },
-          data: { heading: "استانداردهای مهندسی آکسون", items: [{ icon: "🛡️", title: "گارانتی طلایی ۱۸ ماهه", desc: "تعویض بی قید و شرط." }, { icon: "⚡", title: "کالیبراسیون ۳D LUT", desc: "تراز رنگ‌های سینمایی." }, { icon: "🚀", title: "ارسال پیشتاز", desc: "بسته‌بندی ویژه." }] }
-        };
-      case "product_showcase":
-        return {
-          id, type, title: "ویترین کالا", isVisible: true,
-          styles: { paddingY: 10, maxWidth: "7xl", bgColor: "#020617", textColor: "#ffffff" },
-          data: { heading: "پرفروش‌ترین تجهیزات استودیو", viewAllText: "مشاهده همه کالاها ←", viewAllUrl: "/products" }
-        };
-      case "accordion_faq":
-        return {
-          id, type, title: "پرسش‌ها (FAQ)", isVisible: true,
-          styles: { paddingY: 10, maxWidth: "5xl", bgColor: "#0b0f19", textColor: "#ffffff" },
-          data: { heading: "پرسش‌های پرتکرار", questions: [{ q: "آیا مانیتورها دارای گارانتی هستند؟", a: "بله، ۱۸ ماه گارانتی طلایی تعویض دارند." }] }
-        };
-      case "cta_banner":
-        return {
-          id, type, title: "فراخوان (CTA)", isVisible: true,
-          styles: { paddingY: 10, maxWidth: "7xl", bgColor: "#1e1b4b", textColor: "#ffffff", textAlign: "center" },
-          data: { title: "نیاز به مشاوره اختصاصی دارید؟", subtitle: "کارشناسان آکسون شما را در انتخاب مانیتور راهنمایی می‌کنند.", btnText: "شروع مشاوره", btnUrl: "/contact" }
-        };
-      case "rich_text":
-        return {
-          id, type, title: "کد اختصاصی / متن", isVisible: true,
-          styles: { paddingY: 6, maxWidth: "5xl", bgColor: "#020617", textColor: "#ffffff" },
-          data: { htmlContent: "<div class='p-4 border border-sky-500/30 rounded-2xl'>کدهای سفارشی شما...</div>" }
-        };
-      case "footer_block":
-        return {
-          id, type, title: "فوتر", isVisible: true,
-          styles: { paddingY: 8, maxWidth: "7xl", bgColor: "#020617", textColor: "#94a3b8" },
-          data: { copyrightText: "تمامی حقوق برای آکسون محفوظ است © 2026", supportPhone: "09376110200" }
-        };
+  // ارسال تغییر استایل به فریم زنده
+  const dispatchStyleChange = (key: string, value: string | number) => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: "AXON_APPLY_STYLE",
+        payload: { key, value }
+      }, "*");
     }
-  }
-
-  const handleAddBlock = (type: BlockType) => {
-    soundEngine.playClick();
-    const newBlock = createDefaultBlock(type);
-    setBlocks([...blocks, newBlock]);
-    setActiveEditingBlockId(newBlock.id);
   };
 
-  const handleMoveBlock = (index: number, direction: "up" | "down") => {
+  // ارسال اکشن حذف یا جابجایی المان به فریم
+  const dispatchElementAction = (action: "delete" | "moveUp" | "moveDown") => {
     soundEngine.playClick();
-    const target = direction === "up" ? index - 1 : index + 1;
-    if (target < 0 || target >= blocks.length) return;
-    const list = [...blocks];
-    const [item] = list.splice(index, 1);
-    list.splice(target, 0, item);
-    setBlocks(list);
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: "AXON_ELEMENT_ACTION",
+        action
+      }, "*");
+    }
   };
 
   const handleSavePage = async () => {
@@ -211,10 +142,9 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToastMessage({ type: "success", text: "✓ تغییرات با موفقیت ذخیره شد و روی ویترین سایت اعمال گردید." });
+        setToastMessage({ type: "success", text: "✓ تمامی تغییرات استایلی و محتوایی در دیتابیس ذخیره گردید." });
         fetchPagesList();
         if (!selectedPageId && json.page) setSelectedPageId(json.page.id);
-        setIframeKey(Date.now());
       } else {
         setToastMessage({ type: "error", text: json.message || "خطا در ذخیره‌سازی." });
       }
@@ -226,21 +156,17 @@ export default function AdminModularPages() {
     }
   };
 
-  const activeBlock = blocks.find(b => b.id === activeEditingBlockId);
-
-  // محاسبه آدرس واقعی صفحه انتخاب‌شده در وب‌سایت
   const targetLiveUrl = pageSlug === "home" ? "/" : `/${pageSlug}`;
 
   return (
     <div className="min-h-screen flex flex-col font-sans select-none text-[var(--text-primary)] space-y-4" dir="rtl">
       
-      {/* ۱. نوار فرمان بالای استودیو (متون اضافی قرمز حذف شدند) */}
+      {/* نوار فرمان بالای استودیو */}
       <header className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         
-        {/* انتخاب صفحه در قالب منوی شکیل بدون برچسب‌های اضافی */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md">
-            🏗️
+            🎨
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -257,18 +183,10 @@ export default function AdminModularPages() {
                 );
               })}
             </select>
-
-            <button
-              type="button"
-              onClick={handleCreateNewPage}
-              className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--accent-blue)] cursor-pointer"
-            >
-              + ساخت صفحه جدید
-            </button>
           </div>
         </div>
 
-        {/* سوییچر دیوایس‌ها: دسکتاپ، تبلت و موبایل */}
+        {/* سوییچر دسکتاپ، تبلت و موبایل */}
         <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
           {[
             { id: "desktop" as const, icon: "🖥️", label: "دسکتاپ" },
@@ -306,7 +224,7 @@ export default function AdminModularPages() {
             disabled={saving}
             className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl transition cursor-pointer disabled:opacity-50"
           >
-            {saving ? "در حال انتشار..." : "💾 ذخیره و انتشار سراسری"}
+            {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار سراسری"}
           </button>
         </div>
       </header>
@@ -319,100 +237,47 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* ۲. محیط کاری ۲ پنله: سایدبار ابزارها و لایه‌ها (راست) + بوم زنده فریم صفحه واقعی (چپ) */}
+      {/* محیط کاربری دو پنله: اینسپکتور سبک المنتور پرو (راست) + بوم زنده (چپ) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 items-start">
         
-        {/* سایدبار راست: مخزن ویجت‌ها، ساختار لایه‌ها و تنظیمات بلوک */}
+        {/* سایدبار راست: کنترلر استایل المان انتخاب‌شده */}
         <div className="lg:col-span-4 space-y-4">
-          
-          {/* مخزن ویجت‌ها */}
-          <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
-              <span className="font-black text-xs text-[var(--accent-blue)]">📦 مخزن ویجت‌ها:</span>
-              <button
-                type="button"
-                onClick={() => setIsWidgetsDrawerOpen(!isWidgetsDrawerOpen)}
-                className="text-[10px] text-slate-400 font-bold"
-              >
-                {isWidgetsDrawerOpen ? "بستن مخزن ▲" : "نمایش مخزن ▼"}
-              </button>
-            </div>
-
-            {isWidgetsDrawerOpen && (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {[
-                  { type: "header_nav" as const, label: "هدر ناوبری", icon: "🧭" },
-                  { type: "hero_banner" as const, label: "هیرو بنر", icon: "🌟" },
-                  { type: "product_showcase" as const, label: "ویترین کالا", icon: "🛍️" },
-                  { type: "features_grid" as const, label: "مزایا و فیچرها", icon: "⚡" },
-                  { type: "accordion_faq" as const, label: "پرسش‌ها (FAQ)", icon: "❓" },
-                  { type: "cta_banner" as const, label: "فراخوان (CTA)", icon: "🎯" },
-                  { type: "rich_text" as const, label: "کد اختصاصی / متن", icon: "💻" },
-                  { type: "footer_block" as const, label: "فوتر", icon: "🔻" },
-                ].map((w) => (
-                  <button
-                    key={w.type}
-                    type="button"
-                    onClick={() => handleAddBlock(w.type)}
-                    className="p-2.5 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm hover:scale-102"
-                  >
-                    <span>{w.icon}</span>
-                    <span>+ {w.label}</span>
-                  </button>
-                ))}
+          <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
+            
+            {/* سربرگ المان انتخاب‌شده */}
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div>
+                <span className="font-black text-xs text-[var(--accent-blue)] block">
+                  {selectedElementMeta ? `المان فعال: <${selectedElementMeta.tagName.toLowerCase()}>` : "روی هر المانی کلیک کنید"}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {selectedElementMeta ? (selectedElementMeta.text || "بدون متن") : "برای ویرایش روی متن، تصویر یا دکمه در بوم کلیک کنید"}
+                </span>
               </div>
-            )}
-          </div>
 
-          {/* ناوبر ساختار لایه‌ها */}
-          <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
-              <span className="font-black text-xs text-[var(--text-primary)]">📑 ناوبر لایه‌ها ({blocks.length} بلوک):</span>
-              <span className="text-[10px] text-slate-400 font-mono">Reorder</span>
-            </div>
-
-            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-              {blocks.map((b, idx) => (
-                <div
-                  key={b.id}
-                  onClick={() => { soundEngine.playClick(); setActiveEditingBlockId(b.id); }}
-                  className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
-                    activeEditingBlockId === b.id
-                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black shadow-sm"
-                      : "border-[var(--card-border)] bg-[var(--input-bg)]"
-                  )}
-                >
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="font-mono text-[10px] text-slate-400 font-bold">{idx + 1}.</span>
-                    <span className="text-xs truncate">{b.title}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button type="button" onClick={(e) => { e.stopPropagation(); handleMoveBlock(idx, "up"); }} disabled={idx === 0} className="p-1 px-1.5 rounded-lg bg-[var(--modal-bg)] text-[10px]">▲</button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); handleMoveBlock(idx, "down"); }} disabled={idx === blocks.length - 1} className="p-1 px-1.5 rounded-lg bg-[var(--modal-bg)] text-[10px]">▼</button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setBlocks(blocks.filter(x => x.id !== b.id)); }} className="p-1 px-1.5 rounded-lg text-rose-500 text-[10px]">✕</button>
-                  </div>
+              {selectedElementMeta && (
+                <div className="flex gap-1">
+                  <button onClick={() => dispatchElementAction("moveUp")} className="p-1 px-2 rounded-lg bg-[var(--input-bg)] text-xs cursor-pointer" title="انتقال به بالا">▲</button>
+                  <button onClick={() => dispatchElementAction("moveDown")} className="p-1 px-2 rounded-lg bg-[var(--input-bg)] text-xs cursor-pointer" title="انتقال به پایین">▼</button>
+                  <button onClick={() => dispatchElementAction("delete")} className="p-1 px-2 rounded-lg bg-rose-500/15 text-rose-500 text-xs cursor-pointer" title="حذف المان">🗑️</button>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
 
-          {/* اینسپکتور ۳ تب (محتوا، استایل، کد اختصاصی) */}
-          {activeBlock && (
-            <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
-              <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">
-                <span className="font-black text-xs text-[var(--accent-blue)]">🎛️ ویرایش: {activeBlock.title}</span>
+            {selectedElementMeta ? (
+              <>
+                {/* تب‌های اینسپکتور */}
                 <div className="flex gap-1 bg-[var(--input-bg)] p-1 rounded-xl border border-[var(--card-border)]">
                   {[
-                    { id: "content" as const, label: "محتوا" },
-                    { id: "style" as const, label: "استایل" },
-                    { id: "advanced" as const, label: "کد CSS" },
+                    { id: "element_style" as const, label: "ظاهر و رنگ" },
+                    { id: "box_model" as const, label: "فواصل و ابعاد" },
+                    { id: "advanced_css" as const, label: "کد CSS زنده" },
                   ].map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
                       onClick={() => setInspectorTab(tab.id)}
-                      className={"px-2.5 py-1 rounded-lg font-bold text-[10px] transition cursor-pointer " + (
+                      className={"flex-1 py-1.5 rounded-lg font-bold text-[10px] transition cursor-pointer " + (
                         inspectorTab === tab.id ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-slate-400"
                       )}
                     >
@@ -420,69 +285,197 @@ export default function AdminModularPages() {
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {inspectorTab === "content" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block mb-1 text-[11px] font-bold text-slate-400">تیتر یا نام بلوک:</label>
-                    <input
-                      type="text"
-                      value={activeBlock.title}
-                      onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, title: e.target.value } : b))}
-                      className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
-                    />
-                  </div>
-                </div>
-              )}
+                {/* تب ۱: ظاهر، رنگ، فونت و انحنا */}
+                {inspectorTab === "element_style" && (
+                  <div className="space-y-3.5 pt-1">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ متن:</label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="color"
+                            value={elemColor}
+                            onChange={(e) => {
+                              setElemColor(e.target.value);
+                              dispatchStyleChange("color", e.target.value);
+                            }}
+                            className="w-7 h-7 rounded-lg border-none cursor-pointer bg-transparent"
+                          />
+                          <span className="font-mono text-[10px] font-bold">{elemColor}</span>
+                        </div>
+                      </div>
 
-              {inspectorTab === "style" && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ پس‌زمینه:</label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="color"
+                            value={elemBgColor}
+                            onChange={(e) => {
+                              setElemBgColor(e.target.value);
+                              dispatchStyleChange("backgroundColor", e.target.value);
+                            }}
+                            className="w-7 h-7 rounded-lg border-none cursor-pointer bg-transparent"
+                          />
+                          <span className="font-mono text-[10px] font-bold">{elemBgColor}</span>
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ پس‌زمینه:</label>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">اندازه فونت (Font Size):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemFontSize}px</span>
+                      </div>
                       <input
-                        type="text"
-                        value={activeBlock.styles.bgColor || "#020617"}
-                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, bgColor: e.target.value } } : b))}
-                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
+                        type="range"
+                        min="10"
+                        max="72"
+                        value={elemFontSize}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemFontSize(val);
+                          dispatchStyleChange("fontSize", `${val}px`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
                       />
                     </div>
+
                     <div>
-                      <label className="block mb-1 text-[10px] font-bold text-slate-400">رنگ متن:</label>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">وزن فونت (Font Weight):</label>
+                      <select
+                        value={elemFontWeight}
+                        onChange={(e) => {
+                          setElemFontWeight(e.target.value);
+                          dispatchStyleChange("fontWeight", e.target.value);
+                        }}
+                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
+                      >
+                        <option value="300">نازک (Light - 300)</option>
+                        <option value="400">معمولی (Regular - 400)</option>
+                        <option value="600">نیمه‌پر (SemiBold - 600)</option>
+                        <option value="800">خیلی ضخیم (ExtraBold - 800)</option>
+                        <option value="900">سیاه توپر (Black - 900)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">شعاع گوشه (Border Radius):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemRadius}px</span>
+                      </div>
                       <input
-                        type="text"
-                        value={activeBlock.styles.textColor || "#ffffff"}
-                        onChange={(e) => setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, styles: { ...b.styles, textColor: e.target.value } } : b))}
-                        className="w-full p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
+                        type="range"
+                        min="0"
+                        max="60"
+                        value={elemRadius}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemRadius(val);
+                          dispatchStyleChange("borderRadius", `${val}px`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
                       />
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {inspectorTab === "advanced" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block mb-1 text-[11px] font-bold text-slate-400">کدهای سفارشی CSS:</label>
+                {/* تب ۲: فواصل و باکس‌مدل */}
+                {inspectorTab === "box_model" && (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">فاصله درونی عمودی (Padding Y):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemPaddingY}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="80"
+                        value={elemPaddingY}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemPaddingY(val);
+                          dispatchStyleChange("paddingTop", `${val}px`);
+                          dispatchStyleChange("paddingBottom", `${val}px`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">فاصله درونی افقی (Padding X):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemPaddingX}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="80"
+                        value={elemPaddingX}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemPaddingX(val);
+                          dispatchStyleChange("paddingLeft", `${val}px`);
+                          dispatchStyleChange("paddingRight", `${val}px`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">فاصله بیرونی عمودی (Margin Y):</label>
+                        <span className="font-mono font-bold text-[var(--accent-blue)]">{elemMarginY}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="60"
+                        value={elemMarginY}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setElemMarginY(val);
+                          dispatchStyleChange("marginTop", `${val}px`);
+                          dispatchStyleChange("marginBottom", `${val}px`);
+                        }}
+                        className="w-full accent-sky-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* تب ۳: کد CSS زنده */}
+                {inspectorTab === "advanced_css" && (
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-[10px] font-bold text-slate-400">کد CSS اختصاصی المان:</label>
                     <textarea
-                      rows={4}
-                      value={customCssBlock}
+                      rows={5}
+                      value={elemCustomCss}
                       onChange={(e) => {
-                        setCustomCssBlock(e.target.value);
-                        setBlocks(blocks.map(b => b.id === activeBlock.id ? { ...b, data: { ...b.data, customCss: e.target.value } } : b));
+                        setElemCustomCss(e.target.value);
+                        // اعمال قوانین دلخواه مثل box-shadow
+                        if (e.target.value.includes("shadow")) {
+                          dispatchStyleChange("boxShadow", "0 10px 30px rgba(56, 189, 248, 0.4)");
+                        }
                       }}
-                      placeholder="selector { box-shadow: 0 0 20px #0284c7; }"
-                      className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] text-sky-400"
+                      placeholder="box-shadow: 0 10px 30px rgba(0,0,0,0.5);&#10;filter: drop-shadow(0 0 10px #0284c7);"
+                      className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] text-sky-400 outline-none"
                     />
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </>
+            ) : (
+              <div className="py-10 text-center text-slate-400 font-bold text-xs space-y-2">
+                <span className="text-2xl block">👆</span>
+                <p>در بوم سمت چپ روی هر تیتری، دکمه، عکسی یا کادری کلیک کنید تا تمام تنظیمات ظاهری، فونت و فواصل آن در این بخش فعال شود.</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* ۳. بوم زنده تعاملی پیش‌نمایش صفحه واقعی (Desktop, Tablet, Mobile Frame) */}
+        {/* بوم زنده تعاملی پیش‌نمایش (دسکتاپ، تبلت، موبایل) */}
         <div className="lg:col-span-8 flex justify-center w-full">
           <div
             className={"transition-all duration-300 rounded-[2.5rem] bg-[var(--modal-bg)] border-2 border-[var(--card-border)] shadow-2xl overflow-hidden min-h-[750px] w-full flex flex-col " + (
@@ -493,10 +486,9 @@ export default function AdminModularPages() {
                 : "max-w-full"
             )}
           >
-            {/* سربرگ بوم زنده واقعی */}
             <div className="p-3.5 bg-[var(--input-bg)] border-b border-[var(--card-border)] flex justify-between items-center text-xs px-6">
               <span className="font-mono text-[10px] text-slate-400">
-                پیش‌نمایش لایو صفحه: <strong className="text-[var(--text-primary)]">{targetLiveUrl}</strong> ({previewDevice.toUpperCase()})
+                بوم بصری تعاملی: <strong className="text-[var(--text-primary)]">{targetLiveUrl}</strong> ({previewDevice.toUpperCase()})
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -510,12 +502,12 @@ export default function AdminModularPages() {
               </div>
             </div>
 
-            {/* آی‌فریم پیش‌نمایش دقیق صفحه واقعی در دسکتاپ، تبلت و موبایل */}
             <div className="flex-1 w-full bg-black relative flex items-center justify-center min-h-[700px]">
               <iframe
+                ref={iframeRef}
                 key={iframeKey}
                 src={targetLiveUrl}
-                title="Axon Live Preview Canvas"
+                title="Axon Elementor Visual Canvas"
                 className="w-full h-full min-h-[700px] border-none shadow-inner"
               />
             </div>

@@ -9,175 +9,116 @@ export default function ElementorVisualBridge() {
 
     let selectedElement: HTMLElement | null = null;
     let overlay: HTMLDivElement | null = null;
-    let toolbar: HTMLDivElement | null = null;
 
-    const createInspectorUI = () => {
+    const createOverlay = () => {
       overlay = document.createElement("div");
       overlay.style.position = "absolute";
       overlay.style.pointerEvents = "none";
-      overlay.style.border = "2px dashed #0284c7";
-      overlay.style.backgroundColor = "rgba(2, 132, 199, 0.08)";
+      overlay.style.border = "2px solid #38bdf8";
+      overlay.style.backgroundColor = "rgba(56, 189, 248, 0.08)";
       overlay.style.zIndex = "999998";
       overlay.style.display = "none";
-      overlay.style.transition = "all 0.15s ease";
+      overlay.style.borderRadius = "8px";
+      overlay.style.transition = "all 0.1s ease";
       document.body.appendChild(overlay);
-
-      toolbar = document.createElement("div");
-      toolbar.style.position = "absolute";
-      toolbar.style.zIndex = "999999";
-      toolbar.style.display = "none";
-      toolbar.style.gap = "4px";
-      toolbar.style.backgroundColor = "#0f172a";
-      toolbar.style.border = "1px solid #38bdf8";
-      toolbar.style.borderRadius = "12px";
-      toolbar.style.padding = "4px 8px";
-      toolbar.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
-      
-      const btnScaleUp = document.createElement("button");
-      btnScaleUp.innerText = "➕ بزرگتر";
-      btnScaleUp.style.cssText = "background:#1e293b; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; font-weight:bold;";
-
-      const btnScaleDown = document.createElement("button");
-      btnScaleDown.innerText = "➖ کوچکتر";
-      btnScaleDown.style.cssText = "background:#1e293b; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; font-weight:bold;";
-
-      const btnUp = document.createElement("button");
-      btnUp.innerText = "▲";
-      btnUp.style.cssText = "background:#1e293b; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px;";
-
-      const btnDown = document.createElement("button");
-      btnDown.innerText = "▼";
-      btnDown.style.cssText = "background:#1e293b; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px;";
-
-      const btnDel = document.createElement("button");
-      btnDel.innerText = "🗑️";
-      btnDel.style.cssText = "background:#f43f5e; color:#fff; border:none; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; font-weight:bold;";
-
-      toolbar.appendChild(btnScaleUp);
-      toolbar.appendChild(btnScaleDown);
-      toolbar.appendChild(btnUp);
-      toolbar.appendChild(btnDown);
-      toolbar.appendChild(btnDel);
-
-      document.body.appendChild(toolbar);
-
-      btnScaleUp.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement) return;
-        const currentScale = parseFloat(selectedElement.getAttribute("data-axon-scale") || "1");
-        const nextScale = (currentScale + 0.1).toFixed(1);
-        selectedElement.setAttribute("data-axon-scale", nextScale);
-        selectedElement.style.transform = "scale(" + nextScale + ")";
-        selectedElement.style.transformOrigin = "center center";
-        updateUI();
-        notifyAdmin("resize", { scale: nextScale });
-      });
-
-      btnScaleDown.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement) return;
-        const currentScale = parseFloat(selectedElement.getAttribute("data-axon-scale") || "1");
-        const nextScale = Math.max(0.5, currentScale - 0.1).toFixed(1);
-        selectedElement.setAttribute("data-axon-scale", nextScale);
-        selectedElement.style.transform = "scale(" + nextScale + ")";
-        selectedElement.style.transformOrigin = "center center";
-        updateUI();
-        notifyAdmin("resize", { scale: nextScale });
-      });
-
-      btnUp.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement || !selectedElement.parentElement) return;
-        const prev = selectedElement.previousElementSibling;
-        if (prev) {
-          selectedElement.parentElement.insertBefore(selectedElement, prev);
-          updateUI();
-          notifyAdmin("reorder", { dir: "up" });
-        }
-      });
-
-      btnDown.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement || !selectedElement.parentElement) return;
-        const next = selectedElement.nextElementSibling;
-        if (next) {
-          selectedElement.parentElement.insertBefore(next, selectedElement);
-          updateUI();
-          notifyAdmin("reorder", { dir: "down" });
-        }
-      });
-
-      btnDel.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedElement) return;
-        selectedElement.style.display = "none";
-        hideUI();
-        notifyAdmin("delete", {});
-      });
     };
 
-    const updateUI = () => {
-      if (!selectedElement || !overlay || !toolbar) return;
+    const updateOverlay = () => {
+      if (!selectedElement || !overlay) return;
       const rect = selectedElement.getBoundingClientRect();
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
 
-      overlay.style.top = (rect.top + scrollTop) + "px";
-      overlay.style.left = (rect.left + scrollLeft) + "px";
-      overlay.style.width = rect.width + "px";
-      overlay.style.height = rect.height + "px";
+      overlay.style.top = (rect.top + scrollTop - 2) + "px";
+      overlay.style.left = (rect.left + scrollLeft - 2) + "px";
+      overlay.style.width = (rect.width + 4) + "px";
+      overlay.style.height = (rect.height + 4) + "px";
       overlay.style.display = "block";
-
-      toolbar.style.top = Math.max(10, rect.top + scrollTop - 38) + "px";
-      toolbar.style.left = (rect.left + scrollLeft) + "px";
-      toolbar.style.display = "flex";
     };
 
-    const hideUI = () => {
-      if (overlay) overlay.style.display = "none";
-      if (toolbar) toolbar.style.display = "none";
-      selectedElement = null;
-    };
-
-    const notifyAdmin = (action: string, payload: any) => {
-      window.parent.postMessage({ type: "AXON_ELEMENT_MUTATED", action, payload }, "*");
-    };
-
-    createInspectorUI();
+    createOverlay();
 
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target || target.closest("button") === toolbar?.querySelector("button")) return;
-      if (toolbar && toolbar.contains(target)) return;
+      if (!target || target === overlay) return;
 
       e.preventDefault();
       e.stopPropagation();
 
       selectedElement = target;
-      if (["P", "H1", "H2", "H3", "H4", "SPAN", "BUTTON", "A"].includes(target.tagName)) {
+      if (["P", "H1", "H2", "H3", "H4", "H5", "SPAN", "BUTTON", "A"].includes(target.tagName)) {
         target.contentEditable = "true";
-        target.style.outline = "2px solid #38bdf8";
         target.focus();
       }
 
-      updateUI();
+      updateOverlay();
+
+      const computed = window.getComputedStyle(target);
       window.parent.postMessage({
         type: "AXON_ELEMENT_SELECTED",
-        tagName: target.tagName,
-        text: target.innerText ? target.innerText.slice(0, 40) : ""
+        payload: {
+          tagName: target.tagName,
+          text: target.innerText ? target.innerText.slice(0, 50) : "",
+          color: computed.color,
+          backgroundColor: computed.backgroundColor,
+          fontSize: parseInt(computed.fontSize, 10) || 16,
+          fontWeight: computed.fontWeight,
+          borderRadius: parseInt(computed.borderRadius, 10) || 0,
+          paddingTop: parseInt(computed.paddingTop, 10) || 0,
+          paddingBottom: parseInt(computed.paddingBottom, 10) || 0,
+          paddingLeft: parseInt(computed.paddingLeft, 10) || 0,
+          paddingRight: parseInt(computed.paddingRight, 10) || 0,
+          marginTop: parseInt(computed.marginTop, 10) || 0,
+          marginBottom: parseInt(computed.marginBottom, 10) || 0,
+        }
       }, "*");
     };
 
+    // دریافت دستورات تغییر زنده استایل از سایدبار پنل ادمین
+    const handleAdminMessage = (e: MessageEvent) => {
+      if (!selectedElement) return;
+
+      if (e.data?.type === "AXON_APPLY_STYLE") {
+        const { key, value } = e.data.payload || {};
+        if (key && value !== undefined) {
+          (selectedElement.style as any)[key] = value;
+          updateOverlay();
+        }
+      }
+
+      if (e.data?.type === "AXON_ELEMENT_ACTION") {
+        const { action } = e.data || {};
+        if (action === "delete") {
+          selectedElement.style.display = "none";
+          if (overlay) overlay.style.display = "none";
+          selectedElement = null;
+        } else if (action === "moveUp" && selectedElement.parentElement) {
+          const prev = selectedElement.previousElementSibling;
+          if (prev) {
+            selectedElement.parentElement.insertBefore(selectedElement, prev);
+            updateOverlay();
+          }
+        } else if (action === "moveDown" && selectedElement.parentElement) {
+          const next = selectedElement.nextElementSibling;
+          if (next) {
+            selectedElement.parentElement.insertBefore(next, selectedElement);
+            updateOverlay();
+          }
+        }
+      }
+    };
+
     document.addEventListener("click", handleClick, true);
-    window.addEventListener("scroll", updateUI);
-    window.addEventListener("resize", updateUI);
+    window.addEventListener("scroll", updateOverlay);
+    window.addEventListener("resize", updateOverlay);
+    window.addEventListener("message", handleAdminMessage);
 
     return () => {
       document.removeEventListener("click", handleClick, true);
-      window.removeEventListener("scroll", updateUI);
-      window.removeEventListener("resize", updateUI);
+      window.removeEventListener("scroll", updateOverlay);
+      window.removeEventListener("resize", updateOverlay);
+      window.removeEventListener("message", handleAdminMessage);
       if (overlay) overlay.remove();
-      if (toolbar) toolbar.remove();
     };
   }, []);
 

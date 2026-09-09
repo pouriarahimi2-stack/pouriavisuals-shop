@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Modular Page Builder Phase 3: Realtime Dynamic Front-End Renderer (fix.js)
+ * AXON CORE - Modular Page Builder Phase 4: Connecting Homepage (/) to Realtime Modular Engine (fix.js)
  */
 
 const fs = require('fs');
@@ -14,389 +14,244 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-BUILDER-PHASE3]\x1b[0m استقرار موتور رندر بلادرنگ فرانت‌اند و لندینگ‌های داینامیک...");
+console.log("\x1b[36m[AXON-BUILDER-PHASE4]\x1b[0m اتصال صفحه اصلی (/) به سامانه ماژولار و راه‌اندازی اولیه اسلاگ home...");
 
 // =============================================================================
-// ۱. ساخت موتور رندر اختصاصی بلوک‌ها: components/modular/ModularPageRenderer.tsx
+// ۱. بازنویسی ریشه اصلی وب‌سایت: app/page.tsx
 // =============================================================================
-const rendererComponent = `"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { PageBlock, ModularPageDocument } from "@/lib/modularBuilderTypes";
-import { supabase } from "@/lib/supabase";
-
-interface Props {
-  initialPage: ModularPageDocument | null;
-  slug: string;
-}
-
-export default function ModularPageRenderer({ initialPage, slug }: Props) {
-  const [page, setPage] = useState<ModularPageDocument | null>(initialPage);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
-
-  const fetchPage = async () => {
-    try {
-      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && json.page) {
-        setPage(json.page);
-      }
-    } catch (e) {
-      console.error("Live page fetch error:", e);
-    }
-  };
-
-  useEffect(() => {
-    // گوش دادن بلادرنگ به تغییرات جدول modular_pages
-    const channel = supabase
-      .channel(\`realtime-modular-page-\${slug}\`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, (payload: any) => {
-        if (payload.new && payload.new.slug === slug) {
-          setPage(payload.new as ModularPageDocument);
-        } else {
-          fetchPage();
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [slug]);
-
-  if (!page || !page.blocks || page.blocks.length === 0) {
-    return null;
-  }
-
-  const activeBlocks = page.blocks.filter((b) => b.isVisible !== false);
-
-  return (
-    <div className="w-full flex flex-col font-sans select-none overflow-x-hidden" dir="rtl">
-      {activeBlocks.map((block) => renderBlock(block, openFaqIndex, setOpenFaqIndex))}
-    </div>
-  );
-}
-
-function renderBlock(
-  block: PageBlock,
-  openFaqIndex: number | null,
-  setOpenFaqIndex: (idx: number | null) => void
-) {
-  const { id, type, styles, data } = block;
-
-  const containerMaxWidth =
-    styles.maxWidth === "full"
-      ? "w-full px-4"
-      : styles.maxWidth === "5xl"
-      ? "max-w-5xl mx-auto px-4"
-      : styles.maxWidth === "3xl"
-      ? "max-w-3xl mx-auto px-4"
-      : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
-
-  const paddingStyle = {
-    paddingTop: \`\${styles.paddingY ?? 12}rem\`,
-    paddingBottom: \`\${styles.paddingY ?? 12}rem\`,
-    backgroundColor: styles.bgColor || "transparent",
-    color: styles.textColor || "inherit",
-    textAlign: styles.textAlign || "right",
-  };
-
-  switch (type) {
-    case "header_nav":
-      return (
-        <header
-          key={id}
-          style={{ backgroundColor: styles.bgColor || "#0f172a", color: styles.textColor || "#fff" }}
-          className="w-full border-b border-white/10 sticky top-0 z-40 backdrop-blur-md"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-xl font-black text-sky-400 tracking-wider font-mono">
-                {data.brandName || "AXON"}
-              </span>
-              {data.logoText && (
-                <span className="text-xs font-bold opacity-80 border-r border-white/20 pr-3 mr-1">
-                  {data.logoText}
-                </span>
-              )}
-            </div>
-
-            <nav className="hidden md:flex items-center gap-6 text-xs font-bold">
-              {(data.navLinks || []).map((link: any, i: number) => (
-                <Link key={i} href={link.url || "/"} className="hover:text-sky-400 transition">
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-
-            {data.ctaButtonText && (
-              <Link
-                href={data.ctaButtonUrl || "/products"}
-                className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs transition shadow-lg"
-              >
-                {data.ctaButtonText}
-              </Link>
-            )}
-          </div>
-        </header>
-      );
-
-    case "hero_banner":
-      return (
-        <section key={id} style={paddingStyle} className="w-full relative overflow-hidden">
-          <div className={containerMaxWidth}>
-            <div className="flex flex-col items-center justify-center space-y-6 text-center">
-              {data.badge && (
-                <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold animate-pulse">
-                  {data.badge}
-                </span>
-              )}
-
-              <h1 className="text-3xl sm:text-5xl md:text-6xl font-black leading-tight tracking-tight max-w-4xl">
-                {data.headline || "عنوان هیرو"}
-              </h1>
-
-              {data.subheadline && (
-                <p className="text-sm sm:text-base font-medium opacity-80 max-w-2xl leading-relaxed">
-                  {data.subheadline}
-                </p>
-              )}
-
-              <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-                {data.primaryBtnText && (
-                  <Link
-                    href={data.primaryBtnUrl || "/products"}
-                    className="px-8 py-4 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs sm:text-sm shadow-xl hover:scale-105 transition duration-200"
-                  >
-                    {data.primaryBtnText}
-                  </Link>
-                )}
-                {data.secondaryBtnText && (
-                  <Link
-                    href={data.secondaryBtnUrl || "/contact"}
-                    className="px-8 py-4 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-xs sm:text-sm transition"
-                  >
-                    {data.secondaryBtnText}
-                  </Link>
-                )}
-              </div>
-
-              {data.imageUrl && (
-                <div className="w-full max-w-5xl mt-12 rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
-                  <img src={data.imageUrl} alt="" className="w-full h-auto object-cover max-h-[500px]" />
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      );
-
-    case "features_grid":
-      return (
-        <section key={id} style={paddingStyle} className="w-full">
-          <div className={containerMaxWidth}>
-            {data.heading && (
-              <h2 className="text-xl sm:text-3xl font-black text-center mb-12">
-                {data.heading}
-              </h2>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {(data.items || []).map((feat: any, i: number) => (
-                <div
-                  key={i}
-                  className="p-8 rounded-3xl bg-white/5 border border-white/10 hover:border-sky-500/50 transition duration-300 space-y-3"
-                >
-                  <span className="text-3xl block">{feat.icon || "✨"}</span>
-                  <h3 className="font-extrabold text-base">{feat.title}</h3>
-                  <p className="text-xs opacity-75 leading-relaxed font-medium">{feat.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      );
-
-    case "product_showcase":
-      return (
-        <section key={id} style={paddingStyle} className="w-full">
-          <div className={containerMaxWidth}>
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-xl sm:text-2xl font-black">{data.heading || "محصولات ویژه"}</h2>
-              {data.viewAllText && (
-                <Link href={data.viewAllUrl || "/products"} className="text-xs font-bold text-sky-400 hover:underline">
-                  {data.viewAllText}
-                </Link>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="p-4 rounded-3xl bg-white/5 border border-white/10 space-y-3">
-                  <div className="w-full h-44 rounded-2xl bg-black/30 overflow-hidden flex items-center justify-center">
-                    <span className="text-3xl">🖥️</span>
-                  </div>
-                  <h3 className="font-black text-xs">نمایشگر تخصصی مسترینگ ۵K رتینا</h3>
-                  <div className="flex justify-between items-center text-xs font-mono">
-                    <span className="text-emerald-400 font-bold">۱۳۴,۰۰۰,۰۰۰ تومان</span>
-                    <Link href="/products" className="text-sky-400 font-bold text-[11px]">خرید ←</Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      );
-
-    case "accordion_faq":
-      return (
-        <section key={id} style={paddingStyle} className="w-full">
-          <div className={containerMaxWidth}>
-            {data.heading && (
-              <h2 className="text-xl sm:text-3xl font-black text-center mb-10">
-                {data.heading}
-              </h2>
-            )}
-
-            <div className="space-y-3">
-              {(data.questions || []).map((faq: any, i: number) => {
-                const isOpen = openFaqIndex === i;
-                return (
-                  <div
-                    key={i}
-                    onClick={() => setOpenFaqIndex(isOpen ? null : i)}
-                    className="p-5 rounded-2xl bg-white/5 border border-white/10 cursor-pointer transition"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-xs sm:text-sm">{faq.q}</span>
-                      <span className="text-sm font-bold text-sky-400">{isOpen ? "▲" : "▼"}</span>
-                    </div>
-                    {isOpen && (
-                      <p className="mt-4 pt-3 border-t border-white/10 text-xs opacity-80 leading-loose animate-fadeIn">
-                        {faq.a}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      );
-
-    case "cta_banner":
-      return (
-        <section key={id} style={paddingStyle} className="w-full">
-          <div className={containerMaxWidth}>
-            <div className="p-8 sm:p-14 rounded-3xl bg-gradient-to-r from-blue-900/60 to-indigo-900/60 border border-blue-500/30 text-center space-y-4 shadow-2xl">
-              <h2 className="text-2xl sm:text-4xl font-black">{data.title}</h2>
-              {data.subtitle && <p className="text-xs sm:text-sm opacity-85 max-w-xl mx-auto leading-relaxed">{data.subtitle}</p>}
-              {data.btnText && (
-                <div className="pt-4">
-                  <Link
-                    href={data.btnUrl || "/contact"}
-                    className="inline-block px-8 py-3.5 rounded-2xl bg-white text-slate-900 font-black text-xs sm:text-sm hover:bg-slate-100 transition shadow-xl"
-                  >
-                    {data.btnText}
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      );
-
-    case "rich_text":
-      return (
-        <section key={id} style={paddingStyle} className="w-full">
-          <div className={containerMaxWidth}>
-            <div
-              dangerouslySetInnerHTML={{ __html: data.htmlContent || "" }}
-              className="prose dark:prose-invert max-w-none text-xs sm:text-sm leading-loose"
-            />
-          </div>
-        </section>
-      );
-
-    case "footer_block":
-      return (
-        <footer key={id} style={paddingStyle} className="w-full border-t border-white/10 text-xs">
-          <div className={containerMaxWidth}>
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-              <span>{data.copyrightText || "تمامی حقوق برای آکسون محفوظ است."}</span>
-              {data.supportPhone && (
-                <span className="font-mono font-bold text-sky-400">
-                  پشتیبانی: {data.supportPhone}
-                </span>
-              )}
-            </div>
-          </div>
-        </footer>
-      );
-
-    default:
-      return null;
-  }
-}
-`;
-writeFile('components/modular/ModularPageRenderer.tsx', rendererComponent);
-
-// =============================================================================
-// ۲. مسیر اختصاصی رندرینگ لندینگ‌ها و صفحات پویا: app/[slug]/page.tsx
-// =============================================================================
-const dynamicLandingPage = `import { Metadata } from "next";
+const homePageCode = `import { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import ModularPageRenderer from "@/components/modular/ModularPageRenderer";
-import { notFound } from "next/navigation";
+import { productService } from "@/services/productService";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-interface Props {
-  params: Promise<{ slug: string }>;
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
+export async function generateMetadata(): Promise<Metadata> {
   const { data: page } = await supabaseAdmin
     .from("modular_pages")
     .select("title, meta_description")
-    .eq("slug", slug)
+    .eq("slug", "home")
     .eq("is_published", true)
     .maybeSingle();
 
-  if (!page) return { title: "صفحه یافت نشد | آکسون" };
-
   return {
-    title: \`\${page.title} | آکسون استودیو\`,
-    description: page.meta_description || "صفحه لندینگ تخصصی فروشگاه آکسون",
+    title: page?.title ? \`\${page.title} | آکسون استودیو\` : "آکسون | مرجع تخصصی مانیتورهای ۵K و تجهیزات تدوین",
+    description: page?.meta_description || "واردات و کالیبراسیون تخصصی نمایشگرهای مرجع رنگ و تجهیزات استودیویی با ۱۸ ماه گارانتی طلایی",
   };
 }
 
-export default async function DynamicModularPage({ params }: Props) {
-  const { slug } = await params;
-
-  // واکشی داده‌های صفحه از Supabase
-  const { data: page } = await supabaseAdmin
+export default async function HomePage() {
+  // ۱. بررسی وجود ساختار ماژولار برای صفحه اصلی
+  const { data: modularHome } = await supabaseAdmin
     .from("modular_pages")
     .select("*")
-    .eq("slug", slug)
+    .eq("slug", "home")
     .eq("is_published", true)
     .maybeSingle();
 
-  if (!page) {
-    notFound();
+  // اگر صفحه ماژولار با اسلاگ home در پنل ادمین تنظیم شده باشد، رندرر بلادرنگ لود می‌شود
+  if (modularHome && modularHome.blocks && modularHome.blocks.length > 0) {
+    return <ModularPageRenderer initialPage={modularHome} slug="home" />;
   }
 
-  return <ModularPageRenderer initialPage={page} slug={slug} />;
+  // ۲. چیدمان پیش‌فرض در صورت عدم تنظیم صفحه ماژولار
+  const products = await productService.getAll();
+
+  return (
+    <div className="min-h-screen font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      {/* هیرو بخش پیش‌فرض */}
+      <section className="py-20 px-4 max-w-7xl mx-auto text-center space-y-6">
+        <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">
+          🚀 مرجع مانیتورهای استودیویی و رتینا ۵K
+        </span>
+        <h1 className="text-4xl sm:text-6xl font-black leading-tight">
+          تجهیزات تخصصی تصویر، تدوین و پردازش رنگ
+        </h1>
+        <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-2xl mx-auto leading-relaxed font-medium">
+          تأمین مستقیم مانیتورهای Apple Studio Display و پنل‌های کالیبره‌شده Nano-OLED با ضمانت اصالت فیزیکی.
+        </p>
+        <div className="flex justify-center gap-4 pt-4">
+          <Link
+            href="/products"
+            className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs sm:text-sm hover:opacity-90 shadow-xl transition"
+          >
+            مشاهده کاتالوگ فروشگاه
+          </Link>
+          <Link
+            href="/admin/pages"
+            className="px-8 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs sm:text-sm hover:border-[var(--accent-blue)] transition"
+          >
+            صفحه ساز ماژولار (ادمین) ⚙️
+          </Link>
+        </div>
+      </section>
+
+      {/* ویترین محصولات */}
+      <section className="py-12 px-4 max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+          <h2 className="text-lg sm:text-xl font-black">منتخب محصولات استودیو</h2>
+          <Link href="/products" className="text-xs font-bold text-[var(--accent-blue)]">
+            مشاهده همه ←
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {products.slice(0, 4).map((prod) => (
+            <div
+              key={prod.id}
+              className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-3 shadow-md"
+            >
+              <div className="w-full h-44 rounded-2xl overflow-hidden bg-[var(--input-bg)]">
+                <img src={prod.image || prod.images?.[0] || "/placeholder.png"} alt={prod.title} className="w-full h-full object-cover" />
+              </div>
+              <h3 className="font-bold text-xs truncate">{prod.title}</h3>
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="font-black text-emerald-500">{Number(prod.discount_price || prod.price).toLocaleString("fa-IR")} ت</span>
+                <Link href={\`/products/\${prod.id}\`} className="text-[var(--accent-blue)] font-bold text-[11px]">
+                  خرید ←
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
 }
 `;
-writeFile('app/[slug]/page.tsx', dynamicLandingPage);
+writeFile('app/page.tsx', homePageCode);
 
 // =============================================================================
-// ۳. تست بیلد نهایی و ارسال به گیت‌هاب و ورسل
+// ۲. تضمین ثبت صفحه پیش‌فرض home در دیتابیس Supabase
 // =============================================================================
-console.log("تست بیلد کامل نرم‌افزار (npm run build)...");
+const seedScriptCode = `import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export async function seedHomePageIfMissing() {
+  try {
+    const { data: existing } = await supabaseAdmin
+      .from("modular_pages")
+      .select("id")
+      .eq("slug", "home")
+      .maybeSingle();
+
+    if (!existing) {
+      const defaultBlocks = [
+        {
+          id: "blk_home_header",
+          type: "header_nav",
+          title: "هدر و نوبار سراسری",
+          isVisible: true,
+          styles: { paddingY: 4, maxWidth: "7xl", bgColor: "#0f172a", textColor: "#ffffff" },
+          data: {
+            brandName: "AXON CORE",
+            logoText: "آکسون استودیو",
+            navLinks: [
+              { label: "صفحه اصلی", url: "/" },
+              { label: "محصولات", url: "/products" },
+              { label: "اخبار فناوری", url: "/news" },
+              { label: "ارتباط با ما", url: "/contact" }
+            ],
+            ctaButtonText: "مشاهده کاتالوگ",
+            ctaButtonUrl: "/products"
+          }
+        },
+        {
+          id: "blk_home_hero",
+          type: "hero_banner",
+          title: "هیرو بنر صفحه اصلی",
+          isVisible: true,
+          styles: { paddingY: 16, maxWidth: "7xl", bgColor: "#020617", textColor: "#ffffff", textAlign: "center" },
+          data: {
+            badge: "🚀 مرجع تخصصی مانیتورهای ۵K و استودیو",
+            headline: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+            subheadline: "تأمین مستقیم مانیتورهای مسترینگ، پنل‌های Tandem OLED و اتصالات پهنای باند بالای تاندربولت ۵.",
+            primaryBtnText: "خرید مانیتورهای استودیو",
+            primaryBtnUrl: "/products",
+            secondaryBtnText: "مشاوره فنی با کارشناس",
+            secondaryBtnUrl: "/contact",
+            imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200"
+          }
+        },
+        {
+          id: "blk_home_features",
+          type: "features_grid",
+          title: "گرید مزایای آکسون",
+          isVisible: true,
+          styles: { paddingY: 12, maxWidth: "7xl", bgColor: "#090d16", textColor: "#ffffff" },
+          data: {
+            heading: "استانداردهای مهندسی تجهیزات در آکسون",
+            items: [
+              { icon: "🛡️", title: "گارانتی طلایی تعویض", desc: "۱۸ ماه پوشش جامع تعویض بی قید و شرط برای تمامی نمایشگرهای مرجع." },
+              { icon: "⚡", title: "کالیبراسیون ۳D LUT", desc: "تراز رنگ پایدار با گاموت‌های سینمایی DCI-P3 و Rec.2020 قبل از تحویل." },
+              { icon: "📦", title: "بسته‌بندی گرید هوانوردی", desc: "محافظت کامل فیزیکی در برابر تکانه‌ها و ارتعاشات حمل‌ونقل." }
+            ]
+          }
+        },
+        {
+          id: "blk_home_cta",
+          type: "cta_banner",
+          title: "کمپین فراخوان مشاوره",
+          isVisible: true,
+          styles: { paddingY: 12, maxWidth: "7xl", bgColor: "#1e1b4b", textColor: "#ffffff", textAlign: "center" },
+          data: {
+            title: "آیا برای چیدمان میز تدوین خود نیاز به راهنمایی دارید؟",
+            subtitle: "کارشناسان آکسون متناسب با نرم‌افزار کاری شما (Premiere، DaVinci یا Final Cut) بهترین مانیتور را پیشنهاد می‌دهند.",
+            btnText: "شروع مشاوره رایگان",
+            btnUrl: "/contact"
+          }
+        },
+        {
+          id: "blk_home_footer",
+          type: "footer_block",
+          title: "فوتر صفحه اصلی",
+          isVisible: true,
+          styles: { paddingY: 8, maxWidth: "7xl", bgColor: "#020617", textColor: "#94a3b8" },
+          data: {
+            copyrightText: "تمامی حقوق محفوظ است © 2026 آکسون استودیو",
+            supportPhone: "09376110200"
+          }
+        }
+      ];
+
+      await supabaseAdmin.from("modular_pages").insert([{
+        id: "page_home_root",
+        slug: "home",
+        title: "صفحه اصلی وب‌سایت",
+        meta_description: "مرجع تخصصی مانیتورهای ۵K و تجهیزات تصویر آکسون",
+        blocks: defaultBlocks,
+        is_published: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }]);
+    }
+  } catch (e) {
+    console.error("Error seeding home page:", e);
+  }
+}
+`;
+writeFile('lib/seedHomePage.ts', seedScriptCode);
+
+// تزریق seedHomePageIfMissing در روت GET صفحات app/api/pages/route.ts
+const pagesRoutePath = path.join(process.cwd(), 'app/api/pages/route.ts');
+let pagesRouteContent = fs.readFileSync(pagesRoutePath, 'utf8');
+
+if (!pagesRouteContent.includes('seedHomePageIfMissing')) {
+  pagesRouteContent = pagesRouteContent.replace(
+    'import { PageBlock } from "@/lib/modularBuilderTypes";',
+    'import { PageBlock } from "@/lib/modularBuilderTypes";\nimport { seedHomePageIfMissing } from "@/lib/seedHomePage";'
+  );
+  pagesRouteContent = pagesRouteContent.replace(
+    'export async function GET(req: NextRequest) {',
+    'export async function GET(req: NextRequest) {\n  await seedHomePageIfMissing();'
+  );
+  writeFile('app/api/pages/route.ts', pagesRouteContent);
+}
+
+// =============================================================================
+// ۳. تست بیلد و ارسال قطعی به گیت‌هاب و ورسل
+// =============================================================================
+console.log("تست بیلد نهایی فاز ۴ (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -405,11 +260,11 @@ try {
   process.exit(1);
 }
 
-console.log("ارسال قطعی تغییرات فاز ۳ به گیت‌هاب و تریگر دیپلوی ورسل...");
+console.log("ارسال قطعی تغییرات فاز ۴ به گیت‌هاب و تریگر دیپلوی ورسل...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(modular-builder): phase 3 - realtime front-end dynamic renderer & [slug] landing generator"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(modular-builder): phase 4 - link homepage (/) to realtime modular engine with default home page seed"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -418,7 +273,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ فاز ۳ صفحه ساز ماژولار با موفقیت مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ فاز ۴ صفحه ساز ماژولار با موفقیت مستقر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

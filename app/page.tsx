@@ -1,56 +1,99 @@
-// File Path: app/page.tsx
-"use client";
-
-import React, { Suspense } from "react";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
-import ProductList from "@/components/ProductList";
+import { Metadata } from "next";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import ModularPageRenderer from "@/components/modular/ModularPageRenderer";
+import { productService } from "@/services/productService";
 import Link from "next/link";
 
-export default function HomePage() {
-  return (
-    <div className="min-h-screen space-y-16 font-sans select-none text-[var(--text-primary)] pb-12" dir="rtl">
-      <section className="max-w-7xl mx-auto px-4 pt-6">
-        <div className="relative rounded-[2.5rem] bg-gradient-to-b from-[var(--modal-bg)] to-[var(--input-bg)] border border-[var(--card-border)] p-6 sm:p-12 shadow-2xl overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            <div className="space-y-6 z-10 text-right">
-              <span className="px-3.5 py-1.5 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-black inline-block">
-                ⚡ مرجع تخصصی مانیتورهای تدوین رنگ ۵K و ۴K
-              </span>
-              <h1 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight">
-                دقت بی‌نهایت رنگ، <br className="hidden sm:block" />
-                استاندارد حرفه‌ای استودیو
-              </h1>
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium leading-relaxed max-w-lg">
-                تامین، کالیبراسیون و مشاوره تخصصی نمایشگرهای رتینا، کابل‌های تاندربولت و تجهیزات استودیویی با ضمانت اصالت طلایی.
-              </p>
-              <div className="flex flex-wrap gap-3 pt-2">
-                <a
-                  href="#products"
-                  className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl shadow-blue-500/25 flex items-center gap-2"
-                >
-                  <span>🛒</span>
-                  <span>مشاهده کاتالوگ و خرید</span>
-                </a>
-                <Link
-                  href="/products"
-                  className="px-6 py-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
-                >
-                  آرشیو کامل محصولات ←
-                </Link>
-              </div>
-            </div>
+export const dynamic = "force-dynamic";
 
-            <div className="relative h-72 sm:h-96 w-full flex items-center justify-center">
-              <Suspense fallback={<div className="text-xs text-[var(--text-secondary)] animate-pulse">در حال آماده‌سازی مدل سه‌بعدی...</div>}>
-                <Hero3DCanvas />
-              </Suspense>
-            </div>
-          </div>
+export async function generateMetadata(): Promise<Metadata> {
+  const { data: page } = await supabaseAdmin
+    .from("modular_pages")
+    .select("title, meta_description")
+    .eq("slug", "home")
+    .eq("is_published", true)
+    .maybeSingle();
+
+  return {
+    title: page?.title ? `${page.title} | آکسون استودیو` : "آکسون | مرجع تخصصی مانیتورهای ۵K و تجهیزات تدوین",
+    description: page?.meta_description || "واردات و کالیبراسیون تخصصی نمایشگرهای مرجع رنگ و تجهیزات استودیویی با ۱۸ ماه گارانتی طلایی",
+  };
+}
+
+export default async function HomePage() {
+  // ۱. بررسی وجود ساختار ماژولار برای صفحه اصلی
+  const { data: modularHome } = await supabaseAdmin
+    .from("modular_pages")
+    .select("*")
+    .eq("slug", "home")
+    .eq("is_published", true)
+    .maybeSingle();
+
+  // اگر صفحه ماژولار با اسلاگ home در پنل ادمین تنظیم شده باشد، رندرر بلادرنگ لود می‌شود
+  if (modularHome && modularHome.blocks && modularHome.blocks.length > 0) {
+    return <ModularPageRenderer initialPage={modularHome} slug="home" />;
+  }
+
+  // ۲. چیدمان پیش‌فرض در صورت عدم تنظیم صفحه ماژولار
+  const products = await productService.getAll();
+
+  return (
+    <div className="min-h-screen font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      {/* هیرو بخش پیش‌فرض */}
+      <section className="py-20 px-4 max-w-7xl mx-auto text-center space-y-6">
+        <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">
+          🚀 مرجع مانیتورهای استودیویی و رتینا ۵K
+        </span>
+        <h1 className="text-4xl sm:text-6xl font-black leading-tight">
+          تجهیزات تخصصی تصویر، تدوین و پردازش رنگ
+        </h1>
+        <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-2xl mx-auto leading-relaxed font-medium">
+          تأمین مستقیم مانیتورهای Apple Studio Display و پنل‌های کالیبره‌شده Nano-OLED با ضمانت اصالت فیزیکی.
+        </p>
+        <div className="flex justify-center gap-4 pt-4">
+          <Link
+            href="/products"
+            className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs sm:text-sm hover:opacity-90 shadow-xl transition"
+          >
+            مشاهده کاتالوگ فروشگاه
+          </Link>
+          <Link
+            href="/admin/pages"
+            className="px-8 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs sm:text-sm hover:border-[var(--accent-blue)] transition"
+          >
+            صفحه ساز ماژولار (ادمین) ⚙️
+          </Link>
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4" id="products">
-        <ProductList />
+      {/* ویترین محصولات */}
+      <section className="py-12 px-4 max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-4">
+          <h2 className="text-lg sm:text-xl font-black">منتخب محصولات استودیو</h2>
+          <Link href="/products" className="text-xs font-bold text-[var(--accent-blue)]">
+            مشاهده همه ←
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {products.slice(0, 4).map((prod) => (
+            <div
+              key={prod.id}
+              className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-3 shadow-md"
+            >
+              <div className="w-full h-44 rounded-2xl overflow-hidden bg-[var(--input-bg)]">
+                <img src={prod.image || prod.images?.[0] || "/placeholder.png"} alt={prod.title} className="w-full h-full object-cover" />
+              </div>
+              <h3 className="font-bold text-xs truncate">{prod.title}</h3>
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="font-black text-emerald-500">{Number(prod.discount_price || prod.price).toLocaleString("fa-IR")} ت</span>
+                <Link href={`/products/${prod.id}`} className="text-[var(--accent-blue)] font-bold text-[11px]">
+                  خرید ←
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );

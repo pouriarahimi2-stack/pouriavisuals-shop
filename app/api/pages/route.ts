@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { PageBlock } from "@/lib/modularBuilderTypes";
+import { seedHomePageIfMissing } from "@/lib/seedHomePage";
 
 export const dynamic = "force-dynamic";
 
 // واکشی کل صفحات ساخته‌شده
 export async function GET(req: NextRequest) {
+  await seedHomePageIfMissing();
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");

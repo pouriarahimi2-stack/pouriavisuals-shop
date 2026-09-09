@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Enterprise Layout Grid, Responsive Overrides & Template Export (fix.js)
+ * AXON CORE - Full Native Component Integration into Puck Editor (fix.js)
  */
 
 const fs = require('fs');
@@ -14,75 +14,61 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-ENTERPRISE-STUDIO]\x1b[0m افزودن سیستم چندستونه پیشرفته، کنترل‌های ریسپانسیو و خروجی JSON...");
+console.log("\x1b[36m[AXON-FULL-INTEGRATION]\x1b[0m اتصال تک‌تک اجزای اصلی سایت به موتور ویژوال Puck...");
 
 // =============================================================================
-// ۱. افزودن بلوک MultiColumnLayout و ارتقای lib/puckConfig.tsx
+// ۱. ارتقای lib/puckConfig.tsx با کامپوننت‌های واقعی سایت
 // =============================================================================
-const enterprisePuckConfig = `import React, { useState, useEffect } from "react";
+const completeSitePuckConfig = `import React, { useState, useEffect } from "react";
 import type { Config } from "@measured/puck";
 import Link from "next/link";
+import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
+import ProductList from "@/components/ProductList";
+import ProductExplodedView from "@/components/ProductExplodedView";
+import ColorGamutSimulator from "@/components/ColorGamutSimulator";
+import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
 import { productService, Product } from "@/services/productService";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
 
 export type ComponentProps = {
-  MultiColumnLayout: {
-    columnsCount: number;
-    col1Content: string;
-    col2Content: string;
-    col3Content: string;
-    col4Content: string;
-    gap: number;
+  // ۱. اجزای اختصاصی صفحه اول سایت
+  NativeHero3D: {
+    topBadge: string;
     bgColor: string;
+  };
+  NativePerspectiveSlider: {
     paddingY: number;
   };
-  Hero3DBlock: {
-    topBadge: string;
-    showControls: boolean;
-    bgColor: string;
-  };
-  HeroBlock: {
-    badge: string;
-    title: string;
-    subtitle: string;
-    primaryBtnText: string;
-    primaryBtnUrl: string;
-    secondaryBtnText: string;
-    secondaryBtnUrl: string;
-    imageUrl: string;
-    bgColor: string;
-    textColor: string;
-    paddingTop: number;
-    paddingBottom: number;
-    animation: "none" | "fade-up" | "zoom-in" | "slide-right";
-    glassmorphism: boolean;
-    customCss: string;
-  };
-  ProductGrid: {
+  NativeProductCatalog: {
     heading: string;
-    subtitle: string;
-    category: string;
-    limit: number;
-    columns: number;
-    showPriceBadge: boolean;
-    bgColor: string;
-    cardGlass: boolean;
   };
-  ProductComparison: {
-    heading: string;
-    subtitle: string;
-    product1Id: string;
-    product2Id: string;
-    bgColor: string;
+  NativeExplodedView: {
+    productTitle: string;
   };
+  NativeColorGamut: {
+    productTitle: string;
+  };
+  NativePriceMatch: {
+    productTitle: string;
+    ourPrice: number;
+  };
+
+  // ۲. بلوک‌های تکمیلی و مارکتینگ
   CountdownTimer: {
     badge: string;
     title: string;
     targetDate: string;
     buttonText: string;
     buttonUrl: string;
+    bgColor: string;
+  };
+  ProductComparison: {
+    heading: string;
+    subtitle: string;
+    product1Id: string;
+    product2Id: string;
     bgColor: string;
   };
   FeaturesGrid: {
@@ -123,98 +109,54 @@ export type ComponentProps = {
   };
 };
 
-function getAnimationClass(anim?: string) {
-  if (anim === "fade-up") return "animate-[fadeIn_0.7s_ease-out]";
-  if (anim === "zoom-in") return "animate-[scaleIn_0.6s_ease-out]";
-  if (anim === "slide-right") return "animate-[slideRight_0.6s_ease-out]";
-  return "";
+// ویترین کاتالوگ داخلی برای Puck
+function PuckProductListWrapper() {
+  const [products, setProducts] = useState<Product[]>([]);
+  useEffect(() => {
+    productService.getAll().then((data) => setProducts(data || []));
+  }, []);
+
+  return <ProductList initialProducts={products} />;
 }
 
 export const puckConfig: Config<ComponentProps> = {
   categories: {
-    layout: {
-      title: "چیدمان و گرید پیشرفته",
-      components: ["MultiColumnLayout", "Hero3DBlock"]
+    site_core: {
+      title: "⭐ اجزای اختصاصی صفحه اول سایت",
+      components: [
+        "NativeHero3D",
+        "NativePerspectiveSlider",
+        "NativeProductCatalog",
+        "NativeExplodedView",
+        "NativeColorGamut",
+        "NativePriceMatch"
+      ]
     },
-    shop: {
-      title: "فروشگاه و محصولات",
-      components: ["ProductGrid", "ProductComparison", "CountdownTimer", "HeroBlock"]
+    campaign: {
+      title: "🎯 کمپین، تخفیف و مقایسه",
+      components: ["CountdownTimer", "ProductComparison", "CtaBanner"]
     },
     content: {
-      title: "محتوا و اعتمادسازی",
-      components: ["FeaturesGrid", "FaqAccordion", "CtaBanner"]
-    },
-    advanced: {
-      title: "پیشرفته و کدنویسی",
-      components: ["CustomHtml"]
+      title: "📑 محتوا و اعتماد",
+      components: ["FeaturesGrid", "FaqAccordion", "CustomHtml"]
     }
   },
   components: {
-    MultiColumnLayout: {
-      label: "چیدمان چندستونه انعطاف‌پذیر (Grid)",
+    // ۱. هیرو ۳D اورجینال
+    NativeHero3D: {
+      label: "هیرو ۳D اصلی سایت (Hero3DCanvas)",
       fields: {
-        columnsCount: {
-          type: "select",
-          label: "تعداد ستون‌ها",
-          options: [
-            { label: "۲ ستون متقارن", value: 2 },
-            { label: "۳ ستون متقارن", value: 3 },
-            { label: "۴ ستون متقارن", value: 4 }
-          ]
-        },
-        col1Content: { type: "textarea", label: "محتوای ستون ۱ (HTML/متن)" },
-        col2Content: { type: "textarea", label: "محتوای ستون ۲ (HTML/متن)" },
-        col3Content: { type: "textarea", label: "محتوای ستون ۳ (HTML/متن)" },
-        col4Content: { type: "textarea", label: "محتوای ستون ۴ (HTML/متن)" },
-        gap: { type: "number", label: "فاصله بین ستون‌ها (px)" },
-        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
-        paddingY: { type: "number", label: "پدینگ عمودی (px)" }
-      },
-      defaultProps: {
-        columnsCount: 2,
-        col1Content: "<div class='p-6 rounded-2xl bg-white/5 border border-white/10 text-center'><h3 class='font-bold text-sm mb-2'>ستون اول</h3><p class='text-xs opacity-75'>توضیحات ستون اول در اینجا قرار می‌گیرد.</p></div>",
-        col2Content: "<div class='p-6 rounded-2xl bg-white/5 border border-white/10 text-center'><h3 class='font-bold text-sm mb-2'>ستون دوم</h3><p class='text-xs opacity-75'>توضیحات ستون دوم در اینجا قرار می‌گیرد.</p></div>",
-        col3Content: "",
-        col4Content: "",
-        gap: 24,
-        bgColor: "#07090e",
-        paddingY: 40
-      },
-      render: ({ columnsCount, col1Content, col2Content, col3Content, col4Content, gap, bgColor, paddingY }) => {
-        const gridClass = columnsCount === 2 ? "grid-cols-1 md:grid-cols-2" : columnsCount === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
-        return (
-          <section style={{ backgroundColor: bgColor || "#07090e", paddingTop: \`\${paddingY || 40}px\`, paddingBottom: \`\${paddingY || 40}px\` }} className="w-full px-4 font-sans select-none text-white" dir="rtl">
-            <div style={{ gap: \`\${gap || 24}px\` }} className={\`max-w-7xl mx-auto grid \${gridClass}\`}>
-              {col1Content && <div dangerouslySetInnerHTML={{ __html: col1Content }} />}
-              {col2Content && <div dangerouslySetInnerHTML={{ __html: col2Content }} />}
-              {columnsCount >= 3 && col3Content && <div dangerouslySetInnerHTML={{ __html: col3Content }} />}
-              {columnsCount >= 4 && col4Content && <div dangerouslySetInnerHTML={{ __html: col4Content }} />}
-            </div>
-          </section>
-        );
-      }
-    },
-
-    Hero3DBlock: {
-      label: "هیرو ۳D تعاملی با کانوَس",
-      fields: {
-        topBadge: { type: "text", label: "بج بالای کانوَس" },
-        showControls: {
-          type: "radio",
-          label: "نمایش تعاملی کنترل ۳D",
-          options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }]
-        },
+        topBadge: { type: "text", label: "برچسب بالای هیرو" },
         bgColor: { type: "text", label: "رنگ پس‌زمینه" }
       },
       defaultProps: {
-        topBadge: "🌟 تجربه نسل آینده مانیتورهای ۵K",
-        showControls: true,
-        bgColor: "#07090e"
+        topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+        bgColor: "transparent"
       },
       render: ({ topBadge, bgColor }) => (
-        <div style={{ backgroundColor: bgColor || "#07090e" }} className="w-full relative overflow-hidden py-4 font-sans select-none" dir="rtl">
+        <div style={{ backgroundColor: bgColor || "transparent" }} className="w-full relative overflow-hidden select-none" dir="rtl">
           {topBadge && (
-            <div className="text-center pt-4">
+            <div className="text-center pt-3">
               <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-black inline-block">
                 {topBadge}
               </span>
@@ -225,115 +167,159 @@ export const puckConfig: Config<ComponentProps> = {
       )
     },
 
-    ProductGrid: {
-      label: "ویترین زنده محصولات دیتابیس",
+    // ۲. اسلایدر پرسپکتیو ۳D
+    NativePerspectiveSlider: {
+      label: "اسلایدر پرسپکتیو بنرهای اصلی (ProductPerspectiveSlider)",
       fields: {
-        heading: { type: "text", label: "عنوان ویترین" },
-        subtitle: { type: "text", label: "زیرعنوان ویترین" },
-        category: {
-          type: "select",
-          label: "فیلتر دسته کالا",
-          options: [
-            { label: "همه کالاها", value: "all" },
-            { label: "مانیتور و تصویر", value: "مانیتور" },
-            { label: "لپ‌تاپ و مک‌بوک", value: "مک" },
-            { label: "ساعت هوشمند", value: "ساعت" },
-            { label: "تبلت و آیپد", value: "آیپد" },
-          ]
-        },
-        limit: { type: "number", label: "حداکثر تعداد کالا" },
-        columns: { type: "number", label: "تعداد ستون‌ها (۲، ۳ یا ۴)" },
-        showPriceBadge: {
-          type: "radio",
-          label: "نمایش برچسب گارانتی",
-          options: [{ label: "بله", value: true }, { label: "خیر", value: false }]
-        },
-        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
-        cardGlass: {
-          type: "radio",
-          label: "افکت شیشه مات (Glassmorphism)",
-          options: [{ label: "فعال", value: true }, { label: "عادی", value: false }]
-        },
+        paddingY: { type: "number", label: "فاصله عمودی (px)" }
       },
       defaultProps: {
-        heading: "پرفروش‌ترین تجهیزات تصویر و مانیتورها",
-        subtitle: "تأمین مستقیم و تحویل با بسته‌بندی ایمن هوانوردی",
-        category: "all",
-        limit: 6,
-        columns: 3,
-        showPriceBadge: true,
-        bgColor: "#07090e",
-        cardGlass: true,
+        paddingY: 20
       },
-      render: ({ heading, subtitle, category, limit, columns, showPriceBadge, bgColor, cardGlass }) => {
-        const [products, setProducts] = useState<Product[]>([]);
-        const { addToCart } = useCart();
+      render: ({ paddingY }) => (
+        <div style={{ paddingTop: \`\${paddingY || 20}px\`, paddingBottom: \`\${paddingY || 20}px\` }} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+          <ProductPerspectiveSlider />
+        </div>
+      )
+    },
+
+    // ۳. کاتالوگ محصولات اصلی
+    NativeProductCatalog: {
+      label: "ویترین اصلی کاتالوگ محصولات (ProductList)",
+      fields: {
+        heading: { type: "text", label: "عنوان کاتالوگ" }
+      },
+      defaultProps: {
+        heading: "کاتالوگ تجهیزات تخصصی"
+      },
+      render: () => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+          <PuckProductListWrapper />
+        </div>
+      )
+    },
+
+    // ۴. کالبدشکافی ۳D
+    NativeExplodedView: {
+      label: "کالبدشکافی ۳D سخت‌افزار (ProductExplodedView)",
+      fields: {
+        productTitle: { type: "text", label: "نام محصول مدل ۳D" }
+      },
+      defaultProps: {
+        productTitle: "Apple Studio Display 5K Retina"
+      },
+      render: ({ productTitle }) => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+          <ProductExplodedView productTitle={productTitle || "Apple Studio Display 5K"} />
+        </div>
+      )
+    },
+
+    // ۵. شبیه‌ساز رنگ
+    NativeColorGamut: {
+      label: "شبیه‌ساز گاموت رنگی (ColorGamutSimulator)",
+      fields: {
+        productTitle: { type: "text", label: "نام نمایشگر" }
+      },
+      defaultProps: {
+        productTitle: "نمایشگر رتینا ۵K استودیو"
+      },
+      render: ({ productTitle }) => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+          <ColorGamutSimulator productTitle={productTitle || "نمایشگر رتینا ۵K"} />
+        </div>
+      )
+    },
+
+    // ۶. پایش لحظه‌ای قیمت بازار
+    NativePriceMatch: {
+      label: "پایش قیمت لحظه‌ای بازار (LiveMarketArbitrage)",
+      fields: {
+        productTitle: { type: "text", label: "نام کالا" },
+        ourPrice: { type: "number", label: "قیمت آکسون (تومان)" }
+      },
+      defaultProps: {
+        productTitle: "Apple Studio Display 27 5K",
+        ourPrice: 128500000
+      },
+      render: ({ productTitle, ourPrice }) => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+          <LiveMarketArbitrage productTitle={productTitle || "Apple Studio Display"} ourPrice={ourPrice || 128500000} />
+        </div>
+      )
+    },
+
+    // ۷. تایمر جشنواره
+    CountdownTimer: {
+      label: "تایمر معکوس جشنواره فروش",
+      fields: {
+        badge: { type: "text", label: "بج برچسب بالا" },
+        title: { type: "text", label: "تیتر پیشنهاد ویژه" },
+        targetDate: { type: "text", label: "تاریخ پایان (فرمت: YYYY-MM-DDTHH:mm:ss)" },
+        buttonText: { type: "text", label: "متن دکمه خرید" },
+        buttonUrl: { type: "text", label: "لینک دکمه" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        badge: "⚡ پیشنهاد شگفت‌انگیز",
+        title: "تخفیف ویژه مانیتورهای استودیو تا پایان امشب",
+        targetDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 19),
+        buttonText: "مشاهده پیشنهادها",
+        buttonUrl: "/products",
+        bgColor: "#0f172a",
+      },
+      render: ({ badge, title, targetDate, buttonText, buttonUrl, bgColor }) => {
+        const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({ hours: 12, minutes: 45, seconds: 30 });
 
         useEffect(() => {
-          productService.getAll().then((data) => {
-            if (data && data.length > 0) {
-              let filtered = data;
-              if (category && category !== "all") {
-                filtered = data.filter((p) => (p.category || "").toLowerCase().includes(category.toLowerCase()));
-              }
-              setProducts(filtered.slice(0, limit || 6));
-            }
-          });
-        }, [category, limit]);
-
-        const colClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : columns === 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
+          const end = targetDate ? new Date(targetDate).getTime() : Date.now() + 24 * 3600 * 1000;
+          const timer = setInterval(() => {
+            const diff = Math.max(0, end - Date.now());
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            setTimeLeft({ hours, minutes, seconds });
+          }, 1000);
+          return () => clearInterval(timer);
+        }, [targetDate]);
 
         return (
-          <section style={{ backgroundColor: bgColor || "#07090e" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <div className="text-center space-y-1">
-                <h2 className="text-2xl font-black">{heading || "محصولات برگزیده استودیو"}</h2>
-                {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+          <section style={{ backgroundColor: bgColor || "#111827" }} className="w-full py-10 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
+            <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 text-center md:text-right">
+                {badge && <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-black border border-rose-500/30 inline-block">{badge}</span>}
+                <h2 className="text-xl sm:text-2xl font-black">{title || "فرصت محدود جشنواره ویژه"}</h2>
               </div>
 
-              <div className={\`grid \${colClass} gap-6 pt-4\`}>
-                {products.map((p) => {
-                  const priceVal = Number(p.discountPrice || p.discount_price || p.price || 0);
-                  return (
-                    <div key={p.id} className={\`p-5 rounded-3xl border border-white/10 space-y-3 hover:border-sky-500/50 hover:-translate-y-1 transition duration-300 flex flex-col justify-between \${cardGlass ? "bg-white/[0.04] backdrop-blur-xl shadow-2xl" : "bg-white/5"}\`}>
-                      <div className="space-y-3">
-                        <div className="w-full h-48 rounded-2xl bg-black/40 overflow-hidden flex items-center justify-center p-2 border border-white/5 relative group">
-                          <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain group-hover:scale-105 transition duration-500" />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold truncate">{p.title || p.name}</span>
-                            {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">گارانتی طلایی</span>}
-                          </div>
-                          <span className="text-[10px] text-slate-400 block">{p.category || "تجهیزات تخصصی"}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center pt-3 border-t border-white/10">
-                        <span className="font-mono text-emerald-400 font-black text-xs">
-                          {priceVal.toLocaleString("fa-IR")} تومان
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundEngine.playAddToCart();
-                            addToCart({ id: p.id, title: p.title, price: priceVal, image: p.images?.[0] || p.image, stock: p.stock ?? 10 });
-                          }}
-                          className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-sky-500/20"
-                        >
-                          خرید مستقیم 🛒
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center gap-3 font-mono font-black" dir="ltr">
+                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+                  <span className="text-2xl block text-rose-400">{String(timeLeft.hours).padStart(2, '0')}</span>
+                  <span className="text-[9px] font-sans text-slate-400">ساعت</span>
+                </div>
+                <span className="text-xl text-rose-400">:</span>
+                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+                  <span className="text-2xl block text-rose-400">{String(timeLeft.minutes).padStart(2, '0')}</span>
+                  <span className="text-[9px] font-sans text-slate-400">دقیقه</span>
+                </div>
+                <span className="text-xl text-rose-400">:</span>
+                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+                  <span className="text-2xl block text-rose-400">{String(timeLeft.seconds).padStart(2, '0')}</span>
+                  <span className="text-[9px] font-sans text-slate-400">ثانیه</span>
+                </div>
               </div>
+
+              {buttonText && (
+                <Link href={buttonUrl || "/products"} className="px-6 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition shadow-lg shadow-rose-600/30 whitespace-nowrap">
+                  {buttonText} ←
+                </Link>
+              )}
             </div>
           </section>
         );
       },
     },
 
+    // ۸. مقایسه دو محصول
     ProductComparison: {
       label: "ماتریس مقایسه ۲ کالا",
       fields: {
@@ -413,149 +399,7 @@ export const puckConfig: Config<ComponentProps> = {
       },
     },
 
-    CountdownTimer: {
-      label: "تایمر معکوس جشنواره فروش",
-      fields: {
-        badge: { type: "text", label: "بج برچسب بالا" },
-        title: { type: "text", label: "تیتر پیشنهاد ویژه" },
-        targetDate: { type: "text", label: "تاریخ پایان (فرمت: YYYY-MM-DDTHH:mm:ss)" },
-        buttonText: { type: "text", label: "متن دکمه خرید" },
-        buttonUrl: { type: "text", label: "لینک دکمه" },
-        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
-      },
-      defaultProps: {
-        badge: "⚡ پیشنهاد شگفت‌انگیز",
-        title: "تخفیف ویژه مانیتورهای استودیو تا پایان امشب",
-        targetDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 19),
-        buttonText: "مشاهده پیشنهادها",
-        buttonUrl: "/products",
-        bgColor: "#0f172a",
-      },
-      render: ({ badge, title, targetDate, buttonText, buttonUrl, bgColor }) => {
-        const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({ hours: 12, minutes: 45, seconds: 30 });
-
-        useEffect(() => {
-          const end = targetDate ? new Date(targetDate).getTime() : Date.now() + 24 * 3600 * 1000;
-          const timer = setInterval(() => {
-            const diff = Math.max(0, end - Date.now());
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-            setTimeLeft({ hours, minutes, seconds });
-          }, 1000);
-          return () => clearInterval(timer);
-        }, [targetDate]);
-
-        return (
-          <section style={{ backgroundColor: bgColor || "#111827" }} className="w-full py-10 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
-            <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="space-y-2 text-center md:text-right">
-                {badge && <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-black border border-rose-500/30 inline-block">{badge}</span>}
-                <h2 className="text-xl sm:text-2xl font-black">{title || "فرصت محدود جشنواره ویژه"}</h2>
-              </div>
-
-              <div className="flex items-center gap-3 font-mono font-black" dir="ltr">
-                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
-                  <span className="text-2xl block text-rose-400">{String(timeLeft.hours).padStart(2, '0')}</span>
-                  <span className="text-[9px] font-sans text-slate-400">ساعت</span>
-                </div>
-                <span className="text-xl text-rose-400">:</span>
-                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
-                  <span className="text-2xl block text-rose-400">{String(timeLeft.minutes).padStart(2, '0')}</span>
-                  <span className="text-[9px] font-sans text-slate-400">دقیقه</span>
-                </div>
-                <span className="text-xl text-rose-400">:</span>
-                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
-                  <span className="text-2xl block text-rose-400">{String(timeLeft.seconds).padStart(2, '0')}</span>
-                  <span className="text-[9px] font-sans text-slate-400">ثانیه</span>
-                </div>
-              </div>
-
-              {buttonText && (
-                <Link href={buttonUrl || "/products"} className="px-6 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition shadow-lg shadow-rose-600/30 whitespace-nowrap">
-                  {buttonText} ←
-                </Link>
-              )}
-            </div>
-          </section>
-        );
-      },
-    },
-
-    HeroBlock: {
-      label: "هیرو بنر بزرگ استودیویی",
-      fields: {
-        badge: { type: "text", label: "برچسب بالا (Badge)" },
-        title: { type: "text", label: "تیتر اصلی هیرو" },
-        subtitle: { type: "textarea", label: "متن توضیحات زیرعنوان" },
-        primaryBtnText: { type: "text", label: "متن دکمه اول" },
-        primaryBtnUrl: { type: "text", label: "لینک دکمه اول" },
-        secondaryBtnText: { type: "text", label: "متن دکمه دوم" },
-        secondaryBtnUrl: { type: "text", label: "لینک دکمه دوم" },
-        imageUrl: { type: "text", label: "آدرس تصویر شاخص" },
-        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
-        textColor: { type: "text", label: "رنگ متن" },
-        paddingTop: { type: "number", label: "فاصله از بالا (px)" },
-        paddingBottom: { type: "number", label: "فاصله از پایین (px)" },
-        animation: {
-          type: "select",
-          label: "انیمیشن ورود بلوک",
-          options: [
-            { label: "بدون انیمیشن", value: "none" },
-            { label: "آرام به سمت بالا (Fade Up)", value: "fade-up" },
-            { label: "بزرگ‌نمایی ملایم (Zoom In)", value: "zoom-in" },
-            { label: "ورود از راست (Slide Right)", value: "slide-right" },
-          ]
-        },
-        glassmorphism: {
-          type: "radio",
-          label: "کارت شیشه‌ای بلورین",
-          options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
-        },
-        customCss: { type: "textarea", label: "کد CSS سفارشی این بلوک" },
-      },
-      defaultProps: {
-        badge: "🚀 مرجع تخصصی مانیتورهای ۵K",
-        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
-        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
-        primaryBtnText: "کاتالوگ مانیتورها",
-        primaryBtnUrl: "/products",
-        secondaryBtnText: "درخواست مشاوره",
-        secondaryBtnUrl: "/contact",
-        imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-        bgColor: "#020617",
-        textColor: "#ffffff",
-        paddingTop: 60,
-        paddingBottom: 60,
-        animation: "fade-up",
-        glassmorphism: false,
-        customCss: "",
-      },
-      render: ({ badge, title, subtitle, primaryBtnText, primaryBtnUrl, secondaryBtnText, secondaryBtnUrl, imageUrl, bgColor, textColor, paddingTop, paddingBottom, animation, glassmorphism, customCss }) => (
-        <section
-          style={{ backgroundColor: bgColor || "#020617", color: textColor || "#fff", paddingTop: \`\${paddingTop || 60}px\`, paddingBottom: \`\${paddingBottom || 60}px\` }}
-          className={\`w-full text-center px-4 font-sans select-none relative \${getAnimationClass(animation)}\`}
-          dir="rtl"
-        >
-          {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
-          <div className={\`max-w-5xl mx-auto space-y-6 \${glassmorphism ? "p-8 rounded-[2.5rem] bg-white/[0.03] backdrop-blur-2xl border border-white/10 shadow-2xl" : ""}\`}>
-            {badge && <span className="inline-block px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">{badge}</span>}
-            <h1 className="text-3xl sm:text-5xl font-black leading-tight">{title}</h1>
-            {subtitle && <p className="text-sm sm:text-base opacity-80 max-w-2xl mx-auto leading-relaxed">{subtitle}</p>}
-            <div className="flex flex-wrap justify-center gap-3 pt-4">
-              {primaryBtnText && <Link href={primaryBtnUrl || "/products"} className="px-8 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-xl transition">{primaryBtnText}</Link>}
-              {secondaryBtnText && <Link href={secondaryBtnUrl || "/contact"} className="px-8 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-xs transition">{secondaryBtnText}</Link>}
-            </div>
-            {imageUrl && (
-              <div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden mt-8 shadow-2xl border border-white/10">
-                <img src={imageUrl} alt="" className="w-full h-auto object-cover max-h-[480px]" />
-              </div>
-            )}
-          </div>
-        </section>
-      ),
-    },
-
+    // ۹. ویژگی‌ها
     FeaturesGrid: {
       label: "گرید ۳ ستونه مزایا و ویژگی‌ها",
       fields: {
@@ -571,7 +415,7 @@ export const puckConfig: Config<ComponentProps> = {
         paddingBottom: { type: "number", label: "فاصله پایین (px)" },
         hoverLift: {
           type: "radio",
-          label: "افکت شناور هاور (Hover Lift)",
+          label: "افکت شناور هاور",
           options: [{ label: "فعال", value: true }, { label: "عادی", value: false }]
         }
       },
@@ -598,7 +442,7 @@ export const puckConfig: Config<ComponentProps> = {
                 { t: item2Title, d: item2Desc, icon: "⚡" },
                 { t: item3Title, d: item3Desc, icon: "📦" },
               ].map((item, i) => (
-                <div key={i} className={\`p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2 transition duration-300 \${hoverLift ? "hover:-translate-y-1.5 hover:border-sky-500/50 hover:shadow-2xl hover:shadow-sky-500/10" : ""}\`}>
+                <div key={i} className={\`p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2 transition duration-300 \${hoverLift ? "hover:-translate-y-1.5 hover:border-sky-500/50 hover:shadow-2xl" : ""}\`}>
                   <span className="text-3xl block">{item.icon}</span>
                   <h3 className="font-bold text-sm">{item.t}</h3>
                   <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.d}</p>
@@ -610,6 +454,7 @@ export const puckConfig: Config<ComponentProps> = {
       ),
     },
 
+    // ۱۰. سوالات متداول
     FaqAccordion: {
       label: "پرسش و پاسخ آکاردئونی (FAQ)",
       fields: {
@@ -656,6 +501,7 @@ export const puckConfig: Config<ComponentProps> = {
       }
     },
 
+    // ۱۱. فراخوان
     CtaBanner: {
       label: "فراخوان عمل و کمپین (CTA)",
       fields: {
@@ -666,7 +512,7 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: { type: "text", label: "رنگ باکس" },
         glowEffect: {
           type: "radio",
-          label: "هاله نور نئونی (Neon Glow)",
+          label: "هاله نور نئونی",
           options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }]
         }
       },
@@ -700,6 +546,7 @@ export const puckConfig: Config<ComponentProps> = {
       ),
     },
 
+    // ۱۲. کد اختصاصی
     CustomHtml: {
       label: "کد خام اختصاصی (HTML / CSS / SVG)",
       fields: {
@@ -721,12 +568,12 @@ export const puckConfig: Config<ComponentProps> = {
   },
 };
 `;
-writeFile('lib/puckConfig.tsx', enterprisePuckConfig);
+writeFile('lib/puckConfig.tsx', completeSitePuckConfig);
 
 // =============================================================================
-// ۲. ارتقای components/admin/AdminModularPages.tsx با خروجی و ورودی JSON
+// ۲. تنظیم ساختار پیش‌فرض دقیق صفحه اصلی در components/admin/AdminModularPages.tsx
 // =============================================================================
-const studioWithExportCode = `"use client";
+const studioFullEditorCode = `"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { Puck, Render, Data } from "@measured/puck";
@@ -735,100 +582,50 @@ import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
 import Link from "next/link";
 
-const PRESET_TEMPLATES: Record<string, Data> = {
-  festival_sale: {
-    content: [
-      {
-        type: "CountdownTimer",
-        props: {
-          id: "timer-pres-1",
-          badge: "🔥 تخفیف شگفت‌انگیز ۲۴ ساعته",
-          title: "جشنواره مانیتورهای مرجع رنگ و استودیو",
-          targetDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 19),
-          buttonText: "مشاهده پیشنهادهای شگفت‌انگیز",
-          buttonUrl: "/products",
-          bgColor: "#0f172a"
-        }
-      },
-      {
-        type: "ProductGrid",
-        props: {
-          id: "grid-pres-1",
-          heading: "کالاهای منتخب با تخفیف طلایی",
-          subtitle: "تعداد محدود به همراه ارسال رایگان پیشتاز",
-          category: "all",
-          limit: 6,
-          columns: 3,
-          showPriceBadge: true,
-          bgColor: "#07090e",
-          cardGlass: true
-        }
-      },
-      {
-        type: "CtaBanner",
-        props: {
-          id: "cta-pres-1",
-          title: "نیاز به مشاوره قبل از ثبت نهایی فاکتور دارید؟",
-          subtitle: "کارشناسان فنی ما به صورت مستقیم پاسخگوی شما هستند.",
-          btnText: "ارسال پیام در واتساپ یا تماس",
-          btnUrl: "/contact",
-          bgColor: "#1e1b4b",
-          glowEffect: true
-        }
+// دقیقاً ساختار اورجینال و چشم‌نواز صفحه اول آکسون
+const ORIGINAL_HOME_PUCK_DATA: Data = {
+  content: [
+    {
+      type: "NativeHero3D",
+      props: {
+        id: "hero3d-home-core",
+        topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+        bgColor: "transparent"
       }
-    ],
-    root: { props: { title: "کمپین جشنواره فروش" } }
-  },
-  flagship_showcase: {
-    content: [
-      {
-        type: "Hero3DBlock",
-        props: {
-          id: "hero3d-pres-1",
-          topBadge: "🚀 پرچمدار تکنولوژی بصری ۲۰۲۶",
-          showControls: true,
-          bgColor: "#07090e"
-        }
-      },
-      {
-        type: "MultiColumnLayout",
-        props: {
-          id: "grid-multi-1",
-          columnsCount: 2,
-          col1Content: "<div class='p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2'><h4 class='font-bold text-sky-400'>کالیبراسیون سخت‌افزاری ۳D LUT</h4><p class='text-xs opacity-75'>تفکیک دقیق بیش از ۱.۰۷ میلیارد رنگ در طیف گسترده سینمایی DCI-P3 با ضریب خطای دلتا کمتر از ۰.۵.</p></div>",
-          col2Content: "<div class='p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2'><h4 class='font-bold text-emerald-400'>اتصال تاندربولت ۵ و شارژ همزمان</h4><p class='text-xs opacity-75'>انتقال تصویر بی‌نقص با پهنای باند ۱۲۰ گیگابیت بر ثانیه به همراه توان خروجی ۹۶ وات برای لپ‌تاپ.</p></div>",
-          gap: 24,
-          bgColor: "#07090e",
-          paddingY: 30
-        }
-      },
-      {
-        type: "ProductComparison",
-        props: {
-          id: "comp-pres-1",
-          heading: "مقایسه فنی دو مانیتور استودیویی",
-          subtitle: "بررسی تراز رنگ، روشنایی نیت و تاندربولت",
-          product1Id: "prod-studio-display-5k",
-          product2Id: "prod-pro-display-xdr",
-          bgColor: "#090d16"
-        }
+    },
+    {
+      type: "NativePerspectiveSlider",
+      props: {
+        id: "slider-home-core",
+        paddingY: 20
       }
-    ],
-    root: { props: { title: "معرفی پرچمدار استودیو" } }
-  }
+    },
+    {
+      type: "NativeProductCatalog",
+      props: {
+        id: "catalog-home-core",
+        heading: "کاتالوگ تجهیزات تخصصی"
+      }
+    },
+    {
+      type: "NativeExplodedView",
+      props: {
+        id: "exploded-home-core",
+        productTitle: "Apple Studio Display 5K Retina"
+      }
+    }
+  ],
+  root: { props: { title: "صفحه اصلی سایت" } }
 };
 
 export default function AdminModularPages() {
   const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
-  const [pageData, setPageData] = useState<Data>(PRESET_TEMPLATES.flagship_showcase);
-  const [revisions, setRevisions] = useState<Array<{ id: string; created_at: string }>>([]);
+  const [pageData, setPageData] = useState<Data>(ORIGINAL_HOME_PUCK_DATA);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"editor" | "split" | "live_site">("split");
   const [viewportWidth, setViewportWidth] = useState<"100%" | "768px" | "390px">("100%");
   const [toast, setToast] = useState<string | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchPages = async () => {
     try {
@@ -840,16 +637,6 @@ export default function AdminModularPages() {
     } catch {}
   };
 
-  const fetchRevisions = async (slug: string) => {
-    try {
-      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}&revisions=true\`, { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && Array.isArray(json.revisions)) {
-        setRevisions(json.revisions);
-      }
-    } catch {}
-  };
-
   const loadPage = async (slug: string) => {
     setCurrentSlug(slug);
     setLoading(true);
@@ -857,14 +644,13 @@ export default function AdminModularPages() {
     try {
       const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
       const json = await res.json();
-      if (json.success && json.page && json.page.puck_data) {
+      if (json.success && json.page && json.page.puck_data && json.page.puck_data.content?.length > 0) {
         setPageData(json.page.puck_data);
       } else {
-        setPageData(PRESET_TEMPLATES.flagship_showcase);
+        setPageData(ORIGINAL_HOME_PUCK_DATA);
       }
-      fetchRevisions(slug);
     } catch {
-      setPageData(PRESET_TEMPLATES.flagship_showcase);
+      setPageData(ORIGINAL_HOME_PUCK_DATA);
     } finally {
       setLoading(false);
     }
@@ -872,56 +658,12 @@ export default function AdminModularPages() {
 
   useEffect(() => {
     fetchPages();
-    fetchRevisions("home");
+    loadPage("home");
   }, []);
-
-  const handleApplyPreset = (presetKey: string) => {
-    if (!confirm("آیا تمایل دارید ساختار این صفحه را با قالب آماده جایگزین کنید؟")) return;
-    soundEngine.playSuccess();
-    const t = PRESET_TEMPLATES[presetKey];
-    if (t) {
-      setPageData(t);
-      setToast("✓ قالب آماده با موفقیت روی بوم لود شد.");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleExportJson = () => {
-    soundEngine.playClick();
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pageData, null, 2));
-    const downloadAnchor = document.createElement("a");
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", \`axon-page-\${currentSlug}-\${Date.now()}.json\`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    setToast("✓ فایل ساختار قالب (JSON) دانلود شد.");
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const parsed = JSON.parse(event.target?.result as string);
-        if (parsed && parsed.content) {
-          setPageData(parsed);
-          soundEngine.playSuccess();
-          setToast("✓ قالب سفارشی با موفقیت ایمپورت شد.");
-          setTimeout(() => setToast(null), 3000);
-        }
-      } catch {
-        alert("فرمت فایل JSON نامعتبر است.");
-      }
-    };
-    reader.readAsText(file);
-  };
 
   const handleSave = async (data: Data) => {
     soundEngine.playClick();
-    setToast("در حال انتشار تغییرات در دیتابیس...");
+    setToast("در حال انتشار تغییرات روی سایت...");
     try {
       const res = await fetch("/api/pages", {
         method: "POST",
@@ -936,8 +678,7 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToast("✓ صفحه با موفقیت ذخیره و در سراسر سایت منتشر شد.");
-        fetchRevisions(currentSlug);
+        setToast("✓ صفحه با موفقیت ذخیره شد و روی ویترین سایت اعمال گردید.");
       } else {
         setToast("خطا در ذخیره‌سازی.");
       }
@@ -952,8 +693,7 @@ export default function AdminModularPages() {
 
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4" dir="rtl">
-      <input type="file" ref={fileInputRef} onChange={handleImportJson} accept=".json" className="hidden" />
-
+      
       {/* نوار کنترل استودیو */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -961,7 +701,7 @@ export default function AdminModularPages() {
             ⚡
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">صفحه:</span>
+            <span className="text-xs font-bold text-[var(--text-secondary)]">صفحه جاری:</span>
             <select
               value={currentSlug}
               onChange={(e) => loadPage(e.target.value)}
@@ -974,24 +714,6 @@ export default function AdminModularPages() {
               ))}
             </select>
           </div>
-        </div>
-
-        {/* دکمه‌های ایمپورت و اکسپورت قالب JSON */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleExportJson}
-            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-slate-300 hover:border-sky-500 transition cursor-pointer flex items-center gap-1"
-          >
-            <span>📥 دانلود قالب (JSON)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-slate-300 hover:border-sky-500 transition cursor-pointer flex items-center gap-1"
-          >
-            <span>📤 بارگذاری قالب</span>
-          </button>
         </div>
 
         {/* سوییچر حالت‌های نمایش */}
@@ -1054,16 +776,16 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم استودیو */}
+      {/* بوم دوگانه استودیو */}
       <div className="flex-1 w-full min-h-[750px] flex gap-4 items-start">
         {loading ? (
-          <div className="w-full py-32 text-center text-xs font-bold text-slate-400">در حال بارگذاری استودیو...</div>
+          <div className="w-full py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بخش‌های صفحه...</div>
         ) : (
           <>
             {(viewMode === "editor" || viewMode === "split") && (
               <div className={\`rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px] transition-all duration-300 \${viewMode === "split" ? "w-1/2" : "w-full"}\`}>
                 <div className="p-2.5 bg-black/40 border-b border-white/10 px-4 text-xs font-bold text-sky-400 flex items-center gap-2">
-                  <span>🛠️ پنل ویرایشگر Puck</span>
+                  <span>🛠️ پنل ویرایش اجزای صفحه اصلی (درگ، حذف، جابجایی و ویرایش)</span>
                 </div>
                 <Puck
                   config={puckConfig}
@@ -1079,7 +801,7 @@ export default function AdminModularPages() {
                 <div className="p-2.5 bg-black/40 border-b border-white/10 px-4 text-xs font-bold text-emerald-400 flex justify-between items-center">
                   <span className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>پیش‌نمایش زنده همگام با تغییرات</span>
+                    <span>پیش‌نمایش بلادرنگ تغییرات صفحه اصلی</span>
                   </span>
                   <span className="text-[10px] font-mono text-slate-400">{targetLiveUrl}</span>
                 </div>
@@ -1101,10 +823,64 @@ export default function AdminModularPages() {
   );
 }
 `;
-writeFile('components/admin/AdminModularPages.tsx', studioWithExportCode);
+writeFile('components/admin/AdminModularPages.tsx', studioFullEditorCode);
 
 // =============================================================================
-// ۳. تست بیلد نهایی پروژه و انتشار در Vercel
+// ۳. اتصال هوشمند app/page.tsx به دیتابیس Puck (با حفظ فال‌بک اورجینال)
+// =============================================================================
+const dynamicHomePageCode = `import React from "react";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import ModularPageRenderer from "@/components/modular/ModularPageRenderer";
+import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
+import ProductList from "@/components/ProductList";
+import ProductExplodedView from "@/components/ProductExplodedView";
+import { productService } from "@/services/productService";
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  // واکشی چیدمان ذخیره‌شده از صفحه ساز
+  const { data: pageRecord } = await supabaseAdmin
+    .from("modular_pages")
+    .select("*")
+    .eq("slug", "home")
+    .maybeSingle();
+
+  // اگر صفحه در Puck ویرایش و ذخیره شده باشد، با موتور اختصاصی رندر می‌شود
+  if (pageRecord && pageRecord.puck_data && pageRecord.puck_data.content?.length > 0) {
+    return <ModularPageRenderer initialPage={pageRecord} slug="home" />;
+  }
+
+  // در غیر این صورت، چیدمان اورجینال و دست‌نخورده سایت رندر می‌شود
+  const products = await productService.getAll();
+  const sampleProduct = products[0] || {
+    id: "prod-studio-display-5k",
+    title: "Apple Studio Display 27 5K Retina",
+    price: 128500000,
+    category: "مانیتور استودیو"
+  };
+
+  return (
+    <div className="w-full flex flex-col font-sans select-none text-[var(--text-primary)] space-y-12 md:space-y-16 overflow-x-hidden pb-12" dir="rtl">
+      <Hero3DCanvas />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <ProductPerspectiveSlider />
+      </div>
+      <div id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <ProductList initialProducts={products} />
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <ProductExplodedView productTitle={sampleProduct.title || "Apple Studio Display 5K"} />
+      </div>
+    </div>
+  );
+}
+`;
+writeFile('app/page.tsx', dynamicHomePageCode);
+
+// =============================================================================
+// ۴. تست بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
@@ -1119,7 +895,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(puck-enterprise-pro): add MultiColumnLayout, JSON template export/import and split-screen realtime rendering"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(puck-native-core): expose 100% native site components (Hero3D, PerspectiveSlider, ProductList, ExplodedView) to visual builder"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -1128,7 +904,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ پلتفرم کامل Puck با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ اتصال کامل اجزای اصلی سایت به صفحه ساز با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

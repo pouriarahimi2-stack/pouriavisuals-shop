@@ -1,227 +1,173 @@
-// File Path: components/Footer.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { siteInfoService, SiteInfo, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
-import ContactDock from "@/components/ContactDock";
-import AnimatedLogo from "@/components/AnimatedLogo";
-import { soundEngine } from "@/lib/soundEngine";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 
 export default function Footer() {
-  const [info, setInfo] = useState<SiteInfo | null>(() => siteInfoService.getSiteInfoSync());
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
   useEffect(() => {
-    siteInfoService.getSiteInfo().then((d) => d && setInfo(d));
+    const cached = siteInfoService.getSiteInfoSync();
+    if (cached) setSiteInfo(cached);
+
+    siteInfoService.getSiteInfo().then((data) => {
+      if (data) setSiteInfo(data);
+    });
+
     const handleUpdate = (e: any) => {
-      if (e.detail) setInfo(e.detail);
+      if (e.detail) setSiteInfo(e.detail);
     };
+
     window.addEventListener("site_info_updated", handleUpdate);
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
-  const layoutCfg = info?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
-  const footerCfg = layoutCfg.footer;
-  const contactDockCfg = layoutCfg.contactDock;
-
-  if (footerCfg.show === false) return null;
-
-  const siteName = footerCfg.brandTitle || info?.site_name || info?.siteName || "آکسون | Axon";
-  const brandSubtitle = footerCfg.brandSubtitle || "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو";
-  const brandDesc = footerCfg.description || info?.footer_text || info?.description || "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.";
-  const logoUrl = info?.footer_logo_url || info?.footerLogoUrl || info?.logo_url || info?.logoUrl;
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
+  const phone = siteInfo?.phone || "09376110200";
+  const email = siteInfo?.email || "Pouriarahimi@yahoo.com";
+  const address = siteInfo?.address || "شیراز - ستارخان";
+  const workingHours = siteInfo?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰";
+  const enamadCode = "27424534";
+  const bioDesc = siteInfo?.description || siteInfo?.footer_text || "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.";
 
   return (
-    <footer
-      id="storefront-footer"
-      className="w-full border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] mt-10 py-10 select-none transition-colors duration-300 font-sans relative z-10"
-      dir="rtl"
-      suppressHydrationWarning
-    >
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 space-y-8">
+    <footer className="w-full bg-[var(--modal-bg,#ffffff)] dark:bg-[#07090e] border-t border-slate-200 dark:border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans select-none mt-16" dir="rtl">
+      <div className="max-w-7xl mx-auto space-y-12">
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 pb-8 border-b border-[var(--card-border)] items-start">
+        {/* گرید ۴ ستونه دقیقاً مشابه تصویر شما */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
           
-          {/* ستون ۱ (راست): مشخصات برند با لوگوی خیلی بزرگ */}
-          <div className="lg:col-span-5 space-y-4 text-right">
-            <div className="flex items-center gap-4">
-              <AnimatedLogo customLogoUrl={logoUrl} size={70} />
-              <div>
-                <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
-                  {siteName}
-                </h3>
-                <span className="text-xs text-[var(--accent-blue)] font-bold block mt-0.5">
-                  {brandSubtitle}
-                </span>
+          {/* ستون ۱ (راست): معرفی برند، نشان‌ها و داک تعاملی CONTACT */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md text-white font-black text-xs">
+                  ▲
+                </div>
+                <h3 className="font-black text-2xl text-slate-900 dark:text-white">{storeName}</h3>
               </div>
+              <p className="text-xs font-bold text-sky-500">مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pt-1">{bioDesc}</p>
             </div>
 
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium max-w-lg text-justify">
-              {brandDesc}
-            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-black flex items-center gap-1.5">
+                <span>✓</span> گارانتی اصالت ۱۰۰٪ فیزیکی
+              </span>
+              <span className="px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400 text-[11px] font-black flex items-center gap-1.5">
+                <span>🚀</span> ارسال پیشتاز سراسری
+              </span>
+            </div>
 
-            {footerCfg.showBadges && (
-              <div className="flex flex-wrap items-center gap-2 pt-1 animate-fadeIn">
-                <span className="px-3.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs border border-emerald-500/20 shadow-sm flex items-center gap-1.5">
-                  <span className="text-emerald-500 text-xs">✓</span>
-                  <span>{footerCfg.badge1Text || "گارانتی اصالت ۱۰۰٪ فیزیکی"}</span>
-                </span>
-                <span className="px-3.5 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-xs border border-blue-500/20 shadow-sm flex items-center gap-1.5">
-                  <span className="text-xs">🚀</span>
-                  <span>{footerCfg.badge2Text || "ارسال پیشتاز سراسری"}</span>
-                </span>
+            {/* کلیدهای ۳D تعاملی CONTACT */}
+            <div className="pt-3 space-y-2">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span> شبکه‌های ارتباطی و اجتماعی استودیو:
+              </span>
+              <div className="p-3 rounded-3xl bg-slate-900 text-white flex items-center justify-center gap-2 shadow-2xl" dir="ltr">
+                {["C", "O", "N", "T", "A", "C", "T"].map((k, i) => (
+                  <div key={i} className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-mono font-black text-xs shadow-inner hover:scale-110 hover:border-sky-400 transition cursor-pointer">
+                    {k}
+                  </div>
+                ))}
               </div>
-            )}
-
-            {contactDockCfg.show && (
-              <div className="pt-2 border-t border-[var(--card-border)]/60">
-                <ContactDock
-                  title={contactDockCfg.title}
-                  scale={contactDockCfg.scale}
-                />
-              </div>
-            )}
+              <p className="text-[10px] text-center text-slate-400">برای مشاهده امکانات، ماوس را روی کلیدها ببرید یا کلیک کنید</p>
+            </div>
           </div>
 
           {/* ستون ۲: دسترسی سریع */}
-          {footerCfg.quickLinks.show && (
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-2.5">
-                <span className="w-2 h-2 rounded-full bg-[var(--accent-blue)]" />
-                <h4 className="font-black text-xs sm:text-sm text-[var(--text-primary)]">
-                  {footerCfg.quickLinks.title || "دسترسی سریع"}
-                </h4>
-              </div>
-
-              <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-bold">
-                {footerCfg.quickLinks.links.map((link) => (
-                  <li key={link.id}>
-                    <Link
-                      href={link.url}
-                      onClick={() => soundEngine.playClick()}
-                      className="hover:text-[var(--accent-blue)] transition-colors flex items-center gap-1.5 py-1"
-                    >
-                      <span className="text-[10px] opacity-60">›</span>
-                      <span>{link.title}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="lg:col-span-2 space-y-4">
+            <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span> دسترسی سریع
+            </h4>
+            <ul className="space-y-2.5 text-xs font-bold text-slate-600 dark:text-slate-400">
+              <li><Link href="/products" className="hover:text-sky-500 transition">کاتالوگ کالاها</Link></li>
+              <li><Link href="/track-order" className="hover:text-sky-500 transition">سامانه رهگیری مرسولات</Link></li>
+              <li><Link href="/news" className="hover:text-sky-500 transition">جدیدترین اخبار تکنولوژی</Link></li>
+              <li><Link href="/blog" className="hover:text-sky-500 transition">مجله مقالات تخصصی</Link></li>
+              <li><Link href="/about" className="hover:text-sky-500 transition">درباره آکسون</Link></li>
+            </ul>
+          </div>
 
           {/* ستون ۳: خدمات مشتریان */}
-          {footerCfg.customerServices.show && (
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-2.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <h4 className="font-black text-xs sm:text-sm text-[var(--text-primary)]">
-                  {footerCfg.customerServices.title || "خدمات مشتریان"}
-                </h4>
-              </div>
-
-              <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-bold">
-                {footerCfg.customerServices.links.map((link) => (
-                  <li key={link.id}>
-                    <Link
-                      href={link.url}
-                      onClick={() => soundEngine.playClick()}
-                      className="hover:text-[var(--accent-blue)] transition-colors flex items-center gap-1.5 py-1"
-                    >
-                      <span className="text-[10px] opacity-60">›</span>
-                      <span>{link.title}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* ستون ۴: اطلاعات تماس و اینماد */}
-          {footerCfg.contactInfo.show && (
-            <div className="lg:col-span-3 space-y-3">
-              <div className="flex items-center gap-2 border-b border-[var(--card-border)] pb-2.5">
-                <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                <h4 className="font-black text-xs sm:text-sm text-[var(--text-primary)]">
-                  {footerCfg.contactInfo.title || "اطلاعات تماس و دفتر"}
-                </h4>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                {footerCfg.contactInfo.items
-                  .filter((it) => it.show !== false)
-                  .map((it) => {
-                    const isLink = Boolean(it.link);
-                    const CardComponent = isLink ? "a" : "div";
-                    const linkProps = isLink ? { href: it.link, onClick: () => soundEngine.playClick() } : {};
-
-                    return (
-                      <CardComponent
-                        key={it.id}
-                        {...linkProps}
-                        className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition flex items-center justify-between group shadow-sm"
-                      >
-                        <div className="flex items-center gap-2.5 overflow-hidden">
-                          <span className="w-8 h-8 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center text-sm font-bold shadow-inner shrink-0">
-                            {it.type === "phone" ? "📞" : it.type === "email" ? "✉️" : it.type === "address" ? "📍" : "⏰"}
-                          </span>
-                          <div className="overflow-hidden text-right">
-                            <span className="text-[10px] text-[var(--text-secondary)] block font-bold">
-                              {it.title}
-                            </span>
-                            <span className="font-bold text-xs text-[var(--text-primary)] truncate block group-hover:text-[var(--accent-blue)] transition-colors" dir={it.type === "phone" || it.type === "email" ? "ltr" : "rtl"}>
-                              {it.value}
-                            </span>
-                          </div>
-                        </div>
-                      </CardComponent>
-                    );
-                  })}
-              </div>
-
-              {/* نماد اعتماد الکترونیکی */}
-              <div className="pt-3 border-t border-[var(--card-border)]/60 space-y-2">
-                <a
-                  href="https://trustseal.enamad.ir/?id=27424534"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-emerald-500 transition flex items-center gap-3 group shadow-sm"
-                  title="نماد اعتماد الکترونیکی (کد ۲۷۴۲۴۵۳۴)"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 font-bold shrink-0">
-                    <svg className="w-6 h-6 stroke-current" fill="none" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-[var(--text-primary)] block group-hover:text-emerald-500 transition">
-                      نماد اعتماد الکترونیکی
-                    </span>
-                    <span className="text-[10px] font-mono font-bold text-[var(--accent-blue)] block" dir="ltr">
-                      کد رسمی: 27424534
-                    </span>
-                  </div>
-                </a>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* نوار پایین فوتر */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-secondary)] font-medium pt-2" suppressHydrationWarning>
-          <p className="text-center sm:text-right">
-            تمامی حقوق مادی و معنوی برای <strong className="text-[var(--text-primary)] font-black">{siteName}</strong> محفوظ است © 2026
-          </p>
-
-          <div className="flex items-center gap-4 text-[11px] font-bold">
-            <span className="text-[var(--text-secondary)]">طراحی و معماری مهندسی پایدار</span>
-            <span className="text-slate-400">•</span>
-            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)</span>
-            </span>
+          <div className="lg:col-span-2 space-y-4">
+            <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> خدمات مشتریان
+            </h4>
+            <ul className="space-y-2.5 text-xs font-bold text-slate-600 dark:text-slate-400">
+              <li><Link href="/contact" className="hover:text-sky-500 transition">ثبت تیکت مشاوره</Link></li>
+              <li><Link href="/about" className="hover:text-sky-500 transition">شرایط گارانتی طلایی</Link></li>
+              <li><Link href="/about" className="hover:text-sky-500 transition">ضمانت بازگشت وجه ۷ روزه</Link></li>
+              <li><Link href="/blog" className="hover:text-sky-500 transition">راهنمای کالیبراسیون ۵K</Link></li>
+              <li><Link href="/about" className="hover:text-sky-500 transition">روش‌های پرداخت امن شاپرک</Link></li>
+            </ul>
           </div>
+
+          {/* ستون ۴: اطلاعات تماس و نماد اینماد */}
+          <div className="lg:col-span-4 space-y-4">
+            <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> اطلاعات تماس و دفتر
+            </h4>
+            
+            <div className="space-y-2 text-xs">
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">تلفن پشتیبانی:</span>
+                  <span className="font-mono font-black text-slate-800 dark:text-slate-200">{phone}</span>
+                </div>
+                <span className="p-2 rounded-xl bg-rose-500/10 text-rose-500 text-sm">📞</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">پست الکترونیک:</span>
+                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-[11px]">{email}</span>
+                </div>
+                <span className="p-2 rounded-xl bg-sky-500/10 text-sky-500 text-sm">✉️</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">نشانی تحویل حضوری و انبار:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">{address}</span>
+                </div>
+                <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500 text-sm">📍</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">ساعات پاسخگویی:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">{workingHours}</span>
+                </div>
+                <span className="p-2 rounded-xl bg-amber-500/10 text-amber-500 text-sm">⏰</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">نماد اعتماد الکترونیکی</span>
+                  <span className="text-[10px] text-slate-400 block">کد رسمی: <strong className="font-mono text-sky-500">{enamadCode}</strong></span>
+                </div>
+                <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 text-sm">🛡️</span>
+              </div>
+            </div>
+          </div>
+
         </div>
+
+        {/* خط کپی‌رایت انتهای فوتر */}
+        <div className="pt-8 border-t border-slate-200 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-slate-500">
+          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span>نماد اعتماد الکترونیکی فعال ({enamadCode})</span>
+            <span className="text-slate-400">•</span>
+            <span>طراحی و معماری مهندسی پایدار</span>
+          </div>
+          <p className="text-center sm:text-left text-[11px]">
+            تمامی حقوق مادی و معنوی برای {storeName} محفوظ است © 2026
+          </p>
+        </div>
+
       </div>
     </footer>
   );

@@ -19,6 +19,9 @@ export type ComponentProps = {
     textColor: string;
     paddingTop: number;
     paddingBottom: number;
+    animation: "none" | "fade-up" | "zoom-in" | "slide-right";
+    glassmorphism: boolean;
+    customCss: string;
   };
   ProductGrid: {
     heading: string;
@@ -28,6 +31,7 @@ export type ComponentProps = {
     columns: number;
     showPriceBadge: boolean;
     bgColor: string;
+    cardGlass: boolean;
   };
   ProductComparison: {
     heading: string;
@@ -55,6 +59,7 @@ export type ComponentProps = {
     bgColor: string;
     paddingTop: number;
     paddingBottom: number;
+    hoverLift: boolean;
   };
   FaqAccordion: {
     heading: string;
@@ -72,6 +77,7 @@ export type ComponentProps = {
     btnText: string;
     btnUrl: string;
     bgColor: string;
+    glowEffect: boolean;
   };
   CustomHtml: {
     code: string;
@@ -80,7 +86,14 @@ export type ComponentProps = {
   };
 };
 
-function LiveProductGridRenderer({ heading, subtitle, category, limit, columns, showPriceBadge, bgColor }: any) {
+function getAnimationClass(anim?: string) {
+  if (anim === "fade-up") return "animate-[fadeIn_0.7s_ease-out]";
+  if (anim === "zoom-in") return "animate-[scaleIn_0.6s_ease-out]";
+  if (anim === "slide-right") return "animate-[slideRight_0.6s_ease-out]";
+  return "";
+}
+
+function LiveProductGridRenderer({ heading, subtitle, category, limit, columns, showPriceBadge, bgColor, cardGlass }: any) {
   const [products, setProducts] = useState<Product[]>([]);
   const { addToCart } = useCart();
 
@@ -110,15 +123,20 @@ function LiveProductGridRenderer({ heading, subtitle, category, limit, columns, 
           {products.map((p) => {
             const priceVal = Number(p.discountPrice || p.discount_price || p.price || 0);
             return (
-              <div key={p.id} className="p-5 rounded-3xl bg-white/5 border border-white/10 space-y-3 hover:border-sky-500/40 transition flex flex-col justify-between">
+              <div
+                key={p.id}
+                className={`p-5 rounded-3xl border border-white/10 space-y-3 hover:border-sky-500/50 hover:-translate-y-1 transition duration-300 flex flex-col justify-between ${
+                  cardGlass ? "bg-white/[0.04] backdrop-blur-xl shadow-2xl" : "bg-white/5"
+                }`}
+              >
                 <div className="space-y-3">
-                  <div className="w-full h-48 rounded-2xl bg-black/40 overflow-hidden flex items-center justify-center p-2 border border-white/5">
-                    <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain hover:scale-105 transition duration-300" />
+                  <div className="w-full h-48 rounded-2xl bg-black/40 overflow-hidden flex items-center justify-center p-2 border border-white/5 relative group">
+                    <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain group-hover:scale-105 transition duration-500" />
                   </div>
                   <div className="space-y-1">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-bold truncate">{p.title || p.name}</span>
-                      {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">گارانتی طلایی</span>}
+                      {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">گارانتی طلایی</span>}
                     </div>
                     <span className="text-[10px] text-slate-400 block">{p.category || "تجهیزات تخصصی"}</span>
                   </div>
@@ -140,7 +158,7 @@ function LiveProductGridRenderer({ heading, subtitle, category, limit, columns, 
                         stock: p.stock ?? 10
                       });
                     }}
-                    className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs transition cursor-pointer shadow-md"
+                    className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-sky-500/20"
                   >
                     خرید مستقیم 🛒
                   </button>
@@ -184,7 +202,7 @@ function LiveProductComparisonRenderer({ heading, subtitle, product1Id, product2
           {[p1, p2].map((p, idx) => {
             const price = Number(p.discountPrice || p.price || 0);
             return (
-              <div key={p.id + idx} className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-4 flex flex-col justify-between">
+              <div key={p.id + idx} className="p-6 rounded-3xl bg-white/[0.03] backdrop-blur-xl border border-white/10 space-y-4 flex flex-col justify-between shadow-2xl hover:border-sky-500/40 transition">
                 <div className="space-y-3">
                   <div className="w-full h-44 rounded-2xl bg-black/40 p-2 flex items-center justify-center">
                     <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain" />
@@ -243,17 +261,17 @@ function LiveCountdownRenderer({ badge, title, targetDate, buttonText, buttonUrl
         </div>
 
         <div className="flex items-center gap-3 font-mono font-black" dir="ltr">
-          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
             <span className="text-2xl block text-rose-400">{String(timeLeft.hours).padStart(2, '0')}</span>
             <span className="text-[9px] font-sans text-slate-400">ساعت</span>
           </div>
           <span className="text-xl text-rose-400">:</span>
-          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
             <span className="text-2xl block text-rose-400">{String(timeLeft.minutes).padStart(2, '0')}</span>
             <span className="text-[9px] font-sans text-slate-400">دقیقه</span>
           </div>
           <span className="text-xl text-rose-400">:</span>
-          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px]">
+          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
             <span className="text-2xl block text-rose-400">{String(timeLeft.seconds).padStart(2, '0')}</span>
             <span className="text-[9px] font-sans text-slate-400">ثانیه</span>
           </div>
@@ -309,6 +327,11 @@ export const puckConfig: Config<ComponentProps> = {
           options: [{ label: "بله", value: true }, { label: "خیر", value: false }]
         },
         bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+        cardGlass: {
+          type: "radio",
+          label: "افکت شیشه مات (Glassmorphism)",
+          options: [{ label: "فعال", value: true }, { label: "عادی", value: false }]
+        },
       },
       defaultProps: {
         heading: "پرفروش‌ترین تجهیزات تصویر و مانیتورها",
@@ -318,6 +341,7 @@ export const puckConfig: Config<ComponentProps> = {
         columns: 3,
         showPriceBadge: true,
         bgColor: "#07090e",
+        cardGlass: true,
       },
       render: (props) => <LiveProductGridRenderer {...props} />,
     },
@@ -377,6 +401,22 @@ export const puckConfig: Config<ComponentProps> = {
         textColor: { type: "text", label: "رنگ متن" },
         paddingTop: { type: "number", label: "فاصله از بالا (px)" },
         paddingBottom: { type: "number", label: "فاصله از پایین (px)" },
+        animation: {
+          type: "select",
+          label: "انیمیشن ورود بلوک",
+          options: [
+            { label: "بدون انیمیشن", value: "none" },
+            { label: "آرام به سمت بالا (Fade Up)", value: "fade-up" },
+            { label: "بزرگ‌نمایی ملایم (Zoom In)", value: "zoom-in" },
+            { label: "ورود از راست (Slide Right)", value: "slide-right" },
+          ]
+        },
+        glassmorphism: {
+          type: "radio",
+          label: "کارت شیشه‌ای بلورین",
+          options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
+        },
+        customCss: { type: "textarea", label: "کد CSS سفارشی این بلوک" },
       },
       defaultProps: {
         badge: "🚀 مرجع تخصصی مانیتورهای ۵K",
@@ -391,14 +431,18 @@ export const puckConfig: Config<ComponentProps> = {
         textColor: "#ffffff",
         paddingTop: 60,
         paddingBottom: 60,
+        animation: "fade-up",
+        glassmorphism: false,
+        customCss: "",
       },
-      render: ({ badge, title, subtitle, primaryBtnText, primaryBtnUrl, secondaryBtnText, secondaryBtnUrl, imageUrl, bgColor, textColor, paddingTop, paddingBottom }) => (
+      render: ({ badge, title, subtitle, primaryBtnText, primaryBtnUrl, secondaryBtnText, secondaryBtnUrl, imageUrl, bgColor, textColor, paddingTop, paddingBottom, animation, glassmorphism, customCss }) => (
         <section
           style={{ backgroundColor: bgColor || "#020617", color: textColor || "#fff", paddingTop: `${paddingTop || 60}px`, paddingBottom: `${paddingBottom || 60}px` }}
-          className="w-full text-center px-4 font-sans select-none relative"
+          className={`w-full text-center px-4 font-sans select-none relative ${getAnimationClass(animation)}`}
           dir="rtl"
         >
-          <div className="max-w-5xl mx-auto space-y-6">
+          {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
+          <div className={`max-w-5xl mx-auto space-y-6 ${glassmorphism ? "p-8 rounded-[2.5rem] bg-white/[0.03] backdrop-blur-2xl border border-white/10 shadow-2xl" : ""}`}>
             {badge && <span className="inline-block px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold">{badge}</span>}
             <h1 className="text-3xl sm:text-5xl font-black leading-tight">{title}</h1>
             {subtitle && <p className="text-sm sm:text-base opacity-80 max-w-2xl mx-auto leading-relaxed">{subtitle}</p>}
@@ -429,6 +473,11 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: { type: "text", label: "رنگ پس‌زمینه" },
         paddingTop: { type: "number", label: "فاصله بالا (px)" },
         paddingBottom: { type: "number", label: "فاصله پایین (px)" },
+        hoverLift: {
+          type: "radio",
+          label: "افکت شناور هاور (Hover Lift)",
+          options: [{ label: "فعال", value: true }, { label: "عادی", value: false }]
+        }
       },
       defaultProps: {
         heading: "استانداردهای مهندسی آکسون استودیو",
@@ -441,8 +490,9 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: "#090d16",
         paddingTop: 50,
         paddingBottom: 50,
+        hoverLift: true,
       },
-      render: ({ heading, item1Title, item1Desc, item2Title, item2Desc, item3Title, item3Desc, bgColor, paddingTop, paddingBottom }) => (
+      render: ({ heading, item1Title, item1Desc, item2Title, item2Desc, item3Title, item3Desc, bgColor, paddingTop, paddingBottom, hoverLift }) => (
         <section style={{ backgroundColor: bgColor || "#090d16", paddingTop: `${paddingTop || 50}px`, paddingBottom: `${paddingBottom || 50}px` }} className="w-full px-4 font-sans select-none text-white" dir="rtl">
           <div className="max-w-7xl mx-auto space-y-8">
             {heading && <h2 className="text-2xl font-black text-center">{heading}</h2>}
@@ -452,7 +502,7 @@ export const puckConfig: Config<ComponentProps> = {
                 { t: item2Title, d: item2Desc, icon: "⚡" },
                 { t: item3Title, d: item3Desc, icon: "📦" },
               ].map((item, i) => (
-                <div key={i} className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2 hover:border-sky-500/40 transition">
+                <div key={i} className={`p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2 transition duration-300 ${hoverLift ? "hover:-translate-y-1.5 hover:border-sky-500/50 hover:shadow-2xl hover:shadow-sky-500/10" : ""}`}>
                   <span className="text-3xl block">{item.icon}</span>
                   <h3 className="font-bold text-sm">{item.t}</h3>
                   <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.d}</p>
@@ -495,10 +545,10 @@ export const puckConfig: Config<ComponentProps> = {
               {heading && <h2 className="text-2xl font-black text-center mb-8">{heading}</h2>}
               <div className="space-y-3">
                 {list.map((it, idx) => (
-                  <div key={idx} onClick={() => setOpen(open === idx ? null : idx)} className="p-5 rounded-2xl bg-white/5 border border-white/10 cursor-pointer transition">
+                  <div key={idx} onClick={() => setOpen(open === idx ? null : idx)} className="p-5 rounded-2xl bg-white/5 border border-white/10 cursor-pointer transition hover:border-sky-500/30">
                     <div className="flex justify-between items-center text-xs font-bold">
                       <span>{it.q}</span>
-                      <span className="text-sky-400">{open === idx ? "▲" : "▼"}</span>
+                      <span className="text-sky-400 font-mono">{open === idx ? "▲" : "▼"}</span>
                     </div>
                     {open === idx && <p className="mt-3 pt-3 border-t border-white/10 text-xs text-slate-300 leading-relaxed">{it.a}</p>}
                   </div>
@@ -518,6 +568,11 @@ export const puckConfig: Config<ComponentProps> = {
         btnText: { type: "text", label: "متن دکمه" },
         btnUrl: { type: "text", label: "لینک دکمه" },
         bgColor: { type: "text", label: "رنگ باکس" },
+        glowEffect: {
+          type: "radio",
+          label: "هاله نور نئونی (Neon Glow)",
+          options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }]
+        }
       },
       defaultProps: {
         title: "به یک مشاوره تخصصی برای استودیو نیاز دارید؟",
@@ -525,15 +580,21 @@ export const puckConfig: Config<ComponentProps> = {
         btnText: "ثبت تیکت مشاوره",
         btnUrl: "/contact",
         bgColor: "#1e1b4b",
+        glowEffect: true,
       },
-      render: ({ title, subtitle, btnText, btnUrl, bgColor }) => (
+      render: ({ title, subtitle, btnText, btnUrl, bgColor, glowEffect }) => (
         <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none" dir="rtl">
-          <div style={{ backgroundColor: bgColor || "#1e1b4b" }} className="p-8 sm:p-12 rounded-3xl text-center space-y-4 border border-blue-500/30 text-white shadow-2xl">
+          <div
+            style={{ backgroundColor: bgColor || "#1e1b4b" }}
+            className={`p-8 sm:p-12 rounded-3xl text-center space-y-4 border border-blue-500/30 text-white ${
+              glowEffect ? "shadow-[0_0_50px_rgba(59,130,246,0.25)]" : "shadow-2xl"
+            }`}
+          >
             <h2 className="text-2xl font-black">{title}</h2>
-            {subtitle && <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto">{subtitle}</p>}
+            {subtitle && <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">{subtitle}</p>}
             {btnText && (
               <div className="pt-2">
-                <Link href={btnUrl || "/contact"} className="inline-block px-8 py-3 rounded-xl bg-white text-slate-950 font-black text-xs hover:bg-slate-100 transition shadow-lg">
+                <Link href={btnUrl || "/contact"} className="inline-block px-8 py-3.5 rounded-2xl bg-white text-slate-950 font-black text-xs hover:bg-slate-100 transition shadow-xl">
                   {btnText}
                 </Link>
               </div>

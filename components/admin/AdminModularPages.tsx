@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Puck, Data } from "@measured/puck";
+import { Puck, Render, Data } from "@measured/puck";
 import "@measured/puck/puck.css";
 import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
@@ -99,8 +99,8 @@ export default function AdminModularPages() {
   const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
   const [pageData, setPageData] = useState<Data>(PRESET_TEMPLATES.flagship_showcase);
-  const [revisions, setRevisions] = useState<Array<{ id: string; created_at: string }>>([]);
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"editor" | "split" | "live_site">("split");
   const [viewportWidth, setViewportWidth] = useState<"100%" | "768px" | "390px">("100%");
   const [toast, setToast] = useState<string | null>(null);
 
@@ -110,16 +110,6 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success && Array.isArray(json.pages)) {
         setPages(json.pages);
-      }
-    } catch {}
-  };
-
-  const fetchRevisions = async (slug: string) => {
-    try {
-      const res = await fetch(`/api/pages?slug=${encodeURIComponent(slug)}&revisions=true`, { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && Array.isArray(json.revisions)) {
-        setRevisions(json.revisions);
       }
     } catch {}
   };
@@ -136,7 +126,6 @@ export default function AdminModularPages() {
       } else {
         setPageData(PRESET_TEMPLATES.flagship_showcase);
       }
-      fetchRevisions(slug);
     } catch {
       setPageData(PRESET_TEMPLATES.flagship_showcase);
     } finally {
@@ -146,7 +135,6 @@ export default function AdminModularPages() {
 
   useEffect(() => {
     fetchPages();
-    fetchRevisions("home");
   }, []);
 
   const handleApplyPreset = (presetKey: string) => {
@@ -177,8 +165,7 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToast("✓ صفحه با موفقیت ذخیره شد و اسنپ‌شات نسخه ثبت گردید.");
-        fetchRevisions(currentSlug);
+        setToast("✓ صفحه با موفقیت ذخیره و در سراسر سایت منتشر شد.");
       } else {
         setToast("خطا در ذخیره‌سازی.");
       }
@@ -189,10 +176,12 @@ export default function AdminModularPages() {
     }
   };
 
+  const targetLiveUrl = currentSlug === "home" ? "/" : `/${currentSlug}`;
+
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4" dir="rtl">
       
-      {/* نوار ابزار اصلی بالای استودیو */}
+      {/* نوار کنترل استودیو و سوییچر حالت‌های نمایش */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
@@ -214,23 +203,25 @@ export default function AdminModularPages() {
           </div>
         </div>
 
-        {/* لود قالب‌های آماده با ۱ کلیک */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--text-secondary)] font-bold">🎯 لود قالب آماده:</span>
-          <button
-            type="button"
-            onClick={() => handleApplyPreset("flagship_showcase")}
-            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-sky-400 hover:border-sky-500 transition cursor-pointer"
-          >
-            🌟 معرفی پرچمدار ۳D
-          </button>
-          <button
-            type="button"
-            onClick={() => handleApplyPreset("festival_sale")}
-            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-rose-400 hover:border-rose-500 transition cursor-pointer"
-          >
-            🔥 جشنواره تخفیف ۲۴ ساعته
-          </button>
+        {/* سوییچر ۳ حالته: ادیتور تکی / نمای دوتایی زنده / نمای وب‌سایت لایو */}
+        <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)]">
+          {[
+            { id: "editor", label: "محیط ویرایشگر", icon: "✏️" },
+            { id: "split", label: "نمای هم‌زمان (Split View)", icon: "👁️" },
+            { id: "live_site", label: "پیش‌نمایش سایت", icon: "🌐" },
+          ].map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => { soundEngine.playClick(); setViewMode(mode.id as any); }}
+              className={"px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition cursor-pointer " + (
+                viewMode === mode.id ? "bg-sky-500 text-white shadow-md" : "text-slate-400 hover:text-white"
+              )}
+            >
+              <span>{mode.icon}</span>
+              <span className="hidden sm:inline">{mode.label}</span>
+            </button>
+          ))}
         </div>
 
         {/* سوییچر اندازه فریم بوم (دسکتاپ، تبلت و موبایل) */}
@@ -256,11 +247,11 @@ export default function AdminModularPages() {
 
         <div className="flex items-center gap-2">
           <Link
-            href={currentSlug === "home" ? "/" : `/${currentSlug}`}
+            href={targetLiveUrl}
             target="_blank"
             className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
           >
-            <span>مشاهده زنده در سایت</span>
+            <span>باز کردن تب مجزا</span>
             <span>🔗</span>
           </Link>
         </div>
@@ -272,22 +263,58 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم تعاملی Puck */}
-      <div className="flex-1 w-full flex justify-center items-start">
-        <div
-          style={{ width: viewportWidth, maxWidth: "100%", transition: "width 0.3s ease" }}
-          className="rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px]"
-        >
-          {loading ? (
-            <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
-          ) : (
-            <Puck
-              config={puckConfig}
-              data={pageData}
-              onPublish={handleSave}
-            />
-          )}
-        </div>
+      {/* فضای کاری منعطف: حالت‌های Split View یا ویرایشگر تکی */}
+      <div className="flex-1 w-full min-h-[750px] flex gap-4 items-start">
+        {loading ? (
+          <div className="w-full py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم استودیو...</div>
+        ) : (
+          <>
+            {/* ۱. ستون ویرایشگر درگ‌اند‌دراپ Puck */}
+            {(viewMode === "editor" || viewMode === "split") && (
+              <div
+                className={`rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px] transition-all duration-300 ${
+                  viewMode === "split" ? "w-1/2" : "w-full"
+                }`}
+              >
+                <div className="p-2.5 bg-black/40 border-b border-white/10 px-4 text-xs font-bold text-sky-400 flex items-center gap-2">
+                  <span>🛠️ پنل چیدمان و ابزارها</span>
+                </div>
+                <Puck
+                  config={puckConfig}
+                  data={pageData}
+                  onChange={(newData) => setPageData(newData)}
+                  onPublish={handleSave}
+                />
+              </div>
+            )}
+
+            {/* ۲. ستون پیش‌نمایش زنده در لحظه (Instant Live Render) */}
+            {(viewMode === "split" || viewMode === "live_site") && (
+              <div
+                className={`rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px] flex flex-col transition-all duration-300 ${
+                  viewMode === "split" ? "w-1/2" : "w-full"
+                }`}
+              >
+                <div className="p-2.5 bg-black/40 border-b border-white/10 px-4 text-xs font-bold text-emerald-400 flex justify-between items-center">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>پیش‌نمایش رندر زنده صفحه (همگام با تایپ و تغییرات)</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">آدرس مقصد: {targetLiveUrl}</span>
+                </div>
+
+                <div className="flex-1 w-full bg-[#07090e] overflow-y-auto p-4 flex justify-center">
+                  <div
+                    style={{ width: viewportWidth, maxWidth: "100%", transition: "width 0.3s ease" }}
+                    className="rounded-2xl border border-white/5 overflow-hidden shadow-2xl bg-black min-h-[700px]"
+                  >
+                    <Render config={puckConfig} data={pageData} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

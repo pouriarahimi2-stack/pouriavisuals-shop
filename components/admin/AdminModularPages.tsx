@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Puck, Render, Data } from "@measured/puck";
 import "@measured/puck/puck.css";
 import { puckConfig } from "@/lib/puckConfig";
@@ -63,6 +63,18 @@ const PRESET_TEMPLATES: Record<string, Data> = {
         }
       },
       {
+        type: "MultiColumnLayout",
+        props: {
+          id: "grid-multi-1",
+          columnsCount: 2,
+          col1Content: "<div class='p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2'><h4 class='font-bold text-sky-400'>کالیبراسیون سخت‌افزاری ۳D LUT</h4><p class='text-xs opacity-75'>تفکیک دقیق بیش از ۱.۰۷ میلیارد رنگ در طیف گسترده سینمایی DCI-P3 با ضریب خطای دلتا کمتر از ۰.۵.</p></div>",
+          col2Content: "<div class='p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2'><h4 class='font-bold text-emerald-400'>اتصال تاندربولت ۵ و شارژ همزمان</h4><p class='text-xs opacity-75'>انتقال تصویر بی‌نقص با پهنای باند ۱۲۰ گیگابیت بر ثانیه به همراه توان خروجی ۹۶ وات برای لپ‌تاپ.</p></div>",
+          gap: 24,
+          bgColor: "#07090e",
+          paddingY: 30
+        }
+      },
+      {
         type: "ProductComparison",
         props: {
           id: "comp-pres-1",
@@ -71,23 +83,6 @@ const PRESET_TEMPLATES: Record<string, Data> = {
           product1Id: "prod-studio-display-5k",
           product2Id: "prod-pro-display-xdr",
           bgColor: "#090d16"
-        }
-      },
-      {
-        type: "FeaturesGrid",
-        props: {
-          id: "feat-pres-1",
-          heading: "تعهدات طلایی آکسون",
-          item1Title: "۱۸ ماه تعویض کامل",
-          item1Desc: "گارانتی معتبر شرکتی بی قید و شرط.",
-          item2Title: "کالیبراسیون ۳D LUT",
-          item2Desc: "تنظیم تراز دقیق سینمایی قبل از تحویل.",
-          item3Title: "بسته‌بندی ایمن هوانوردی",
-          item3Desc: "ارسال سریع پیشتاز با پوشش کامل بیمه مرسوله.",
-          bgColor: "#07090e",
-          paddingTop: 50,
-          paddingBottom: 50,
-          hoverLift: true
         }
       }
     ],
@@ -99,10 +94,13 @@ export default function AdminModularPages() {
   const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
   const [pageData, setPageData] = useState<Data>(PRESET_TEMPLATES.flagship_showcase);
+  const [revisions, setRevisions] = useState<Array<{ id: string; created_at: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"editor" | "split" | "live_site">("split");
   const [viewportWidth, setViewportWidth] = useState<"100%" | "768px" | "390px">("100%");
   const [toast, setToast] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchPages = async () => {
     try {
@@ -110,6 +108,16 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success && Array.isArray(json.pages)) {
         setPages(json.pages);
+      }
+    } catch {}
+  };
+
+  const fetchRevisions = async (slug: string) => {
+    try {
+      const res = await fetch(`/api/pages?slug=${encodeURIComponent(slug)}&revisions=true`, { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.revisions)) {
+        setRevisions(json.revisions);
       }
     } catch {}
   };
@@ -126,6 +134,7 @@ export default function AdminModularPages() {
       } else {
         setPageData(PRESET_TEMPLATES.flagship_showcase);
       }
+      fetchRevisions(slug);
     } catch {
       setPageData(PRESET_TEMPLATES.flagship_showcase);
     } finally {
@@ -135,6 +144,7 @@ export default function AdminModularPages() {
 
   useEffect(() => {
     fetchPages();
+    fetchRevisions("home");
   }, []);
 
   const handleApplyPreset = (presetKey: string) => {
@@ -146,6 +156,39 @@ export default function AdminModularPages() {
       setToast("✓ قالب آماده با موفقیت روی بوم لود شد.");
       setTimeout(() => setToast(null), 3000);
     }
+  };
+
+  const handleExportJson = () => {
+    soundEngine.playClick();
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pageData, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `axon-page-${currentSlug}-${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    setToast("✓ فایل ساختار قالب (JSON) دانلود شد.");
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (parsed && parsed.content) {
+          setPageData(parsed);
+          soundEngine.playSuccess();
+          setToast("✓ قالب سفارشی با موفقیت ایمپورت شد.");
+          setTimeout(() => setToast(null), 3000);
+        }
+      } catch {
+        alert("فرمت فایل JSON نامعتبر است.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleSave = async (data: Data) => {
@@ -166,6 +209,7 @@ export default function AdminModularPages() {
       if (json.success) {
         soundEngine.playSuccess();
         setToast("✓ صفحه با موفقیت ذخیره و در سراسر سایت منتشر شد.");
+        fetchRevisions(currentSlug);
       } else {
         setToast("خطا در ذخیره‌سازی.");
       }
@@ -180,15 +224,16 @@ export default function AdminModularPages() {
 
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4" dir="rtl">
-      
-      {/* نوار کنترل استودیو و سوییچر حالت‌های نمایش */}
+      <input type="file" ref={fileInputRef} onChange={handleImportJson} accept=".json" className="hidden" />
+
+      {/* نوار کنترل استودیو */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
             ⚡
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه:</span>
+            <span className="text-xs font-bold text-[var(--text-secondary)]">صفحه:</span>
             <select
               value={currentSlug}
               onChange={(e) => loadPage(e.target.value)}
@@ -203,7 +248,25 @@ export default function AdminModularPages() {
           </div>
         </div>
 
-        {/* سوییچر ۳ حالته: ادیتور تکی / نمای دوتایی زنده / نمای وب‌سایت لایو */}
+        {/* دکمه‌های ایمپورت و اکسپورت قالب JSON */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportJson}
+            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-slate-300 hover:border-sky-500 transition cursor-pointer flex items-center gap-1"
+          >
+            <span>📥 دانلود قالب (JSON)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold text-slate-300 hover:border-sky-500 transition cursor-pointer flex items-center gap-1"
+          >
+            <span>📤 بارگذاری قالب</span>
+          </button>
+        </div>
+
+        {/* سوییچر حالت‌های نمایش */}
         <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)]">
           {[
             { id: "editor", label: "محیط ویرایشگر", icon: "✏️" },
@@ -224,7 +287,7 @@ export default function AdminModularPages() {
           ))}
         </div>
 
-        {/* سوییچر اندازه فریم بوم (دسکتاپ، تبلت و موبایل) */}
+        {/* سوییچر اندازه فریم بوم */}
         <div className="flex items-center gap-1 bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--card-border)]">
           {[
             { id: "100%", label: "دسکتاپ", icon: "🖥️" },
@@ -251,7 +314,7 @@ export default function AdminModularPages() {
             target="_blank"
             className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
           >
-            <span>باز کردن تب مجزا</span>
+            <span>مشاهده زنده</span>
             <span>🔗</span>
           </Link>
         </div>
@@ -263,21 +326,16 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* فضای کاری منعطف: حالت‌های Split View یا ویرایشگر تکی */}
+      {/* بوم استودیو */}
       <div className="flex-1 w-full min-h-[750px] flex gap-4 items-start">
         {loading ? (
-          <div className="w-full py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم استودیو...</div>
+          <div className="w-full py-32 text-center text-xs font-bold text-slate-400">در حال بارگذاری استودیو...</div>
         ) : (
           <>
-            {/* ۱. ستون ویرایشگر درگ‌اند‌دراپ Puck */}
             {(viewMode === "editor" || viewMode === "split") && (
-              <div
-                className={`rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px] transition-all duration-300 ${
-                  viewMode === "split" ? "w-1/2" : "w-full"
-                }`}
-              >
+              <div className={`rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px] transition-all duration-300 ${viewMode === "split" ? "w-1/2" : "w-full"}`}>
                 <div className="p-2.5 bg-black/40 border-b border-white/10 px-4 text-xs font-bold text-sky-400 flex items-center gap-2">
-                  <span>🛠️ پنل چیدمان و ابزارها</span>
+                  <span>🛠️ پنل ویرایشگر Puck</span>
                 </div>
                 <Puck
                   config={puckConfig}
@@ -288,19 +346,14 @@ export default function AdminModularPages() {
               </div>
             )}
 
-            {/* ۲. ستون پیش‌نمایش زنده در لحظه (Instant Live Render) */}
             {(viewMode === "split" || viewMode === "live_site") && (
-              <div
-                className={`rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px] flex flex-col transition-all duration-300 ${
-                  viewMode === "split" ? "w-1/2" : "w-full"
-                }`}
-              >
+              <div className={`rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[750px] flex flex-col transition-all duration-300 ${viewMode === "split" ? "w-1/2" : "w-full"}`}>
                 <div className="p-2.5 bg-black/40 border-b border-white/10 px-4 text-xs font-bold text-emerald-400 flex justify-between items-center">
                   <span className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>پیش‌نمایش رندر زنده صفحه (همگام با تایپ و تغییرات)</span>
+                    <span>پیش‌نمایش زنده همگام با تغییرات</span>
                   </span>
-                  <span className="text-[10px] font-mono text-slate-400">آدرس مقصد: {targetLiveUrl}</span>
+                  <span className="text-[10px] font-mono text-slate-400">{targetLiveUrl}</span>
                 </div>
 
                 <div className="flex-1 w-full bg-[#07090e] overflow-y-auto p-4 flex justify-center">

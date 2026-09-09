@@ -7,6 +7,16 @@ import { soundEngine } from "@/lib/soundEngine";
 import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
 
 export type ComponentProps = {
+  MultiColumnLayout: {
+    columnsCount: number;
+    col1Content: string;
+    col2Content: string;
+    col3Content: string;
+    col4Content: string;
+    gap: number;
+    bgColor: string;
+    paddingY: number;
+  };
   Hero3DBlock: {
     topBadge: string;
     showControls: boolean;
@@ -99,205 +109,11 @@ function getAnimationClass(anim?: string) {
   return "";
 }
 
-function LiveProductGridRenderer({ heading, subtitle, category, limit, columns, showPriceBadge, bgColor, cardGlass }: any) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const { addToCart } = useCart();
-
-  useEffect(() => {
-    productService.getAll().then((data) => {
-      if (data && data.length > 0) {
-        let filtered = data;
-        if (category && category !== "all") {
-          filtered = data.filter((p) => (p.category || "").toLowerCase().includes(category.toLowerCase()));
-        }
-        setProducts(filtered.slice(0, limit || 6));
-      }
-    });
-  }, [category, limit]);
-
-  const colClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : columns === 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
-
-  return (
-    <section style={{ backgroundColor: bgColor || "#07090e" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="text-center space-y-1">
-          <h2 className="text-2xl font-black">{heading || "محصولات برگزیده استودیو"}</h2>
-          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
-        </div>
-
-        <div className={`grid ${colClass} gap-6 pt-4`}>
-          {products.map((p) => {
-            const priceVal = Number(p.discountPrice || p.discount_price || p.price || 0);
-            return (
-              <div
-                key={p.id}
-                className={`p-5 rounded-3xl border border-white/10 space-y-3 hover:border-sky-500/50 hover:-translate-y-1 transition duration-300 flex flex-col justify-between ${
-                  cardGlass ? "bg-white/[0.04] backdrop-blur-xl shadow-2xl" : "bg-white/5"
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className="w-full h-48 rounded-2xl bg-black/40 overflow-hidden flex items-center justify-center p-2 border border-white/5 relative group">
-                    <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain group-hover:scale-105 transition duration-500" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold truncate">{p.title || p.name}</span>
-                      {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">گارانتی طلایی</span>}
-                    </div>
-                    <span className="text-[10px] text-slate-400 block">{p.category || "تجهیزات تخصصی"}</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center pt-3 border-t border-white/10">
-                  <span className="font-mono text-emerald-400 font-black text-xs">
-                    {priceVal.toLocaleString("fa-IR")} تومان
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playAddToCart();
-                      addToCart({
-                        id: p.id,
-                        title: p.title,
-                        price: priceVal,
-                        image: p.images?.[0] || p.image,
-                        stock: p.stock ?? 10
-                      });
-                    }}
-                    className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-sky-500/20"
-                  >
-                    خرید مستقیم 🛒
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LiveProductComparisonRenderer({ heading, subtitle, product1Id, product2Id, bgColor }: any) {
-  const [p1, setP1] = useState<Product | null>(null);
-  const [p2, setP2] = useState<Product | null>(null);
-  const { addToCart } = useCart();
-
-  useEffect(() => {
-    productService.getAll().then((data) => {
-      if (data && data.length > 0) {
-        const first = data.find(p => p.id === product1Id) || data[0];
-        const second = data.find(p => p.id === product2Id) || data[1] || data[0];
-        setP1(first);
-        setP2(second);
-      }
-    });
-  }, [product1Id, product2Id]);
-
-  if (!p1 || !p2) return null;
-
-  return (
-    <section style={{ backgroundColor: bgColor || "#090d16" }} className="w-full py-12 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="text-center space-y-1">
-          <h2 className="text-2xl font-black">{heading || "ماتریس مقایسه فنی و انتخاب دقیق"}</h2>
-          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-          {[p1, p2].map((p, idx) => {
-            const price = Number(p.discountPrice || p.price || 0);
-            return (
-              <div key={p.id + idx} className="p-6 rounded-3xl bg-white/[0.03] backdrop-blur-xl border border-white/10 space-y-4 flex flex-col justify-between shadow-2xl hover:border-sky-500/40 transition">
-                <div className="space-y-3">
-                  <div className="w-full h-44 rounded-2xl bg-black/40 p-2 flex items-center justify-center">
-                    <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain" />
-                  </div>
-                  <h3 className="font-black text-sm text-sky-400">{p.title}</h3>
-                  <div className="space-y-1 text-xs text-slate-300">
-                    <div className="flex justify-between py-1 border-b border-white/5"><span>دسته‌بندی:</span><span className="font-bold">{p.category || "استودیویی"}</span></div>
-                    <div className="flex justify-between py-1 border-b border-white/5"><span>گارانتی:</span><span className="font-bold text-emerald-400">۱۸ ماه تعویض طلایی</span></div>
-                    <div className="flex justify-between py-1 border-b border-white/5"><span>وضعیت تحویل:</span><span className="font-bold">ارسال پیشتاز بیمه‌شده</span></div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-white/10 flex justify-between items-center">
-                  <span className="font-mono font-black text-emerald-400 text-sm">{price.toLocaleString("fa-IR")} تومان</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playAddToCart();
-                      addToCart({ id: p.id, title: p.title, price, image: p.images?.[0] || p.image, stock: 10 });
-                    }}
-                    className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shadow-md cursor-pointer transition"
-                  >
-                    افزودن به سبد 🛒
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LiveCountdownRenderer({ badge, title, targetDate, buttonText, buttonUrl, bgColor }: any) {
-  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({ hours: 12, minutes: 45, seconds: 30 });
-
-  useEffect(() => {
-    const end = targetDate ? new Date(targetDate).getTime() : Date.now() + 24 * 3600 * 1000;
-    const timer = setInterval(() => {
-      const diff = Math.max(0, end - Date.now());
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft({ hours, minutes, seconds });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [targetDate]);
-
-  return (
-    <section style={{ backgroundColor: bgColor || "#111827" }} className="w-full py-10 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
-      <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="space-y-2 text-center md:text-right">
-          {badge && <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-black border border-rose-500/30 inline-block">{badge}</span>}
-          <h2 className="text-xl sm:text-2xl font-black">{title || "فرصت محدود جشنواره ویژه"}</h2>
-        </div>
-
-        <div className="flex items-center gap-3 font-mono font-black" dir="ltr">
-          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
-            <span className="text-2xl block text-rose-400">{String(timeLeft.hours).padStart(2, '0')}</span>
-            <span className="text-[9px] font-sans text-slate-400">ساعت</span>
-          </div>
-          <span className="text-xl text-rose-400">:</span>
-          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
-            <span className="text-2xl block text-rose-400">{String(timeLeft.minutes).padStart(2, '0')}</span>
-            <span className="text-[9px] font-sans text-slate-400">دقیقه</span>
-          </div>
-          <span className="text-xl text-rose-400">:</span>
-          <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
-            <span className="text-2xl block text-rose-400">{String(timeLeft.seconds).padStart(2, '0')}</span>
-            <span className="text-[9px] font-sans text-slate-400">ثانیه</span>
-          </div>
-        </div>
-
-        {buttonText && (
-          <Link href={buttonUrl || "/products"} className="px-6 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition shadow-lg shadow-rose-600/30 whitespace-nowrap">
-            {buttonText} ←
-          </Link>
-        )}
-      </div>
-    </section>
-  );
-}
-
 export const puckConfig: Config<ComponentProps> = {
   categories: {
-    "3d": {
-      title: "کانواس و المان‌های ۳D",
-      components: ["Hero3DBlock"]
+    layout: {
+      title: "چیدمان و گرید پیشرفته",
+      components: ["MultiColumnLayout", "Hero3DBlock"]
     },
     shop: {
       title: "فروشگاه و محصولات",
@@ -313,6 +129,51 @@ export const puckConfig: Config<ComponentProps> = {
     }
   },
   components: {
+    MultiColumnLayout: {
+      label: "چیدمان چندستونه انعطاف‌پذیر (Grid)",
+      fields: {
+        columnsCount: {
+          type: "select",
+          label: "تعداد ستون‌ها",
+          options: [
+            { label: "۲ ستون متقارن", value: 2 },
+            { label: "۳ ستون متقارن", value: 3 },
+            { label: "۴ ستون متقارن", value: 4 }
+          ]
+        },
+        col1Content: { type: "textarea", label: "محتوای ستون ۱ (HTML/متن)" },
+        col2Content: { type: "textarea", label: "محتوای ستون ۲ (HTML/متن)" },
+        col3Content: { type: "textarea", label: "محتوای ستون ۳ (HTML/متن)" },
+        col4Content: { type: "textarea", label: "محتوای ستون ۴ (HTML/متن)" },
+        gap: { type: "number", label: "فاصله بین ستون‌ها (px)" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+        paddingY: { type: "number", label: "پدینگ عمودی (px)" }
+      },
+      defaultProps: {
+        columnsCount: 2,
+        col1Content: "<div class='p-6 rounded-2xl bg-white/5 border border-white/10 text-center'><h3 class='font-bold text-sm mb-2'>ستون اول</h3><p class='text-xs opacity-75'>توضیحات ستون اول در اینجا قرار می‌گیرد.</p></div>",
+        col2Content: "<div class='p-6 rounded-2xl bg-white/5 border border-white/10 text-center'><h3 class='font-bold text-sm mb-2'>ستون دوم</h3><p class='text-xs opacity-75'>توضیحات ستون دوم در اینجا قرار می‌گیرد.</p></div>",
+        col3Content: "",
+        col4Content: "",
+        gap: 24,
+        bgColor: "#07090e",
+        paddingY: 40
+      },
+      render: ({ columnsCount, col1Content, col2Content, col3Content, col4Content, gap, bgColor, paddingY }) => {
+        const gridClass = columnsCount === 2 ? "grid-cols-1 md:grid-cols-2" : columnsCount === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
+        return (
+          <section style={{ backgroundColor: bgColor || "#07090e", paddingTop: `${paddingY || 40}px`, paddingBottom: `${paddingY || 40}px` }} className="w-full px-4 font-sans select-none text-white" dir="rtl">
+            <div style={{ gap: `${gap || 24}px` }} className={`max-w-7xl mx-auto grid ${gridClass}`}>
+              {col1Content && <div dangerouslySetInnerHTML={{ __html: col1Content }} />}
+              {col2Content && <div dangerouslySetInnerHTML={{ __html: col2Content }} />}
+              {columnsCount >= 3 && col3Content && <div dangerouslySetInnerHTML={{ __html: col3Content }} />}
+              {columnsCount >= 4 && col4Content && <div dangerouslySetInnerHTML={{ __html: col4Content }} />}
+            </div>
+          </section>
+        );
+      }
+    },
+
     Hero3DBlock: {
       label: "هیرو ۳D تعاملی با کانوَس",
       fields: {
@@ -383,7 +244,73 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: "#07090e",
         cardGlass: true,
       },
-      render: (props) => <LiveProductGridRenderer {...props} />,
+      render: ({ heading, subtitle, category, limit, columns, showPriceBadge, bgColor, cardGlass }) => {
+        const [products, setProducts] = useState<Product[]>([]);
+        const { addToCart } = useCart();
+
+        useEffect(() => {
+          productService.getAll().then((data) => {
+            if (data && data.length > 0) {
+              let filtered = data;
+              if (category && category !== "all") {
+                filtered = data.filter((p) => (p.category || "").toLowerCase().includes(category.toLowerCase()));
+              }
+              setProducts(filtered.slice(0, limit || 6));
+            }
+          });
+        }, [category, limit]);
+
+        const colClass = columns === 2 ? "grid-cols-1 sm:grid-cols-2" : columns === 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3";
+
+        return (
+          <section style={{ backgroundColor: bgColor || "#07090e" }} className="w-full py-12 px-4 font-sans select-none text-white" dir="rtl">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <div className="text-center space-y-1">
+                <h2 className="text-2xl font-black">{heading || "محصولات برگزیده استودیو"}</h2>
+                {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+              </div>
+
+              <div className={`grid ${colClass} gap-6 pt-4`}>
+                {products.map((p) => {
+                  const priceVal = Number(p.discountPrice || p.discount_price || p.price || 0);
+                  return (
+                    <div key={p.id} className={`p-5 rounded-3xl border border-white/10 space-y-3 hover:border-sky-500/50 hover:-translate-y-1 transition duration-300 flex flex-col justify-between ${cardGlass ? "bg-white/[0.04] backdrop-blur-xl shadow-2xl" : "bg-white/5"}`}>
+                      <div className="space-y-3">
+                        <div className="w-full h-48 rounded-2xl bg-black/40 overflow-hidden flex items-center justify-center p-2 border border-white/5 relative group">
+                          <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain group-hover:scale-105 transition duration-500" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-bold truncate">{p.title || p.name}</span>
+                            {showPriceBadge && <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">گارانتی طلایی</span>}
+                          </div>
+                          <span className="text-[10px] text-slate-400 block">{p.category || "تجهیزات تخصصی"}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-3 border-t border-white/10">
+                        <span className="font-mono text-emerald-400 font-black text-xs">
+                          {priceVal.toLocaleString("fa-IR")} تومان
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundEngine.playAddToCart();
+                            addToCart({ id: p.id, title: p.title, price: priceVal, image: p.images?.[0] || p.image, stock: p.stock ?? 10 });
+                          }}
+                          className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-sky-500/20"
+                        >
+                          خرید مستقیم 🛒
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        );
+      },
     },
 
     ProductComparison: {
@@ -402,7 +329,67 @@ export const puckConfig: Config<ComponentProps> = {
         product2Id: "prod-pro-display-xdr",
         bgColor: "#090d16",
       },
-      render: (props) => <LiveProductComparisonRenderer {...props} />,
+      render: ({ heading, subtitle, product1Id, product2Id, bgColor }) => {
+        const [p1, setP1] = useState<Product | null>(null);
+        const [p2, setP2] = useState<Product | null>(null);
+        const { addToCart } = useCart();
+
+        useEffect(() => {
+          productService.getAll().then((data) => {
+            if (data && data.length > 0) {
+              setP1(data.find(p => p.id === product1Id) || data[0]);
+              setP2(data.find(p => p.id === product2Id) || data[1] || data[0]);
+            }
+          });
+        }, [product1Id, product2Id]);
+
+        if (!p1 || !p2) return null;
+
+        return (
+          <section style={{ backgroundColor: bgColor || "#090d16" }} className="w-full py-12 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div className="text-center space-y-1">
+                <h2 className="text-2xl font-black">{heading || "ماتریس مقایسه فنی و انتخاب دقیق"}</h2>
+                {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                {[p1, p2].map((p, idx) => {
+                  const price = Number(p.discountPrice || p.price || 0);
+                  return (
+                    <div key={p.id + idx} className="p-6 rounded-3xl bg-white/[0.03] backdrop-blur-xl border border-white/10 space-y-4 flex flex-col justify-between shadow-2xl hover:border-sky-500/40 transition">
+                      <div className="space-y-3">
+                        <div className="w-full h-44 rounded-2xl bg-black/40 p-2 flex items-center justify-center">
+                          <img src={p.images?.[0] || p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain" />
+                        </div>
+                        <h3 className="font-black text-sm text-sky-400">{p.title}</h3>
+                        <div className="space-y-1 text-xs text-slate-300">
+                          <div className="flex justify-between py-1 border-b border-white/5"><span>دسته‌بندی:</span><span className="font-bold">{p.category || "استودیویی"}</span></div>
+                          <div className="flex justify-between py-1 border-b border-white/5"><span>گارانتی:</span><span className="font-bold text-emerald-400">۱۸ ماه تعویض طلایی</span></div>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                        <span className="font-mono font-black text-emerald-400 text-sm">{price.toLocaleString("fa-IR")} تومان</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundEngine.playAddToCart();
+                            addToCart({ id: p.id, title: p.title, price, image: p.images?.[0] || p.image, stock: 10 });
+                          }}
+                          className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shadow-md cursor-pointer transition"
+                        >
+                          افزودن به سبد 🛒
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        );
+      },
     },
 
     CountdownTimer: {
@@ -423,7 +410,55 @@ export const puckConfig: Config<ComponentProps> = {
         buttonUrl: "/products",
         bgColor: "#0f172a",
       },
-      render: (props) => <LiveCountdownRenderer {...props} />,
+      render: ({ badge, title, targetDate, buttonText, buttonUrl, bgColor }) => {
+        const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({ hours: 12, minutes: 45, seconds: 30 });
+
+        useEffect(() => {
+          const end = targetDate ? new Date(targetDate).getTime() : Date.now() + 24 * 3600 * 1000;
+          const timer = setInterval(() => {
+            const diff = Math.max(0, end - Date.now());
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            setTimeLeft({ hours, minutes, seconds });
+          }, 1000);
+          return () => clearInterval(timer);
+        }, [targetDate]);
+
+        return (
+          <section style={{ backgroundColor: bgColor || "#111827" }} className="w-full py-10 px-4 font-sans select-none text-white border-y border-white/10" dir="rtl">
+            <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 text-center md:text-right">
+                {badge && <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-black border border-rose-500/30 inline-block">{badge}</span>}
+                <h2 className="text-xl sm:text-2xl font-black">{title || "فرصت محدود جشنواره ویژه"}</h2>
+              </div>
+
+              <div className="flex items-center gap-3 font-mono font-black" dir="ltr">
+                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
+                  <span className="text-2xl block text-rose-400">{String(timeLeft.hours).padStart(2, '0')}</span>
+                  <span className="text-[9px] font-sans text-slate-400">ساعت</span>
+                </div>
+                <span className="text-xl text-rose-400">:</span>
+                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
+                  <span className="text-2xl block text-rose-400">{String(timeLeft.minutes).padStart(2, '0')}</span>
+                  <span className="text-[9px] font-sans text-slate-400">دقیقه</span>
+                </div>
+                <span className="text-xl text-rose-400">:</span>
+                <div className="p-3 rounded-2xl bg-white/10 border border-white/15 text-center min-w-[65px] shadow-lg">
+                  <span className="text-2xl block text-rose-400">{String(timeLeft.seconds).padStart(2, '0')}</span>
+                  <span className="text-[9px] font-sans text-slate-400">ثانیه</span>
+                </div>
+              </div>
+
+              {buttonText && (
+                <Link href={buttonUrl || "/products"} className="px-6 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition shadow-lg shadow-rose-600/30 whitespace-nowrap">
+                  {buttonText} ←
+                </Link>
+              )}
+            </div>
+          </section>
+        );
+      },
     },
 
     HeroBlock: {

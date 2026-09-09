@@ -274,9 +274,14 @@ export default function AdminModularPages() {
                 onChange={(e) => loadPageDetails(e.target.value)}
                 className="p-1.5 px-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black text-[var(--text-primary)] outline-none cursor-pointer"
               >
-                {pages.map((p) => (
-                  <option key={p.id} value={p.slug}>📄 {p.title} ({p.slug === "home" ? "صفحه اصلی /" : "/" + p.slug})</option>
-                ))}
+                {pages.map((p) => {
+    const isSys = ["home", "products", "news", "blog", "about", "contact", "track-order"].includes(p.slug);
+    return (
+      <option key={p.id} value={p.slug}>
+        {isSys ? "⭐ [صفحه اصلی سایت] " : "📄 [لندینگ سفارشی] "} {p.title} (/{p.slug === "home" ? "" : p.slug})
+      </option>
+    );
+  })}
               </select>
 
               <button

@@ -92,7 +92,7 @@ export default function Header() {
   const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
 
   return (
-    <header className="sticky top-2 sm:top-3 z-50 w-full max-w-[1440px] mx-auto px-3 sm:px-6 font-sans text-[var(--text-primary)] select-none" dir="rtl" suppressHydrationWarning>
+    <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 transition-all duration-300" dir="rtl" suppressHydrationWarning>
       <div className="w-full glass-morphism rounded-full px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4 shadow-xl">
         
         {/* برند و لوگوی بزرگ در سمت راست */}

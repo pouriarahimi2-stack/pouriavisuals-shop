@@ -1,11 +1,16 @@
 /**
- * AXON CORE - Phase 21: Dynamic XML Sitemap & Robots.txt Generator (fix.js)
+ * AXON CORE - Phase 22: Database Schema Integrity & Production Readiness Audit (fix.js)
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+console.log("\x1b[36m[AXON-PHASE22]\x1b[0m بررسی یکپارچگی جدول‌های پایگاه داده و آمادگی نهایی پروداکشن...");
+
+// =============================================================================
+// ۱. ایجاد اسکریپت تست اتصال و سلامت دیتابیس scripts/db-audit.ts
+// =============================================================================
 function writeFile(relPath, content) {
   const fullPath = path.join(process.cwd(), relPath);
   const dir = path.dirname(fullPath);
@@ -14,80 +19,32 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PHASE21]\x1b[0m ایجاد نقشه سایت دینامیک و فایل robots.txt...");
+const dbAuditCode = `/**
+ * AXON CORE - Database Schema Audit Script
+ */
+import { supabaseAdmin } from "../lib/supabaseServer";
 
-// =============================================================================
-// ۱. ساخت app/sitemap.ts برای تولید خودکار نقشه سایت سئو
-// =============================================================================
-const sitemapCode = `import { MetadataRoute } from "next";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-
-export const dynamic = "force-dynamic";
-
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://axoncore.ir";
-
-  const staticPages: MetadataRoute.Sitemap = [
-    { url: baseUrl, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
-    { url: \`\${baseUrl}/products\`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
-    { url: \`\${baseUrl}/blog\`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
-    { url: \`\${baseUrl}/news\`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
-    { url: \`\${baseUrl}/about\`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
-    { url: \`\${baseUrl}/contact\`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
-    { url: \`\${baseUrl}/track-order\`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.6 },
-  ];
-
-  let dynamicProducts: MetadataRoute.Sitemap = [];
-  try {
-    const { data: products } = await supabaseAdmin.from("products").select("id, updated_at");
-    if (products) {
-      dynamicProducts = products.map((p) => ({
-        url: \`\${baseUrl}/products/\${p.id}\`,
-        lastModified: p.updated_at ? new Date(p.updated_at) : new Date(),
-        changeFrequency: "weekly",
-        priority: 0.8,
-      }));
+async function runAudit() {
+  console.log("🔍 در حال بررسی اتصال به پایگاه داده Supabase...");
+  
+  const tables = ["products", "orders", "payments", "posts", "site_info", "contact_messages"];
+  for (const table of tables) {
+    const { error } = await supabaseAdmin.from(table).select("*", { count: "exact", head: true });
+    if (error) {
+      console.warn(\`⚠️ جدول \${table} نیاز به بررسی دارد یا موجود نیست: \`, error.message);
+    } else {
+      console.log(\`✔ جدول \_\_\${table}\_\_\_ با موفقیت پاسخ داد.\`);
     }
-  } catch {}
-
-  let dynamicPosts: MetadataRoute.Sitemap = [];
-  try {
-    const { data: posts } = await supabaseAdmin.from("posts").select("id, slug, updated_at");
-    if (posts) {
-      dynamicPosts = posts.map((p) => ({
-        url: \`\${baseUrl}/blog/\${p.slug || p.id}\`,
-        lastModified: p.updated_at ? new Date(p.updated_at) : new Date(),
-        changeFrequency: "weekly",
-        priority: 0.7,
-      }));
-    }
-  } catch {}
-
-  return [...staticPages, ...dynamicProducts, ...dynamicPosts];
+  }
 }
+
+runAudit();
 `;
-writeFile('app/sitemap.ts', sitemapCode);
+scriptsDir = 'scripts';
+writeFile('scripts/db-audit.ts', dbAuditCode);
 
 // =============================================================================
-// ۲. ساخت app/robots.ts برای مدیریت ربات‌های جستجو
-// =============================================================================
-const robotsCode = `import { MetadataRoute } from "next";
-
-export default function robots(): MetadataRoute.Robots {
-  return {
-    rules: {
-      userAgent: "*",
-      allow: "/",
-      disallow: ["/admin/", "/api/"],
-    },
-    sitemap: "https://axoncore.ir/sitemap.xml",
-  };
-}
-`;
-writeFile('app/robots.ts', robotsCode);
-
-// =============================================================================
-// ۳. بیلد نهایی پروژه و انتشار در Vercel
+// ۲. تست بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -102,7 +59,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(seo): implement dynamic sitemap.ts and robots.ts generators"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "chore(audit): add database schema integrity audit script and finalize production setup"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -111,7 +68,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ نقشه سایت و تنظیمات ربات‌ها با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ ممیزی نهایی و به‌روزرسانی مخزن با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

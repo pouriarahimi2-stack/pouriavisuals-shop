@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Phase 8: Advanced Order Tracking System & Realtime Status (fix.js)
+ * AXON CORE - Phase 9: Standardized API Contracts & Request Validation Guard (fix.js)
  */
 
 const fs = require('fs');
@@ -14,181 +14,118 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PHASE8]\x1b[0m پیاده‌سازی سامانه پیشرفته رهگیری لحظه‌ای مرسولات...");
+console.log("\x1b[36m[AXON-PHASE9]\x1b[0m پیاده‌سازی لایه استاندارد اعتبارسنجی سروری و مدیریت خطا...");
 
 // =============================================================================
-// بازنویسی کامل app/track-order/page.tsx
+// ۱. ایجاد ابزار مرکزی اعتبارسنجی در lib/validationGuard.ts
 // =============================================================================
-const trackOrderPageCode = `"use client";
+const validationGuardCode = `/**
+ * AXON CORE - Central API Validation & Sanitization Guard
+ */
 
-import React, { useState, useEffect } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message?: string;
+  data?: T;
+  errors?: Record<string, string>;
+}
 
-export default function TrackOrderPage() {
-  const searchParams = useSearchParams();
-  const initialOrderId = searchParams.get("orderId") || "";
+export function validatePhoneNumber(phone: string): boolean {
+  const clean = String(phone || "").trim().replace(/\\D/g, "");
+  return /^09\\d{9}$/.test(clean);
+}
 
-  const [query, setQuery] = useState(initialOrderId);
-  const [loading, setLoading] = useState(false);
-  const [orderResult, setOrderResult] = useState<any | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+export function validatePostalCode(postal: string): boolean {
+  if (!postal) return true; // اختیاری
+  const clean = String(postal).trim().replace(/\\D/g, "");
+  return clean.length === 10;
+}
 
-  const handleTrack = async (searchTarget?: string) => {
-    const target = (searchTarget !== undefined ? searchTarget : query).trim();
-    if (!target) return;
+export function sanitizeInput(input: string): string {
+  return String(input || "")
+    .replace(/<[^>]*>?/gm, "") // حذف تگ‌های HTML جهت جلوگیری از XSS
+    .trim();
+}
 
-    soundEngine.playClick();
-    setLoading(true);
-    setErrorMessage(null);
-    setOrderResult(null);
+export function createApiError(message: string, status: number = 400, errors?: Record<string, string>) {
+  return Response.json(
+    {
+      success: false,
+      message,
+      ...(errors ? { errors } : {}),
+    },
+    { status }
+  );
+}
 
-    try {
-      // جستجو در API فاکتورها
-      const res = await fetch(\`/api/orders/track?q=\${encodeURIComponent(target)}\`, { cache: "no-store" });
-      const json = await res.json();
-
-      if (json.success && json.order) {
-        soundEngine.playSuccess();
-        setOrderResult(json.order);
-      } else {
-        // جستجو در حافظه محلی لوکال به عنوان فال‌بک
-        const localKeys = Object.keys(localStorage);
-        let foundLocal = null;
-        for (const k of localKeys) {
-          if (k.startsWith("fallback_order_") || k.includes("order")) {
-            try {
-              const val = JSON.parse(localStorage.getItem(k) || "{}");
-              if (String(val.id || "").includes(target) || String(val.phone || "").includes(target)) {
-                foundLocal = val;
-                break;
-              }
-            } catch {}
-          }
-        }
-
-        if (foundLocal) {
-          soundEngine.playSuccess();
-          setOrderResult(foundLocal);
-        } else {
-          setErrorMessage("سفارشی با این مشخصات یا کد رهگیری در سیستم یافت نشد.");
-        }
-      }
-    } catch {
-      setErrorMessage("خطا در برقراری ارتباط با سرور رهگیری.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (initialOrderId) {
-      setQuery(initialOrderId);
-      handleTrack(initialOrderId);
-    }
-  }, [initialOrderId]);
-
-  return (
-    <div className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
-      
-      <div className="text-center space-y-3">
-        <span className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] inline-block text-2xl shadow-sm">
-          📦
-        </span>
-        <h1 className="text-2xl md:text-3xl font-black">سامانه رهگیری لحظه‌ای مرسولات پستی و فاکتورها</h1>
-        <p className="text-xs text-[var(--text-secondary)] font-medium max-w-lg mx-auto leading-relaxed">
-          شماره سفارش، شماره موبایل یا کد رهگیری ۲۴ رقمی پست پیشتاز خود را جهت بررسی وضعیت ارسال وارد کنید
-        </p>
-      </div>
-
-      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleTrack();
-          }}
-          className="flex flex-col sm:flex-row gap-3"
-        >
-          <input
-            type="text"
-            required
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="مثال: AX-589201 یا 09123456789 یا کد پستی..."
-            className="flex-1 p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] shadow-sm"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-8 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl cursor-pointer disabled:opacity-50 shrink-0"
-          >
-            {loading ? "در حال جستجو..." : "استعلام وضعیت بسته 🔍"}
-          </button>
-        </form>
-
-        {errorMessage && (
-          <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold text-center animate-fadeIn">
-            ⚠️ {errorMessage}
-          </div>
-        )}
-
-        {orderResult && (
-          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-6 animate-fadeIn text-xs">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
-              <div>
-                <span className="text-[var(--text-secondary)] font-bold block">شناسه فاکتور:</span>
-                <span className="font-mono font-black text-sm text-[var(--accent-blue)]">{orderResult.id || orderResult.order_number}</span>
-              </div>
-              <div>
-                <span className="text-[var(--text-secondary)] font-bold block">وضعیت سفارش:</span>
-                <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black text-[11px] border border-emerald-500/30">
-                  {orderResult.status === "shipped" ? "ارسال شده به پست 🚚" : orderResult.status === "paid" ? "پرداخت شده (آماده‌سازی استودیویی) ✓" : "در انتظار پردازش"}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <span className="text-[var(--text-secondary)] font-bold">نام خریدار:</span>
-                <p className="font-black text-[var(--text-primary)]">{orderResult.customer_name || orderResult.customer?.fullName || "مشتری گرامی"}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-[var(--text-secondary)] font-bold">شماره تماس:</span>
-                <p className="font-mono font-bold text-[var(--text-primary)]">{orderResult.phone || orderResult.customer?.phone}</p>
-              </div>
-              <div className="sm:col-span-2 space-y-1">
-                <span className="text-[var(--text-secondary)] font-bold">نشانی تحویل مرسوله:</span>
-                <p className="font-medium text-[var(--text-primary)] leading-relaxed">{orderResult.address || orderResult.customer?.address}</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
-              <span className="font-bold text-[var(--text-secondary)] block">کد رهگیری پست پیشتاز:</span>
-              <p className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
-                {orderResult.tracking_code || orderResult.trackingCode || "بارنامه شما پس از تحویل به پست در این بخش درج خواهد شد."}
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="pt-4 flex justify-end border-t border-[var(--card-border)]">
-          <Link
-            href="/"
-            className="px-6 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition"
-          >
-            ← بازگشت به صفحه نخست
-          </Link>
-        </div>
-      </div>
-    </div>
+export function createApiSuccess<T>(data?: T, message: string = "عملیات با موفقیت انجام شد.", status: number = 200) {
+  return Response.json(
+    {
+      success: true,
+      message,
+      ...(data !== undefined ? { data } : {}),
+    },
+    { status }
   );
 }
 `;
-writeFile('app/track-order/page.tsx', trackOrderPageCode);
+writeFile('lib/validationGuard.ts', validationGuardCode);
 
 // =============================================================================
-// بیلد نهایی پروژه و انتشار در Vercel
+// ۲. ایمن‌سازی و استانداردسازی روت تماس با ما (/api/contact/route.ts)
+// =============================================================================
+const contactApiRoute = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { validatePhoneNumber, sanitizeInput, createApiError, createApiSuccess } from "@/lib/validationGuard";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const fullName = sanitizeInput(body?.full_name || body?.fullName);
+    const phone = String(body?.phone || "").trim();
+    const subject = sanitizeInput(body?.subject || "مشاوره تخصصی");
+    const message = sanitizeInput(body?.message);
+
+    if (!fullName || fullName.length < 2) {
+      return createApiError("نام و نام خانوادگی نامعتبر است.", 400);
+    }
+
+    if (!validatePhoneNumber(phone)) {
+      return createApiError("شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود.", 400);
+    }
+
+    if (!message || message.length < 5) {
+      return createApiError("متن پیام یا شرح نیاز باید حداقل ۵ کاراکتر باشد.", 400);
+    }
+
+    const { error } = await supabaseAdmin.from("contact_messages").insert([
+      {
+        full_name: fullName,
+        phone: phone.replace(/\\D/g, ""),
+        subject,
+        message,
+        status: "unread",
+        created_at: new Date().toISOString(),
+      },
+    ]);
+
+    if (error) {
+      throw error;
+    }
+
+    return createApiSuccess(null, "پیام شما با موفقیت ثبت شد و به زودی توسط کارشناسان بررسی خواهد شد.");
+  } catch (err: any) {
+    console.error("Contact API Error:", err);
+    return createApiError("خطای داخلی سرور در ثبت پیام.", 500);
+  }
+}
+`;
+writeFile('app/api/contact/route.ts', contactApiRoute);
+
+// =============================================================================
+// ۳. بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -203,7 +140,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(tracking): upgrade order tracking page with robust database and local fallback search"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(validation): implement centralized validation guard and standardize API responses"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -212,7 +149,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ سامانه رهگیری سفارشات با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ لایه اعتبارسنجی و استانداردسازی API با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

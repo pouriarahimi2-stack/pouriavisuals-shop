@@ -7,6 +7,27 @@ import ProductList from "@/components/ProductList";
 import ProductExplodedView from "@/components/ProductExplodedView";
 import { productService, Product } from "@/services/productService";
 
+// کامپوننت فیلد اختصاصی انتخابگر رنگ
+const ColorPickerCustomField = ({ value, onChange }: { value: string; onChange: (val: string) => void }) => {
+  return (
+    <div className="flex items-center gap-2 p-1 bg-white/5 border border-white/10 rounded-xl" dir="ltr">
+      <input
+        type="color"
+        value={value && value.startsWith("#") ? value : "#07090e"}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-9 h-9 rounded-lg border-0 bg-transparent cursor-pointer p-0 shrink-0"
+      />
+      <input
+        type="text"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="#07090e یا rgba(...)"
+        className="w-full bg-transparent text-xs font-mono text-white outline-none px-2 text-right"
+      />
+    </div>
+  );
+};
+
 export type ComponentProps = {
   HeaderCapsuleBar: {
     brandText: string;
@@ -88,7 +109,7 @@ export const puckConfig: Config<ComponentProps> = {
   },
   components: {
     HeaderCapsuleBar: {
-      label: "هدر کپسولی (کنترل تمام منوها، لوگو و دکمه‌ها)",
+      label: "هدر کپسولی (کنترل تمام منوها، لوگو و انتخاب رنگ)",
       fields: {
         brandText: { type: "text", label: "نام برند" },
         logoUrl: { type: "text", label: "آدرس تصویر لوگو (URL)" },
@@ -119,8 +140,16 @@ export const puckConfig: Config<ComponentProps> = {
           label: "آیکون پروفایل",
           options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
         },
-        capsuleBg: { type: "text", label: "رنگ پس‌زمینه کپسول" },
-        capsuleBorder: { type: "text", label: "رنگ کادر کپسول" }
+        capsuleBg: {
+          type: "custom",
+          label: "رنگ پس‌زمینه کپسول (پالت رنگ)",
+          render: ({ value, onChange }) => <ColorPickerCustomField value={value} onChange={onChange} />
+        },
+        capsuleBorder: {
+          type: "custom",
+          label: "رنگ خط دور کپسول (پالت رنگ)",
+          render: ({ value, onChange }) => <ColorPickerCustomField value={value} onChange={onChange} />
+        }
       },
       defaultProps: {
         brandText: "Axon | آکسون",
@@ -140,8 +169,8 @@ export const puckConfig: Config<ComponentProps> = {
         showCart: true,
         showTheme: true,
         showUser: true,
-        capsuleBg: "rgba(7, 9, 14, 0.9)",
-        capsuleBorder: "rgba(255, 255, 255, 0.12)"
+        capsuleBg: "#07090e",
+        capsuleBorder: "#27272a"
       },
       render: ({
         brandText, logoUrl, logoWidth, logoHeight,
@@ -153,8 +182,8 @@ export const puckConfig: Config<ComponentProps> = {
         return (
           <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 my-2 select-none font-sans" dir="ltr">
             <div
-              style={{ backgroundColor: capsuleBg || "rgba(7, 9, 14, 0.9)", borderColor: capsuleBorder || "rgba(255, 255, 255, 0.12)" }}
-              className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all"
+              style={{ backgroundColor: capsuleBg || "#07090e", borderColor: capsuleBorder || "#27272a" }}
+              className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all duration-300"
             >
               <div className="flex items-center gap-2 order-1">
                 {showCart && <span className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200">🛒</span>}
@@ -174,7 +203,7 @@ export const puckConfig: Config<ComponentProps> = {
                 <span className="font-black text-base sm:text-lg tracking-tight text-white">{brandText || "Axon | آکسون"}</span>
                 <div
                   style={{ width: w + "px", height: h + "px" }}
-                  className="rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0"
+                  className="rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0 transition-all duration-300"
                 >
                   {logoUrl ? (
                     <img src={logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
@@ -299,7 +328,11 @@ export const puckConfig: Config<ComponentProps> = {
         workingHours: { type: "text", label: "ساعات پاسخگویی" },
         enamadCode: { type: "text", label: "کد اینماد" },
         copyrightText: { type: "text", label: "متن کپی‌رایت" },
-        footerBg: { type: "text", label: "رنگ پس‌زمینه فوتر" }
+        footerBg: {
+          type: "custom",
+          label: "رنگ پس‌زمینه فوتر (پالت رنگ)",
+          render: ({ value, onChange }) => <ColorPickerCustomField value={value} onChange={onChange} />
+        }
       },
       defaultProps: {
         footerLogoUrl: "",

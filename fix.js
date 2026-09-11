@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Commit & Deploy Flat In-Canvas Header Controls (fix.js)
+ * AXON CORE - Fix Complete Persistence (No Reset on Refresh) + Visual Color Picker (fix.js)
  */
 
 const fs = require('fs');
@@ -14,10 +14,102 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-DEPLOY]\x1b[0m استقرار فیلدهای کامل هدر و رفع نهایی ویرایشگر...");
+console.log("\x1b[36m[AXON-PERSISTENCE-FIX]\x1b[0m ۱. تضمین ذخیره و بازخوانی دائمی دیتابیس بدون بازگشت به پیش‌فرض...");
+console.log("\x1b[36m[AXON-PERSISTENCE-FIX]\x1b[0m ۲. افزودن انتخابگر رنگ بصری (Color Picker) برای پس‌زمینه و کادر...");
 
 // =============================================================================
-// ۱. بازنویسی کامل lib/puckConfig.tsx با فیلدهای تک‌تک ۵ منو، لوگو و دکمه‌ها
+// ۱. اصلاح app/api/pages/route.ts برای تضمین تقدم دیتابیس بر SYSTEM_PAGES
+// =============================================================================
+const pagesApiContent = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const slug = searchParams.get("slug");
+
+    if (slug) {
+      const cleanSlug = String(slug).trim().toLowerCase();
+      // تقدم ۱۰۰٪ واکشی از دیتابیس Supabase
+      const { data, error } = await supabaseAdmin
+        .from("modular_pages")
+        .select("*")
+        .eq("slug", cleanSlug)
+        .maybeSingle();
+
+      if (data && data.puck_data) {
+        return NextResponse.json({ success: true, page: data });
+      }
+
+      // فال‌بک لوکال در صورت نبود رکورد دیتابیس
+      return NextResponse.json({
+        success: true,
+        page: { slug: cleanSlug, title: cleanSlug === "home" ? "صفحه اصلی" : cleanSlug, puck_data: null }
+      });
+    }
+
+    const { data: allPages } = await supabaseAdmin
+      .from("modular_pages")
+      .select("id, slug, title, is_published, updated_at")
+      .order("updated_at", { ascending: false });
+
+    return NextResponse.json({ success: true, pages: allPages || [] });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { slug, title, puck_data, is_published } = body;
+    const cleanSlug = String(slug || "home").trim().toLowerCase();
+
+    const { data: existing } = await supabaseAdmin
+      .from("modular_pages")
+      .select("id")
+      .eq("slug", cleanSlug)
+      .maybeSingle();
+
+    const payload: any = {
+      slug: cleanSlug,
+      title: String(title || cleanSlug).trim(),
+      puck_data: puck_data || {},
+      is_published: is_published !== false,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existing) {
+      const { error: updErr } = await supabaseAdmin
+        .from("modular_pages")
+        .update(payload)
+        .eq("id", existing.id);
+      if (updErr) throw updErr;
+    } else {
+      payload.created_at = new Date().toISOString();
+      const { error: insErr } = await supabaseAdmin
+        .from("modular_pages")
+        .insert([payload]);
+      if (insErr) throw insErr;
+    }
+
+    return NextResponse.json({ success: true, message: "صفحه با موفقیت در دیتابیس ذخیره شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+`;
+writeFile('app/api/pages/route.ts', pagesApiContent);
+
+// =============================================================================
+// ۲. به‌روزرسانی lib/puckConfig.tsx با فیلد انتخابگر رنگ بصری (Color Picker)
 // =============================================================================
 const puckConfigContent = `import React, { useState, useEffect } from "react";
 import type { Config } from "@measured/puck";
@@ -27,6 +119,27 @@ import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
 import ProductList from "@/components/ProductList";
 import ProductExplodedView from "@/components/ProductExplodedView";
 import { productService, Product } from "@/services/productService";
+
+// کامپوننت فیلد اختصاصی انتخابگر رنگ
+const ColorPickerCustomField = ({ value, onChange }: { value: string; onChange: (val: string) => void }) => {
+  return (
+    <div className="flex items-center gap-2 p-1 bg-white/5 border border-white/10 rounded-xl" dir="ltr">
+      <input
+        type="color"
+        value={value && value.startsWith("#") ? value : "#07090e"}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-9 h-9 rounded-lg border-0 bg-transparent cursor-pointer p-0 shrink-0"
+      />
+      <input
+        type="text"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="#07090e یا rgba(...)"
+        className="w-full bg-transparent text-xs font-mono text-white outline-none px-2 text-right"
+      />
+    </div>
+  );
+};
 
 export type ComponentProps = {
   HeaderCapsuleBar: {
@@ -109,7 +222,7 @@ export const puckConfig: Config<ComponentProps> = {
   },
   components: {
     HeaderCapsuleBar: {
-      label: "هدر کپسولی (کنترل تمام منوها، لوگو و دکمه‌ها)",
+      label: "هدر کپسولی (کنترل تمام منوها، لوگو و انتخاب رنگ)",
       fields: {
         brandText: { type: "text", label: "نام برند" },
         logoUrl: { type: "text", label: "آدرس تصویر لوگو (URL)" },
@@ -140,8 +253,16 @@ export const puckConfig: Config<ComponentProps> = {
           label: "آیکون پروفایل",
           options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
         },
-        capsuleBg: { type: "text", label: "رنگ پس‌زمینه کپسول" },
-        capsuleBorder: { type: "text", label: "رنگ کادر کپسول" }
+        capsuleBg: {
+          type: "custom",
+          label: "رنگ پس‌زمینه کپسول (پالت رنگ)",
+          render: ({ value, onChange }) => <ColorPickerCustomField value={value} onChange={onChange} />
+        },
+        capsuleBorder: {
+          type: "custom",
+          label: "رنگ خط دور کپسول (پالت رنگ)",
+          render: ({ value, onChange }) => <ColorPickerCustomField value={value} onChange={onChange} />
+        }
       },
       defaultProps: {
         brandText: "Axon | آکسون",
@@ -161,8 +282,8 @@ export const puckConfig: Config<ComponentProps> = {
         showCart: true,
         showTheme: true,
         showUser: true,
-        capsuleBg: "rgba(7, 9, 14, 0.9)",
-        capsuleBorder: "rgba(255, 255, 255, 0.12)"
+        capsuleBg: "#07090e",
+        capsuleBorder: "#27272a"
       },
       render: ({
         brandText, logoUrl, logoWidth, logoHeight,
@@ -174,8 +295,8 @@ export const puckConfig: Config<ComponentProps> = {
         return (
           <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 my-2 select-none font-sans" dir="ltr">
             <div
-              style={{ backgroundColor: capsuleBg || "rgba(7, 9, 14, 0.9)", borderColor: capsuleBorder || "rgba(255, 255, 255, 0.12)" }}
-              className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all"
+              style={{ backgroundColor: capsuleBg || "#07090e", borderColor: capsuleBorder || "#27272a" }}
+              className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all duration-300"
             >
               <div className="flex items-center gap-2 order-1">
                 {showCart && <span className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200">🛒</span>}
@@ -195,7 +316,7 @@ export const puckConfig: Config<ComponentProps> = {
                 <span className="font-black text-base sm:text-lg tracking-tight text-white">{brandText || "Axon | آکسون"}</span>
                 <div
                   style={{ width: w + "px", height: h + "px" }}
-                  className="rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0"
+                  className="rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0 transition-all duration-300"
                 >
                   {logoUrl ? (
                     <img src={logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
@@ -320,7 +441,11 @@ export const puckConfig: Config<ComponentProps> = {
         workingHours: { type: "text", label: "ساعات پاسخگویی" },
         enamadCode: { type: "text", label: "کد اینماد" },
         copyrightText: { type: "text", label: "متن کپی‌رایت" },
-        footerBg: { type: "text", label: "رنگ پس‌زمینه فوتر" }
+        footerBg: {
+          type: "custom",
+          label: "رنگ پس‌زمینه فوتر (پالت رنگ)",
+          render: ({ value, onChange }) => <ColorPickerCustomField value={value} onChange={onChange} />
+        }
       },
       defaultProps: {
         footerLogoUrl: "",
@@ -435,7 +560,252 @@ export const puckConfig: Config<ComponentProps> = {
 writeFile('lib/puckConfig.tsx', puckConfigContent);
 
 // =============================================================================
-// ۲. ارسال بیلد و اعمال تغییرات روی گیت
+// ۳. بازنویسی components/admin/AdminModularPages.tsx بدون بازگشت به مقدار پیش‌فرض
+// =============================================================================
+const adminModularPagesCode = `"use client";
+
+import React, { useState, useEffect } from "react";
+import { Puck, Data } from "@measured/puck";
+import "@measured/puck/puck.css";
+import { puckConfig } from "@/lib/puckConfig";
+import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+
+export default function AdminModularPages() {
+  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
+  const [currentSlug, setCurrentSlug] = useState<string>("home");
+  const [pageData, setPageData] = useState<Data | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const fetchPages = async () => {
+    try {
+      const res = await fetch("/api/pages", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.pages)) {
+        setPages(json.pages);
+      }
+    } catch {}
+  };
+
+  const loadPage = async (slug: string) => {
+    setCurrentSlug(slug);
+    setLoading(true);
+    soundEngine.playClick();
+    try {
+      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
+      const json = await res.json();
+
+      if (json.success && json.page && json.page.puck_data && Array.isArray(json.page.puck_data.content) && json.page.puck_data.content.length > 0) {
+        setPageData(json.page.puck_data);
+      } else {
+        // ساختار اولیه در صورتی که دیتابیس کاملاً خالی باشد
+        setPageData({
+          content: [
+            {
+              type: "HeaderCapsuleBar",
+              props: {
+                id: "header-capsule-1",
+                brandText: "Axon | آکسون",
+                logoUrl: "",
+                logoWidth: 36,
+                logoHeight: 36,
+                menu1Text: "کاتالوگ محصولات",
+                menu1Url: "/products",
+                menu2Text: "اخبار تکنولوژی",
+                menu2Url: "/news",
+                menu3Text: "مجله سئو",
+                menu3Url: "/blog",
+                menu4Text: "پیگیری سفارش",
+                menu4Url: "/track-order",
+                menu5Text: "تماس با ما",
+                menu5Url: "/contact",
+                showCart: true,
+                showTheme: true,
+                showUser: true,
+                capsuleBg: "#07090e",
+                capsuleBorder: "#27272a"
+              }
+            },
+            {
+              type: "NativeHero3D",
+              props: {
+                id: "hero-1",
+                topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+                badgeColor: "#38bdf8",
+                title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+                titleSize: 42,
+                subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+                bgColor: "transparent"
+              }
+            },
+            {
+              type: "NativePerspectiveSlider",
+              props: {
+                id: "slider-1",
+                sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+                sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی"
+              }
+            },
+            {
+              type: "NativeProductCatalog",
+              props: {
+                id: "catalog-1",
+                heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
+                subtitle: "تمامی کالاها با گارانتی اصالت طلایی عرضه می‌شوند",
+                limit: 8
+              }
+            },
+            {
+              type: "NativeExplodedView",
+              props: {
+                id: "exploded-1",
+                productTitle: "Apple Studio Display 5K Retina",
+                sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری"
+              }
+            },
+            {
+              type: "GlobalFooterBlock",
+              props: {
+                id: "footer-1",
+                footerLogoUrl: "",
+                brandTitle: "Axon | آکسون",
+                brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
+                brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+                supportPhone: "09376110200",
+                supportEmail: "Pouriarahimi@yahoo.com",
+                warehouseAddress: "شیراز - ستارخان",
+                workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+                enamadCode: "27424534",
+                copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
+                footerBg: "#07090e"
+              }
+            }
+          ],
+          root: { props: { title: slug } }
+        });
+      }
+    } catch {
+      // در صورت بروز خطا، داده‌های موجود حفظ می‌شوند
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPages();
+    loadPage("home");
+  }, []);
+
+  const handleSave = async (data: Data) => {
+    soundEngine.playClick();
+    setToast("در حال ذخیره و انتشار سراسری تغییرات در دیتابیس...");
+
+    try {
+      const res = await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: currentSlug,
+          title: currentSlug === "home" ? "صفحه اصلی" : currentSlug,
+          puck_data: data,
+          is_published: true,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setPageData(data); // تثبیت فوری در استیت کلاینت
+        setToast("✓ تغییرات با موفقیت ذخیره شد و پس از رفرش پایدار خواهد ماند.");
+
+        // برودکست وب‌سوکت بلادرنگ
+        try {
+          const headerBlock = data.content?.find((b: any) => b.type === "HeaderCapsuleBar");
+          supabase.channel("realtime-header-puck-sync").send({
+            type: "broadcast",
+            event: "header_updated",
+            payload: headerBlock?.props || {}
+          });
+        } catch {}
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("puck_published"));
+        }
+      } else {
+        setToast("خطا در ذخیره‌سازی: " + (json.message || ""));
+      }
+    } catch {
+      setToast("خطا در برقراری ارتباط با سرور.");
+    } finally {
+      setTimeout(() => setToast(null), 3500);
+    }
+  };
+
+  const targetLiveUrl = currentSlug === "home" ? "/" : \`/\${currentSlug}\`;
+
+  return (
+    <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]" dir="rtl">
+      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
+            ⚡
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه:</span>
+            <select
+              value={currentSlug}
+              onChange={(e) => loadPage(e.target.value)}
+              className="p-2 px-3.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black outline-none cursor-pointer"
+            >
+              {pages.map((p) => (
+                <option key={p.id} value={p.slug}>
+                  📄 {p.title} (/{p.slug === "home" ? "" : p.slug})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href={targetLiveUrl}
+            target="_blank"
+            className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
+          >
+            <span>مشاهده زنده در سایت</span>
+            <span>🔗</span>
+          </Link>
+        </div>
+      </div>
+
+      {toast && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
+          {toast}
+        </div>
+      )}
+
+      <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px]">
+        {loading || !pageData ? (
+          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال فراخوانی داده‌های ذخیره‌شده از دیتابیس...</div>
+        ) : (
+          <Puck
+            key={currentSlug} // رفرش بوم متناسب با اسلاگ صفحه بدون باگ کش
+            config={puckConfig}
+            data={pageData}
+            onPublish={handleSave}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+`;
+writeFile('components/admin/AdminModularPages.tsx', adminModularPagesCode);
+
+// =============================================================================
+// ۴. بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
@@ -450,7 +820,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(puck): fully editable in-canvas header fields for all 5 menus, logo and dimensions" --allow-empty', { stdio: 'inherit' });
+  execSync('git commit -m "fix(persistence): permanently preserve all custom fields upon page refresh and add native visual color pickers"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -459,7 +829,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ تغییرات با موفقیت در ورسل پوش شد!\x1b[0m");
+  console.log("\x1b[32m✔ ذخیره دائمی و پالت انتخابگر رنگ با موفقیت مستقر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

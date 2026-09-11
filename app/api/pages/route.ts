@@ -4,64 +4,37 @@ import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-export const SYSTEM_PAGES = [
-  { id: "sys-home", slug: "home", title: "صفحه اصلی (خانه)" },
-  { id: "sys-products", slug: "products", title: "کاتالوگ محصولات و تجهیزات" },
-  { id: "sys-news", slug: "news", title: "رادار اخبار تکنولوژی" },
-  { id: "sys-blog", slug: "blog", title: "مجله تخصصی و مقالات سئو" },
-  { id: "sys-about", slug: "about", title: "درباره استودیو آکسون" },
-  { id: "sys-contact", slug: "contact", title: "تماس و مشاوره تخصصی" },
-  { id: "sys-track", slug: "track-order", title: "پیگیری مرسولات پستی" },
-];
-
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
-    const getRevisions = searchParams.get("revisions");
-
-    // واکشی تاریخچه نسخه‌های یک صفحه
-    if (slug && getRevisions === "true") {
-      const { data: revs } = await supabaseAdmin
-        .from("page_revisions")
-        .select("id, created_at")
-        .eq("page_slug", slug)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      return NextResponse.json({ success: true, revisions: revs || [] });
-    }
 
     if (slug) {
-      const { data } = await supabaseAdmin
+      const cleanSlug = String(slug).trim().toLowerCase();
+      // تقدم ۱۰۰٪ واکشی از دیتابیس Supabase
+      const { data, error } = await supabaseAdmin
         .from("modular_pages")
         .select("*")
-        .eq("slug", slug)
+        .eq("slug", cleanSlug)
         .maybeSingle();
 
-      if (data) {
+      if (data && data.puck_data) {
         return NextResponse.json({ success: true, page: data });
       }
 
-      const sys = SYSTEM_PAGES.find((p) => p.slug === slug);
-      if (sys) {
-        return NextResponse.json({ success: true, page: sys });
-      }
+      // فال‌بک لوکال در صورت نبود رکورد دیتابیس
+      return NextResponse.json({
+        success: true,
+        page: { slug: cleanSlug, title: cleanSlug === "home" ? "صفحه اصلی" : cleanSlug, puck_data: null }
+      });
     }
 
-    const { data: customPages } = await supabaseAdmin
+    const { data: allPages } = await supabaseAdmin
       .from("modular_pages")
       .select("id, slug, title, is_published, updated_at")
       .order("updated_at", { ascending: false });
 
-    const combined = [...SYSTEM_PAGES];
-    (customPages || []).forEach((cp) => {
-      if (!combined.some((p) => p.slug === cp.slug)) {
-        combined.push(cp);
-      }
-    });
-
-    return NextResponse.json({ success: true, pages: combined });
+    return NextResponse.json({ success: true, pages: allPages || [] });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -74,26 +47,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { slug, title, puck_data, is_published, restoreRevisionId } = body;
-    const cleanSlug = String(slug || "").trim().toLowerCase();
+    const { slug, title, puck_data, is_published } = body;
+    const cleanSlug = String(slug || "home").trim().toLowerCase();
 
-    // اگر درخواست بازیابی نسخه قبلی باشد
-    if (restoreRevisionId) {
-      const { data: rev } = await supabaseAdmin
-        .from("page_revisions")
-        .select("puck_data")
-        .eq("id", restoreRevisionId)
-        .maybeSingle();
-
-      if (rev && rev.puck_data) {
-        await supabaseAdmin
-          .from("modular_pages")
-          .update({ puck_data: rev.puck_data, updated_at: new Date().toISOString() })
-          .eq("slug", cleanSlug);
-
-        return NextResponse.json({ success: true, message: "صفحه با موفقیت به نسخه انتخابی بازگردانی شد.", restoredData: rev.puck_data });
-      }
-    }
+    const { data: existing } = await supabaseAdmin
+      .from("modular_pages")
+      .select("id")
+      .eq("slug", cleanSlug)
+      .maybeSingle();
 
     const payload: any = {
       slug: cleanSlug,
@@ -103,26 +64,21 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabaseAdmin.from("modular_pages").select("id").eq("slug", cleanSlug).maybeSingle();
-
     if (existing) {
-      await supabaseAdmin.from("modular_pages").update(payload).eq("id", existing.id);
+      const { error: updErr } = await supabaseAdmin
+        .from("modular_pages")
+        .update(payload)
+        .eq("id", existing.id);
+      if (updErr) throw updErr;
     } else {
-      payload.id = "page_" + Date.now();
       payload.created_at = new Date().toISOString();
-      await supabaseAdmin.from("modular_pages").insert([payload]);
+      const { error: insErr } = await supabaseAdmin
+        .from("modular_pages")
+        .insert([payload]);
+      if (insErr) throw insErr;
     }
 
-    // ثبت اسنپ‌شات در تاریخچه نسخه‌ها
-    if (puck_data) {
-      try {
-        await supabaseAdmin.from("page_revisions").insert([
-          { page_slug: cleanSlug, puck_data }
-        ]);
-      } catch {}
-    }
-
-    return NextResponse.json({ success: true, message: "صفحه با موفقیت ذخیره و اسنپ‌شات نسخه ثبت شد." });
+    return NextResponse.json({ success: true, message: "صفحه با موفقیت در دیتابیس ذخیره شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

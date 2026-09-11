@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Phase 15: Enterprise Security Headers & CSP (fix.js)
+ * AXON CORE - Fix CI Workflow Script Escaping (fix.js)
  */
 
 const fs = require('fs');
@@ -14,66 +14,43 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PHASE15]\x1b[0m پیاده‌سازی هدرهای امنیتی پیشرفته و حفاظت در برابر حملات وب...");
+console.log("\x1b[36m[AXON-FIX]\x1b[0m اصلاح کاراکترهای اسکریپت خط لوله...");
 
-// =============================================================================
-// به‌روزرسانی next.config.ts با هدرهای امنیتی استاندارد
-// =============================================================================
-const nextConfigSecure = `import type { NextConfig } from "next";
+const githubWorkflowCode = `name: Axon Core CI Pipeline
 
-const nextConfig: NextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-    ],
-  },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "X-Frame-Options",
-            value: "DENY",
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
-        ],
-      },
-    ];
-  },
-};
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-export default nextConfig;
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Production Build Test
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: \${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: \${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: \${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 `;
-writeFile('next.config.ts', nextConfigSecure);
 
-// =============================================================================
-// بیلد نهایی پروژه و انتشار در Vercel
-// =============================================================================
+writeFile('.github/workflows/ci.yml', githubWorkflowCode);
+
 console.log("تست بیلد کامل (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -83,11 +60,11 @@ try {
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگر دیپلوی ورسل...");
+console.log("ارسال تغییرات به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "security(headers): implement enterprise security headers for XSS and clickjacking protection"', { stdio: 'inherit' });
+  execSync('git commit -m "ci(pipeline): add github actions workflow with proper escaping"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -96,7 +73,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ هدرهای امنیتی با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ خط لوله CI با موفقیت در گیت‌هاب ثبت شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

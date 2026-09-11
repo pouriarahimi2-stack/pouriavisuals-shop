@@ -1,4 +1,3 @@
-// File Path: app/api/orders/track/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
@@ -8,7 +7,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get("query")?.trim();
+    // پشتیبانی همزمان از هر دو پارامتر query و q
+    const query = (searchParams.get("query") || searchParams.get("q") || "").trim();
 
     if (!query) {
       return NextResponse.json(
@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // دسترسی یکجا به تمام فاکتورها فقط مختص ادمین است
     if (query.toLowerCase() === "all") {
       if (!verifyAdminSession(req)) {
         return NextResponse.json(
@@ -52,7 +51,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, message: "فاکتوری با این مشخصات یافت نشد." }, { status: 404 });
       }
 
-      return NextResponse.json({ success: true, data });
+      return NextResponse.json({ success: true, order: data[0], data });
     }
 
     return NextResponse.json({ success: false, message: "دیتابیس در دسترس نیست." }, { status: 503 });

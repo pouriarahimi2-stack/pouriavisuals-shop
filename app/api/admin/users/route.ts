@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { authSecurity } from "@/lib/authSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +30,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: "اطلاعات ناقص است" }, { status: 400 });
   }
 
+  const hashedPassword = authSecurity.hashPassword(password.trim());
+
   const { data, error } = await supabaseAdmin.from("admin_users").insert({
     username: username.trim().toLowerCase(),
-    password: password.trim(),
+    password: hashedPassword,
+    password_hash: hashedPassword,
     full_name: full_name?.trim() || username.trim(),
-    role: role || "admin",
+    role: role || "product_manager",
     created_at: new Date().toISOString(),
   }).select().single();
 

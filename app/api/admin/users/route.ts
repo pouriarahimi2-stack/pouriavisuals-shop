@@ -6,7 +6,7 @@ import { authSecurity } from "@/lib/authSecurity";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const session = verifyAdminSession(req);
+  const session: any = await verifyAdminSession(req);
   if (!session) {
     return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
   }
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = verifyAdminSession(req);
+  const session: any = await verifyAdminSession(req);
   if (!session) {
     return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
   }
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = verifyAdminSession(req);
+  const session: any = await verifyAdminSession(req);
   if (!session) {
     return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
   }

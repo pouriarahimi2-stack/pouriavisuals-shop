@@ -25,12 +25,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = verifyAdminSession(req);
+    const session: any = await verifyAdminSession(req);
     if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
-    // بررسی دسترسی ویرایش استایل (فقط سوپرادمین یا طراح)
     if (!enforceRbac(session.role, "styles.manage") && session.role !== "superadmin") {
       return NextResponse.json(
         { success: false, message: "نقش کاربری شما اجازه تغییر هویت بصری و استایل‌های سایت را ندارد." },

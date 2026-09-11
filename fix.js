@@ -1,5 +1,5 @@
 /**
- * AXON CORE - True Granular Full-Site Builder with Atomic Component Editing (fix.js)
+ * AXON CORE - True Micro-Drag & Drop Atomic Header & Fixed Alignment (fix.js)
  */
 
 const fs = require('fs');
@@ -14,441 +14,406 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-ATOMIC-BUILDER]\x1b[0m تفکیک کامل و اتمیک اجزای هدر، اسلایدر، کاتالوگ و فوتر برای ویرایش ۱۰۰٪ آزاد...");
+console.log("\x1b[36m[AXON-HEADER-MICRO-BUILDER]\x1b[0m اصلاح چینش چپ/راست هدر و تفکیک تک‌تک اجزا به درگ‌واند‌دراپ ماوس...");
 
 // =============================================================================
-// ۱. بازنویسی lib/puckConfig.tsx با فیلدهای آرایه‌ای و اتمیک برای تک‌تک اجزا
+// ۱. اصلاح components/Header.tsx با ترتیب فیزیکی استاندارد و قطعی
 // =============================================================================
-const atomicPuckConfig = `import React, { useState, useEffect } from "react";
+const exactHeaderCode = `"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+
+export default function Header() {
+  const { totalItems, toggleCart } = useCart();
+  const [mounted, setMounted] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    const cached = siteInfoService.getSiteInfoSync();
+    if (cached) setSiteInfo(cached);
+
+    siteInfoService.getSiteInfo().then((data) => {
+      if (data) setSiteInfo(data);
+    });
+
+    try {
+      const savedTheme = localStorage.getItem("theme");
+      const isDark = savedTheme !== "light";
+      setIsDarkMode(isDark);
+      if (isDark) document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
+    } catch {}
+
+    const handleUpdate = (e: any) => {
+      if (e.detail) setSiteInfo(e.detail);
+    };
+
+    window.addEventListener("site_info_updated", handleUpdate);
+    return () => window.removeEventListener("site_info_updated", handleUpdate);
+  }, []);
+
+  const toggleDarkMode = () => {
+    soundEngine.playClick();
+    if (isDarkMode) {
+      document.documentElement.classList.remove("dark");
+      setIsDarkMode(false);
+      localStorage.setItem("theme", "light");
+    } else {
+      document.documentElement.classList.add("dark");
+      setIsDarkMode(true);
+      localStorage.setItem("theme", "dark");
+    }
+  };
+
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
+
+  return (
+    <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="ltr">
+      <div className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all">
+        
+        {/* سمت چپ مطلق: ابزارهای کاربری (سبد خرید، دارک‌مود، پروفایل) */}
+        <div className="flex items-center gap-2 order-1">
+          <button
+            type="button"
+            onClick={() => { soundEngine.playClick(); toggleCart(); }}
+            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer relative shadow-sm"
+            title="سبد خرید"
+          >
+            🛒
+            {mounted && totalItems > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-black flex items-center justify-center shadow-md animate-bounce">
+                {totalItems}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleDarkMode}
+            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer text-xs"
+            title="حالت شب / روز"
+          >
+            {isDarkMode ? "🌙" : "☀️"}
+          </button>
+
+          <Link
+            href="/admin/login"
+            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer text-xs"
+            title="ورود به حساب"
+          >
+            👤
+          </Link>
+        </div>
+
+        {/* وسط: منوهای ناوبری فارسی */}
+        <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-700 dark:text-slate-300 order-2" dir="rtl">
+          <Link href="/products" className="hover:text-sky-500 transition cursor-pointer">کاتالوگ محصولات</Link>
+          <Link href="/news" className="hover:text-sky-500 transition cursor-pointer">اخبار تکنولوژی</Link>
+          <Link href="/blog" className="hover:text-sky-500 transition cursor-pointer">مجله سئو</Link>
+          <Link href="/track-order" className="hover:text-sky-500 transition cursor-pointer">پیگیری سفارش</Link>
+          <Link href="/contact" className="hover:text-sky-500 transition cursor-pointer">تماس با ما</Link>
+        </nav>
+
+        {/* سمت راست مطلق: نام و نشان اختصاصی برند آکسون */}
+        <Link href="/" className="flex items-center gap-3 group order-3" dir="rtl">
+          <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition">
+            {storeName}
+          </span>
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md text-white font-black text-xs group-hover:scale-105 transition">
+            ▲
+          </div>
+        </Link>
+
+      </div>
+    </header>
+  );
+}
+`;
+writeFile('components/Header.tsx', exactHeaderCode);
+
+// =============================================================================
+// ۲. بازنویسی lib/puckConfig.tsx با اجزای اتمیک درگ‌واند‌دراپ با ماوس
+// =============================================================================
+const atomicDropzonePuckConfig = `import React, { useState, useEffect } from "react";
 import type { Config } from "@measured/puck";
+import { DropZone } from "@measured/puck";
 import Link from "next/link";
 import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
 import ProductList from "@/components/ProductList";
 import ProductExplodedView from "@/components/ProductExplodedView";
 import { productService, Product } from "@/services/productService";
-import { useCart } from "@/context/CartContext";
 
 export type ComponentProps = {
-  HeaderModularBlock: {
-    brandName: string;
-    brandLogoText: string;
-    menuItems: Array<{ label: string; href: string }>;
-    showCartIcon: boolean;
-    showThemeIcon: boolean;
-    showUserIcon: boolean;
-    headerBg: string;
-    capsuleBorder: string;
+  // ۱. ساختار هدر اتمیک
+  HeaderCapsuleBar: {
+    paddingY: number;
   };
-  Hero3DModularBlock: {
-    badgeText: string;
-    badgeColor: string;
+  HeaderBrandLogo: {
+    brandText: string;
+    iconText: string;
+  };
+  HeaderNavItem: {
     title: string;
-    subtitle: string;
-    ctaButtonText: string;
-    ctaButtonUrl: string;
-    canvasHeight: number;
+    url: string;
   };
-  PerspectiveSliderModularBlock: {
-    sectionTitle: string;
-    sectionSubtitle: string;
-    slides: Array<{
-      title: string;
-      subtitle: string;
-      badge: string;
-      imageUrl: string;
-      linkUrl: string;
-      priceText: string;
-    }>;
+  HeaderActionsGroup: {
+    showCart: boolean;
+    showTheme: boolean;
+    showUser: boolean;
   };
-  ProductCatalogModularBlock: {
-    catalogTitle: string;
-    catalogSubtitle: string;
-    limit: number;
-    columns: number;
+
+  // ۲. بخش‌های بدنه
+  NativeHero3D: {
+    topBadge: string;
+    bgColor: string;
   };
-  ExplodedViewModularBlock: {
-    targetProductTitle: string;
-    badgeTitle: string;
-    boxBg: string;
+  NativePerspectiveSlider: {
+    paddingY: number;
   };
-  FooterModularBlock: {
+  NativeProductCatalog: {
+    heading: string;
+  };
+  NativeExplodedView: {
+    productTitle: string;
+  };
+
+  // ۳. فوتر سازمانی
+  GlobalFooterBlock: {
     brandTitle: string;
     brandSubtitle: string;
-    bioDescription: string;
-    badge1: string;
-    badge2: string;
-    quickLinks: Array<{ label: string; href: string }>;
-    customerServiceLinks: Array<{ label: string; href: string }>;
-    phone: string;
-    email: string;
+    brandDesc: string;
+    supportPhone: string;
+    supportEmail: string;
     warehouseAddress: string;
     workingHours: string;
     enamadCode: string;
-    copyright: string;
+    copyrightText: string;
   };
 };
 
-function PuckProductListWrapper({ limit }: { limit?: number }) {
+function PuckProductListWrapper() {
   const [products, setProducts] = useState<Product[]>([]);
   useEffect(() => {
-    productService.getAll().then((data) => {
-      if (data) setProducts(limit ? data.slice(0, limit) : data);
-    });
-  }, [limit]);
+    productService.getAll().then((data) => setProducts(data || []));
+  }, []);
   return <ProductList initialProducts={products} />;
 }
 
 export const puckConfig: Config<ComponentProps> = {
   categories: {
-    header_footer: {
-      title: "🧭 ناوبری، هدر و فوتر اتمیک",
-      components: ["HeaderModularBlock", "FooterModularBlock"]
+    header_atoms: {
+      title: "🧩 اجزای ریز هدر (درگ تک‌تک آیتم‌ها با ماوس)",
+      components: ["HeaderCapsuleBar", "HeaderBrandLogo", "HeaderNavItem", "HeaderActionsGroup"]
     },
-    main_sections: {
-      title: "⭐ بخش‌های اصلی و سه‌بعدی صفحه",
-      components: ["Hero3DModularBlock", "PerspectiveSliderModularBlock", "ProductCatalogModularBlock", "ExplodedViewModularBlock"]
+    page_sections: {
+      title: "⭐ بخش‌های صفحه و فوتر",
+      components: ["NativeHero3D", "NativePerspectiveSlider", "NativeProductCatalog", "NativeExplodedView", "GlobalFooterBlock"]
     }
   },
   components: {
-    // ۱. هدر اتمیک با امکان افزودن نامحدود منو و تغییر رنگ و ظاهر
-    HeaderModularBlock: {
-      label: "هدر کپسولی (ویرایش کامل منوها، لوگو و دکمه‌ها)",
+    // کانتینر اصلی هدر با ۳ بخش مستقل درگ‌واند‌دراپ
+    HeaderCapsuleBar: {
+      label: "نوار کپسولی هدر (شامل جایگاه‌های درگ)",
       fields: {
-        brandName: { type: "text", label: "عنوان متنی برند" },
-        brandLogoText: { type: "text", label: "کاراکتر لوگو (مثلا ▲)" },
-        menuItems: {
-          type: "array",
-          label: "منوهای ناوبری (افزودن / ویرایش / حذف منو)",
-          arrayFields: {
-            label: { type: "text", label: "عنوان منو" },
-            href: { type: "text", label: "آدرس لینک (URL)" }
-          },
-          getItemSummary: (item) => item.label || "منوی جدید"
-        },
-        showCartIcon: {
-          type: "radio",
-          label: "نمایش آیکون سبد خرید",
-          options: [{ label: "بله", value: true }, { label: "خیر", value: false }]
-        },
-        showThemeIcon: {
-          type: "radio",
-          label: "نمایش آیکون دارک‌مود",
-          options: [{ label: "بله", value: true }, { label: "خیر", value: false }]
-        },
-        showUserIcon: {
-          type: "radio",
-          label: "نمایش آیکون پروفایل",
-          options: [{ label: "بله", value: true }, { label: "خیر", value: false }]
-        },
-        headerBg: { type: "text", label: "رنگ پس‌زمینه کپسول (Hex یا rgba)" },
-        capsuleBorder: { type: "text", label: "رنگ خط دور کپسول" }
+        paddingY: { type: "number", label: "فاصله عمودی (px)" }
       },
       defaultProps: {
-        brandName: "Axon | آکسون",
-        brandLogoText: "▲",
-        menuItems: [
-          { label: "کاتالوگ محصولات", href: "/products" },
-          { label: "اخبار تکنولوژی", href: "/news" },
-          { label: "مجله سئو", href: "/blog" },
-          { label: "پیگیری سفارش", href: "/track-order" },
-          { label: "تماس با ما", href: "/contact" },
-        ],
-        showCartIcon: true,
-        showThemeIcon: true,
-        showUserIcon: true,
-        headerBg: "rgba(7, 9, 14, 0.85)",
-        capsuleBorder: "rgba(255, 255, 255, 0.1)"
+        paddingY: 10
       },
-      render: ({ brandName, brandLogoText, menuItems, showCartIcon, showThemeIcon, showUserIcon, headerBg, capsuleBorder }) => (
-        <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="rtl">
-          <div
-            style={{ backgroundColor: headerBg || "rgba(7, 9, 14, 0.85)", borderColor: capsuleBorder || "rgba(255, 255, 255, 0.1)" }}
-            className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all"
-          >
-            <div className="flex items-center gap-2">
-              {showCartIcon && (
-                <Link href="/cart" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 hover:scale-105 transition">
-                  🛒
-                </Link>
-              )}
-              {showThemeIcon && (
-                <button type="button" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 hover:scale-105 transition">
-                  🌙
-                </button>
-              )}
-              {showUserIcon && (
-                <Link href="/login" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 hover:scale-105 transition">
-                  👤
-                </Link>
-              )}
+      render: ({ paddingY }) => (
+        <header style={{ paddingTop: \`\${paddingY || 10}px\`, paddingBottom: \`\${paddingY || 10}px\` }} className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 select-none font-sans" dir="ltr">
+          <div className="flex items-center justify-between px-6 py-3 rounded-full bg-[#07090e]/95 border border-white/10 backdrop-blur-2xl shadow-2xl">
+            
+            {/* شیار سمت چپ (Left Dropzone): دکمه‌های سبد خرید، تم و پروفایل */}
+            <div className="flex items-center gap-2 order-1">
+              <DropZone zone="left-actions" />
             </div>
 
-            <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-300">
-              {(menuItems || []).map((m, idx) => (
-                <Link key={idx} href={m.href || "/"} className="hover:text-sky-400 transition">
-                  {m.label}
-                </Link>
-              ))}
+            {/* شیار وسط (Center Dropzone): تک‌تک منوهای ناوبری با امکان جابجایی ماوس */}
+            <nav className="flex items-center gap-6 text-xs font-black text-slate-300 order-2" dir="rtl">
+              <DropZone zone="center-menu" />
             </nav>
 
-            <Link href="/" className="flex items-center gap-3">
-              <span className="font-black text-base sm:text-lg tracking-tight text-white">
-                {brandName}
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md text-white font-black text-xs">
-                {brandLogoText || "▲"}
-              </div>
-            </Link>
+            {/* شیار سمت راست (Right Dropzone): نشان و نام برند آکسون */}
+            <div className="flex items-center gap-3 order-3" dir="rtl">
+              <DropZone zone="right-brand" />
+            </div>
+
           </div>
         </header>
       )
     },
 
-    // ۲. هیرو ۳D با ویرایش متن، تیتر، دکمه و ارتفاع
-    Hero3DModularBlock: {
-      label: "هیرو ۳D (ویرایش تیتر، برچسب، دکمه و مدل ۳D)",
+    // المان برند و لوگو
+    HeaderBrandLogo: {
+      label: "نشان و نام برند آکسون",
       fields: {
-        badgeText: { type: "text", label: "متن برچسب بالای هیرو" },
-        badgeColor: { type: "text", label: "رنگ متن برچسب" },
-        title: { type: "text", label: "تیتر اصلی هیرو" },
-        subtitle: { type: "textarea", label: "زیرعنوان و توضیحات" },
-        ctaButtonText: { type: "text", label: "متن دکمه اصلی" },
-        ctaButtonUrl: { type: "text", label: "لینک دکمه اصلی" },
-        canvasHeight: { type: "number", label: "ارتفاع کانوَس (px)" }
+        brandText: { type: "text", label: "نام برند" },
+        iconText: { type: "text", label: "کاراکتر آیکون" }
       },
       defaultProps: {
-        badgeText: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
-        badgeColor: "#38bdf8",
-        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
-        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای ۵K با ۱۸ ماه گارانتی طلایی",
-        ctaButtonText: "ورود به کاتالوگ مانیتورها",
-        ctaButtonUrl: "/products",
-        canvasHeight: 520
+        brandText: "Axon | آکسون",
+        iconText: "▲"
       },
-      render: ({ badgeText, badgeColor, title, subtitle, ctaButtonText, ctaButtonUrl, canvasHeight }) => (
-        <section className="w-full relative overflow-hidden select-none py-6 font-sans text-white text-center" dir="rtl">
-          <div className="max-w-4xl mx-auto space-y-4 relative z-10 px-4">
-            {badgeText && (
-              <span style={{ color: badgeColor || "#38bdf8" }} className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-xs font-black inline-block">
-                {badgeText}
-              </span>
-            )}
-            <h1 className="text-3xl sm:text-5xl font-black leading-tight text-white">
-              {title}
-            </h1>
-            {subtitle && (
-              <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
-                {subtitle}
-              </p>
-            )}
-            {ctaButtonText && (
-              <div className="pt-2">
-                <Link href={ctaButtonUrl || "/products"} className="inline-block px-8 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-xl transition">
-                  {ctaButtonText} ←
-                </Link>
-              </div>
-            )}
+      render: ({ brandText, iconText }) => (
+        <div className="flex items-center gap-3 cursor-pointer">
+          <span className="font-black text-base tracking-tight text-white">{brandText}</span>
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md text-white font-black text-xs">
+            {iconText || "▲"}
           </div>
-          <div style={{ height: \`\${canvasHeight || 520}px\` }} className="w-full relative overflow-hidden mt-4">
-            <Hero3DCanvas />
-          </div>
-        </section>
-      )
-    },
-
-    // ۳. اسلایدر پرسپکتیو با ویرایش دانه به دانه اسلایدها و عکس‌ها
-    PerspectiveSliderModularBlock: {
-      label: "اسلایدر پرسپکتیو ۳D (ویرایش آزاد اسلایدها و تصاویر)",
-      fields: {
-        sectionTitle: { type: "text", label: "تیتر بخش اسلایدر" },
-        sectionSubtitle: { type: "text", label: "زیرعنوان بخش" },
-        slides: {
-          type: "array",
-          label: "اسلایدهای بنر (افزودن / تغییر عکس و لینک)",
-          arrayFields: {
-            title: { type: "text", label: "عنوان کالا در اسلاید" },
-            subtitle: { type: "text", label: "توضیح کوتاه" },
-            badge: { type: "text", label: "بج نئونی (مثلا آفر ویژه)" },
-            imageUrl: { type: "text", label: "آدرس تصویر (URL)" },
-            linkUrl: { type: "text", label: "لینک صفحه کالا" },
-            priceText: { type: "text", label: "قیمت نمایشی" }
-          },
-          getItemSummary: (item) => item.title || "اسلاید بنر"
-        }
-      },
-      defaultProps: {
-        sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-        sectionSubtitle: "پیمایش جهت بررسی دقیق مشخصات و گارانتی",
-        slides: [
-          {
-            title: "Apple Studio Display 27 5K",
-            subtitle: "پنل رتینا با کالیبراسیون ۳D LUT",
-            badge: "پرچمدار",
-            imageUrl: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
-            linkUrl: "/products",
-            priceText: "۱۲۸,۵۰۰,۰۰۰ تومان"
-          },
-          {
-            title: "Apple Pro Display XDR 32 6K",
-            subtitle: "روشنایی ۱۶۰۰ نیت و وضوح خیره‌کننده 6K",
-            badge: "استودیوی حرفه‌ای",
-            imageUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-            linkUrl: "/products",
-            priceText: "۲۴۵,۰۰۰,۰۰۰ تومان"
-          }
-        ]
-      },
-      render: ({ sectionTitle, sectionSubtitle, slides }) => (
-        <section className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-white space-y-6" dir="rtl">
-          <div className="text-center space-y-1">
-            <h2 className="text-2xl font-black">{sectionTitle}</h2>
-            <p className="text-xs text-slate-400">{sectionSubtitle}</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-            {(slides || []).map((slide, idx) => (
-              <div key={idx} className="p-5 rounded-3xl bg-white/[0.04] border border-white/10 space-y-3 hover:border-sky-500/40 transition flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="w-full h-44 rounded-2xl bg-black/40 overflow-hidden flex items-center justify-center p-2 border border-white/5 relative">
-                    {slide.imageUrl ? (
-                      <img src={slide.imageUrl} alt="" className="w-full h-full object-contain" />
-                    ) : (
-                      <span className="text-4xl">🖥️</span>
-                    )}
-                    {slide.badge && (
-                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 text-[10px] font-bold border border-sky-500/30">
-                        {slide.badge}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-white">{slide.title}</h3>
-                    <p className="text-xs text-slate-400 mt-1">{slide.subtitle}</p>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center pt-3 border-t border-white/10">
-                  <span className="font-mono text-emerald-400 font-black text-xs">{slide.priceText}</span>
-                  <Link href={slide.linkUrl || "/products"} className="px-4 py-1.5 rounded-xl bg-sky-500 text-white font-bold text-xs hover:bg-sky-400 transition">
-                    خرید کالا ←
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )
-    },
-
-    // ۴. ویترین کاتالوگ کالاها
-    ProductCatalogModularBlock: {
-      label: "ویترین کاتالوگ کالاها (تعداد ستون و کالا)",
-      fields: {
-        catalogTitle: { type: "text", label: "عنوان ویترین کاتالوگ" },
-        catalogSubtitle: { type: "text", label: "توضیح کوتاه" },
-        limit: { type: "number", label: "حداکثر تعداد کالا" },
-        columns: { type: "number", label: "تعداد ستون‌ها (۲، ۳ یا ۴)" }
-      },
-      defaultProps: {
-        catalogTitle: "کاتالوگ تجهیزات تخصصی و مانیتورها",
-        catalogSubtitle: "تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند",
-        limit: 6,
-        columns: 3
-      },
-      render: ({ catalogTitle, catalogSubtitle, limit }) => (
-        <section className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-white space-y-4" dir="rtl">
-          <div className="text-center space-y-1">
-            <h2 className="text-2xl font-black">{catalogTitle}</h2>
-            <p className="text-xs text-slate-400">{catalogSubtitle}</p>
-          </div>
-          <PuckProductListWrapper limit={limit} />
-        </section>
-      )
-    },
-
-    // ۵. کالبدشکافی ۳D
-    ExplodedViewModularBlock: {
-      label: "کالبدشکافی ۳D سخت‌افزار (انتخاب محصول)",
-      fields: {
-        targetProductTitle: { type: "text", label: "نام محصول مدل ۳D" },
-        badgeTitle: { type: "text", label: "برچسب بالا" },
-        boxBg: { type: "text", label: "رنگ پس‌زمینه باکس" }
-      },
-      defaultProps: {
-        targetProductTitle: "Apple Studio Display 5K Retina",
-        badgeTitle: "🧬 کالبدشکافی تخصصی لایه‌ها",
-        boxBg: "transparent"
-      },
-      render: ({ targetProductTitle, badgeTitle, boxBg }) => (
-        <div style={{ backgroundColor: boxBg || "transparent" }} className="max-w-7xl mx-auto px-4 py-6 font-sans select-none" dir="rtl">
-          <ProductExplodedView productTitle={targetProductTitle || "Apple Studio Display 5K"} />
         </div>
       )
     },
 
-    // ۶. فوتر اتمیک کامل با کنترل تک‌تک ستون‌ها و کارت‌های تماس
-    FooterModularBlock: {
-      label: "فوتر ۴ ستونه (ویرایش کامل تلفن، آدرس، نمادها و لینک‌ها)",
+    // تک‌تک منوها به عنوان بلوک مستقل قابل جابجایی
+    HeaderNavItem: {
+      label: "آیتم منو (قابل کشیدن با ماوس)",
+      fields: {
+        title: { type: "text", label: "عنوان منو" },
+        url: { type: "text", label: "آدرس لینک" }
+      },
+      defaultProps: {
+        title: "منوی جدید",
+        url: "/products"
+      },
+      render: ({ title, url }) => (
+        <Link href={url || "#"} className="hover:text-sky-400 transition cursor-pointer px-2 py-1 rounded-lg hover:bg-white/5">
+          {title}
+        </Link>
+      )
+    },
+
+    // دکمه‌های سمت چپ هدر
+    HeaderActionsGroup: {
+      label: "دکمه‌های سبد خرید، تم و کاربر",
+      fields: {
+        showCart: { type: "radio", label: "سبد خرید", options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }] },
+        showTheme: { type: "radio", label: "تم دارک", options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }] },
+        showUser: { type: "radio", label: "پروفایل", options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }] }
+      },
+      defaultProps: {
+        showCart: true,
+        showTheme: true,
+        showUser: true
+      },
+      render: ({ showCart, showTheme, showUser }) => (
+        <div className="flex items-center gap-2">
+          {showCart && <span className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs">🛒</span>}
+          {showTheme && <span className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs">🌙</span>}
+          {showUser && <span className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs">👤</span>}
+        </div>
+      )
+    },
+
+    // هیرو ۳D
+    NativeHero3D: {
+      label: "هیرو ۳D اصلی سایت",
+      fields: {
+        topBadge: { type: "text", label: "برچسب بالای هیرو" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" }
+      },
+      defaultProps: {
+        topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+        bgColor: "transparent"
+      },
+      render: ({ topBadge, bgColor }) => (
+        <div style={{ backgroundColor: bgColor || "transparent" }} className="w-full relative overflow-hidden select-none py-4" dir="rtl">
+          {topBadge && (
+            <div className="text-center pt-2">
+              <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-black inline-block">
+                {topBadge}
+              </span>
+            </div>
+          )}
+          <Hero3DCanvas />
+        </div>
+      )
+    },
+
+    // اسلایدر پرسپکتیو
+    NativePerspectiveSlider: {
+      label: "اسلایدر پرسپکتیو بنرها",
+      fields: {
+        paddingY: { type: "number", label: "فاصله عمودی (px)" }
+      },
+      defaultProps: {
+        paddingY: 20
+      },
+      render: ({ paddingY }) => (
+        <div style={{ paddingTop: \`\${paddingY || 20}px\`, paddingBottom: \`\${paddingY || 20}px\` }} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+          <ProductPerspectiveSlider />
+        </div>
+      )
+    },
+
+    // کاتالوگ محصولات
+    NativeProductCatalog: {
+      label: "ویترین اصلی کاتالوگ محصولات",
+      fields: {
+        heading: { type: "text", label: "عنوان کاتالوگ" }
+      },
+      defaultProps: {
+        heading: "کاتالوگ تجهیزات تخصصی"
+      },
+      render: () => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+          <PuckProductListWrapper />
+        </div>
+      )
+    },
+
+    // کالبدشکافی ۳D
+    NativeExplodedView: {
+      label: "کالبدشکافی ۳D سخت‌افزار",
+      fields: {
+        productTitle: { type: "text", label: "نام محصول مدل ۳D" }
+      },
+      defaultProps: {
+        productTitle: "Apple Studio Display 5K Retina"
+      },
+      render: ({ productTitle }) => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+          <ProductExplodedView productTitle={productTitle || "Apple Studio Display 5K"} />
+        </div>
+      )
+    },
+
+    // فوتر ۴ ستونه
+    GlobalFooterBlock: {
+      label: "فوتر ۴ ستونه مهندسی کامل",
       fields: {
         brandTitle: { type: "text", label: "تیتر برند در فوتر" },
         brandSubtitle: { type: "text", label: "زیرعنوان برند" },
-        bioDescription: { type: "textarea", label: "شرح فعالیت و گارانتی" },
-        badge1: { type: "text", label: "نشان گارانتی اول" },
-        badge2: { type: "text", label: "نشان گارانتی دوم" },
-        phone: { type: "text", label: "شماره تلفن پشتیبانی" },
-        email: { type: "text", label: "پست الکترونیک" },
-        warehouseAddress: { type: "text", label: "نشانی انبار و تحویل" },
+        brandDesc: { type: "textarea", label: "متن معرفی گارانتی" },
+        supportPhone: { type: "text", label: "شماره پشتیبانی" },
+        supportEmail: { type: "text", label: "پست الکترونیک" },
+        warehouseAddress: { type: "text", label: "نشانی انبار" },
         workingHours: { type: "text", label: "ساعات پاسخگویی" },
-        enamadCode: { type: "text", label: "کد نماد اعتماد (اینماد)" },
-        copyright: { type: "text", label: "متن کپی‌رایت" },
-        quickLinks: {
-          type: "array",
-          label: "لینک‌های ستون دسترسی سریع",
-          arrayFields: {
-            label: { type: "text", label: "عنوان لینک" },
-            href: { type: "text", label: "آدرس مقصد" }
-          },
-          getItemSummary: (item) => item.label || "لینک"
-        },
-        customerServiceLinks: {
-          type: "array",
-          label: "لینک‌های ستون خدمات مشتریان",
-          arrayFields: {
-            label: { type: "text", label: "عنوان لینک" },
-            href: { type: "text", label: "آدرس مقصد" }
-          },
-          getItemSummary: (item) => item.label || "لینک"
-        }
+        enamadCode: { type: "text", label: "کد اینماد" },
+        copyrightText: { type: "text", label: "متن کپی‌رایت" }
       },
       defaultProps: {
         brandTitle: "Axon | آکسون",
         brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
-        bioDescription: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
-        badge1: "✓ گارانتی اصالت ۱۰۰٪ فیزیکی",
-        badge2: "🚀 ارسال پیشتاز سراسری",
-        phone: "09376110200",
-        email: "Pouriarahimi@yahoo.com",
+        brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+        supportPhone: "09376110200",
+        supportEmail: "Pouriarahimi@yahoo.com",
         warehouseAddress: "شیراز - ستارخان",
         workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
         enamadCode: "27424534",
-        copyright: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
-        quickLinks: [
-          { label: "کاتالوگ کالاها", href: "/products" },
-          { label: "سامانه رهگیری مرسولات", href: "/track-order" },
-          { label: "جدیدترین اخبار تکنولوژی", href: "/news" },
-          { label: "مجله مقالات تخصصی", href: "/blog" },
-          { label: "درباره آکسون", href: "/about" },
-        ],
-        customerServiceLinks: [
-          { label: "ثبت تیکت مشاوره", href: "/contact" },
-          { label: "شرایط گارانتی طلایی", href: "/about" },
-          { label: "ضمانت بازگشت وجه ۷ روزه", href: "/about" },
-          { label: "راهنمای کالیبراسیون ۵K", href: "/blog" },
-        ]
+        copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026"
       },
-      render: ({ brandTitle, brandSubtitle, bioDescription, badge1, badge2, phone, email, warehouseAddress, workingHours, enamadCode, copyright, quickLinks, customerServiceLinks }) => (
+      render: ({ brandTitle, brandSubtitle, brandDesc, supportPhone, supportEmail, warehouseAddress, workingHours, enamadCode, copyrightText }) => (
         <footer className="w-full bg-[#07090e] border-t border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans select-none text-white mt-16" dir="rtl">
           <div className="max-w-7xl mx-auto space-y-12">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
-              
               <div className="lg:col-span-4 space-y-6">
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
@@ -458,18 +423,18 @@ export const puckConfig: Config<ComponentProps> = {
                     <h3 className="font-black text-2xl text-white">{brandTitle}</h3>
                   </div>
                   <p className="text-xs font-bold text-sky-400">{brandSubtitle}</p>
-                  <p className="text-xs text-slate-400 leading-relaxed pt-1">{bioDescription}</p>
+                  <p className="text-xs text-slate-400 leading-relaxed pt-1">{brandDesc}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-black">
-                    {badge1}
+                    ✓ گارانتی اصالت ۱۰۰٪ فیزیکی
                   </span>
                   <span className="px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[11px] font-black">
-                    {badge2}
+                    🚀 ارسال پیشتاز سراسری
                   </span>
                 </div>
                 <div className="pt-3 space-y-2">
-                  <span className="text-[11px] font-bold text-slate-400">شبکه‌های ارتباطی استودیو:</span>
+                  <span className="text-[11px] font-bold text-slate-400">شبکه‌های ارتباطی:</span>
                   <div className="p-3 rounded-3xl bg-slate-900 text-white flex items-center justify-center gap-2 shadow-2xl" dir="ltr">
                     {["C", "O", "N", "T", "A", "C", "T"].map((k, i) => (
                       <div key={i} className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-mono font-black text-xs shadow-inner">
@@ -483,18 +448,20 @@ export const puckConfig: Config<ComponentProps> = {
               <div className="lg:col-span-2 space-y-4">
                 <h4 className="font-black text-sm text-white">دسترسی سریع</h4>
                 <ul className="space-y-2.5 text-xs font-bold text-slate-400">
-                  {(quickLinks || []).map((l, i) => (
-                    <li key={i}><Link href={l.href || "/"} className="hover:text-sky-400 transition">{l.label}</Link></li>
-                  ))}
+                  <li><Link href="/products" className="hover:text-sky-400 transition">کاتالوگ کالاها</Link></li>
+                  <li><Link href="/track-order" className="hover:text-sky-400 transition">سامانه رهگیری مرسولات</Link></li>
+                  <li><Link href="/news" className="hover:text-sky-400 transition">جدیدترین اخبار تکنولوژی</Link></li>
+                  <li><Link href="/blog" className="hover:text-sky-400 transition">مجله مقالات تخصصی</Link></li>
                 </ul>
               </div>
 
               <div className="lg:col-span-2 space-y-4">
                 <h4 className="font-black text-sm text-white">خدمات مشتریان</h4>
                 <ul className="space-y-2.5 text-xs font-bold text-slate-400">
-                  {(customerServiceLinks || []).map((l, i) => (
-                    <li key={i}><Link href={l.href || "/"} className="hover:text-sky-400 transition">{l.label}</Link></li>
-                  ))}
+                  <li><Link href="/contact" className="hover:text-sky-400 transition">ثبت تیکت مشاوره</Link></li>
+                  <li><Link href="/about" className="hover:text-sky-400 transition">شرایط گارانتی طلایی</Link></li>
+                  <li><Link href="/about" className="hover:text-sky-400 transition">ضمانت بازگشت وجه ۷ روزه</Link></li>
+                  <li><Link href="/blog" className="hover:text-sky-400 transition">راهنمای کالیبراسیون ۵K</Link></li>
                 </ul>
               </div>
 
@@ -504,14 +471,14 @@ export const puckConfig: Config<ComponentProps> = {
                   <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex justify-between items-center">
                     <div>
                       <span className="text-[10px] text-slate-400 block font-medium">تلفن پشتیبانی:</span>
-                      <span className="font-mono font-black text-slate-200">{phone}</span>
+                      <span className="font-mono font-black text-slate-200">{supportPhone}</span>
                     </div>
                     <span>📞</span>
                   </div>
                   <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex justify-between items-center">
                     <div>
                       <span className="text-[10px] text-slate-400 block font-medium">پست الکترونیک:</span>
-                      <span className="font-mono font-bold text-slate-200">{email}</span>
+                      <span className="font-mono font-bold text-slate-200">{supportEmail}</span>
                     </div>
                     <span>✉️</span>
                   </div>
@@ -531,12 +498,11 @@ export const puckConfig: Config<ComponentProps> = {
                   </div>
                 </div>
               </div>
-
             </div>
 
             <div className="pt-8 border-t border-white/10 flex justify-between text-xs font-bold text-slate-500">
               <span>نماد اعتماد الکترونیکی فعال ({enamadCode})</span>
-              <p>{copyright}</p>
+              <p>{copyrightText}</p>
             </div>
           </div>
         </footer>
@@ -545,12 +511,12 @@ export const puckConfig: Config<ComponentProps> = {
   }
 };
 `;
-writeFile('lib/puckConfig.tsx', atomicPuckConfig);
+writeFile('lib/puckConfig.tsx', atomicDropzonePuckConfig);
 
 // =============================================================================
-// ۲. استقرار استودیوی تمام‌عرض و حرفه‌ای در components/admin/AdminModularPages.tsx
+// ۳. به‌روزرسانی داده‌های اولیه بوم با قرار دادن تک‌تک آیتم‌های منو در شیارهای هدر
 // =============================================================================
-const studioAtomicCode = `"use client";
+const studioAtomicLayoutCode = `"use client";
 
 import React, { useState, useEffect } from "react";
 import { Puck, Data } from "@measured/puck";
@@ -559,124 +525,97 @@ import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
 import Link from "next/link";
 
-const DEFAULT_FULL_DATA: Data = {
+const ATOMIC_INITIAL_DATA: Data = {
   content: [
     {
-      type: "HeaderModularBlock",
+      type: "HeaderCapsuleBar",
       props: {
-        id: "header-block-1",
-        brandName: "Axon | آکسون",
-        brandLogoText: "▲",
-        menuItems: [
-          { label: "کاتالوگ محصولات", href: "/products" },
-          { label: "اخبار تکنولوژی", href: "/news" },
-          { label: "مجله سئو", href: "/blog" },
-          { label: "پیگیری سفارش", href: "/track-order" },
-          { label: "تماس با ما", href: "/contact" },
-        ],
-        showCartIcon: true,
-        showThemeIcon: true,
-        showUserIcon: true,
-        headerBg: "rgba(7, 9, 14, 0.85)",
-        capsuleBorder: "rgba(255, 255, 255, 0.1)"
+        id: "header-capsule-1",
+        paddingY: 10
       }
     },
     {
-      type: "Hero3DModularBlock",
+      type: "NativeHero3D",
       props: {
-        id: "hero-block-1",
-        badgeText: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
-        badgeColor: "#38bdf8",
-        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
-        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای ۵K با ۱۸ ماه گارانتی طلایی",
-        ctaButtonText: "ورود به کاتالوگ مانیتورها",
-        ctaButtonUrl: "/products",
-        canvasHeight: 520
+        id: "hero-1",
+        topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+        bgColor: "transparent"
       }
     },
     {
-      type: "PerspectiveSliderModularBlock",
+      type: "NativePerspectiveSlider",
       props: {
-        id: "slider-block-1",
-        sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-        sectionSubtitle: "پیمایش جهت بررسی دقیق مشخصات و گارانتی",
-        slides: [
-          {
-            title: "Apple Studio Display 27 5K",
-            subtitle: "پنل رتینا با کالیبراسیون ۳D LUT",
-            badge: "پرچمدار",
-            imageUrl: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
-            linkUrl: "/products",
-            priceText: "۱۲۸,۵۰۰,۰۰۰ تومان"
-          },
-          {
-            title: "Apple Pro Display XDR 32 6K",
-            subtitle: "روشنایی ۱۶۰۰ نیت و وضوح خیره‌کننده 6K",
-            badge: "استودیوی حرفه‌ای",
-            imageUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
-            linkUrl: "/products",
-            priceText: "۲۴۵,۰۰۰,۰۰۰ تومان"
-          }
-        ]
+        id: "slider-1",
+        paddingY: 20
       }
     },
     {
-      type: "ProductCatalogModularBlock",
+      type: "NativeProductCatalog",
       props: {
-        id: "catalog-block-1",
-        catalogTitle: "کاتالوگ تجهیزات تخصصی و مانیتورها",
-        catalogSubtitle: "تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند",
-        limit: 6,
-        columns: 3
+        id: "catalog-1",
+        heading: "کاتالوگ تجهیزات تخصصی"
       }
     },
     {
-      type: "ExplodedViewModularBlock",
+      type: "NativeExplodedView",
       props: {
-        id: "exploded-block-1",
-        targetProductTitle: "Apple Studio Display 5K Retina",
-        badgeTitle: "🧬 کالبدشکافی تخصصی لایه‌ها",
-        boxBg: "transparent"
+        id: "exploded-1",
+        productTitle: "Apple Studio Display 5K Retina"
       }
     },
     {
-      type: "FooterModularBlock",
+      type: "GlobalFooterBlock",
       props: {
-        id: "footer-block-1",
+        id: "footer-1",
         brandTitle: "Axon | آکسون",
         brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
-        bioDescription: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
-        badge1: "✓ گارانتی اصالت ۱۰۰٪ فیزیکی",
-        badge2: "🚀 ارسال پیشتاز سراسری",
-        phone: "09376110200",
-        email: "Pouriarahimi@yahoo.com",
+        brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+        supportPhone: "09376110200",
+        supportEmail: "Pouriarahimi@yahoo.com",
         warehouseAddress: "شیراز - ستارخان",
         workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
         enamadCode: "27424534",
-        copyright: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
-        quickLinks: [
-          { label: "کاتالوگ کالاها", href: "/products" },
-          { label: "سامانه رهگیری مرسولات", href: "/track-order" },
-          { label: "جدیدترین اخبار تکنولوژی", href: "/news" },
-          { label: "مجله مقالات تخصصی", href: "/blog" },
-          { label: "درباره آکسون", href: "/about" },
-        ],
-        customerServiceLinks: [
-          { label: "ثبت تیکت مشاوره", href: "/contact" },
-          { label: "شرایط گارانتی طلایی", href: "/about" },
-          { label: "ضمانت بازگشت وجه ۷ روزه", href: "/about" },
-          { label: "راهنمای کالیبراسیون ۵K", href: "/blog" },
-        ]
+        copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026"
       }
     }
   ],
+  zones: {
+    "header-capsule-1:right-brand": [
+      {
+        type: "HeaderBrandLogo",
+        props: {
+          id: "brand-logo-1",
+          brandText: "Axon | آکسون",
+          iconText: "▲"
+        }
+      }
+    ],
+    "header-capsule-1:center-menu": [
+      { type: "HeaderNavItem", props: { id: "nav-1", title: "کاتالوگ محصولات", url: "/products" } },
+      { type: "HeaderNavItem", props: { id: "nav-2", title: "اخبار تکنولوژی", url: "/news" } },
+      { type: "HeaderNavItem", props: { id: "nav-3", title: "مجله سئو", url: "/blog" } },
+      { type: "HeaderNavItem", props: { id: "nav-4", title: "پیگیری سفارش", url: "/track-order" } },
+      { type: "HeaderNavItem", props: { id: "nav-5", title: "تماس با ما", url: "/contact" } }
+    ],
+    "header-capsule-1:left-actions": [
+      {
+        type: "HeaderActionsGroup",
+        props: {
+          id: "actions-1",
+          showCart: true,
+          showTheme: true,
+          showUser: true
+        }
+      }
+    ]
+  },
   root: { props: { title: "صفحه اصلی" } }
 };
 
 export default function AdminModularPages() {
   const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
-  const [pageData, setPageData] = useState<Data>(DEFAULT_FULL_DATA);
+  const [pageData, setPageData] = useState<Data>(ATOMIC_INITIAL_DATA);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -700,10 +639,10 @@ export default function AdminModularPages() {
       if (json.success && json.page && json.page.puck_data && json.page.puck_data.content?.length > 0) {
         setPageData(json.page.puck_data);
       } else {
-        setPageData(DEFAULT_FULL_DATA);
+        setPageData(ATOMIC_INITIAL_DATA);
       }
     } catch {
-      setPageData(DEFAULT_FULL_DATA);
+      setPageData(ATOMIC_INITIAL_DATA);
     } finally {
       setLoading(false);
     }
@@ -731,7 +670,7 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToast("✓ تمام تغییرات اتمیک با موفقیت ذخیره و در سایت منتشر شد.");
+        setToast("✓ صفحه با موفقیت ذخیره شد و تغییرات اعمال گردید.");
       } else {
         setToast("خطا در ذخیره‌سازی.");
       }
@@ -747,7 +686,7 @@ export default function AdminModularPages() {
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]" dir="rtl">
       
-      {/* سربرگ کنترل صفحه ساز */}
+      {/* سربرگ استودیو */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
@@ -787,8 +726,8 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم تمام‌عرض ۱۰۰٪ آزاد Puck بدون فشرده‌سازی و بدون خطای لایه‌بندی */}
-      <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[850px]">
+      {/* بوم استاندارد با بزرگنمایی طبیعی ۱۰۰٪ و قابلیت درگ با ماوس */}
+      <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px]">
         {loading ? (
           <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
         ) : (
@@ -803,43 +742,10 @@ export default function AdminModularPages() {
   );
 }
 `;
-writeFile('components/admin/AdminModularPages.tsx', studioAtomicCode);
+writeFile('components/admin/AdminModularPages.tsx', studioAtomicLayoutCode);
 
 // =============================================================================
-// ۳. هوشمندسازی components/LayoutWrapper.tsx (حذف تکرار هدر و فوتر در صفحات Puck)
-// =============================================================================
-const smartLayoutWrapper = `"use client";
-
-import React, { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import CartDrawer from "@/components/CartDrawer";
-import AIAssistantChat from "@/components/AIAssistantChat";
-import MobileBottomNav from "@/components/MobileBottomNav";
-import TechRadarFeed from "@/components/TechRadarFeed";
-
-export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname() || "";
-  const isAdmin = pathname.startsWith("/admin");
-
-  return (
-    <div className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300">
-      {!isAdmin && <TechRadarFeed />}
-      {!isAdmin && <Header />}
-      <main className="flex-1 w-full">{children}</main>
-      {!isAdmin && <Footer />}
-      {!isAdmin && <MobileBottomNav />}
-      {!isAdmin && <AIAssistantChat />}
-      <CartDrawer />
-    </div>
-  );
-}
-`;
-writeFile('components/LayoutWrapper.tsx', smartLayoutWrapper);
-
-// =============================================================================
-// ۴. تست بیلد و دیپلوی مستقیم به ورسل
+// ۴. بیلد و ارسال به گیت‌هاب و استقرار ورسل
 // =============================================================================
 console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
@@ -854,7 +760,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(puck-atomic): full-featured atomic editor with array-based menu/slide/link management & full-width canvas"', { stdio: 'inherit' });
+  execSync('git commit -m "fix(header-alignment): correct left/right layout order and enable true granular mouse drag-and-drop with Puck DropZones"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -863,7 +769,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ ویرایشگر کامل با موفقیت در ورسل دیپلوی شد!\x1b[0m");
+  console.log("\x1b[32m✔ اصلاح چینش هدر و فعال‌سازی درگ با ماوس با موفقیت دیپلوی شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

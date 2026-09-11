@@ -51,20 +51,13 @@ export default function Header() {
   };
 
   const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
-  const navItems = siteInfo?.homepage_layout_config?.headerNavLinks || [
-    { title: "کاتالوگ محصولات", url: "/products" },
-    { title: "اخبار تکنولوژی", url: "/news" },
-    { title: "مجله سئو", url: "/blog" },
-    { title: "پیگیری سفارش", url: "/track-order" },
-    { title: "تماس با ما", url: "/contact" },
-  ];
 
   return (
-    <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="rtl">
-      <div className="flex items-center justify-between px-6 py-3 rounded-full bg-[var(--modal-bg,#ffffff)]/80 dark:bg-[#07090e]/80 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all">
+    <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="ltr">
+      <div className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all">
         
-        {/* ابزارهای سمت چپ (سبد خرید، تغییر تم، ورود کاربر) */}
-        <div className="flex items-center gap-2">
+        {/* سمت چپ مطلق: ابزارهای کاربری (سبد خرید، دارک‌مود، پروفایل) */}
+        <div className="flex items-center gap-2 order-1">
           <button
             type="button"
             onClick={() => { soundEngine.playClick(); toggleCart(); }}
@@ -91,27 +84,23 @@ export default function Header() {
           <Link
             href="/admin/login"
             className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer text-xs"
-            title="ورود به پنل"
+            title="ورود به حساب"
           >
             👤
           </Link>
         </div>
 
-        {/* منوهای ناوبری */}
-        <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-700 dark:text-slate-300">
-          {navItems.map((item: any, idx: number) => (
-            <Link
-              key={idx}
-              href={item.url || "/"}
-              className="hover:text-sky-500 transition cursor-pointer"
-            >
-              {item.title}
-            </Link>
-          ))}
+        {/* وسط: منوهای ناوبری فارسی */}
+        <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-700 dark:text-slate-300 order-2" dir="rtl">
+          <Link href="/products" className="hover:text-sky-500 transition cursor-pointer">کاتالوگ محصولات</Link>
+          <Link href="/news" className="hover:text-sky-500 transition cursor-pointer">اخبار تکنولوژی</Link>
+          <Link href="/blog" className="hover:text-sky-500 transition cursor-pointer">مجله سئو</Link>
+          <Link href="/track-order" className="hover:text-sky-500 transition cursor-pointer">پیگیری سفارش</Link>
+          <Link href="/contact" className="hover:text-sky-500 transition cursor-pointer">تماس با ما</Link>
         </nav>
 
-        {/* نام برند و آیکون اختصاصی */}
-        <Link href="/" className="flex items-center gap-3 group">
+        {/* سمت راست مطلق: نام و نشان اختصاصی برند آکسون */}
+        <Link href="/" className="flex items-center gap-3 group order-3" dir="rtl">
           <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition">
             {storeName}
           </span>

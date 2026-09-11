@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Phase 7: Blog & News SSR, Dynamic Metadata & Article Schema (fix.js)
+ * AXON CORE - Phase 8: Advanced Order Tracking System & Realtime Status (fix.js)
  */
 
 const fs = require('fs');
@@ -14,133 +14,181 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PHASE7]\x1b[0m پیاده‌سازی سئوی سروری برای بلاگ و اخبار...");
+console.log("\x1b[36m[AXON-PHASE8]\x1b[0m پیاده‌سازی سامانه پیشرفته رهگیری لحظه‌ای مرسولات...");
 
 // =============================================================================
-// ۱. تبدیل app/blog/[id]/page.tsx به Server Component واقعی با Schema.org
+// بازنویسی کامل app/track-order/page.tsx
 // =============================================================================
-const serverBlogPostPage = `import React from "react";
-import { notFound } from "next/navigation";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+const trackOrderPageCode = `"use client";
+
+import React, { useState, useEffect } from "react";
+import { soundEngine } from "@/lib/soundEngine";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+export default function TrackOrderPage() {
+  const searchParams = useSearchParams();
+  const initialOrderId = searchParams.get("orderId") || "";
 
-async function fetchBlogPost(idOrSlug: string) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("posts")
-      .select("*")
-      .or(\`id.eq.\${idOrSlug},slug.eq.\${idOrSlug}\`)
-      .maybeSingle();
+  const [query, setQuery] = useState(initialOrderId);
+  const [loading, setLoading] = useState(false);
+  const [orderResult, setOrderResult] = useState<any | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    if (!error && data) return data;
-  } catch {}
-  return null;
-}
+  const handleTrack = async (searchTarget?: string) => {
+    const target = (searchTarget !== undefined ? searchTarget : query).trim();
+    if (!target) return;
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const post = await fetchBlogPost(id);
+    soundEngine.playClick();
+    setLoading(true);
+    setErrorMessage(null);
+    setOrderResult(null);
 
-  if (!post) return { title: "مقاله یافت نشد | آکسون" };
+    try {
+      // جستجو در API فاکتورها
+      const res = await fetch(\`/api/orders/track?q=\${encodeURIComponent(target)}\`, { cache: "no-store" });
+      const json = await res.json();
 
-  const title = post.title || "مقاله تخصصی استودیو";
-  const desc = post.meta_description || post.metaDescription || post.content?.replace(/<[^>]*>?/gm, "").substring(0, 150) || "";
-  const image = post.image_url || post.imageUrl || "https://axoncore.ir/placeholder.png";
+      if (json.success && json.order) {
+        soundEngine.playSuccess();
+        setOrderResult(json.order);
+      } else {
+        // جستجو در حافظه محلی لوکال به عنوان فال‌بک
+        const localKeys = Object.keys(localStorage);
+        let foundLocal = null;
+        for (const k of localKeys) {
+          if (k.startsWith("fallback_order_") || k.includes("order")) {
+            try {
+              const val = JSON.parse(localStorage.getItem(k) || "{}");
+              if (String(val.id || "").includes(target) || String(val.phone || "").includes(target)) {
+                foundLocal = val;
+                break;
+              }
+            } catch {}
+          }
+        }
 
-  return {
-    title: \`\${title} | مجله سئو و تکنولوژی آکسون\`,
-    description: desc,
-    openGraph: {
-      title,
-      description: desc,
-      images: [{ url: image }],
-      type: "article",
-    },
-  };
-}
-
-export default async function BlogPostDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const post = await fetchBlogPost(id);
-
-  if (!post) notFound();
-
-  const title = post.title || "مقاله تخصصی";
-  const content = post.content || "";
-  const category = post.category || "مقاله تخصصی";
-  const imageUrl = post.image_url || post.imageUrl;
-  const createdAt = post.created_at || post.createdAt || new Date().toISOString();
-
-  const articleJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    "headline": title,
-    "image": imageUrl ? [imageUrl] : ["https://axoncore.ir/placeholder.png"],
-    "datePublished": createdAt,
-    "dateModified": createdAt,
-    "author": {
-      "@type": "Organization",
-      "name": "تیم مهندسی آکسون (Axon Core)"
+        if (foundLocal) {
+          soundEngine.playSuccess();
+          setOrderResult(foundLocal);
+        } else {
+          setErrorMessage("سفارشی با این مشخصات یا کد رهگیری در سیستم یافت نشد.");
+        }
+      }
+    } catch {
+      setErrorMessage("خطا در برقراری ارتباط با سرور رهگیری.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <article className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
-      />
+  useEffect(() => {
+    if (initialOrderId) {
+      setQuery(initialOrderId);
+      handleTrack(initialOrderId);
+    }
+  }, [initialOrderId]);
 
-      <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
-        <Link href="/" className="hover:text-[var(--accent-blue)]">فروشگاه</Link>
-        <span>/</span>
-        <Link href="/blog" className="hover:text-[var(--accent-blue)]">مجله مقالات</Link>
-        <span>/</span>
-        <span className="text-[var(--text-primary)] truncate max-w-xs">{title}</span>
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+      
+      <div className="text-center space-y-3">
+        <span className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] inline-block text-2xl shadow-sm">
+          📦
+        </span>
+        <h1 className="text-2xl md:text-3xl font-black">سامانه رهگیری لحظه‌ای مرسولات پستی و فاکتورها</h1>
+        <p className="text-xs text-[var(--text-secondary)] font-medium max-w-lg mx-auto leading-relaxed">
+          شماره سفارش، شماره موبایل یا کد رهگیری ۲۴ رقمی پست پیشتاز خود را جهت بررسی وضعیت ارسال وارد کنید
+        </p>
       </div>
 
-      <div className="p-6 sm:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
-        <div className="space-y-3 border-b border-[var(--card-border)] pb-6">
-          <div className="flex items-center justify-between text-xs font-bold">
-            <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20">
-              {category}
-            </span>
-            <span className="text-[var(--text-secondary)] font-mono">
-              📅 {new Date(createdAt).toLocaleDateString("fa-IR")}
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] leading-snug">{title}</h1>
-        </div>
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleTrack();
+          }}
+          className="flex flex-col sm:flex-row gap-3"
+        >
+          <input
+            type="text"
+            required
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="مثال: AX-589201 یا 09123456789 یا کد پستی..."
+            className="flex-1 p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] shadow-sm"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-8 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {loading ? "در حال جستجو..." : "استعلام وضعیت بسته 🔍"}
+          </button>
+        </form>
 
-        {imageUrl && (
-          <div className="w-full h-72 sm:h-96 rounded-3xl overflow-hidden bg-[var(--input-bg)] border border-[var(--card-border)] shadow-md">
-            <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+        {errorMessage && (
+          <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold text-center animate-fadeIn">
+            ⚠️ {errorMessage}
           </div>
         )}
 
-        <div className="text-sm leading-loose text-[var(--text-secondary)] font-medium space-y-4 text-justify whitespace-pre-line">
-          {content.replace(/<[^>]*>?/gm, "")}
-        </div>
+        {orderResult && (
+          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-6 animate-fadeIn text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
+              <div>
+                <span className="text-[var(--text-secondary)] font-bold block">شناسه فاکتور:</span>
+                <span className="font-mono font-black text-sm text-[var(--accent-blue)]">{orderResult.id || orderResult.order_number}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-secondary)] font-bold block">وضعیت سفارش:</span>
+                <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black text-[11px] border border-emerald-500/30">
+                  {orderResult.status === "shipped" ? "ارسال شده به پست 🚚" : orderResult.status === "paid" ? "پرداخت شده (آماده‌سازی استودیویی) ✓" : "در انتظار پردازش"}
+                </span>
+              </div>
+            </div>
 
-        <div className="pt-6 border-t border-[var(--card-border)] flex justify-between items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <span className="text-[var(--text-secondary)] font-bold">نام خریدار:</span>
+                <p className="font-black text-[var(--text-primary)]">{orderResult.customer_name || orderResult.customer?.fullName || "مشتری گرامی"}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[var(--text-secondary)] font-bold">شماره تماس:</span>
+                <p className="font-mono font-bold text-[var(--text-primary)]">{orderResult.phone || orderResult.customer?.phone}</p>
+              </div>
+              <div className="sm:col-span-2 space-y-1">
+                <span className="text-[var(--text-secondary)] font-bold">نشانی تحویل مرسوله:</span>
+                <p className="font-medium text-[var(--text-primary)] leading-relaxed">{orderResult.address || orderResult.customer?.address}</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
+              <span className="font-bold text-[var(--text-secondary)] block">کد رهگیری پست پیشتاز:</span>
+              <p className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
+                {orderResult.tracking_code || orderResult.trackingCode || "بارنامه شما پس از تحویل به پست در این بخش درج خواهد شد."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="pt-4 flex justify-end border-t border-[var(--card-border)]">
           <Link
-            href="/blog"
-            className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md"
+            href="/"
+            className="px-6 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition"
           >
-            ← بازگشت به آرشیو مقالات
+            ← بازگشت به صفحه نخست
           </Link>
         </div>
       </div>
-    </article>
+    </div>
   );
 }
 `;
-writeFile('app/blog/[id]/page.tsx', serverBlogPostPage);
+writeFile('app/track-order/page.tsx', trackOrderPageCode);
 
 // =============================================================================
-// ۲. بیلد نهایی پروژه و انتشار در Vercel
+// بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -155,7 +203,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(seo-blog): upgrade blog detail page to server component with metadata and Article schema.org"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(tracking): upgrade order tracking page with robust database and local fallback search"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -164,7 +212,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ سئوی سروری مقالات بلاگ با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ سامانه رهگیری سفارشات با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

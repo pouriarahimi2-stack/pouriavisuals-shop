@@ -1,193 +1,117 @@
-// File Path: app/blog/[id]/page.tsx
-"use client";
-
-import React, { useState, useEffect, use } from "react";
+import React from "react";
+import { notFound } from "next/navigation";
+import { supabaseAdmin } from "@/lib/supabaseServer";
 import Link from "next/link";
-import { productService, Product } from "@/services/productService";
-import ProductCard from "@/components/ProductCard";
-import TableOfContents from "@/components/TableOfContents";
 
-interface BlogPost {
-  id: string;
-  title: string;
-  metaDescription?: string;
-  content: string;
-  createdAt: string;
-  category?: string;
-  imageUrl?: string;
-  image_url?: string;
+export const dynamic = "force-dynamic";
+
+async function fetchBlogPost(idOrSlug: string) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("posts")
+      .select("*")
+      .or(`id.eq.${idOrSlug},slug.eq.${idOrSlug}`)
+      .maybeSingle();
+
+    if (!error && data) return data;
+  } catch {}
+  return null;
 }
 
-function sanitizeHtml(raw: string): string {
-  if (!raw) return "";
-  return raw
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/on\w+="[^"]*"/gi, "")
-    .replace(/javascript:[^"']*/gi, "");
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const post = await fetchBlogPost(id);
+
+  if (!post) return { title: "مقاله یافت نشد | آکسون" };
+
+  const title = post.title || "مقاله تخصصی استودیو";
+  const desc = post.meta_description || post.metaDescription || post.content?.replace(/<[^>]*>?/gm, "").substring(0, 150) || "";
+  const image = post.image_url || post.imageUrl || "https://axoncore.ir/placeholder.png";
+
+  return {
+    title: `${title} | مجله سئو و تکنولوژی آکسون`,
+    description: desc,
+    openGraph: {
+      title,
+      description: desc,
+      images: [{ url: image }],
+      type: "article",
+    },
+  };
 }
 
-export default function SingleBlogPostPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
+export default async function BlogPostDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const post = await fetchBlogPost(id);
 
-  const [post, setPost] = useState<BlogPost | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [scrollProgress, setScrollProgress] = useState(0);
+  if (!post) notFound();
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (totalHeight > 0) {
-        setScrollProgress((window.scrollY / totalHeight) * 100);
-      }
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const title = post.title || "مقاله تخصصی";
+  const content = post.content || "";
+  const category = post.category || "مقاله تخصصی";
+  const imageUrl = post.image_url || post.imageUrl;
+  const createdAt = post.created_at || post.createdAt || new Date().toISOString();
 
-  useEffect(() => {
-    async function loadPostAndRelated() {
-      setLoading(true);
-      try {
-        let found: BlogPost | null = null;
-
-        try {
-          const res = await fetch("/api/blogs");
-          const data = await res.json();
-          const allPosts = data.data || data.posts || [];
-          found = allPosts.find((p: any) => String(p.id) === String(id) || p.slug === id) || null;
-        } catch {}
-
-        if (!found && typeof window !== "undefined") {
-          const localBlogs: BlogPost[] = JSON.parse(
-            localStorage.getItem("site_blogs") || "[]"
-          );
-          found = localBlogs.find((p) => String(p.id) === String(id) || (p as any).slug === id) || null;
-        }
-
-        setPost(found);
-
-        const prods = await productService.getAll();
-        setRelatedProducts(prods.slice(0, 4));
-      } finally {
-        setLoading(false);
-      }
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": title,
+    "image": imageUrl ? [imageUrl] : ["https://axoncore.ir/placeholder.png"],
+    "datePublished": createdAt,
+    "dateModified": createdAt,
+    "author": {
+      "@type": "Organization",
+      "name": "تیم مهندسی آکسون (Axon Core)"
     }
-    loadPostAndRelated();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans space-y-3">
-        <div className="w-10 h-10 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری مقاله تخصصی...</p>
-      </div>
-    );
-  }
-
-  if (!post) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-24 text-center space-y-4 font-sans select-none" dir="rtl">
-        <div className="text-5xl">📄</div>
-        <h2 className="text-xl font-black text-[var(--text-primary)]">مقاله مورد نظر یافت نشد!</h2>
-        <Link
-          href="/blog"
-          className="inline-block px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-lg"
-        >
-          ← بازگشت به بخش مقالات
-        </Link>
-      </div>
-    );
-  }
-
-  const headerImage = post.imageUrl || post.image_url;
-  const safeContent = sanitizeHtml(post.content);
+  };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
-      <div
-        className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 z-50 transition-all duration-150"
-        style={{ width: `${scrollProgress}%` }}
+    <article className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
       />
 
-      <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-bold">
-        <Link href="/" className="hover:text-[var(--accent-blue)] transition">صفحه اصلی</Link>
+      <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
+        <Link href="/" className="hover:text-[var(--accent-blue)]">فروشگاه</Link>
         <span>/</span>
-        <Link href="/blog" className="hover:text-[var(--accent-blue)] transition">مجله تخصصی</Link>
+        <Link href="/blog" className="hover:text-[var(--accent-blue)]">مجله مقالات</Link>
         <span>/</span>
-        <span className="text-[var(--text-primary)] truncate max-w-xs">{post.title}</span>
+        <span className="text-[var(--text-primary)] truncate max-w-xs">{title}</span>
       </div>
 
-      <article className="p-6 md:p-12 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 backdrop-blur-2xl">
-        <header className="space-y-4 border-b border-[var(--card-border)] pb-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-            <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-black">
-              {post.category || "راهنمای تخصصی تکنولوژی"}
+      <div className="p-6 sm:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        <div className="space-y-3 border-b border-[var(--card-border)] pb-6">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20">
+              {category}
             </span>
-            <span className="font-mono text-[var(--text-secondary)] font-bold">
-              📅 انتشار: {post.createdAt ? new Date(post.createdAt).toLocaleDateString("fa-IR") : "امروز"}
+            <span className="text-[var(--text-secondary)] font-mono">
+              📅 {new Date(createdAt).toLocaleDateString("fa-IR")}
             </span>
           </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] leading-snug">{title}</h1>
+        </div>
 
-          <h1 className="text-2xl md:text-4xl font-black leading-snug text-[var(--text-primary)]">
-            {post.title}
-          </h1>
+        {imageUrl && (
+          <div className="w-full h-72 sm:h-96 rounded-3xl overflow-hidden bg-[var(--input-bg)] border border-[var(--card-border)] shadow-md">
+            <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+          </div>
+        )}
 
-          {headerImage && (
-            <div className="w-full h-80 md:h-[420px] rounded-3xl overflow-hidden bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
-              <img src={headerImage} alt={post.title} className="w-full h-full object-cover" />
-            </div>
-          )}
+        <div className="text-sm leading-loose text-[var(--text-secondary)] font-medium space-y-4 text-justify whitespace-pre-line">
+          {content.replace(/<[^>]*>?/gm, "")}
+        </div>
 
-          {post.metaDescription && (
-            <div className="text-xs md:text-sm text-[var(--text-secondary)] leading-relaxed font-medium bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
-              💡 {post.metaDescription}
-            </div>
-          )}
-        </header>
-
-        {/* فهرست خودکار سئو با اسکرول هوشمند */}
-        <TableOfContents contentHtml={safeContent} />
-
-        <div
-          dangerouslySetInnerHTML={{ __html: safeContent }}
-          className="blog-content prose prose-sm max-w-none text-xs md:text-sm leading-loose text-[var(--text-primary)] font-medium space-y-4 text-justify"
-        />
-
-        <footer className="pt-6 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-4">
+        <div className="pt-6 border-t border-[var(--card-border)] flex justify-between items-center">
           <Link
             href="/blog"
-            className="px-5 py-2.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition flex items-center gap-2"
+            className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md"
           >
-            <span>←</span>
-            <span>مشاهده سایر مقالات مجله</span>
+            ← بازگشت به آرشیو مقالات
           </Link>
-
-          <Link
-            href="/#products"
-            className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-lg flex items-center gap-2"
-          >
-            <span>🛍️</span>
-            <span>مشاهده کاتالوگ فروشگاه</span>
-          </Link>
-        </footer>
-      </article>
-
-      {relatedProducts.length > 0 && (
-        <section className="space-y-6">
-          <div className="flex justify-between items-center px-1">
-            <h3 className="text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
-              <span>💎</span> کالاهای مرتبط با این موضوع
-            </h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {relatedProducts.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
+        </div>
+      </div>
+    </article>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Phase 3 & 6: Product SSR, Real SEO Metadata & Schema (fix.js)
+ * AXON CORE - Phase 7: Blog & News SSR, Dynamic Metadata & Article Schema (fix.js)
  */
 
 const fs = require('fs');
@@ -14,203 +14,130 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PHASE3-6]\x1b[0m پیاده‌سازی سئوی سروری (SSR) برای محصولات و ساختار داده‌ای انبار...");
+console.log("\x1b[36m[AXON-PHASE7]\x1b[0m پیاده‌سازی سئوی سروری برای بلاگ و اخبار...");
 
 // =============================================================================
-// ۱. بازنویسی app/products/[id]/page.tsx به صورت Server Component با Metadata و Schema
+// ۱. تبدیل app/blog/[id]/page.tsx به Server Component واقعی با Schema.org
 // =============================================================================
-const serverProductDetailPage = `import React from "react";
+const serverBlogPostPage = `import React from "react";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
-import AddToCartButton from "@/components/AddToCartButton";
-import ProductExplodedView from "@/components/ProductExplodedView";
-import ColorGamutSimulator from "@/components/ColorGamutSimulator";
-import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
-import ProductReviews from "@/components/ProductReviews";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-async function fetchProductData(id: string) {
+async function fetchBlogPost(idOrSlug: string) {
   try {
     const { data, error } = await supabaseAdmin
-      .from("products")
+      .from("posts")
       .select("*")
-      .eq("id", id)
+      .or(\`id.eq.\${idOrSlug},slug.eq.\${idOrSlug}\`)
       .maybeSingle();
 
     if (!error && data) return data;
   } catch {}
-
-  const flagship = FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === String(id));
-  if (flagship) return flagship;
-
   return null;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const product = await fetchProductData(id);
+  const post = await fetchBlogPost(id);
 
-  if (!product) {
-    return { title: "کالا یافت نشد | آکسون" };
-  }
+  if (!post) return { title: "مقاله یافت نشد | آکسون" };
 
-  const title = product.title || product.name || "کالای تخصصی استودیو";
-  const desc = product.subtitle || product.short_description || product.description || "خرید تخصصی با گارانتی اصالت طلایی";
-  const image = product.images?.[0] || product.image || "https://axoncore.ir/placeholder.png";
+  const title = post.title || "مقاله تخصصی استودیو";
+  const desc = post.meta_description || post.metaDescription || post.content?.replace(/<[^>]*>?/gm, "").substring(0, 150) || "";
+  const image = post.image_url || post.imageUrl || "https://axoncore.ir/placeholder.png";
 
   return {
-    title: \`\${title} | خرید و قیمت در آکسون\`,
+    title: \`\${title} | مجله سئو و تکنولوژی آکسون\`,
     description: desc,
     openGraph: {
       title,
       description: desc,
       images: [{ url: image }],
-      type: "website",
+      type: "article",
     },
   };
 }
 
-export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BlogPostDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const product = await fetchProductData(id);
+  const post = await fetchBlogPost(id);
 
-  if (!product) {
-    notFound();
-  }
+  if (!post) notFound();
 
-  const title = product.title || product.name || "کالای دیجیتال استودیویی";
-  const price = Number(product.price || 0);
-  const discountPrice = product.discount_price || product.discountPrice ? Number(product.discount_price || product.discountPrice) : undefined;
-  const finalPrice = discountPrice && discountPrice > 0 ? discountPrice : price;
-  const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"];
-  const stock = product.stock !== undefined ? Number(product.stock) : 10;
-  const category = product.category || "تجهیزات تخصصی تصویر";
-  const desc = product.description || product.short_description || "تامین و کالیبراسیون تخصصی با ۱۸ ماه گارانتی اصالت طلایی.";
+  const title = post.title || "مقاله تخصصی";
+  const content = post.content || "";
+  const category = post.category || "مقاله تخصصی";
+  const imageUrl = post.image_url || post.imageUrl;
+  const createdAt = post.created_at || post.createdAt || new Date().toISOString();
 
-  // ساخت اسکیما (Structured Data) برای گوگل
-  const jsonLd = {
-    "@context": "https://schema.org/",
-    "@type": "Product",
-    "name": title,
-    "image": images,
-    "description": desc,
-    "brand": {
-      "@type": "Brand",
-      "name": "Apple / Axon Core"
-    },
-    "offers": {
-      "@type": "Offer",
-      "url": \`https://axoncore.ir/products/\${product.id}\`,
-      "priceCurrency": "IRR",
-      "price": finalPrice * 10, // تبدیل تومان به ریال برای استاندارد گوگل
-      "availability": stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": title,
+    "image": imageUrl ? [imageUrl] : ["https://axoncore.ir/placeholder.png"],
+    "datePublished": createdAt,
+    "dateModified": createdAt,
+    "author": {
+      "@type": "Organization",
+      "name": "تیم مهندسی آکسون (Axon Core)"
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-[var(--text-primary)] space-y-12" dir="rtl">
+    <article className="max-w-4xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
       />
 
-      {/* مسیر ناوبری (Breadcrumb) */}
       <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
         <Link href="/" className="hover:text-[var(--accent-blue)]">فروشگاه</Link>
         <span>/</span>
-        <Link href="/products" className="hover:text-[var(--accent-blue)]">کاتالوگ محصولات</Link>
+        <Link href="/blog" className="hover:text-[var(--accent-blue)]">مجله مقالات</Link>
         <span>/</span>
         <span className="text-[var(--text-primary)] truncate max-w-xs">{title}</span>
       </div>
 
-      {/* بخش اصلی معرفی کالا */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* گالری تصاویر */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="w-full h-[420px] sm:h-[500px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-xl p-4 flex items-center justify-center">
-            <img src={images[0]} alt={title} className="w-full h-full object-contain" />
-          </div>
-          {images.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {images.map((imgUrl: string, idx: number) => (
-                <div key={idx} className="w-20 h-20 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 shrink-0 overflow-hidden shadow-sm">
-                  <img src={imgUrl} alt="" className="w-full h-full object-contain" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* مشخصات و دکمه خرید */}
-        <div className="lg:col-span-5 p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
-          <div className="space-y-2">
-            <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 text-[11px] font-black inline-block">
+      <div className="p-6 sm:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        <div className="space-y-3 border-b border-[var(--card-border)] pb-6">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20">
               {category}
             </span>
-            <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] leading-tight">{title}</h1>
-            <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">{product.subtitle || "کالای استاندارد استودیویی"}</p>
+            <span className="text-[var(--text-secondary)] font-mono">
+              📅 {new Date(createdAt).toLocaleDateString("fa-IR")}
+            </span>
           </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] leading-snug">{title}</h1>
+        </div>
 
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-            <div className="flex justify-between items-center text-xs font-bold text-[var(--text-secondary)]">
-              <span>وضعیت انبار:</span>
-              <span className={stock > 0 ? "text-emerald-600 dark:text-emerald-400 font-black" : "text-rose-500 font-black"}>
-                {stock > 0 ? \`موجود در انبار (\${stock} عدد)\` : "ناموجود"}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between pt-2 border-t border-[var(--card-border)]">
-              <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت مصرف‌کننده:</span>
-              <div className="text-left font-mono">
-                {discountPrice && discountPrice < price && (
-                  <span className="text-xs text-slate-400 line-through block">{price.toLocaleString("fa-IR")} تومان</span>
-                )}
-                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-                  {finalPrice.toLocaleString("fa-IR")} <span className="text-xs">تومان</span>
-                </span>
-              </div>
-            </div>
+        {imageUrl && (
+          <div className="w-full h-72 sm:h-96 rounded-3xl overflow-hidden bg-[var(--input-bg)] border border-[var(--card-border)] shadow-md">
+            <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
           </div>
+        )}
 
-          <div className="pt-2">
-            <AddToCartButton
-              product={{
-                id: product.id,
-                title: title,
-                price: finalPrice,
-                image: images[0],
-                images: images,
-                stock: stock,
-                category: category
-              }}
-            />
-          </div>
+        <div className="text-sm leading-loose text-[var(--text-secondary)] font-medium space-y-4 text-justify whitespace-pre-line">
+          {content.replace(/<[^>]*>?/gm, "")}
+        </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--card-border)] text-[11px] font-bold text-[var(--text-secondary)]">
-            <div className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center">
-              🛡️ ۱۸ ماه گارانتی طلایی
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center">
-              🚀 ارسال پیشتاز سراسری
-            </div>
-          </div>
+        <div className="pt-6 border-t border-[var(--card-border)] flex justify-between items-center">
+          <Link
+            href="/blog"
+            className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md"
+          >
+            ← بازگشت به آرشیو مقالات
+          </Link>
         </div>
       </div>
-
-      {/* ماژول‌های پیشرفته (کالبدشکافی ۳D، شبیه‌ساز رنگ و مقایسه قیمت) */}
-      <div className="space-y-12 pt-6 border-t border-[var(--card-border)]">
-        <ProductExplodedView productTitle={title} productCategory={category} />
-        <ColorGamutSimulator productTitle={title} />
-        <LiveMarketArbitrage productTitle={title} currentPrice={finalPrice} />
-        <ProductReviews productId={String(product.id)} />
-      </div>
-    </div>
+    </article>
   );
 }
 `;
-writeFile('app/products/[id]/page.tsx', serverProductDetailPage);
+writeFile('app/blog/[id]/page.tsx', serverBlogPostPage);
 
 // =============================================================================
 // ۲. بیلد نهایی پروژه و انتشار در Vercel
@@ -228,7 +155,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "feat(seo-ssr): upgrade product detail page to server component with metadata, OpenGraph and schema.org"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(seo-blog): upgrade blog detail page to server component with metadata and Article schema.org"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -237,7 +164,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ ارتقای سئوی سروری محصولات با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ سئوی سروری مقالات بلاگ با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

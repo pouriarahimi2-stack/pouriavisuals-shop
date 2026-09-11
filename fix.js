@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Fix Suspense Boundary on /track-order (fix.js)
+ * AXON CORE - Step 10: Product Schema (JSON-LD), Sticky Mobile CTA & Rich Results (fix.js)
  */
 
 const fs = require('fs');
@@ -11,225 +11,226 @@ function writeFile(relPath, content) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ اصلاح شد: ${relPath}\x1b[0m`);
+  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-FIX]\x1b[0m افزودن Suspense Boundary به صفحه پیگیری سفارش (/track-order)...");
+console.log("\x1b[36m[STEP-10]\x1b[0m افزودن اسکیمای کامل Product و دکمه چسبان موبایل...");
 
 // =============================================================================
-// بازنویسی app/track-order/page.tsx با احاطه کامل در Suspense
+// بازنویسی app/products/[id]/page.tsx
 // =============================================================================
-const fixedTrackOrderPage = `"use client";
-
-import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+const productPageCode = `import React from "react";
+import { notFound } from "next/navigation";
 import Link from "next/link";
-import { soundEngine } from "@/lib/soundEngine";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
+import AddToCartButton from "@/components/AddToCartButton";
 import { formatPrice } from "@/lib/formatters";
+import type { Metadata } from "next";
 
-function TrackOrderContent() {
-  const searchParams = useSearchParams();
-  const initialOrderId = searchParams.get("orderId") || "";
-  const isSuccess = searchParams.get("success") === "true";
+export const dynamic = "force-dynamic";
 
-  const [query, setQuery] = useState(initialOrderId);
-  const [loading, setLoading] = useState(false);
-  const [order, setOrder] = useState<any>(null);
-  const [errorMessage, setErrorMessage] = useState("");
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  const searchOrder = async (targetQuery?: string) => {
-    const q = (targetQuery !== undefined ? targetQuery : query).trim();
-    if (!q) return;
+async function getProduct(id: string) {
+  try {
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
 
-    soundEngine.playClick();
-    setLoading(true);
-    setErrorMessage("");
-    setOrder(null);
-
-    try {
-      const res = await fetch(\`/api/orders/track?query=\${encodeURIComponent(q)}\`);
-      const data = await res.json();
-
-      if (res.ok && data.success && data.order) {
-        soundEngine.playSuccess();
-        setOrder(data.order);
-      } else {
-        setErrorMessage(data.message || "سفارشی با این کد رهگیری یا شماره تماس یافت نشد.");
-      }
-    } catch {
-      setErrorMessage("خطا در برقراری ارتباط با سرور پیگیری.");
-    } finally {
-      setLoading(false);
+      if (data) return data;
     }
+  } catch {}
+
+  return FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === String(id)) || null;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const product = await getProduct(id);
+
+  if (!product) {
+    return { title: "کالای مورد نظر یافت نشد | آکسون" };
+  }
+
+  const title = product.title || product.name || "محصول استودیویی آکسون";
+  const desc = product.meta_description || product.description?.slice(0, 150) || "مشخصات فنی، قیمت و خرید مانیتور و تجهیزات استودیویی در آکسون کور.";
+
+  return {
+    title: \`\${title} | نقد و بررسی و خرید با گارانتی اصالت\`,
+    description: desc,
+    alternates: {
+      canonical: \`https://axoncore.ir/products/\${id}\`,
+    },
+    openGraph: {
+      title,
+      description: desc,
+      url: \`https://axoncore.ir/products/\${id}\`,
+      images: [product.image_url || product.image || "https://axoncore.ir/placeholder.png"],
+    },
+  };
+}
+
+export default async function ProductDetailPage({ params }: PageProps) {
+  const { id } = await params;
+  const product = await getProduct(id);
+
+  if (!product) notFound();
+
+  const title = product.title || product.name || "کالای تخصصی";
+  const finalPrice = Number(product.discount_price || product.discountPrice || product.price || 0);
+  const basePrice = Number(product.price || 0);
+  const hasDiscount = Boolean(finalPrice > 0 && finalPrice < basePrice);
+  const imageUrl = product.image_url || product.image || (product.images && product.images[0]) || "https://axoncore.ir/placeholder.png";
+
+  // ساخت اسکیمای استاندارد Product گوگل
+  const productSchemaJsonLd = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": title,
+    "image": [imageUrl],
+    "description": product.description || "تجهیزات تخصصی و مانیتور تدوین استودیو با گارانتی اصالت طلایی",
+    "sku": product.sku || \`AXN-\${product.id}\`,
+    "brand": {
+      "@type": "Brand",
+      "name": product.brand || "Apple",
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": \`https://axoncore.ir/products/\${product.id}\`,
+      "priceCurrency": "IRR",
+      "price": finalPrice * 10, // تبدیل تومان به ریال برای گوگل
+      "availability": product.is_available !== false ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "itemCondition": "https://schema.org/NewCondition",
+    },
   };
 
-  useEffect(() => {
-    if (initialOrderId) {
-      searchOrder(initialOrderId);
-    }
-  }, [initialOrderId]);
-
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
-      <div className="text-center space-y-2">
-        <div className="w-14 h-14 mx-auto rounded-3xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] flex items-center justify-center text-2xl shadow-sm">
-          📦
+    <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchemaJsonLd) }}
+      />
+
+      <nav className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
+        <Link href="/" className="hover:text-[var(--accent-blue)]">خانه</Link>
+        <span>/</span>
+        <Link href="/products" className="hover:text-[var(--accent-blue)]">تجهیزات</Link>
+        <span>/</span>
+        <span className="text-[var(--text-primary)] truncate max-w-xs">{title}</span>
+      </nav>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
+        {/* گالری تصویر */}
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 shadow-xl flex items-center justify-center aspect-square overflow-hidden">
+          <img
+            src={imageUrl}
+            alt={title}
+            width={520}
+            height={520}
+            className="w-full h-full object-contain max-h-[420px] transition-transform duration-300 hover:scale-105"
+          />
         </div>
-        <h1 className="text-2xl font-black">سامانه هوشمند رهگیری و استعلام سفارشات</h1>
-        <p className="text-xs text-[var(--text-secondary)] font-medium">
-          شماره موبایل یا شناسه فاکتور (ORD-xxxx) را جهت مشاهده وضعیت بسته وارد نمایید
-        </p>
-      </div>
 
-      {isSuccess && (
-        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center animate-fadeIn">
-          ✓ پرداخت شما با موفقیت ثبت شد. اطلاعات فاکتور و مرسوله شما در کادر زیر قابل پیگیری است.
-        </div>
-      )}
+        {/* مشخصات و جعبه خرید */}
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-xs font-bold font-mono">
+              {product.category || "تجهیزات تخصصی تصویر"}
+            </span>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black leading-snug">
+              {title}
+            </h1>
+            {product.title_fa && (
+              <p className="text-xs text-[var(--text-secondary)] font-bold">{product.title_fa}</p>
+            )}
+          </div>
 
-      {/* فرم جستجو */}
-      <div className="p-3 sm:p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex gap-2">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && searchOrder()}
-          placeholder="مثال: ORD-123456 یا ۰۹۱۲۳۴۵۶۷۸۹..."
-          className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold font-mono outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-        />
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => searchOrder()}
-          className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50 shrink-0"
-        >
-          {loading ? "در حال استعلام..." : "رهگیری مرسوله 🔍"}
-        </button>
-      </div>
-
-      {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 text-xs font-bold text-center animate-fadeIn">
-          ⚠️ {errorMessage}
-        </div>
-      )}
-
-      {/* کارت نتایج سفارش */}
-      {order && (
-        <div className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 animate-fadeIn">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
-            <div>
-              <span className="text-[10px] text-[var(--text-secondary)] font-mono block">شناسه فاکتور رسمی:</span>
-              <h2 className="text-base font-mono font-black text-[var(--accent-blue)]">{order.order_number || order.id}</h2>
+          {/* کارت گارانتی و اصالت */}
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] block font-bold">🛡️ گارانتی محصول:</span>
+              <strong className="text-xs font-bold text-[var(--text-primary)]">{product.warranty || "۱۸ ماه گارانتی اصالت طلایی"}</strong>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={\`px-3 py-1 rounded-full text-xs font-black \${
-                order.status === "shipped" ? "bg-blue-500/15 text-blue-500 border border-blue-500/30" :
-                order.status === "paid" ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30" :
-                order.status === "delivered" ? "bg-purple-500/15 text-purple-500 border border-purple-500/30" :
-                order.status === "cancelled" ? "bg-rose-500/15 text-rose-500 border border-rose-500/30" :
-                "bg-amber-500/15 text-amber-500 border border-amber-500/30"
-              }\`}>
-                {order.status === "shipped" ? "ارسال به پست 🚚" :
-                 order.status === "paid" ? "پرداخت شده و آماده‌سازی ✓" :
-                 order.status === "delivered" ? "تحویل خریدار شد" :
-                 order.status === "cancelled" ? "لغو شده" : "در انتظار پرداخت"}
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] block font-bold">🚀 وضعیت ارسال:</span>
+              <strong className="text-xs font-bold text-emerald-600 dark:text-emerald-400">آماده تحویل به پست پیشتاز</strong>
+            </div>
+          </div>
+
+          {/* قیمت */}
+          <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت رسمی استودیو:</span>
+            <div className="flex flex-col items-end">
+              {hasDiscount && (
+                <span className="text-xs font-mono line-through text-slate-400" suppressHydrationWarning>
+                  {formatPrice(basePrice)} تومان
+                </span>
+              )}
+              <span className="text-lg sm:text-xl font-mono font-black text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
+                {formatPrice(finalPrice)} تومان
               </span>
             </div>
           </div>
 
-          {/* بارنامه پستی */}
-          {order.tracking_code ? (
-            <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/25 space-y-2">
-              <span className="text-[11px] font-bold text-blue-500 block">📮 کد رهگیری ۲۴ رقمی شرکت ملی پست:</span>
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-black text-sm text-[var(--text-primary)] tracking-widest">{order.tracking_code}</span>
-                <a
-                  href={\`https://tracking.post.ir/?id=\${order.tracking_code}\`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-[10px] font-bold hover:bg-blue-500 transition"
-                >
-                  رهگیری در سامانه پست ←
-                </a>
-              </div>
-            </div>
-          ) : (
-            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-medium">
-              مرسوله در حال حاضر در مرحله آماده‌سازی و بسته‌بندی ضدضربه استودیویی است و به محض تحویل به پست، کد ۲۴ رقمی پیامک خواهد شد.
-            </div>
-          )}
+          <AddToCartButton
+            product={{
+              id: product.id,
+              title,
+              price: finalPrice,
+              image: imageUrl,
+              images: [imageUrl],
+              stock: product.stock,
+              category: product.category,
+            }}
+          />
 
-          {/* مشخصات گیرنده */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-[10px] text-[var(--text-secondary)] font-bold block">تحویل‌گیرنده:</span>
-              <p className="font-black text-[var(--text-primary)]">{order.customer_name || "خریدار محترم"}</p>
-              <p className="font-mono text-[11px] text-[var(--text-secondary)]">{order.phone}</p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-[10px] text-[var(--text-secondary)] font-bold block">مبلغ فاکتور:</span>
-              <p className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
-                {formatPrice(order.final_amount || order.total_amount)} تومان
-              </p>
-              <p className="text-[10px] text-[var(--text-secondary)]">بسته‌بندی و ارسال پیشتاز: رایگان</p>
-            </div>
-
-            <div className="sm:col-span-2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-[10px] text-[var(--text-secondary)] font-bold block">نشانی تحویل مرسوله:</span>
-              <p className="text-[11px] text-[var(--text-primary)] leading-relaxed font-medium">
-                {order.address || \`استان \${order.province || ""}، شهر \${order.city || ""}\`}
-              </p>
-            </div>
+          {/* توضیحات */}
+          <div className="space-y-3 pt-4 border-t border-[var(--card-border)]">
+            <h3 className="font-black text-sm">توضیحات و مشخصات فنی</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium whitespace-pre-line text-justify">
+              {product.description || "این کالا منطبق با استانداردهای رتینا، پوشش رنگ DCI-P3 و کالیبراسیون سخت‌افزاری استودیوهای تدوین رنگ ارائه می‌گردد."}
+            </p>
           </div>
-
-          {/* اقلام خریداری‌شده */}
-          {Array.isArray(order.items) && order.items.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-[var(--card-border)]">
-              <span className="text-xs font-black block">اقلام این سفارش:</span>
-              <div className="space-y-2">
-                {order.items.map((it: any, idx: number) => (
-                  <div key={idx} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center text-xs">
-                    <span className="font-bold text-[var(--text-primary)]">{it.title || it.name} (×{it.quantity || 1})</span>
-                    <span className="font-mono font-black text-[var(--accent-blue)]" suppressHydrationWarning>
-                      {formatPrice(it.price * (it.quantity || 1))} ت
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-      )}
+      </div>
 
-      <div className="text-center pt-4">
-        <Link href="/" className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold transition">
-          ← بازگشت به صفحه نخست فروشگاه
-        </Link>
+      {/* نوار چسبان خرید سریع در پایین موبایل */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 p-3 bg-[var(--modal-bg)]/95 backdrop-blur-xl border-t border-[var(--card-border)] flex items-center justify-between gap-3">
+        <div className="overflow-hidden">
+          <span className="text-[11px] font-black truncate block max-w-[150px]">{title}</span>
+          <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
+            {formatPrice(finalPrice)} ت
+          </span>
+        </div>
+        <div className="w-44">
+          <AddToCartButton
+            product={{
+              id: product.id,
+              title,
+              price: finalPrice,
+              image: imageUrl,
+              images: [imageUrl],
+              stock: product.stock,
+              category: product.category,
+            }}
+            showCounter={false}
+          />
+        </div>
       </div>
     </div>
   );
 }
-
-export default function TrackOrderPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-[60vh] flex flex-col items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
-          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin mb-3" />
-          در حال آماده‌سازی سامانه رهگیری...
-        </div>
-      }
-    >
-      <TrackOrderContent />
-    </Suspense>
-  );
-}
 `;
-writeFile('app/track-order/page.tsx', fixedTrackOrderPage);
+writeFile('app/products/[id]/page.tsx', productPageCode);
 
 // =============================================================================
-// بیلد نهایی پروژه و انتشار در Vercel
+// بیلد و دیپلوی ورسل
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -244,7 +245,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و انتش
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "fix(track-order): wrap useSearchParams in Suspense boundary for Next.js 15 prerender compliance"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(seo-step10): add complete Product schema, dynamic canonical metadata, and sticky mobile purchase bar"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -253,7 +254,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه رهگیری اصلاح شد و پروژه با موفقیت در ورسل منتشر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ قدم دهم با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

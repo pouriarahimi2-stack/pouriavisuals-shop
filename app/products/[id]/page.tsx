@@ -1,189 +1,206 @@
 import React from "react";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
 import AddToCartButton from "@/components/AddToCartButton";
-import ProductExplodedView from "@/components/ProductExplodedView";
-import ColorGamutSimulator from "@/components/ColorGamutSimulator";
-import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
-import ProductReviews from "@/components/ProductReviews";
-import Link from "next/link";
+import { formatPrice } from "@/lib/formatters";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
-async function fetchProductData(id: string) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("products")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (!error && data) return data;
-  } catch {}
-
-  const flagship = FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === String(id));
-  if (flagship) return flagship;
-
-  return null;
+interface PageProps {
+  params: Promise<{ id: string }>;
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+async function getProduct(id: string) {
+  try {
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (data) return data;
+    }
+  } catch {}
+
+  return FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === String(id)) || null;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const product = await fetchProductData(id);
+  const product = await getProduct(id);
 
   if (!product) {
-    return { title: "کالا یافت نشد | آکسون" };
+    return { title: "کالای مورد نظر یافت نشد | آکسون" };
   }
 
-  const title = product.title || product.name || "کالای تخصصی استودیو";
-  const desc = product.subtitle || product.short_description || product.description || "خرید تخصصی با گارانتی اصالت طلایی";
-  const image = product.images?.[0] || product.image || "https://axoncore.ir/placeholder.png";
+  const title = product.title || product.name || "محصول استودیویی آکسون";
+  const desc = product.meta_description || product.description?.slice(0, 150) || "مشخصات فنی، قیمت و خرید مانیتور و تجهیزات استودیویی در آکسون کور.";
 
   return {
-    title: `${title} | خرید و قیمت در آکسون`,
+    title: `${title} | نقد و بررسی و خرید با گارانتی اصالت`,
     description: desc,
+    alternates: {
+      canonical: `https://axoncore.ir/products/${id}`,
+    },
     openGraph: {
       title,
       description: desc,
-      images: [{ url: image }],
-      type: "website",
+      url: `https://axoncore.ir/products/${id}`,
+      images: [product.image_url || product.image || "https://axoncore.ir/placeholder.png"],
     },
   };
 }
 
-export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const product = await fetchProductData(id);
+  const product = await getProduct(id);
 
-  if (!product) {
-    notFound();
-  }
+  if (!product) notFound();
 
-  const title = product.title || product.name || "کالای دیجیتال استودیویی";
-  const price = Number(product.price || 0);
-  const discountPrice = product.discount_price || product.discountPrice ? Number(product.discount_price || product.discountPrice) : undefined;
-  const finalPrice = discountPrice && discountPrice > 0 ? discountPrice : price;
-  const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"];
-  const stock = product.stock !== undefined ? Number(product.stock) : 10;
-  const category = product.category || "تجهیزات تخصصی تصویر";
-  const desc = product.description || product.short_description || "تامین و کالیبراسیون تخصصی با ۱۸ ماه گارانتی اصالت طلایی.";
+  const title = product.title || product.name || "کالای تخصصی";
+  const finalPrice = Number(product.discount_price || product.discountPrice || product.price || 0);
+  const basePrice = Number(product.price || 0);
+  const hasDiscount = Boolean(finalPrice > 0 && finalPrice < basePrice);
+  const imageUrl = product.image_url || product.image || (product.images && product.images[0]) || "https://axoncore.ir/placeholder.png";
 
-  // ساخت اسکیما (Structured Data) برای گوگل
-  const jsonLd = {
+  // ساخت اسکیمای استاندارد Product گوگل
+  const productSchemaJsonLd = {
     "@context": "https://schema.org/",
     "@type": "Product",
     "name": title,
-    "image": images,
-    "description": desc,
+    "image": [imageUrl],
+    "description": product.description || "تجهیزات تخصصی و مانیتور تدوین استودیو با گارانتی اصالت طلایی",
+    "sku": product.sku || `AXN-${product.id}`,
     "brand": {
       "@type": "Brand",
-      "name": "Apple / Axon Core"
+      "name": product.brand || "Apple",
     },
     "offers": {
       "@type": "Offer",
       "url": `https://axoncore.ir/products/${product.id}`,
       "priceCurrency": "IRR",
-      "price": finalPrice * 10, // تبدیل تومان به ریال برای استاندارد گوگل
-      "availability": stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
-    }
+      "price": finalPrice * 10, // تبدیل تومان به ریال برای گوگل
+      "availability": product.is_available !== false ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "itemCondition": "https://schema.org/NewCondition",
+    },
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-[var(--text-primary)] space-y-12" dir="rtl">
+    <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchemaJsonLd) }}
       />
 
-      {/* مسیر ناوبری (Breadcrumb) */}
-      <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
-        <Link href="/" className="hover:text-[var(--accent-blue)]">فروشگاه</Link>
+      <nav className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
+        <Link href="/" className="hover:text-[var(--accent-blue)]">خانه</Link>
         <span>/</span>
-        <Link href="/products" className="hover:text-[var(--accent-blue)]">کاتالوگ محصولات</Link>
+        <Link href="/products" className="hover:text-[var(--accent-blue)]">تجهیزات</Link>
         <span>/</span>
         <span className="text-[var(--text-primary)] truncate max-w-xs">{title}</span>
-      </div>
+      </nav>
 
-      {/* بخش اصلی معرفی کالا */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* گالری تصاویر */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="w-full h-[420px] sm:h-[500px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-xl p-4 flex items-center justify-center">
-            <img src={images[0]} alt={title} className="w-full h-full object-contain" />
-          </div>
-          {images.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {images.map((imgUrl: string, idx: number) => (
-                <div key={idx} className="w-20 h-20 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 shrink-0 overflow-hidden shadow-sm">
-                  <img src={imgUrl} alt="" className="w-full h-full object-contain" />
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
+        {/* گالری تصویر */}
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 shadow-xl flex items-center justify-center aspect-square overflow-hidden">
+          <img
+            src={imageUrl}
+            alt={title}
+            width={520}
+            height={520}
+            className="w-full h-full object-contain max-h-[420px] transition-transform duration-300 hover:scale-105"
+          />
         </div>
 
-        {/* مشخصات و دکمه خرید */}
-        <div className="lg:col-span-5 p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+        {/* مشخصات و جعبه خرید */}
+        <div className="space-y-6">
           <div className="space-y-2">
-            <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 text-[11px] font-black inline-block">
-              {category}
+            <span className="px-3 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-xs font-bold font-mono">
+              {product.category || "تجهیزات تخصصی تصویر"}
             </span>
-            <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] leading-tight">{title}</h1>
-            <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">{product.subtitle || "کالای استاندارد استودیویی"}</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black leading-snug">
+              {title}
+            </h1>
+            {product.title_fa && (
+              <p className="text-xs text-[var(--text-secondary)] font-bold">{product.title_fa}</p>
+            )}
           </div>
 
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-            <div className="flex justify-between items-center text-xs font-bold text-[var(--text-secondary)]">
-              <span>وضعیت انبار:</span>
-              <span className={stock > 0 ? "text-emerald-600 dark:text-emerald-400 font-black" : "text-rose-500 font-black"}>
-                {stock > 0 ? `موجود در انبار (${stock} عدد)` : "ناموجود"}
+          {/* کارت گارانتی و اصالت */}
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] block font-bold">🛡️ گارانتی محصول:</span>
+              <strong className="text-xs font-bold text-[var(--text-primary)]">{product.warranty || "۱۸ ماه گارانتی اصالت طلایی"}</strong>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] block font-bold">🚀 وضعیت ارسال:</span>
+              <strong className="text-xs font-bold text-emerald-600 dark:text-emerald-400">آماده تحویل به پست پیشتاز</strong>
+            </div>
+          </div>
+
+          {/* قیمت */}
+          <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت رسمی استودیو:</span>
+            <div className="flex flex-col items-end">
+              {hasDiscount && (
+                <span className="text-xs font-mono line-through text-slate-400" suppressHydrationWarning>
+                  {formatPrice(basePrice)} تومان
+                </span>
+              )}
+              <span className="text-lg sm:text-xl font-mono font-black text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
+                {formatPrice(finalPrice)} تومان
               </span>
             </div>
-            <div className="flex items-baseline justify-between pt-2 border-t border-[var(--card-border)]">
-              <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت مصرف‌کننده:</span>
-              <div className="text-left font-mono">
-                {discountPrice && discountPrice < price && (
-                  <span className="text-xs text-slate-400 line-through block">{price.toLocaleString("fa-IR")} تومان</span>
-                )}
-                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-                  {finalPrice.toLocaleString("fa-IR")} <span className="text-xs">تومان</span>
-                </span>
-              </div>
-            </div>
           </div>
 
-          <div className="pt-2">
-            <AddToCartButton
-              product={{
-                id: product.id,
-                title: title,
-                price: finalPrice,
-                image: images[0],
-                images: images,
-                stock: stock,
-                category: category
-              }}
-            />
-          </div>
+          <AddToCartButton
+            product={{
+              id: product.id,
+              title,
+              price: finalPrice,
+              image: imageUrl,
+              images: [imageUrl],
+              stock: product.stock,
+              category: product.category,
+            }}
+          />
 
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--card-border)] text-[11px] font-bold text-[var(--text-secondary)]">
-            <div className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center">
-              🛡️ ۱۸ ماه گارانتی طلایی
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center">
-              🚀 ارسال پیشتاز سراسری
-            </div>
+          {/* توضیحات */}
+          <div className="space-y-3 pt-4 border-t border-[var(--card-border)]">
+            <h3 className="font-black text-sm">توضیحات و مشخصات فنی</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium whitespace-pre-line text-justify">
+              {product.description || "این کالا منطبق با استانداردهای رتینا، پوشش رنگ DCI-P3 و کالیبراسیون سخت‌افزاری استودیوهای تدوین رنگ ارائه می‌گردد."}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* ماژول‌های پیشرفته (کالبدشکافی ۳D، شبیه‌ساز رنگ و مقایسه قیمت) */}
-      <div className="space-y-12 pt-6 border-t border-[var(--card-border)]">
-        <ProductExplodedView productTitle={title} productCategory={category} />
-        <ColorGamutSimulator productTitle={title} />
-        <LiveMarketArbitrage productTitle={title} currentPrice={finalPrice} />
-        <ProductReviews productId={String(product.id)} />
+      {/* نوار چسبان خرید سریع در پایین موبایل */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 p-3 bg-[var(--modal-bg)]/95 backdrop-blur-xl border-t border-[var(--card-border)] flex items-center justify-between gap-3">
+        <div className="overflow-hidden">
+          <span className="text-[11px] font-black truncate block max-w-[150px]">{title}</span>
+          <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
+            {formatPrice(finalPrice)} ت
+          </span>
+        </div>
+        <div className="w-44">
+          <AddToCartButton
+            product={{
+              id: product.id,
+              title,
+              price: finalPrice,
+              image: imageUrl,
+              images: [imageUrl],
+              stock: product.stock,
+              category: product.category,
+            }}
+            showCounter={false}
+          />
+        </div>
       </div>
     </div>
   );

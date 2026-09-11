@@ -1,56 +1,56 @@
 /**
- * AXON CORE - Phase 13: Clean up redundant local backups and optimize repository structure (fix.js)
+ * AXON CORE - Phase 14: Database-Based Rate Limiting & Abuse Protection (fix.js)
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-function deleteFolderRecursive(dirPath) {
-  if (fs.existsSync(dirPath)) {
-    fs.readdirSync(dirPath).forEach((file) => {
-      const curPath = path.join(dirPath, file);
-      if (fs.lstatSync(curPath).isDirectory()) {
-        deleteFolderRecursive(curPath);
-      } else {
-        fs.unlinkSync(curPath);
-      }
-    });
-    fs.rmdirSync(dirPath);
-    console.log(`\x1b[31m✖ حذف شد (پوشه زائد): ${dirPath}\x1b[0m`);
-  }
+function writeFile(relPath, content) {
+  const fullPath = path.join(process.cwd(), relPath);
+  const dir = path.dirname(fullPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
+  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PHASE13]\x1b[0m پاکسازی فایل‌ها و پوشه‌های پشتیبان محلی زائد...");
-
-// ۱. حذف پوشه ضمیمه بکاپ‌های قدیمی .axon-fix-backups
-const backupsDir = path.join(process.cwd(), '.axon-fix-backups');
-deleteFolderRecursive(backupsDir);
-
-// ۲. به‌روزرسانی .gitignore برای اطمینان از عدم بازگشت فایل‌های موقت
-const gitignorePath = path.join(process.cwd(), '.gitignore');
-let gitignoreContent = "";
-if (fs.existsSync(gitignorePath)) {
-  gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-}
-
-const additions = [".axon-fix-backups", "fix.js", "repomix-output.xml", ".DS_Store"];
-let updated = false;
-
-additions.forEach((item) => {
-  if (!gitignoreContent.includes(item)) {
-    gitignoreContent += `\n${item}`;
-    updated = true;
-  }
-});
-
-if (updated) {
-  fs.writeFileSync(gitignorePath, gitignoreContent.trim() + '\n', 'utf8');
-  console.log("\x1b[32m✔ فایل .gitignore به‌روزرسانی شد.\x1b[0m");
-}
+console.log("\x1b[36m[AXON-PHASE14]\x1b[0m پیاده‌سازی Rate Limiting مبتنی بر پایگاه داده...");
 
 // =============================================================================
-// تست بیلد نهایی پروژه و انتشار در Vercel
+// ۱. ساخت ابزار lib/rateLimiter.ts
+// =============================================================================
+const rateLimiterCode = `/**
+ * AXON CORE - Database-Backed Rate Limiting Guard
+ */
+
+import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export async function checkRateLimit(identifier: string, maxAttempts: number = 5, windowMinutes: number = 10): Promise<boolean> {
+  try {
+    const now = new Date();
+    const windowAgo = new Date(now.getTime() - windowMinutes * 60 * 1000).toISOString();
+
+    // بررسی تعداد درخواست‌ها در بازه زمانی مشخص
+    const { count, error } = await supabaseAdmin
+      .from("contact_messages") // یا جدول لاگ عمومی درخواست‌ها
+      .select("*", { count: "exact", head: true })
+      .eq("phone", identifier)
+      .gte("created_at", windowAgo);
+
+    if (error) {
+      return true; // در صورت خطای دیتابیس به صورت پیش‌فرض اجازه دسترسی می‌دهیم تا اختلالی ایجاد نشود
+    }
+
+    return (count || 0) < maxAttempts;
+  } catch {
+    return true;
+  }
+}
+`;
+writeFile('lib/rateLimiter.ts', rateLimiterCode);
+
+// =============================================================================
+// ۲. بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -65,7 +65,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "refactor(cleanup): remove redundant local backup trees and harden gitignore rules"', { stdio: 'inherit' });
+  execSync('git commit -m "security(rate-limit): implement database-backed rate limiting guard for serverless resilience"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -74,7 +74,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ پاکسازی ساختار مخزن با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ لایه Rate Limiting پایگاه‌داده با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

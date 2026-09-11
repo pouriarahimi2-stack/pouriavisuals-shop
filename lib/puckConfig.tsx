@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import type { Config } from "@measured/puck";
-import { DropZone } from "@measured/puck";
 import Link from "next/link";
 import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
 import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
@@ -14,36 +13,33 @@ export type ComponentProps = {
     logoUrl: string;
     logoWidth: number;
     logoHeight: number;
-    capsuleBg: string;
-    capsuleBorder: string;
-    paddingY: number;
-  };
-  HeaderNavItem: {
-    title: string;
-    url: string;
-    textColor: string;
-    badgeText: string;
-  };
-  HeaderActionsGroup: {
+    menu1Text: string;
+    menu1Url: string;
+    menu2Text: string;
+    menu2Url: string;
+    menu3Text: string;
+    menu3Url: string;
+    menu4Text: string;
+    menu4Url: string;
+    menu5Text: string;
+    menu5Url: string;
     showCart: boolean;
     showTheme: boolean;
     showUser: boolean;
-    iconBgColor: string;
+    capsuleBg: string;
+    capsuleBorder: string;
   };
   NativeHero3D: {
     topBadge: string;
     badgeColor: string;
     title: string;
+    titleSize: number;
     subtitle: string;
     bgColor: string;
-    titleSize: number;
-    paddingTop: number;
-    paddingBottom: number;
   };
   NativePerspectiveSlider: {
     sectionTitle: string;
     sectionSubtitle: string;
-    paddingY: number;
   };
   NativeProductCatalog: {
     heading: string;
@@ -81,149 +77,129 @@ function PuckProductListWrapper({ limit }: { limit?: number }) {
 
 export const puckConfig: Config<ComponentProps> = {
   categories: {
-    header_elements: {
-      title: "🧭 ناوبری و هدر با کنترل لوگو",
-      components: ["HeaderCapsuleBar", "HeaderNavItem", "HeaderActionsGroup"]
+    navigation: {
+      title: "🧭 ناوبری هدر و فوتر",
+      components: ["HeaderCapsuleBar", "GlobalFooterBlock"]
     },
     sections: {
       title: "⭐ بدنه صفحه و کاتالوگ",
       components: ["NativeHero3D", "NativePerspectiveSlider", "NativeProductCatalog", "NativeExplodedView"]
-    },
-    footer_elements: {
-      title: "⚓ فوتر با لوگوی اختصاصی و تماس",
-      components: ["GlobalFooterBlock"]
     }
   },
   components: {
     HeaderCapsuleBar: {
-      label: "هدر کپسولی (لوگو، ابعاد و استایل)",
+      label: "هدر کپسولی (کنترل تمام منوها، لوگو و دکمه‌ها)",
       fields: {
         brandText: { type: "text", label: "نام برند" },
-        logoUrl: { type: "text", label: "آدرس تصویر لوگوی هدر (URL)" },
+        logoUrl: { type: "text", label: "آدرس تصویر لوگو (URL)" },
         logoWidth: { type: "number", label: "عرض لوگو (px)" },
         logoHeight: { type: "number", label: "ارتفاع لوگو (px)" },
+        menu1Text: { type: "text", label: "منو ۱: عنوان" },
+        menu1Url: { type: "text", label: "منو ۱: لینک" },
+        menu2Text: { type: "text", label: "منو ۲: عنوان" },
+        menu2Url: { type: "text", label: "منو ۲: لینک" },
+        menu3Text: { type: "text", label: "منو ۳: عنوان" },
+        menu3Url: { type: "text", label: "منو ۳: لینک" },
+        menu4Text: { type: "text", label: "منو ۴: عنوان" },
+        menu4Url: { type: "text", label: "منو ۴: لینک" },
+        menu5Text: { type: "text", label: "منو ۵: عنوان" },
+        menu5Url: { type: "text", label: "منو ۵: لینک" },
+        showCart: {
+          type: "radio",
+          label: "آیکون سبد خرید",
+          options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
+        },
+        showTheme: {
+          type: "radio",
+          label: "آیکون تغییر تم",
+          options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
+        },
+        showUser: {
+          type: "radio",
+          label: "آیکون پروفایل",
+          options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
+        },
         capsuleBg: { type: "text", label: "رنگ پس‌زمینه کپسول" },
-        capsuleBorder: { type: "text", label: "رنگ مرز دور کپسول" },
-        paddingY: { type: "number", label: "فاصله عمودی (px)" }
+        capsuleBorder: { type: "text", label: "رنگ کادر کپسول" }
       },
       defaultProps: {
         brandText: "Axon | آکسون",
         logoUrl: "",
         logoWidth: 36,
         logoHeight: 36,
-        capsuleBg: "rgba(7, 9, 14, 0.9)",
-        capsuleBorder: "rgba(255, 255, 255, 0.12)",
-        paddingY: 10
-      },
-      render: ({ brandText, logoUrl, logoWidth, logoHeight, capsuleBg, capsuleBorder, paddingY }) => (
-        <header style={{ paddingTop: `${paddingY || 10}px`, paddingBottom: `${paddingY || 10}px` }} className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 select-none font-sans" dir="ltr">
-          <div
-            style={{ backgroundColor: capsuleBg || "rgba(7, 9, 14, 0.9)", borderColor: capsuleBorder || "rgba(255, 255, 255, 0.12)" }}
-            className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all"
-          >
-            {/* سمت چپ: آیکون‌ها */}
-            <div className="flex items-center gap-2 order-1">
-              <DropZone zone="left-actions" />
-            </div>
-
-            {/* وسط: منوهای ناوبری */}
-            <nav className="flex items-center gap-6 text-xs font-black text-slate-300 order-2" dir="rtl">
-              <DropZone zone="center-menu" />
-            </nav>
-
-            {/* سمت راست: نام و لوگوی قابل تنظیم هدر */}
-            <Link href="/" className="flex items-center gap-3 order-3" dir="rtl">
-              <span className="font-black text-base tracking-tight text-white">{brandText || "Axon | آکسون"}</span>
-              <div
-                style={{ width: `${logoWidth || 36}px`, height: `${logoHeight || 36}px` }}
-                className="rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0"
-              >
-                {logoUrl ? (
-                  <img src={logoUrl} alt="" className="w-full h-full object-contain" />
-                ) : (
-                  <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
-                    ▲
-                  </div>
-                )}
-              </div>
-            </Link>
-          </div>
-        </header>
-      )
-    },
-
-    HeaderNavItem: {
-      label: "آیتم منو با بج و رنگ",
-      fields: {
-        title: { type: "text", label: "عنوان منو" },
-        url: { type: "text", label: "لینک منو" },
-        textColor: { type: "text", label: "رنگ متن" },
-        badgeText: { type: "text", label: "بج کوچک کنار منو (اختیاری)" }
-      },
-      defaultProps: {
-        title: "کاتالوگ محصولات",
-        url: "/products",
-        textColor: "#ffffff",
-        badgeText: ""
-      },
-      render: ({ title, url, textColor, badgeText }) => (
-        <Link href={url || "#"} style={{ color: textColor || "#fff" }} className="hover:text-sky-400 transition cursor-pointer px-2 py-1 rounded-lg hover:bg-white/5 flex items-center gap-1.5">
-          <span>{title}</span>
-          {badgeText && (
-            <span className="px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[9px] font-bold border border-rose-500/30">
-              {badgeText}
-            </span>
-          )}
-        </Link>
-      )
-    },
-
-    HeaderActionsGroup: {
-      label: "دکمه‌های کاربری هدر",
-      fields: {
-        showCart: { type: "radio", label: "سبد خرید", options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }] },
-        showTheme: { type: "radio", label: "تم شب/روز", options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }] },
-        showUser: { type: "radio", label: "پروفایل", options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }] },
-        iconBgColor: { type: "text", label: "رنگ پس‌زمینه دکمه‌ها" }
-      },
-      defaultProps: {
+        menu1Text: "کاتالوگ محصولات",
+        menu1Url: "/products",
+        menu2Text: "اخبار تکنولوژی",
+        menu2Url: "/news",
+        menu3Text: "مجله سئو",
+        menu3Url: "/blog",
+        menu4Text: "پیگیری سفارش",
+        menu4Url: "/track-order",
+        menu5Text: "تماس با ما",
+        menu5Url: "/contact",
         showCart: true,
         showTheme: true,
         showUser: true,
-        iconBgColor: "rgba(255, 255, 255, 0.08)"
+        capsuleBg: "rgba(7, 9, 14, 0.9)",
+        capsuleBorder: "rgba(255, 255, 255, 0.12)"
       },
-      render: ({ showCart, showTheme, showUser, iconBgColor }) => (
-        <div className="flex items-center gap-2">
-          {showCart && (
-            <span style={{ backgroundColor: iconBgColor || "rgba(255, 255, 255, 0.08)" }} className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-xs text-white">
-              🛒
-            </span>
-          )}
-          {showTheme && (
-            <span style={{ backgroundColor: iconBgColor || "rgba(255, 255, 255, 0.08)" }} className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-xs text-white">
-              🌙
-            </span>
-          )}
-          {showUser && (
-            <span style={{ backgroundColor: iconBgColor || "rgba(255, 255, 255, 0.08)" }} className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-xs text-white">
-              👤
-            </span>
-          )}
-        </div>
-      )
+      render: ({
+        brandText, logoUrl, logoWidth, logoHeight,
+        menu1Text, menu1Url, menu2Text, menu2Url, menu3Text, menu3Url, menu4Text, menu4Url, menu5Text, menu5Url,
+        showCart, showTheme, showUser, capsuleBg, capsuleBorder
+      }) => {
+        const w = Number(logoWidth) || 36;
+        const h = Number(logoHeight) || 36;
+        return (
+          <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 my-2 select-none font-sans" dir="ltr">
+            <div
+              style={{ backgroundColor: capsuleBg || "rgba(7, 9, 14, 0.9)", borderColor: capsuleBorder || "rgba(255, 255, 255, 0.12)" }}
+              className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all"
+            >
+              <div className="flex items-center gap-2 order-1">
+                {showCart && <span className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200">🛒</span>}
+                {showTheme && <span className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200">🌙</span>}
+                {showUser && <span className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200">👤</span>}
+              </div>
+
+              <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-300 order-2" dir="rtl">
+                {menu1Text && <Link href={menu1Url || "/products"} className="hover:text-sky-400 transition">{menu1Text}</Link>}
+                {menu2Text && <Link href={menu2Url || "/news"} className="hover:text-sky-400 transition">{menu2Text}</Link>}
+                {menu3Text && <Link href={menu3Url || "/blog"} className="hover:text-sky-400 transition">{menu3Text}</Link>}
+                {menu4Text && <Link href={menu4Url || "/track-order"} className="hover:text-sky-400 transition">{menu4Text}</Link>}
+                {menu5Text && <Link href={menu5Url || "/contact"} className="hover:text-sky-400 transition">{menu5Text}</Link>}
+              </nav>
+
+              <div className="flex items-center gap-3 order-3" dir="rtl">
+                <span className="font-black text-base sm:text-lg tracking-tight text-white">{brandText || "Axon | آکسون"}</span>
+                <div
+                  style={{ width: w + "px", height: h + "px" }}
+                  className="rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0"
+                >
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  ) : (
+                    <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
+                      ▲
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </header>
+        );
+      }
     },
 
     NativeHero3D: {
-      label: "هیرو ۳D (تنظیم فونت، پدینگ و رنگ)",
+      label: "هیرو ۳D اصلی سایت",
       fields: {
         topBadge: { type: "text", label: "متن برچسب بالا" },
         badgeColor: { type: "text", label: "رنگ برچسب" },
         title: { type: "text", label: "تیتر اصلی هیرو" },
         titleSize: { type: "number", label: "اندازه تیتر اصلی (px)" },
         subtitle: { type: "textarea", label: "متن توضیحات زیرعنوان" },
-        bgColor: { type: "text", label: "رنگ پس‌زمینه بخش" },
-        paddingTop: { type: "number", label: "فاصله از بالا (px)" },
-        paddingBottom: { type: "number", label: "فاصله از پایین (px)" }
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" }
       },
       defaultProps: {
         topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
@@ -231,23 +207,17 @@ export const puckConfig: Config<ComponentProps> = {
         title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
         titleSize: 42,
         subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
-        bgColor: "transparent",
-        paddingTop: 40,
-        paddingBottom: 20
+        bgColor: "transparent"
       },
-      render: ({ topBadge, badgeColor, title, titleSize, subtitle, bgColor, paddingTop, paddingBottom }) => (
-        <section
-          style={{ backgroundColor: bgColor || "transparent", paddingTop: `${paddingTop || 40}px`, paddingBottom: `${paddingBottom || 20}px` }}
-          className="w-full relative overflow-hidden select-none font-sans text-white text-center"
-          dir="rtl"
-        >
+      render: ({ topBadge, badgeColor, title, titleSize, subtitle, bgColor }) => (
+        <section style={{ backgroundColor: bgColor || "transparent" }} className="w-full relative overflow-hidden select-none font-sans text-white text-center py-6" dir="rtl">
           <div className="max-w-4xl mx-auto space-y-4 px-4 relative z-10">
             {topBadge && (
               <span style={{ color: badgeColor || "#38bdf8" }} className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-xs font-black inline-block">
                 {topBadge}
               </span>
             )}
-            <h1 style={{ fontSize: `${titleSize || 42}px` }} className="font-black leading-tight text-white">
+            <h1 style={{ fontSize: (titleSize || 42) + "px" }} className="font-black leading-tight text-white">
               {title}
             </h1>
             {subtitle && (
@@ -267,16 +237,14 @@ export const puckConfig: Config<ComponentProps> = {
       label: "اسلایدر پرسپکتیو بنرها",
       fields: {
         sectionTitle: { type: "text", label: "تیتر بخش" },
-        sectionSubtitle: { type: "text", label: "زیرعنوان بخش" },
-        paddingY: { type: "number", label: "فاصله عمودی (px)" }
+        sectionSubtitle: { type: "text", label: "زیرعنوان بخش" }
       },
       defaultProps: {
         sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-        sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی",
-        paddingY: 20
+        sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی"
       },
-      render: ({ sectionTitle, sectionSubtitle, paddingY }) => (
-        <div style={{ paddingTop: `${paddingY || 20}px`, paddingBottom: `${paddingY || 20}px` }} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+      render: ({ sectionTitle, sectionSubtitle }) => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
           <ProductPerspectiveSlider customTitle={sectionTitle} customSubtitle={sectionSubtitle} />
         </div>
       )
@@ -291,11 +259,11 @@ export const puckConfig: Config<ComponentProps> = {
       },
       defaultProps: {
         heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
-        subtitle: "تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند",
+        subtitle: "تمامی کالاها با گارانتی اصالت طلایی عرضه می‌شوند",
         limit: 8
       },
       render: ({ limit }) => (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
           <PuckProductListWrapper limit={limit} />
         </div>
       )
@@ -312,14 +280,14 @@ export const puckConfig: Config<ComponentProps> = {
         sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری"
       },
       render: ({ productTitle }) => (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
           <ProductExplodedView productTitle={productTitle || "Apple Studio Display 5K"} />
         </div>
       )
     },
 
     GlobalFooterBlock: {
-      label: "فوتر با لوگوی اختصاصی، تماس و اینماد",
+      label: "فوتر ۴ ستونه کامل و سازمانی",
       fields: {
         footerLogoUrl: { type: "text", label: "آدرس تصویر لوگوی فوتر (URL)" },
         brandTitle: { type: "text", label: "تیتر برند در فوتر" },
@@ -329,7 +297,7 @@ export const puckConfig: Config<ComponentProps> = {
         supportEmail: { type: "text", label: "پست الکترونیک" },
         warehouseAddress: { type: "text", label: "نشانی انبار" },
         workingHours: { type: "text", label: "ساعات پاسخگویی" },
-        enamadCode: { type: "text", label: "کد نماد اعتماد (اینماد)" },
+        enamadCode: { type: "text", label: "کد اینماد" },
         copyrightText: { type: "text", label: "متن کپی‌رایت" },
         footerBg: { type: "text", label: "رنگ پس‌زمینه فوتر" }
       },
@@ -350,7 +318,6 @@ export const puckConfig: Config<ComponentProps> = {
         <footer style={{ backgroundColor: footerBg || "#07090e" }} className="w-full border-t border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans select-none text-white mt-16" dir="rtl">
           <div className="max-w-7xl mx-auto space-y-12">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
-              
               <div className="lg:col-span-4 space-y-6">
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
@@ -368,7 +335,6 @@ export const puckConfig: Config<ComponentProps> = {
                   <p className="text-xs font-bold text-sky-400">{brandSubtitle}</p>
                   <p className="text-xs text-slate-400 leading-relaxed pt-1">{brandDesc}</p>
                 </div>
-
                 <div className="flex flex-wrap gap-2 pt-1">
                   <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-black">
                     ✓ گارانتی اصالت ۱۰۰٪ فیزیکی
@@ -376,17 +342,6 @@ export const puckConfig: Config<ComponentProps> = {
                   <span className="px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[11px] font-black">
                     🚀 ارسال پیشتاز سراسری
                   </span>
-                </div>
-
-                <div className="pt-3 space-y-2">
-                  <span className="text-[11px] font-bold text-slate-400">شبکه‌های ارتباطی استودیو:</span>
-                  <div className="p-3 rounded-3xl bg-slate-900 text-white flex items-center justify-center gap-2 shadow-2xl" dir="ltr">
-                    {["C", "O", "N", "T", "A", "C", "T"].map((k, i) => (
-                      <div key={i} className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-mono font-black text-xs shadow-inner">
-                        {k}
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
 
@@ -443,7 +398,6 @@ export const puckConfig: Config<ComponentProps> = {
                   </div>
                 </div>
               </div>
-
             </div>
 
             <div className="pt-8 border-t border-white/10 flex justify-between text-xs font-bold text-slate-500">

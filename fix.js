@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Fix Logo Dimensions Persistence on Refresh (fix.js)
+ * AXON CORE - Commit & Deploy Flat In-Canvas Header Controls (fix.js)
  */
 
 const fs = require('fs');
@@ -14,81 +14,315 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PERSISTENCE-FIX]\x1b[0m تضمین ذخیره دائمی ابعاد لوگو پس از رفرش در دیتابیس و استیت ادمین...");
+console.log("\x1b[36m[AXON-DEPLOY]\x1b[0m استقرار فیلدهای کامل هدر و رفع نهایی ویرایشگر...");
 
 // =============================================================================
-// ۱. بازنویسی components/admin/AdminModularPages.tsx با نگه‌داری پایدار مقادیر
+// ۱. بازنویسی کامل lib/puckConfig.tsx با فیلدهای تک‌تک ۵ منو، لوگو و دکمه‌ها
 // =============================================================================
-const persistentAdminModularPages = `"use client";
-
-import React, { useState, useEffect } from "react";
-import { Puck, Data } from "@measured/puck";
-import "@measured/puck/puck.css";
-import { puckConfig } from "@/lib/puckConfig";
-import { soundEngine } from "@/lib/soundEngine";
-import { supabase } from "@/lib/supabase";
-import { siteInfoService } from "@/services/siteInfoService";
+const puckConfigContent = `import React, { useState, useEffect } from "react";
+import type { Config } from "@measured/puck";
 import Link from "next/link";
+import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
+import ProductList from "@/components/ProductList";
+import ProductExplodedView from "@/components/ProductExplodedView";
+import { productService, Product } from "@/services/productService";
 
-const BASE_INITIAL_DATA: Data = {
-  content: [
-    {
-      type: "HeaderCapsuleBar",
-      props: {
-        id: "header-capsule-1",
+export type ComponentProps = {
+  HeaderCapsuleBar: {
+    brandText: string;
+    logoUrl: string;
+    logoWidth: number;
+    logoHeight: number;
+    menu1Text: string;
+    menu1Url: string;
+    menu2Text: string;
+    menu2Url: string;
+    menu3Text: string;
+    menu3Url: string;
+    menu4Text: string;
+    menu4Url: string;
+    menu5Text: string;
+    menu5Url: string;
+    showCart: boolean;
+    showTheme: boolean;
+    showUser: boolean;
+    capsuleBg: string;
+    capsuleBorder: string;
+  };
+  NativeHero3D: {
+    topBadge: string;
+    badgeColor: string;
+    title: string;
+    titleSize: number;
+    subtitle: string;
+    bgColor: string;
+  };
+  NativePerspectiveSlider: {
+    sectionTitle: string;
+    sectionSubtitle: string;
+  };
+  NativeProductCatalog: {
+    heading: string;
+    subtitle: string;
+    limit: number;
+  };
+  NativeExplodedView: {
+    productTitle: string;
+    sectionTitle: string;
+  };
+  GlobalFooterBlock: {
+    footerLogoUrl: string;
+    brandTitle: string;
+    brandSubtitle: string;
+    brandDesc: string;
+    supportPhone: string;
+    supportEmail: string;
+    warehouseAddress: string;
+    workingHours: string;
+    enamadCode: string;
+    copyrightText: string;
+    footerBg: string;
+  };
+};
+
+function PuckProductListWrapper({ limit }: { limit?: number }) {
+  const [products, setProducts] = useState<Product[]>([]);
+  useEffect(() => {
+    productService.getAll().then((data) => {
+      if (data) setProducts(limit ? data.slice(0, limit) : data);
+    });
+  }, [limit]);
+  return <ProductList initialProducts={products} />;
+}
+
+export const puckConfig: Config<ComponentProps> = {
+  categories: {
+    navigation: {
+      title: "🧭 ناوبری هدر و فوتر",
+      components: ["HeaderCapsuleBar", "GlobalFooterBlock"]
+    },
+    sections: {
+      title: "⭐ بدنه صفحه و کاتالوگ",
+      components: ["NativeHero3D", "NativePerspectiveSlider", "NativeProductCatalog", "NativeExplodedView"]
+    }
+  },
+  components: {
+    HeaderCapsuleBar: {
+      label: "هدر کپسولی (کنترل تمام منوها، لوگو و دکمه‌ها)",
+      fields: {
+        brandText: { type: "text", label: "نام برند" },
+        logoUrl: { type: "text", label: "آدرس تصویر لوگو (URL)" },
+        logoWidth: { type: "number", label: "عرض لوگو (px)" },
+        logoHeight: { type: "number", label: "ارتفاع لوگو (px)" },
+        menu1Text: { type: "text", label: "منو ۱: عنوان" },
+        menu1Url: { type: "text", label: "منو ۱: لینک" },
+        menu2Text: { type: "text", label: "منو ۲: عنوان" },
+        menu2Url: { type: "text", label: "منو ۲: لینک" },
+        menu3Text: { type: "text", label: "منو ۳: عنوان" },
+        menu3Url: { type: "text", label: "منو ۳: لینک" },
+        menu4Text: { type: "text", label: "منو ۴: عنوان" },
+        menu4Url: { type: "text", label: "منو ۴: لینک" },
+        menu5Text: { type: "text", label: "منو ۵: عنوان" },
+        menu5Url: { type: "text", label: "منو ۵: لینک" },
+        showCart: {
+          type: "radio",
+          label: "آیکون سبد خرید",
+          options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
+        },
+        showTheme: {
+          type: "radio",
+          label: "آیکون تغییر تم",
+          options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
+        },
+        showUser: {
+          type: "radio",
+          label: "آیکون پروفایل",
+          options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }]
+        },
+        capsuleBg: { type: "text", label: "رنگ پس‌زمینه کپسول" },
+        capsuleBorder: { type: "text", label: "رنگ کادر کپسول" }
+      },
+      defaultProps: {
         brandText: "Axon | آکسون",
         logoUrl: "",
         logoWidth: 36,
         logoHeight: 36,
+        menu1Text: "کاتالوگ محصولات",
+        menu1Url: "/products",
+        menu2Text: "اخبار تکنولوژی",
+        menu2Url: "/news",
+        menu3Text: "مجله سئو",
+        menu3Url: "/blog",
+        menu4Text: "پیگیری سفارش",
+        menu4Url: "/track-order",
+        menu5Text: "تماس با ما",
+        menu5Url: "/contact",
+        showCart: true,
+        showTheme: true,
+        showUser: true,
         capsuleBg: "rgba(7, 9, 14, 0.9)",
-        capsuleBorder: "rgba(255, 255, 255, 0.12)",
-        paddingY: 10
+        capsuleBorder: "rgba(255, 255, 255, 0.12)"
+      },
+      render: ({
+        brandText, logoUrl, logoWidth, logoHeight,
+        menu1Text, menu1Url, menu2Text, menu2Url, menu3Text, menu3Url, menu4Text, menu4Url, menu5Text, menu5Url,
+        showCart, showTheme, showUser, capsuleBg, capsuleBorder
+      }) => {
+        const w = Number(logoWidth) || 36;
+        const h = Number(logoHeight) || 36;
+        return (
+          <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 my-2 select-none font-sans" dir="ltr">
+            <div
+              style={{ backgroundColor: capsuleBg || "rgba(7, 9, 14, 0.9)", borderColor: capsuleBorder || "rgba(255, 255, 255, 0.12)" }}
+              className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all"
+            >
+              <div className="flex items-center gap-2 order-1">
+                {showCart && <span className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200">🛒</span>}
+                {showTheme && <span className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200">🌙</span>}
+                {showUser && <span className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-200">👤</span>}
+              </div>
+
+              <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-300 order-2" dir="rtl">
+                {menu1Text && <Link href={menu1Url || "/products"} className="hover:text-sky-400 transition">{menu1Text}</Link>}
+                {menu2Text && <Link href={menu2Url || "/news"} className="hover:text-sky-400 transition">{menu2Text}</Link>}
+                {menu3Text && <Link href={menu3Url || "/blog"} className="hover:text-sky-400 transition">{menu3Text}</Link>}
+                {menu4Text && <Link href={menu4Url || "/track-order"} className="hover:text-sky-400 transition">{menu4Text}</Link>}
+                {menu5Text && <Link href={menu5Url || "/contact"} className="hover:text-sky-400 transition">{menu5Text}</Link>}
+              </nav>
+
+              <div className="flex items-center gap-3 order-3" dir="rtl">
+                <span className="font-black text-base sm:text-lg tracking-tight text-white">{brandText || "Axon | آکسون"}</span>
+                <div
+                  style={{ width: w + "px", height: h + "px" }}
+                  className="rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0"
+                >
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  ) : (
+                    <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
+                      ▲
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </header>
+        );
       }
     },
-    {
-      type: "NativeHero3D",
-      props: {
-        id: "hero-1",
+
+    NativeHero3D: {
+      label: "هیرو ۳D اصلی سایت",
+      fields: {
+        topBadge: { type: "text", label: "متن برچسب بالا" },
+        badgeColor: { type: "text", label: "رنگ برچسب" },
+        title: { type: "text", label: "تیتر اصلی هیرو" },
+        titleSize: { type: "number", label: "اندازه تیتر اصلی (px)" },
+        subtitle: { type: "textarea", label: "متن توضیحات زیرعنوان" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" }
+      },
+      defaultProps: {
         topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
         badgeColor: "#38bdf8",
         title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
         titleSize: 42,
         subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
-        bgColor: "transparent",
-        paddingTop: 40,
-        paddingBottom: 20
-      }
+        bgColor: "transparent"
+      },
+      render: ({ topBadge, badgeColor, title, titleSize, subtitle, bgColor }) => (
+        <section style={{ backgroundColor: bgColor || "transparent" }} className="w-full relative overflow-hidden select-none font-sans text-white text-center py-6" dir="rtl">
+          <div className="max-w-4xl mx-auto space-y-4 px-4 relative z-10">
+            {topBadge && (
+              <span style={{ color: badgeColor || "#38bdf8" }} className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-xs font-black inline-block">
+                {topBadge}
+              </span>
+            )}
+            <h1 style={{ fontSize: (titleSize || 42) + "px" }} className="font-black leading-tight text-white">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
+                {subtitle}
+              </p>
+            )}
+          </div>
+          <div className="w-full h-[480px] relative overflow-hidden mt-4">
+            <Hero3DCanvas />
+          </div>
+        </section>
+      )
     },
-    {
-      type: "NativePerspectiveSlider",
-      props: {
-        id: "slider-1",
+
+    NativePerspectiveSlider: {
+      label: "اسلایدر پرسپکتیو بنرها",
+      fields: {
+        sectionTitle: { type: "text", label: "تیتر بخش" },
+        sectionSubtitle: { type: "text", label: "زیرعنوان بخش" }
+      },
+      defaultProps: {
         sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-        sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی",
-        paddingY: 20
-      }
+        sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی"
+      },
+      render: ({ sectionTitle, sectionSubtitle }) => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
+          <ProductPerspectiveSlider customTitle={sectionTitle} customSubtitle={sectionSubtitle} />
+        </div>
+      )
     },
-    {
-      type: "NativeProductCatalog",
-      props: {
-        id: "catalog-1",
+
+    NativeProductCatalog: {
+      label: "کاتالوگ اصلی محصولات",
+      fields: {
+        heading: { type: "text", label: "عنوان کاتالوگ" },
+        subtitle: { type: "text", label: "زیرعنوان کاتالوگ" },
+        limit: { type: "number", label: "حداکثر تعداد کالا" }
+      },
+      defaultProps: {
         heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
-        subtitle: "تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند",
+        subtitle: "تمامی کالاها با گارانتی اصالت طلایی عرضه می‌شوند",
         limit: 8
-      }
+      },
+      render: ({ limit }) => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
+          <PuckProductListWrapper limit={limit} />
+        </div>
+      )
     },
-    {
-      type: "NativeExplodedView",
-      props: {
-        id: "exploded-1",
+
+    NativeExplodedView: {
+      label: "کالبدشکافی ۳D سخت‌افزار",
+      fields: {
+        productTitle: { type: "text", label: "نام محصول مدل ۳D" },
+        sectionTitle: { type: "text", label: "تیتر بخش" }
+      },
+      defaultProps: {
         productTitle: "Apple Studio Display 5K Retina",
         sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری"
-      }
+      },
+      render: ({ productTitle }) => (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
+          <ProductExplodedView productTitle={productTitle || "Apple Studio Display 5K"} />
+        </div>
+      )
     },
-    {
-      type: "GlobalFooterBlock",
-      props: {
-        id: "footer-1",
+
+    GlobalFooterBlock: {
+      label: "فوتر ۴ ستونه کامل و سازمانی",
+      fields: {
+        footerLogoUrl: { type: "text", label: "آدرس تصویر لوگوی فوتر (URL)" },
+        brandTitle: { type: "text", label: "تیتر برند در فوتر" },
+        brandSubtitle: { type: "text", label: "زیرعنوان برند" },
+        brandDesc: { type: "textarea", label: "متن معرفی گارانتی" },
+        supportPhone: { type: "text", label: "شماره تلفن پشتیبانی" },
+        supportEmail: { type: "text", label: "پست الکترونیک" },
+        warehouseAddress: { type: "text", label: "نشانی انبار" },
+        workingHours: { type: "text", label: "ساعات پاسخگویی" },
+        enamadCode: { type: "text", label: "کد اینماد" },
+        copyrightText: { type: "text", label: "متن کپی‌رایت" },
+        footerBg: { type: "text", label: "رنگ پس‌زمینه فوتر" }
+      },
+      defaultProps: {
         footerLogoUrl: "",
         brandTitle: "Axon | آکسون",
         brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
@@ -100,400 +334,108 @@ const BASE_INITIAL_DATA: Data = {
         enamadCode: "27424534",
         copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
         footerBg: "#07090e"
-      }
-    }
-  ],
-  root: { props: { title: "صفحه اصلی" } }
-};
-
-export default function AdminModularPages() {
-  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
-  const [currentSlug, setCurrentSlug] = useState<string>("home");
-  const [pageData, setPageData] = useState<Data>(BASE_INITIAL_DATA);
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const fetchPages = async () => {
-    try {
-      const res = await fetch("/api/pages", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && Array.isArray(json.pages)) {
-        setPages(json.pages);
-      }
-    } catch {}
-  };
-
-  const loadPage = async (slug: string) => {
-    setCurrentSlug(slug);
-    setLoading(true);
-    soundEngine.playClick();
-    try {
-      // ۱. ابتدا تنظیمات ذخیره‌شده مستقیم دیتابیس را می‌خوانیم
-      const siteInfo = await siteInfoService.getSiteInfo();
-
-      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
-      const json = await res.json();
-
-      let targetData: Data = BASE_INITIAL_DATA;
-
-      if (json.success && json.page && json.page.puck_data && Array.isArray(json.page.puck_data.content) && json.page.puck_data.content.length > 0) {
-        targetData = json.page.puck_data;
-      }
-
-      // تضمین بازگردانی ابعاد لوگو حتی اگر Puck ناقص ذخیره کرده باشد
-      const headerIndex = targetData.content.findIndex((b: any) => b.type === "HeaderCapsuleBar");
-      if (headerIndex !== -1 && siteInfo?.homepage_layout_config?.headerLogoConfig) {
-        const savedLogo = siteInfo.homepage_layout_config.headerLogoConfig;
-        targetData.content[headerIndex].props = {
-          ...targetData.content[headerIndex].props,
-          logoWidth: savedLogo.width || targetData.content[headerIndex].props.logoWidth || 36,
-          logoHeight: savedLogo.height || targetData.content[headerIndex].props.logoHeight || 36,
-          logoUrl: savedLogo.url || targetData.content[headerIndex].props.logoUrl || "",
-        };
-      }
-
-      setPageData(targetData);
-    } catch {
-      setPageData(BASE_INITIAL_DATA);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPages();
-    loadPage("home");
-  }, []);
-
-  const handleSave = async (data: Data) => {
-    soundEngine.playClick();
-    setToast("در حال انتشار تغییرات روی سایت...");
-
-    try {
-      // استخراج تنظیمات لوگوی هدر
-      const headerBlock = data.content?.find((b: any) => b.type === "HeaderCapsuleBar");
-      const logoW = Number(headerBlock?.props?.logoWidth) || 36;
-      const logoH = Number(headerBlock?.props?.logoHeight) || 36;
-      const logoU = headerBlock?.props?.logoUrl || "";
-
-      // ذخیره دائمی در site_info جهت حفظ ۱۰۰٪ پس از رفرش
-      const currentInfo = await siteInfoService.getSiteInfo();
-      await siteInfoService.updateSiteInfo({
-        homepage_layout_config: {
-          ...(currentInfo?.homepage_layout_config || {}),
-          headerLogoConfig: {
-            width: logoW,
-            height: logoH,
-            url: logoU
-          }
-        }
-      });
-
-      // ذخیره درخت ساختار Puck در modular_pages
-      const res = await fetch("/api/pages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug: currentSlug,
-          title: currentSlug === "home" ? "صفحه اصلی" : currentSlug,
-          puck_data: data,
-          is_published: true,
-        }),
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        soundEngine.playSuccess();
-        setToast("✓ ابعاد لوگو و تنظیمات صفحه با موفقیت ذخیره دائم شد.");
-
-        // برودکست وب‌سوکت بلادرنگ به تمام تب‌ها
-        try {
-          supabase.channel("realtime-header-puck-sync").send({
-            type: "broadcast",
-            event: "header_updated",
-            payload: {
-              ...(headerBlock?.props || {}),
-              logoWidth: logoW,
-              logoHeight: logoH
-            }
-          });
-        } catch {}
-
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("puck_published"));
-        }
-      } else {
-        setToast("خطا در ذخیره‌سازی.");
-      }
-    } catch {
-      setToast("خطا در برقراری ارتباط با سرور.");
-    } finally {
-      setTimeout(() => setToast(null), 3500);
-    }
-  };
-
-  const targetLiveUrl = currentSlug === "home" ? "/" : \`/\${currentSlug}\`;
-
-  return (
-    <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]" dir="rtl">
-      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
-            ⚡
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه:</span>
-            <select
-              value={currentSlug}
-              onChange={(e) => loadPage(e.target.value)}
-              className="p-2 px-3.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black outline-none cursor-pointer"
-            >
-              {pages.map((p) => (
-                <option key={p.id} value={p.slug}>
-                  📄 {p.title} (/{p.slug === "home" ? "" : p.slug})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href={targetLiveUrl}
-            target="_blank"
-            className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
-          >
-            <span>مشاهده زنده در سایت</span>
-            <span>🔗</span>
-          </Link>
-        </div>
-      </div>
-
-      {toast && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
-          {toast}
-        </div>
-      )}
-
-      <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px]">
-        {loading ? (
-          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری و فراخوانی ابعاد ذخیره‌شده...</div>
-        ) : (
-          <Puck
-            config={puckConfig}
-            data={pageData}
-            onPublish={handleSave}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-`;
-writeFile('components/admin/AdminModularPages.tsx', persistentAdminModularPages);
-
-// =============================================================================
-// ۲. همگام‌سازی مستقیم components/Header.tsx با مقادیر پایدار دیتابیس
-// =============================================================================
-const stableHeaderCode = `"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
-import { supabase } from "@/lib/supabase";
-
-export default function Header() {
-  const { totalItems, toggleCart } = useCart();
-  const [mounted, setMounted] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
-
-  const [headerConfig, setHeaderConfig] = useState<{
-    brandText?: string;
-    logoUrl?: string;
-    logoWidth?: number;
-    logoHeight?: number;
-    capsuleBg?: string;
-    capsuleBorder?: string;
-  }>({});
-
-  const loadHeaderState = async () => {
-    try {
-      const info = await siteInfoService.getSiteInfo();
-      if (info) {
-        setSiteInfo(info);
-        const savedLogo = info.homepage_layout_config?.headerLogoConfig;
-        if (savedLogo) {
-          setHeaderConfig((prev) => ({
-            ...prev,
-            logoWidth: savedLogo.width,
-            logoHeight: savedLogo.height,
-            logoUrl: savedLogo.url || prev.logoUrl
-          }));
-        }
-      }
-
-      const res = await fetch("/api/pages?slug=home", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && json.page?.puck_data?.content) {
-        const headerBlock = json.page.puck_data.content.find(
-          (b: any) => b.type === "HeaderCapsuleBar"
-        );
-        if (headerBlock?.props) {
-          setHeaderConfig((prev) => ({
-            ...prev,
-            ...headerBlock.props
-          }));
-        }
-      }
-    } catch {}
-  };
-
-  useEffect(() => {
-    setMounted(true);
-    const cached = siteInfoService.getSiteInfoSync();
-    if (cached) setSiteInfo(cached);
-
-    loadHeaderState();
-
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      const isDark = savedTheme !== "light";
-      setIsDarkMode(isDark);
-      if (isDark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-    } catch {}
-
-    const channel = supabase
-      .channel("realtime-header-puck-sync")
-      .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
-        loadHeaderState();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
-        loadHeaderState();
-      })
-      .on("broadcast", { event: "header_updated" }, (payload) => {
-        if (payload?.payload) {
-          setHeaderConfig((prev) => ({
-            ...prev,
-            ...payload.payload
-          }));
-        } else {
-          loadHeaderState();
-        }
-      })
-      .subscribe();
-
-    const handleLocalUpdate = () => loadHeaderState();
-    window.addEventListener("puck_published", handleLocalUpdate);
-
-    return () => {
-      supabase.removeChannel(channel);
-      window.removeEventListener("puck_published", handleLocalUpdate);
-    };
-  }, []);
-
-  const toggleDarkMode = () => {
-    soundEngine.playClick();
-    if (isDarkMode) {
-      document.documentElement.classList.remove("dark");
-      setIsDarkMode(false);
-      localStorage.setItem("theme", "light");
-    } else {
-      document.documentElement.classList.add("dark");
-      setIsDarkMode(true);
-      localStorage.setItem("theme", "dark");
-    }
-  };
-
-  const savedLogoConfig = siteInfo?.homepage_layout_config?.headerLogoConfig;
-  const storeName = headerConfig.brandText || siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
-  const logoUrl = headerConfig.logoUrl || savedLogoConfig?.url || siteInfo?.logo_url || siteInfo?.logoUrl;
-  const logoW = Number(headerConfig.logoWidth || savedLogoConfig?.width || 36);
-  const logoH = Number(headerConfig.logoHeight || savedLogoConfig?.height || 36);
-
-  return (
-    <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="ltr">
-      <div
-        style={{
-          backgroundColor: headerConfig.capsuleBg || undefined,
-          borderColor: headerConfig.capsuleBorder || undefined,
-        }}
-        className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-300"
-      >
-        <div className="flex items-center gap-2 order-1">
-          <button
-            type="button"
-            onClick={() => { soundEngine.playClick(); toggleCart(); }}
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer relative shadow-sm"
-            title="سبد خرید"
-          >
-            🛒
-            {mounted && totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-black flex items-center justify-center shadow-md animate-bounce">
-                {totalItems}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleDarkMode}
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer text-xs"
-            title="حالت شب / روز"
-          >
-            {isDarkMode ? "🌙" : "☀️"}
-          </button>
-
-          <Link
-            href="/admin/login"
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer text-xs"
-            title="ورود به حساب"
-          >
-            👤
-          </Link>
-        </div>
-
-        <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-700 dark:text-slate-300 order-2" dir="rtl">
-          <Link href="/products" className="hover:text-sky-500 transition cursor-pointer">کاتالوگ محصولات</Link>
-          <Link href="/news" className="hover:text-sky-500 transition cursor-pointer">اخبار تکنولوژی</Link>
-          <Link href="/blog" className="hover:text-sky-500 transition cursor-pointer">مجله سئو</Link>
-          <Link href="/track-order" className="hover:text-sky-500 transition cursor-pointer">پیگیری سفارش</Link>
-          <Link href="/contact" className="hover:text-sky-500 transition cursor-pointer">تماس با ما</Link>
-        </nav>
-
-        <Link href="/" className="flex items-center gap-3 group order-3" dir="rtl">
-          <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition">
-            {storeName}
-          </span>
-          <div
-            style={{ width: logoW + 'px', height: logoH + 'px' }}
-            className="rounded-xl bg-[var(--input-bg)] border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shadow-md group-hover:scale-105 transition-all duration-300 p-1 shrink-0"
-          >
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={storeName}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            ) : (
-              <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
-                ▲
+      },
+      render: ({ footerLogoUrl, brandTitle, brandSubtitle, brandDesc, supportPhone, supportEmail, warehouseAddress, workingHours, enamadCode, copyrightText, footerBg }) => (
+        <footer style={{ backgroundColor: footerBg || "#07090e" }} className="w-full border-t border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans select-none text-white mt-16" dir="rtl">
+          <div className="max-w-7xl mx-auto space-y-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-4 space-y-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0">
+                      {footerLogoUrl ? (
+                        <img src={footerLogoUrl} alt="" className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
+                          ▲
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="font-black text-2xl text-white">{brandTitle}</h3>
+                  </div>
+                  <p className="text-xs font-bold text-sky-400">{brandSubtitle}</p>
+                  <p className="text-xs text-slate-400 leading-relaxed pt-1">{brandDesc}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-black">
+                    ✓ گارانتی اصالت ۱۰۰٪ فیزیکی
+                  </span>
+                  <span className="px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[11px] font-black">
+                    🚀 ارسال پیشتاز سراسری
+                  </span>
+                </div>
               </div>
-            )}
+
+              <div className="lg:col-span-2 space-y-4">
+                <h4 className="font-black text-sm text-white">دسترسی سریع</h4>
+                <ul className="space-y-2.5 text-xs font-bold text-slate-400">
+                  <li><Link href="/products" className="hover:text-sky-400 transition">کاتالوگ کالاها</Link></li>
+                  <li><Link href="/track-order" className="hover:text-sky-400 transition">سامانه رهگیری مرسولات</Link></li>
+                  <li><Link href="/news" className="hover:text-sky-400 transition">جدیدترین اخبار تکنولوژی</Link></li>
+                  <li><Link href="/blog" className="hover:text-sky-400 transition">مجله مقالات تخصصی</Link></li>
+                </ul>
+              </div>
+
+              <div className="lg:col-span-2 space-y-4">
+                <h4 className="font-black text-sm text-white">خدمات مشتریان</h4>
+                <ul className="space-y-2.5 text-xs font-bold text-slate-400">
+                  <li><Link href="/contact" className="hover:text-sky-400 transition">ثبت تیکت مشاوره</Link></li>
+                  <li><Link href="/about" className="hover:text-sky-400 transition">شرایط گارانتی طلایی</Link></li>
+                  <li><Link href="/about" className="hover:text-sky-400 transition">ضمانت بازگشت وجه ۷ روزه</Link></li>
+                  <li><Link href="/blog" className="hover:text-sky-400 transition">راهنمای کالیبراسیون ۵K</Link></li>
+                </ul>
+              </div>
+
+              <div className="lg:col-span-4 space-y-4">
+                <h4 className="font-black text-sm text-white">اطلاعات تماس و دفتر</h4>
+                <div className="space-y-2 text-xs">
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-medium">تلفن پشتیبانی:</span>
+                      <span className="font-mono font-black text-slate-200">{supportPhone}</span>
+                    </div>
+                    <span>📞</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-medium">پست الکترونیک:</span>
+                      <span className="font-mono font-bold text-slate-200">{supportEmail}</span>
+                    </div>
+                    <span>✉️</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-medium">نشانی تحویل و انبار:</span>
+                      <span className="font-bold text-slate-200">{warehouseAddress}</span>
+                    </div>
+                    <span>📍</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-slate-200">نماد اعتماد الکترونیکی</span>
+                      <span className="text-[10px] text-slate-400 block">کد: {enamadCode}</span>
+                    </div>
+                    <span>🛡️</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-8 border-t border-white/10 flex justify-between text-xs font-bold text-slate-500">
+              <span>نماد اعتماد الکترونیکی فعال ({enamadCode})</span>
+              <p>{copyrightText}</p>
+            </div>
           </div>
-        </Link>
-      </div>
-    </header>
-  );
-}
+        </footer>
+      )
+    }
+  }
+};
 `;
-writeFile('components/Header.tsx', stableHeaderCode);
+writeFile('lib/puckConfig.tsx', puckConfigContent);
 
 // =============================================================================
-// ۳. بیلد پروژه و ارسال قطعی به گیت‌هاب و استقرار در ورسل
+// ۲. ارسال بیلد و اعمال تغییرات روی گیت
 // =============================================================================
 console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
@@ -508,7 +450,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(persistence): permanently persist header logo width & height in site_info & puck store across full page reloads"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(puck): fully editable in-canvas header fields for all 5 menus, logo and dimensions" --allow-empty', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -517,7 +459,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ ذخیره دائمی ابعاد لوگو با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ تغییرات با موفقیت در ورسل پوش شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

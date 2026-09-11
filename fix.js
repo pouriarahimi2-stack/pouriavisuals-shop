@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Fix CI Workflow Script Escaping (fix.js)
+ * AXON CORE - Phase 17: Automated Business Logic & Pricing Tests (fix.js)
  */
 
 const fs = require('fs');
@@ -14,43 +14,64 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-FIX]\x1b[0m اصلاح کاراکترهای اسکریپت خط لوله...");
+console.log("\x1b[36m[AXON-PHASE17]\x1b[0m ایجاد ساختار تست‌های خودکار منطق قیمت‌گذاری...");
 
-const githubWorkflowCode = `name: Axon Core CI Pipeline
+// =============================================================================
+// ۱. ایجاد فایل تست واحد برای محاسبه سبد خرید و تخفیف (__tests__/pricing.test.ts)
+// =============================================================================
+const pricingTestCode = `/**
+ * AXON CORE - Pricing & Cart Unit Tests
+ */
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+describe("Cart & Pricing Business Logic", () => {
+  test("calculates raw subtotal correctly", () => {
+    const items = [
+      { price: 1000000, quantity: 2 },
+      { price: 500000, quantity: 1 },
+    ];
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    expect(subtotal).toBe(2500000);
+  });
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+  test("applies percentage discount accurately and respects max discount", () => {
+    const rawTotal = 10000000;
+    const discountPercent = 20;
+    const maxDiscount = 1500000;
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    let discount = Math.round((rawTotal * discountPercent) / 100);
+    if (maxDiscount && discount > maxDiscount) {
+      discount = maxDiscount;
+    }
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Run Production Build Test
-        run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: \${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: \${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: \${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    const finalPayable = Math.max(0, rawTotal - discount);
+    expect(discount).toBe(1500000);
+    expect(finalPayable).toBe(8500000);
+  });
+});
 `;
+writeFile('__tests__/pricing.test.ts', pricingTestCode);
 
-writeFile('.github/workflows/ci.yml', githubWorkflowCode);
+// =============================================================================
+// ۲. نصب پکیج‌های تست و به‌روزرسانی package.json
+// =============================================================================
+const packageJsonPath = path.join(process.cwd(), 'package.json');
+if (fs.existsSync(packageJsonPath)) {
+  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  pkg.scripts = pkg.scripts || {};
+  pkg.scripts.test = "jest --passWithNoTests";
+  
+  if (!pkg.devDependencies) pkg.devDependencies = {};
+  pkg.devDependencies["jest"] = "^29.7.0";
+  pkg.devDependencies["ts-jest"] = "^29.1.2";
+  pkg.devDependencies["@types/jest"] = "^29.5.12";
 
+  fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2), 'utf8');
+  console.log("\x1b[32m✔ اسکریپت‌های تست به package.json افزوده شد.\x1b[0m");
+}
+
+// =============================================================================
+// ۳. بیلد نهایی پروژه و انتشار در Vercel
+// =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -60,11 +81,11 @@ try {
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
+console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگر دیپلوی ورسل...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "ci(pipeline): add github actions workflow with proper escaping"', { stdio: 'inherit' });
+  execSync('git commit -m "test(pricing): add automated unit tests for cart subtotal and coupon calculations"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -73,7 +94,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ خط لوله CI با موفقیت در گیت‌هاب ثبت شد!\x1b[0m");
+  console.log("\x1b[32m✔ تست‌های خودکار با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

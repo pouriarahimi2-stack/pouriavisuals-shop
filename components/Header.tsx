@@ -22,8 +22,22 @@ export default function Header() {
     capsuleBorder?: string;
   }>({});
 
-  const loadHeaderFromPuck = async () => {
+  const loadHeaderState = async () => {
     try {
+      const info = await siteInfoService.getSiteInfo();
+      if (info) {
+        setSiteInfo(info);
+        const savedLogo = info.homepage_layout_config?.headerLogoConfig;
+        if (savedLogo) {
+          setHeaderConfig((prev) => ({
+            ...prev,
+            logoWidth: savedLogo.width,
+            logoHeight: savedLogo.height,
+            logoUrl: savedLogo.url || prev.logoUrl
+          }));
+        }
+      }
+
       const res = await fetch("/api/pages?slug=home", { cache: "no-store" });
       const json = await res.json();
       if (json.success && json.page?.puck_data?.content) {
@@ -31,7 +45,10 @@ export default function Header() {
           (b: any) => b.type === "HeaderCapsuleBar"
         );
         if (headerBlock?.props) {
-          setHeaderConfig(headerBlock.props);
+          setHeaderConfig((prev) => ({
+            ...prev,
+            ...headerBlock.props
+          }));
         }
       }
     } catch {}
@@ -42,11 +59,7 @@ export default function Header() {
     const cached = siteInfoService.getSiteInfoSync();
     if (cached) setSiteInfo(cached);
 
-    siteInfoService.getSiteInfo().then((data) => {
-      if (data) setSiteInfo(data);
-    });
-
-    loadHeaderFromPuck();
+    loadHeaderState();
 
     try {
       const savedTheme = localStorage.getItem("theme");
@@ -56,22 +69,27 @@ export default function Header() {
       else document.documentElement.classList.remove("dark");
     } catch {}
 
-    // وب‌سوکت بلادرنگ دیتابیس Supabase (بدون نیاز به رفرش)
     const channel = supabase
       .channel("realtime-header-puck-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
-        loadHeaderFromPuck();
+        loadHeaderState();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
+        loadHeaderState();
       })
       .on("broadcast", { event: "header_updated" }, (payload) => {
         if (payload?.payload) {
-          setHeaderConfig(payload.payload);
+          setHeaderConfig((prev) => ({
+            ...prev,
+            ...payload.payload
+          }));
         } else {
-          loadHeaderFromPuck();
+          loadHeaderState();
         }
       })
       .subscribe();
 
-    const handleLocalUpdate = () => loadHeaderFromPuck();
+    const handleLocalUpdate = () => loadHeaderState();
     window.addEventListener("puck_published", handleLocalUpdate);
 
     return () => {
@@ -93,10 +111,11 @@ export default function Header() {
     }
   };
 
+  const savedLogoConfig = siteInfo?.homepage_layout_config?.headerLogoConfig;
   const storeName = headerConfig.brandText || siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
-  const logoUrl = headerConfig.logoUrl || siteInfo?.logo_url || siteInfo?.logoUrl;
-  const logoW = Number(headerConfig.logoWidth) || 36;
-  const logoH = Number(headerConfig.logoHeight) || 36;
+  const logoUrl = headerConfig.logoUrl || savedLogoConfig?.url || siteInfo?.logo_url || siteInfo?.logoUrl;
+  const logoW = Number(headerConfig.logoWidth || savedLogoConfig?.width || 36);
+  const logoH = Number(headerConfig.logoHeight || savedLogoConfig?.height || 36);
 
   return (
     <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="ltr">
@@ -107,7 +126,6 @@ export default function Header() {
         }}
         className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-300"
       >
-        {/* ابزارهای کاربر در چپ */}
         <div className="flex items-center gap-2 order-1">
           <button
             type="button"
@@ -141,7 +159,6 @@ export default function Header() {
           </Link>
         </div>
 
-        {/* منوهای ناوبری */}
         <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-700 dark:text-slate-300 order-2" dir="rtl">
           <Link href="/products" className="hover:text-sky-500 transition cursor-pointer">کاتالوگ محصولات</Link>
           <Link href="/news" className="hover:text-sky-500 transition cursor-pointer">اخبار تکنولوژی</Link>
@@ -150,7 +167,6 @@ export default function Header() {
           <Link href="/contact" className="hover:text-sky-500 transition cursor-pointer">تماس با ما</Link>
         </nav>
 
-        {/* سمت راست: لوگو با کنترل بلادرنگ ابعاد */}
         <Link href="/" className="flex items-center gap-3 group order-3" dir="rtl">
           <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition">
             {storeName}

@@ -6,9 +6,10 @@ import "@measured/puck/puck.css";
 import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import { siteInfoService } from "@/services/siteInfoService";
 import Link from "next/link";
 
-const ATOMIC_INITIAL_DATA: Data = {
+const BASE_INITIAL_DATA: Data = {
   content: [
     {
       type: "HeaderCapsuleBar",
@@ -87,7 +88,7 @@ const ATOMIC_INITIAL_DATA: Data = {
 export default function AdminModularPages() {
   const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
-  const [pageData, setPageData] = useState<Data>(ATOMIC_INITIAL_DATA);
+  const [pageData, setPageData] = useState<Data>(BASE_INITIAL_DATA);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -106,15 +107,33 @@ export default function AdminModularPages() {
     setLoading(true);
     soundEngine.playClick();
     try {
+      // ۱. ابتدا تنظیمات ذخیره‌شده مستقیم دیتابیس را می‌خوانیم
+      const siteInfo = await siteInfoService.getSiteInfo();
+
       const res = await fetch(`/api/pages?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
       const json = await res.json();
-      if (json.success && json.page && json.page.puck_data && json.page.puck_data.content?.length > 0) {
-        setPageData(json.page.puck_data);
-      } else {
-        setPageData(ATOMIC_INITIAL_DATA);
+
+      let targetData: Data = BASE_INITIAL_DATA;
+
+      if (json.success && json.page && json.page.puck_data && Array.isArray(json.page.puck_data.content) && json.page.puck_data.content.length > 0) {
+        targetData = json.page.puck_data;
       }
+
+      // تضمین بازگردانی ابعاد لوگو حتی اگر Puck ناقص ذخیره کرده باشد
+      const headerIndex = targetData.content.findIndex((b: any) => b.type === "HeaderCapsuleBar");
+      if (headerIndex !== -1 && siteInfo?.homepage_layout_config?.headerLogoConfig) {
+        const savedLogo = siteInfo.homepage_layout_config.headerLogoConfig;
+        targetData.content[headerIndex].props = {
+          ...targetData.content[headerIndex].props,
+          logoWidth: savedLogo.width || targetData.content[headerIndex].props.logoWidth || 36,
+          logoHeight: savedLogo.height || targetData.content[headerIndex].props.logoHeight || 36,
+          logoUrl: savedLogo.url || targetData.content[headerIndex].props.logoUrl || "",
+        };
+      }
+
+      setPageData(targetData);
     } catch {
-      setPageData(ATOMIC_INITIAL_DATA);
+      setPageData(BASE_INITIAL_DATA);
     } finally {
       setLoading(false);
     }
@@ -128,7 +147,28 @@ export default function AdminModularPages() {
   const handleSave = async (data: Data) => {
     soundEngine.playClick();
     setToast("در حال انتشار تغییرات روی سایت...");
+
     try {
+      // استخراج تنظیمات لوگوی هدر
+      const headerBlock = data.content?.find((b: any) => b.type === "HeaderCapsuleBar");
+      const logoW = Number(headerBlock?.props?.logoWidth) || 36;
+      const logoH = Number(headerBlock?.props?.logoHeight) || 36;
+      const logoU = headerBlock?.props?.logoUrl || "";
+
+      // ذخیره دائمی در site_info جهت حفظ ۱۰۰٪ پس از رفرش
+      const currentInfo = await siteInfoService.getSiteInfo();
+      await siteInfoService.updateSiteInfo({
+        homepage_layout_config: {
+          ...(currentInfo?.homepage_layout_config || {}),
+          headerLogoConfig: {
+            width: logoW,
+            height: logoH,
+            url: logoU
+          }
+        }
+      });
+
+      // ذخیره درخت ساختار Puck در modular_pages
       const res = await fetch("/api/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,18 +179,22 @@ export default function AdminModularPages() {
           is_published: true,
         }),
       });
+
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToast("✓ صفحه با موفقیت ذخیره شد و تغییرات بلادرنگ اعمال گردید.");
+        setToast("✓ ابعاد لوگو و تنظیمات صفحه با موفقیت ذخیره دائم شد.");
 
-        // برودکست وب‌سوکت بلادرنگ به تمام تب‌های باز
+        // برودکست وب‌سوکت بلادرنگ به تمام تب‌ها
         try {
-          const headerBlock = data.content?.find((b: any) => b.type === "HeaderCapsuleBar");
           supabase.channel("realtime-header-puck-sync").send({
             type: "broadcast",
             event: "header_updated",
-            payload: headerBlock?.props || {}
+            payload: {
+              ...(headerBlock?.props || {}),
+              logoWidth: logoW,
+              logoHeight: logoH
+            }
           });
         } catch {}
 
@@ -171,8 +215,6 @@ export default function AdminModularPages() {
 
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]" dir="rtl">
-      
-      {/* سربرگ استودیو */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
@@ -212,10 +254,9 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم استاندارد با بزرگنمایی طبیعی ۱۰۰٪ */}
       <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px]">
         {loading ? (
-          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
+          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری و فراخوانی ابعاد ذخیره‌شده...</div>
         ) : (
           <Puck
             config={puckConfig}

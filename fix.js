@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Step 3: Secure Customer JWT & HttpOnly Session Management (fix.js)
+ * AXON CORE - Step 4: Enforce RBAC Permission Matrix on Admin APIs (fix.js)
  */
 
 const fs = require('fs');
@@ -14,290 +14,163 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[STEP-3]\x1b[0m پیاده‌سازی سشن امن JWT با کوکی‌های محافظت‌شده HttpOnly...");
+console.log("\x1b[36m[STEP-4]\x1b[0m اعمال بررسی نقش‌محور (RBAC) روی کنترلرهای حساس ادمین...");
 
 // =============================================================================
-// ۱. ایجاد ابزار lib/customerSession.ts جهت ساخت و تایید JWT خریداران
+// ۱. ارتقای app/api/styles/route.ts با اعتبارسنجی نقش ادمین
 // =============================================================================
-const customerSessionCode = `import crypto from "crypto";
-
-const SECRET = process.env.CUSTOMER_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "axon_customer_fallback_secret_key_2026";
-
-export interface CustomerSessionPayload {
-  id: string;
-  phone: string;
-  username?: string;
-  email?: string;
-  name?: string;
-  exp: number;
-}
-
-export function signCustomerPayload(user: { id: string; phone: string; username?: string; email?: string; name?: string }): string {
-  const payload: CustomerSessionPayload = {
-    ...user,
-    exp: Date.now() + 30 * 24 * 60 * 60 * 1000, // ۳۰ روز اعتبار
-  };
-
-  const str = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = crypto.createHmac("sha256", SECRET).update(str).digest("base64url");
-  return \`\${str}.\${signature}\`;
-}
-
-export function verifyCustomerToken(token: string): CustomerSessionPayload | null {
-  try {
-    if (!token || !token.includes(".")) return null;
-    const [payloadStr, signature] = token.split(".");
-    const expectedSig = crypto.createHmac("sha256", SECRET).update(payloadStr).digest("base64url");
-
-    if (signature !== expectedSig) return null;
-
-    const payload: CustomerSessionPayload = JSON.parse(Buffer.from(payloadStr, "base64url").toString());
-    if (Date.now() > payload.exp) return null;
-
-    return payload;
-  } catch {
-    return null;
-  }
-}
-`;
-writeFile('lib/customerSession.ts', customerSessionCode);
-
-// =============================================================================
-// ۲. ارتقای app/api/user/auth/route.ts به کوکی امن و JWT امضاشده
-// =============================================================================
-const fixedUserAuthRoute = `import { NextRequest, NextResponse } from "next/server";
+const fixedStylesRoute = `import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { signCustomerPayload } from "@/lib/customerSession";
-import crypto from "crypto";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { enforceRbac } from "@/lib/rbacGuard";
 
 export const dynamic = "force-dynamic";
 
-function hashPassword(password: string): string {
-  const salt = process.env.CUSTOMER_SALT || "axon_customer_salt_2026";
-  return crypto.scryptSync(password.trim(), salt, 32).toString("hex");
+export async function GET() {
+  try {
+    const { data } = await supabaseAdmin.from("site_styles").select("*").limit(1).maybeSingle();
+    return NextResponse.json({
+      success: true,
+      data: data || {
+        primary_color: "#0071e3",
+        secondary_color: "#4f46e5",
+        font_family: "Vazirmatn",
+        border_radius: "1.5rem",
+        custom_css: "",
+      },
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    const session = verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    // بررسی دسترسی ویرایش استایل (فقط سوپرادمین یا طراح)
+    if (!enforceRbac(session.role, "styles.manage") && session.role !== "superadmin") {
+      return NextResponse.json(
+        { success: false, message: "نقش کاربری شما اجازه تغییر هویت بصری و استایل‌های سایت را ندارد." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
-    const { action } = body;
-    const isProd = process.env.NODE_ENV === "production";
+    const payload = {
+      primary_color: body.primary_color || "#0071e3",
+      secondary_color: body.secondary_color || "#4f46e5",
+      font_family: body.font_family || "Vazirmatn",
+      border_radius: body.border_radius || "1.5rem",
+      custom_css: body.custom_css || "",
+      updated_at: new Date().toISOString(),
+    };
 
-    // ۱. ورود با شماره/شناسه و کلمه عبور
-    if (action === "login_credentials") {
-      const { identifier, password } = body;
-      if (!identifier || !password) {
-        return NextResponse.json({ success: false, message: "شناسه و کلمه عبور الزامی است." }, { status: 400 });
-      }
+    const { data: existing } = await supabaseAdmin.from("site_styles").select("id").limit(1);
 
-      const cleanIdentifier = String(identifier).trim().toLowerCase();
-      const cleanPassword = String(password).trim();
-      const hashed = hashPassword(cleanPassword);
-
-      if (supabaseAdmin) {
-        const { data: user, error } = await supabaseAdmin
-          .from("customers")
-          .select("*")
-          .or(\`phone.eq.\${cleanIdentifier},username.eq.\${cleanIdentifier},email.eq.\${cleanIdentifier}\`)
-          .maybeSingle();
-
-        if (!error && user) {
-          const isPasswordValid = user.password_hash === hashed || user.password === cleanPassword;
-          if (isPasswordValid) {
-            const userData = {
-              id: String(user.id),
-              phone: user.phone,
-              username: user.username,
-              email: user.email,
-              name: user.name || user.full_name || "کاربر آکسون",
-            };
-
-            const token = signCustomerPayload(userData);
-            const response = NextResponse.json({
-              success: true,
-              message: "ورود با موفقیت انجام شد.",
-              user: userData,
-              token,
-            });
-
-            response.cookies.set("customer_session_token", token, {
-              httpOnly: true,
-              secure: isProd,
-              sameSite: "lax",
-              path: "/",
-              maxAge: 30 * 24 * 60 * 60,
-            });
-
-            return response;
-          }
-        }
-      }
-
-      return NextResponse.json({ success: false, message: "نام کاربری یا کلمه عبور اشتباه است." }, { status: 401 });
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.from("site_styles").update(payload).eq("id", existing[0].id);
+    } else {
+      await supabaseAdmin.from("site_styles").insert([payload]);
     }
 
-    // ۲. ثبت‌نام کاربر جدید
-    if (action === "register") {
-      const { phone, username, password, email, name } = body;
-
-      if (!phone || !password) {
-        return NextResponse.json({ success: false, message: "شماره موبایل و کلمه عبور الزامی هستند." }, { status: 400 });
-      }
-
-      const cleanPhone = String(phone).replace(/\\D/g, "");
-      const cleanUsername = String(username || \`user_\${cleanPhone.slice(-4)}\`).trim().toLowerCase();
-      const hashedPassword = hashPassword(password);
-      const cleanEmail = email ? String(email).trim().toLowerCase() : null;
-
-      const newUserPayload = {
-        id: \`cust_\${Date.now()}\`,
-        phone: cleanPhone,
-        username: cleanUsername,
-        password_hash: hashedPassword,
-        email: cleanEmail,
-        name: name ? String(name).trim() : cleanUsername,
-        full_name: name ? String(name).trim() : cleanUsername,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      if (supabaseAdmin) {
-        try {
-          await supabaseAdmin.from("customers").upsert(newUserPayload, { onConflict: "phone" });
-        } catch (dbErr) {
-          console.warn("Customer registration upsert notice:", dbErr);
-        }
-      }
-
-      const userData = {
-        id: newUserPayload.id,
-        phone: cleanPhone,
-        username: cleanUsername,
-        email: cleanEmail || undefined,
-        name: newUserPayload.name,
-      };
-
-      const token = signCustomerPayload(userData);
-      const response = NextResponse.json({
-        success: true,
-        message: "حساب کاربری با موفقیت ساخته شد.",
-        user: userData,
-        token,
-      });
-
-      response.cookies.set("customer_session_token", token, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 30 * 24 * 60 * 60,
-      });
-
-      return response;
-    }
-
-    // ۳. همگام‌سازی ورود از طریق OAuth
-    if (action === "oauth_sync") {
-      const { provider, email, name, avatar } = body;
-      const cleanEmail = String(email || \`\${provider}_user@axoncore.ir\`).trim().toLowerCase();
-      const generatedPhone = body.phone ? String(body.phone).replace(/\\D/g, "") : \`0999\${Date.now().toString().slice(-7)}\`;
-
-      const oauthUserPayload = {
-        id: \`oauth_\${provider}_\${Date.now()}\`,
-        phone: generatedPhone,
-        username: cleanEmail.split("@")[0],
-        email: cleanEmail,
-        name: name || \`کاربر \${provider === "google" ? "گوگل" : "اپل"}\`,
-        full_name: name || \`کاربر \${provider === "google" ? "گوگل" : "اپل"}\`,
-        avatar_url: avatar || null,
-        oauth_provider: provider,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      if (supabaseAdmin) {
-        try {
-          await supabaseAdmin.from("customers").upsert(oauthUserPayload, { onConflict: "email" });
-        } catch {}
-      }
-
-      const userData = {
-        id: oauthUserPayload.id,
-        phone: generatedPhone,
-        username: oauthUserPayload.username,
-        email: cleanEmail,
-        name: oauthUserPayload.name,
-      };
-
-      const token = signCustomerPayload(userData);
-      const response = NextResponse.json({
-        success: true,
-        message: \`ورود با موفقیت از طریق \${provider === "google" ? "حساب گوگل" : "اپل آیدی"} انجام شد.\`,
-        user: userData,
-        token,
-      });
-
-      response.cookies.set("customer_session_token", token, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 30 * 24 * 60 * 60,
-      });
-
-      return response;
-    }
-
-    return NextResponse.json({ success: false, message: "درخواست نامعتبر است." }, { status: 400 });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, message: "استایل‌ها و هویت بصری با موفقیت در دیتابیس ثبت شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 `;
-writeFile('app/api/user/auth/route.ts', fixedUserAuthRoute);
+writeFile('app/api/styles/route.ts', fixedStylesRoute);
 
 // =============================================================================
-// ۳. ساخت روت app/api/user/session/route.ts جهت احراز هویت سشن
+// ۲. ارتقای app/api/admin/users/route.ts (ایجاد و حذف مدیر منحصراً توسط superadmin)
 // =============================================================================
-const userSessionRoute = `import { NextRequest, NextResponse } from "next/server";
-import { verifyCustomerToken } from "@/lib/customerSession";
+const fixedAdminUsersRoute = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { authSecurity } from "@/lib/authSecurity";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  try {
-    const token = req.cookies.get("customer_session_token")?.value;
-    if (!token) {
-      return NextResponse.json({ authenticated: false }, { status: 200 });
-    }
-
-    const payload = verifyCustomerToken(token);
-    if (!payload) {
-      return NextResponse.json({ authenticated: false }, { status: 200 });
-    }
-
-    return NextResponse.json({
-      authenticated: true,
-      user: {
-        id: payload.id,
-        phone: payload.phone,
-        username: payload.username,
-        email: payload.email,
-        name: payload.name,
-      },
-    });
-  } catch {
-    return NextResponse.json({ authenticated: false }, { status: 200 });
+  const session = verifyAdminSession(req);
+  if (!session) {
+    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
   }
+
+  if (session.role !== "superadmin") {
+    return NextResponse.json({ success: false, message: "مشاهده لیست مدیران فقط برای مدیر ارشد مجاز است." }, { status: 403 });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("admin_users")
+    .select("id, username, full_name, role, created_at");
+
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, users: data });
 }
 
-export async function POST() {
-  const response = NextResponse.json({ success: true, message: "با موفقیت خارج شدید." });
-  response.cookies.delete("customer_session_token");
-  return response;
+export async function POST(req: NextRequest) {
+  const session = verifyAdminSession(req);
+  if (!session) {
+    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+  }
+
+  if (session.role !== "superadmin") {
+    return NextResponse.json({ success: false, message: "ایجاد مدیر جدید منحصراً در اختیارات مدیر ارشد سیستم است." }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const { username, password, full_name, role } = body;
+
+  if (!username || !password) {
+    return NextResponse.json({ success: false, message: "اطلاعات ناقص است." }, { status: 400 });
+  }
+
+  const hashedPassword = authSecurity.hashPassword(password.trim());
+
+  const { data, error } = await supabaseAdmin.from("admin_users").insert({
+    username: username.trim().toLowerCase(),
+    password: hashedPassword,
+    password_hash: hashedPassword,
+    full_name: full_name?.trim() || username.trim(),
+    role: role || "product_manager",
+    created_at: new Date().toISOString(),
+  }).select().single();
+
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, user: data });
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = verifyAdminSession(req);
+  if (!session) {
+    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+  }
+
+  if (session.role !== "superadmin") {
+    return NextResponse.json({ success: false, message: "حذف مدیر فقط در حیطه اختیارات مدیر ارشد سیستم است." }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+
+  if (!id) return NextResponse.json({ success: false, message: "شناسه کاربر الزامی است." }, { status: 400 });
+
+  if (String(session.id) === String(id)) {
+    return NextResponse.json({ success: false, message: "نمی‌توانید حساب کاربری جاری خود را حذف کنید." }, { status: 400 });
+  }
+
+  const { error } = await supabaseAdmin.from("admin_users").delete().eq("id", id);
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+  return NextResponse.json({ success: true, message: "کاربر با موفقیت حذف شد." });
 }
 `;
-writeFile('app/api/user/session/route.ts', userSessionRoute);
+writeFile('app/api/admin/users/route.ts', fixedAdminUsersRoute);
 
 // =============================================================================
 // بیلد و دیپلوی ورسل
@@ -315,7 +188,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و انتش
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(step3): implement customer JWT authentication and HttpOnly session cookies"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "security(step4): enforce role-based access control (RBAC) on styles and user management APIs"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -324,7 +197,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قدم سوم با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ قدم چهارم با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

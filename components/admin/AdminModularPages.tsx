@@ -7,77 +7,124 @@ import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
 import Link from "next/link";
 
-const COMPLETE_HOMEPAGE_STRUCTURE: Data = {
+const DEFAULT_FULL_DATA: Data = {
   content: [
     {
-      type: "GlobalHeaderBlock",
+      type: "HeaderModularBlock",
       props: {
-        id: "header-1",
+        id: "header-block-1",
         brandName: "Axon | آکسون",
-        link1Text: "کاتالوگ محصولات",
-        link1Url: "/products",
-        link2Text: "اخبار تکنولوژی",
-        link2Url: "/news",
-        link3Text: "مجله سئو",
-        link3Url: "/blog",
-        link4Text: "پیگیری سفارش",
-        link4Url: "/track-order",
-        link5Text: "تماس با ما",
-        link5Url: "/contact",
+        brandLogoText: "▲",
+        menuItems: [
+          { label: "کاتالوگ محصولات", href: "/products" },
+          { label: "اخبار تکنولوژی", href: "/news" },
+          { label: "مجله سئو", href: "/blog" },
+          { label: "پیگیری سفارش", href: "/track-order" },
+          { label: "تماس با ما", href: "/contact" },
+        ],
+        showCartIcon: true,
+        showThemeIcon: true,
+        showUserIcon: true,
+        headerBg: "rgba(7, 9, 14, 0.85)",
+        capsuleBorder: "rgba(255, 255, 255, 0.1)"
       }
     },
     {
-      type: "NativeHero3D",
+      type: "Hero3DModularBlock",
       props: {
-        id: "hero-1",
-        topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
-        bgColor: "transparent"
+        id: "hero-block-1",
+        badgeText: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+        badgeColor: "#38bdf8",
+        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای ۵K با ۱۸ ماه گارانتی طلایی",
+        ctaButtonText: "ورود به کاتالوگ مانیتورها",
+        ctaButtonUrl: "/products",
+        canvasHeight: 520
       }
     },
     {
-      type: "NativePerspectiveSlider",
+      type: "PerspectiveSliderModularBlock",
       props: {
-        id: "slider-1",
-        paddingY: 20
+        id: "slider-block-1",
+        sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+        sectionSubtitle: "پیمایش جهت بررسی دقیق مشخصات و گارانتی",
+        slides: [
+          {
+            title: "Apple Studio Display 27 5K",
+            subtitle: "پنل رتینا با کالیبراسیون ۳D LUT",
+            badge: "پرچمدار",
+            imageUrl: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800",
+            linkUrl: "/products",
+            priceText: "۱۲۸,۵۰۰,۰۰۰ تومان"
+          },
+          {
+            title: "Apple Pro Display XDR 32 6K",
+            subtitle: "روشنایی ۱۶۰۰ نیت و وضوح خیره‌کننده 6K",
+            badge: "استودیوی حرفه‌ای",
+            imageUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
+            linkUrl: "/products",
+            priceText: "۲۴۵,۰۰۰,۰۰۰ تومان"
+          }
+        ]
       }
     },
     {
-      type: "NativeProductCatalog",
+      type: "ProductCatalogModularBlock",
       props: {
-        id: "catalog-1",
-        heading: "کاتالوگ تجهیزات تخصصی"
+        id: "catalog-block-1",
+        catalogTitle: "کاتالوگ تجهیزات تخصصی و مانیتورها",
+        catalogSubtitle: "تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند",
+        limit: 6,
+        columns: 3
       }
     },
     {
-      type: "NativeExplodedView",
+      type: "ExplodedViewModularBlock",
       props: {
-        id: "exploded-1",
-        productTitle: "Apple Studio Display 5K Retina"
+        id: "exploded-block-1",
+        targetProductTitle: "Apple Studio Display 5K Retina",
+        badgeTitle: "🧬 کالبدشکافی تخصصی لایه‌ها",
+        boxBg: "transparent"
       }
     },
     {
-      type: "GlobalFooterBlock",
+      type: "FooterModularBlock",
       props: {
-        id: "footer-1",
+        id: "footer-block-1",
         brandTitle: "Axon | آکسون",
         brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
-        brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
-        supportPhone: "09376110200",
-        supportEmail: "Pouriarahimi@yahoo.com",
+        bioDescription: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+        badge1: "✓ گارانتی اصالت ۱۰۰٪ فیزیکی",
+        badge2: "🚀 ارسال پیشتاز سراسری",
+        phone: "09376110200",
+        email: "Pouriarahimi@yahoo.com",
         warehouseAddress: "شیراز - ستارخان",
         workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
         enamadCode: "27424534",
-        copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026"
+        copyright: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
+        quickLinks: [
+          { label: "کاتالوگ کالاها", href: "/products" },
+          { label: "سامانه رهگیری مرسولات", href: "/track-order" },
+          { label: "جدیدترین اخبار تکنولوژی", href: "/news" },
+          { label: "مجله مقالات تخصصی", href: "/blog" },
+          { label: "درباره آکسون", href: "/about" },
+        ],
+        customerServiceLinks: [
+          { label: "ثبت تیکت مشاوره", href: "/contact" },
+          { label: "شرایط گارانتی طلایی", href: "/about" },
+          { label: "ضمانت بازگشت وجه ۷ روزه", href: "/about" },
+          { label: "راهنمای کالیبراسیون ۵K", href: "/blog" },
+        ]
       }
     }
   ],
-  root: { props: { title: "صفحه اصلی سایت" } }
+  root: { props: { title: "صفحه اصلی" } }
 };
 
 export default function AdminModularPages() {
   const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
   const [currentSlug, setCurrentSlug] = useState<string>("home");
-  const [pageData, setPageData] = useState<Data>(COMPLETE_HOMEPAGE_STRUCTURE);
+  const [pageData, setPageData] = useState<Data>(DEFAULT_FULL_DATA);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -101,10 +148,10 @@ export default function AdminModularPages() {
       if (json.success && json.page && json.page.puck_data && json.page.puck_data.content?.length > 0) {
         setPageData(json.page.puck_data);
       } else {
-        setPageData(COMPLETE_HOMEPAGE_STRUCTURE);
+        setPageData(DEFAULT_FULL_DATA);
       }
     } catch {
-      setPageData(COMPLETE_HOMEPAGE_STRUCTURE);
+      setPageData(DEFAULT_FULL_DATA);
     } finally {
       setLoading(false);
     }
@@ -117,7 +164,7 @@ export default function AdminModularPages() {
 
   const handleSave = async (data: Data) => {
     soundEngine.playClick();
-    setToast("در حال ذخیره و انتشار سراسری در سایت...");
+    setToast("در حال انتشار تغییرات روی سایت...");
     try {
       const res = await fetch("/api/pages", {
         method: "POST",
@@ -132,7 +179,7 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToast("✓ صفحه با موفقیت ذخیره شد و روی ویترین سایت اعمال گردید.");
+        setToast("✓ تمام تغییرات اتمیک با موفقیت ذخیره و در سایت منتشر شد.");
       } else {
         setToast("خطا در ذخیره‌سازی.");
       }
@@ -148,7 +195,7 @@ export default function AdminModularPages() {
   return (
     <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]" dir="rtl">
       
-      {/* سربرگ تک‌ردیفه تمیز استودیو */}
+      {/* سربرگ کنترل صفحه ساز */}
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
@@ -188,8 +235,8 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم تمام‌عرض بدون تقسیم‌بندی اشتباه */}
-      <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[800px]">
+      {/* بوم تمام‌عرض ۱۰۰٪ آزاد Puck بدون فشرده‌سازی و بدون خطای لایه‌بندی */}
+      <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[850px]">
         {loading ? (
           <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
         ) : (

@@ -44,3 +44,6 @@ pouriavisuals-shop/
 *.pem
 .idea/
 .vscode/
+.axon-fix-backups
+fix.js
+repomix-output.xml

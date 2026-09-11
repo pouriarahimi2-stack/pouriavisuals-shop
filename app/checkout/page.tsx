@@ -1,9 +1,8 @@
-// File Path: app/checkout/page.tsx
 "use client";
 
 import React, { useState } from "react";
 import { useCart } from "@/context/CartContext";
-import { orderService } from "@/services/orderService";
+import { createOrderServer } from "@/app/actions/orders";
 import { couponService, Coupon } from "@/services/couponService";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -105,15 +104,19 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     try {
-      const orderId = `ORD-${Date.now().toString().slice(-6)}`;
       const fullAddress = `استان ${province}، شهر ${city}، ${address.trim()}`;
 
-      const orderPayload = {
-        id: orderId,
-        order_number: orderId,
+      // فراخوانی مستقیم Server Action امن با استعلام قیمت واقعی سرور
+      const result = await createOrderServer({
+        items: cartItems.map((item) => ({
+          productId: item.id,
+          title: item.title || item.name || "کالا",
+          price: item.price,
+          quantity: item.quantity || 1,
+          image: item.image,
+        })),
         customer: {
           fullName: customerName.trim(),
-          name: customerName.trim(),
           phone: cleanPhone,
           province,
           city,
@@ -121,40 +124,17 @@ export default function CheckoutPage() {
           postalCode: postalCode.trim() || undefined,
           notes: notes.trim() || undefined,
         },
-        customer_name: customerName.trim(),
-        phone: cleanPhone,
-        province,
-        city,
-        address: fullAddress,
-        postal_code: postalCode.trim() || undefined,
-        items: cartItems.map((item) => ({
-          productId: item.id,
-          product_id: item.id,
-          title: item.title || item.name || "کالا",
-          name: item.name || item.title || "کالا",
-          price: item.price,
-          quantity: item.quantity || 1,
-          image: item.image,
-        })),
-        total_amount: rawTotal,
-        totalAmount: rawTotal,
-        discount_amount: discountAmount > 0 ? discountAmount : undefined,
-        discountAmount: discountAmount > 0 ? discountAmount : undefined,
-        coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
-        couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-        final_amount: finalPayable,
-        finalAmount: finalPayable,
-        status: "pending" as const,
-        payment_status: "pending" as const,
-        paymentStatus: "pending" as const,
-      };
+        couponCode: appliedCoupon?.code,
+        shippingCost: 0,
+      });
 
-      const created = await orderService.create(orderPayload);
-      if (created) {
+      if (result.success && result.orderId) {
+        sessionStorage.setItem("pending_payment_amount", String(result.totalAmount));
+        sessionStorage.setItem("pending_payment_order_id", result.orderId);
         clearCart();
-        router.push(`/checkout/payment?orderId=${created.orderNumber || created.id}`);
+        router.push(`/checkout/payment?orderId=${result.orderId}`);
       } else {
-        setErrorMessage("خطا در ثبت نهایی فاکتور. لطفاً مجدداً تلاش فرمایید.");
+        setErrorMessage(result.error || "خطا در ثبت نهایی فاکتور. لطفاً مجدداً تلاش فرمایید.");
       }
     } catch {
       setErrorMessage("خطا در برقراری ارتباط با سرور.");
@@ -183,7 +163,6 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
-      
       <div className="text-center space-y-2">
         <h1 className="text-2xl md:text-3xl font-black">تکمیل اطلاعات و صدور فاکتور رسمی</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium">نشانی و مشخصات گیرنده مرسوله را با دقت وارد کنید</p>

@@ -1422,67 +1422,6 @@ export async function GET(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/admin/users/route.ts">
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
-
-export const dynamic = "force-dynamic";
-
-export async function GET(req: NextRequest) {
-  if (!verifyAdminSession(req)) {
-    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("admin_users")
-    .select("id, username, full_name, role, created_at");
-
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, users: data });
-}
-
-export async function POST(req: NextRequest) {
-  if (!verifyAdminSession(req)) {
-    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
-  }
-
-  const body = await req.json();
-  const { username, password, full_name, role } = body;
-
-  if (!username || !password) {
-    return NextResponse.json({ success: false, message: "اطلاعات ناقص است" }, { status: 400 });
-  }
-
-  const { data, error } = await supabaseAdmin.from("admin_users").insert({
-    username: username.trim().toLowerCase(),
-    password: password.trim(),
-    full_name: full_name?.trim() || username.trim(),
-    role: role || "admin",
-    created_at: new Date().toISOString(),
-  }).select().single();
-
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, user: data });
-}
-
-export async function DELETE(req: NextRequest) {
-  if (!verifyAdminSession(req)) {
-    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-
-  if (!id) return NextResponse.json({ success: false, message: "شناسه کاربر الزامی است" }, { status: 400 });
-
-  const { error } = await supabaseAdmin.from("admin_users").delete().eq("id", id);
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-
-  return NextResponse.json({ success: true, message: "کاربر با موفقیت حذف شد." });
-}
-</file>
-
 <file path="app/api/enamad/route.ts">
 // File Path: app/api/enamad/route.ts
 import { NextResponse } from 'next/server';
@@ -1497,71 +1436,6 @@ export async function GET() {
       'Cache-Control': 'no-store, max-age=0',
     },
   });
-}
-</file>
-
-<file path="app/api/orders/track/route.ts">
-// File Path: app/api/orders/track/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
-
-export const dynamic = "force-dynamic";
-
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const query = searchParams.get("query")?.trim();
-
-    if (!query) {
-      return NextResponse.json(
-        { success: false, message: "کد رهگیری فاکتور یا شماره موبایل الزامی است." },
-        { status: 400 }
-      );
-    }
-
-    // دسترسی یکجا به تمام فاکتورها فقط مختص ادمین است
-    if (query.toLowerCase() === "all") {
-      if (!verifyAdminSession(req)) {
-        return NextResponse.json(
-          { success: false, message: "دسترسی غیرمجاز." },
-          { status: 401 }
-        );
-      }
-
-      if (supabaseAdmin) {
-        const { data } = await supabaseAdmin
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        return NextResponse.json({ success: true, data: data || [] });
-      }
-
-      return NextResponse.json({ success: true, data: [] });
-    }
-
-    const cleanQuery = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
-
-    if (supabaseAdmin) {
-      const { data, error } = await supabaseAdmin
-        .from("orders")
-        .select("id, order_number, customer_name, phone, status, tracking_code, items, total_amount, final_amount, created_at, province, city, address")
-        .or(`id.eq.${query},order_number.eq.${query},tracking_code.eq.${query},phone.eq.${cleanQuery || query}`)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      if (error || !data || data.length === 0) {
-        return NextResponse.json({ success: false, message: "فاکتوری با این مشخصات یافت نشد." }, { status: 404 });
-      }
-
-      return NextResponse.json({ success: true, data });
-    }
-
-    return NextResponse.json({ success: false, message: "دیتابیس در دسترس نیست." }, { status: 503 });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
 }
 </file>
 
@@ -1616,6 +1490,62 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message: 'پیامک با موفقیت ارسال شد.' });
   } catch {
     return NextResponse.json({ success: false, message: 'خطای سیستمی در پردازش پیامک.' }, { status: 500 });
+  }
+}
+</file>
+
+<file path="app/api/styles/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  try {
+    const { data } = await supabaseAdmin.from("site_styles").select("*").limit(1).maybeSingle();
+    return NextResponse.json({
+      success: true,
+      data: data || {
+        primary_color: "#0071e3",
+        secondary_color: "#4f46e5",
+        font_family: "Vazirmatn",
+        border_radius: "1.5rem",
+        custom_css: "",
+      },
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    if (!verifyAdminSession(req)) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const payload = {
+      primary_color: body.primary_color || "#0071e3",
+      secondary_color: body.secondary_color || "#4f46e5",
+      font_family: body.font_family || "Vazirmatn",
+      border_radius: body.border_radius || "1.5rem",
+      custom_css: body.custom_css || "",
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: existing } = await supabaseAdmin.from("site_styles").select("id").limit(1);
+
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.from("site_styles").update(payload).eq("id", existing[0].id);
+    } else {
+      await supabaseAdmin.from("site_styles").insert([payload]);
+    }
+
+    return NextResponse.json({ success: true, message: "استایل‌ها و هویت بصری با موفقیت در دیتابیس ثبت شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 </file>
@@ -16444,6 +16374,71 @@ export async function GET(req: NextRequest) {
 }
 </file>
 
+<file path="app/api/admin/users/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { authSecurity } from "@/lib/authSecurity";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  if (!verifyAdminSession(req)) {
+    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("admin_users")
+    .select("id, username, full_name, role, created_at");
+
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, users: data });
+}
+
+export async function POST(req: NextRequest) {
+  if (!verifyAdminSession(req)) {
+    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { username, password, full_name, role } = body;
+
+  if (!username || !password) {
+    return NextResponse.json({ success: false, message: "اطلاعات ناقص است" }, { status: 400 });
+  }
+
+  const hashedPassword = authSecurity.hashPassword(password.trim());
+
+  const { data, error } = await supabaseAdmin.from("admin_users").insert({
+    username: username.trim().toLowerCase(),
+    password: hashedPassword,
+    password_hash: hashedPassword,
+    full_name: full_name?.trim() || username.trim(),
+    role: role || "product_manager",
+    created_at: new Date().toISOString(),
+  }).select().single();
+
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, user: data });
+}
+
+export async function DELETE(req: NextRequest) {
+  if (!verifyAdminSession(req)) {
+    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+
+  if (!id) return NextResponse.json({ success: false, message: "شناسه کاربر الزامی است" }, { status: 400 });
+
+  const { error } = await supabaseAdmin.from("admin_users").delete().eq("id", id);
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+  return NextResponse.json({ success: true, message: "کاربر با موفقیت حذف شد." });
+}
+</file>
+
 <file path="app/api/auth/recovery/route.ts">
 // File Path: app/api/auth/recovery/route.ts
 import { NextRequest, NextResponse } from "next/server";
@@ -16978,120 +16973,66 @@ export async function DELETE(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/payment/verify/route.ts">
+<file path="app/api/orders/track/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import crypto from "crypto";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const { orderId, authority } = await req.json();
+    const { searchParams } = new URL(req.url);
+    // پشتیبانی همزمان از هر دو پارامتر query و q
+    const query = (searchParams.get("query") || searchParams.get("q") || "").trim();
 
-    if (!orderId || !authority) {
-      return NextResponse.json({ success: false, message: "شناسه فاکتور و کد مرجع پرداخت الزامی است." }, { status: 400 });
+    if (!query) {
+      return NextResponse.json(
+        { success: false, message: "کد رهگیری فاکتور یا شماره موبایل الزامی است." },
+        { status: 400 }
+      );
     }
 
-    const cleanOrderId = String(orderId).trim();
-    const cleanAuth = String(authority).trim();
-
-    // ۱. استعلام سفارش از دیتابیس
-    const { data: order, error: orderErr } = await supabaseAdmin
-      .from("orders")
-      .select("*")
-      .eq("id", cleanOrderId)
-      .maybeSingle();
-
-    if (orderErr || !order) {
-      return NextResponse.json({ success: false, message: "سفارش یافت نشد." }, { status: 404 });
-    }
-
-    // اگر قبلاً تایید شده، مجدداً تایید نشود (Idempotency)
-    if (order.payment_status === "paid") {
-      return NextResponse.json({
-        success: true,
-        message: "این سفارش پیش از این با موفقیت پرداخت شده است.",
-        orderId: order.id,
-        trackingRef: order.tracking_code || "PAID_PREVIOUSLY"
-      });
-    }
-
-    // ۲. تطبیق امنیتی Authority ثبت‌شده در جدول payments
-    const { data: paymentRecord } = await supabaseAdmin
-      .from("payments")
-      .select("*")
-      .eq("authority", cleanAuth)
-      .eq("order_id", cleanOrderId)
-      .maybeSingle();
-
-    // اعتبارسنجی حداقل ملزومات تراکنش
-    const expectedAmount = Number(order.final_amount || order.total_amount);
-
-    if (paymentRecord && Number(paymentRecord.amount) !== expectedAmount) {
-      return NextResponse.json({ success: false, message: "مغایرت امنیتی در مبلغ فاکتور و مبلغ تراکنش بانکی!" }, { status: 400 });
-    }
-
-    // ۳. کسر اتمیک موجودی انبار از طریق فراخوانی تابع RPC در دیتابیس
-    const items = Array.isArray(order.items) ? order.items : [];
-    if (items.length > 0) {
-      const rpcItems = items.map((i: any) => ({
-        product_id: String(i.product_id || i.productId || i.id),
-        quantity: Number(i.quantity || 1)
-      }));
-
-      const { error: rpcError } = await supabaseAdmin.rpc("reserve_order_stock", {
-        p_items: rpcItems
-      });
-
-      if (rpcError) {
-        console.error("Atomic Inventory Error:", rpcError);
-        return NextResponse.json({
-          success: false,
-          message: "متاسفانه موجودی یک یا چند کالا پیش از پرداخت نهایی به پایان رسیده است."
-        }, { status: 409 });
+    if (query.toLowerCase() === "all") {
+      if (!verifyAdminSession(req)) {
+        return NextResponse.json(
+          { success: false, message: "دسترسی غیرمجاز." },
+          { status: 401 }
+        );
       }
+
+      if (supabaseAdmin) {
+        const { data } = await supabaseAdmin
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        return NextResponse.json({ success: true, data: data || [] });
+      }
+
+      return NextResponse.json({ success: true, data: [] });
     }
 
-    // ۴. ثبت کد رهگیری قطعی شاپرک
-    const trackingRef = "SHP_" + Date.now().toString().slice(-6) + "_" + crypto.randomBytes(2).toString("hex").toUpperCase();
+    const cleanQuery = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
 
-    // ۵. آپدیت قطعی سفارش به وضعیت پردازش و پرداخت‌شده
-    const { error: updateErr } = await supabaseAdmin
-      .from("orders")
-      .update({
-        status: "paid",
-        payment_status: "paid",
-        payment_method: "online_gateway",
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", order.id);
+    if (supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_number, customer_name, phone, status, tracking_code, items, total_amount, final_amount, created_at, province, city, address")
+        .or(`id.eq.${query},order_number.eq.${query},tracking_code.eq.${query},phone.eq.${cleanQuery || query}`)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-    if (updateErr) {
-      throw updateErr;
+      if (error || !data || data.length === 0) {
+        return NextResponse.json({ success: false, message: "فاکتوری با این مشخصات یافت نشد." }, { status: 404 });
+      }
+
+      return NextResponse.json({ success: true, order: data[0], data });
     }
 
-    // به‌روزرسانی جدول payments
-    if (paymentRecord) {
-      await supabaseAdmin
-        .from("payments")
-        .update({
-          status: "verified",
-          reference_id: trackingRef,
-          verified_at: new Date().toISOString()
-        })
-        .eq("id", paymentRecord.id);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "تراکنش بانکی با موفقیت تایید و سفارش نهایی گردید.",
-      orderId: order.id,
-      trackingRef: trackingRef
-    });
+    return NextResponse.json({ success: false, message: "دیتابیس در دسترس نیست." }, { status: 503 });
   } catch (err: any) {
-    console.error("Secure Payment Verification Error:", err);
-    return NextResponse.json({ success: false, message: "خطا در تایید تراکنش بانکی." }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 </file>
@@ -17348,62 +17289,6 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, message: "تنظیمات با موفقیت ذخیره شد." });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-</file>
-
-<file path="app/api/styles/route.ts">
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
-
-export const dynamic = "force-dynamic";
-
-export async function GET() {
-  try {
-    const { data } = await supabaseAdmin.from("site_styles").select("*").limit(1).maybeSingle();
-    return NextResponse.json({
-      success: true,
-      data: data || {
-        primary_color: "#0071e3",
-        secondary_color: "#4f46e5",
-        font_family: "Vazirmatn",
-        border_radius: "1.5rem",
-        custom_css: "",
-      },
-    });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const payload = {
-      primary_color: body.primary_color || "#0071e3",
-      secondary_color: body.secondary_color || "#4f46e5",
-      font_family: body.font_family || "Vazirmatn",
-      border_radius: body.border_radius || "1.5rem",
-      custom_css: body.custom_css || "",
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data: existing } = await supabaseAdmin.from("site_styles").select("id").limit(1);
-
-    if (existing && existing.length > 0) {
-      await supabaseAdmin.from("site_styles").update(payload).eq("id", existing[0].id);
-    } else {
-      await supabaseAdmin.from("site_styles").insert([payload]);
-    }
-
-    return NextResponse.json({ success: true, message: "استایل‌ها و هویت بصری با موفقیت در دیتابیس ثبت شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -23113,6 +22998,339 @@ async function runAudit() {
 runAudit();
 </file>
 
+<file path="services/couponService.ts">
+import { supabase } from "@/lib/supabase";
+
+export interface Coupon {
+  id: string | number;
+  code: string;
+  type: "percent" | "fixed";
+  discount_type?: "percent" | "fixed";
+  value: number;
+  discount_value?: number;
+  min_order_amount?: number;
+  max_discount_amount?: number;
+  max_discount?: number;
+  usage_limit?: number;
+  used_count?: number;
+  target_type?: "all" | "category" | "product";
+  target_id?: string | null;
+  is_active: boolean;
+  starts_at?: string;
+  expires_at?: string;
+  created_at?: string;
+}
+
+export const couponService = {
+  async getAll(): Promise<Coupon[]> {
+    try {
+      const res = await fetch("/api/coupons", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.data) {
+        return json.data;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  async create(coupon: Partial<Coupon>): Promise<Coupon | null> {
+    try {
+      const res = await fetch("/api/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(coupon),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        return json.data;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  async update(id: string | number, updates: Partial<Coupon>): Promise<boolean> {
+    try {
+      const res = await fetch("/api/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...updates, id }),
+      });
+      const json = await res.json();
+      return !!json.success;
+    } catch {
+      return false;
+    }
+  },
+
+  async delete(id: string | number): Promise<boolean> {
+    try {
+      const res = await fetch("/api/coupons?id=" + encodeURIComponent(id), { method: "DELETE" });
+      const json = await res.json();
+      return !!json.success;
+    } catch {
+      return false;
+    }
+  },
+
+  async validateCoupon(code: string, totalAmount: number, items: any[] = []): Promise<{ valid: boolean; discount: number; message: string; coupon?: Coupon }> {
+    try {
+      const { data: coupon, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", code.trim().toUpperCase())
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (error || !coupon) {
+        return { valid: false, discount: 0, message: "کد تخفیف نامعتبر یا غیرفعال است." };
+      }
+
+      const now = new Date();
+      if (coupon.starts_at && new Date(coupon.starts_at) > now) {
+        return { valid: false, discount: 0, message: "زمان استفاده از این کد تخفیف هنوز شروع نشده است." };
+      }
+
+      if (coupon.expires_at && new Date(coupon.expires_at) < now) {
+        return { valid: false, discount: 0, message: "مهلت اعتبار این کد تخفیف به پایان رسیده است." };
+      }
+
+      if (coupon.usage_limit && (coupon.used_count || 0) >= coupon.usage_limit) {
+        return { valid: false, discount: 0, message: "ظرفیت استفاده از این کد تخفیف به پایان رسیده است." };
+      }
+
+      if (coupon.min_order_amount && totalAmount < Number(coupon.min_order_amount)) {
+        return { valid: false, discount: 0, message: "حداقل مبلغ سفارش برای این کد " + Number(coupon.min_order_amount).toLocaleString("fa-IR") + " تومان است." };
+      }
+
+      // ارزیابی هدف‌گذاری کالا یا دسته
+      let applicableAmount = totalAmount;
+      if (coupon.target_type === "category" && coupon.target_id && items.length > 0) {
+        const matchingItems = items.filter((it: any) => it.category === coupon.target_id);
+        if (matchingItems.length === 0) {
+          return { valid: false, discount: 0, message: "این کد تخفیف مخصوص دسته‌بندی «" + coupon.target_id + "» است." };
+        }
+        applicableAmount = matchingItems.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+      } else if (coupon.target_type === "product" && coupon.target_id && items.length > 0) {
+        const matchingItems = items.filter((it: any) => String(it.productId || it.product_id) === String(coupon.target_id));
+        if (matchingItems.length === 0) {
+          return { valid: false, discount: 0, message: "این کد تخفیف فقط برای محصول خاصی معتبر است." };
+        }
+        applicableAmount = matchingItems.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+      }
+
+      const isPercent = coupon.type === "percent" || coupon.discount_type === "percent";
+      const val = Number(coupon.value || coupon.discount_value || 0);
+
+      let calc = isPercent ? Math.round((applicableAmount * val) / 100) : val;
+      const maxLimit = Number(coupon.max_discount || coupon.max_discount_amount || 0);
+      if (maxLimit > 0 && calc > maxLimit) {
+        calc = maxLimit;
+      }
+
+      return { valid: true, discount: calc, message: "کد تخفیف با موفقیت اعمال گردید.", coupon };
+    } catch {
+      return { valid: false, discount: 0, message: "خطا در بررسی اعتبار کد تخفیف." };
+    }
+  },
+};
+</file>
+
+<file path="services/orderService.ts">
+// File Path: services/orderService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface OrderItem {
+  productId?: string | number;
+  product_id?: string | number;
+  title: string;
+  name?: string;
+  price: number;
+  quantity: number;
+  image?: string;
+}
+
+export interface Order {
+  id: string;
+  orderNumber?: string;
+  order_number?: string;
+  customerName?: string;
+  customer_name?: string;
+  phone: string;
+  province?: string;
+  city?: string;
+  address: string;
+  postalCode?: string;
+  postal_code?: string;
+  notes?: string;
+  items: OrderItem[];
+  totalAmount: number;
+  total_amount?: number;
+  discountAmount?: number;
+  discount_amount?: number;
+  finalAmount: number;
+  final_amount?: number;
+  couponCode?: string;
+  coupon_code?: string;
+  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+  payment_status?: "pending" | "paid" | "failed";
+  paymentStatus?: "pending" | "paid" | "failed";
+  trackingCode?: string;
+  tracking_code?: string;
+  created_at?: string;
+  updated_at?: string;
+  customer?: {
+    fullName?: string;
+    name?: string;
+    phone: string;
+    address: string;
+    postalCode?: string;
+    province?: string;
+    city?: string;
+    notes?: string;
+  };
+}
+
+export function normalizeOrder(o: any): Order {
+  const customerName = o.customer_name || o.customerName || o.customer?.fullName || o.customer?.name || "خریدار محترم";
+  const phone = o.phone || o.customer?.phone || "";
+  const address = o.address || o.customer?.address || "";
+  const postalCode = o.postal_code || o.postalCode || o.customer?.postalCode || undefined;
+  const province = o.province || o.customer?.province || undefined;
+  const city = o.city || o.customer?.city || undefined;
+  const totalAmount = Number(o.total_amount || o.totalAmount || 0);
+  const finalAmount = Number(o.final_amount || o.finalAmount || totalAmount);
+  const discountAmount = Number(o.discount_amount || o.discountAmount || 0);
+
+  return {
+    ...o,
+    id: String(o.id || o.order_number || ""),
+    orderNumber: String(o.order_number || o.id || ""),
+    order_number: String(o.order_number || o.id || ""),
+    customerName,
+    customer_name: customerName,
+    phone,
+    address,
+    postalCode,
+    postal_code: postalCode,
+    province,
+    city,
+    totalAmount,
+    total_amount: totalAmount,
+    finalAmount,
+    final_amount: finalAmount,
+    discountAmount,
+    discount_amount: discountAmount,
+    status: o.status || "pending",
+    payment_status: o.payment_status || o.paymentStatus || "pending",
+    items: Array.isArray(o.items) ? o.items : [],
+    customer: {
+      fullName: customerName,
+      name: customerName,
+      phone,
+      address,
+      postalCode,
+      province,
+      city,
+      notes: o.notes || o.customer?.notes,
+    },
+  };
+}
+
+export const orderService = {
+  async getAll(): Promise<Order[]> {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error || !data) return [];
+      return data.map(normalizeOrder);
+    } catch {
+      return [];
+    }
+  },
+
+  async getById(id: string): Promise<Order | null> {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .or(`id.eq.${id},order_number.eq.${id}`)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return normalizeOrder(data);
+    } catch {
+      return null;
+    }
+  },
+
+  async create(orderPayload: any): Promise<Order | null> {
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success && json.data) {
+        return normalizeOrder(json.data);
+      }
+      return null;
+    } catch (e) {
+      console.error("OrderService create error:", e);
+      return null;
+    }
+  },
+
+  async updateStatus(id: string | number, status: string, trackingCode?: string): Promise<boolean> {
+    try {
+      const payload: Record<string, any> = {
+        status,
+        updated_at: new Date().toISOString(),
+      };
+      if (trackingCode) {
+        payload.tracking_code = trackingCode.trim();
+      }
+      if (status === "paid") {
+        payload.payment_status = "paid";
+      }
+
+      const { error } = await supabase.from("orders").update(payload).eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  async trackOrder(query: string): Promise<Order[]> {
+    try {
+      const clean = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).trim();
+      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(clean)}`, { cache: "no-store" });
+      const json = await res.json();
+
+      if (json.success && Array.isArray(json.data)) {
+        return json.data.map(normalizeOrder);
+      }
+      if (json.success && Array.isArray(json.orders)) {
+        return json.orders.map(normalizeOrder);
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+};
+
+export default orderService;
+</file>
+
 <file path="services/siteInfoService.ts">
 // File Path: services/siteInfoService.ts
 import { supabase } from "@/lib/supabase";
@@ -24517,6 +24735,58 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: "خطا در برقراری ارتباط با درگاه." }, { status: 500 });
+  }
+}
+</file>
+
+<file path="app/api/payment/verify/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import crypto from "crypto";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const orderId = String(body?.orderId || "").trim();
+
+    if (!orderId) {
+      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
+    }
+
+    const trackingRef = "TRX-" + Date.now().toString().slice(-6) + "-" + crypto.randomBytes(2).toString("hex").toUpperCase();
+
+    if (supabaseAdmin) {
+      // به‌روزرسانی وضعیت فاکتور به پرداخت‌شده
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          payment_status: "paid",
+          status: "paid",
+          updated_at: new Date().toISOString()
+        })
+        .or(`id.eq.${orderId},order_number.eq.${orderId}`);
+
+      // ثبت تراکنش در جدول payments
+      try {
+        await supabaseAdmin.from("payments").insert([{
+          order_id: orderId,
+          authority: body.authority || ("AUTH_" + Date.now()),
+          tracking_ref: trackingRef,
+          status: "verified",
+          created_at: new Date().toISOString()
+        }]);
+      } catch {}
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "تراکنش بانکی با موفقیت تایید و فاکتور تسویه شد.",
+      trackingRef
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: "خطا در تایید تراکنش." }, { status: 500 });
   }
 }
 </file>
@@ -26527,339 +26797,6 @@ export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
 });
 </file>
 
-<file path="services/couponService.ts">
-import { supabase } from "@/lib/supabase";
-
-export interface Coupon {
-  id: string | number;
-  code: string;
-  type: "percent" | "fixed";
-  discount_type?: "percent" | "fixed";
-  value: number;
-  discount_value?: number;
-  min_order_amount?: number;
-  max_discount_amount?: number;
-  max_discount?: number;
-  usage_limit?: number;
-  used_count?: number;
-  target_type?: "all" | "category" | "product";
-  target_id?: string | null;
-  is_active: boolean;
-  starts_at?: string;
-  expires_at?: string;
-  created_at?: string;
-}
-
-export const couponService = {
-  async getAll(): Promise<Coupon[]> {
-    try {
-      const res = await fetch("/api/coupons", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && json.data) {
-        return json.data;
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  },
-
-  async create(coupon: Partial<Coupon>): Promise<Coupon | null> {
-    try {
-      const res = await fetch("/api/coupons", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(coupon),
-      });
-      const json = await res.json();
-      if (json.success && json.data) {
-        return json.data;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
-
-  async update(id: string | number, updates: Partial<Coupon>): Promise<boolean> {
-    try {
-      const res = await fetch("/api/coupons", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...updates, id }),
-      });
-      const json = await res.json();
-      return !!json.success;
-    } catch {
-      return false;
-    }
-  },
-
-  async delete(id: string | number): Promise<boolean> {
-    try {
-      const res = await fetch("/api/coupons?id=" + encodeURIComponent(id), { method: "DELETE" });
-      const json = await res.json();
-      return !!json.success;
-    } catch {
-      return false;
-    }
-  },
-
-  async validateCoupon(code: string, totalAmount: number, items: any[] = []): Promise<{ valid: boolean; discount: number; message: string; coupon?: Coupon }> {
-    try {
-      const { data: coupon, error } = await supabase
-        .from("coupons")
-        .select("*")
-        .eq("code", code.trim().toUpperCase())
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (error || !coupon) {
-        return { valid: false, discount: 0, message: "کد تخفیف نامعتبر یا غیرفعال است." };
-      }
-
-      const now = new Date();
-      if (coupon.starts_at && new Date(coupon.starts_at) > now) {
-        return { valid: false, discount: 0, message: "زمان استفاده از این کد تخفیف هنوز شروع نشده است." };
-      }
-
-      if (coupon.expires_at && new Date(coupon.expires_at) < now) {
-        return { valid: false, discount: 0, message: "مهلت اعتبار این کد تخفیف به پایان رسیده است." };
-      }
-
-      if (coupon.usage_limit && (coupon.used_count || 0) >= coupon.usage_limit) {
-        return { valid: false, discount: 0, message: "ظرفیت استفاده از این کد تخفیف به پایان رسیده است." };
-      }
-
-      if (coupon.min_order_amount && totalAmount < Number(coupon.min_order_amount)) {
-        return { valid: false, discount: 0, message: "حداقل مبلغ سفارش برای این کد " + Number(coupon.min_order_amount).toLocaleString("fa-IR") + " تومان است." };
-      }
-
-      // ارزیابی هدف‌گذاری کالا یا دسته
-      let applicableAmount = totalAmount;
-      if (coupon.target_type === "category" && coupon.target_id && items.length > 0) {
-        const matchingItems = items.filter((it: any) => it.category === coupon.target_id);
-        if (matchingItems.length === 0) {
-          return { valid: false, discount: 0, message: "این کد تخفیف مخصوص دسته‌بندی «" + coupon.target_id + "» است." };
-        }
-        applicableAmount = matchingItems.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
-      } else if (coupon.target_type === "product" && coupon.target_id && items.length > 0) {
-        const matchingItems = items.filter((it: any) => String(it.productId || it.product_id) === String(coupon.target_id));
-        if (matchingItems.length === 0) {
-          return { valid: false, discount: 0, message: "این کد تخفیف فقط برای محصول خاصی معتبر است." };
-        }
-        applicableAmount = matchingItems.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
-      }
-
-      const isPercent = coupon.type === "percent" || coupon.discount_type === "percent";
-      const val = Number(coupon.value || coupon.discount_value || 0);
-
-      let calc = isPercent ? Math.round((applicableAmount * val) / 100) : val;
-      const maxLimit = Number(coupon.max_discount || coupon.max_discount_amount || 0);
-      if (maxLimit > 0 && calc > maxLimit) {
-        calc = maxLimit;
-      }
-
-      return { valid: true, discount: calc, message: "کد تخفیف با موفقیت اعمال گردید.", coupon };
-    } catch {
-      return { valid: false, discount: 0, message: "خطا در بررسی اعتبار کد تخفیف." };
-    }
-  },
-};
-</file>
-
-<file path="services/orderService.ts">
-// File Path: services/orderService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface OrderItem {
-  productId?: string | number;
-  product_id?: string | number;
-  title: string;
-  name?: string;
-  price: number;
-  quantity: number;
-  image?: string;
-}
-
-export interface Order {
-  id: string;
-  orderNumber?: string;
-  order_number?: string;
-  customerName?: string;
-  customer_name?: string;
-  phone: string;
-  province?: string;
-  city?: string;
-  address: string;
-  postalCode?: string;
-  postal_code?: string;
-  notes?: string;
-  items: OrderItem[];
-  totalAmount: number;
-  total_amount?: number;
-  discountAmount?: number;
-  discount_amount?: number;
-  finalAmount: number;
-  final_amount?: number;
-  couponCode?: string;
-  coupon_code?: string;
-  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
-  payment_status?: "pending" | "paid" | "failed";
-  paymentStatus?: "pending" | "paid" | "failed";
-  trackingCode?: string;
-  tracking_code?: string;
-  created_at?: string;
-  updated_at?: string;
-  customer?: {
-    fullName?: string;
-    name?: string;
-    phone: string;
-    address: string;
-    postalCode?: string;
-    province?: string;
-    city?: string;
-    notes?: string;
-  };
-}
-
-export function normalizeOrder(o: any): Order {
-  const customerName = o.customer_name || o.customerName || o.customer?.fullName || o.customer?.name || "خریدار محترم";
-  const phone = o.phone || o.customer?.phone || "";
-  const address = o.address || o.customer?.address || "";
-  const postalCode = o.postal_code || o.postalCode || o.customer?.postalCode || undefined;
-  const province = o.province || o.customer?.province || undefined;
-  const city = o.city || o.customer?.city || undefined;
-  const totalAmount = Number(o.total_amount || o.totalAmount || 0);
-  const finalAmount = Number(o.final_amount || o.finalAmount || totalAmount);
-  const discountAmount = Number(o.discount_amount || o.discountAmount || 0);
-
-  return {
-    ...o,
-    id: String(o.id || o.order_number || ""),
-    orderNumber: String(o.order_number || o.id || ""),
-    order_number: String(o.order_number || o.id || ""),
-    customerName,
-    customer_name: customerName,
-    phone,
-    address,
-    postalCode,
-    postal_code: postalCode,
-    province,
-    city,
-    totalAmount,
-    total_amount: totalAmount,
-    finalAmount,
-    final_amount: finalAmount,
-    discountAmount,
-    discount_amount: discountAmount,
-    status: o.status || "pending",
-    payment_status: o.payment_status || o.paymentStatus || "pending",
-    items: Array.isArray(o.items) ? o.items : [],
-    customer: {
-      fullName: customerName,
-      name: customerName,
-      phone,
-      address,
-      postalCode,
-      province,
-      city,
-      notes: o.notes || o.customer?.notes,
-    },
-  };
-}
-
-export const orderService = {
-  async getAll(): Promise<Order[]> {
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error || !data) return [];
-      return data.map(normalizeOrder);
-    } catch {
-      return [];
-    }
-  },
-
-  async getById(id: string): Promise<Order | null> {
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .or(`id.eq.${id},order_number.eq.${id}`)
-        .maybeSingle();
-
-      if (error || !data) return null;
-      return normalizeOrder(data);
-    } catch {
-      return null;
-    }
-  },
-
-  async create(orderPayload: any): Promise<Order | null> {
-    try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.success && json.data) {
-        return normalizeOrder(json.data);
-      }
-      return null;
-    } catch (e) {
-      console.error("OrderService create error:", e);
-      return null;
-    }
-  },
-
-  async updateStatus(id: string | number, status: string, trackingCode?: string): Promise<boolean> {
-    try {
-      const payload: Record<string, any> = {
-        status,
-        updated_at: new Date().toISOString(),
-      };
-      if (trackingCode) {
-        payload.tracking_code = trackingCode.trim();
-      }
-      if (status === "paid") {
-        payload.payment_status = "paid";
-      }
-
-      const { error } = await supabase.from("orders").update(payload).eq("id", id);
-      return !error;
-    } catch {
-      return false;
-    }
-  },
-
-  async trackOrder(query: string): Promise<Order[]> {
-    try {
-      const clean = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).trim();
-      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(clean)}`, { cache: "no-store" });
-      const json = await res.json();
-
-      if (json.success && Array.isArray(json.data)) {
-        return json.data.map(normalizeOrder);
-      }
-      if (json.success && Array.isArray(json.orders)) {
-        return json.orders.map(normalizeOrder);
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  },
-};
-
-export default orderService;
-</file>
-
 <file path="next.config.ts">
 import type { NextConfig } from "next";
 
@@ -27328,6 +27265,294 @@ export default function ContactDock() {
 }
 </file>
 
+<file path="services/categoryService.ts">
+import { supabase } from "@/lib/supabase";
+
+export interface Category {
+  id: string;
+  name: string;
+  slug?: string;
+  order?: number;
+  created_at?: string;
+}
+
+export const categoryService = {
+  async getAll(): Promise<Category[]> {
+    try {
+      const res = await fetch("/api/categories", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.data) {
+        return json.data.map((c: any) => ({ ...c, id: String(c.id) }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  async addCategory(cat: { name: string }): Promise<Category | null> {
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: cat.name.trim() }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        return { ...json.data, id: String(json.data.id) };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  async updateCategory(id: string, newName: string): Promise<Category | null> {
+    try {
+      const res = await fetch("/api/categories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name: newName.trim() }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        return { ...json.data, id: String(json.data.id) };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteCategory(id: string, catName?: string): Promise<boolean> {
+    try {
+      let url = "/api/categories?id=" + encodeURIComponent(id);
+      if (catName) url += "&name=" + encodeURIComponent(catName);
+      const res = await fetch(url, { method: "DELETE" });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+};
+</file>
+
+<file path="services/productService.ts">
+// File Path: services/productService.ts
+import { supabase } from "@/lib/supabase";
+
+export interface ProductVariant {
+  id: string;
+  name: string;
+  colorHex?: string;
+  priceDelta?: number;
+}
+
+export interface MarketBenchmark {
+  storeName: string;
+  price?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  warranty: string;
+  isOurStore?: boolean;
+  deliveryTime?: string;
+  logo?: string;
+}
+
+export interface Product {
+  id: string;
+  title: string;
+  name?: string;
+  title_fa?: string;
+  sku?: string;
+  brand?: string;
+  price: number;
+  discountPrice?: number;
+  discount_price?: number;
+  stock?: number;
+  is_available?: boolean;
+  isAvailable?: boolean;
+  is_featured?: boolean;
+  category?: string;
+  image?: string;
+  images?: string[];
+  description?: string;
+  short_description?: string;
+  warranty?: string;
+  variants?: ProductVariant[];
+  specs?: Record<string, string>;
+  market_comparison?: MarketBenchmark[];
+  meta_title?: string;
+  meta_description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const FLAGSHIP_7_PRODUCTS: Product[] = [];
+
+export const productService = {
+  async getAll(): Promise<Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        return data.map((p: any) => ({
+          ...p,
+          id: String(p.id),
+          title: p.title || p.name,
+          name: p.name || p.title,
+          discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
+          isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+          is_available: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/placeholder.png"],
+          image: (Array.isArray(p.images) && p.images[0]) || p.image || "/placeholder.png",
+          market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
+        }));
+      }
+
+      const res = await fetch("/api/products", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.data) {
+        return json.data.map((p: any) => ({
+          ...p,
+          id: String(p.id),
+          title: p.title || p.name,
+          name: p.name || p.title,
+          discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
+          isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+          is_available: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/placeholder.png"],
+          image: (Array.isArray(p.images) && p.images[0]) || p.image || "/placeholder.png",
+          market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
+        }));
+      }
+
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  getAllSync(): Product[] {
+    return [];
+  },
+
+  async getById(id: string): Promise<Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (!error && data) {
+        return {
+          ...data,
+          id: String(data.id),
+          title: data.title || data.name,
+          name: data.name || data.title,
+          discountPrice: data.discount_price ? Number(data.discount_price) : undefined,
+          isAvailable: data.is_available !== false && (data.stock === null || data.stock === undefined || data.stock > 0),
+          is_available: data.is_available !== false && (data.stock === null || data.stock === undefined || data.stock > 0),
+          images: Array.isArray(data.images) && data.images.length > 0 ? data.images : [data.image || "/placeholder.png"],
+          image: (Array.isArray(data.images) && data.images[0]) || data.image || "/placeholder.png",
+          market_comparison: Array.isArray(data.market_comparison) ? data.market_comparison : [],
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  async saveProduct(product: Partial<Product>): Promise<Product | null> {
+    const cleanTitle = String(product.title || product.name || "").trim();
+    const productId = product.id || ("prod_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7));
+
+    const payload = {
+      ...product,
+      id: productId,
+      name: cleanTitle,
+      title: cleanTitle,
+    };
+
+    try {
+      let saved: any = null;
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success && json.data) {
+        saved = json.data;
+      } else {
+        const dbPayload: Record<string, any> = {
+          id: productId,
+          name: cleanTitle,
+          title: cleanTitle,
+          title_fa: product.title_fa || cleanTitle,
+          sku: product.sku || ("SKU-" + productId.slice(-6).toUpperCase()),
+          brand: product.brand || "Apple",
+          category: product.category || "تجهیزات تخصصی",
+          price: Number(product.price || 0),
+          discount_price: product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : null),
+          stock: product.stock !== undefined ? Number(product.stock) : 10,
+          is_available: product.isAvailable ?? product.is_available ?? true,
+          image: product.image || (product.images && product.images[0]) || null,
+          images: product.images || [],
+          description: product.description || null,
+          warranty: product.warranty || "گارانتی اصالت طلایی",
+          variants: product.variants || [],
+          specs: product.specs || {},
+          market_comparison: product.market_comparison || [],
+          meta_title: product.meta_title || cleanTitle,
+          meta_description: product.meta_description || null,
+        };
+
+        const { data: existing } = await supabase.from("products").select("id").eq("id", productId).maybeSingle();
+
+        if (existing) {
+          const { data, error } = await supabase.from("products").update(dbPayload).eq("id", productId).select().single();
+          if (!error) saved = data;
+        } else {
+          dbPayload.created_at = new Date().toISOString();
+          const { data, error } = await supabase.from("products").insert([dbPayload]).select().single();
+          if (!error) saved = data;
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("products_updated", { detail: saved }));
+      }
+      return saved;
+    } catch (e) {
+      console.error("Save product error:", e);
+      return null;
+    }
+  },
+
+  async deleteProduct(id: string): Promise<boolean> {
+    try {
+      const res = await fetch("/api/products?id=" + encodeURIComponent(id), { method: "DELETE" });
+      const ok = res.ok;
+      if (ok && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("products_updated", { detail: { id, deleted: true } }));
+      }
+      return ok;
+    } catch {
+      return false;
+    }
+  },
+};
+
+export default productService;
+</file>
+
 <file path="components/AdminSiteInfo.tsx">
 "use client";
 
@@ -27630,294 +27855,6 @@ export default function AdminSiteInfo() {
     </div>
   );
 }
-</file>
-
-<file path="services/categoryService.ts">
-import { supabase } from "@/lib/supabase";
-
-export interface Category {
-  id: string;
-  name: string;
-  slug?: string;
-  order?: number;
-  created_at?: string;
-}
-
-export const categoryService = {
-  async getAll(): Promise<Category[]> {
-    try {
-      const res = await fetch("/api/categories", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && json.data) {
-        return json.data.map((c: any) => ({ ...c, id: String(c.id) }));
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  },
-
-  async addCategory(cat: { name: string }): Promise<Category | null> {
-    try {
-      const res = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: cat.name.trim() }),
-      });
-      const json = await res.json();
-      if (json.success && json.data) {
-        return { ...json.data, id: String(json.data.id) };
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
-
-  async updateCategory(id: string, newName: string): Promise<Category | null> {
-    try {
-      const res = await fetch("/api/categories", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, name: newName.trim() }),
-      });
-      const json = await res.json();
-      if (json.success && json.data) {
-        return { ...json.data, id: String(json.data.id) };
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
-
-  async deleteCategory(id: string, catName?: string): Promise<boolean> {
-    try {
-      let url = "/api/categories?id=" + encodeURIComponent(id);
-      if (catName) url += "&name=" + encodeURIComponent(catName);
-      const res = await fetch(url, { method: "DELETE" });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  },
-};
-</file>
-
-<file path="services/productService.ts">
-// File Path: services/productService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface ProductVariant {
-  id: string;
-  name: string;
-  colorHex?: string;
-  priceDelta?: number;
-}
-
-export interface MarketBenchmark {
-  storeName: string;
-  price?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  warranty: string;
-  isOurStore?: boolean;
-  deliveryTime?: string;
-  logo?: string;
-}
-
-export interface Product {
-  id: string;
-  title: string;
-  name?: string;
-  title_fa?: string;
-  sku?: string;
-  brand?: string;
-  price: number;
-  discountPrice?: number;
-  discount_price?: number;
-  stock?: number;
-  is_available?: boolean;
-  isAvailable?: boolean;
-  is_featured?: boolean;
-  category?: string;
-  image?: string;
-  images?: string[];
-  description?: string;
-  short_description?: string;
-  warranty?: string;
-  variants?: ProductVariant[];
-  specs?: Record<string, string>;
-  market_comparison?: MarketBenchmark[];
-  meta_title?: string;
-  meta_description?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export const FLAGSHIP_7_PRODUCTS: Product[] = [];
-
-export const productService = {
-  async getAll(): Promise<Product[]> {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        return data.map((p: any) => ({
-          ...p,
-          id: String(p.id),
-          title: p.title || p.name,
-          name: p.name || p.title,
-          discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
-          isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
-          is_available: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
-          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/placeholder.png"],
-          image: (Array.isArray(p.images) && p.images[0]) || p.image || "/placeholder.png",
-          market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
-        }));
-      }
-
-      const res = await fetch("/api/products", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && json.data) {
-        return json.data.map((p: any) => ({
-          ...p,
-          id: String(p.id),
-          title: p.title || p.name,
-          name: p.name || p.title,
-          discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
-          isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
-          is_available: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
-          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/placeholder.png"],
-          image: (Array.isArray(p.images) && p.images[0]) || p.image || "/placeholder.png",
-          market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
-        }));
-      }
-
-      return [];
-    } catch {
-      return [];
-    }
-  },
-
-  getAllSync(): Product[] {
-    return [];
-  },
-
-  async getById(id: string): Promise<Product | null> {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (!error && data) {
-        return {
-          ...data,
-          id: String(data.id),
-          title: data.title || data.name,
-          name: data.name || data.title,
-          discountPrice: data.discount_price ? Number(data.discount_price) : undefined,
-          isAvailable: data.is_available !== false && (data.stock === null || data.stock === undefined || data.stock > 0),
-          is_available: data.is_available !== false && (data.stock === null || data.stock === undefined || data.stock > 0),
-          images: Array.isArray(data.images) && data.images.length > 0 ? data.images : [data.image || "/placeholder.png"],
-          image: (Array.isArray(data.images) && data.images[0]) || data.image || "/placeholder.png",
-          market_comparison: Array.isArray(data.market_comparison) ? data.market_comparison : [],
-        };
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
-
-  async saveProduct(product: Partial<Product>): Promise<Product | null> {
-    const cleanTitle = String(product.title || product.name || "").trim();
-    const productId = product.id || ("prod_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7));
-
-    const payload = {
-      ...product,
-      id: productId,
-      name: cleanTitle,
-      title: cleanTitle,
-    };
-
-    try {
-      let saved: any = null;
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.success && json.data) {
-        saved = json.data;
-      } else {
-        const dbPayload: Record<string, any> = {
-          id: productId,
-          name: cleanTitle,
-          title: cleanTitle,
-          title_fa: product.title_fa || cleanTitle,
-          sku: product.sku || ("SKU-" + productId.slice(-6).toUpperCase()),
-          brand: product.brand || "Apple",
-          category: product.category || "تجهیزات تخصصی",
-          price: Number(product.price || 0),
-          discount_price: product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : null),
-          stock: product.stock !== undefined ? Number(product.stock) : 10,
-          is_available: product.isAvailable ?? product.is_available ?? true,
-          image: product.image || (product.images && product.images[0]) || null,
-          images: product.images || [],
-          description: product.description || null,
-          warranty: product.warranty || "گارانتی اصالت طلایی",
-          variants: product.variants || [],
-          specs: product.specs || {},
-          market_comparison: product.market_comparison || [],
-          meta_title: product.meta_title || cleanTitle,
-          meta_description: product.meta_description || null,
-        };
-
-        const { data: existing } = await supabase.from("products").select("id").eq("id", productId).maybeSingle();
-
-        if (existing) {
-          const { data, error } = await supabase.from("products").update(dbPayload).eq("id", productId).select().single();
-          if (!error) saved = data;
-        } else {
-          dbPayload.created_at = new Date().toISOString();
-          const { data, error } = await supabase.from("products").insert([dbPayload]).select().single();
-          if (!error) saved = data;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("products_updated", { detail: saved }));
-      }
-      return saved;
-    } catch (e) {
-      console.error("Save product error:", e);
-      return null;
-    }
-  },
-
-  async deleteProduct(id: string): Promise<boolean> {
-    try {
-      const res = await fetch("/api/products?id=" + encodeURIComponent(id), { method: "DELETE" });
-      const ok = res.ok;
-      if (ok && typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("products_updated", { detail: { id, deleted: true } }));
-      }
-      return ok;
-    } catch {
-      return false;
-    }
-  },
-};
-
-export default productService;
 </file>
 
 <file path="app/page.tsx">

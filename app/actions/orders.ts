@@ -19,7 +19,7 @@ export interface CreateOrderInput {
     province?: string;
     city?: string;
     address: string;
-    postalCode: string;
+    postalCode?: string;
     notes?: string;
   };
   couponCode?: string;
@@ -59,21 +59,24 @@ export async function createOrderServer(payload: CreateOrderInput) {
     let calculatedTotal = 0;
     const validatedItems = [];
 
+    // بررسی قیمت واقعی دیتابیس و موجودی انبار
     for (const item of items) {
       const dbProduct = dbProducts.find((p: any) => String(p.id) === String(item.productId));
 
-      // بستن قطعی رخنه جعل قیمت: اگر کالایی در دیتابیس نباشد، سفارش فوراً رد می‌شود
       if (!dbProduct) {
         return {
           success: false,
-          error: `کالای «${item.title || item.productId}» در سیستم یافت نشد یا معتبر نیست.`,
+          error: `کالای «${item.title || item.productId}» در سیستم یافت نشد.`,
         };
       }
 
-      if (dbProduct.stock !== null && dbProduct.stock !== undefined && dbProduct.stock < (item.quantity || 1)) {
+      const reqQty = Math.max(1, Number(item.quantity || 1));
+      const currentStock = dbProduct.stock !== null && dbProduct.stock !== undefined ? Number(dbProduct.stock) : 0;
+
+      if (currentStock < reqQty) {
         return {
           success: false,
-          error: `موجودی کالای «${dbProduct.title}» در انبار برای این تعداد کافی نیست.`,
+          error: `موجودی کالای «${dbProduct.title}» کافی نیست (موجودی: ${currentStock}).`,
         };
       }
 
@@ -82,17 +85,18 @@ export async function createOrderServer(payload: CreateOrderInput) {
           ? Number(dbProduct.discount_price)
           : Number(dbProduct.price);
 
-      calculatedTotal += unitPrice * Number(item.quantity || 1);
+      calculatedTotal += unitPrice * reqQty;
 
       validatedItems.push({
         productId: String(dbProduct.id),
         title: dbProduct.title,
         price: unitPrice,
-        quantity: Number(item.quantity || 1),
+        quantity: reqQty,
         image: item.image || "",
       });
     }
 
+    // محاسبه کد تخفیف در سرور
     let discountAmount = 0;
     if (couponCode) {
       const { data: coupon } = await supabaseAdmin
@@ -122,7 +126,6 @@ export async function createOrderServer(payload: CreateOrderInput) {
     }
 
     const finalPayable = Math.max(0, calculatedTotal - discountAmount + shippingCost);
-    // ساخت شناسه یکتا و بدون تصادم
     const orderId = `ORD-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 
     const { data: newOrder, error: insertError } = await supabaseAdmin
@@ -135,7 +138,7 @@ export async function createOrderServer(payload: CreateOrderInput) {
         province: customer.province || "تهران",
         city: customer.city || "تهران",
         address: customer.address.trim(),
-        postal_code: customer.postalCode.trim(),
+        postal_code: customer.postalCode?.trim() || null,
         notes: customer.notes || "",
         items: validatedItems,
         total_amount: calculatedTotal,
@@ -154,7 +157,7 @@ export async function createOrderServer(payload: CreateOrderInput) {
       return { success: false, error: "خطا در ثبت سفارش در پایگاه داده." };
     }
 
-    // کسر موجودی انبار
+    // کسر اتمیک و امن موجودی کالاها
     for (const it of validatedItems) {
       try {
         const { data: p } = await supabaseAdmin

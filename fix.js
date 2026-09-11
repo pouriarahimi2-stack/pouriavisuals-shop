@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Phase 19: Performance Optimization & ISR Caching Tags (fix.js)
+ * AXON CORE - Phase 20: Event-Driven Analytics & Conversion Funnel (fix.js)
  */
 
 const fs = require('fs');
@@ -14,32 +14,51 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PHASE19]\x1b[0m پیاده‌سازی مکانیزم کش و Revalidation پیشرفته...");
+console.log("\x1b[36m[AXON-PHASE20]\x1b[0m پیاده‌سازی سامانه ردیابی قیف تبدیل و تحلیل رویدادها...");
 
 // =============================================================================
-// ۱. ایجاد ماژول lib/cacheConfig.ts برای مدیریت تگ‌های ISR
+// ۱. ساخت ابزار ردیابی رویدادها lib/analytics.ts
 // =============================================================================
-const cacheConfigCode = `/**
- * AXON CORE - ISR Cache Tags & Revalidation Helpers
+const analyticsEngineCode = `/**
+ * AXON CORE - Event-Driven Analytics & Funnel Tracking
  */
 
-export const CACHE_TAGS = {
-  PRODUCTS: "products-cache",
-  BLOGS: "blogs-cache",
-  SITE_INFO: "site-info-cache",
-  ORDERS: "orders-cache",
-};
+type EcommerceEvent = 
+  | "view_product" 
+  | "add_to_cart" 
+  | "begin_checkout" 
+  | "coupon_applied" 
+  | "payment_started" 
+  | "purchase";
 
-export const REVALIDATE_TIMES = {
-  PRODUCTS: 60, // هر ۶۰ ثانیه
-  BLOGS: 300,   // هر ۵ دقیقه
-  SETTINGS: 3600, // هر ۱ ساعت
+export const analytics = {
+  track(event: EcommerceEvent, payload?: Record<string, any>) {
+    const eventData = {
+      event,
+      timestamp: new Date().toISOString(),
+      ...(payload ? { payload } : {}),
+    };
+
+    if (typeof window !== "undefined") {
+      try {
+        const existing = JSON.parse(localStorage.getItem("axon_analytics_funnel_log") || "[]");
+        existing.push(eventData);
+        // نگهداری ۱۰۰ رویداد آخر در لوکال استوریج
+        if (existing.length > 100) existing.shift();
+        localStorage.setItem("axon_analytics_funnel_log", JSON.stringify(existing));
+      } catch {}
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log(\`📊 [ANALYTICS_EVENT]: \${event}\`, payload || "");
+    }
+  },
 };
 `;
-writeFile('lib/cacheConfig.ts', cacheConfigCode);
+writeFile('lib/analytics.ts', analyticsEngineCode);
 
 // =============================================================================
-// ۲. بیلد نهایی پروژه و انتشار در Vercel با مدیریت ایمن گیت
+// ۲. بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -54,7 +73,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "perf(isr): add centralized cache configuration and revalidation tags for Next.js app router"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(analytics): implement event-driven analytics and conversion funnel tracking utility"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -63,7 +82,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بهینه‌سازی کش با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ سامانه تحلیل رفتار با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

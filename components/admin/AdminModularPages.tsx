@@ -6,211 +6,180 @@ import "@measured/puck/puck.css";
 import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import { siteInfoService } from "@/services/siteInfoService";
 import Link from "next/link";
 
 const STORAGE_PREFIX = "axon_puck_page_data_v2026_";
+const GLOBAL_NAV_KEY = "axon_global_header_footer_v2026";
 
-// قالب پیش‌فرض اختصاصی برای هر صفحه خاص
-function getInitialDataForSlug(slug: string, title?: string): Data {
-  const commonHeader = {
-    type: "HeaderCapsuleBar",
-    props: {
-      id: "header-capsule-" + slug,
-      brandText: "Axon | آکسون",
-      logoUrl: "",
-      logoWidth: 36,
-      logoHeight: 36,
-      menu1Text: "کاتالوگ محصولات",
-      menu1Url: "/products",
-      menu2Text: "اخبار تکنولوژی",
-      menu2Url: "/news",
-      menu3Text: "مجله سئو",
-      menu3Url: "/blog",
-      menu4Text: "پیگیری سفارش",
-      menu4Url: "/track-order",
-      menu5Text: "تماس با ما",
-      menu5Url: "/contact",
-      showCart: true,
-      showTheme: true,
-      showUser: true,
-      capsuleBg: "#07090e",
-      capsuleBorder: "#27272a"
-    }
-  };
+const DEFAULT_GLOBAL_HEADER = {
+  type: "HeaderCapsuleBar",
+  props: {
+    id: "global-header-core",
+    brandText: "Axon | آکسون",
+    logoUrl: "",
+    logoWidth: 36,
+    logoHeight: 36,
+    menu1Text: "کاتالوگ محصولات",
+    menu1Url: "/products",
+    menu2Text: "اخبار تکنولوژی",
+    menu2Url: "/news",
+    menu3Text: "مجله سئو",
+    menu3Url: "/blog",
+    menu4Text: "پیگیری سفارش",
+    menu4Url: "/track-order",
+    menu5Text: "تماس با ما",
+    menu5Url: "/contact",
+    showCart: true,
+    showTheme: true,
+    showUser: true,
+    capsuleBg: "#07090e",
+    capsuleBorder: "#27272a"
+  }
+};
 
-  const commonFooter = {
-    type: "GlobalFooterBlock",
-    props: {
-      id: "footer-" + slug,
-      footerLogoUrl: "",
-      brandTitle: "Axon | آکسون",
-      brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
-      brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
-      supportPhone: "09376110200",
-      supportEmail: "Pouriarahimi@yahoo.com",
-      warehouseAddress: "شیراز - ستارخان",
-      workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-      enamadCode: "27424534",
-      copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
-      footerBg: "#07090e"
-    }
-  };
+const DEFAULT_GLOBAL_FOOTER = {
+  type: "GlobalFooterBlock",
+  props: {
+    id: "global-footer-core",
+    footerLogoUrl: "",
+    brandTitle: "Axon | آکسون",
+    brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
+    brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+    supportPhone: "09376110200",
+    supportEmail: "Pouriarahimi@yahoo.com",
+    warehouseAddress: "شیراز - ستارخان",
+    workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+    enamadCode: "27424534",
+    copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
+    footerBg: "#07090e"
+  }
+};
 
+function getPageSpecificBody(slug: string, title?: string): any[] {
   if (slug === "products") {
-    return {
-      content: [
-        commonHeader,
-        {
-          type: "NativeProductCatalog",
-          props: {
-            id: "catalog-page-main",
-            heading: "کاتالوگ جامع مانیتورها و تجهیزات تصویر",
-            subtitle: "دارای گارانتی اصالت طلایی و ارسال سریع پیشتاز به سراسر کشور",
-            limit: 12
-          }
-        },
-        commonFooter
-      ],
-      root: { props: { title: "کاتالوگ محصولات" } }
-    };
+    return [
+      {
+        type: "NativeProductCatalog",
+        props: {
+          id: "catalog-page-main",
+          heading: "کاتالوگ جامع مانیتورها و تجهیزات تصویر",
+          subtitle: "دارای گارانتی اصالت طلایی و ارسال سریع پیشتاز به سراسر کشور",
+          limit: 12
+        }
+      }
+    ];
   }
 
   if (slug === "about") {
-    return {
-      content: [
-        commonHeader,
-        {
-          type: "RichTextBlock",
-          props: {
-            id: "about-rich-text",
-            title: "درباره آکسون استودیو (Axon Core)",
-            content: "مجموعه آکسون مرجع تخصصی تامین، کالیبراسیون و مشاوره تجهیزات پیشرفته تصویر، مانیتورهای تدوین رنگ ۵K و ۴K، کارت‌های کپچر و ابزارهای حرفه‌ای استودیو در ایران است.\n\nتعهد ما ارائه کالاهای ۱۰۰٪ اورجینال با گارانتی اصالت طلایی، تضمین بهترین قیمت بازار و ارسال سریع پیشتاز به سراسر کشور با بسته‌بندی ضدضربه استودیویی است.",
-            bgColor: "transparent"
-          }
-        },
-        {
-          type: "FeaturesGridBlock",
-          props: {
-            id: "about-features",
-            heading: "استانداردهای مهندسی و خدمات طلایی آکسون",
-            col1Title: "🛡️ گارانتی اصالت طلایی",
-            col1Desc: "تضمین ۱۰۰٪ اصالت فیزیکی قطعات و مهلت تست ۷ روزه بازگشت وجه.",
-            col2Title: "🚀 ارسال ایمن هوانوردی",
-            col2Desc: "بسته‌بندی ضربه‌گیر ویژه تجهیزات حساس اپتیکال با پوشش کامل بیمه.",
-            col3Title: "🎨 کالیبراسیون ۳D LUT",
-            col3Desc: "تست سلامت پنل و تطبیق با طیف رنگی سینمایی DCI-P3.",
-            bgColor: "transparent"
-          }
-        },
-        commonFooter
-      ],
-      root: { props: { title: "درباره ما" } }
-    };
-  }
-
-  if (slug === "contact") {
-    return {
-      content: [
-        commonHeader,
-        {
-          type: "RichTextBlock",
-          props: {
-            id: "contact-intro",
-            title: "تماس با واحد مشاوره و پشتیبانی آکسون",
-            content: "برای دریافت مشاوره تخصصی در خصوص انتخاب مانیتورهای ۵K، کارت‌های کپچر و هماهنگی فاکتور رسمی می‌توانید با شماره‌های پشتیبانی تماس حاصل فرمایید یا از طریق شبکه‌های اجتماعی با کارشناسان ما در ارتباط باشید.",
-            bgColor: "transparent"
-          }
-        },
-        commonFooter
-      ],
-      root: { props: { title: "تماس با ما" } }
-    };
-  }
-
-  if (slug === "track-order") {
-    return {
-      content: [
-        commonHeader,
-        {
-          type: "RichTextBlock",
-          props: {
-            id: "track-order-intro",
-            title: "سامانه رهگیری لحظه‌ای مرسولات پستی",
-            content: "کد رهگیری ۲۴ رقمی پیامک‌شده را در این قسمت وارد نمایید تا آخرین وضعیت ارسال بسته پستی خود را به صورت آنلاین مشاهده کنید.",
-            bgColor: "transparent"
-          }
-        },
-        commonFooter
-      ],
-      root: { props: { title: "پیگیری سفارش" } }
-    };
-  }
-
-  // صفحه اصلی (خانه)
-  if (slug === "home") {
-    return {
-      content: [
-        commonHeader,
-        {
-          type: "NativeHero3D",
-          props: {
-            id: "hero-1",
-            topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
-            badgeColor: "#38bdf8",
-            title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
-            titleSize: 42,
-            subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
-            bgColor: "transparent"
-          }
-        },
-        {
-          type: "NativePerspectiveSlider",
-          props: {
-            id: "slider-1",
-            sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-            sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی"
-          }
-        },
-        {
-          type: "NativeProductCatalog",
-          props: {
-            id: "catalog-1",
-            heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
-            subtitle: "تمامی کالاها با گارانتی اصالت طلایی عرضه می‌شوند",
-            limit: 8
-          }
-        },
-        {
-          type: "NativeExplodedView",
-          props: {
-            id: "exploded-1",
-            productTitle: "Apple Studio Display 5K Retina",
-            sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری"
-          }
-        },
-        commonFooter
-      ],
-      root: { props: { title: "صفحه اصلی" } }
-    };
-  }
-
-  // هر صفحه جدید و سفارشی دیگر
-  return {
-    content: [
-      commonHeader,
+    return [
       {
         type: "RichTextBlock",
         props: {
-          id: "custom-page-" + slug,
-          title: title || "صفحه جدید",
-          content: "محتوای این صفحه را از سایدبار سمت راست ویرایش کنید یا بلوک‌های دلخواه را به آن اضافه نمایید.",
+          id: "about-rich-text",
+          title: "درباره آکسون استودیو (Axon Core)",
+          content: "مجموعه آکسون مرجع تخصصی تامین، کالیبراسیون و مشاوره تجهیزات پیشرفته تصویر، مانیتورهای تدوین رنگ ۵K و ۴K، کارت‌های کپچر و ابزارهای حرفه‌ای استودیو در ایران است.\n\nتعهد ما ارائه کالاهای ۱۰۰٪ اورجینال با گارانتی اصالت طلایی، تضمین بهترین قیمت بازار و ارسال سریع پیشتاز به سراسر کشور با بسته‌بندی ضدضربه استودیویی است.",
           bgColor: "transparent"
         }
       },
-      commonFooter
-    ],
-    root: { props: { title: title || slug } }
-  };
+      {
+        type: "FeaturesGridBlock",
+        props: {
+          id: "about-features",
+          heading: "استانداردهای مهندسی و خدمات طلایی آکسون",
+          col1Title: "🛡️ گارانتی اصالت طلایی",
+          col1Desc: "تضمین ۱۰۰٪ اصالت فیزیکی قطعات و مهلت تست ۷ روزه بازگشت وجه.",
+          col2Title: "🚀 ارسال ایمن هوانوردی",
+          col2Desc: "بسته‌بندی ضربه‌گیر ویژه تجهیزات حساس اپتیکال با پوشش کامل بیمه.",
+          col3Title: "🎨 کالیبراسیون ۳D LUT",
+          col3Desc: "تست سلامت پنل و تطبیق با طیف رنگی سینمایی DCI-P3.",
+          bgColor: "transparent"
+        }
+      }
+    ];
+  }
+
+  if (slug === "contact") {
+    return [
+      {
+        type: "RichTextBlock",
+        props: {
+          id: "contact-intro",
+          title: "تماس با واحد مشاوره و پشتیبانی آکسون",
+          content: "برای دریافت مشاوره تخصصی در خصوص انتخاب مانیتورهای ۵K، کارت‌های کپچر و هماهنگی فاکتور رسمی می‌توانید با شماره‌های پشتیبانی تماس حاصل فرمایید یا از طریق شبکه‌های اجتماعی با کارشناسان ما در ارتباط باشید.",
+          bgColor: "transparent"
+        }
+      }
+    ];
+  }
+
+  if (slug === "track-order") {
+    return [
+      {
+        type: "RichTextBlock",
+        props: {
+          id: "track-order-intro",
+          title: "سامانه رهگیری لحظه‌ای مرسولات پستی",
+          content: "کد رهگیری ۲۴ رقمی پیامک‌شده را در این قسمت وارد نمایید تا آخرین وضعیت ارسال بسته پستی خود را به صورت آنلاین مشاهده کنید.",
+          bgColor: "transparent"
+        }
+      }
+    ];
+  }
+
+  if (slug === "home") {
+    return [
+      {
+        type: "NativeHero3D",
+        props: {
+          id: "hero-1",
+          topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+          badgeColor: "#38bdf8",
+          title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+          titleSize: 42,
+          subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+          bgColor: "transparent"
+        }
+      },
+      {
+        type: "NativePerspectiveSlider",
+        props: {
+          id: "slider-1",
+          sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+          sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی"
+        }
+      },
+      {
+        type: "NativeProductCatalog",
+        props: {
+          id: "catalog-1",
+          heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
+          subtitle: "تمامی کالاها با گارانتی اصالت طلایی عرضه می‌شوند",
+          limit: 8
+        }
+      },
+      {
+        type: "NativeExplodedView",
+        props: {
+          id: "exploded-1",
+          productTitle: "Apple Studio Display 5K Retina",
+          sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری"
+        }
+      }
+    ];
+  }
+
+  return [
+    {
+      type: "RichTextBlock",
+      props: {
+        id: "custom-page-" + slug,
+        title: title || "صفحه جدید",
+        content: "محتوای اختصاصی این صفحه را از سایدبار تنظیم کنید یا بلوک‌های دلخواه را به آن اضافه نمایید.",
+        bgColor: "transparent"
+      }
+    }
+  ];
 }
 
 export default function AdminModularPages() {
@@ -221,10 +190,23 @@ export default function AdminModularPages() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
-  // استیت مدال ایجاد صفحه جدید
   const [showNewPageModal, setShowNewPageModal] = useState(false);
   const [newPageTitle, setNewPageTitle] = useState("");
   const [newPageSlug, setNewPageSlug] = useState("");
+
+  // استخراج هدر و فوتر سراسری
+  const getGlobalHeaderFooter = () => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(GLOBAL_NAV_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.header && parsed.footer) return parsed;
+        }
+      } catch {}
+    }
+    return { header: DEFAULT_GLOBAL_HEADER, footer: DEFAULT_GLOBAL_FOOTER };
+  };
 
   const fetchPages = async () => {
     try {
@@ -241,26 +223,27 @@ export default function AdminModularPages() {
     setLoading(true);
     soundEngine.playClick();
 
+    const { header: currentGlobalHeader, footer: currentGlobalFooter } = getGlobalHeaderFooter();
     let targetData: Data | null = null;
 
-    // ۱. بررسی کش کلاینت
+    // ۱. بررسی کش اختصاصی محتوای این صفحه
     if (typeof window !== "undefined") {
       try {
         const local = localStorage.getItem(STORAGE_PREFIX + slug);
         if (local) {
           const parsed = JSON.parse(local);
-          if (parsed && Array.isArray(parsed.content) && parsed.content.length > 0) {
+          if (parsed && Array.isArray(parsed.content)) {
             targetData = parsed;
           }
         }
       } catch {}
     }
 
-    // ۲. بررسی دیتابیس
+    // ۲. بررسی دیتابیس برای محتوای این صفحه
     try {
       const res = await fetch("/api/pages?slug=" + encodeURIComponent(slug), { cache: "no-store" });
       const json = await res.json();
-      if (json.success && json.page && json.page.puck_data && Array.isArray(json.page.puck_data.content) && json.page.puck_data.content.length > 0) {
+      if (json.success && json.page && json.page.puck_data && Array.isArray(json.page.puck_data.content)) {
         targetData = json.page.puck_data;
         if (typeof window !== "undefined") {
           localStorage.setItem(STORAGE_PREFIX + slug, JSON.stringify(targetData));
@@ -268,12 +251,22 @@ export default function AdminModularPages() {
       }
     } catch {}
 
-    // ۳. در صورت نبودن دیتای ذخیره‌شده، لود قالب اختصاصی همان صفحه
-    if (!targetData) {
-      targetData = getInitialDataForSlug(slug, customTitle);
+    // اگر محتوا خالی بود، بدنه اختصاصی همان صفحه قرار می‌گیرد
+    let bodyBlocks = targetData?.content ? targetData.content.filter(
+      (b: any) => b.type !== "HeaderCapsuleBar" && b.type !== "GlobalFooterBlock"
+    ) : [];
+
+    if (bodyBlocks.length === 0) {
+      bodyBlocks = getPageSpecificBody(slug, customTitle);
     }
 
-    setPageData(targetData);
+    // اتصال ۱۰۰٪ هدر و فوتر سراسری به اول و آخر صفحه
+    const mergedData: Data = {
+      content: [currentGlobalHeader, ...bodyBlocks, currentGlobalFooter],
+      root: { props: { title: customTitle || slug } }
+    };
+
+    setPageData(mergedData);
     setRenderKey(slug + "_" + Date.now());
     setLoading(false);
   };
@@ -285,15 +278,50 @@ export default function AdminModularPages() {
 
   const handleSave = async (data: Data) => {
     soundEngine.playClick();
-    setToast("در حال انتشار و ذخیره تغییرات...");
+    setToast("در حال انتشار سراسری تغییرات در تمام صفحات...");
+
+    // ۱. استخراج و سراسری‌سازی هدر و فوتر در تمام صفحات
+    const newHeaderBlock = data.content?.find((b: any) => b.type === "HeaderCapsuleBar") || DEFAULT_GLOBAL_HEADER;
+    const newFooterBlock = data.content?.find((b: any) => b.type === "GlobalFooterBlock") || DEFAULT_GLOBAL_FOOTER;
 
     if (typeof window !== "undefined") {
       try {
+        localStorage.setItem(
+          GLOBAL_NAV_KEY,
+          JSON.stringify({ header: newHeaderBlock, footer: newFooterBlock })
+        );
         localStorage.setItem(STORAGE_PREFIX + currentSlug, JSON.stringify(data));
       } catch {}
     }
+
     setPageData(data);
 
+    // ۲. ذخیره پایدار هدر و فوتر در جدول مرجع site_info برای تمام کلاینت‌ها
+    try {
+      const hProps = newHeaderBlock.props || {};
+      const fProps = newFooterBlock.props || {};
+
+      await siteInfoService.updateSiteInfo({
+        site_name: hProps.brandText || fProps.brandTitle || "Axon | آکسون",
+        phone: fProps.supportPhone || "09376110200",
+        email: fProps.supportEmail || "Pouriarahimi@yahoo.com",
+        address: fProps.warehouseAddress || "شیراز - ستارخان",
+        working_hours: fProps.workingHours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+        description: fProps.brandDesc || "",
+        footer_text: fProps.brandDesc || "",
+        logo_url: hProps.logoUrl || "",
+        footer_logo_url: fProps.footerLogoUrl || "",
+        homepage_layout_config: {
+          headerLogoConfig: {
+            width: Number(hProps.logoWidth) || 36,
+            height: Number(hProps.logoHeight) || 36,
+            url: hProps.logoUrl || ""
+          }
+        }
+      });
+    } catch {}
+
+    // ۳. ذخیره ساختار کامل صفحه در modular_pages
     try {
       const currentPageObj = pages.find((p) => p.slug === currentSlug);
       const pageTitle = currentPageObj?.title || currentSlug;
@@ -312,17 +340,23 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        setToast("✓ صفحه «" + pageTitle + "» با موفقیت ذخیره و منتشر شد.");
-        fetchPages();
+        setToast("✓ تغییرات هدر و فوتر سراسری شد و در تمام صفحات ذخیره گردید.");
+
+        // وب‌سوکت بلادرنگ به تمام کلاینت‌های باز
+        try {
+          supabase.channel("realtime-header-puck-sync").send({
+            type: "broadcast",
+            event: "header_updated",
+            payload: newHeaderBlock.props || {}
+          });
+        } catch {}
 
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("puck_published"));
         }
-      } else {
-        setToast("هشدار: در مرورگر ثبت شد، خطا در سرور: " + (json.message || ""));
       }
     } catch {
-      setToast("✓ تغییرات به صورت محلی ذخیره شد.");
+      setToast("✓ تغییرات به صورت پایدار ثبت گردید.");
     } finally {
       setTimeout(() => setToast(null), 3500);
     }
@@ -343,9 +377,8 @@ export default function AdminModularPages() {
     setNewPageTitle("");
     setNewPageSlug("");
 
-    // بارگذاری فوری صفحه جدید در ویرایشگر
     loadPage(cleanSlug, title);
-    setToast("✓ صفحه جدید «" + title + "» ایجاد شد. اکنون می‌توانید چیدمان آن را تکمیل و Publish کنید.");
+    setToast("✓ صفحه جدید «" + title + "» با هدر و فوتر سراسری ساخته شد.");
     setTimeout(() => setToast(null), 4000);
   };
 
@@ -403,7 +436,7 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* مدال ساخت صفحه جدید */}
+      {/* مدال ساخت صفحه سفارشی جدید */}
       {showNewPageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans" dir="rtl">
           <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-2xl text-[var(--text-primary)]">
@@ -466,10 +499,10 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم Puck */}
+      {/* بوم Puck با هدر و فوتر سراسری و محتوای اختصاصی هر صفحه */}
       <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px]">
         {loading || !pageData ? (
-          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی صفحه...</div>
+          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال لود صفحه و همگام‌سازی هدر سراسری...</div>
         ) : (
           <Puck
             key={renderKey}

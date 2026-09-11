@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { supabase } from "@/lib/supabase";
 
 export default function Header() {
   const { totalItems, toggleCart } = useCart();
@@ -12,7 +13,6 @@ export default function Header() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
-  // استیت‌های اختصاصی Puck برای هدر
   const [headerConfig, setHeaderConfig] = useState<{
     brandText?: string;
     logoUrl?: string;
@@ -22,7 +22,7 @@ export default function Header() {
     capsuleBorder?: string;
   }>({});
 
-  const loadPuckHeaderData = async () => {
+  const loadHeaderFromPuck = async () => {
     try {
       const res = await fetch("/api/pages?slug=home", { cache: "no-store" });
       const json = await res.json();
@@ -46,7 +46,7 @@ export default function Header() {
       if (data) setSiteInfo(data);
     });
 
-    loadPuckHeaderData();
+    loadHeaderFromPuck();
 
     try {
       const savedTheme = localStorage.getItem("theme");
@@ -56,17 +56,27 @@ export default function Header() {
       else document.documentElement.classList.remove("dark");
     } catch {}
 
-    const handleSiteUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-      loadPuckHeaderData();
-    };
+    // وب‌سوکت بلادرنگ دیتابیس Supabase (بدون نیاز به رفرش)
+    const channel = supabase
+      .channel("realtime-header-puck-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
+        loadHeaderFromPuck();
+      })
+      .on("broadcast", { event: "header_updated" }, (payload) => {
+        if (payload?.payload) {
+          setHeaderConfig(payload.payload);
+        } else {
+          loadHeaderFromPuck();
+        }
+      })
+      .subscribe();
 
-    window.addEventListener("site_info_updated", handleSiteUpdate);
-    window.addEventListener("puck_published", loadPuckHeaderData);
+    const handleLocalUpdate = () => loadHeaderFromPuck();
+    window.addEventListener("puck_published", handleLocalUpdate);
 
     return () => {
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
-      window.removeEventListener("puck_published", loadPuckHeaderData);
+      supabase.removeChannel(channel);
+      window.removeEventListener("puck_published", handleLocalUpdate);
     };
   }, []);
 
@@ -95,9 +105,9 @@ export default function Header() {
           backgroundColor: headerConfig.capsuleBg || undefined,
           borderColor: headerConfig.capsuleBorder || undefined,
         }}
-        className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all"
+        className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-300"
       >
-        {/* سمت چپ: ابزارهای کاربری */}
+        {/* ابزارهای کاربر در چپ */}
         <div className="flex items-center gap-2 order-1">
           <button
             type="button"
@@ -131,7 +141,7 @@ export default function Header() {
           </Link>
         </div>
 
-        {/* وسط: منوهای ناوبری */}
+        {/* منوهای ناوبری */}
         <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-700 dark:text-slate-300 order-2" dir="rtl">
           <Link href="/products" className="hover:text-sky-500 transition cursor-pointer">کاتالوگ محصولات</Link>
           <Link href="/news" className="hover:text-sky-500 transition cursor-pointer">اخبار تکنولوژی</Link>
@@ -140,14 +150,14 @@ export default function Header() {
           <Link href="/contact" className="hover:text-sky-500 transition cursor-pointer">تماس با ما</Link>
         </nav>
 
-        {/* سمت راست: لوگو با اعمال مستقیم ابعاد درخواستی */}
+        {/* سمت راست: لوگو با کنترل بلادرنگ ابعاد */}
         <Link href="/" className="flex items-center gap-3 group order-3" dir="rtl">
           <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition">
             {storeName}
           </span>
           <div
             style={{ width: logoW + 'px', height: logoH + 'px' }}
-            className="rounded-xl bg-[var(--input-bg)] border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shadow-md group-hover:scale-105 transition p-1 shrink-0"
+            className="rounded-xl bg-[var(--input-bg)] border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shadow-md group-hover:scale-105 transition-all duration-300 p-1 shrink-0"
           >
             {logoUrl ? (
               <img

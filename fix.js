@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Fix Header Logo Dimensions & Puck Sync (fix.js)
+ * AXON CORE - Fix "use client" Directive Order & Complete Realtime Sync (fix.js)
  */
 
 const fs = require('fs');
@@ -14,200 +14,247 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-FIX]\x1b[0m اتصال مستقیم ابعاد لوگوی هدر به داده‌های ذخیره‌شده در صفحه ساز...");
+console.log("\x1b[36m[AXON-CLIENT-DIRECTIVE-FIX]\x1b[0m اصلاح جایگاه use client در خط اول و تکمیل وب‌سوکت ریل‌تایم...");
 
 // =============================================================================
-// ۱. بازنویسی components/Header.tsx با دریافت لحظه‌ای تنظیمات Puck
+// ۱. بازنویسی کامل components/admin/AdminModularPages.tsx با use client در خط اول
 // =============================================================================
-const fixedHeaderCode = `"use client";
+const fixedAdminModularPages = `"use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { useCart } from "@/context/CartContext";
+import { Puck, Data } from "@measured/puck";
+import "@measured/puck/puck.css";
+import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
-import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
 
-export default function Header() {
-  const { totalItems, toggleCart } = useCart();
-  const [mounted, setMounted] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+const ATOMIC_INITIAL_DATA: Data = {
+  content: [
+    {
+      type: "HeaderCapsuleBar",
+      props: {
+        id: "header-capsule-1",
+        brandText: "Axon | آکسون",
+        logoUrl: "",
+        logoWidth: 36,
+        logoHeight: 36,
+        capsuleBg: "rgba(7, 9, 14, 0.9)",
+        capsuleBorder: "rgba(255, 255, 255, 0.12)",
+        paddingY: 10
+      }
+    },
+    {
+      type: "NativeHero3D",
+      props: {
+        id: "hero-1",
+        topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+        badgeColor: "#38bdf8",
+        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+        titleSize: 42,
+        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+        bgColor: "transparent",
+        paddingTop: 40,
+        paddingBottom: 20
+      }
+    },
+    {
+      type: "NativePerspectiveSlider",
+      props: {
+        id: "slider-1",
+        sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+        sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی",
+        paddingY: 20
+      }
+    },
+    {
+      type: "NativeProductCatalog",
+      props: {
+        id: "catalog-1",
+        heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
+        subtitle: "تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند",
+        limit: 8
+      }
+    },
+    {
+      type: "NativeExplodedView",
+      props: {
+        id: "exploded-1",
+        productTitle: "Apple Studio Display 5K Retina",
+        sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری"
+      }
+    },
+    {
+      type: "GlobalFooterBlock",
+      props: {
+        id: "footer-1",
+        footerLogoUrl: "",
+        brandTitle: "Axon | آکسون",
+        brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
+        brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+        supportPhone: "09376110200",
+        supportEmail: "Pouriarahimi@yahoo.com",
+        warehouseAddress: "شیراز - ستارخان",
+        workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+        enamadCode: "27424534",
+        copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
+        footerBg: "#07090e"
+      }
+    }
+  ],
+  root: { props: { title: "صفحه اصلی" } }
+};
 
-  // استیت‌های اختصاصی Puck برای هدر
-  const [headerConfig, setHeaderConfig] = useState<{
-    brandText?: string;
-    logoUrl?: string;
-    logoWidth?: number;
-    logoHeight?: number;
-    capsuleBg?: string;
-    capsuleBorder?: string;
-  }>({});
+export default function AdminModularPages() {
+  const [pages, setPages] = useState<Array<{ id: string; slug: string; title: string }>>([]);
+  const [currentSlug, setCurrentSlug] = useState<string>("home");
+  const [pageData, setPageData] = useState<Data>(ATOMIC_INITIAL_DATA);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  const loadPuckHeaderData = async () => {
+  const fetchPages = async () => {
     try {
-      const res = await fetch("/api/pages?slug=home", { cache: "no-store" });
+      const res = await fetch("/api/pages", { cache: "no-store" });
       const json = await res.json();
-      if (json.success && json.page?.puck_data?.content) {
-        const headerBlock = json.page.puck_data.content.find(
-          (b: any) => b.type === "HeaderCapsuleBar"
-        );
-        if (headerBlock?.props) {
-          setHeaderConfig(headerBlock.props);
-        }
+      if (json.success && Array.isArray(json.pages)) {
+        setPages(json.pages);
       }
     } catch {}
   };
 
-  useEffect(() => {
-    setMounted(true);
-    const cached = siteInfoService.getSiteInfoSync();
-    if (cached) setSiteInfo(cached);
-
-    siteInfoService.getSiteInfo().then((data) => {
-      if (data) setSiteInfo(data);
-    });
-
-    loadPuckHeaderData();
-
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      const isDark = savedTheme !== "light";
-      setIsDarkMode(isDark);
-      if (isDark) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-    } catch {}
-
-    const handleSiteUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-      loadPuckHeaderData();
-    };
-
-    window.addEventListener("site_info_updated", handleSiteUpdate);
-    window.addEventListener("puck_published", loadPuckHeaderData);
-
-    return () => {
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
-      window.removeEventListener("puck_published", loadPuckHeaderData);
-    };
-  }, []);
-
-  const toggleDarkMode = () => {
+  const loadPage = async (slug: string) => {
+    setCurrentSlug(slug);
+    setLoading(true);
     soundEngine.playClick();
-    if (isDarkMode) {
-      document.documentElement.classList.remove("dark");
-      setIsDarkMode(false);
-      localStorage.setItem("theme", "light");
-    } else {
-      document.documentElement.classList.add("dark");
-      setIsDarkMode(true);
-      localStorage.setItem("theme", "dark");
+    try {
+      const res = await fetch(\`/api/pages?slug=\${encodeURIComponent(slug)}\`, { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.page && json.page.puck_data && json.page.puck_data.content?.length > 0) {
+        setPageData(json.page.puck_data);
+      } else {
+        setPageData(ATOMIC_INITIAL_DATA);
+      }
+    } catch {
+      setPageData(ATOMIC_INITIAL_DATA);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const storeName = headerConfig.brandText || siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
-  const logoUrl = headerConfig.logoUrl || siteInfo?.logo_url || siteInfo?.logoUrl;
-  const logoW = Number(headerConfig.logoWidth) || 36;
-  const logoH = Number(headerConfig.logoHeight) || 36;
+  useEffect(() => {
+    fetchPages();
+    loadPage("home");
+  }, []);
+
+  const handleSave = async (data: Data) => {
+    soundEngine.playClick();
+    setToast("در حال انتشار تغییرات روی سایت...");
+    try {
+      const res = await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: currentSlug,
+          title: currentSlug === "home" ? "صفحه اصلی" : currentSlug,
+          puck_data: data,
+          is_published: true,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setToast("✓ صفحه با موفقیت ذخیره شد و تغییرات بلادرنگ اعمال گردید.");
+
+        // برودکست وب‌سوکت بلادرنگ به تمام تب‌های باز
+        try {
+          const headerBlock = data.content?.find((b: any) => b.type === "HeaderCapsuleBar");
+          supabase.channel("realtime-header-puck-sync").send({
+            type: "broadcast",
+            event: "header_updated",
+            payload: headerBlock?.props || {}
+          });
+        } catch {}
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("puck_published"));
+        }
+      } else {
+        setToast("خطا در ذخیره‌سازی.");
+      }
+    } catch {
+      setToast("خطا در برقراری ارتباط با سرور.");
+    } finally {
+      setTimeout(() => setToast(null), 3500);
+    }
+  };
+
+  const targetLiveUrl = currentSlug === "home" ? "/" : \`/\${currentSlug}\`;
 
   return (
-    <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="ltr">
-      <div
-        style={{
-          backgroundColor: headerConfig.capsuleBg || undefined,
-          borderColor: headerConfig.capsuleBorder || undefined,
-        }}
-        className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all"
-      >
-        {/* سمت چپ: ابزارهای کاربری */}
-        <div className="flex items-center gap-2 order-1">
-          <button
-            type="button"
-            onClick={() => { soundEngine.playClick(); toggleCart(); }}
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer relative shadow-sm"
-            title="سبد خرید"
-          >
-            🛒
-            {mounted && totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-black flex items-center justify-center shadow-md animate-bounce">
-                {totalItems}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleDarkMode}
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer text-xs"
-            title="حالت شب / روز"
-          >
-            {isDarkMode ? "🌙" : "☀️"}
-          </button>
-
-          <Link
-            href="/admin/login"
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition cursor-pointer text-xs"
-            title="ورود به حساب"
-          >
-            👤
-          </Link>
+    <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]" dir="rtl">
+      
+      {/* سربرگ استودیو */}
+      <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md font-bold">
+            ⚡
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">انتخاب صفحه:</span>
+            <select
+              value={currentSlug}
+              onChange={(e) => loadPage(e.target.value)}
+              className="p-2 px-3.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-black outline-none cursor-pointer"
+            >
+              {pages.map((p) => (
+                <option key={p.id} value={p.slug}>
+                  📄 {p.title} (/{p.slug === "home" ? "" : p.slug})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* وسط: منوهای ناوبری */}
-        <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-700 dark:text-slate-300 order-2" dir="rtl">
-          <Link href="/products" className="hover:text-sky-500 transition cursor-pointer">کاتالوگ محصولات</Link>
-          <Link href="/news" className="hover:text-sky-500 transition cursor-pointer">اخبار تکنولوژی</Link>
-          <Link href="/blog" className="hover:text-sky-500 transition cursor-pointer">مجله سئو</Link>
-          <Link href="/track-order" className="hover:text-sky-500 transition cursor-pointer">پیگیری سفارش</Link>
-          <Link href="/contact" className="hover:text-sky-500 transition cursor-pointer">تماس با ما</Link>
-        </nav>
-
-        {/* سمت راست: لوگو با اعمال مستقیم ابعاد درخواستی */}
-        <Link href="/" className="flex items-center gap-3 group order-3" dir="rtl">
-          <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition">
-            {storeName}
-          </span>
-          <div
-            style={{ width: logoW + 'px', height: logoH + 'px' }}
-            className="rounded-xl bg-[var(--input-bg)] border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shadow-md group-hover:scale-105 transition p-1 shrink-0"
+        <div className="flex items-center gap-2">
+          <Link
+            href={targetLiveUrl}
+            target="_blank"
+            className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
           >
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={storeName}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            ) : (
-              <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
-                ▲
-              </div>
-            )}
-          </div>
-        </Link>
+            <span>مشاهده زنده در سایت</span>
+            <span>🔗</span>
+          </Link>
+        </div>
       </div>
-    </header>
+
+      {toast && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
+          {toast}
+        </div>
+      )}
+
+      {/* بوم استاندارد با بزرگنمایی طبیعی ۱۰۰٪ */}
+      <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px]">
+        {loading ? (
+          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>
+        ) : (
+          <Puck
+            config={puckConfig}
+            data={pageData}
+            onPublish={handleSave}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 `;
-writeFile('components/Header.tsx', fixedHeaderCode);
+writeFile('components/admin/AdminModularPages.tsx', fixedAdminModularPages);
 
 // =============================================================================
-// ۲. به‌روزرسانی components/admin/AdminModularPages.tsx جهت ارسال ایونت آنی ذخیره‌سازی
+// ۲. بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
-const adminModularPagesPath = path.join(process.cwd(), 'components/admin/AdminModularPages.tsx');
-let adminModularCode = fs.readFileSync(adminModularPagesPath, 'utf8');
-
-if (!adminModularCode.includes('puck_published')) {
-  adminModularCode = adminModularCode.replace(
-    'soundEngine.playSuccess();',
-    'soundEngine.playSuccess();\n        if (typeof window !== "undefined") window.dispatchEvent(new Event("puck_published"));'
-  );
-  writeFile('components/admin/AdminModularPages.tsx', adminModularCode);
-}
-
-// =============================================================================
-// ۳. بیلد نهایی پروژه و انتشار در Vercel
-// =============================================================================
-console.log("تست بیلد کامل (npm run build)...");
+console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -220,7 +267,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(header-puck-sync): dynamically apply logo width and height from puck store to live header"', { stdio: 'inherit' });
+  execSync('git commit -m "fix: place use client at top of AdminModularPages.tsx and sync header via realtime websocket"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -229,7 +276,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ اعمال ابعاد لوگو با موفقیت منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ بیلد و دیپلوی با موفقیت به اتمام رسید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

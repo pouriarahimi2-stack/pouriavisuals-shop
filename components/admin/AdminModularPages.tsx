@@ -5,6 +5,7 @@ import { Puck, Data } from "@measured/puck";
 import "@measured/puck/puck.css";
 import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 
 const ATOMIC_INITIAL_DATA: Data = {
@@ -13,6 +14,12 @@ const ATOMIC_INITIAL_DATA: Data = {
       type: "HeaderCapsuleBar",
       props: {
         id: "header-capsule-1",
+        brandText: "Axon | آکسون",
+        logoUrl: "",
+        logoWidth: 36,
+        logoHeight: 36,
+        capsuleBg: "rgba(7, 9, 14, 0.9)",
+        capsuleBorder: "rgba(255, 255, 255, 0.12)",
         paddingY: 10
       }
     },
@@ -21,13 +28,21 @@ const ATOMIC_INITIAL_DATA: Data = {
       props: {
         id: "hero-1",
         topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
-        bgColor: "transparent"
+        badgeColor: "#38bdf8",
+        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+        titleSize: 42,
+        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+        bgColor: "transparent",
+        paddingTop: 40,
+        paddingBottom: 20
       }
     },
     {
       type: "NativePerspectiveSlider",
       props: {
         id: "slider-1",
+        sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+        sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی",
         paddingY: 20
       }
     },
@@ -35,20 +50,24 @@ const ATOMIC_INITIAL_DATA: Data = {
       type: "NativeProductCatalog",
       props: {
         id: "catalog-1",
-        heading: "کاتالوگ تجهیزات تخصصی"
+        heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
+        subtitle: "تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند",
+        limit: 8
       }
     },
     {
       type: "NativeExplodedView",
       props: {
         id: "exploded-1",
-        productTitle: "Apple Studio Display 5K Retina"
+        productTitle: "Apple Studio Display 5K Retina",
+        sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری"
       }
     },
     {
       type: "GlobalFooterBlock",
       props: {
         id: "footer-1",
+        footerLogoUrl: "",
         brandTitle: "Axon | آکسون",
         brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
         brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
@@ -57,40 +76,11 @@ const ATOMIC_INITIAL_DATA: Data = {
         warehouseAddress: "شیراز - ستارخان",
         workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
         enamadCode: "27424534",
-        copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026"
+        copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
+        footerBg: "#07090e"
       }
     }
   ],
-  zones: {
-    "header-capsule-1:right-brand": [
-      {
-        type: "HeaderBrandLogo",
-        props: {
-          id: "brand-logo-1",
-          brandText: "Axon | آکسون",
-          iconText: "▲"
-        }
-      }
-    ],
-    "header-capsule-1:center-menu": [
-      { type: "HeaderNavItem", props: { id: "nav-1", title: "کاتالوگ محصولات", url: "/products" } },
-      { type: "HeaderNavItem", props: { id: "nav-2", title: "اخبار تکنولوژی", url: "/news" } },
-      { type: "HeaderNavItem", props: { id: "nav-3", title: "مجله سئو", url: "/blog" } },
-      { type: "HeaderNavItem", props: { id: "nav-4", title: "پیگیری سفارش", url: "/track-order" } },
-      { type: "HeaderNavItem", props: { id: "nav-5", title: "تماس با ما", url: "/contact" } }
-    ],
-    "header-capsule-1:left-actions": [
-      {
-        type: "HeaderActionsGroup",
-        props: {
-          id: "actions-1",
-          showCart: true,
-          showTheme: true,
-          showUser: true
-        }
-      }
-    ]
-  },
   root: { props: { title: "صفحه اصلی" } }
 };
 
@@ -152,8 +142,21 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        if (typeof window !== "undefined") window.dispatchEvent(new Event("puck_published"));
-        setToast("✓ صفحه با موفقیت ذخیره شد و تغییرات اعمال گردید.");
+        setToast("✓ صفحه با موفقیت ذخیره شد و تغییرات بلادرنگ اعمال گردید.");
+
+        // برودکست وب‌سوکت بلادرنگ به تمام تب‌های باز
+        try {
+          const headerBlock = data.content?.find((b: any) => b.type === "HeaderCapsuleBar");
+          supabase.channel("realtime-header-puck-sync").send({
+            type: "broadcast",
+            event: "header_updated",
+            payload: headerBlock?.props || {}
+          });
+        } catch {}
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("puck_published"));
+        }
       } else {
         setToast("خطا در ذخیره‌سازی.");
       }
@@ -209,7 +212,7 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      {/* بوم استاندارد با بزرگنمایی طبیعی ۱۰۰٪ و قابلیت درگ با ماوس */}
+      {/* بوم استاندارد با بزرگنمایی طبیعی ۱۰۰٪ */}
       <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px]">
         {loading ? (
           <div className="py-32 text-center text-xs font-bold text-slate-400">در حال آماده‌سازی بوم بصری...</div>

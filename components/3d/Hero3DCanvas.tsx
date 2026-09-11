@@ -12,6 +12,9 @@ export default function Hero3DCanvas() {
     const container = containerRef.current;
     if (!container) return;
 
+    let isVisible = true;
+    let isTabActive = true;
+
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
       45,
@@ -27,12 +30,12 @@ export default function Hero3DCanvas() {
       powerPreference: "high-performance",
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.4;
     container.appendChild(renderer.domElement);
 
-    // سیستم نورپردازی استودیویی ۳ بعدی
+    // نورپردازی استودیو
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
@@ -48,7 +51,7 @@ export default function Hero3DCanvas() {
     rimLight.position.set(0, 8, -5);
     scene.add(rimLight);
 
-    // هسته کریستالی اپتیکال شکست نور
+    // هسته منشور هندسی
     const coreGroup = new THREE.Group();
     scene.add(coreGroup);
 
@@ -68,7 +71,7 @@ export default function Hero3DCanvas() {
     const coreMesh = new THREE.Mesh(coreGeo, coreMat);
     coreGroup.add(coreMesh);
 
-    // وایرفریم نئونی هندسی
+    // وایرفریم نئونی
     const wireGeo = new THREE.IcosahedronGeometry(1.68, 2);
     const wireMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
@@ -79,7 +82,7 @@ export default function Hero3DCanvas() {
     const wireMesh = new THREE.Mesh(wireGeo, wireMat);
     coreGroup.add(wireMesh);
 
-    // حلقه‌های تیتانیومی مداری چرخشی
+    // مدارات مدور
     const ringMat1 = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
       metalness: 0.9,
@@ -105,8 +108,8 @@ export default function Hero3DCanvas() {
     ring2.rotation.y = Math.PI / 4;
     scene.add(ring2);
 
-    // ماتریس ذرات نئونی
-    const particleCount = 200;
+    // ذرات معلق
+    const particleCount = 160;
     const particlePositions = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount * 3; i += 3) {
       particlePositions[i] = (Math.random() - 0.5) * 14;
@@ -125,7 +128,6 @@ export default function Hero3DCanvas() {
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    // تعامل پارالاکس با ماوس
     let mouseX = 0;
     let mouseY = 0;
     let targetX = 0;
@@ -139,13 +141,32 @@ export default function Hero3DCanvas() {
       mouseY = -(y / rect.height) * 2;
     };
 
-    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+
+    // سنسور توقف انیمیشن در پس‌زمینه تب مرورگر
+    const handleVisibility = () => {
+      isTabActive = !document.hidden;
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // سنسور رویت المان (IntersectionObserver)
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+      },
+      { root: null, threshold: 0.05 }
+    );
+    observer.observe(container);
 
     let animationFrameId: number;
     const clock = new THREE.Clock();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
+
+      // جلوگیری از مصرف GPU هنگامی که هیرو در کادر نیست یا تب تغییر کرده است
+      if (!isVisible || !isTabActive) return;
+
       const elapsedTime = clock.getElapsedTime();
 
       coreMesh.rotation.y = elapsedTime * 0.28;
@@ -182,11 +203,13 @@ export default function Hero3DCanvas() {
       renderer.setSize(container.clientWidth, container.clientHeight);
     };
 
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", handleResize, { passive: true });
 
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      observer.disconnect();
       cancelAnimationFrame(animationFrameId);
 
       coreGeo.dispose();

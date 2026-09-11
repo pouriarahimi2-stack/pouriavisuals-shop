@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Step 4: Enforce RBAC Permission Matrix on Admin APIs (fix.js)
+ * AXON CORE - Step 5: WebGL Viewport Throttling & Energy-Efficient Three.js (fix.js)
  */
 
 const fs = require('fs');
@@ -14,163 +14,255 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[STEP-4]\x1b[0m اعمال بررسی نقش‌محور (RBAC) روی کنترلرهای حساس ادمین...");
+console.log("\x1b[36m[STEP-5]\x1b[0m بهینه‌سازی مصرف انرژی و متوقف‌سازی هوشمند رندرهای WebGL...");
 
 // =============================================================================
-// ۱. ارتقای app/api/styles/route.ts با اعتبارسنجی نقش ادمین
+// بازنویسی بهینه و کم‌مصرف components/3d/Hero3DCanvas.tsx
 // =============================================================================
-const fixedStylesRoute = `import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
-import { enforceRbac } from "@/lib/rbacGuard";
+const optimizedHeroCanvasCode = `"use client";
 
-export const dynamic = "force-dynamic";
+import React, { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 
-export async function GET() {
-  try {
-    const { data } = await supabaseAdmin.from("site_styles").select("*").limit(1).maybeSingle();
-    return NextResponse.json({
-      success: true,
-      data: data || {
-        primary_color: "#0071e3",
-        secondary_color: "#4f46e5",
-        font_family: "Vazirmatn",
-        border_radius: "1.5rem",
-        custom_css: "",
-      },
+export default function Hero3DCanvas() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const container = containerRef.current;
+    if (!container) return;
+
+    let isVisible = true;
+    let isTabActive = true;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 0, 6.5);
+
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      powerPreference: "high-performance",
     });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.4;
+    container.appendChild(renderer.domElement);
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = verifyAdminSession(req);
-    if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    // نورپردازی استودیو
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    scene.add(ambientLight);
+
+    const keySpot = new THREE.SpotLight(0x0284c7, 28, 40, Math.PI / 3, 0.4);
+    keySpot.position.set(6, 6, 6);
+    scene.add(keySpot);
+
+    const cyanPoint = new THREE.PointLight(0x38bdf8, 18, 30);
+    cyanPoint.position.set(-6, -3, 5);
+    scene.add(cyanPoint);
+
+    const rimLight = new THREE.DirectionalLight(0x818cf8, 8);
+    rimLight.position.set(0, 8, -5);
+    scene.add(rimLight);
+
+    // هسته منشور هندسی
+    const coreGroup = new THREE.Group();
+    scene.add(coreGroup);
+
+    const coreGeo = new THREE.IcosahedronGeometry(1.65, 4);
+    const coreMat = new THREE.MeshPhysicalMaterial({
+      color: 0x0284c7,
+      emissive: 0x031024,
+      emissiveIntensity: 0.5,
+      roughness: 0.06,
+      metalness: 0.1,
+      transmission: 0.94,
+      ior: 1.54,
+      thickness: 1.8,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+    });
+    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+    coreGroup.add(coreMesh);
+
+    // وایرفریم نئونی
+    const wireGeo = new THREE.IcosahedronGeometry(1.68, 2);
+    const wireMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.4,
+    });
+    const wireMesh = new THREE.Mesh(wireGeo, wireMat);
+    coreGroup.add(wireMesh);
+
+    // مدارات مدور
+    const ringMat1 = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      metalness: 0.9,
+      roughness: 0.1,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.7,
+    });
+    const ringGeo1 = new THREE.TorusGeometry(2.4, 0.025, 16, 120);
+    const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
+    ring1.rotation.x = Math.PI / 3;
+    scene.add(ring1);
+
+    const ringMat2 = new THREE.MeshStandardMaterial({
+      color: 0x818cf8,
+      metalness: 0.95,
+      roughness: 0.2,
+      transparent: true,
+      opacity: 0.45,
+    });
+    const ringGeo2 = new THREE.TorusGeometry(2.85, 0.02, 16, 120);
+    const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
+    ring2.rotation.y = Math.PI / 4;
+    scene.add(ring2);
+
+    // ذرات معلق
+    const particleCount = 160;
+    const particlePositions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount * 3; i += 3) {
+      particlePositions[i] = (Math.random() - 0.5) * 14;
+      particlePositions[i + 1] = (Math.random() - 0.5) * 9;
+      particlePositions[i + 2] = (Math.random() - 0.5) * 7;
     }
+    const particleGeo = new THREE.BufferGeometry();
+    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+    const particleMat = new THREE.PointsMaterial({
+      color: 0x38bdf8,
+      size: 0.045,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+    });
+    const particles = new THREE.Points(particleGeo, particleMat);
+    scene.add(particles);
 
-    // بررسی دسترسی ویرایش استایل (فقط سوپرادمین یا طراح)
-    if (!enforceRbac(session.role, "styles.manage") && session.role !== "superadmin") {
-      return NextResponse.json(
-        { success: false, message: "نقش کاربری شما اجازه تغییر هویت بصری و استایل‌های سایت را ندارد." },
-        { status: 403 }
-      );
-    }
+    let mouseX = 0;
+    let mouseY = 0;
+    let targetX = 0;
+    let targetY = 0;
 
-    const body = await req.json();
-    const payload = {
-      primary_color: body.primary_color || "#0071e3",
-      secondary_color: body.secondary_color || "#4f46e5",
-      font_family: body.font_family || "Vazirmatn",
-      border_radius: body.border_radius || "1.5rem",
-      custom_css: body.custom_css || "",
-      updated_at: new Date().toISOString(),
+    const handlePointerMove = (e: PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+      mouseX = (x / rect.width) * 2;
+      mouseY = -(y / rect.height) * 2;
     };
 
-    const { data: existing } = await supabaseAdmin.from("site_styles").select("id").limit(1);
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
 
-    if (existing && existing.length > 0) {
-      await supabaseAdmin.from("site_styles").update(payload).eq("id", existing[0].id);
-    } else {
-      await supabaseAdmin.from("site_styles").insert([payload]);
-    }
+    // سنسور توقف انیمیشن در پس‌زمینه تب مرورگر
+    const handleVisibility = () => {
+      isTabActive = !document.hidden;
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
 
-    return NextResponse.json({ success: true, message: "استایل‌ها و هویت بصری با موفقیت در دیتابیس ثبت شد." });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
+    // سنسور رویت المان (IntersectionObserver)
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+      },
+      { root: null, threshold: 0.05 }
+    );
+    observer.observe(container);
+
+    let animationFrameId: number;
+    const clock = new THREE.Clock();
+
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
+
+      // جلوگیری از مصرف GPU هنگامی که هیرو در کادر نیست یا تب تغییر کرده است
+      if (!isVisible || !isTabActive) return;
+
+      const elapsedTime = clock.getElapsedTime();
+
+      coreMesh.rotation.y = elapsedTime * 0.28;
+      coreMesh.rotation.x = Math.sin(elapsedTime * 0.25) * 0.2;
+      wireMesh.rotation.y = -elapsedTime * 0.32;
+      wireMesh.rotation.z = elapsedTime * 0.16;
+
+      ring1.rotation.z = elapsedTime * 0.22;
+      ring1.rotation.y = Math.sin(elapsedTime * 0.3) * 0.45;
+
+      ring2.rotation.x = -elapsedTime * 0.18;
+      ring2.rotation.z = Math.cos(elapsedTime * 0.25) * 0.35;
+
+      particles.rotation.y = elapsedTime * 0.06;
+
+      targetX += (mouseX - targetX) * 0.05;
+      targetY += (mouseY - targetY) * 0.05;
+
+      coreGroup.rotation.y = targetX * 0.6;
+      coreGroup.rotation.x = -targetY * 0.6;
+      camera.position.x = targetX * 0.3;
+      camera.position.y = targetY * 0.3;
+      camera.lookAt(0, 0, 0);
+
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      if (!container) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    };
+
+    window.addEventListener("resize", handleResize, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      observer.disconnect();
+      cancelAnimationFrame(animationFrameId);
+
+      coreGeo.dispose();
+      coreMat.dispose();
+      wireGeo.dispose();
+      wireMat.dispose();
+      ringGeo1.dispose();
+      ringMat1.dispose();
+      ringGeo2.dispose();
+      ringMat2.dispose();
+      particleGeo.dispose();
+      particleMat.dispose();
+      renderer.dispose();
+
+      if (container && renderer.domElement) {
+        container.removeChild(renderer.domElement);
+      }
+    };
+  }, []);
+
+  if (!mounted) return null;
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-hidden"
+      style={{ opacity: 0.85 }}
+    />
+  );
 }
 `;
-writeFile('app/api/styles/route.ts', fixedStylesRoute);
-
-// =============================================================================
-// ۲. ارتقای app/api/admin/users/route.ts (ایجاد و حذف مدیر منحصراً توسط superadmin)
-// =============================================================================
-const fixedAdminUsersRoute = `import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
-import { authSecurity } from "@/lib/authSecurity";
-
-export const dynamic = "force-dynamic";
-
-export async function GET(req: NextRequest) {
-  const session = verifyAdminSession(req);
-  if (!session) {
-    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-  }
-
-  if (session.role !== "superadmin") {
-    return NextResponse.json({ success: false, message: "مشاهده لیست مدیران فقط برای مدیر ارشد مجاز است." }, { status: 403 });
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("admin_users")
-    .select("id, username, full_name, role, created_at");
-
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, users: data });
-}
-
-export async function POST(req: NextRequest) {
-  const session = verifyAdminSession(req);
-  if (!session) {
-    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-  }
-
-  if (session.role !== "superadmin") {
-    return NextResponse.json({ success: false, message: "ایجاد مدیر جدید منحصراً در اختیارات مدیر ارشد سیستم است." }, { status: 403 });
-  }
-
-  const body = await req.json();
-  const { username, password, full_name, role } = body;
-
-  if (!username || !password) {
-    return NextResponse.json({ success: false, message: "اطلاعات ناقص است." }, { status: 400 });
-  }
-
-  const hashedPassword = authSecurity.hashPassword(password.trim());
-
-  const { data, error } = await supabaseAdmin.from("admin_users").insert({
-    username: username.trim().toLowerCase(),
-    password: hashedPassword,
-    password_hash: hashedPassword,
-    full_name: full_name?.trim() || username.trim(),
-    role: role || "product_manager",
-    created_at: new Date().toISOString(),
-  }).select().single();
-
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, user: data });
-}
-
-export async function DELETE(req: NextRequest) {
-  const session = verifyAdminSession(req);
-  if (!session) {
-    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-  }
-
-  if (session.role !== "superadmin") {
-    return NextResponse.json({ success: false, message: "حذف مدیر فقط در حیطه اختیارات مدیر ارشد سیستم است." }, { status: 403 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-
-  if (!id) return NextResponse.json({ success: false, message: "شناسه کاربر الزامی است." }, { status: 400 });
-
-  if (String(session.id) === String(id)) {
-    return NextResponse.json({ success: false, message: "نمی‌توانید حساب کاربری جاری خود را حذف کنید." }, { status: 400 });
-  }
-
-  const { error } = await supabaseAdmin.from("admin_users").delete().eq("id", id);
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-
-  return NextResponse.json({ success: true, message: "کاربر با موفقیت حذف شد." });
-}
-`;
-writeFile('app/api/admin/users/route.ts', fixedAdminUsersRoute);
+writeFile('components/3d/Hero3DCanvas.tsx', optimizedHeroCanvasCode);
 
 // =============================================================================
 // بیلد و دیپلوی ورسل
@@ -188,7 +280,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و انتش
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(step4): enforce role-based access control (RBAC) on styles and user management APIs"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "perf(threejs-step5): add viewport throttling and background tab suspension for 3D hero canvas"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -197,7 +289,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قدم چهارم با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ قدم پنجم با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

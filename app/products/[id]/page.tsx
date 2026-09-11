@@ -1,173 +1,190 @@
-// File Path: app/products/[id]/page.tsx
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { productService, Product } from "@/services/productService";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
+import React from "react";
+import { notFound } from "next/navigation";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
+import AddToCartButton from "@/components/AddToCartButton";
+import ProductExplodedView from "@/components/ProductExplodedView";
+import ColorGamutSimulator from "@/components/ColorGamutSimulator";
 import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
 import ProductReviews from "@/components/ProductReviews";
-import ColorGamutSimulator from "@/components/ColorGamutSimulator";
-import ProductExplodedView from "@/components/ProductExplodedView";
 import Link from "next/link";
-import { formatPrice } from "@/lib/formatters";
 
-export default function ProductDetailPage() {
-  const params = useParams();
-  const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeImage, setActiveImage] = useState<string>("");
-  const [isExplodedOpen, setIsExplodedOpen] = useState(false);
-  const { addToCart } = useCart();
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    async function load() {
-      if (!id) return;
-      try {
-        const found = await productService.getById(id);
-        if (found) {
-          setProduct(found);
-          const firstImg = found.images?.[0] || found.image || "";
-          setActiveImage(firstImg);
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [id]);
+async function fetchProductData(id: string) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
 
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
-        در حال دریافت مشخصات کالا...
-      </div>
-    );
-  }
+    if (!error && data) return data;
+  } catch {}
+
+  const flagship = FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === String(id));
+  if (flagship) return flagship;
+
+  return null;
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const product = await fetchProductData(id);
 
   if (!product) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center font-sans space-y-4" dir="rtl">
-        <h2 className="text-xl font-black">کالای مورد نظر یافت نشد.</h2>
-        <Link href="/" className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md">
-          بازگشت به فروشگاه
-        </Link>
-      </div>
-    );
+    return { title: "کالا یافت نشد | آکسون" };
   }
 
-  const allImages = product.images && product.images.length > 0 ? product.images : [product.image || ""];
-  const currentPrice = Number(product.discountPrice || product.price || 0);
+  const title = product.title || product.name || "کالای تخصصی استودیو";
+  const desc = product.subtitle || product.short_description || product.description || "خرید تخصصی با گارانتی اصالت طلایی";
+  const image = product.images?.[0] || product.image || "https://axoncore.ir/placeholder.png";
+
+  return {
+    title: `${title} | خرید و قیمت در آکسون`,
+    description: desc,
+    openGraph: {
+      title,
+      description: desc,
+      images: [{ url: image }],
+      type: "website",
+    },
+  };
+}
+
+export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const product = await fetchProductData(id);
+
+  if (!product) {
+    notFound();
+  }
+
+  const title = product.title || product.name || "کالای دیجیتال استودیویی";
+  const price = Number(product.price || 0);
+  const discountPrice = product.discount_price || product.discountPrice ? Number(product.discount_price || product.discountPrice) : undefined;
+  const finalPrice = discountPrice && discountPrice > 0 ? discountPrice : price;
+  const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800"];
+  const stock = product.stock !== undefined ? Number(product.stock) : 10;
+  const category = product.category || "تجهیزات تخصصی تصویر";
+  const desc = product.description || product.short_description || "تامین و کالیبراسیون تخصصی با ۱۸ ماه گارانتی اصالت طلایی.";
+
+  // ساخت اسکیما (Structured Data) برای گوگل
+  const jsonLd = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": title,
+    "image": images,
+    "description": desc,
+    "brand": {
+      "@type": "Brand",
+      "name": "Apple / Axon Core"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": `https://axoncore.ir/products/${product.id}`,
+      "priceCurrency": "IRR",
+      "price": finalPrice * 10, // تبدیل تومان به ریال برای استاندارد گوگل
+      "availability": stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+    }
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10 space-y-12 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] p-6 sm:p-10 shadow-2xl">
-        <div className="space-y-4">
-          <div className="w-full h-80 sm:h-96 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-4 flex items-center justify-center overflow-hidden relative group">
-            <img src={activeImage || allImages[0]} alt={product.title} className="w-full h-full object-contain group-hover:scale-105 transition duration-500" />
-            
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.playExplodeShift();
-                setIsExplodedOpen(true);
-              }}
-              className="absolute bottom-4 right-4 px-4 py-2 rounded-2xl bg-black/75 hover:bg-blue-600 text-white font-bold text-xs border border-white/20 backdrop-blur-md transition flex items-center gap-1.5 shadow-xl cursor-pointer"
-            >
-              <span>🧬</span>
-              <span>کالبدشکافی ۳D لایه‌ها</span>
-            </button>
-          </div>
+    <div className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-[var(--text-primary)] space-y-12" dir="rtl">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
-          {allImages.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-              {allImages.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setActiveImage(img);
-                  }}
-                  className={"w-16 h-16 rounded-2xl border p-1 bg-[var(--input-bg)] transition cursor-pointer shrink-0 " + (activeImage === img ? "border-[var(--accent-blue)] ring-2 ring-blue-500/30" : "border-[var(--card-border)]")}
-                >
-                  <img src={img} alt="" className="w-full h-full object-contain" />
-                </button>
+      {/* مسیر ناوبری (Breadcrumb) */}
+      <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
+        <Link href="/" className="hover:text-[var(--accent-blue)]">فروشگاه</Link>
+        <span>/</span>
+        <Link href="/products" className="hover:text-[var(--accent-blue)]">کاتالوگ محصولات</Link>
+        <span>/</span>
+        <span className="text-[var(--text-primary)] truncate max-w-xs">{title}</span>
+      </div>
+
+      {/* بخش اصلی معرفی کالا */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* گالری تصاویر */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="w-full h-[420px] sm:h-[500px] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-xl p-4 flex items-center justify-center">
+            <img src={images[0]} alt={title} className="w-full h-full object-contain" />
+          </div>
+          {images.length > 1 && (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {images.map((imgUrl: string, idx: number) => (
+                <div key={idx} className="w-20 h-20 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 shrink-0 overflow-hidden shadow-sm">
+                  <img src={imgUrl} alt="" className="w-full h-full object-contain" />
+                </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="space-y-6 flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-xs font-black">
-                {product.category || "تجهیزات استودیویی"}
-              </span>
-              <span className="font-mono text-xs text-[var(--text-secondary)] font-bold">
-                {product.brand || "Apple"}
-              </span>
-            </div>
-
-            <h1 className="text-xl sm:text-3xl font-black leading-snug">{product.title}</h1>
-            <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">
-              {product.description || "ارائه شده با ضمانت اصالت فیزیکی و پشتیبانی تخصصی استودیو."}
-            </p>
+        {/* مشخصات و دکمه خرید */}
+        <div className="lg:col-span-5 p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+          <div className="space-y-2">
+            <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 text-[11px] font-black inline-block">
+              {category}
+            </span>
+            <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] leading-tight">{title}</h1>
+            <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">{product.subtitle || "کالای استاندارد استودیویی"}</p>
           </div>
 
-          <div className="space-y-4 p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت رسمی فروشگاه:</span>
-              <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                {formatPrice(currentPrice)} تومان
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+            <div className="flex justify-between items-center text-xs font-bold text-[var(--text-secondary)]">
+              <span>وضعیت انبار:</span>
+              <span className={stock > 0 ? "text-emerald-600 dark:text-emerald-400 font-black" : "text-rose-500 font-black"}>
+                {stock > 0 ? `موجود در انبار (${stock} عدد)` : "ناموجود"}
               </span>
             </div>
+            <div className="flex items-baseline justify-between pt-2 border-t border-[var(--card-border)]">
+              <span className="text-xs text-[var(--text-secondary)] font-bold">قیمت مصرف‌کننده:</span>
+              <div className="text-left font-mono">
+                {discountPrice && discountPrice < price && (
+                  <span className="text-xs text-slate-400 line-through block">{price.toLocaleString("fa-IR")} تومان</span>
+                )}
+                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                  {finalPrice.toLocaleString("fa-IR")} <span className="text-xs">تومان</span>
+                </span>
+              </div>
+            </div>
+          </div>
 
-            <button
-              onClick={() => {
-                soundEngine.playAddToCart();
-                addToCart({
-                  id: product.id,
-                  title: product.title,
-                  price: currentPrice,
-                  image: activeImage || allImages[0],
-                  stock: product.stock ?? 10,
-                  category: product.category,
-                });
+          <div className="pt-2">
+            <AddToCartButton
+              product={{
+                id: product.id,
+                title: title,
+                price: finalPrice,
+                image: images[0],
+                images: images,
+                stock: stock,
+                category: category
               }}
-              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-            >
-              <span>🛒</span>
-              <span>افزودن به سبد خرید</span>
-            </button>
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--card-border)] text-[11px] font-bold text-[var(--text-secondary)]">
+            <div className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center">
+              🛡️ ۱۸ ماه گارانتی طلایی
+            </div>
+            <div className="p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center">
+              🚀 ارسال پیشتاز سراسری
+            </div>
           </div>
         </div>
       </div>
 
-      <section className="space-y-4">
-        <LiveMarketArbitrage
-          productTitle={product.title}
-          ourPrice={currentPrice}
-          marketBenchmarks={product.market_comparison || []}
-        />
-      </section>
-
-      <section className="space-y-4">
-        <ColorGamutSimulator productTitle={product.title} />
-      </section>
-
-      <section className="space-y-4">
-        <ProductReviews productId={product.id} />
-      </section>
-
-      <ProductExplodedView
-        productId={product.id}
-        productTitle={product.title}
-        category={product.category}
-        isOpen={isExplodedOpen}
-        onClose={() => setIsExplodedOpen(false)}
-      />
+      {/* ماژول‌های پیشرفته (کالبدشکافی ۳D، شبیه‌ساز رنگ و مقایسه قیمت) */}
+      <div className="space-y-12 pt-6 border-t border-[var(--card-border)]">
+        <ProductExplodedView productTitle={title} productCategory={category} />
+        <ColorGamutSimulator productTitle={title} />
+        <LiveMarketArbitrage productTitle={title} currentPrice={finalPrice} />
+        <ProductReviews productId={String(product.id)} />
+      </div>
     </div>
   );
 }

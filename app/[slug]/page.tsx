@@ -1,45 +1,23 @@
-import { Metadata } from "next";
+import React from "react";
+import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import ModularPageRenderer from "@/components/modular/ModularPageRenderer";
-import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-interface Props {
-  params: Promise<{ slug: string }>;
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export default async function DynamicSlugPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { data: page } = await supabaseAdmin
-    .from("modular_pages")
-    .select("title, meta_description")
-    .eq("slug", slug)
-    .eq("is_published", true)
-    .maybeSingle();
+  const cleanSlug = String(slug || "").trim().toLowerCase();
 
-  if (!page) return { title: "صفحه یافت نشد | آکسون" };
-
-  return {
-    title: `${page.title} | آکسون استودیو`,
-    description: page.meta_description || "صفحه لندینگ تخصصی فروشگاه آکسون",
-  };
-}
-
-export default async function DynamicModularPage({ params }: Props) {
-  const { slug } = await params;
-
-  // واکشی داده‌های صفحه از Supabase
-  const { data: page } = await supabaseAdmin
+  const { data: pageRecord } = await supabaseAdmin
     .from("modular_pages")
     .select("*")
-    .eq("slug", slug)
-    .eq("is_published", true)
+    .eq("slug", cleanSlug)
     .maybeSingle();
 
-  if (!page) {
-    notFound();
+  if (pageRecord && pageRecord.puck_data && pageRecord.puck_data.content?.length > 0) {
+    return <ModularPageRenderer initialPage={pageRecord} slug={cleanSlug} />;
   }
 
-  return <ModularPageRenderer initialPage={page} slug={slug} />;
+  notFound();
 }

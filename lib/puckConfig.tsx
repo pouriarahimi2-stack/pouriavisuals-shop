@@ -7,7 +7,6 @@ import ProductList from "@/components/ProductList";
 import ProductExplodedView from "@/components/ProductExplodedView";
 import { productService, Product } from "@/services/productService";
 
-// کامپوننت اصلاح‌شده انتخابگر رنگ با عنوان واضح و سازگار با حالت روشن/تاریک
 const ColorPickerCustomField = ({
   label,
   value,
@@ -91,6 +90,21 @@ export type ComponentProps = {
     productTitle: string;
     sectionTitle: string;
   };
+  RichTextBlock: {
+    title: string;
+    content: string;
+    bgColor: string;
+  };
+  FeaturesGridBlock: {
+    heading: string;
+    col1Title: string;
+    col1Desc: string;
+    col2Title: string;
+    col2Desc: string;
+    col3Title: string;
+    col3Desc: string;
+    bgColor: string;
+  };
   GlobalFooterBlock: {
     footerLogoUrl: string;
     brandTitle: string;
@@ -123,13 +137,17 @@ export const puckConfig: Config<ComponentProps> = {
       components: ["HeaderCapsuleBar", "GlobalFooterBlock"],
     },
     sections: {
-      title: "⭐ بدنه صفحه و کاتالوگ",
+      title: "⭐ کاتالوگ و المان‌های ۳D",
       components: [
         "NativeHero3D",
         "NativePerspectiveSlider",
         "NativeProductCatalog",
         "NativeExplodedView",
       ],
+    },
+    content_blocks: {
+      title: "📝 محتوا و صفحات سفارشی",
+      components: ["RichTextBlock", "FeaturesGridBlock"],
     },
   },
   components: {
@@ -470,6 +488,71 @@ export const puckConfig: Config<ComponentProps> = {
             productTitle={productTitle || "Apple Studio Display 5K"}
           />
         </div>
+      ),
+    },
+
+    RichTextBlock: {
+      label: "بلوک محتوا و متن آزاد",
+      fields: {
+        title: { type: "text", label: "عنوان بخش" },
+        content: { type: "textarea", label: "متن کامل یا توضیحات" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        title: "درباره خدمات و تعهدات ما",
+        content: "متن کامل این بخش را اینجا وارد نمایید...",
+        bgColor: "transparent",
+      },
+      render: ({ title, content, bgColor }) => (
+        <section style={{ backgroundColor: bgColor || "transparent" }} className="max-w-5xl mx-auto px-4 py-8 font-sans select-none text-white space-y-4" dir="rtl">
+          {title && <h2 className="text-2xl font-black text-center">{title}</h2>}
+          <div className="p-6 rounded-3xl bg-white/5 border border-white/10 text-sm leading-loose text-slate-300 whitespace-pre-line text-justify">
+            {content}
+          </div>
+        </section>
+      ),
+    },
+
+    FeaturesGridBlock: {
+      label: "گرید ۳ ستونه ویژگی‌ها و خدمات",
+      fields: {
+        heading: { type: "text", label: "عنوان گرید" },
+        col1Title: { type: "text", label: "عنوان ستون اول" },
+        col1Desc: { type: "textarea", label: "توضیح ستون اول" },
+        col2Title: { type: "text", label: "عنوان ستون دوم" },
+        col2Desc: { type: "textarea", label: "توضیح ستون دوم" },
+        col3Title: { type: "text", label: "عنوان ستون سوم" },
+        col3Desc: { type: "textarea", label: "توضیح ستون سوم" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه" },
+      },
+      defaultProps: {
+        heading: "مزایای خرید و استانداردهای آکسون",
+        col1Title: "🛡️ گارانتی ۱۸ ماهه طلایی",
+        col1Desc: "تضمین اصالت فیزیکی و تعویض بی قید و شرط قطعات.",
+        col2Title: "🚀 ارسال سریع پیشتاز",
+        col2Desc: "بسته‌بندی ضربه‌گیر ویژه هوانوردی با پوشش کامل بیمه مرسوله.",
+        col3Title: "🎨 کالیبراسیون تخصصی",
+        col3Desc: "تنظیم دقیق گاموت‌های رنگی سینمایی DCI-P3 قبل از تحویل.",
+        bgColor: "transparent",
+      },
+      render: ({ heading, col1Title, col1Desc, col2Title, col2Desc, col3Title, col3Desc, bgColor }) => (
+        <section style={{ backgroundColor: bgColor || "transparent" }} className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-white space-y-6" dir="rtl">
+          {heading && <h2 className="text-2xl font-black text-center">{heading}</h2>}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2">
+              <h3 className="font-bold text-base text-sky-400">{col1Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{col1Desc}</p>
+            </div>
+            <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2">
+              <h3 className="font-bold text-base text-sky-400">{col2Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{col2Desc}</p>
+            </div>
+            <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2">
+              <h3 className="font-bold text-base text-sky-400">{col3Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{col3Desc}</p>
+            </div>
+          </div>
+        </section>
       ),
     },
 

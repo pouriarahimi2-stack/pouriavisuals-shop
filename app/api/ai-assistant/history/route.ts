@@ -1,17 +1,16 @@
+// File Path: app/api/ai-assistant/history/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-// دریافت تاریخچه‌ها همراه با اعمال خودکار قوانین ۱۴ روز و سقف ۲۰ نشست
 export async function GET(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
-    // ۱. پاکسازی گفتگوهای با عمر بیش از ۱۴ روز
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
     await supabaseAdmin
@@ -19,7 +18,6 @@ export async function GET(req: NextRequest) {
       .delete()
       .lt("updated_at", fourteenDaysAgo.toISOString());
 
-    // ۲. واکشی گفتگوها به ترتیب جدیدترین
     const { data: list, error } = await supabaseAdmin
       .from("copilot_chat_history")
       .select("*")
@@ -27,10 +25,9 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
 
-    // ۳. حفظ حداکثر ۲۰ نشست آخر (FIFO)
     if (list && list.length > 20) {
       const surplus = list.slice(20);
-      const surplusIds = surplus.map(item => item.id);
+      const surplusIds = surplus.map((item: any) => item.id);
       await supabaseAdmin.from("copilot_chat_history").delete().in("id", surplusIds);
       return NextResponse.json({ success: true, history: list.slice(0, 20) });
     }
@@ -41,7 +38,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ذخیره یا به‌روزرسانی نشست جاری
 export async function POST(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {
@@ -59,7 +55,7 @@ export async function POST(req: NextRequest) {
     const firstUserMsg = messages.find((m: any) => m.role === "user");
     const sessionTitle = title || (firstUserMsg ? firstUserMsg.text.slice(0, 35) + "..." : "گفتگوی مدیریت");
 
-    const payload = {
+    const payload: Record<string, any> = {
       id: sessionId,
       title: sessionTitle,
       messages,
@@ -71,18 +67,17 @@ export async function POST(req: NextRequest) {
     if (existing) {
       await supabaseAdmin.from("copilot_chat_history").update(payload).eq("id", sessionId);
     } else {
-      payload["created_at"] = new Date().toISOString();
+      payload.created_at = new Date().toISOString();
       await supabaseAdmin.from("copilot_chat_history").insert([payload]);
     }
 
-    // حذف خودکار موارد مازاد بر ۲۰ نشست
     const { data: allList } = await supabaseAdmin
       .from("copilot_chat_history")
       .select("id")
       .order("updated_at", { ascending: false });
 
     if (allList && allList.length > 20) {
-      const toDelete = allList.slice(20).map(i => i.id);
+      const toDelete = allList.slice(20).map((i: any) => i.id);
       await supabaseAdmin.from("copilot_chat_history").delete().in("id", toDelete);
     }
 
@@ -92,7 +87,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// حذف دستی یک نشست از تاریخچه
 export async function DELETE(req: NextRequest) {
   try {
     if (!verifyAdminSession(req)) {

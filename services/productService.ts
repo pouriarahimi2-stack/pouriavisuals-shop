@@ -1,3 +1,4 @@
+// File Path: services/productService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface ProductVariant {
@@ -5,6 +6,17 @@ export interface ProductVariant {
   name: string;
   colorHex?: string;
   priceDelta?: number;
+}
+
+export interface MarketBenchmark {
+  storeName: string;
+  price?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  warranty: string;
+  isOurStore?: boolean;
+  deliveryTime?: string;
+  logo?: string;
 }
 
 export interface Product {
@@ -25,12 +37,15 @@ export interface Product {
   image?: string;
   images?: string[];
   description?: string;
+  short_description?: string;
   warranty?: string;
   variants?: ProductVariant[];
   specs?: Record<string, string>;
+  market_comparison?: MarketBenchmark[];
   meta_title?: string;
   meta_description?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export const FLAGSHIP_7_PRODUCTS: Product[] = [];
@@ -51,6 +66,10 @@ export const productService = {
           name: p.name || p.title,
           discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
           isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+          is_available: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/placeholder.png"],
+          image: (Array.isArray(p.images) && p.images[0]) || p.image || "/placeholder.png",
+          market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
         }));
       }
 
@@ -64,6 +83,10 @@ export const productService = {
           name: p.name || p.title,
           discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
           isAvailable: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+          is_available: p.is_available !== false && (p.stock === null || p.stock === undefined || p.stock > 0),
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/placeholder.png"],
+          image: (Array.isArray(p.images) && p.images[0]) || p.image || "/placeholder.png",
+          market_comparison: Array.isArray(p.market_comparison) ? p.market_comparison : [],
         }));
       }
 
@@ -93,6 +116,10 @@ export const productService = {
           name: data.name || data.title,
           discountPrice: data.discount_price ? Number(data.discount_price) : undefined,
           isAvailable: data.is_available !== false && (data.stock === null || data.stock === undefined || data.stock > 0),
+          is_available: data.is_available !== false && (data.stock === null || data.stock === undefined || data.stock > 0),
+          images: Array.isArray(data.images) && data.images.length > 0 ? data.images : [data.image || "/placeholder.png"],
+          image: (Array.isArray(data.images) && data.images[0]) || data.image || "/placeholder.png",
+          market_comparison: Array.isArray(data.market_comparison) ? data.market_comparison : [],
         };
       }
       return null;
@@ -142,6 +169,7 @@ export const productService = {
           warranty: product.warranty || "گارانتی اصالت طلایی",
           variants: product.variants || [],
           specs: product.specs || {},
+          market_comparison: product.market_comparison || [],
           meta_title: product.meta_title || cleanTitle,
           meta_description: product.meta_description || null,
         };
@@ -158,7 +186,6 @@ export const productService = {
         }
       }
 
-      // انتشار زنده رویداد در مرورگر برای جهش لحظه‌ای ویترین کالاها
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("products_updated", { detail: saved }));
       }
@@ -182,3 +209,5 @@ export const productService = {
     }
   },
 };
+
+export default productService;

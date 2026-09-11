@@ -138,7 +138,7 @@ export default function CartDrawer({ isOpen: propIsOpen, onClose: propOnClose }:
           name: item.name || item.title || "کالا",
           price: Number(item.price) || 0,
           quantity: Number(item.quantity) || 1,
-          image: item.image || item.images?.[0] || "",
+          image: item.image || (item as any).images?.[0] || "",
         })),
         total_amount: totalPrice,
         discount_amount: discountAmount,

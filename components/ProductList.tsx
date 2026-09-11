@@ -3,12 +3,15 @@
 
 import React, { useState, useEffect } from "react";
 import { productService, Product } from "@/services/productService";
-import { soundEngine } from "@/lib/soundEngine";
 import ProductCard from "@/components/ProductCard";
 
-export default function ProductList() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+export interface ProductListProps {
+  initialProducts?: Product[];
+}
+
+export default function ProductList({ initialProducts }: ProductListProps = {}) {
+  const [products, setProducts] = useState<Product[]>(initialProducts || []);
+  const [loading, setLoading] = useState(!initialProducts || initialProducts.length === 0);
 
   const loadProducts = async () => {
     try {
@@ -20,7 +23,12 @@ export default function ProductList() {
   };
 
   useEffect(() => {
-    loadProducts();
+    if (!initialProducts || initialProducts.length === 0) {
+      loadProducts();
+    } else {
+      setProducts(initialProducts);
+      setLoading(false);
+    }
 
     const handleUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) setProducts(e.detail);
@@ -31,7 +39,7 @@ export default function ProductList() {
     return () => {
       window.removeEventListener("products_updated", handleUpdate);
     };
-  }, []);
+  }, [initialProducts]);
 
   return (
     <section className="py-8 space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">

@@ -1,7 +1,6 @@
 // File Path: lib/authSecurity.ts
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 
-// سیستم ضد بروت‌فورس (Rate Limiter) در حافظه امن
 interface RateLimitEntry {
   attempts: number;
   blockedUntil: number;
@@ -9,10 +8,9 @@ interface RateLimitEntry {
 
 const loginAttempts = new Map<string, RateLimitEntry>();
 const MAX_ATTEMPTS = 5;
-const BLOCK_DURATION_MS = 15 * 60 * 1000; // ۱۵ دقیقه مسدودسازی پس از ۵ تلاش اشتباه
+const BLOCK_DURATION_MS = 15 * 60 * 1000;
 
 export const authSecurity = {
-  // بررسی و مهار حملات بروت‌فورس
   checkRateLimit(ip: string): { allowed: boolean; waitMinutes?: number } {
     const now = Date.now();
     const entry = loginAttempts.get(ip);
@@ -47,7 +45,6 @@ export const authSecurity = {
     loginAttempts.delete(ip);
   },
 
-  // هش کردن رمز عبور با تولید Salt اختصاصی و الگوریتم Scrypt
   hashPassword(password: string): string {
     const clean = String(password).trim();
     const salt = randomBytes(16).toString("hex");
@@ -55,13 +52,13 @@ export const authSecurity = {
     return `${salt}:${hash}`;
   },
 
-  // اعتبارسنجی امن کلمه عبور با مقایسه تساوی زمانی (Timing-Safe)
   verifyPassword(password: string, storedHashOrPlain: string): boolean {
     try {
       const clean = String(password).trim();
       const stored = String(storedHashOrPlain).trim();
 
-      // اگر رمز هش شده باشد (قالب salt:hash)
+      if (!stored) return false;
+
       if (stored.includes(":")) {
         const [salt, key] = stored.split(":");
         if (!salt || !key) return false;
@@ -73,9 +70,8 @@ export const authSecurity = {
         return timingSafeEqual(keyBuffer, derivedKeyBuffer);
       }
 
-      // پشتیبانی موقت برای رمزهای پیش‌فرض با مقایسه تساوی زمانی
-      const inputBuffer = Buffer.from(clean);
-      const storedBuffer = Buffer.from(stored);
+      const inputBuffer = Buffer.from(clean, "utf8");
+      const storedBuffer = Buffer.from(stored, "utf8");
 
       if (inputBuffer.length !== storedBuffer.length) return false;
       return timingSafeEqual(inputBuffer, storedBuffer);

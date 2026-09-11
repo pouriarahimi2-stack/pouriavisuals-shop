@@ -1,175 +1,156 @@
-// File Path: app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
-
-function generateGuestCredentials(fullName: string, phone: string) {
-  const clean = String(fullName || "user")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "_")
-    .slice(0, 10);
-  const rand = Math.floor(100 + Math.random() * 900);
-  return {
-    username: `${clean || "buyer"}_${rand}`,
-    password: `${phone.slice(-4)}_${Math.random().toString(36).slice(-4)}`,
-  };
-}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const customerName = String(body.customerName || body.customer_name || body.customer?.fullName || body.customer?.name || "").trim();
-    const phone = String(body.phone || body.customer?.phone || "").trim().replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).replace(/\D/g, "");
-    const province = String(body.province || body.customer?.province || "تهران").trim();
-    const city = String(body.city || body.customer?.city || "تهران").trim();
-    const address = String(body.address || body.customer?.address || "").trim();
-    const postalCode = body.postalCode || body.postal_code || body.customer?.postalCode || null;
-    const rawItems = Array.isArray(body.items) ? body.items : [];
-    const couponCode = body.couponCode || body.coupon_code || null;
+    const { customer, items, coupon_code } = body;
 
-    if (!customerName || !phone || !address || rawItems.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "مشخصات تحویل‌گیرنده، شماره تماس و اقلام سفارش الزامی هستند." },
-        { status: 400 }
-      );
+    // ۱. اعتبارسنجی اولیه ساختار اطلاعات کاربر
+    const customerName = String(customer?.fullName || customer?.name || body.customer_name || "").trim();
+    const cleanPhone = String(customer?.phone || body.phone || "").trim().replace(/\D/g, "");
+    const address = String(customer?.address || body.address || "").trim();
+
+    if (!customerName || customerName.length < 2) {
+      return NextResponse.json({ success: false, message: "نام و نام خانوادگی خریدار الزامی است." }, { status: 400 });
     }
 
-    if (!/^09\d{9}$/.test(phone)) {
-      return NextResponse.json(
-        { success: false, message: "شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود." },
-        { status: 400 }
-      );
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return NextResponse.json({ success: false, message: "شماره موبایل باید ۱۱ رقمی و با ۰۹ شروع شود." }, { status: 400 });
     }
 
-    const orderId = body.id || body.order_number || `ORD-${Date.now().toString().slice(-6)}`;
-    const { username: guestUsername, password: guestPassword } = generateGuestCredentials(customerName, phone);
-
-    const productIds = rawItems.map((i: any) => String(i.productId || i.id || i.product_id)).filter(Boolean);
-    let dbProducts: any[] = [];
-
-    if (supabaseAdmin && productIds.length > 0) {
-      const { data } = await supabaseAdmin.from("products").select("*").in("id", productIds);
-      if (data) dbProducts = data;
+    if (!address || address.length < 6) {
+      return NextResponse.json({ success: false, message: "نشانی پستی دقیق الزامی است." }, { status: 400 });
     }
 
-    let calculatedTotal = 0;
-    const validatedItems: any[] = [];
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ success: false, message: "سبد خرید خالی است." }, { status: 400 });
+    }
 
-    for (const item of rawItems) {
-      const pId = String(item.productId || item.id || item.product_id);
-      let matched = dbProducts.find((p: any) => String(p.id) === pId);
+    // ۲. دریافت قیمت و موجودی واقعی از دیتابیس (سرور تنها منبع تعیین قیمت است)
+    const productIds = items.map((i: any) => String(i.productId || i.product_id || i.id));
+    const { data: dbProducts, error: prodErr } = await supabaseAdmin
+      .from("products")
+      .select("id, title, price, discount_price, stock, is_available")
+      .in("id", productIds);
 
-      if (!matched) {
-        return NextResponse.json(
-          { success: false, message: `کالای درخواستی با شناسه «${pId}» در دیتابیس یافت نشد.` },
-          { status: 400 }
-        );
+    if (prodErr || !dbProducts) {
+      return NextResponse.json({ success: false, message: "خطا در استعلام محصولات از پایگاه داده." }, { status: 500 });
+    }
+
+    let calculatedRawTotal = 0;
+    const verifiedItems: any[] = [];
+    const stockReservationPayload: any[] = [];
+
+    for (const clientItem of items) {
+      const pId = String(clientItem.productId || clientItem.product_id || clientItem.id);
+      const dbProd = dbProducts.find((p) => String(p.id) === pId);
+
+      if (!dbProd) {
+        return NextResponse.json({ success: false, message: `کالای ${pId} دیگر در سیستم موجود نیست.` }, { status: 400 });
       }
 
-      const officialPrice = matched.discount_price && Number(matched.discount_price) > 0
-        ? Number(matched.discount_price)
-        : (matched.discountPrice && Number(matched.discountPrice) > 0
-            ? Number(matched.discountPrice)
-            : Number(matched.price || 0));
+      const qty = Math.max(1, Math.floor(Number(clientItem.quantity || 1)));
+      if (dbProd.stock !== undefined && dbProd.stock < qty) {
+        return NextResponse.json({
+          success: false,
+          message: `موجودی کالای «${dbProd.title}» ناکافی است (موجودی انبار: ${dbProd.stock} عدد).`
+        }, { status: 400 });
+      }
 
-      const qty = Math.max(1, Number(item.quantity || 1));
-      calculatedTotal += officialPrice * qty;
+      const unitPrice = Number(dbProd.discount_price || dbProd.price || 0);
+      calculatedRawTotal += unitPrice * qty;
 
-      validatedItems.push({
-        productId: pId,
-        product_id: pId,
-        title: matched.title || matched.name || "کالای دیجیتال استودیویی",
-        name: matched.title || matched.name || "کالای دیجیتال استودیویی",
-        price: officialPrice,
-        quantity: qty,
-        image: matched.image || matched.images?.[0] || "",
+      verifiedItems.push({
+        product_id: dbProd.id,
+        title: dbProd.title,
+        price: unitPrice,
+        quantity: qty
+      });
+
+      stockReservationPayload.push({
+        product_id: dbProd.id,
+        quantity: qty
       });
     }
 
+    // ۳. اعتبارسنجی مستقل کد تخفیف در سرور
     let discountAmount = 0;
-    if (couponCode && supabaseAdmin) {
-      try {
-        const { data: coupon } = await supabaseAdmin
-          .from("coupons")
-          .select("*")
-          .eq("code", String(couponCode).trim().toUpperCase())
-          .eq("is_active", true)
-          .maybeSingle();
+    let validCouponCode: string | null = null;
 
-        if (coupon) {
-          const isPercent = coupon.type === "percent" || coupon.discount_type === "percent";
-          const val = Number(coupon.value || coupon.discount_value || 0);
-          if (isPercent) {
-            discountAmount = Math.round((calculatedTotal * val) / 100);
-            const maxLimit = Number(coupon.max_discount || coupon.max_discount_amount || 0);
-            if (maxLimit > 0 && discountAmount > maxLimit) discountAmount = maxLimit;
-          } else {
-            discountAmount = val;
+    if (coupon_code) {
+      const cleanCoupon = String(coupon_code).trim().toUpperCase();
+      const { data: couponRecord } = await supabaseAdmin
+        .from("coupons")
+        .select("*")
+        .eq("code", cleanCoupon)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (couponRecord) {
+        const isPercent = couponRecord.type === "percent" || couponRecord.discount_type === "percent";
+        const val = Number(couponRecord.value || couponRecord.discount_value || 0);
+        if (isPercent) {
+          discountAmount = Math.round((calculatedRawTotal * val) / 100);
+          if (couponRecord.max_discount && discountAmount > couponRecord.max_discount) {
+            discountAmount = Number(couponRecord.max_discount);
           }
+        } else {
+          discountAmount = val;
         }
-      } catch {}
+        validCouponCode = cleanCoupon;
+      }
     }
 
-    const finalPayable = Math.max(0, calculatedTotal - discountAmount);
+    const finalCalculatedPayable = Math.max(0, calculatedRawTotal - discountAmount);
 
-    const orderPayload: any = {
-      id: orderId,
-      order_number: orderId,
+    // ۴. شناسه فاکتور ضد تکرار (Collision-Proof Order ID)
+    const uniqueSuffix = crypto.randomBytes(3).toString("hex").toUpperCase();
+    const orderNumber = `AX-${Date.now().toString().slice(-6)}-${uniqueSuffix}`;
+
+    // ۵. ثبت سفارش با وضعیت قطعی pending (کلاینت اجازه تعیین status را ندارد)
+    const orderRecord = {
+      id: orderNumber,
+      order_number: orderNumber,
       customer_name: customerName,
-      phone,
-      province,
-      city,
-      address,
-      items: validatedItems,
-      total_amount: calculatedTotal,
+      phone: cleanPhone,
+      province: customer?.province || body.province || "نامشخص",
+      city: customer?.city || body.city || "نامشخص",
+      address: address,
+      postal_code: customer?.postalCode || body.postal_code || null,
+      items: verifiedItems,
+      total_amount: calculatedRawTotal,
       discount_amount: discountAmount,
-      final_amount: finalPayable,
-      status: body.status || "pending",
-      payment_status: body.payment_status || body.paymentStatus || "pending",
-      payment_method: body.payment_method || body.paymentMethod || "online",
-      tracking_code: body.tracking_code || body.trackingCode || null,
-      notes: body.notes || body.customer?.notes || "",
-      guest_username: guestUsername,
-      guest_password: guestPassword,
-      updated_at: new Date().toISOString(),
+      coupon_code: validCouponCode,
+      final_amount: finalCalculatedPayable,
+      status: "pending", // صرفاً سرور تعیین می‌کند
+      payment_status: "unpaid", // به هیچ وجه توسط کاربر paid نمی‌شود
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
-    if (postalCode) orderPayload.postal_code = String(postalCode).trim();
-    if (couponCode) orderPayload.coupon_code = String(couponCode).trim().toUpperCase();
+    const { data: createdOrder, error: insertErr } = await supabaseAdmin
+      .from("orders")
+      .insert([orderRecord])
+      .select()
+      .single();
 
-    if (supabaseAdmin) {
-      await supabaseAdmin.from("orders").upsert(orderPayload, { onConflict: "id" });
-
-      for (const it of validatedItems) {
-        try {
-          const { data: currentP } = await supabaseAdmin
-            .from("products")
-            .select("stock")
-            .eq("id", it.productId)
-            .maybeSingle();
-
-          if (currentP && currentP.stock !== null && currentP.stock !== undefined) {
-            const newStock = Math.max(0, Number(currentP.stock) - Number(it.quantity || 1));
-            await supabaseAdmin
-              .from("products")
-              .update({ stock: newStock, is_available: newStock > 0 })
-              .eq("id", it.productId);
-          }
-        } catch (stkErr) {
-          console.warn("Stock decrement notice:", stkErr);
-        }
-      }
+    if (insertErr || !createdOrder) {
+      throw insertErr || new Error("خطا در ایجاد سفارش.");
     }
 
     return NextResponse.json({
       success: true,
-      message: "فاکتور رسمی با موفقیت اعتبارسنجی و صادر شد.",
-      data: orderPayload,
+      order: createdOrder,
+      orderId: createdOrder.id,
+      orderNumber: createdOrder.order_number,
+      payableAmount: finalCalculatedPayable
     });
   } catch (err: any) {
-    console.error("Order Route Error:", err);
-    return NextResponse.json({ success: false, message: err?.message || "خطا در ثبت فاکتور" }, { status: 500 });
+    console.error("Secure Order Creation Error:", err);
+    return NextResponse.json({ success: false, message: "خطای امنیتی سرور در ایجاد سفارش." }, { status: 500 });
   }
 }

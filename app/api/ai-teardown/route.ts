@@ -1,3 +1,17 @@
+export interface TeardownComponent {
+  name: string;
+  specs?: string;
+  role?: string;
+  material?: string;
+}
+
+export interface TeardownData {
+  title?: string;
+  layers?: TeardownComponent[];
+  components?: TeardownComponent[];
+  summary?: string;
+}
+
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";

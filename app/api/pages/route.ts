@@ -1,17 +1,26 @@
+// File Path: app/api/pages/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-const FALLBACK_PAGES = [
-  { id: "sys-home", slug: "home", title: "صفحه اصلی (خانه)" },
-  { id: "sys-products", slug: "products", title: "کاتالوگ محصولات و تجهیزات" },
-  { id: "sys-news", slug: "news", title: "اخبار تکنولوژی" },
-  { id: "sys-blog", slug: "blog", title: "مجله سئو" },
-  { id: "sys-about", slug: "about", title: "درباره ما" },
-  { id: "sys-contact", slug: "contact", title: "تماس با ما" },
-  { id: "sys-track", slug: "track-order", title: "پیگیری سفارش" },
+export interface PageSummaryItem {
+  id: string;
+  slug: string;
+  title: string;
+  is_published: boolean;
+  updated_at: string;
+}
+
+const FALLBACK_PAGES: PageSummaryItem[] = [
+  { id: "sys-home", slug: "home", title: "صفحه اصلی (خانه)", is_published: true, updated_at: new Date().toISOString() },
+  { id: "sys-products", slug: "products", title: "کاتالوگ محصولات و تجهیزات", is_published: true, updated_at: new Date().toISOString() },
+  { id: "sys-news", slug: "news", title: "اخبار تکنولوژی", is_published: true, updated_at: new Date().toISOString() },
+  { id: "sys-blog", slug: "blog", title: "مجله سئو", is_published: true, updated_at: new Date().toISOString() },
+  { id: "sys-about", slug: "about", title: "درباره ما", is_published: true, updated_at: new Date().toISOString() },
+  { id: "sys-contact", slug: "contact", title: "تماس با ما", is_published: true, updated_at: new Date().toISOString() },
+  { id: "sys-track", slug: "track-order", title: "پیگیری سفارش", is_published: true, updated_at: new Date().toISOString() },
 ];
 
 export async function GET(req: NextRequest) {
@@ -50,7 +59,7 @@ export async function GET(req: NextRequest) {
         .order("updated_at", { ascending: false });
 
       if (!error && Array.isArray(dbPages)) {
-        const merged = [...dbPages];
+        const merged: PageSummaryItem[] = [...(dbPages as PageSummaryItem[])];
         FALLBACK_PAGES.forEach((fp) => {
           if (!merged.some((p) => p.slug === fp.slug)) {
             merged.push(fp);
@@ -78,7 +87,7 @@ export async function POST(req: NextRequest) {
     const { slug, title, puck_data, is_published } = body;
     const cleanSlug = String(slug || "home").trim().toLowerCase();
 
-    const payload: any = {
+    const payload: Record<string, any> = {
       slug: cleanSlug,
       title: String(title || cleanSlug).trim(),
       puck_data: puck_data || {},
@@ -107,7 +116,7 @@ export async function POST(req: NextRequest) {
       console.error("Database upsert error in /api/pages:", dbErr);
       return NextResponse.json({
         success: false,
-        message: "خطا در ثبت پایگاه‌داده: " + (dbErr.message || "جدول modular_pages را ایجاد کنید.")
+        message: "خطا در ثبت پایگاه‌داده: " + (dbErr.message || "خطای سرور")
       }, { status: 200 });
     }
 

@@ -1,4 +1,3 @@
-// File Path: next.config.ts
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -15,14 +14,6 @@ const nextConfig: NextConfig = {
         hostname: "**",
       },
     ],
-  },
-  async rewrites() {
-    return [
-      {
-        source: "/27424534.txt",
-        destination: "/api/enamad",
-      },
-    ];
   },
 };
 

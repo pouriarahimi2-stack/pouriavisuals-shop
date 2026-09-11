@@ -1,81 +1,45 @@
-// File Path: app/api/test-ai/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabaseServer';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const authHeader = req.headers.get('authorization') || '';
+    const adminToken = req.cookies.get('pv_admin_session')?.value || req.cookies.get('admin_session_token')?.value;
+
+    // محافظت از endpoint در برابر دسترسی ناشناس عمومی
+    if (!authHeader.includes('Bearer') && !adminToken) {
+      return NextResponse.json({ success: false, message: 'دسترسی غیرمجاز. فقط ادمین مجاز است.' }, { status: 401 });
+    }
+
     const { apiKey } = await req.json();
-    const cleanKey = String(apiKey || "").trim();
+    const cleanKey = String(apiKey || process.env.GEMINI_API_KEY || '').trim();
 
     if (!cleanKey) {
-      return NextResponse.json({ success: false, message: "کادر کلید API خالی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'کلید API هوش مصنوعی یافت نشد.' }, { status: 400 });
     }
 
-    const endpointsToTry = [
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
-      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
-    ];
+    const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: 'سلام! یک کلمه بگو: فعال' }] }],
+      }),
+    });
 
-    let reply = "";
-    let successfulEndpoint = "";
-    let lastErrorMsg = "";
-
-    for (const ep of endpointsToTry) {
-      try {
-        const testRes = await fetch(`${ep}?key=${cleanKey}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": cleanKey,
-          },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: "سلام! یک کلمه بگو: آماده‌ام" }] }],
-          }),
-        });
-
-        const testJson = await testRes.json();
-
-        if (testJson.error) {
-          lastErrorMsg = testJson.error.message || "";
-          continue;
-        }
-
-        const generatedText = testJson.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (generatedText) {
-          reply = generatedText.trim();
-          successfulEndpoint = ep.split("/models/")[1]?.split(":")[0] || "gemini-1.5-flash";
-          break;
-        }
-      } catch (err: any) {
-        lastErrorMsg = err?.message || "";
-        continue;
-      }
+    const testJson = await testRes.json();
+    if (testJson.error) {
+      return NextResponse.json({ success: false, message: testJson.error.message || 'خطا در ارتباط با مدل گوگل.' }, { status: 400 });
     }
 
-    if (reply) {
-      try {
-        if (supabaseAdmin) {
-          await supabaseAdmin.from("site_info").upsert({ id: 1, gemini_api_key: cleanKey }, { onConflict: "id" });
-        }
-      } catch {}
-
-      return NextResponse.json({
-        success: true,
-        message: `✓ اتصال ۱۰۰٪ برقرار شد! پاسخ هوش مصنوعی: "${reply}" (مدل فعال: ${successfulEndpoint})`,
-        activeModel: successfulEndpoint,
-      });
-    }
+    const text = testJson.candidates?.[0]?.content?.parts?.[0]?.text || 'آماده';
 
     return NextResponse.json({
-      success: false,
-      message: `خطای گوگل: ${lastErrorMsg || "عدم دسترسی به مدل‌ها. لطفاً کلید API را بررسی فرمایید."}`
-    }, { status: 400 });
+      success: true,
+      message: `✓ اتصال برقرار شد! پاسخ هوش مصنوعی: "${text.trim()}"`,
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: `خطای سرور: ${err.message}` }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'خطا در آزمون اتصال هوش مصنوعی.' }, { status: 500 });
   }
 }

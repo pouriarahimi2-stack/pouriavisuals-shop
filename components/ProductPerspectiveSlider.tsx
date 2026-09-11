@@ -1,50 +1,43 @@
 // File Path: components/ProductPerspectiveSlider.tsx
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 import { formatPrice } from "@/lib/formatters";
 import AddToCartButton from "@/components/AddToCartButton";
 import ProductExplodedView from "@/components/ProductExplodedView";
+import { productService, Product } from "@/services/productService";
 
-interface ProductItem {
-  id: string;
-  title: string;
-  price: number;
-  discountPrice?: number;
-  discount_price?: number;
-  image: string;
-  images?: string[];
-  brand?: string;
-  category?: string;
-  stock?: number;
-  description?: string;
-  short_description?: string;
-  specs?: Record<string, string>;
-  highlights?: string[];
-  is_available?: boolean;
-}
-
-interface ProductPerspectiveSliderProps {
-  products: ProductItem[];
+export interface ProductPerspectiveSliderProps {
+  products?: any[];
   customTitle?: string;
   customSubtitle?: string;
   cardScale?: "compact" | "standard" | "large";
 }
 
 export default function ProductPerspectiveSlider({
-  products,
+  products: initialProducts,
   customTitle,
   customSubtitle,
   cardScale = "standard",
 }: ProductPerspectiveSliderProps) {
+  const [products, setProducts] = useState<any[]>(initialProducts || []);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [teardownProduct, setTeardownProduct] = useState<ProductItem | null>(null);
+  const [teardownProduct, setTeardownProduct] = useState<any | null>(null);
 
-  // استیت‌های سوایپ لمسی برای موبایل و تبلت + درگ ماوس دسکتاپ
   const touchStartXRef = useRef<number>(0);
   const isDraggingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (!initialProducts || initialProducts.length === 0) {
+      productService.getAll().then((data) => {
+        if (data && data.length > 0) setProducts(data);
+      });
+    } else {
+      setProducts(initialProducts);
+    }
+  }, [initialProducts]);
 
   if (!products || products.length === 0) return null;
 
@@ -60,7 +53,6 @@ export default function ProductPerspectiveSlider({
     setActiveIndex((prev) => (prev - 1 + total) % total);
   };
 
-  // هندلر تاچ و سوایپ لمسی
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartXRef.current = e.touches[0].clientX;
   };
@@ -70,17 +62,11 @@ export default function ProductPerspectiveSlider({
     const diff = touchStartXRef.current - touchEndX;
 
     if (Math.abs(diff) > 40) {
-      if (diff > 0) {
-        // سوایپ به چپ -> کالای بعدی
-        handleNext();
-      } else {
-        // سوایپ به راست -> کالای قبلی
-        handlePrev();
-      }
+      if (diff > 0) handleNext();
+      else handlePrev();
     }
   };
 
-  // هندلر درگ ماوس در دسکتاپ
   const handleMouseDown = (e: React.MouseEvent) => {
     isDraggingRef.current = true;
     touchStartXRef.current = e.clientX;
@@ -112,7 +98,7 @@ export default function ProductPerspectiveSlider({
       : "h-[480px] sm:h-[530px]";
 
   return (
-    <section id="products" className="w-full py-4 select-none font-sans space-y-4" dir="rtl" suppressHydrationWarning>
+    <section id="products-slider" className="w-full py-4 select-none font-sans space-y-4" dir="rtl" suppressHydrationWarning>
       <div className="text-center space-y-1">
         <h2 className="text-xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
           {customTitle || "نمایشگاه سه‌بعدی تجهیزات پرچمدار"}
@@ -122,7 +108,6 @@ export default function ProductPerspectiveSlider({
         </p>
       </div>
 
-      {/* کاروسل ۳D کارت‌ها با گوش‌به‌زنگ سوایپ لمسی (Touch Gestures) */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -147,12 +132,13 @@ export default function ProductPerspectiveSlider({
           const filter = isActive ? "none" : "grayscale(95%) opacity(50%) blur(0.5px)";
           const zIndex = 20 - Math.abs(offset);
 
-          const isAvail = (p.stock ?? 10) > 0 && p.is_available !== false;
+          const isAvail = (p.stock ?? 10) > 0 && p.is_available !== false && p.isAvailable !== false;
           const finalPrice = p.discountPrice || p.discount_price || p.price;
+          const displayImage = p.image || p.images?.[0] || "/placeholder.png";
 
           return (
             <div
-              key={p.id}
+              key={p.id || idx}
               onClick={() => {
                 if (!isActive) {
                   soundEngine.playClick();
@@ -184,8 +170,8 @@ export default function ProductPerspectiveSlider({
                 <div className="relative w-full h-44 sm:h-52 rounded-2xl bg-[var(--input-bg)] p-3 border border-[var(--card-border)] flex items-center justify-center overflow-hidden group">
                   <Link href={`/products/${p.id}`} className="w-full h-full flex items-center justify-center">
                     <img
-                      src={p.image}
-                      alt={p.title}
+                      src={displayImage}
+                      alt={p.title || "کالا"}
                       className="w-full h-full object-contain transition-transform duration-500 hover:scale-105"
                     />
                   </Link>
@@ -209,7 +195,7 @@ export default function ProductPerspectiveSlider({
                 <div>
                   <Link href={`/products/${p.id}`}>
                     <h3 className="font-extrabold text-sm text-[var(--text-primary)] line-clamp-2 leading-snug hover:text-[var(--accent-blue)] transition">
-                      {p.title}
+                      {p.title || p.name}
                     </h3>
                   </Link>
                   <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1 font-medium mt-1">
@@ -244,7 +230,6 @@ export default function ProductPerspectiveSlider({
         })}
       </div>
 
-      {/* ناوبری اسلایدر با شمارنده */}
       <div className="flex flex-col items-center gap-2">
         <div className="flex items-center gap-4">
           <button
@@ -272,7 +257,7 @@ export default function ProductPerspectiveSlider({
       {teardownProduct && (
         <ProductExplodedView
           productId={teardownProduct.id}
-          productTitle={teardownProduct.title}
+          productTitle={teardownProduct.title || teardownProduct.name}
           category={teardownProduct.category}
           isOpen={!!teardownProduct}
           onClose={() => setTeardownProduct(null)}

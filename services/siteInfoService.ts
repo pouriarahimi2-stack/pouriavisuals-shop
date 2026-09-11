@@ -57,6 +57,7 @@ export interface AuthSecurityConfig {
 }
 
 export interface HomepageLayoutConfig {
+  headerLogoConfig?: any;
   hero: {
     show: boolean;
     heightMode: "compact" | "standard" | "cinematic";
@@ -167,7 +168,7 @@ export interface SiteInfo {
   custom_css?: string;
   active_font_id?: string;
   gemini_api_key?: string;
-  homepage_layout_config?: HomepageLayoutConfig;
+  homepage_layout_config?: Partial<HomepageLayoutConfig> | any;
   auth_security_config?: AuthSecurityConfig;
   updated_at?: string;
 }

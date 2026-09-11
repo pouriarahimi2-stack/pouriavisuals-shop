@@ -1,8 +1,11 @@
+// File Path: services/orderService.ts
 import { supabase } from "@/lib/supabase";
 
 export interface OrderItem {
-  productId: string;
+  productId?: string | number;
+  product_id?: string | number;
   title: string;
+  name?: string;
   price: number;
   quantity: number;
   image?: string;
@@ -28,17 +31,70 @@ export interface Order {
   discount_amount?: number;
   finalAmount: number;
   final_amount?: number;
+  couponCode?: string;
+  coupon_code?: string;
   status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
   payment_status?: "pending" | "paid" | "failed";
+  paymentStatus?: "pending" | "paid" | "failed";
   trackingCode?: string;
   tracking_code?: string;
   created_at?: string;
   updated_at?: string;
   customer?: {
-    fullName: string;
+    fullName?: string;
+    name?: string;
     phone: string;
     address: string;
     postalCode?: string;
+    province?: string;
+    city?: string;
+    notes?: string;
+  };
+}
+
+export function normalizeOrder(o: any): Order {
+  const customerName = o.customer_name || o.customerName || o.customer?.fullName || o.customer?.name || "خریدار محترم";
+  const phone = o.phone || o.customer?.phone || "";
+  const address = o.address || o.customer?.address || "";
+  const postalCode = o.postal_code || o.postalCode || o.customer?.postalCode || undefined;
+  const province = o.province || o.customer?.province || undefined;
+  const city = o.city || o.customer?.city || undefined;
+  const totalAmount = Number(o.total_amount || o.totalAmount || 0);
+  const finalAmount = Number(o.final_amount || o.finalAmount || totalAmount);
+  const discountAmount = Number(o.discount_amount || o.discountAmount || 0);
+
+  return {
+    ...o,
+    id: String(o.id || o.order_number || ""),
+    orderNumber: String(o.order_number || o.id || ""),
+    order_number: String(o.order_number || o.id || ""),
+    customerName,
+    customer_name: customerName,
+    phone,
+    address,
+    postalCode,
+    postal_code: postalCode,
+    province,
+    city,
+    totalAmount,
+    total_amount: totalAmount,
+    finalAmount,
+    final_amount: finalAmount,
+    discountAmount,
+    discount_amount: discountAmount,
+    status: o.status || "pending",
+    payment_status: o.payment_status || o.paymentStatus || "pending",
+    items: Array.isArray(o.items) ? o.items : [],
+    customer: {
+      fullName: customerName,
+      name: customerName,
+      phone,
+      address,
+      postalCode,
+      province,
+      city,
+      notes: o.notes || o.customer?.notes,
+    },
   };
 }
 
@@ -51,16 +107,7 @@ export const orderService = {
         .order("created_at", { ascending: false });
 
       if (error || !data) return [];
-      return data.map((o: any) => ({
-        ...o,
-        customerName: o.customer_name,
-        customer: {
-          fullName: o.customer_name,
-          phone: o.phone,
-          address: o.address,
-          postalCode: o.postal_code,
-        },
-      }));
+      return data.map(normalizeOrder);
     } catch {
       return [];
     }
@@ -71,21 +118,31 @@ export const orderService = {
       const { data, error } = await supabase
         .from("orders")
         .select("*")
-        .eq("id", id)
+        .or(`id.eq.${id},order_number.eq.${id}`)
         .maybeSingle();
 
       if (error || !data) return null;
-      return {
-        ...data,
-        customerName: data.customer_name,
-        customer: {
-          fullName: data.customer_name,
-          phone: data.phone,
-          address: data.address,
-          postalCode: data.postal_code,
-        },
-      };
+      return normalizeOrder(data);
     } catch {
+      return null;
+    }
+  },
+
+  async create(orderPayload: any): Promise<Order | null> {
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success && json.data) {
+        return normalizeOrder(json.data);
+      }
+      return null;
+    } catch (e) {
+      console.error("OrderService create error:", e);
       return null;
     }
   },
@@ -113,26 +170,20 @@ export const orderService = {
   async trackOrder(query: string): Promise<Order[]> {
     try {
       const clean = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).trim();
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .or("id.eq." + clean + ",order_number.eq." + clean + ",phone.eq." + clean + ",tracking_code.eq." + clean)
-        .order("created_at", { ascending: false })
-        .limit(5);
+      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(clean)}`, { cache: "no-store" });
+      const json = await res.json();
 
-      if (error || !data) return [];
-      return data.map((o: any) => ({
-        ...o,
-        customerName: o.customer_name,
-        customer: {
-          fullName: o.customer_name,
-          phone: o.phone,
-          address: o.address,
-          postalCode: o.postal_code,
-        },
-      }));
+      if (json.success && Array.isArray(json.data)) {
+        return json.data.map(normalizeOrder);
+      }
+      if (json.success && Array.isArray(json.orders)) {
+        return json.orders.map(normalizeOrder);
+      }
+      return [];
     } catch {
       return [];
     }
   },
 };
+
+export default orderService;

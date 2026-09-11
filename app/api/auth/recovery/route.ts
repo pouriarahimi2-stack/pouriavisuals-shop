@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
-    // ۱. بررسی وجود شماره تلفن مشتری
     if (action === "check_customer_phone") {
       const { phone } = body;
       const cleanPhone = String(phone || "").replace(/\D/g, "");
@@ -63,7 +62,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, exists: userExists });
     }
 
-    // ۲. درخواست فراموشی رمز ادمین
     if (action === "admin_forgot") {
       const { email } = body;
       const cleanEmail = String(email || "").trim().toLowerCase();
@@ -82,7 +80,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۳. تغییر رمز ادمین پس از تایید
     if (action === "admin_reset") {
       const { email, code, newPassword, recoveryTicket } = body;
       const cleanEmail = String(email || "").trim().toLowerCase();
@@ -92,7 +89,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (newPassword && supabaseAdmin) {
-        const salt = "axon_admin_salt_2026";
+        const salt = crypto.randomBytes(16).toString("hex");
         const hashedPassword = crypto.scryptSync(newPassword.trim(), salt, 64).toString("hex");
         await supabaseAdmin.from("admin_users").update({ password: `${salt}:${hashedPassword}` }).eq("username", "admin");
       }
@@ -100,7 +97,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: "کلمه عبور مدیریت با موفقیت در پایگاه داده ذخیره شد." });
     }
 
-    // ۴. درخواست فراموشی رمز مشتری
     if (action === "customer_forgot") {
       const { email } = body;
       const cleanEmail = String(email || "").trim().toLowerCase();
@@ -119,7 +115,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۵. ثبت رمز جدید مشتری
     if (action === "customer_reset") {
       const { email, code, newPassword, recoveryTicket } = body;
       const cleanEmail = String(email || "").trim().toLowerCase();
@@ -128,11 +123,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: "کد تایید نامعتبر است." }, { status: 400 });
       }
 
-      const salt = "axon_customer_salt_2026";
+      const salt = crypto.randomBytes(16).toString("hex");
       const hashedPassword = crypto.scryptSync(newPassword.trim(), salt, 32).toString("hex");
 
       if (supabaseAdmin) {
-        await supabaseAdmin.from("customers").update({ password_hash: hashedPassword }).eq("email", cleanEmail);
+        await supabaseAdmin.from("customers").update({ password_hash: `${salt}:${hashedPassword}` }).eq("email", cleanEmail);
       }
 
       return NextResponse.json({ success: true, message: "کلمه عبور جدید با موفقیت ذخیره شد." });

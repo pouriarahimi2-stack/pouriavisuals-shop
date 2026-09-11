@@ -1,32 +1,23 @@
-// File Path: lib/supabaseServer.ts
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "https://mock.supabase.co";
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-let clientInstance: SupabaseClient | null = null;
-
-function getSupabaseAdmin(): SupabaseClient {
-  if (!clientInstance) {
-    clientInstance = createClient(supabaseUrl, serviceRoleKey || "service_role_build_key", {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-  }
-  return clientInstance;
+if (!supabaseUrl) {
+  throw new Error('NEXT_PUBLIC_SUPABASE_URL تنظیم نشده است.');
 }
 
-export const supabaseAdmin = new Proxy({} as SupabaseClient, {
-  get(_target, prop) {
-    const client = getSupabaseAdmin();
-    const value = (client as any)[prop];
-    if (typeof value === "function") {
-      return value.bind(client);
-    }
-    return value;
-  },
-});
+if (!supabaseServiceKey && process.env.NODE_ENV === 'production') {
+  throw new Error('🚨 SUPABASE_SERVICE_ROLE_KEY برای عملیات سروری در Production اجباری است.');
+}
 
-export default supabaseAdmin;
+export const supabaseAdmin = createClient(
+  supabaseUrl,
+  supabaseServiceKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy_anon_key_for_build',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
+);

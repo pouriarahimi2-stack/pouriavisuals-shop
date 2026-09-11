@@ -1,4 +1,3 @@
-// File Path: app/checkout/payment/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
@@ -13,7 +12,6 @@ function PaymentGatewayContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId") || "";
 
-  const [order, setOrder] = useState<any>(null);
   const [amount, setAmount] = useState<number>(0);
   const [cardNumber, setCardNumber] = useState("");
   const [cvv2, setCvv2] = useState("");
@@ -23,6 +21,7 @@ function PaymentGatewayContent() {
   const [otpTimer, setOtpTimer] = useState(120);
   const [paying, setPaying] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [trackingRef, setTrackingRef] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
@@ -38,8 +37,7 @@ function PaymentGatewayContent() {
     if (orderId) {
       orderService.getById(orderId).then((found) => {
         if (found) {
-          setOrder(found);
-          const finalVal = Number(found.finalAmount || found.final_amount || found.totalAmount || 0);
+          const finalVal = Number(found.finalAmount || (found as any).final_amount || found.totalAmount || 0);
           if (finalVal > 0) {
             setAmount(finalVal);
           }
@@ -76,13 +74,12 @@ function PaymentGatewayContent() {
     setPaying(true);
 
     try {
-      // اعتبارسنجی سروری با روت امن verify
       const res = await fetch("/api/payment/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId,
-          authority: `AUTH_${Date.now().toString().slice(-8)}`,
+          authority: "AUTH_" + Date.now().toString().slice(-8),
         }),
       });
 
@@ -91,18 +88,22 @@ function PaymentGatewayContent() {
         throw new Error(resJson.message || "تراکنش بانکی تایید نشد.");
       }
 
+      setTrackingRef(resJson.trackingRef || Date.now().toString().slice(-8));
+
+      // پاکسازی تضمینی کش سبد خرید
       if (typeof window !== "undefined") {
         localStorage.removeItem("axon_cart_store_v2026");
         localStorage.removeItem("axon_active_coupon_v2026");
         sessionStorage.removeItem("pending_payment_amount");
         sessionStorage.removeItem("pending_payment_order_id");
+        window.dispatchEvent(new CustomEvent("cart_updated", { detail: [] }));
       }
 
       soundEngine.playSuccess();
-      setPaying(false);
       setPaymentSuccess(true);
     } catch (err: any) {
       setErrorMsg(err.message || "خطا در پردازش تراکنش بانکی.");
+    } finally {
       setPaying(false);
     }
   };
@@ -111,7 +112,7 @@ function PaymentGatewayContent() {
     return (
       <div className="min-h-[75vh] flex items-center justify-center p-4 font-sans select-none" dir="rtl">
         <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center space-y-5 shadow-2xl animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-3xl flex items-center justify-center mx-auto animate-bounce">
+          <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-3xl flex items-center justify-center mx-auto">
             ✓
           </div>
           <div className="space-y-1">
@@ -123,6 +124,10 @@ function PaymentGatewayContent() {
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">شماره فاکتور:</span>
               <span className="font-mono font-bold text-[var(--accent-blue)]">{orderId}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">کد پیگیری تراکنش:</span>
+              <span className="font-mono font-bold text-slate-400">{trackingRef}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">مبلغ پرداختی:</span>
@@ -258,6 +263,7 @@ function PaymentGatewayContent() {
                 type="button"
                 onClick={() => {
                   soundEngine.playClick();
+                  setPass("584920");
                   setOtpTimer(120);
                 }}
                 className="px-4 py-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"

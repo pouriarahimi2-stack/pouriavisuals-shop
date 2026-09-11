@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Phase 20: Event-Driven Analytics & Conversion Funnel (fix.js)
+ * AXON CORE - Phase 21: Dynamic XML Sitemap & Robots.txt Generator (fix.js)
  */
 
 const fs = require('fs');
@@ -14,51 +14,80 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-PHASE20]\x1b[0m پیاده‌سازی سامانه ردیابی قیف تبدیل و تحلیل رویدادها...");
+console.log("\x1b[36m[AXON-PHASE21]\x1b[0m ایجاد نقشه سایت دینامیک و فایل robots.txt...");
 
 // =============================================================================
-// ۱. ساخت ابزار ردیابی رویدادها lib/analytics.ts
+// ۱. ساخت app/sitemap.ts برای تولید خودکار نقشه سایت سئو
 // =============================================================================
-const analyticsEngineCode = `/**
- * AXON CORE - Event-Driven Analytics & Funnel Tracking
- */
+const sitemapCode = `import { MetadataRoute } from "next";
+import { supabaseAdmin } from "@/lib/supabaseServer";
 
-type EcommerceEvent = 
-  | "view_product" 
-  | "add_to_cart" 
-  | "begin_checkout" 
-  | "coupon_applied" 
-  | "payment_started" 
-  | "purchase";
+export const dynamic = "force-dynamic";
 
-export const analytics = {
-  track(event: EcommerceEvent, payload?: Record<string, any>) {
-    const eventData = {
-      event,
-      timestamp: new Date().toISOString(),
-      ...(payload ? { payload } : {}),
-    };
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = "https://axoncore.ir";
 
-    if (typeof window !== "undefined") {
-      try {
-        const existing = JSON.parse(localStorage.getItem("axon_analytics_funnel_log") || "[]");
-        existing.push(eventData);
-        // نگهداری ۱۰۰ رویداد آخر در لوکال استوریج
-        if (existing.length > 100) existing.shift();
-        localStorage.setItem("axon_analytics_funnel_log", JSON.stringify(existing));
-      } catch {}
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: baseUrl, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
+    { url: \`\${baseUrl}/products\`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
+    { url: \`\${baseUrl}/blog\`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
+    { url: \`\${baseUrl}/news\`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
+    { url: \`\${baseUrl}/about\`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
+    { url: \`\${baseUrl}/contact\`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
+    { url: \`\${baseUrl}/track-order\`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.6 },
+  ];
+
+  let dynamicProducts: MetadataRoute.Sitemap = [];
+  try {
+    const { data: products } = await supabaseAdmin.from("products").select("id, updated_at");
+    if (products) {
+      dynamicProducts = products.map((p) => ({
+        url: \`\${baseUrl}/products/\${p.id}\`,
+        lastModified: p.updated_at ? new Date(p.updated_at) : new Date(),
+        changeFrequency: "weekly",
+        priority: 0.8,
+      }));
     }
+  } catch {}
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log(\`📊 [ANALYTICS_EVENT]: \${event}\`, payload || "");
+  let dynamicPosts: MetadataRoute.Sitemap = [];
+  try {
+    const { data: posts } = await supabaseAdmin.from("posts").select("id, slug, updated_at");
+    if (posts) {
+      dynamicPosts = posts.map((p) => ({
+        url: \`\${baseUrl}/blog/\${p.slug || p.id}\`,
+        lastModified: p.updated_at ? new Date(p.updated_at) : new Date(),
+        changeFrequency: "weekly",
+        priority: 0.7,
+      }));
     }
-  },
-};
+  } catch {}
+
+  return [...staticPages, ...dynamicProducts, ...dynamicPosts];
+}
 `;
-writeFile('lib/analytics.ts', analyticsEngineCode);
+writeFile('app/sitemap.ts', sitemapCode);
 
 // =============================================================================
-// ۲. بیلد نهایی پروژه و انتشار در Vercel
+// ۲. ساخت app/robots.ts برای مدیریت ربات‌های جستجو
+// =============================================================================
+const robotsCode = `import { MetadataRoute } from "next";
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: "*",
+      allow: "/",
+      disallow: ["/admin/", "/api/"],
+    },
+    sitemap: "https://axoncore.ir/sitemap.xml",
+  };
+}
+`;
+writeFile('app/robots.ts', robotsCode);
+
+// =============================================================================
+// ۳. بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -73,7 +102,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(analytics): implement event-driven analytics and conversion funnel tracking utility"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(seo): implement dynamic sitemap.ts and robots.ts generators"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -82,7 +111,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ سامانه تحلیل رفتار با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ نقشه سایت و تنظیمات ربات‌ها با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Step 2: Server-Side Rendered Blog Archive & Category SEO (fix.js)
+ * AXON CORE - Step 3: Secure Customer JWT & HttpOnly Session Management (fix.js)
  */
 
 const fs = require('fs');
@@ -14,234 +14,290 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[STEP-2]\x1b[0m ارتقای صفحه آرشیو مقالات به SSR و سئوی پیشرفته دسته‌بندی‌ها...");
+console.log("\x1b[36m[STEP-3]\x1b[0m پیاده‌سازی سشن امن JWT با کوکی‌های محافظت‌شده HttpOnly...");
 
 // =============================================================================
-// ۱. ایجاد کامپوننت کلاینتی فیلتر و جستجوی مقالات (components/BlogArchiveClient.tsx)
+// ۱. ایجاد ابزار lib/customerSession.ts جهت ساخت و تایید JWT خریداران
 // =============================================================================
-const blogClientCode = `"use client";
+const customerSessionCode = `import crypto from "crypto";
 
-import React, { useState } from "react";
-import Link from "next/link";
-import { soundEngine } from "@/lib/soundEngine";
+const SECRET = process.env.CUSTOMER_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "axon_customer_fallback_secret_key_2026";
 
-export interface BlogPostItem {
+export interface CustomerSessionPayload {
   id: string;
-  title: string;
-  slug?: string;
-  meta_description?: string;
-  content: string;
-  created_at?: string;
-  category?: string;
-  image_url?: string;
+  phone: string;
+  username?: string;
+  email?: string;
+  name?: string;
+  exp: number;
 }
 
-export default function BlogArchiveClient({ initialPosts }: { initialPosts: BlogPostItem[] }) {
-  const [search, setSearch] = useState("");
-  const [selectedCat, setSelectedCat] = useState("all");
+export function signCustomerPayload(user: { id: string; phone: string; username?: string; email?: string; name?: string }): string {
+  const payload: CustomerSessionPayload = {
+    ...user,
+    exp: Date.now() + 30 * 24 * 60 * 60 * 1000, // ۳۰ روز اعتبار
+  };
 
-  const categories = Array.from(
-    new Set(initialPosts.map((p) => p.category || "مقاله تخصصی"))
-  ).filter(Boolean);
+  const str = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto.createHmac("sha256", SECRET).update(str).digest("base64url");
+  return \`\${str}.\${signature}\`;
+}
 
-  const filteredPosts = initialPosts.filter((p) => {
-    const matchCat = selectedCat === "all" || (p.category || "مقاله تخصصی") === selectedCat;
-    const matchSearch =
-      (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.meta_description || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.content || "").toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
-  });
+export function verifyCustomerToken(token: string): CustomerSessionPayload | null {
+  try {
+    if (!token || !token.includes(".")) return null;
+    const [payloadStr, signature] = token.split(".");
+    const expectedSig = crypto.createHmac("sha256", SECRET).update(payloadStr).digest("base64url");
 
-  return (
-    <div className="space-y-10">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              setSelectedCat("all");
-            }}
-            className={\`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer \${
-              selectedCat === "all"
-                ? "bg-[var(--accent-blue)] text-white shadow-md"
-                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-            }\`}
-          >
-            همه مقالات ({initialPosts.length})
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => {
-                soundEngine.playClick();
-                setSelectedCat(cat);
-              }}
-              className={\`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer \${
-                selectedCat === cat
-                  ? "bg-[var(--accent-blue)] text-white shadow-md"
-                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-              }\`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+    if (signature !== expectedSig) return null;
 
-        <div className="w-full sm:w-72">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 جستجو در مقالات..."
-            className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
-          />
-        </div>
-      </div>
+    const payload: CustomerSessionPayload = JSON.parse(Buffer.from(payloadStr, "base64url").toString());
+    if (Date.now() > payload.exp) return null;
 
-      {filteredPosts.length === 0 ? (
-        <div className="p-12 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center text-xs font-bold text-[var(--text-secondary)]">
-          مقاله‌ای مطابق با جستجوی شما پیدا نشد.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPosts.map((post) => {
-            const displayImg = post.image_url || "https://axoncore.ir/placeholder.png";
-            return (
-              <article
-                key={post.id || post.title}
-                className="p-6 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col justify-between space-y-4 hover:border-[var(--accent-blue)] transition duration-300 group"
-              >
-                <div className="space-y-3">
-                  <div className="w-full h-44 rounded-2xl overflow-hidden bg-[var(--input-bg)] border border-[var(--card-border)]">
-                    <img
-                      src={displayImg}
-                      alt={post.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                    />
-                  </div>
-
-                  <div className="flex justify-between items-center text-[10px] font-bold">
-                    <span className="bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20 px-3 py-0.5 rounded-full">
-                      {post.category || "مقاله تخصصی"}
-                    </span>
-                    <span className="text-[var(--text-secondary)] font-mono">
-                      📅 {post.created_at ? new Date(post.created_at).toLocaleDateString("fa-IR") : "امروز"}
-                    </span>
-                  </div>
-
-                  <h2 className="font-extrabold text-sm text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition leading-snug line-clamp-2">
-                    {post.title}
-                  </h2>
-
-                  <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed line-clamp-3">
-                    {post.meta_description || post.content.replace(/<[^>]*>?/gm, "").substring(0, 110) + "..."}
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-[var(--card-border)] flex justify-between items-center">
-                  <Link
-                    href={\`/blog/\${post.slug || post.id}\`}
-                    className="text-xs font-black text-[var(--accent-blue)] hover:underline flex items-center gap-1"
-                  >
-                    <span>مطالعه کامل مقاله</span>
-                    <span>←</span>
-                  </Link>
-                  <span className="text-[10px] text-[var(--text-secondary)] font-bold">
-                    📖 ۴ دقیقه مطالعه
-                  </span>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+    return payload;
+  } catch {
+    return null;
+  }
 }
 `;
-writeFile('components/BlogArchiveClient.tsx', blogClientCode);
+writeFile('lib/customerSession.ts', customerSessionCode);
 
 // =============================================================================
-// ۲. بازنویسی app/blog/page.tsx به Server Component خالص با متادیتای سئو
+// ۲. ارتقای app/api/user/auth/route.ts به کوکی امن و JWT امضاشده
 // =============================================================================
-const serverBlogPageCode = `import React from "react";
+const fixedUserAuthRoute = `import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import BlogArchiveClient from "@/components/BlogArchiveClient";
-import type { Metadata } from "next";
+import { signCustomerPayload } from "@/lib/customerSession";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "مجله تخصصی و مقالات تحلیلی مانیتور و تجهیزات رنگ استودیو | آکسون",
-  description: "راهنمای خرید، تست گاموت رنگی، مقایسه تخصصی مانیتورهای ۵K و ۴K و استانداردهای سخت‌افزار تدوین در آکسون کور.",
-  openGraph: {
-    title: "مجله تخصصی آکسون | مقالات تحلیلی مانیتور و تصویر",
-    description: "مرجع مقالات کالیبراسیون و بررسی سخت‌افزار ادیتورهای ویدیو و کالریست‌ها.",
-    url: "https://axoncore.ir/blog",
-    type: "website",
-  },
-  alternates: {
-    canonical: "https://axoncore.ir/blog",
-  },
-};
+function hashPassword(password: string): string {
+  const salt = process.env.CUSTOMER_SALT || "axon_customer_salt_2026";
+  return crypto.scryptSync(password.trim(), salt, 32).toString("hex");
+}
 
-export default async function BlogArchivePage() {
-  let posts: any[] = [];
-
+export async function POST(req: NextRequest) {
   try {
-    if (supabaseAdmin) {
-      const { data } = await supabaseAdmin
-        .from("posts")
-        .select("id, title, slug, content, category, image_url, meta_description, created_at, is_visible, is_published")
-        .order("created_at", { ascending: false });
+    const body = await req.json();
+    const { action } = body;
+    const isProd = process.env.NODE_ENV === "production";
 
-      if (data) {
-        posts = data.filter((p) => p.is_visible !== false && p.is_published !== false);
+    // ۱. ورود با شماره/شناسه و کلمه عبور
+    if (action === "login_credentials") {
+      const { identifier, password } = body;
+      if (!identifier || !password) {
+        return NextResponse.json({ success: false, message: "شناسه و کلمه عبور الزامی است." }, { status: 400 });
       }
+
+      const cleanIdentifier = String(identifier).trim().toLowerCase();
+      const cleanPassword = String(password).trim();
+      const hashed = hashPassword(cleanPassword);
+
+      if (supabaseAdmin) {
+        const { data: user, error } = await supabaseAdmin
+          .from("customers")
+          .select("*")
+          .or(\`phone.eq.\${cleanIdentifier},username.eq.\${cleanIdentifier},email.eq.\${cleanIdentifier}\`)
+          .maybeSingle();
+
+        if (!error && user) {
+          const isPasswordValid = user.password_hash === hashed || user.password === cleanPassword;
+          if (isPasswordValid) {
+            const userData = {
+              id: String(user.id),
+              phone: user.phone,
+              username: user.username,
+              email: user.email,
+              name: user.name || user.full_name || "کاربر آکسون",
+            };
+
+            const token = signCustomerPayload(userData);
+            const response = NextResponse.json({
+              success: true,
+              message: "ورود با موفقیت انجام شد.",
+              user: userData,
+              token,
+            });
+
+            response.cookies.set("customer_session_token", token, {
+              httpOnly: true,
+              secure: isProd,
+              sameSite: "lax",
+              path: "/",
+              maxAge: 30 * 24 * 60 * 60,
+            });
+
+            return response;
+          }
+        }
+      }
+
+      return NextResponse.json({ success: false, message: "نام کاربری یا کلمه عبور اشتباه است." }, { status: 401 });
     }
-  } catch (err) {
-    console.warn("Blog server load warning:", err);
+
+    // ۲. ثبت‌نام کاربر جدید
+    if (action === "register") {
+      const { phone, username, password, email, name } = body;
+
+      if (!phone || !password) {
+        return NextResponse.json({ success: false, message: "شماره موبایل و کلمه عبور الزامی هستند." }, { status: 400 });
+      }
+
+      const cleanPhone = String(phone).replace(/\\D/g, "");
+      const cleanUsername = String(username || \`user_\${cleanPhone.slice(-4)}\`).trim().toLowerCase();
+      const hashedPassword = hashPassword(password);
+      const cleanEmail = email ? String(email).trim().toLowerCase() : null;
+
+      const newUserPayload = {
+        id: \`cust_\${Date.now()}\`,
+        phone: cleanPhone,
+        username: cleanUsername,
+        password_hash: hashedPassword,
+        email: cleanEmail,
+        name: name ? String(name).trim() : cleanUsername,
+        full_name: name ? String(name).trim() : cleanUsername,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (supabaseAdmin) {
+        try {
+          await supabaseAdmin.from("customers").upsert(newUserPayload, { onConflict: "phone" });
+        } catch (dbErr) {
+          console.warn("Customer registration upsert notice:", dbErr);
+        }
+      }
+
+      const userData = {
+        id: newUserPayload.id,
+        phone: cleanPhone,
+        username: cleanUsername,
+        email: cleanEmail || undefined,
+        name: newUserPayload.name,
+      };
+
+      const token = signCustomerPayload(userData);
+      const response = NextResponse.json({
+        success: true,
+        message: "حساب کاربری با موفقیت ساخته شد.",
+        user: userData,
+        token,
+      });
+
+      response.cookies.set("customer_session_token", token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+
+      return response;
+    }
+
+    // ۳. همگام‌سازی ورود از طریق OAuth
+    if (action === "oauth_sync") {
+      const { provider, email, name, avatar } = body;
+      const cleanEmail = String(email || \`\${provider}_user@axoncore.ir\`).trim().toLowerCase();
+      const generatedPhone = body.phone ? String(body.phone).replace(/\\D/g, "") : \`0999\${Date.now().toString().slice(-7)}\`;
+
+      const oauthUserPayload = {
+        id: \`oauth_\${provider}_\${Date.now()}\`,
+        phone: generatedPhone,
+        username: cleanEmail.split("@")[0],
+        email: cleanEmail,
+        name: name || \`کاربر \${provider === "google" ? "گوگل" : "اپل"}\`,
+        full_name: name || \`کاربر \${provider === "google" ? "گوگل" : "اپل"}\`,
+        avatar_url: avatar || null,
+        oauth_provider: provider,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (supabaseAdmin) {
+        try {
+          await supabaseAdmin.from("customers").upsert(oauthUserPayload, { onConflict: "email" });
+        } catch {}
+      }
+
+      const userData = {
+        id: oauthUserPayload.id,
+        phone: generatedPhone,
+        username: oauthUserPayload.username,
+        email: cleanEmail,
+        name: oauthUserPayload.name,
+      };
+
+      const token = signCustomerPayload(userData);
+      const response = NextResponse.json({
+        success: true,
+        message: \`ورود با موفقیت از طریق \${provider === "google" ? "حساب گوگل" : "اپل آیدی"} انجام شد.\`,
+        user: userData,
+        token,
+      });
+
+      response.cookies.set("customer_session_token", token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+
+      return response;
+    }
+
+    return NextResponse.json({ success: false, message: "درخواست نامعتبر است." }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
-
-  // اسکیما CollectionPage برای گوگل
-  const collectionJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    "name": "مجله تخصصی و مقالات آکسون",
-    "url": "https://axoncore.ir/blog",
-    "description": "مجموعه مقالات تحلیل رنگ، مانیتورهای استودیو و استانداردهای نمایش تصویر",
-    "hasPart": posts.slice(0, 10).map((p) => ({
-      "@type": "BlogPosting",
-      "headline": p.title,
-      "url": \`https://axoncore.ir/blog/\${p.slug || p.id}\`,
-      "datePublished": p.created_at,
-    })),
-  };
-
-  return (
-    <div className="max-w-6xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}
-      />
-
-      <div className="text-center space-y-3">
-        <span className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] inline-block text-2xl shadow-sm">
-          📚
-        </span>
-        <h1 className="text-2xl md:text-4xl font-black">مجله تخصصی، راهنمای خرید و مقالات تحلیلی</h1>
-        <p className="text-xs text-[var(--text-secondary)] font-medium max-w-xl mx-auto leading-relaxed">
-          تحلیل‌های جامع بازار، مقایسه سخت‌افزارها، مانیتورهای تدوین ۵K و کالیبراسیون تخصصی تصویر
-        </p>
-      </div>
-
-      <BlogArchiveClient initialPosts={posts} />
-    </div>
-  );
 }
 `;
-writeFile('app/blog/page.tsx', serverBlogPageCode);
+writeFile('app/api/user/auth/route.ts', fixedUserAuthRoute);
+
+// =============================================================================
+// ۳. ساخت روت app/api/user/session/route.ts جهت احراز هویت سشن
+// =============================================================================
+const userSessionRoute = `import { NextRequest, NextResponse } from "next/server";
+import { verifyCustomerToken } from "@/lib/customerSession";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  try {
+    const token = req.cookies.get("customer_session_token")?.value;
+    if (!token) {
+      return NextResponse.json({ authenticated: false }, { status: 200 });
+    }
+
+    const payload = verifyCustomerToken(token);
+    if (!payload) {
+      return NextResponse.json({ authenticated: false }, { status: 200 });
+    }
+
+    return NextResponse.json({
+      authenticated: true,
+      user: {
+        id: payload.id,
+        phone: payload.phone,
+        username: payload.username,
+        email: payload.email,
+        name: payload.name,
+      },
+    });
+  } catch {
+    return NextResponse.json({ authenticated: false }, { status: 200 });
+  }
+}
+
+export async function POST() {
+  const response = NextResponse.json({ success: true, message: "با موفقیت خارج شدید." });
+  response.cookies.delete("customer_session_token");
+  return response;
+}
+`;
+writeFile('app/api/user/session/route.ts', userSessionRoute);
 
 // =============================================================================
 // بیلد و دیپلوی ورسل
@@ -259,7 +315,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و انتش
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(seo-step2): convert blog archive to server component with dynamic JSON-LD and canonical metadata"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "security(step3): implement customer JWT authentication and HttpOnly session cookies"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -268,7 +324,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قدم دوم با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ قدم سوم با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

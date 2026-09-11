@@ -1,6 +1,6 @@
-// File Path: app/api/user/auth/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { signCustomerPayload } from "@/lib/customerSession";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +14,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { action } = body;
+    const isProd = process.env.NODE_ENV === "production";
 
-    // ۱. ورود با شناسه/موبایل و رمز عبور
+    // ۱. ورود با شماره/شناسه و کلمه عبور
     if (action === "login_credentials") {
       const { identifier, password } = body;
       if (!identifier || !password) {
@@ -36,19 +37,31 @@ export async function POST(req: NextRequest) {
         if (!error && user) {
           const isPasswordValid = user.password_hash === hashed || user.password === cleanPassword;
           if (isPasswordValid) {
-            const token = `USER-${crypto.randomBytes(16).toString("hex")}`;
-            return NextResponse.json({
+            const userData = {
+              id: String(user.id),
+              phone: user.phone,
+              username: user.username,
+              email: user.email,
+              name: user.name || user.full_name || "کاربر آکسون",
+            };
+
+            const token = signCustomerPayload(userData);
+            const response = NextResponse.json({
               success: true,
               message: "ورود با موفقیت انجام شد.",
-              user: {
-                id: user.id,
-                phone: user.phone,
-                username: user.username,
-                email: user.email,
-                name: user.name || user.full_name,
-              },
+              user: userData,
               token,
             });
+
+            response.cookies.set("customer_session_token", token, {
+              httpOnly: true,
+              secure: isProd,
+              sameSite: "lax",
+              path: "/",
+              maxAge: 30 * 24 * 60 * 60,
+            });
+
+            return response;
           }
         }
       }
@@ -69,7 +82,7 @@ export async function POST(req: NextRequest) {
       const hashedPassword = hashPassword(password);
       const cleanEmail = email ? String(email).trim().toLowerCase() : null;
 
-      const newUserPayload: any = {
+      const newUserPayload = {
         id: `cust_${Date.now()}`,
         phone: cleanPhone,
         username: cleanUsername,
@@ -89,28 +102,40 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const token = `USER-${crypto.randomBytes(16).toString("hex")}`;
-      return NextResponse.json({
+      const userData = {
+        id: newUserPayload.id,
+        phone: cleanPhone,
+        username: cleanUsername,
+        email: cleanEmail || undefined,
+        name: newUserPayload.name,
+      };
+
+      const token = signCustomerPayload(userData);
+      const response = NextResponse.json({
         success: true,
         message: "حساب کاربری با موفقیت ساخته شد.",
-        user: {
-          id: newUserPayload.id,
-          phone: cleanPhone,
-          username: cleanUsername,
-          email: cleanEmail,
-          name: newUserPayload.name,
-        },
+        user: userData,
         token,
       });
+
+      response.cookies.set("customer_session_token", token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+
+      return response;
     }
 
-    // ۳. همگام‌سازی ورود با Google / Apple OAuth
+    // ۳. همگام‌سازی ورود از طریق OAuth
     if (action === "oauth_sync") {
       const { provider, email, name, avatar } = body;
       const cleanEmail = String(email || `${provider}_user@axoncore.ir`).trim().toLowerCase();
       const generatedPhone = body.phone ? String(body.phone).replace(/\D/g, "") : `0999${Date.now().toString().slice(-7)}`;
 
-      const oauthUserPayload: any = {
+      const oauthUserPayload = {
         id: `oauth_${provider}_${Date.now()}`,
         phone: generatedPhone,
         username: cleanEmail.split("@")[0],
@@ -129,13 +154,31 @@ export async function POST(req: NextRequest) {
         } catch {}
       }
 
-      const token = `OAUTH-${provider.toUpperCase()}-${crypto.randomBytes(16).toString("hex")}`;
-      return NextResponse.json({
+      const userData = {
+        id: oauthUserPayload.id,
+        phone: generatedPhone,
+        username: oauthUserPayload.username,
+        email: cleanEmail,
+        name: oauthUserPayload.name,
+      };
+
+      const token = signCustomerPayload(userData);
+      const response = NextResponse.json({
         success: true,
         message: `ورود با موفقیت از طریق ${provider === "google" ? "حساب گوگل" : "اپل آیدی"} انجام شد.`,
-        user: oauthUserPayload,
+        user: userData,
         token,
       });
+
+      response.cookies.set("customer_session_token", token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+
+      return response;
     }
 
     return NextResponse.json({ success: false, message: "درخواست نامعتبر است." }, { status: 400 });

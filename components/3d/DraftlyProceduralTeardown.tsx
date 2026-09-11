@@ -3,7 +3,146 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { soundEngine } from "@/lib/soundEngine";
-import { classifyProductArchetype, generateDraftlyLayers, DraftlyLayerInfo } from "@/components/3d/DraftlyProceduralTeardown";
+
+export type ProductArchetype =
+  | "studio_display"
+  | "macbook"
+  | "watch"
+  | "ipad"
+  | "capture_card"
+  | "calibrator"
+  | "generic_gear";
+
+export interface DraftlyLayerInfo {
+  id: string;
+  depthIndex: number;
+  nameEn: string;
+  nameFa: string;
+  category: "optics" | "display" | "logicboard" | "power" | "audio" | "chassis";
+  role: string;
+  engineeringHighlight: string;
+  metallurgyMaterial: string;
+  specifications: Record<string, string>;
+  meshZOffset: number;
+  meshScale: [number, number, number];
+  colorHex: number;
+  metalness: number;
+  roughness: number;
+  transmission?: number;
+}
+
+export function classifyProductArchetype(title: string, category: string = ""): ProductArchetype {
+  const norm = (title + " " + category).toLowerCase();
+  if (norm.includes("studio") || norm.includes("display") || norm.includes("xdr") || norm.includes("مانیتور")) return "studio_display";
+  if (norm.includes("macbook") || norm.includes("مک‌بوک") || norm.includes("مک بوک") || norm.includes("laptop")) return "macbook";
+  if (norm.includes("watch") || norm.includes("ساعت") || norm.includes("ultra")) return "watch";
+  if (norm.includes("ipad") || norm.includes("آیپد") || norm.includes("tablet")) return "ipad";
+  if (norm.includes("decklink") || norm.includes("کپچر") || norm.includes("blackmagic")) return "capture_card";
+  if (norm.includes("calibrite") || norm.includes("کالیبرایت") || norm.includes("sensor")) return "calibrator";
+  return "generic_gear";
+}
+
+export function generateDraftlyLayers(archetype: ProductArchetype, title: string): DraftlyLayerInfo[] {
+  return [
+    {
+      id: "layer-1",
+      depthIndex: 1,
+      nameEn: "Nano-Texture Front Optical Glass",
+      nameFa: "شیشه نوری نانوتکستچر با فیلتر پولاریزه آنتی‌رفلکت",
+      category: "optics",
+      role: "حذف ۹۹.۴٪ بازتاب‌های محیطی و عبور دقیق طیف نور بدون اعوجاج رنگی",
+      engineeringHighlight: "حکاکی مستقیم شیشه در مقیاس نانومتری جهت تثبیت کنتراست",
+      metallurgyMaterial: "شیشه سیلیکات تقویت‌شده با پوشش اولئوفوبیک",
+      specifications: { "ضریب بازتاب": "۰.۲٪", "شفافیت": "۹۸.۶٪", "سختی سطحی": "9H" },
+      meshZOffset: 1.8,
+      meshScale: [3.4, 2.0, 0.04],
+      colorHex: 0x38bdf8,
+      metalness: 0.1,
+      roughness: 0.08,
+      transmission: 0.92,
+    },
+    {
+      id: "layer-2",
+      depthIndex: 2,
+      nameEn: "5K Retina IPS Precision Active Matrix Panel",
+      nameFa: "پنل ۵K رتینا با ماتریس رنگ ۱۰ بیتی و مناطق نوردهی موضعی",
+      category: "display",
+      role: "تولید تصویر با وضوح ۲۱۸ PPI و پوشش ۹۹٪ گاموت رنگی DCI-P3",
+      engineeringHighlight: "کالیبراسیون سخت‌افزاری با جدول رنگ ۳D LUT داخلی",
+      metallurgyMaterial: "زیرلایه نیمه‌هادی ایندیوم گالیوم زینک اکسید (IGZO)",
+      specifications: { "تراکم": "218 PPI", "تفکیک رنگ": "1.07 میلیارد رنگ", "روشنایی": "600 Nits" },
+      meshZOffset: 1.1,
+      meshScale: [3.35, 1.95, 0.06],
+      colorHex: 0x0284c7,
+      metalness: 0.3,
+      roughness: 0.2,
+    },
+    {
+      id: "layer-3",
+      depthIndex: 3,
+      nameEn: "Main Logic Board & Neural Processor Die",
+      nameFa: "مادربرد مرکزی ۱۲ لایه با پردازشگر عصبی تصویر (Neural Engine)",
+      category: "logicboard",
+      role: "مدیریت لحظه‌ای Center Stage، پردازش صدای فراگیر و کنترل تاندربولت",
+      engineeringHighlight: "تبدیل بلادرنگ فضای رنگ Rec.709 به Rec.2020 در ۰.۱ میلی‌ثانیه",
+      metallurgyMaterial: "فایبرگلاس نظامی FR-4 با روکش طلای غوطه‌ور ENIG",
+      specifications: { "پهنای باند": "40Gbps Thunderbolt 3", "تعداد لایه‌ها": "PCB دوازده لایه", "پردازنده": "Neural Display Core" },
+      meshZOffset: 0.4,
+      meshScale: [2.8, 1.4, 0.08],
+      colorHex: 0x047857,
+      metalness: 0.8,
+      roughness: 0.3,
+    },
+    {
+      id: "layer-4",
+      depthIndex: 4,
+      nameEn: "Integrated GaN High-Efficiency Power Subsystem",
+      nameFa: "ماژول تغذیه یکپارچه نیترید گالیوم و هیت‌پایپ‌های مسی خنک‌کاری",
+      category: "power",
+      role: "تامین ولتاژ پایدار ۲۴۰ وات با راندمان ۹۶٪ و شارژ همزمان مک‌بوک",
+      engineeringHighlight: "کاهش ۶۰ درصدی ابعاد نسبت به منابع تغذیه متداول",
+      metallurgyMaterial: "نیمه‌هادی‌های GaNFast با خازن‌های جامد ژاپنی و مس C1100",
+      specifications: { "توان خروجی": "240W پیوسته", "شارژ تاندربولت": "96W Power Delivery", "راندمان": "96%" },
+      meshZOffset: -0.3,
+      meshScale: [2.2, 0.9, 0.12],
+      colorHex: 0xd97706,
+      metalness: 0.75,
+      roughness: 0.35,
+    },
+    {
+      id: "layer-5",
+      depthIndex: 5,
+      nameEn: "Six-Speaker Acoustic Chamber with Force-Cancelling",
+      nameFa: "محفظه آکوستیک استودیویی با ۶ اسپیکر لغوکننده لرزش",
+      category: "audio",
+      role: "تولید صدای سه‌بعدی Dolby Atmos بدون انتقال کوچک‌ترین ارتعاش به پنل",
+      engineeringHighlight: "چیدمان متقارن جفت درایورها جهت خنثی‌سازی کامل گشتاور مکانیکی",
+      metallurgyMaterial: "محفظه رزین کربن فشرده با مگنت‌های نئودیمیوم N52",
+      specifications: { "تعداد درایور": "۴ ووفر + ۲ توییتر", "فرکانس": "45Hz تا 22kHz", "پشتیبانی": "Spatial Audio" },
+      meshZOffset: -1.0,
+      meshScale: [3.1, 0.7, 0.15],
+      colorHex: 0x4f46e5,
+      metalness: 0.5,
+      roughness: 0.5,
+    },
+    {
+      id: "layer-6",
+      depthIndex: 6,
+      nameEn: "Unibody CNC Billet Aluminum Structural Chassis",
+      nameFa: "شاسی یکپارچه آلومینیوم سری ۶۰۰۰ با شبکه خنک‌کاری Laminar",
+      category: "chassis",
+      role: "پایداری ساختار فیزیکی، جذب نویز الکترومغناطیسی و تخلیه یکنواخت گرما",
+      engineeringHighlight: "تراشکاری تمام اتوماتیک ۵ محوره CNC با خطای کمتر از ۰.۰۱ میلی‌متر",
+      metallurgyMaterial: "آلومینیوم هوافضایی گرید ۶۰۶۳-T6 بازیافتی ۱۰۰٪",
+      specifications: { "روش ساخت": "5-Axis CNC Milling", "دفع حرارت": "تا 70W بدون فن", "آلیاژ": "Alloy 6063-T6" },
+      meshZOffset: -1.7,
+      meshScale: [3.45, 2.05, 0.18],
+      colorHex: 0x94a3b8,
+      metalness: 0.9,
+      roughness: 0.2,
+    },
+  ];
+}
 
 interface DraftlyTeardownProps {
   productTitle: string;
@@ -55,7 +194,7 @@ export default function DraftlyProceduralTeardown({
 
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
-      antialias: !isMobile, // در موبایل برای ۶۰ فریم روان آنتی‌الیاسینگ غیرفعال می‌شود
+      antialias: !isMobile,
       powerPreference: "high-performance",
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -80,7 +219,6 @@ export default function DraftlyProceduralTeardown({
         layer.meshScale[2]
       );
 
-      // متریال سریع و سازگار با چیپ گرافیکی موبایل
       const mat = new THREE.MeshStandardMaterial({
         color: layer.colorHex,
         metalness: isMobile ? 0.3 : layer.metalness,
@@ -95,7 +233,6 @@ export default function DraftlyProceduralTeardown({
       meshesRef.current.push(mesh);
     });
 
-    // رویدادهای لمسی بدون تداخل با اسکرول صفحه
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
         isInteractingRef.current = true;
@@ -180,7 +317,6 @@ export default function DraftlyProceduralTeardown({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/95 backdrop-blur-2xl font-sans select-none animate-fadeIn text-slate-100" dir="rtl">
       <div className="relative w-full max-w-6xl h-[92vh] max-h-[820px] bg-slate-900 border border-slate-700/60 rounded-[2rem] shadow-2xl flex flex-col justify-between overflow-hidden">
-        
         <header className="p-4 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-950/80 shrink-0">
           <div>
             <h3 className="font-black text-xs sm:text-sm text-white truncate max-w-xs sm:max-w-md">{productTitle}</h3>

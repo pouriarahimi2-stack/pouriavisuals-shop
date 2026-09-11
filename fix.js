@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Step 7: Mobile-First Touch Ergonomics & 60fps CartDrawer Optimization (fix.js)
+ * AXON CORE - Fix Suspense Boundary on /track-order (fix.js)
  */
 
 const fs = require('fs');
@@ -11,181 +11,225 @@ function writeFile(relPath, content) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ذخیره و بهینه‌سازی شد: ${relPath}\x1b[0m`);
+  console.log(`\x1b[32m✔ اصلاح شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[STEP-7]\x1b[0m ارتقای ارگونومی لمسی کشوی سبد خرید و تثبیت رندر ۶۰fps در موبایل...");
+console.log("\x1b[36m[AXON-FIX]\x1b[0m افزودن Suspense Boundary به صفحه پیگیری سفارش (/track-order)...");
 
 // =============================================================================
-// بازنویسی روان و فوق‌سریع components/CartDrawer.tsx برای موبایل و تبلت
+// بازنویسی app/track-order/page.tsx با احاطه کامل در Suspense
 // =============================================================================
-const cartDrawerCode = `"use client";
+const fixedTrackOrderPage = `"use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { formatPrice } from "@/lib/formatters";
 
-export default function CartDrawer() {
-  const { cartItems, isCartOpen, closeCart, updateQuantity, removeFromCart } = useCart();
-  const drawerRef = useRef<HTMLDivElement>(null);
+function TrackOrderContent() {
+  const searchParams = useSearchParams();
+  const initialOrderId = searchParams.get("orderId") || "";
+  const isSuccess = searchParams.get("success") === "true";
 
-  // قفل اسکرول بدنه هنگام باز بودن کشو در موبایل
-  useEffect(() => {
-    if (isCartOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
+  const [query, setQuery] = useState(initialOrderId);
+  const [loading, setLoading] = useState(false);
+  const [order, setOrder] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const searchOrder = async (targetQuery?: string) => {
+    const q = (targetQuery !== undefined ? targetQuery : query).trim();
+    if (!q) return;
+
+    soundEngine.playClick();
+    setLoading(true);
+    setErrorMessage("");
+    setOrder(null);
+
+    try {
+      const res = await fetch(\`/api/orders/track?query=\${encodeURIComponent(q)}\`);
+      const data = await res.json();
+
+      if (res.ok && data.success && data.order) {
+        soundEngine.playSuccess();
+        setOrder(data.order);
+      } else {
+        setErrorMessage(data.message || "سفارشی با این کد رهگیری یا شماره تماس یافت نشد.");
+      }
+    } catch {
+      setErrorMessage("خطا در برقراری ارتباط با سرور پیگیری.");
+    } finally {
+      setLoading(false);
     }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isCartOpen]);
+  };
 
-  if (!isCartOpen) return null;
-
-  const rawTotal = cartItems.reduce(
-    (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
-    0
-  );
+  useEffect(() => {
+    if (initialOrderId) {
+      searchOrder(initialOrderId);
+    }
+  }, [initialOrderId]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-start bg-black/60 backdrop-blur-sm transition-opacity duration-200"
-      onClick={closeCart}
-      dir="rtl"
-    >
-      <div
-        ref={drawerRef}
-        onClick={(e) => e.stopPropagation()}
-        style={{ transform: "translateZ(0)" }}
-        className="w-full max-w-md h-full bg-[var(--modal-bg)] border-l border-[var(--card-border)] shadow-2xl flex flex-col justify-between p-4 sm:p-6 text-[var(--text-primary)] select-none animate-fadeIn"
-      >
-        {/* هدر کشوی سبد خرید */}
-        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🛒</span>
-            <h2 className="text-base font-black">سبد خرید شما</h2>
-            <span className="px-2.5 py-0.5 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-xs font-bold font-mono">
-              {cartItems.length} کالا
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              closeCart();
-            }}
-            className="w-11 h-11 rounded-2xl bg-[var(--input-bg)] hover:bg-rose-500 hover:text-white border border-[var(--card-border)] flex items-center justify-center text-sm font-black transition cursor-pointer"
-            aria-label="بستن سبد خرید"
-          >
-            ✕
-          </button>
+    <div className="max-w-3xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+      <div className="text-center space-y-2">
+        <div className="w-14 h-14 mx-auto rounded-3xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] flex items-center justify-center text-2xl shadow-sm">
+          📦
         </div>
+        <h1 className="text-2xl font-black">سامانه هوشمند رهگیری و استعلام سفارشات</h1>
+        <p className="text-xs text-[var(--text-secondary)] font-medium">
+          شماره موبایل یا شناسه فاکتور (ORD-xxxx) را جهت مشاهده وضعیت بسته وارد نمایید
+        </p>
+      </div>
 
-        {/* لیست اقلام با تاچ تارگت استاندارد */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-3 scrollbar-none">
-          {cartItems.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-3">
-              <span className="text-4xl">🛍️</span>
-              <p className="text-xs font-bold text-[var(--text-secondary)]">سبد خرید شما در حال حاضر خالی است.</p>
-              <button
-                type="button"
-                onClick={closeCart}
-                className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md cursor-pointer"
-              >
-                مشاهده محصولات فروشگاه
-              </button>
+      {isSuccess && (
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center animate-fadeIn">
+          ✓ پرداخت شما با موفقیت ثبت شد. اطلاعات فاکتور و مرسوله شما در کادر زیر قابل پیگیری است.
+        </div>
+      )}
+
+      {/* فرم جستجو */}
+      <div className="p-3 sm:p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && searchOrder()}
+          placeholder="مثال: ORD-123456 یا ۰۹۱۲۳۴۵۶۷۸۹..."
+          className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold font-mono outline-none text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+        />
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => searchOrder()}
+          className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50 shrink-0"
+        >
+          {loading ? "در حال استعلام..." : "رهگیری مرسوله 🔍"}
+        </button>
+      </div>
+
+      {errorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 text-xs font-bold text-center animate-fadeIn">
+          ⚠️ {errorMessage}
+        </div>
+      )}
+
+      {/* کارت نتایج سفارش */}
+      {order && (
+        <div className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 animate-fadeIn">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
+            <div>
+              <span className="text-[10px] text-[var(--text-secondary)] font-mono block">شناسه فاکتور رسمی:</span>
+              <h2 className="text-base font-mono font-black text-[var(--accent-blue)]">{order.order_number || order.id}</h2>
             </div>
-          ) : (
-            cartItems.map((item) => (
-              <div
-                key={item.id}
-                className="p-3 sm:p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <img
-                    src={item.image || "/placeholder.png"}
-                    alt={item.title || item.name || "کالا"}
-                    className="w-14 h-14 object-contain rounded-xl bg-[var(--modal-bg)] p-1 border border-[var(--card-border)] shrink-0"
-                  />
-                  <div className="overflow-hidden space-y-1">
-                    <h3 className="text-xs font-black truncate max-w-[160px] sm:max-w-[180px]">
-                      {item.title || item.name}
-                    </h3>
-                    <span className="text-xs font-mono font-bold text-[var(--accent-blue)] block" suppressHydrationWarning>
-                      {formatPrice(item.price)} تومان
-                    </span>
-                  </div>
-                </div>
-
-                {/* دکمه‌های کم و زیاد با حداقل ابعاد لمسی ۴۴ پیکسل برای موبایل */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick();
-                      updateQuantity(item.id, (item.quantity || 1) + 1);
-                    }}
-                    className="w-10 h-10 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center font-black text-sm transition cursor-pointer"
-                  >
-                    +
-                  </button>
-                  <span className="w-6 text-center font-mono font-bold text-xs">
-                    {item.quantity || 1}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick();
-                      if ((item.quantity || 1) > 1) {
-                        updateQuantity(item.id, (item.quantity || 1) - 1);
-                      } else {
-                        removeFromCart(item.id);
-                      }
-                    }}
-                    className="w-10 h-10 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-rose-500 hover:text-rose-500 flex items-center justify-center font-black text-sm transition cursor-pointer"
-                  >
-                    -
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* فوتر سبد و دکمه پرداخت سریع */}
-        {cartItems.length > 0 && (
-          <div className="border-t border-[var(--card-border)] pt-4 space-y-3 shrink-0">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-bold text-[var(--text-secondary)]">مبلغ کل قابل پرداخت:</span>
-              <span className="font-mono font-black text-base text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
-                {formatPrice(rawTotal)} تومان
+            <div className="flex items-center gap-2">
+              <span className={\`px-3 py-1 rounded-full text-xs font-black \${
+                order.status === "shipped" ? "bg-blue-500/15 text-blue-500 border border-blue-500/30" :
+                order.status === "paid" ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30" :
+                order.status === "delivered" ? "bg-purple-500/15 text-purple-500 border border-purple-500/30" :
+                order.status === "cancelled" ? "bg-rose-500/15 text-rose-500 border border-rose-500/30" :
+                "bg-amber-500/15 text-amber-500 border border-amber-500/30"
+              }\`}>
+                {order.status === "shipped" ? "ارسال به پست 🚚" :
+                 order.status === "paid" ? "پرداخت شده و آماده‌سازی ✓" :
+                 order.status === "delivered" ? "تحویل خریدار شد" :
+                 order.status === "cancelled" ? "لغو شده" : "در انتظار پرداخت"}
               </span>
             </div>
-
-            <Link
-              href="/checkout"
-              onClick={() => {
-                soundEngine.playClick();
-                closeCart();
-              }}
-              className="w-full min-h-[48px] py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-95 transition shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-            >
-              <span>تکمیل سفارش و تسویه حساب 💳</span>
-            </Link>
           </div>
-        )}
+
+          {/* بارنامه پستی */}
+          {order.tracking_code ? (
+            <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/25 space-y-2">
+              <span className="text-[11px] font-bold text-blue-500 block">📮 کد رهگیری ۲۴ رقمی شرکت ملی پست:</span>
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-black text-sm text-[var(--text-primary)] tracking-widest">{order.tracking_code}</span>
+                <a
+                  href={\`https://tracking.post.ir/?id=\${order.tracking_code}\`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-[10px] font-bold hover:bg-blue-500 transition"
+                >
+                  رهگیری در سامانه پست ←
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-secondary)] font-medium">
+              مرسوله در حال حاضر در مرحله آماده‌سازی و بسته‌بندی ضدضربه استودیویی است و به محض تحویل به پست، کد ۲۴ رقمی پیامک خواهد شد.
+            </div>
+          )}
+
+          {/* مشخصات گیرنده */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[10px] text-[var(--text-secondary)] font-bold block">تحویل‌گیرنده:</span>
+              <p className="font-black text-[var(--text-primary)]">{order.customer_name || "خریدار محترم"}</p>
+              <p className="font-mono text-[11px] text-[var(--text-secondary)]">{order.phone}</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[10px] text-[var(--text-secondary)] font-bold block">مبلغ فاکتور:</span>
+              <p className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
+                {formatPrice(order.final_amount || order.total_amount)} تومان
+              </p>
+              <p className="text-[10px] text-[var(--text-secondary)]">بسته‌بندی و ارسال پیشتاز: رایگان</p>
+            </div>
+
+            <div className="sm:col-span-2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[10px] text-[var(--text-secondary)] font-bold block">نشانی تحویل مرسوله:</span>
+              <p className="text-[11px] text-[var(--text-primary)] leading-relaxed font-medium">
+                {order.address || \`استان \${order.province || ""}، شهر \${order.city || ""}\`}
+              </p>
+            </div>
+          </div>
+
+          {/* اقلام خریداری‌شده */}
+          {Array.isArray(order.items) && order.items.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-[var(--card-border)]">
+              <span className="text-xs font-black block">اقلام این سفارش:</span>
+              <div className="space-y-2">
+                {order.items.map((it: any, idx: number) => (
+                  <div key={idx} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center text-xs">
+                    <span className="font-bold text-[var(--text-primary)]">{it.title || it.name} (×{it.quantity || 1})</span>
+                    <span className="font-mono font-black text-[var(--accent-blue)]" suppressHydrationWarning>
+                      {formatPrice(it.price * (it.quantity || 1))} ت
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="text-center pt-4">
+        <Link href="/" className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold transition">
+          ← بازگشت به صفحه نخست فروشگاه
+        </Link>
       </div>
     </div>
   );
 }
+
+export default function TrackOrderPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[60vh] flex flex-col items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
+          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-blue)] border-t-transparent animate-spin mb-3" />
+          در حال آماده‌سازی سامانه رهگیری...
+        </div>
+      }
+    >
+      <TrackOrderContent />
+    </Suspense>
+  );
+}
 `;
-writeFile('components/CartDrawer.tsx', cartDrawerCode);
+writeFile('app/track-order/page.tsx', fixedTrackOrderPage);
 
 // =============================================================================
-// بیلد و انتشار در ورسل
+// بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -200,7 +244,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و انتش
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "perf(touch-step7): optimize cart drawer touch interactions and mobile ergonomics for 60fps"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "fix(track-order): wrap useSearchParams in Suspense boundary for Next.js 15 prerender compliance"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -209,7 +253,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قدم هفتم با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ صفحه رهگیری اصلاح شد و پروژه با موفقیت در ورسل منتشر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

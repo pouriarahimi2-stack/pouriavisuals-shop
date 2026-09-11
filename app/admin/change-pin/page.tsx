@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import Link from "next/link";
@@ -121,7 +120,6 @@ export default function AdminChangePinPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5 text-xs">
-          {/* مشخصات هویتی ادمین */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="font-bold text-[var(--text-secondary)]">نام و نام خانوادگی مدیر:</label>
@@ -152,7 +150,6 @@ export default function AdminChangePinPage() {
           <div className="border-t border-[var(--card-border)] pt-4 space-y-4">
             <h3 className="font-black text-xs text-[var(--accent-blue)]">🔑 تغییر کلمه عبور یا پین‌کد ورود</h3>
 
-            {/* رمز فعلی با دکمه چشم */}
             <div className="space-y-1.5">
               <label className="font-bold text-[var(--text-secondary)]">کلمه عبور یا پین‌کد فعلی (پیش‌فرض: 1234):</label>
               <div className="relative">
@@ -176,7 +173,6 @@ export default function AdminChangePinPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* رمز جدید */}
               <div className="space-y-1.5">
                 <label className="font-bold text-[var(--text-secondary)]">کلمه عبور / پین جدید (حداقل ۴ نویسه):</label>
                 <div className="relative">
@@ -198,7 +194,6 @@ export default function AdminChangePinPage() {
                 </div>
               </div>
 
-              {/* تکرار رمز جدید */}
               <div className="space-y-1.5">
                 <label className="font-bold text-[var(--text-secondary)]">تکرار کلمه عبور / پین جدید:</label>
                 <div className="relative">
@@ -220,9 +215,6 @@ export default function AdminChangePinPage() {
                 </div>
               </div>
             </div>
-            <p className="text-[10px] text-[var(--text-secondary)]">
-              نکته: در صورتی که فیلد کلمه عبور جدید را خالی بگذارید، رمز عبور تغییر نکرده و صرفاً نام کاربری و نام نمایشی شما به‌روزرسانی خواهد شد.
-            </p>
           </div>
 
           <div className="pt-2">

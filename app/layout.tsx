@@ -1,14 +1,27 @@
-// File Path: app/layout.tsx
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import LayoutWrapper from '@/components/LayoutWrapper';
+import { getSiteInfoServer } from '@/app/actions/siteInfo';
 
-export const metadata: Metadata = {
-  title: 'آکسون | مرجع تخصصی تکنولوژی و گجت‌های نوین',
-  description: 'فروشگاه تخصصی و مرجع پیشرفته تجهیزات دیجیتال، گجت‌های هوشمند و سخت‌افزار با گارانتی اصالت طلایی',
-  other: { enamad: '27424534' },
-};
+export const dynamic = 'force-dynamic';
+
+export async function generateMetadata(): Promise<Metadata> {
+  const info = await getSiteInfoServer();
+  const sName = info.site_name || info.siteName || "آکسون";
+  const iconUrl = info.favicon_url || "/favicon.ico";
+
+  return {
+    title: `${sName} | مرجع تخصصی مانیتورهای ۵K و تجهیزات تصویر`,
+    description: info.description || "فروشگاه تخصصی و مرجع پیشرفته تجهیزات دیجیتال با ۱۸ ماه گارانتی اصالت طلایی",
+    icons: {
+      icon: iconUrl,
+      shortcut: iconUrl,
+      apple: iconUrl,
+    },
+    other: { enamad: '27424534' },
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -20,12 +33,15 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const info = await getSiteInfoServer();
+  const faviconHref = info.favicon_url || "/favicon.ico";
+
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
         <meta name="enamad" content="27424534" />
-        <link id="axon-dynamic-favicon" rel="icon" href="/favicon.ico" />
+        <link id="axon-dynamic-favicon" rel="icon" href={faviconHref} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />

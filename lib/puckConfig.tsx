@@ -9,41 +9,53 @@ import ProductExplodedView from "@/components/ProductExplodedView";
 import { productService, Product } from "@/services/productService";
 
 export type ComponentProps = {
-  // ۱. ساختار هدر اتمیک
   HeaderCapsuleBar: {
-    paddingY: number;
-  };
-  HeaderBrandLogo: {
     brandText: string;
-    iconText: string;
+    logoUrl: string;
+    logoWidth: number;
+    logoHeight: number;
+    capsuleBg: string;
+    capsuleBorder: string;
+    paddingY: number;
   };
   HeaderNavItem: {
     title: string;
     url: string;
+    textColor: string;
+    badgeText: string;
   };
   HeaderActionsGroup: {
     showCart: boolean;
     showTheme: boolean;
     showUser: boolean;
+    iconBgColor: string;
   };
-
-  // ۲. بخش‌های بدنه
   NativeHero3D: {
     topBadge: string;
+    badgeColor: string;
+    title: string;
+    subtitle: string;
     bgColor: string;
+    titleSize: number;
+    paddingTop: number;
+    paddingBottom: number;
   };
   NativePerspectiveSlider: {
+    sectionTitle: string;
+    sectionSubtitle: string;
     paddingY: number;
   };
   NativeProductCatalog: {
     heading: string;
+    subtitle: string;
+    limit: number;
   };
   NativeExplodedView: {
     productTitle: string;
+    sectionTitle: string;
   };
-
-  // ۳. فوتر سازمانی
   GlobalFooterBlock: {
+    footerLogoUrl: string;
     brandTitle: string;
     brandSubtitle: string;
     brandDesc: string;
@@ -53,188 +65,251 @@ export type ComponentProps = {
     workingHours: string;
     enamadCode: string;
     copyrightText: string;
+    footerBg: string;
   };
 };
 
-function PuckProductListWrapper() {
+function PuckProductListWrapper({ limit }: { limit?: number }) {
   const [products, setProducts] = useState<Product[]>([]);
   useEffect(() => {
-    productService.getAll().then((data) => setProducts(data || []));
-  }, []);
+    productService.getAll().then((data) => {
+      if (data) setProducts(limit ? data.slice(0, limit) : data);
+    });
+  }, [limit]);
   return <ProductList initialProducts={products} />;
 }
 
 export const puckConfig: Config<ComponentProps> = {
   categories: {
-    header_atoms: {
-      title: "🧩 اجزای ریز هدر (درگ تک‌تک آیتم‌ها با ماوس)",
-      components: ["HeaderCapsuleBar", "HeaderBrandLogo", "HeaderNavItem", "HeaderActionsGroup"]
+    header_elements: {
+      title: "🧭 ناوبری و هدر با کنترل لوگو",
+      components: ["HeaderCapsuleBar", "HeaderNavItem", "HeaderActionsGroup"]
     },
-    page_sections: {
-      title: "⭐ بخش‌های صفحه و فوتر",
-      components: ["NativeHero3D", "NativePerspectiveSlider", "NativeProductCatalog", "NativeExplodedView", "GlobalFooterBlock"]
+    sections: {
+      title: "⭐ بدنه صفحه و کاتالوگ",
+      components: ["NativeHero3D", "NativePerspectiveSlider", "NativeProductCatalog", "NativeExplodedView"]
+    },
+    footer_elements: {
+      title: "⚓ فوتر با لوگوی اختصاصی و تماس",
+      components: ["GlobalFooterBlock"]
     }
   },
   components: {
-    // کانتینر اصلی هدر با ۳ بخش مستقل درگ‌واند‌دراپ
     HeaderCapsuleBar: {
-      label: "نوار کپسولی هدر (شامل جایگاه‌های درگ)",
+      label: "هدر کپسولی (لوگو، ابعاد و استایل)",
       fields: {
+        brandText: { type: "text", label: "نام برند" },
+        logoUrl: { type: "text", label: "آدرس تصویر لوگوی هدر (URL)" },
+        logoWidth: { type: "number", label: "عرض لوگو (px)" },
+        logoHeight: { type: "number", label: "ارتفاع لوگو (px)" },
+        capsuleBg: { type: "text", label: "رنگ پس‌زمینه کپسول" },
+        capsuleBorder: { type: "text", label: "رنگ مرز دور کپسول" },
         paddingY: { type: "number", label: "فاصله عمودی (px)" }
       },
       defaultProps: {
+        brandText: "Axon | آکسون",
+        logoUrl: "",
+        logoWidth: 36,
+        logoHeight: 36,
+        capsuleBg: "rgba(7, 9, 14, 0.9)",
+        capsuleBorder: "rgba(255, 255, 255, 0.12)",
         paddingY: 10
       },
-      render: ({ paddingY }) => (
+      render: ({ brandText, logoUrl, logoWidth, logoHeight, capsuleBg, capsuleBorder, paddingY }) => (
         <header style={{ paddingTop: `${paddingY || 10}px`, paddingBottom: `${paddingY || 10}px` }} className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 select-none font-sans" dir="ltr">
-          <div className="flex items-center justify-between px-6 py-3 rounded-full bg-[#07090e]/95 border border-white/10 backdrop-blur-2xl shadow-2xl">
-            
-            {/* شیار سمت چپ (Left Dropzone): دکمه‌های سبد خرید، تم و پروفایل */}
+          <div
+            style={{ backgroundColor: capsuleBg || "rgba(7, 9, 14, 0.9)", borderColor: capsuleBorder || "rgba(255, 255, 255, 0.12)" }}
+            className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl transition-all"
+          >
+            {/* سمت چپ: آیکون‌ها */}
             <div className="flex items-center gap-2 order-1">
               <DropZone zone="left-actions" />
             </div>
 
-            {/* شیار وسط (Center Dropzone): تک‌تک منوهای ناوبری با امکان جابجایی ماوس */}
+            {/* وسط: منوهای ناوبری */}
             <nav className="flex items-center gap-6 text-xs font-black text-slate-300 order-2" dir="rtl">
               <DropZone zone="center-menu" />
             </nav>
 
-            {/* شیار سمت راست (Right Dropzone): نشان و نام برند آکسون */}
-            <div className="flex items-center gap-3 order-3" dir="rtl">
-              <DropZone zone="right-brand" />
-            </div>
-
+            {/* سمت راست: نام و لوگوی قابل تنظیم هدر */}
+            <Link href="/" className="flex items-center gap-3 order-3" dir="rtl">
+              <span className="font-black text-base tracking-tight text-white">{brandText || "Axon | آکسون"}</span>
+              <div
+                style={{ width: `${logoWidth || 36}px`, height: `${logoHeight || 36}px` }}
+                className="rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0"
+              >
+                {logoUrl ? (
+                  <img src={logoUrl} alt="" className="w-full h-full object-contain" />
+                ) : (
+                  <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
+                    ▲
+                  </div>
+                )}
+              </div>
+            </Link>
           </div>
         </header>
       )
     },
 
-    // المان برند و لوگو
-    HeaderBrandLogo: {
-      label: "نشان و نام برند آکسون",
-      fields: {
-        brandText: { type: "text", label: "نام برند" },
-        iconText: { type: "text", label: "کاراکتر آیکون" }
-      },
-      defaultProps: {
-        brandText: "Axon | آکسون",
-        iconText: "▲"
-      },
-      render: ({ brandText, iconText }) => (
-        <div className="flex items-center gap-3 cursor-pointer">
-          <span className="font-black text-base tracking-tight text-white">{brandText}</span>
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md text-white font-black text-xs">
-            {iconText || "▲"}
-          </div>
-        </div>
-      )
-    },
-
-    // تک‌تک منوها به عنوان بلوک مستقل قابل جابجایی
     HeaderNavItem: {
-      label: "آیتم منو (قابل کشیدن با ماوس)",
+      label: "آیتم منو با بج و رنگ",
       fields: {
         title: { type: "text", label: "عنوان منو" },
-        url: { type: "text", label: "آدرس لینک" }
+        url: { type: "text", label: "لینک منو" },
+        textColor: { type: "text", label: "رنگ متن" },
+        badgeText: { type: "text", label: "بج کوچک کنار منو (اختیاری)" }
       },
       defaultProps: {
-        title: "منوی جدید",
-        url: "/products"
+        title: "کاتالوگ محصولات",
+        url: "/products",
+        textColor: "#ffffff",
+        badgeText: ""
       },
-      render: ({ title, url }) => (
-        <Link href={url || "#"} className="hover:text-sky-400 transition cursor-pointer px-2 py-1 rounded-lg hover:bg-white/5">
-          {title}
+      render: ({ title, url, textColor, badgeText }) => (
+        <Link href={url || "#"} style={{ color: textColor || "#fff" }} className="hover:text-sky-400 transition cursor-pointer px-2 py-1 rounded-lg hover:bg-white/5 flex items-center gap-1.5">
+          <span>{title}</span>
+          {badgeText && (
+            <span className="px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[9px] font-bold border border-rose-500/30">
+              {badgeText}
+            </span>
+          )}
         </Link>
       )
     },
 
-    // دکمه‌های سمت چپ هدر
     HeaderActionsGroup: {
-      label: "دکمه‌های سبد خرید، تم و کاربر",
+      label: "دکمه‌های کاربری هدر",
       fields: {
-        showCart: { type: "radio", label: "سبد خرید", options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }] },
-        showTheme: { type: "radio", label: "تم دارک", options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }] },
-        showUser: { type: "radio", label: "پروفایل", options: [{ label: "فعال", value: true }, { label: "خاموش", value: false }] }
+        showCart: { type: "radio", label: "سبد خرید", options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }] },
+        showTheme: { type: "radio", label: "تم شب/روز", options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }] },
+        showUser: { type: "radio", label: "پروفایل", options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }] },
+        iconBgColor: { type: "text", label: "رنگ پس‌زمینه دکمه‌ها" }
       },
       defaultProps: {
         showCart: true,
         showTheme: true,
-        showUser: true
+        showUser: true,
+        iconBgColor: "rgba(255, 255, 255, 0.08)"
       },
-      render: ({ showCart, showTheme, showUser }) => (
+      render: ({ showCart, showTheme, showUser, iconBgColor }) => (
         <div className="flex items-center gap-2">
-          {showCart && <span className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs">🛒</span>}
-          {showTheme && <span className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs">🌙</span>}
-          {showUser && <span className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs">👤</span>}
+          {showCart && (
+            <span style={{ backgroundColor: iconBgColor || "rgba(255, 255, 255, 0.08)" }} className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-xs text-white">
+              🛒
+            </span>
+          )}
+          {showTheme && (
+            <span style={{ backgroundColor: iconBgColor || "rgba(255, 255, 255, 0.08)" }} className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-xs text-white">
+              🌙
+            </span>
+          )}
+          {showUser && (
+            <span style={{ backgroundColor: iconBgColor || "rgba(255, 255, 255, 0.08)" }} className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-xs text-white">
+              👤
+            </span>
+          )}
         </div>
       )
     },
 
-    // هیرو ۳D
     NativeHero3D: {
-      label: "هیرو ۳D اصلی سایت",
+      label: "هیرو ۳D (تنظیم فونت، پدینگ و رنگ)",
       fields: {
-        topBadge: { type: "text", label: "برچسب بالای هیرو" },
-        bgColor: { type: "text", label: "رنگ پس‌زمینه" }
+        topBadge: { type: "text", label: "متن برچسب بالا" },
+        badgeColor: { type: "text", label: "رنگ برچسب" },
+        title: { type: "text", label: "تیتر اصلی هیرو" },
+        titleSize: { type: "number", label: "اندازه تیتر اصلی (px)" },
+        subtitle: { type: "textarea", label: "متن توضیحات زیرعنوان" },
+        bgColor: { type: "text", label: "رنگ پس‌زمینه بخش" },
+        paddingTop: { type: "number", label: "فاصله از بالا (px)" },
+        paddingBottom: { type: "number", label: "فاصله از پایین (px)" }
       },
       defaultProps: {
         topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
-        bgColor: "transparent"
+        badgeColor: "#38bdf8",
+        title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+        titleSize: 42,
+        subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
+        bgColor: "transparent",
+        paddingTop: 40,
+        paddingBottom: 20
       },
-      render: ({ topBadge, bgColor }) => (
-        <div style={{ backgroundColor: bgColor || "transparent" }} className="w-full relative overflow-hidden select-none py-4" dir="rtl">
-          {topBadge && (
-            <div className="text-center pt-2">
-              <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-black inline-block">
+      render: ({ topBadge, badgeColor, title, titleSize, subtitle, bgColor, paddingTop, paddingBottom }) => (
+        <section
+          style={{ backgroundColor: bgColor || "transparent", paddingTop: `${paddingTop || 40}px`, paddingBottom: `${paddingBottom || 20}px` }}
+          className="w-full relative overflow-hidden select-none font-sans text-white text-center"
+          dir="rtl"
+        >
+          <div className="max-w-4xl mx-auto space-y-4 px-4 relative z-10">
+            {topBadge && (
+              <span style={{ color: badgeColor || "#38bdf8" }} className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-xs font-black inline-block">
                 {topBadge}
               </span>
-            </div>
-          )}
-          <Hero3DCanvas />
-        </div>
+            )}
+            <h1 style={{ fontSize: `${titleSize || 42}px` }} className="font-black leading-tight text-white">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
+                {subtitle}
+              </p>
+            )}
+          </div>
+          <div className="w-full h-[480px] relative overflow-hidden mt-4">
+            <Hero3DCanvas />
+          </div>
+        </section>
       )
     },
 
-    // اسلایدر پرسپکتیو
     NativePerspectiveSlider: {
       label: "اسلایدر پرسپکتیو بنرها",
       fields: {
+        sectionTitle: { type: "text", label: "تیتر بخش" },
+        sectionSubtitle: { type: "text", label: "زیرعنوان بخش" },
         paddingY: { type: "number", label: "فاصله عمودی (px)" }
       },
       defaultProps: {
+        sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
+        sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی",
         paddingY: 20
       },
-      render: ({ paddingY }) => (
+      render: ({ sectionTitle, sectionSubtitle, paddingY }) => (
         <div style={{ paddingTop: `${paddingY || 20}px`, paddingBottom: `${paddingY || 20}px` }} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
-          <ProductPerspectiveSlider />
+          <ProductPerspectiveSlider customTitle={sectionTitle} customSubtitle={sectionSubtitle} />
         </div>
       )
     },
 
-    // کاتالوگ محصولات
     NativeProductCatalog: {
-      label: "ویترین اصلی کاتالوگ محصولات",
+      label: "کاتالوگ اصلی محصولات",
       fields: {
-        heading: { type: "text", label: "عنوان کاتالوگ" }
+        heading: { type: "text", label: "عنوان کاتالوگ" },
+        subtitle: { type: "text", label: "زیرعنوان کاتالوگ" },
+        limit: { type: "number", label: "حداکثر تعداد کالا" }
       },
       defaultProps: {
-        heading: "کاتالوگ تجهیزات تخصصی"
+        heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
+        subtitle: "تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند",
+        limit: 8
       },
-      render: () => (
+      render: ({ limit }) => (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
-          <PuckProductListWrapper />
+          <PuckProductListWrapper limit={limit} />
         </div>
       )
     },
 
-    // کالبدشکافی ۳D
     NativeExplodedView: {
       label: "کالبدشکافی ۳D سخت‌افزار",
       fields: {
-        productTitle: { type: "text", label: "نام محصول مدل ۳D" }
+        productTitle: { type: "text", label: "نام محصول مدل ۳D" },
+        sectionTitle: { type: "text", label: "تیتر بخش" }
       },
       defaultProps: {
-        productTitle: "Apple Studio Display 5K Retina"
+        productTitle: "Apple Studio Display 5K Retina",
+        sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری"
       },
       render: ({ productTitle }) => (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none" dir="rtl">
@@ -243,21 +318,23 @@ export const puckConfig: Config<ComponentProps> = {
       )
     },
 
-    // فوتر ۴ ستونه
     GlobalFooterBlock: {
-      label: "فوتر ۴ ستونه مهندسی کامل",
+      label: "فوتر با لوگوی اختصاصی، تماس و اینماد",
       fields: {
+        footerLogoUrl: { type: "text", label: "آدرس تصویر لوگوی فوتر (URL)" },
         brandTitle: { type: "text", label: "تیتر برند در فوتر" },
         brandSubtitle: { type: "text", label: "زیرعنوان برند" },
         brandDesc: { type: "textarea", label: "متن معرفی گارانتی" },
-        supportPhone: { type: "text", label: "شماره پشتیبانی" },
+        supportPhone: { type: "text", label: "شماره تلفن پشتیبانی" },
         supportEmail: { type: "text", label: "پست الکترونیک" },
         warehouseAddress: { type: "text", label: "نشانی انبار" },
         workingHours: { type: "text", label: "ساعات پاسخگویی" },
-        enamadCode: { type: "text", label: "کد اینماد" },
-        copyrightText: { type: "text", label: "متن کپی‌رایت" }
+        enamadCode: { type: "text", label: "کد نماد اعتماد (اینماد)" },
+        copyrightText: { type: "text", label: "متن کپی‌رایت" },
+        footerBg: { type: "text", label: "رنگ پس‌زمینه فوتر" }
       },
       defaultProps: {
+        footerLogoUrl: "",
         brandTitle: "Axon | آکسون",
         brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
         brandDesc: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
@@ -266,23 +343,32 @@ export const puckConfig: Config<ComponentProps> = {
         warehouseAddress: "شیراز - ستارخان",
         workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
         enamadCode: "27424534",
-        copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026"
+        copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
+        footerBg: "#07090e"
       },
-      render: ({ brandTitle, brandSubtitle, brandDesc, supportPhone, supportEmail, warehouseAddress, workingHours, enamadCode, copyrightText }) => (
-        <footer className="w-full bg-[#07090e] border-t border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans select-none text-white mt-16" dir="rtl">
+      render: ({ footerLogoUrl, brandTitle, brandSubtitle, brandDesc, supportPhone, supportEmail, warehouseAddress, workingHours, enamadCode, copyrightText, footerBg }) => (
+        <footer style={{ backgroundColor: footerBg || "#07090e" }} className="w-full border-t border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans select-none text-white mt-16" dir="rtl">
           <div className="max-w-7xl mx-auto space-y-12">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
+              
               <div className="lg:col-span-4 space-y-6">
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md text-white font-black text-xs">
-                      ▲
+                    <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden shadow-md p-1 shrink-0">
+                      {footerLogoUrl ? (
+                        <img src={footerLogoUrl} alt="" className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
+                          ▲
+                        </div>
+                      )}
                     </div>
                     <h3 className="font-black text-2xl text-white">{brandTitle}</h3>
                   </div>
                   <p className="text-xs font-bold text-sky-400">{brandSubtitle}</p>
                   <p className="text-xs text-slate-400 leading-relaxed pt-1">{brandDesc}</p>
                 </div>
+
                 <div className="flex flex-wrap gap-2 pt-1">
                   <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-black">
                     ✓ گارانتی اصالت ۱۰۰٪ فیزیکی
@@ -291,8 +377,9 @@ export const puckConfig: Config<ComponentProps> = {
                     🚀 ارسال پیشتاز سراسری
                   </span>
                 </div>
+
                 <div className="pt-3 space-y-2">
-                  <span className="text-[11px] font-bold text-slate-400">شبکه‌های ارتباطی:</span>
+                  <span className="text-[11px] font-bold text-slate-400">شبکه‌های ارتباطی استودیو:</span>
                   <div className="p-3 rounded-3xl bg-slate-900 text-white flex items-center justify-center gap-2 shadow-2xl" dir="ltr">
                     {["C", "O", "N", "T", "A", "C", "T"].map((k, i) => (
                       <div key={i} className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-mono font-black text-xs shadow-inner">
@@ -356,6 +443,7 @@ export const puckConfig: Config<ComponentProps> = {
                   </div>
                 </div>
               </div>
+
             </div>
 
             <div className="pt-8 border-t border-white/10 flex justify-between text-xs font-bold text-slate-500">

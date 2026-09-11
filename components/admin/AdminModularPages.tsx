@@ -152,6 +152,7 @@ export default function AdminModularPages() {
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("puck_published"));
         setToast("✓ صفحه با موفقیت ذخیره شد و تغییرات اعمال گردید.");
       } else {
         setToast("خطا در ذخیره‌سازی.");

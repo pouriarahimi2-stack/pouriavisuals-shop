@@ -12,6 +12,31 @@ export default function Header() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
+  // استیت‌های اختصاصی Puck برای هدر
+  const [headerConfig, setHeaderConfig] = useState<{
+    brandText?: string;
+    logoUrl?: string;
+    logoWidth?: number;
+    logoHeight?: number;
+    capsuleBg?: string;
+    capsuleBorder?: string;
+  }>({});
+
+  const loadPuckHeaderData = async () => {
+    try {
+      const res = await fetch("/api/pages?slug=home", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && json.page?.puck_data?.content) {
+        const headerBlock = json.page.puck_data.content.find(
+          (b: any) => b.type === "HeaderCapsuleBar"
+        );
+        if (headerBlock?.props) {
+          setHeaderConfig(headerBlock.props);
+        }
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     setMounted(true);
     const cached = siteInfoService.getSiteInfoSync();
@@ -21,6 +46,8 @@ export default function Header() {
       if (data) setSiteInfo(data);
     });
 
+    loadPuckHeaderData();
+
     try {
       const savedTheme = localStorage.getItem("theme");
       const isDark = savedTheme !== "light";
@@ -29,12 +56,18 @@ export default function Header() {
       else document.documentElement.classList.remove("dark");
     } catch {}
 
-    const handleUpdate = (e: any) => {
+    const handleSiteUpdate = (e: any) => {
       if (e.detail) setSiteInfo(e.detail);
+      loadPuckHeaderData();
     };
 
-    window.addEventListener("site_info_updated", handleUpdate);
-    return () => window.removeEventListener("site_info_updated", handleUpdate);
+    window.addEventListener("site_info_updated", handleSiteUpdate);
+    window.addEventListener("puck_published", loadPuckHeaderData);
+
+    return () => {
+      window.removeEventListener("site_info_updated", handleSiteUpdate);
+      window.removeEventListener("puck_published", loadPuckHeaderData);
+    };
   }, []);
 
   const toggleDarkMode = () => {
@@ -50,13 +83,20 @@ export default function Header() {
     }
   };
 
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
-  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
+  const storeName = headerConfig.brandText || siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
+  const logoUrl = headerConfig.logoUrl || siteInfo?.logo_url || siteInfo?.logoUrl;
+  const logoW = Number(headerConfig.logoWidth) || 36;
+  const logoH = Number(headerConfig.logoHeight) || 36;
 
   return (
     <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="ltr">
-      <div className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all">
-        
+      <div
+        style={{
+          backgroundColor: headerConfig.capsuleBg || undefined,
+          borderColor: headerConfig.capsuleBorder || undefined,
+        }}
+        className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all"
+      >
         {/* سمت چپ: ابزارهای کاربری */}
         <div className="flex items-center gap-2 order-1">
           <button
@@ -100,14 +140,21 @@ export default function Header() {
           <Link href="/contact" className="hover:text-sky-500 transition cursor-pointer">تماس با ما</Link>
         </nav>
 
-        {/* سمت راست: نام برند به همراه لوگوی تصویری یا نشان گرادیانتی */}
+        {/* سمت راست: لوگو با اعمال مستقیم ابعاد درخواستی */}
         <Link href="/" className="flex items-center gap-3 group order-3" dir="rtl">
           <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition">
             {storeName}
           </span>
-          <div className="w-9 h-9 rounded-xl bg-[var(--input-bg)] border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shadow-md group-hover:scale-105 transition p-1">
+          <div
+            style={{ width: logoW + 'px', height: logoH + 'px' }}
+            className="rounded-xl bg-[var(--input-bg)] border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shadow-md group-hover:scale-105 transition p-1 shrink-0"
+          >
             {logoUrl ? (
-              <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
+              <img
+                src={logoUrl}
+                alt={storeName}
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
             ) : (
               <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
                 ▲
@@ -115,7 +162,6 @@ export default function Header() {
             )}
           </div>
         </Link>
-
       </div>
     </header>
   );

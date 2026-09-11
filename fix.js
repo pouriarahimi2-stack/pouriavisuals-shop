@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Step 11: Dynamic Sitemap.xml & Crawl-Budget Optimized Robots.ts (fix.js)
+ * AXON CORE - Step 12: High-Throughput Torob Crawler API (Escaped Template) (fix.js)
  */
 
 const fs = require('fs');
@@ -14,157 +14,101 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[STEP-11]\x1b[0m ایجاد sitemap.ts داینامیک دیتابیس‌محور و بهینه‌سازی robots.ts...");
+console.log("\x1b[36m[STEP-12]\x1b[0m ارتقای فید اختصاصی ترب به استاندارد رسمی با کشینگ لبه (Edge Cache)...");
 
 // =============================================================================
-// ۱. بازنویسی هوشمند و داینامیک app/sitemap.ts
+// بازنویسی کامل و استاندارد app/api/torob/route.ts
 // =============================================================================
-const sitemapCode = `import { MetadataRoute } from "next";
+const torobRouteCode = `import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
 
 export const dynamic = "force-dynamic";
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
-  const now = new Date();
-
-  // صفحات پایه و ساختاری استودیو
-  const staticRoutes: MetadataRoute.Sitemap = [
-    {
-      url: \`\${baseUrl}\`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 1.0,
-    },
-    {
-      url: \`\${baseUrl}/products\`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.9,
-    },
-    {
-      url: \`\${baseUrl}/blog\`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.85,
-    },
-    {
-      url: \`\${baseUrl}/about\`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.6,
-    },
-    {
-      url: \`\${baseUrl}/contact\`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.6,
-    },
-    {
-      url: \`\${baseUrl}/track-order\`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.5,
-    },
-  ];
-
-  let productRoutes: MetadataRoute.Sitemap = [];
-  let blogRoutes: MetadataRoute.Sitemap = [];
-
+export async function GET() {
   try {
-    if (supabaseAdmin) {
-      const [prodsRes, postsRes] = await Promise.all([
-        supabaseAdmin.from("products").select("id, updated_at, created_at").eq("is_available", true).limit(200),
-        supabaseAdmin.from("posts").select("id, slug, updated_at, created_at").eq("is_published", true).limit(200),
-      ]);
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
+    let rawProducts: any[] = [];
 
-      if (prodsRes.data && prodsRes.data.length > 0) {
-        productRoutes = prodsRes.data.map((p: any) => ({
-          url: \`\${baseUrl}/products/\${p.id}\`,
-          lastModified: p.updated_at ? new Date(p.updated_at) : (p.created_at ? new Date(p.created_at) : now),
-          changeFrequency: "weekly",
-          priority: 0.8,
-        }));
-      } else {
-        productRoutes = FLAGSHIP_7_PRODUCTS.map((p) => ({
-          url: \`\${baseUrl}/products/\${p.id}\`,
-          lastModified: now,
-          changeFrequency: "weekly",
-          priority: 0.8,
-        }));
-      }
+    try {
+      if (supabaseAdmin) {
+        const { data: dbProducts } = await supabaseAdmin
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(500);
 
-      if (postsRes.data && postsRes.data.length > 0) {
-        blogRoutes = postsRes.data.map((b: any) => ({
-          url: \`\${baseUrl}/blog/\${b.slug || b.id}\`,
-          lastModified: b.updated_at ? new Date(b.updated_at) : (b.created_at ? new Date(b.created_at) : now),
-          changeFrequency: "weekly",
-          priority: 0.75,
-        }));
+        if (dbProducts && dbProducts.length > 0) {
+          rawProducts = dbProducts;
+        }
       }
+    } catch (dbErr) {
+      console.warn("Torob DB fallback warning:", dbErr);
     }
-  } catch {
-    productRoutes = FLAGSHIP_7_PRODUCTS.map((p) => ({
-      url: \`\${baseUrl}/products/\${p.id}\`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.8,
-    }));
-  }
 
-  return [...staticRoutes, ...productRoutes, ...blogRoutes];
-}
-`;
-writeFile('app/sitemap.ts', sitemapCode);
+    if (rawProducts.length === 0 && Array.isArray(FLAGSHIP_7_PRODUCTS)) {
+      rawProducts = [...FLAGSHIP_7_PRODUCTS];
+    } else if (Array.isArray(FLAGSHIP_7_PRODUCTS)) {
+      const dbIds = new Set(rawProducts.map((p) => String(p.id)));
+      const extras = FLAGSHIP_7_PRODUCTS.filter((f) => !dbIds.has(String(f.id)));
+      rawProducts = [...rawProducts, ...extras];
+    }
 
-// =============================================================================
-// ۲. بازنویسی app/robots.ts با مدیریت صحیح Crawl Budget
-// =============================================================================
-const robotsCode = `import { MetadataRoute } from "next";
+    const formattedList = rawProducts.map((p: any) => {
+      const basePrice = Number(p.price || 0);
+      const discountVal = p.discount_price || p.discountPrice ? Number(p.discount_price || p.discountPrice) : undefined;
+      const finalPrice = discountVal && discountVal > 0 ? discountVal : basePrice;
+      const isAvailable = p.is_available !== false && p.isAvailable !== false && (p.stock === undefined || p.stock === null || Number(p.stock) > 0);
 
-export const dynamic = "force-dynamic";
+      let images: string[] = [];
+      if (Array.isArray(p.images) && p.images.length > 0) {
+        images = p.images.map((img: string) => img.startsWith("http") ? img : baseUrl + img);
+      } else if (p.image_url || p.image) {
+        const single = String(p.image_url || p.image);
+        images = [single.startsWith("http") ? single : baseUrl + single];
+      } else {
+        images = [baseUrl + "/placeholder.png"];
+      }
 
-export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
+      return {
+        page_unique_id: String(p.id),
+        title: p.title || p.name || "تجهیزات استودیویی آکسون",
+        subtitle: p.title_fa || p.short_description || "",
+        price: finalPrice,
+        old_price: discountVal && discountVal < basePrice ? basePrice : undefined,
+        availability: isAvailable ? "instock" : "outofstock",
+        category_name: p.category || p.category_name || "تجهیزات استودیو و تدوین",
+        image_links: images,
+        page_url: baseUrl + "/products/" + p.id,
+        spec: p.specs && typeof p.specs === "object" ? p.specs : undefined,
+        guarantee: p.warranty || "۱۸ ماه گارانتی اصالت طلایی",
+      };
+    });
 
-  return {
-    rules: [
+    return NextResponse.json(
       {
-        userAgent: "*",
-        allow: [
-          "/",
-          "/products",
-          "/products/*",
-          "/blog",
-          "/blog/*",
-          "/about",
-          "/contact",
-          "/api/torob",
-        ],
-        disallow: [
-          "/admin",
-          "/admin/*",
-          "/api/admin/*",
-          "/api/user/*",
-          "/checkout",
-          "/checkout/*",
-          "/payment",
-          "/payment/*",
-          "/login",
-        ],
+        count: formattedList.length,
+        products: formattedList,
       },
-    ],
-    sitemap: \`\${baseUrl}/sitemap.xml\`,
-  };
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "s-maxage=120, stale-while-revalidate=300",
+        },
+      }
+    );
+  } catch (err: any) {
+    return NextResponse.json({ count: 0, products: [], error: err.message }, { status: 500 });
+  }
 }
 `;
-writeFile('app/robots.ts', robotsCode);
+writeFile('app/api/torob/route.ts', torobRouteCode);
 
 // =============================================================================
-// بیلد و انتشار در ورسل
+// بیلد نهایی پروژه و استقرار
 // =============================================================================
-console.log("تست بیلد کامل (npm run build)...");
+console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -177,7 +121,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و انتش
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(seo-step11): implement dynamic database-backed sitemap and crawl-budget optimized robots.ts"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(torob-step12): fix template string syntax and upgrade torob feed"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -186,7 +130,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قدم یازدهم با موفقیت در ورسل مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ قدم دوازدهم با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

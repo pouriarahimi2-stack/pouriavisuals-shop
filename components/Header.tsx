@@ -51,12 +51,13 @@ export default function Header() {
   };
 
   const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
+  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
 
   return (
     <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 sm:px-6 my-2 select-none font-sans" dir="ltr">
       <div className="flex items-center justify-between px-6 py-3 rounded-full bg-white/90 dark:bg-[#07090e]/90 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all">
         
-        {/* سمت چپ مطلق: ابزارهای کاربری (سبد خرید، دارک‌مود، پروفایل) */}
+        {/* سمت چپ: ابزارهای کاربری */}
         <div className="flex items-center gap-2 order-1">
           <button
             type="button"
@@ -90,7 +91,7 @@ export default function Header() {
           </Link>
         </div>
 
-        {/* وسط: منوهای ناوبری فارسی */}
+        {/* وسط: منوهای ناوبری */}
         <nav className="hidden lg:flex items-center gap-7 text-xs font-black text-slate-700 dark:text-slate-300 order-2" dir="rtl">
           <Link href="/products" className="hover:text-sky-500 transition cursor-pointer">کاتالوگ محصولات</Link>
           <Link href="/news" className="hover:text-sky-500 transition cursor-pointer">اخبار تکنولوژی</Link>
@@ -99,13 +100,19 @@ export default function Header() {
           <Link href="/contact" className="hover:text-sky-500 transition cursor-pointer">تماس با ما</Link>
         </nav>
 
-        {/* سمت راست مطلق: نام و نشان اختصاصی برند آکسون */}
+        {/* سمت راست: نام برند به همراه لوگوی تصویری یا نشان گرادیانتی */}
         <Link href="/" className="flex items-center gap-3 group order-3" dir="rtl">
           <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition">
             {storeName}
           </span>
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md text-white font-black text-xs group-hover:scale-105 transition">
-            ▲
+          <div className="w-9 h-9 rounded-xl bg-[var(--input-bg)] border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shadow-md group-hover:scale-105 transition p-1">
+            {logoUrl ? (
+              <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
+            ) : (
+              <div className="w-full h-full rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
+                ▲
+              </div>
+            )}
           </div>
         </Link>
 

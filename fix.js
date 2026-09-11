@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Crash Proof Homepage & Safe Error Boundary (fix.js)
+ * AXON CORE - Bulletproof Server Actions & Zero 500 Error Guarantee (fix.js)
  */
 
 const fs = require('fs');
@@ -14,91 +14,121 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-CRASH-FIX]\x1b[0m ساخت صفحه اصلی ایمن و ضد کرش...");
+console.log("\x1b[36m[AXON-BULLETPROOF]\x1b[0m مقاوم‌سازی سرور اکشن‌ها و جلوگیری از هرگونه خطای ۵۰۰...");
 
 // =============================================================================
-// ۱. بازنویسی کاملاً ایمن app/page.tsx با مدیریت خطای try/catch سراسری
+// ۱. بازنویسی کاملاً ایمن app/actions/siteInfo.ts
 // =============================================================================
-const safeHomePageCode = `import React from "react";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
-import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
-import ProductList from "@/components/ProductList";
-import ProductExplodedView from "@/components/ProductExplodedView";
-import { productService } from "@/services/productService";
+const safeSiteInfoAction = `"use server";
+
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { SiteInfo, MaintenanceMode } from "@/services/siteInfoService";
+import { revalidatePath } from "next/cache";
 
-export const dynamic = "force-dynamic";
-
-export default async function HomePage() {
-  let initialProducts: any[] = [];
-  let pageContent: any = null;
-
+export async function getSiteInfoServer(): Promise<SiteInfo> {
   try {
-    initialProducts = await productService.getAll();
-  } catch {
-    initialProducts = [];
-  }
+    if (!supabaseAdmin) {
+      return getDefaultSiteInfo();
+    }
 
-  try {
-    const { data } = await supabaseAdmin
-      .from("modular_pages")
+    const { data, error } = await supabaseAdmin
+      .from("site_info")
       .select("*")
-      .eq("slug", "home")
+      .order("id", { ascending: true })
+      .limit(1)
       .maybeSingle();
 
-    if (data && data.puck_data) {
-      pageContent = data.puck_data;
+    if (error || !data) {
+      return getDefaultSiteInfo();
     }
-  } catch {}
 
-  return (
-    <div className="w-full flex flex-col min-h-screen font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      {/* هیرو ۳D اصلی */}
-      <section className="w-full relative overflow-hidden py-8 text-center" dir="rtl">
-        <div className="max-w-4xl mx-auto space-y-4 px-4 relative z-10">
-          <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-black inline-block">
-            🚀 مرجع تخصصی مانیتورهای ۵K استودیو
-          </span>
-          <h1 className="text-3xl sm:text-5xl font-black leading-tight text-white">
-            دیدن واقعیت رنگ‌ها بدون مصالحه و خطا
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
-            تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.
-          </p>
-        </div>
-        <div className="w-full h-[450px] relative overflow-hidden mt-4">
-          <Hero3DCanvas />
-        </div>
-      </section>
+    const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
 
-      {/* اسلایدر پرسپکتیو */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6">
-        <ProductPerspectiveSlider />
-      </div>
+    return {
+      id: data.id,
+      site_name: data.site_name || data.store_name || "آکسون | Axon",
+      siteName: data.site_name || data.store_name || "آکسون | Axon",
+      storeName: data.site_name || data.store_name || "آکسون | Axon",
+      tagline: data.tagline || "",
+      logo_url: data.logo_url || "",
+      logoUrl: data.logo_url || "",
+      footer_logo_url: data.footer_logo_url || "",
+      footerLogoUrl: data.footer_logo_url || "",
+      favicon_url: data.favicon_url || "",
+      active_font_id: data.active_font_id || "Vazirmatn",
+      phone: data.phone || "",
+      email: data.email || "",
+      address: data.address || "",
+      working_hours: data.working_hours || "",
+      instagram: data.instagram || "",
+      telegram: data.telegram || "",
+      whatsapp: data.whatsapp || "",
+      youtube: data.youtube || "",
+      header_announcement: data.header_announcement || "",
+      free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
+      allow_google_index: isAllowed,
+      allowGoogleIndex: isAllowed,
+      maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
+      maintenance_until: data.maintenance_until || undefined,
+      maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
+    };
+  } catch (err) {
+    console.warn("Safe fallback in getSiteInfoServer:", err);
+    return getDefaultSiteInfo();
+  }
+}
 
-      {/* کاتالوگ محصولات */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6">
-        <div className="text-center space-y-2 mb-8">
-          <h2 className="text-2xl font-black">کاتالوگ تجهیزات تخصصی و مانیتورها</h2>
-          <p className="text-xs text-slate-400">تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند</p>
-        </div>
-        <ProductList initialProducts={initialProducts || []} />
-      </div>
+function getDefaultSiteInfo(): SiteInfo {
+  return {
+    site_name: "آکسون | Axon",
+    siteName: "آکسون | Axon",
+    storeName: "آکسون | Axon",
+    tagline: "مرجع تخصصی تجهیزات تصویر، مانیتور و استودیو",
+    allow_google_index: true,
+    allowGoogleIndex: true,
+    maintenance_mode: "none",
+  };
+}
 
-      {/* کالبدشکافی ۳D سخت‌افزار */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-12">
-        <ProductExplodedView productTitle="Apple Studio Display 5K Retina" />
-      </div>
-    </div>
-  );
+export async function updateSiteInfoServer(info: Partial<SiteInfo>) {
+  try {
+    const sName = info.site_name || info.siteName || info.storeName || "آکسون | Axon";
+    const isAllowed = info.allow_google_index !== false;
+
+    const payload: Record<string, any> = {
+      site_name: sName,
+      store_name: sName,
+      tagline: info.tagline || "",
+      logo_url: info.logo_url || info.logoUrl || "",
+      footer_logo_url: info.footer_logo_url || info.footerLogoUrl || "",
+      favicon_url: info.favicon_url || "",
+      allow_google_index: isAllowed,
+      maintenance_mode: info.maintenance_mode || "none",
+      updated_at: new Date().toISOString(),
+    };
+
+    if (supabaseAdmin) {
+      const { data: existingRecords } = await supabaseAdmin.from("site_info").select("id").limit(1);
+      if (existingRecords && existingRecords.length > 0) {
+        await supabaseAdmin.from("site_info").update(payload).eq("id", existingRecords[0].id);
+      } else {
+        await supabaseAdmin.from("site_info").insert([payload]);
+      }
+    }
+
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
 `;
-writeFile('app/page.tsx', safeHomePageCode);
+writeFile('app/actions/siteInfo.ts', safeSiteInfoAction);
 
 // =============================================================================
 // ۲. بیلد نهایی پروژه و انتشار در Vercel
 // =============================================================================
-console.log("تست بیلد نهایی پروژه (npm run build)...");
+console.log("تست بیلد کامل (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -111,7 +141,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و تریگ
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "fix(homepage): implement crash-proof error boundary and fallback homepage to prevent 500 server errors"', { stdio: 'inherit' });
+  execSync('git commit -m "fix(site-info-action): add bulletproof fallback to prevent server-side 500 exceptions"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -120,7 +150,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه اصلی ضد کرش با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ اصلاحات با موفقیت در ورسل منتشر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

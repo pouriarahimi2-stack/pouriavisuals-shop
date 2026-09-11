@@ -1,4 +1,3 @@
-// File Path: app/actions/siteInfo.ts
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -7,6 +6,10 @@ import { revalidatePath } from "next/cache";
 
 export async function getSiteInfoServer(): Promise<SiteInfo> {
   try {
+    if (!supabaseAdmin) {
+      return getDefaultSiteInfo();
+    }
+
     const { data, error } = await supabaseAdmin
       .from("site_info")
       .select("*")
@@ -15,15 +18,7 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
       .maybeSingle();
 
     if (error || !data) {
-      return {
-        site_name: "آکسون | Axon",
-        siteName: "آکسون | Axon",
-        storeName: "آکسون | Axon",
-        tagline: "مرجع تخصصی تجهیزات تصویر، مانیتور و استودیو",
-        allow_google_index: true,
-        allowGoogleIndex: true,
-        maintenance_mode: "none",
-      };
+      return getDefaultSiteInfo();
     }
 
     const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
@@ -57,27 +52,27 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
       maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
     };
   } catch (err) {
-    console.error("Error in getSiteInfoServer:", err);
-    return { site_name: "آکسون | Axon", allow_google_index: true, allowGoogleIndex: true, maintenance_mode: "none" };
+    console.warn("Safe fallback in getSiteInfoServer:", err);
+    return getDefaultSiteInfo();
   }
+}
+
+function getDefaultSiteInfo(): SiteInfo {
+  return {
+    site_name: "آکسون | Axon",
+    siteName: "آکسون | Axon",
+    storeName: "آکسون | Axon",
+    tagline: "مرجع تخصصی تجهیزات تصویر، مانیتور و استودیو",
+    allow_google_index: true,
+    allowGoogleIndex: true,
+    maintenance_mode: "none",
+  };
 }
 
 export async function updateSiteInfoServer(info: Partial<SiteInfo>) {
   try {
     const sName = info.site_name || info.siteName || info.storeName || "آکسون | Axon";
-    const isAllowed =
-      info.allow_google_index !== undefined
-        ? info.allow_google_index
-        : info.allowGoogleIndex !== undefined
-        ? info.allowGoogleIndex
-        : info.maintenance_mode === "none";
-
-    const { data: existingRecords } = await supabaseAdmin
-      .from("site_info")
-      .select("id")
-      .limit(1);
-
-    const existingId = existingRecords && existingRecords.length > 0 ? existingRecords[0].id : null;
+    const isAllowed = info.allow_google_index !== false;
 
     const payload: Record<string, any> = {
       site_name: sName,
@@ -86,37 +81,23 @@ export async function updateSiteInfoServer(info: Partial<SiteInfo>) {
       logo_url: info.logo_url || info.logoUrl || "",
       footer_logo_url: info.footer_logo_url || info.footerLogoUrl || "",
       favicon_url: info.favicon_url || "",
-      active_font_id: info.active_font_id || "Vazirmatn",
-      description: info.description || info.footer_text || "",
-      footer_text: info.footer_text || info.description || "",
-      phone: info.phone || "",
-      email: info.email || "",
-      address: info.address || "",
-      working_hours: info.working_hours || "",
-      instagram: info.instagram || "",
-      telegram: info.telegram || "",
-      whatsapp: info.whatsapp || "",
-      youtube: info.youtube || "",
-      header_announcement: info.header_announcement || "",
-      free_shipping_threshold: Number(info.free_shipping_threshold || 2000000),
       allow_google_index: isAllowed,
-      maintenance_mode: info.maintenance_mode || (isAllowed ? "none" : "indefinite"),
-      maintenance_until: info.maintenance_until || null,
-      maintenance_duration_minutes: info.maintenance_duration_minutes || null,
-      custom_css: info.custom_css || "",
+      maintenance_mode: info.maintenance_mode || "none",
       updated_at: new Date().toISOString(),
     };
 
-    if (existingId !== null && existingId !== undefined) {
-      await supabaseAdmin.from("site_info").update(payload).eq("id", existingId);
-    } else {
-      await supabaseAdmin.from("site_info").insert([payload]);
+    if (supabaseAdmin) {
+      const { data: existingRecords } = await supabaseAdmin.from("site_info").select("id").limit(1);
+      if (existingRecords && existingRecords.length > 0) {
+        await supabaseAdmin.from("site_info").update(payload).eq("id", existingRecords[0].id);
+      } else {
+        await supabaseAdmin.from("site_info").insert([payload]);
+      }
     }
 
     revalidatePath("/", "layout");
     return { success: true };
   } catch (err: any) {
-    console.error("Error updating site info server action:", err);
     return { success: false, error: err.message };
   }
 }

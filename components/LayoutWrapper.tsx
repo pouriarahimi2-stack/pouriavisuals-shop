@@ -4,22 +4,26 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import CartDrawer from "@/components/CartDrawer";
+import ContactDock from "@/components/ContactDock";
 import AIAssistantChat from "@/components/AIAssistantChat";
-import MobileBottomNav from "@/components/MobileBottomNav";
+import CartDrawer from "@/components/CartDrawer";
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname() || "";
-  const isAdmin = pathname.startsWith("/admin");
+  const pathname = usePathname();
+  const isAdminRoute = pathname?.startsWith("/admin");
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300">
-      {!isAdmin && <Header />}
+    <>
+      {!isAdminRoute && <Header />}
       <main className="flex-1 w-full">{children}</main>
-      {!isAdmin && <Footer />}
-      {!isAdmin && <MobileBottomNav />}
-      {!isAdmin && <AIAssistantChat />}
-      <CartDrawer />
-    </div>
+      {!isAdminRoute && (
+        <>
+          <Footer />
+          <ContactDock />
+          <AIAssistantChat />
+          <CartDrawer />
+        </>
+      )}
+    </>
   );
 }

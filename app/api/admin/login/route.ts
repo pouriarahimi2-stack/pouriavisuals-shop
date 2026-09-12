@@ -22,10 +22,10 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const pinOrPassword = String(body.password || body.pin || "").trim();
-    const username = String(body.username || "admin").trim().toLowerCase();
+    const username = String(body.username || "").trim().toLowerCase();
 
-    if (!pinOrPassword) {
-      return NextResponse.json({ success: false, message: "کلمه عبور یا پین امنیتی الزامی است." }, { status: 400 });
+    if (!username || !pinOrPassword) {
+      return NextResponse.json({ success: false, message: "شناسه کاربری و کلمه عبور الزامی است." }, { status: 400 });
     }
 
     let adminUser: any = null;
@@ -38,26 +38,9 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       adminUser = data;
-
-      if (!adminUser && username === "admin") {
-        const { data: allAdmins } = await supabaseAdmin.from("admin_users").select("id").limit(1);
-        if (!allAdmins || allAdmins.length === 0) {
-          const defaultPassword = pinOrPassword.length >= 4 ? pinOrPassword : "admin";
-          const { data: created } = await supabaseAdmin
-            .from("admin_users")
-            .insert({
-              username: "admin",
-              password: authSecurity.hashPassword(defaultPassword),
-              full_name: "مدیر ارشد آکسون",
-              role: "superadmin",
-            })
-            .select()
-            .single();
-          adminUser = created;
-        }
-      }
     }
 
+    // عدم ایجاد خودکار ادمین؛ جلوگیری از مصالحه امنیتی
     if (!adminUser) {
       authSecurity.recordFailedAttempt(clientIp);
       return NextResponse.json({ success: false, message: "کاربری با این مشخصات یافت نشد." }, { status: 401 });
@@ -72,7 +55,6 @@ export async function POST(req: NextRequest) {
 
     authSecurity.resetAttempts(clientIp);
 
-    // صدور توکن HMAC استاندارد با انقضای ۷۲ ساعته
     const token = await signPayload({
       id: String(adminUser.id),
       username: adminUser.username,
@@ -93,7 +75,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // تنها یک کوکی استاندارد با حداکثر پرچم‌های امنیتی
     response.cookies.set(COOKIE_NAME, token, {
       httpOnly: true,
       secure: isProd,
@@ -102,7 +83,6 @@ export async function POST(req: NextRequest) {
       maxAge: 72 * 60 * 60,
     });
 
-    // پاکسازی کامل کوکی تکراری منسوخ‌شده
     response.cookies.delete("pv_admin_session");
 
     return response;

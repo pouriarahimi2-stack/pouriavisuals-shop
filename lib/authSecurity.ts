@@ -1,84 +1,70 @@
-// File Path: lib/authSecurity.ts
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 
-interface RateLimitEntry {
+interface RateLimitRecord {
   attempts: number;
-  blockedUntil: number;
+  blockedUntil: number | null;
+  lastAttempt: number;
 }
 
-const loginAttempts = new Map<string, RateLimitEntry>();
-const MAX_ATTEMPTS = 5;
-const BLOCK_DURATION_MS = 15 * 60 * 1000;
+const rateLimitMap = new Map<string, RateLimitRecord>();
 
 export const authSecurity = {
   checkRateLimit(ip: string): { allowed: boolean; waitMinutes?: number } {
     const now = Date.now();
-    const entry = loginAttempts.get(ip);
+    const record = rateLimitMap.get(ip);
 
-    if (!entry) return { allowed: true };
+    if (!record) return { allowed: true };
 
-    if (entry.blockedUntil > now) {
-      const waitMinutes = Math.ceil((entry.blockedUntil - now) / (60 * 1000));
+    if (record.blockedUntil && record.blockedUntil > now) {
+      const waitMinutes = Math.ceil((record.blockedUntil - now) / 60000);
       return { allowed: false, waitMinutes };
     }
 
-    if (entry.blockedUntil <= now && entry.attempts >= MAX_ATTEMPTS) {
-      loginAttempts.delete(ip);
+    if (now - record.lastAttempt > 15 * 60 * 1000) {
+      rateLimitMap.delete(ip);
+      return { allowed: true };
     }
 
     return { allowed: true };
   },
 
-  recordFailedAttempt(ip: string): void {
+  recordFailedAttempt(ip: string) {
     const now = Date.now();
-    const entry = loginAttempts.get(ip) || { attempts: 0, blockedUntil: 0 };
-    entry.attempts += 1;
+    const record = rateLimitMap.get(ip) || { attempts: 0, blockedUntil: null, lastAttempt: now };
 
-    if (entry.attempts >= MAX_ATTEMPTS) {
-      entry.blockedUntil = now + BLOCK_DURATION_MS;
+    record.attempts += 1;
+    record.lastAttempt = now;
+
+    if (record.attempts >= 5) {
+      record.blockedUntil = now + 15 * 60 * 1000;
     }
 
-    loginAttempts.set(ip, entry);
+    rateLimitMap.set(ip, record);
   },
 
-  resetAttempts(ip: string): void {
-    loginAttempts.delete(ip);
+  resetAttempts(ip: string) {
+    rateLimitMap.delete(ip);
   },
 
   hashPassword(password: string): string {
-    const clean = String(password).trim();
     const salt = randomBytes(16).toString("hex");
-    const hash = scryptSync(clean, salt, 64).toString("hex");
+    const hash = scryptSync(password, salt, 64).toString("hex");
     return `${salt}:${hash}`;
   },
 
-  verifyPassword(password: string, storedHashOrPlain: string): boolean {
+  verifyPassword(supplied: string, stored: string): boolean {
+    if (!stored || !stored.includes(":")) {
+      // رد قطعی پسوردهای بدون فرمت سالت و هش (رد هرگونه متن ساده)
+      return false;
+    }
+
     try {
-      const clean = String(password).trim();
-      const stored = String(storedHashOrPlain).trim();
-
-      if (!stored) return false;
-
-      if (stored.includes(":")) {
-        const [salt, key] = stored.split(":");
-        if (!salt || !key) return false;
-
-        const keyBuffer = Buffer.from(key, "hex");
-        const derivedKeyBuffer = scryptSync(clean, salt, 64);
-
-        if (keyBuffer.length !== derivedKeyBuffer.length) return false;
-        return timingSafeEqual(keyBuffer, derivedKeyBuffer);
-      }
-
-      const inputBuffer = Buffer.from(clean, "utf8");
-      const storedBuffer = Buffer.from(stored, "utf8");
-
-      if (inputBuffer.length !== storedBuffer.length) return false;
-      return timingSafeEqual(inputBuffer, storedBuffer);
+      const [salt, key] = stored.split(":");
+      const keyBuffer = Buffer.from(key, "hex");
+      const derivedBuffer = scryptSync(supplied, salt, 64);
+      return timingSafeEqual(keyBuffer, derivedBuffer);
     } catch {
       return false;
     }
   },
 };
-
-export default authSecurity;

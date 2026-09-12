@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Fix DynamicHomeSections Module & Finalize SSR Homepage (fix.js)
+ * AXON CORE - Step 19: Touch-Optimized Checkout & Digits Sanitizer (Escaped) (fix.js)
  */
 
 const fs = require('fs');
@@ -11,181 +11,392 @@ function writeFile(relPath, content) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ایجاد شد: ${relPath}\x1b[0m`);
+  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[AXON-FIX]\x1b[0m ایجاد کامپوننت DynamicHomeSections و رفع خطای ماژول...");
+console.log("\x1b[36m[STEP-19]\x1b[0m بهینه‌سازی فرم ثبت سفارش و سبد خرید برای موبایل...");
 
 // =============================================================================
-// ۱. ایجاد components/DynamicHomeSections.tsx
+// بازنویسی بهینه و استاندارد app/checkout/page.tsx
 // =============================================================================
-const dynamicHomeSectionsCode = `"use client";
+const checkoutPageCode = `"use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import ProductCard from "@/components/ProductCard";
+import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
+import { formatPrice } from "@/lib/formatters";
 
-interface DynamicHomeSectionsProps {
-  initialProducts: any[];
-  initialBanners: any[];
+// تبدیل ارقام فارسی و عربی به انگلیسی
+function toEnglishDigits(str: string): string {
+  return str
+    .replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d).toString())
+    .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d).toString());
 }
 
-export default function DynamicHomeSections({
-  initialProducts = [],
-  initialBanners = [],
-}: DynamicHomeSectionsProps) {
-  const [activeCategory, setActiveCategory] = useState("all");
+export default function CheckoutPage() {
+  const router = useRouter();
+  const { cart, totalAmount, clearCart } = useCart();
 
-  const categories = Array.from(
-    new Set(initialProducts.map((p) => p.category).filter(Boolean))
-  );
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [province, setProvince] = useState("تهران");
+  const [city, setCity] = useState("تهران");
+  const [postalCode, setPostalCode] = useState("");
+  const [address, setAddress] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const filteredProducts =
-    activeCategory === "all"
-      ? initialProducts
-      : initialProducts.filter((p) => p.category === activeCategory);
+  const [couponCode, setCouponCode] = useState("");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [couponMsg, setCouponMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [checkingCoupon, setCheckingCoupon] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    try {
+      const savedCoupon = localStorage.getItem("axon_active_coupon_v2026");
+      if (savedCoupon) {
+        const parsed = JSON.parse(savedCoupon);
+        if (parsed && parsed.discount) {
+          setDiscountAmount(Number(parsed.discount));
+          setCouponCode(parsed.code || "");
+        }
+      }
+    } catch {}
+  }, []);
+
+  const handleApplyCoupon = async () => {
+    const code = couponCode.trim();
+    if (!code) return;
+
+    soundEngine.playClick();
+    setCheckingCoupon(true);
+    setCouponMsg(null);
+
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, totalAmount }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const discount = Number(data.discount || 0);
+        setDiscountAmount(discount);
+        setCouponMsg({ type: "success", text: "کد تخفیف اعمال شد: " + formatPrice(discount) + " تومان کسر گردید." });
+        localStorage.setItem("axon_active_coupon_v2026", JSON.stringify({ code, discount }));
+        soundEngine.playSuccess();
+      } else {
+        setDiscountAmount(0);
+        setCouponMsg({ type: "error", text: data.message || "کد تخفیف نامعتبر یا منقضی شده است." });
+      }
+    } catch {
+      setCouponMsg({ type: "error", text: "خطا در استعلام کد تخفیف." });
+    } finally {
+      setCheckingCoupon(false);
+    }
+  };
+
+  const handleSubmitOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setErrorMsg("");
+
+    const cleanPhone = toEnglishDigits(phone).replace(/\\D/g, "");
+    if (cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
+      setErrorMsg("شماره موبایل باید ۱۱ رقم بوده و با ۰۹ شروع شود.");
+      return;
+    }
+
+    const cleanPostal = toEnglishDigits(postalCode).replace(/\\D/g, "");
+    if (cleanPostal.length !== 10) {
+      setErrorMsg("کد پستی ده رقمی معتبر را وارد نمایید.");
+      return;
+    }
+
+    if (address.trim().length < 10) {
+      setErrorMsg("نشانی دقیق پستی برای تحویل مرسوله الزامی است.");
+      return;
+    }
+
+    if (cart.length === 0) {
+      setErrorMsg("سبد خرید شما خالی است.");
+      return;
+    }
+
+    setSubmitting(true);
+    const payableAmount = Math.max(0, totalAmount - discountAmount);
+
+    try {
+      const orderPayload = {
+        customer_name: fullName.trim(),
+        phone: cleanPhone,
+        province: province.trim(),
+        city: city.trim(),
+        postal_code: cleanPostal,
+        address: address.trim(),
+        notes: notes.trim(),
+        items: cart.map((it) => ({
+          id: it.id,
+          title: it.title,
+          price: it.price,
+          quantity: it.quantity,
+          image: it.image,
+        })),
+        total_amount: totalAmount,
+        discount_amount: discountAmount,
+        final_amount: payableAmount,
+        coupon_code: couponCode.trim() || null,
+      };
+
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "خطا در ثبت فاکتور سفارش.");
+      }
+
+      const orderId = data.order?.order_number || data.order?.id;
+      sessionStorage.setItem("pending_payment_amount", String(payableAmount));
+      sessionStorage.setItem("pending_payment_order_id", String(orderId));
+
+      soundEngine.playSuccess();
+      router.push("/checkout/payment?orderId=" + orderId);
+    } catch (err: any) {
+      setErrorMsg(err.message || "ثبت سفارش با اختلال مواجه شد. لطفاً دوباره تلاش کنید.");
+      setSubmitting(false);
+    }
+  };
+
+  const finalPayable = Math.max(0, totalAmount - discountAmount);
+
+  if (cart.length === 0) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-4 font-sans select-none text-center space-y-4" dir="rtl">
+        <div className="w-16 h-16 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-3xl">
+          🛍️
+        </div>
+        <h2 className="text-lg font-black text-[var(--text-primary)]">سبد خرید شما خالی است</h2>
+        <p className="text-xs text-[var(--text-secondary)]">تجهیزات و مانیتورهای مورد نظر خود را به سبد اضافه کنید.</p>
+        <Link
+          href="/products"
+          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition"
+        >
+          مشاهده کاتالوگ استودیو ←
+        </Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-16 py-6 sm:py-10 max-w-7xl mx-auto px-4 font-sans select-none" dir="rtl">
-      {/* بخش هیرو استودیویی و بنر اصلی */}
-      <section className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-slate-950 to-black border border-[var(--card-border)] p-6 sm:p-12 overflow-hidden shadow-2xl">
-        <div className="relative z-10 max-w-2xl space-y-6">
-          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--accent-blue)]/20 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] text-xs font-mono font-bold">
-            <span>⚡</span> نسل جدید مانیتورهای ۵K استودیو دیسپلی
-          </span>
+    <div className="max-w-6xl mx-auto px-4 py-8 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+      <div className="border-b border-[var(--card-border)] pb-4">
+        <h1 className="text-xl sm:text-2xl font-black">اطلاعات ارسال و صدور فاکتور رسمی</h1>
+        <p className="text-xs text-[var(--text-secondary)] mt-1">مشخصات تحویل‌گیرنده را جهت صدور بارنامه پستی ضدضربه وارد فرمایید.</p>
+      </div>
 
-          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
-            دقت مطلق در رنگ و جزئیات برای استودیوهای تدوین
-          </h1>
-
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-            تراکم پیکسلی ۲۱۸ PPI، پوشش ۹۹٪ گاموت رنگی DCI-P3 و کالیبراسیون سخت‌افزاری اختصاصی جهت پاسخگویی به استانداردهای تصحیح رنگ و خروجی‌های حرفه‌ای.
-          </p>
-
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Link
-              href="/products"
-              onClick={() => soundEngine.playClick()}
-              className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-lg shadow-[var(--accent-blue)]/25 cursor-pointer"
-            >
-              مشاهده کاتالوگ تجهیزات ←
-            </Link>
-            <Link
-              href="/blog"
-              onClick={() => soundEngine.playClick()}
-              className="px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/20 text-xs font-bold backdrop-blur-md transition cursor-pointer"
-            >
-              راهنمای انتخاب مانیتور
-            </Link>
-          </div>
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold animate-fadeIn">
+          ⚠️ {errorMsg}
         </div>
-
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(2,132,199,0.18),transparent_50%)] pointer-events-none" />
-      </section>
-
-      {/* بنرهای پرچمدار در صورت وجود */}
-      {initialBanners.length > 0 && (
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {initialBanners.slice(0, 2).map((banner, idx) => (
-            <div
-              key={banner.id || idx}
-              className="relative rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] p-6 flex flex-col justify-between min-h-[180px] shadow-sm"
-            >
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono text-[var(--accent-blue)] font-bold">ویژه استودیو</span>
-                <h3 className="text-base font-black text-[var(--text-primary)]">{banner.title || "تجهیزات رتینا"}</h3>
-                <p className="text-xs text-[var(--text-secondary)] line-clamp-2">{banner.subtitle || "تضمین سلامت پنل و گارانتی اصالت طلایی آکسون"}</p>
-              </div>
-              {banner.link && (
-                <Link
-                  href={banner.link}
-                  className="text-xs font-bold text-[var(--accent-blue)] hover:underline pt-4 block"
-                >
-                  مشاهده بیشتر ←
-                </Link>
-              )}
-            </div>
-          ))}
-        </section>
       )}
 
-      {/* بخش کاتالوگ و فیلتر دسته‌بندی */}
-      <section className="space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
-          <div>
-            <h2 className="text-lg sm:text-xl font-black text-[var(--text-primary)]">محصولات منتخب و پرچمدار</h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">آماده ارسال با بسته‌بندی ضدضربه استودیویی</p>
+      <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* فرم اطلاعات گیرنده */}
+        <div className="lg:col-span-7 space-y-5 p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
+          <h2 className="text-sm font-black text-[var(--accent-blue)]">📍 مشخصات تحویل‌گیرنده مرسوله</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="space-y-1.5">
+              <label className="font-bold text-[var(--text-secondary)]">نام و نام خانوادگی:</label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="مثلاً: پوریا رحیمی"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] transition"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-[var(--text-secondary)]">شماره موبایل (جهت پیامک رهگیری):</label>
+              <input
+                type="tel"
+                required
+                dir="ltr"
+                maxLength={11}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="09123456789"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] transition"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-[var(--text-secondary)]">استان:</label>
+              <input
+                type="text"
+                required
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                placeholder="تهران"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] transition"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-[var(--text-secondary)]">شهر:</label>
+              <input
+                type="text"
+                required
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="تهران"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold text-xs focus:border-[var(--accent-blue)] transition"
+              />
+            </div>
           </div>
 
-          {/* فیلتر دسته‌بندی */}
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full pb-1">
+          <div className="space-y-1.5 text-xs">
+            <label className="font-bold text-[var(--text-secondary)]">کد پستی ۱۰ رقمی:</label>
+            <input
+              type="text"
+              required
+              dir="ltr"
+              maxLength={10}
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              placeholder="1234567890"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] transition"
+            />
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            <label className="font-bold text-[var(--text-secondary)]">نشانی دقیق پستی:</label>
+            <textarea
+              required
+              rows={3}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="خیابان، کوچه، پلاک، واحد..."
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-xs focus:border-[var(--accent-blue)] transition leading-relaxed"
+            />
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            <label className="font-bold text-[var(--text-secondary)]">توضیحات سفارش (اختیاری):</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="نکات هماهنگی با مامور پست یا تست بسته‌بندی..."
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium text-xs focus:border-[var(--accent-blue)] transition"
+            />
+          </div>
+        </div>
+
+        {/* خلاصه فاکتور و پرداخت */}
+        <div className="lg:col-span-5 space-y-5">
+          <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm space-y-4">
+            <h2 className="text-sm font-black text-[var(--text-primary)]">🧾 خلاصه اقلام فاکتور ({cart.length})</h2>
+
+            <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1 scrollbar-none">
+              {cart.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 text-xs p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                  <div className="overflow-hidden">
+                    <span className="font-bold truncate block max-w-[200px]">{item.title}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] font-mono">{item.quantity} عدد</span>
+                  </div>
+                  <span className="font-mono font-bold text-[var(--accent-blue)]" suppressHydrationWarning>
+                    {formatPrice(item.price * item.quantity)} ت
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* کوپن تخفیف */}
+            <div className="pt-3 border-t border-[var(--card-border)] space-y-2">
+              <label className="text-[11px] font-bold text-[var(--text-secondary)] block">کد تخفیف دارید؟</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="AXON-DISCOUNT"
+                  className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold outline-none uppercase text-center"
+                />
+                <button
+                  type="button"
+                  disabled={checkingCoupon || !couponCode.trim()}
+                  onClick={handleApplyCoupon}
+                  className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition disabled:opacity-50"
+                >
+                  {checkingCoupon ? "..." : "اعمال"}
+                </button>
+              </div>
+              {couponMsg && (
+                <p className={"text-[10px] font-bold " + (couponMsg.type === "success" ? "text-emerald-500" : "text-rose-500")}>
+                  {couponMsg.text}
+                </p>
+              )}
+            </div>
+
+            {/* ریز مبالغ */}
+            <div className="space-y-2 pt-3 border-t border-[var(--card-border)] text-xs">
+              <div className="flex justify-between text-[var(--text-secondary)]">
+                <span>جمع کل اقلام:</span>
+                <span className="font-mono font-bold" suppressHydrationWarning>{formatPrice(totalAmount)} تومان</span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-emerald-500">
+                  <span>تخفیف اعمال‌شده:</span>
+                  <span className="font-mono font-bold" suppressHydrationWarning>- {formatPrice(discountAmount)} تومان</span>
+                </div>
+              )}
+              <div className="flex justify-between text-[var(--text-secondary)]">
+                <span>بسته‌بندی و ارسال پیشتاز:</span>
+                <span className="text-emerald-500 font-bold">رایگان (ویژه استودیو)</span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-[var(--card-border)] text-sm">
+                <span className="font-black">مبلغ قابل پرداخت:</span>
+                <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-base" suppressHydrationWarning>
+                  {formatPrice(finalPayable)} تومان
+                </span>
+              </div>
+            </div>
+
             <button
-              onClick={() => {
-                soundEngine.playClick();
-                setActiveCategory("all");
-              }}
-              className={\`px-3.5 py-2 rounded-xl text-xs font-black transition whitespace-nowrap cursor-pointer \${
-                activeCategory === "all"
-                  ? "bg-[var(--accent-blue)] text-white shadow-sm"
-                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-              }\`}
+              type="submit"
+              disabled={submitting}
+              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              همه ({initialProducts.length})
+              {submitting ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
+              ) : (
+                <span>تایید اطلاعات و اتصال به درگاه بانکی ←</span>
+              )}
             </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => {
-                  soundEngine.playClick();
-                  setActiveCategory(cat);
-                }}
-                className={\`px-3.5 py-2 rounded-xl text-xs font-black transition whitespace-nowrap cursor-pointer \${
-                  activeCategory === cat
-                    ? "bg-[var(--accent-blue)] text-white shadow-sm"
-                    : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-                }\`}
-              >
-                {cat}
-              </button>
-            ))}
           </div>
         </div>
-
-        {/* شبکه نمایش کارت کالاها */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      </section>
-
-      {/* نشان‌های اعتماد و استانداردهای گارانتی */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-[var(--card-border)] pt-10 text-center">
-        <div className="p-5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
-          <span className="text-2xl">🛡️</span>
-          <h4 className="text-xs font-black text-[var(--text-primary)]">۱۸ ماه گارانتی اصالت طلایی</h4>
-          <p className="text-[11px] text-[var(--text-secondary)]">تضمین سلامت سخت‌افزاری پنل بدون پیکسل سوخته</p>
-        </div>
-        <div className="p-5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
-          <span className="text-2xl">⚡</span>
-          <h4 className="text-xs font-black text-[var(--text-primary)]">کالیبراسیون سخت‌افزاری</h4>
-          <p className="text-[11px] text-[var(--text-secondary)]">پوشش دقیق فضاهای رنگی DCI-P3 و Rec.709</p>
-        </div>
-        <div className="p-5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2">
-          <span className="text-2xl">📦</span>
-          <h4 className="text-xs font-black text-[var(--text-primary)]">ارسال فوق‌سریع و ایمن</h4>
-          <p className="text-[11px] text-[var(--text-secondary)]">بسته‌بندی اختصاصی ضدضربه جهت ارسال به سراسر کشور</p>
-        </div>
-      </section>
+      </form>
     </div>
   );
 }
 `;
-writeFile('components/DynamicHomeSections.tsx', dynamicHomeSectionsCode);
+writeFile('app/checkout/page.tsx', checkoutPageCode);
 
 // =============================================================================
-// ۲. بیلد و انتشار در ورسل
+// بیلد و انتشار در ورسل
 // =============================================================================
 console.log("تست بیلد کامل (npm run build)...");
 try {
@@ -200,7 +411,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و انتش
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(homepage): add DynamicHomeSections component and complete SSR homepage build"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(checkout-step19): fix template literals and deploy touch-optimized checkout"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -209,7 +420,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه اصلی با موفقیت بیلد و در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ قدم نوزدهم با موفقیت در ورسل مستقر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

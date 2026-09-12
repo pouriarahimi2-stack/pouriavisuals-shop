@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Step 16: Dynamic Blog Post SSR & Article/Breadcrumb Schema (fix.js)
+ * AXON CORE - Step 17: Server-Side Rendered Blog Archive & Blog Schema (fix.js)
  */
 
 const fs = require('fs');
@@ -14,227 +14,264 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[STEP-16]\x1b[0m ارتقای سئوی صفحه مقالات و تزریق Article Schema...");
+console.log("\x1b[36m[STEP-17]\x1b[0m تبدیل آرشیو وبلاگ به SSR و تزریق اسکیمای رسمی Blog...");
 
 // =============================================================================
-// بازنویسی کامل و استاندارد app/blog/[id]/page.tsx
+// ۱. ساخت کامپوننت کلاینت فیلتر و جستجوی مقالات (components/BlogArchiveClient.tsx)
 // =============================================================================
-const blogPostPageCode = `import React from "react";
-import { notFound } from "next/navigation";
+const blogArchiveClientCode = `"use client";
+
+import React, { useState } from "react";
 import Link from "next/link";
+import { soundEngine } from "@/lib/soundEngine";
+
+export interface BlogPostItem {
+  id: string | number;
+  title: string;
+  slug?: string;
+  category?: string;
+  excerpt?: string;
+  meta_description?: string;
+  image_url?: string;
+  created_at?: string;
+  author?: string;
+}
+
+export default function BlogArchiveClient({
+  initialPosts,
+  categories,
+}: {
+  initialPosts: BlogPostItem[];
+  categories: string[];
+}) {
+  const [selectedCat, setSelectedCat] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const filtered = initialPosts.filter((post) => {
+    const matchCat = selectedCat === "all" || post.category === selectedCat;
+    const matchSearch =
+      (post.title || "").toLowerCase().includes(search.toLowerCase()) ||
+      (post.category || "").toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchSearch;
+  });
+
+  return (
+    <div className="space-y-8">
+      {/* فیلترها و جستجو ارگونومیک برای موبایل */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              setSelectedCat("all");
+            }}
+            className={\`px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer \${
+              selectedCat === "all"
+                ? "bg-[var(--accent-blue)] text-white shadow-md"
+                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
+            }\`}
+          >
+            همه مقالات ({initialPosts.length})
+          </button>
+          {categories.map((c) => (
+            <button
+              key={c}
+              onClick={() => {
+                soundEngine.playClick();
+                setSelectedCat(c);
+              }}
+              className={\`px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer \${
+                selectedCat === c
+                  ? "bg-[var(--accent-blue)] text-white shadow-md"
+                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
+              }\`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
+        <div className="w-full sm:w-64">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 جستجو در مقالات سئو..."
+            className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none text-xs font-bold text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
+          />
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="p-12 text-center bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl text-xs font-bold text-[var(--text-secondary)]">
+          مقاله‌ای مطابق با جستجوی شما پیدا نشد.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((post) => (
+            <article
+              key={post.id}
+              className="rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] overflow-hidden shadow-sm hover:shadow-xl hover:border-[var(--accent-blue)]/50 transition-all duration-300 flex flex-col justify-between"
+            >
+              <div className="space-y-4 p-5">
+                <div className="relative aspect-video rounded-2xl bg-[var(--input-bg)] overflow-hidden border border-[var(--card-border)]">
+                  <img
+                    src={post.image_url || "/placeholder.png"}
+                    alt={post.title}
+                    width={480}
+                    height={270}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                  <span className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-xl bg-black/60 text-white text-[10px] font-bold backdrop-blur-md">
+                    {post.category || "تکنولوژی"}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <Link href={\`/blog/\${post.slug || post.id}\`}>
+                    <h3 className="font-black text-sm text-[var(--text-primary)] hover:text-[var(--accent-blue)] transition line-clamp-2 leading-snug">
+                      {post.title}
+                    </h3>
+                  </Link>
+                  <p className="text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-medium">
+                    {post.excerpt || post.meta_description || "بررسی مشخصات فنی و استانداردهای نمایش تصویر در این مقاله تخصصی..."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-5 pt-0 border-t border-[var(--card-border)] flex items-center justify-between mt-3 text-[11px] text-[var(--text-secondary)] font-medium">
+                <span>{post.created_at ? new Date(post.created_at).toLocaleDateString("fa-IR") : "به‌روزرسانی تازه"}</span>
+                <Link
+                  href={\`/blog/\${post.slug || post.id}\`}
+                  className="font-bold text-[var(--accent-blue)] hover:underline"
+                >
+                  مطالعه کامل ←
+                </Link>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+`;
+writeFile('components/BlogArchiveClient.tsx', blogArchiveClientCode);
+
+// =============================================================================
+// ۲. بازنویسی app/blog/page.tsx به Server Component
+// =============================================================================
+const serverBlogPageCode = `import React from "react";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import BlogArchiveClient, { BlogPostItem } from "@/components/BlogArchiveClient";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+export const metadata: Metadata = {
+  title: "مجله تخصصی تصویر، مانیتورهای ۵K و تکنولوژی استودیو | آکسون",
+  description: "مجموعه مقالات تخصصی، راهنمای خرید مانیتورهای تدوین، کالیبراسیون رنگ، بررسی درگاه‌های تاندربولت و اخبار گجت‌های هوشمند در آکسون کور.",
+  openGraph: {
+    title: "مجله تخصصی استودیو و مانیتورهای ۵K | آکسون",
+    description: "مرجع مقالات و راهنماهای حرفه‌ای تجهیزات تدوین و تصحیح رنگ.",
+    url: "https://axoncore.ir/blog",
+    type: "website",
+  },
+  alternates: {
+    canonical: "https://axoncore.ir/blog",
+  },
+};
 
-async function getPost(idOrSlug: string) {
+const DEFAULT_POSTS: BlogPostItem[] = [
+  {
+    id: "guide-5k-monitors",
+    slug: "guide-5k-monitors",
+    title: "راهنمای جامع انتخاب مانیتورهای ۵K و ۴K برای تدوینگران و استودیوهای رنگ",
+    category: "راهنمای خرید",
+    excerpt: "تفاوت‌های حیاتی تراکم پیکسلی ۲۱۸ PPI با نمایشگرهای متداول و بررسی پوشش گاموت رنگی DCI-P3 برای تدوین ویدیو.",
+    image_url: "https://axoncore.ir/placeholder.png",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "thunderbolt-5-breakthrough",
+    slug: "thunderbolt-5-breakthrough",
+    title: "بررسی معماری تاندربولت ۵؛ پهنای باند ۱۲۰ گیگابیت بر ثانیه در خدمت خروجی دوگانه ۸K",
+    category: "تکنولوژی و سخت‌افزار",
+    excerpt: "بررسی پهنای باند و نحوه انتقال سیگنال‌های تصویری فشرده‌نشده در پروژه‌های استودیویی مدرن.",
+    image_url: "https://axoncore.ir/placeholder.png",
+    created_at: new Date().toISOString(),
+  }
+];
+
+export default async function BlogPage() {
+  let posts: BlogPostItem[] = [];
+  let categories: string[] = [];
+
   try {
     if (supabaseAdmin) {
       const { data } = await supabaseAdmin
         .from("posts")
         .select("*")
-        .or(\`id.eq.\${idOrSlug},slug.eq.\${idOrSlug}\`)
-        .maybeSingle();
+        .eq("is_published", true)
+        .order("created_at", { ascending: false });
 
-      if (data) return data;
+      if (data && data.length > 0) {
+        posts = data;
+      } else {
+        posts = DEFAULT_POSTS;
+      }
     }
-  } catch {}
-
-  // فال‌بک پیش‌فرض مقاله تخصصی در صورت عدم اتصال لحظه‌ای دیتابیس
-  return {
-    id: idOrSlug,
-    title: "راهنمای جامع انتخاب مانیتورهای ۵K و ۴K برای تدوینگران و استودیوهای رنگ",
-    slug: idOrSlug,
-    category: "راهنمای خرید و بررسی",
-    author: "تیم فنی آکسون کور",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    image_url: "https://axoncore.ir/placeholder.png",
-    content: \`در دنیای تولید محتوای پیشرفته و استودیوهای اصلاح رنگ، انتخاب نمایشگر به یکی از حیاتی‌ترین تصمیمات سخت‌افزاری تبدیل شده است. وضوح تصویر ۵K با تراکم پیکسلی ۲۱۸ پیکسل در هر اینچ (PPI) به چشم اجازه می‌دهد جزئیات متون و خطوط را بدون کوچک‌ترین تارشدگی یا خستگی مشاهده کند.\\n\\nاستاندارد گاموت رنگی DCI-P3 و پوشش بیش از ۹۹ درصدی آن تضمین می‌کند که خروجی نهایی پروژه شما دقیقاً همان رنگی باشد که در مانیتورهای سینمایی مشاهده خواهد شد. کلیه مانیتورهای ارائه‌شده در استودیو آکسون با ابزارهای دقیق سخت‌افزاری کالیبره شده و با برگه اصالت سلامت به دست متخصصان می‌رسند.\`,
-  };
-}
-
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { id } = await params;
-  const post = await getPost(id);
-
-  if (!post) {
-    return { title: "مقاله یافت نشد | مجله تخصصی آکسون" };
+  } catch {
+    posts = DEFAULT_POSTS;
   }
 
-  const title = post.title || "مقاله تخصصی تجهیزات استودیو";
-  const desc = post.meta_description || post.content?.slice(0, 150) || "بررسی و راهنمای تخصصی مانیتورهای ۵K و تجهیزات تصویر در مجله آکسون.";
+  categories = Array.from(new Set(posts.map((p) => p.category || "مقالات تخصصی"))).filter(Boolean);
 
-  return {
-    title: \`\${title} | مجله تخصصی آکسون\`,
-    description: desc,
-    alternates: {
-      canonical: \`https://axoncore.ir/blog/\${post.slug || post.id}\`,
-    },
-    openGraph: {
-      title,
-      description: desc,
-      url: \`https://axoncore.ir/blog/\${post.slug || post.id}\`,
-      type: "article",
-      publishedTime: post.created_at,
-      modifiedTime: post.updated_at,
-      images: [post.image_url || "https://axoncore.ir/placeholder.png"],
-    },
-  };
-}
-
-export default async function BlogPostPage({ params }: PageProps) {
-  const { id } = await params;
-  const post = await getPost(id);
-
-  if (!post) notFound();
-
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
-  const postUrl = \`\${baseUrl}/blog/\${post.slug || post.id}\`;
-
-  // ۱. اسکیمای ساختاریافته مقاله گوگل (Article Schema)
-  const articleJsonLd = {
+  // اسکیمای رسمی Blog موتورهای جستجو
+  const blogJsonLd = {
     "@context": "https://schema.org",
-    "@type": "Article",
-    "headline": post.title,
-    "description": post.meta_description || post.content?.slice(0, 150),
-    "image": [post.image_url || \`\${baseUrl}/placeholder.png\`],
-    "datePublished": post.created_at,
-    "dateModified": post.updated_at || post.created_at,
-    "author": {
-      "@type": "Person",
-      "name": post.author || "کارشناس فنی آکسون کور",
-    },
-    "publisher": {
-      "@type": "Organization",
-      "name": "آکسون کور | Axon Core",
-      "logo": {
-        "@type": "ImageObject",
-        "url": \`\${baseUrl}/favicon.ico\`,
-      },
-    },
-    "mainEntityOfPage": {
-      "@type": "WebPage",
-      "@id": postUrl,
-    },
-  };
-
-  // ۲. اسکیمای BreadcrumbList
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {
-        "@type": "ListItem",
-        "position": 1,
-        "name": "صفحه اصلی",
-        "item": baseUrl,
-      },
-      {
-        "@type": "ListItem",
-        "position": 2,
-        "name": "مجله تخصصی",
-        "item": \`\${baseUrl}/blog\`,
-      },
-      {
-        "@type": "ListItem",
-        "position": 3,
-        "name": post.title,
-        "item": postUrl,
-      },
-    ],
+    "@type": "Blog",
+    "name": "مجله تخصصی تکنولوژی و تصویر استودیو آکسون",
+    "description": "مرجع مقالات و راهنماهای کالیبراسیون مانیتورهای ۵K و سخت‌افزار تدوین",
+    "url": "https://axoncore.ir/blog",
+    "blogPost": posts.slice(0, 10).map((post) => ({
+      "@type": "BlogPosting",
+      "headline": post.title,
+      "url": \`https://axoncore.ir/blog/\${post.slug || post.id}\`,
+      "datePublished": post.created_at,
+    })),
   };
 
   return (
-    <article className="max-w-4xl mx-auto px-4 py-8 sm:py-12 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+    <div className="max-w-7xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogJsonLd) }}
       />
 
-      {/* ناوبری Breadcrumb */}
-      <nav className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
-        <Link href="/" className="hover:text-[var(--accent-blue)]">خانه</Link>
-        <span>/</span>
-        <Link href="/blog" className="hover:text-[var(--accent-blue)]">مجله تخصصی</Link>
-        <span>/</span>
-        <span className="text-[var(--text-primary)] truncate max-w-xs">{post.title}</span>
-      </nav>
-
-      {/* هدر مقاله */}
-      <header className="space-y-4 border-b border-[var(--card-border)] pb-6">
-        <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-xs font-bold font-mono">
-          {post.category || "تکنولوژی و تصویر"}
+      <div className="text-center space-y-2">
+        <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] font-mono text-[11px] font-bold">
+          AXON KNOWLEDGE BASE • 2026
         </span>
-
-        <h1 className="text-xl sm:text-3xl lg:text-4xl font-black leading-snug">
-          {post.title}
-        </h1>
-
-        <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--text-secondary)] font-medium">
-          <span>✍️ نویسنده: <strong className="text-[var(--text-primary)]">{post.author || "کارشناس استودیو"}</strong></span>
-          <span>•</span>
-          <span>📅 تاریخ انتشار: {new Date(post.created_at).toLocaleDateString("fa-IR")}</span>
-        </div>
-      </header>
-
-      {/* تصویر شاخص */}
-      {post.image_url && (
-        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-2 overflow-hidden shadow-xl">
-          <img
-            src={post.image_url}
-            alt={post.title}
-            width={900}
-            height={480}
-            className="w-full h-auto max-h-[420px] object-cover rounded-[2rem]"
-          />
-        </div>
-      )}
-
-      {/* بدنه مقاله */}
-      <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-10 shadow-sm leading-loose text-sm sm:text-base text-[var(--text-secondary)] font-medium space-y-4 whitespace-pre-line text-justify">
-        {post.content}
+        <h1 className="text-2xl md:text-4xl font-black">مجله تخصصی فناوری تصویر و استودیو</h1>
+        <p className="text-xs text-[var(--text-secondary)] font-medium max-w-xl mx-auto leading-relaxed">
+          تحلیل‌های تخصصی سخت‌افزار، راهنمای استانداردهای کالیبراسیون و بررسی فناوری‌های رتینا
+        </p>
       </div>
 
-      {/* فوتر بازگشت و کال‌تو‌اکشن بررسی کاتالوگ */}
-      <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>
-          <h4 className="font-black text-sm text-[var(--text-primary)]">نیاز به مشاوره جهت انتخاب مانیتور دارید؟</h4>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">کارشناسان آکسون آماده پاسخگویی و هماهنگی تست سخت‌افزاری هستند.</p>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Link
-            href="/products"
-            className="flex-1 sm:flex-initial px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-md text-center"
-          >
-            مشاهده کاتالوگ تجهیزات ←
-          </Link>
-          <Link
-            href="/blog"
-            className="flex-1 sm:flex-initial px-4 py-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition text-center"
-          >
-            سایر مقالات
-          </Link>
-        </div>
-      </div>
-    </article>
+      <BlogArchiveClient initialPosts={posts} categories={categories} />
+    </div>
   );
 }
 `;
-writeFile('app/blog/[id]/page.tsx', blogPostPageCode);
+writeFile('app/blog/page.tsx', serverBlogPageCode);
 
 // =============================================================================
-// بیلد و انتشار در ورسل
+// بیلد و استقرار در ورسل
 // =============================================================================
-console.log("تست بیلد کامل (npm run build)...");
+console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
@@ -247,7 +284,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب و انتش
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(blog-step16): implement server-side rendered blog post with Article & BreadcrumbList JSON-LD schemas"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(blog-step17): implement SSR blog archive with schema.org Blog markup and canonical tag"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -256,7 +293,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قدم شانزدهم با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ قدم هفدهم با موفقیت در ورسل مستقر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

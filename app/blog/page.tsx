@@ -1,16 +1,16 @@
 import React from "react";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import BlogArchiveClient from "@/components/BlogArchiveClient";
+import BlogArchiveClient, { BlogPostItem } from "@/components/BlogArchiveClient";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "مجله تخصصی و مقالات تحلیلی مانیتور و تجهیزات رنگ استودیو | آکسون",
-  description: "راهنمای خرید، تست گاموت رنگی، مقایسه تخصصی مانیتورهای ۵K و ۴K و استانداردهای سخت‌افزار تدوین در آکسون کور.",
+  title: "مجله تخصصی تصویر، مانیتورهای ۵K و تکنولوژی استودیو | آکسون",
+  description: "مجموعه مقالات تخصصی، راهنمای خرید مانیتورهای تدوین، کالیبراسیون رنگ، بررسی درگاه‌های تاندربولت و اخبار گجت‌های هوشمند در آکسون کور.",
   openGraph: {
-    title: "مجله تخصصی آکسون | مقالات تحلیلی مانیتور و تصویر",
-    description: "مرجع مقالات کالیبراسیون و بررسی سخت‌افزار ادیتورهای ویدیو و کالریست‌ها.",
+    title: "مجله تخصصی استودیو و مانیتورهای ۵K | آکسون",
+    description: "مرجع مقالات و راهنماهای حرفه‌ای تجهیزات تدوین و تصحیح رنگ.",
     url: "https://axoncore.ir/blog",
     type: "website",
   },
@@ -19,57 +19,84 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function BlogArchivePage() {
-  let posts: any[] = [];
+const DEFAULT_POSTS: BlogPostItem[] = [
+  {
+    id: "guide-5k-monitors",
+    slug: "guide-5k-monitors",
+    title: "راهنمای جامع انتخاب مانیتورهای ۵K و ۴K برای تدوینگران و استودیوهای رنگ",
+    category: "راهنمای خرید",
+    excerpt: "تفاوت‌های حیاتی تراکم پیکسلی ۲۱۸ PPI با نمایشگرهای متداول و بررسی پوشش گاموت رنگی DCI-P3 برای تدوین ویدیو.",
+    image_url: "https://axoncore.ir/placeholder.png",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "thunderbolt-5-breakthrough",
+    slug: "thunderbolt-5-breakthrough",
+    title: "بررسی معماری تاندربولت ۵؛ پهنای باند ۱۲۰ گیگابیت بر ثانیه در خدمت خروجی دوگانه ۸K",
+    category: "تکنولوژی و سخت‌افزار",
+    excerpt: "بررسی پهنای باند و نحوه انتقال سیگنال‌های تصویری فشرده‌نشده در پروژه‌های استودیویی مدرن.",
+    image_url: "https://axoncore.ir/placeholder.png",
+    created_at: new Date().toISOString(),
+  }
+];
+
+export default async function BlogPage() {
+  let posts: BlogPostItem[] = [];
+  let categories: string[] = [];
 
   try {
     if (supabaseAdmin) {
       const { data } = await supabaseAdmin
         .from("posts")
-        .select("id, title, slug, content, category, image_url, meta_description, created_at, is_visible, is_published")
+        .select("*")
+        .eq("is_published", true)
         .order("created_at", { ascending: false });
 
-      if (data) {
-        posts = data.filter((p) => p.is_visible !== false && p.is_published !== false);
+      if (data && data.length > 0) {
+        posts = data;
+      } else {
+        posts = DEFAULT_POSTS;
       }
     }
-  } catch (err) {
-    console.warn("Blog server load warning:", err);
+  } catch {
+    posts = DEFAULT_POSTS;
   }
 
-  // اسکیما CollectionPage برای گوگل
-  const collectionJsonLd = {
+  categories = Array.from(new Set(posts.map((p) => p.category || "مقالات تخصصی"))).filter(Boolean);
+
+  // اسکیمای رسمی Blog موتورهای جستجو
+  const blogJsonLd = {
     "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    "name": "مجله تخصصی و مقالات آکسون",
+    "@type": "Blog",
+    "name": "مجله تخصصی تکنولوژی و تصویر استودیو آکسون",
+    "description": "مرجع مقالات و راهنماهای کالیبراسیون مانیتورهای ۵K و سخت‌افزار تدوین",
     "url": "https://axoncore.ir/blog",
-    "description": "مجموعه مقالات تحلیل رنگ، مانیتورهای استودیو و استانداردهای نمایش تصویر",
-    "hasPart": posts.slice(0, 10).map((p) => ({
+    "blogPost": posts.slice(0, 10).map((post) => ({
       "@type": "BlogPosting",
-      "headline": p.title,
-      "url": `https://axoncore.ir/blog/${p.slug || p.id}`,
-      "datePublished": p.created_at,
+      "headline": post.title,
+      "url": `https://axoncore.ir/blog/${post.slug || post.id}`,
+      "datePublished": post.created_at,
     })),
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-12 font-sans select-none text-[var(--text-primary)] space-y-10" dir="rtl">
+    <div className="max-w-7xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogJsonLd) }}
       />
 
-      <div className="text-center space-y-3">
-        <span className="p-3.5 rounded-2xl bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] inline-block text-2xl shadow-sm">
-          📚
+      <div className="text-center space-y-2">
+        <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] font-mono text-[11px] font-bold">
+          AXON KNOWLEDGE BASE • 2026
         </span>
-        <h1 className="text-2xl md:text-4xl font-black">مجله تخصصی، راهنمای خرید و مقالات تحلیلی</h1>
+        <h1 className="text-2xl md:text-4xl font-black">مجله تخصصی فناوری تصویر و استودیو</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium max-w-xl mx-auto leading-relaxed">
-          تحلیل‌های جامع بازار، مقایسه سخت‌افزارها، مانیتورهای تدوین ۵K و کالیبراسیون تخصصی تصویر
+          تحلیل‌های تخصصی سخت‌افزار، راهنمای استانداردهای کالیبراسیون و بررسی فناوری‌های رتینا
         </p>
       </div>
 
-      <BlogArchiveClient initialPosts={posts} />
+      <BlogArchiveClient initialPosts={posts} categories={categories} />
     </div>
   );
 }

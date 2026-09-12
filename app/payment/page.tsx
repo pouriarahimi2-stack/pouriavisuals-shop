@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { orderService } from "@/services/orderService";
 import { soundEngine } from "@/lib/soundEngine";
+import { formatPrice } from "@/lib/formatters";
 
 function PaymentGatewayForm() {
   const router = useRouter();
@@ -30,7 +31,7 @@ function PaymentGatewayForm() {
           const found = await orderService.getById(orderId);
           if (found) {
             setOrder(found);
-            const finalPayable = Number(found.finalAmount || found.final_amount || found.totalAmount || 0);
+            const finalPayable = Number(found.finalAmount || (found as any).final_amount || found.totalAmount || 0);
             setAmount(finalPayable);
             return;
           }
@@ -61,12 +62,12 @@ function PaymentGatewayForm() {
 
     const cleanCard = cardNumber.replace(/\D/g, "");
     if (cleanCard.length !== 16) {
-      setErrorMsg("شماره کارت بانکی باید دقیقاً ۱۶ رقم باشد.");
+      setErrorMsg("شماره کارت بانکی باید ۱۶ رقم کامل باشد.");
       return;
     }
 
     if (cvv2.length < 3 || cvv2.length > 4) {
-      setErrorMsg("کد CVV2 نامعتبر است (۳ یا ۴ رقم).");
+      setErrorMsg("کد CVV2 نامعتبر است.");
       return;
     }
 
@@ -78,7 +79,6 @@ function PaymentGatewayForm() {
     setIsProcessing(true);
 
     try {
-      // اعتبارسنجی و تایید رسمی پرداخت از طریق روت سروری محافظت‌شده
       const verifyRes = await fetch("/api/payment/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,18 +95,20 @@ function PaymentGatewayForm() {
 
       setTxnRef(resJson.trackingRef || Date.now().toString().slice(-8));
 
+      // پاکسازی کامل ذخیره‌سازی محلی و فراخوانی همگام‌سازی سبد
       if (typeof window !== "undefined") {
         localStorage.removeItem("axon_cart_store_v2026");
         localStorage.removeItem("axon_active_coupon_v2026");
+        sessionStorage.removeItem("pending_payment_amount");
+        sessionStorage.removeItem("pending_payment_order_id");
+        window.dispatchEvent(new CustomEvent("cart_updated", { detail: [] }));
       }
 
       soundEngine.playSuccess();
       setStatus("success");
-      sessionStorage.removeItem("pending_payment_amount");
-      sessionStorage.removeItem("pending_payment_order_id");
     } catch (err: any) {
       setStatus("failed");
-      setErrorMsg(err.message || "تراکنش توسط بانک رد شد یا ارتباط با درگاه برقرار نشد.");
+      setErrorMsg(err.message || "تراکنش توسط بانک رد شد.");
     } finally {
       setIsProcessing(false);
     }
@@ -141,7 +143,7 @@ function PaymentGatewayForm() {
           </p>
           <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-1">
             <p className="text-slate-400">کد پیگیری تراکنش بانکی: {txnRef}</p>
-            <p className="text-emerald-400 font-bold">مبلغ واریزی: {amount.toLocaleString("fa-IR")} تومان</p>
+            <p className="text-emerald-400 font-bold" suppressHydrationWarning>مبلغ واریزی: {formatPrice(amount)} تومان</p>
           </div>
           <button
             onClick={() => router.push(`/track-order?orderId=${orderId}&success=true`)}
@@ -160,8 +162,8 @@ function PaymentGatewayForm() {
 
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex justify-between items-center">
             <span className="text-slate-400 font-bold">مبلغ فاکتور قابل پرداخت:</span>
-            <span className="text-base font-black text-emerald-400 font-mono">
-              {amount.toLocaleString("fa-IR")} تومان
+            <span className="text-base font-black text-emerald-400 font-mono" suppressHydrationWarning>
+              {formatPrice(amount)} تومان
             </span>
           </div>
 
@@ -224,7 +226,7 @@ function PaymentGatewayForm() {
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <label className="font-bold text-slate-300">رمز دوم پویا:</label>
-              <span className="text-[10px] font-mono text-amber-400 font-bold">
+              <span className="text-[10px] font-mono text-amber-400 font-bold" suppressHydrationWarning>
                 {Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, "0")} مانده
               </span>
             </div>

@@ -8,7 +8,6 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    // پایش خودکار و بدون دخالت انسان در هر درخواست ورودی
     await ensureFreshAutonomousNews();
 
     const { data, error } = await supabaseAdmin
@@ -29,7 +28,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    const session = await verifyAdminSession(req);
+    if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
@@ -80,7 +80,8 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    const session = await verifyAdminSession(req);
+    if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 

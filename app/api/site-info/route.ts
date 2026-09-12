@@ -21,7 +21,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    const session = await verifyAdminSession(req);
+    if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 

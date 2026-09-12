@@ -1,58 +1,29 @@
-/**
- * AXON CORE - Centralized Structured Logger
- */
+import { supabaseAdmin } from "@/lib/supabaseServer";
 
-type LogLevel = "INFO" | "WARN" | "ERROR" | "SECURITY" | "PAYMENT" | "AUDIT";
+export interface AuditLogEntry {
+  admin_username: string;
+  action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "STATUS_CHANGE";
+  resource: "PRODUCT" | "ORDER" | "COUPON" | "BANNER" | "PAGE" | "BLOG" | "SETTINGS";
+  resource_id?: string;
+  details?: string;
+  ip?: string;
+}
 
-export const logger = {
-  log(level: LogLevel, message: string, meta?: Record<string, any>) {
-    const timestamp = new Date().toISOString();
-    const payload = {
-      timestamp,
-      level,
-      message,
-      ...(meta ? { meta } : {}),
-    };
-
-    if (process.env.NODE_ENV === "production") {
-      // در محیط پروداکشن می‌توان به سنسورهای مانیتورینگ مانند Sentry ارسال کرد
-      if (level === "ERROR" || level === "SECURITY" || level === "PAYMENT") {
-        console.error(JSON.stringify(payload));
-      } else {
-        console.log(JSON.stringify(payload));
-      }
-    } else {
-      const color =
-        level === "ERROR" ? "\x1b[31m" :
-        level === "SECURITY" ? "\x1b[35m" :
-        level === "PAYMENT" ? "\x1b[32m" :
-        level === "WARN" ? "\x1b[33m" : "\x1b[36m";
-
-      console.log(`${color}[${level}] ${timestamp}: ${message}\x1b[0m`, meta || "");
-    }
-  },
-
-  info(msg: string, meta?: Record<string, any>) {
-    this.log("INFO", msg, meta);
-  },
-
-  warn(msg: string, meta?: Record<string, any>) {
-    this.log("WARN", msg, meta);
-  },
-
-  error(msg: string, meta?: Record<string, any>) {
-    this.log("ERROR", msg, meta);
-  },
-
-  security(msg: string, meta?: Record<string, any>) {
-    this.log("SECURITY", msg, meta);
-  },
-
-  payment(msg: string, meta?: Record<string, any>) {
-    this.log("PAYMENT", msg, meta);
-  },
-
-  audit(msg: string, meta?: Record<string, any>) {
-    this.log("AUDIT", msg, meta);
-  },
-};
+export async function logAdminActivity(entry: AuditLogEntry) {
+  try {
+    if (!supabaseAdmin) return;
+    await supabaseAdmin.from("admin_audit_logs").insert([{
+      id: "log_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      admin_username: entry.admin_username,
+      action: entry.action,
+      resource: entry.resource,
+      resource_id: entry.resource_id || null,
+      details: entry.details || null,
+      ip: entry.ip || "internal",
+      created_at: new Date().toISOString(),
+    }]);
+  } catch (e) {
+    // خطای ثبت لاگ نباید عملکرد تراکنش اصلی را متوقف کند
+    console.error("Audit log error:", e);
+  }
+}

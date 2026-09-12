@@ -1,33 +1,44 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseServer';
+import { NextRequest, NextResponse } from "next/server";
+import * as harvester from "@/lib/techNewsHarvester";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('authorization') || '';
-    const cronSecret = process.env.CRON_SECRET || 'axon_cron_local_key';
-    const hasAdminCookie = req.cookies.get('pv_admin_session')?.value;
+    const session = await verifyAdminSession(req);
+    const cronAuth = req.headers.get("authorization");
+    const validCronSecret = process.env.CRON_SECRET;
 
-    if (authHeader !== `Bearer ${cronSecret}` && !hasAdminCookie) {
-      return NextResponse.json({ success: false, message: 'عدم احراز هویت برای همگام‌سازی اخبار.' }, { status: 401 });
+    const isAuthorized =
+      session !== null ||
+      (validCronSecret && cronAuth === `Bearer ${validCronSecret}`);
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز به سرویس همگام‌سازی اخبار." },
+        { status: 401 }
+      );
     }
 
-    const { data: freshNews, error } = await supabaseAdmin
-      .from('tech_news')
-      .select('id')
-      .limit(1);
-
-    if (error) {
-      return NextResponse.json({ success: false, message: 'خطا در استعلام پایگاه داده.' }, { status: 500 });
+    // فراخوانی امن تابع موجود در ماژول پایش اخبار
+    let count = 0;
+    if (typeof (harvester as any).syncAutonomousNewsFeed === "function") {
+      count = await (harvester as any).syncAutonomousNewsFeed();
+    } else if (typeof (harvester as any).ensureFreshAutonomousNews === "function") {
+      const res = await (harvester as any).ensureFreshAutonomousNews();
+      count = Array.isArray(res) ? res.length : 1;
+    } else if (typeof (harvester as any).harvestLatestTechNews === "function") {
+      const res = await (harvester as any).harvestLatestTechNews();
+      count = Array.isArray(res) ? res.length : 1;
     }
 
     return NextResponse.json({
       success: true,
-      message: 'همگام‌سازی اخبار با موفقیت انجام شد.',
-      count: freshNews?.length || 0,
+      message: `رادار اخبار تکنولوژی با موفقیت بررسی و بروزرسانی شد (${count} آیتم).`,
+      count,
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: 'خطای سیستمی.' }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

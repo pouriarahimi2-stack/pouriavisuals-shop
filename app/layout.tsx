@@ -13,16 +13,39 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://axoncore.ir"),
   title: {
-    default: "آکسون کور | مرجع تخصصی مانیتورهای تدوین ۵K و تجهیزات استودیو",
+    default: "آکسون کور | مرجع مانیتورهای تدوین ۵K و تجهیزات استودیو رنگ",
     template: "%s | آکسون کور",
   },
-  description: "تامین، مشاوره فنی و کالیبراسیون تخصصی مانیتورهای تدوین رنگ ۵K، مک‌بوک و تجهیزات استودیویی در ایران با گارانتی اصالت طلایی.",
+  description: "تامین رسمی، کالیبراسیون و مشاوره فنی مانیتورهای ۵K استودیو دیسپلی، مک‌بوک پرو و درگاه‌های تاندربولت در ایران با گارانتی اصالت طلایی ۱۸ ماهه.",
   alternates: {
-    canonical: "./",
+    canonical: "https://axoncore.ir",
+  },
+  openGraph: {
+    title: "آکسون کور | مرجع مانیتورهای تدوین ۵K و سخت‌افزار استودیو",
+    description: "تامین تخصصی مانیتورهای رتینا با تفکیک رنگ DCI-P3، درگاه‌های ۱۲۰Gbps تاندربولت و گارانتی اصالت طلایی.",
+    url: "https://axoncore.ir",
+    siteName: "آکسون کور",
+    locale: "fa_IR",
+    type: "website",
+    images: [
+      {
+        url: "https://axoncore.ir/placeholder.png",
+        width: 1200,
+        height: 630,
+        alt: "Axon Core Studio Displays",
+      },
+    ],
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 };
 

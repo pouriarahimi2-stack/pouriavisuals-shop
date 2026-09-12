@@ -6,11 +6,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. لطفا مجددا وارد شوید." }, { status: 401 });
     }
 
-    // ۱. دریافت کالاها و سفارش‌ها با دسترسی ادمین
     const [prodsRes, ordersRes] = await Promise.all([
       supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }),
       supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false }),
@@ -19,7 +19,6 @@ export async function GET(req: NextRequest) {
     const products = prodsRes.data || [];
     const orders = ordersRes.data || [];
 
-    // ۲. محاسبه عملکرد ماهانه (۳۰ روز گذشته)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -28,7 +27,6 @@ export async function GET(req: NextRequest) {
       return orderDate >= thirtyDaysAgo && o.status !== "cancelled";
     });
 
-    // ۳. تشکیل ماتریس مالی و بهای تمام‌شده به ازای هر محصول
     const productFinancials = products.map((p) => {
       let unitsSoldMonthly = 0;
       let totalRevenueMonthly = 0;
@@ -36,7 +34,7 @@ export async function GET(req: NextRequest) {
       monthlyOrders.forEach((o) => {
         const items = o.items || [];
         items.forEach((item: any) => {
-          if (String(item.productId || item.product_id) === String(p.id)) {
+          if (String(item.productId || item.product_id || item.id) === String(p.id)) {
             const qty = Number(item.quantity || 1);
             unitsSoldMonthly += qty;
             totalRevenueMonthly += Number(item.price || p.price || 0) * qty;
@@ -45,14 +43,9 @@ export async function GET(req: NextRequest) {
       });
 
       const sellingPrice = Number(p.discountPrice || p.discount_price || p.price || 0);
-      // قیمت خرید واحد (پیش‌فرض برآورد هوشمند در صورت عدم ثبت دستی: ۷۰٪ نرخ فروش)
       const purchasePrice = Number(p.purchase_price || p.purchasePrice || Math.round(sellingPrice * 0.7));
-      
-      // ۱۰٪ مالیات بر ارزش افزوده روی فروش ناخالص
       const vatPerUnit = Math.round(sellingPrice * 0.1);
-      // بهای خالص فروش منهای مالیات
       const netSellingRevenuePerUnit = sellingPrice - vatPerUnit;
-      // سود خالص هر واحد
       const netProfitPerUnit = Math.max(0, netSellingRevenuePerUnit - purchasePrice);
 
       const totalPurchaseCostMonthly = unitsSoldMonthly * purchasePrice;
@@ -63,7 +56,7 @@ export async function GET(req: NextRequest) {
       return {
         id: String(p.id),
         title: p.title || p.name || "کالای بدون عنوان",
-        category: p.category || "تجهیزات",
+        category: p.category || "تجهیزات تخصصی",
         stock: p.stock !== undefined && p.stock !== null ? Number(p.stock) : 0,
         isAvailable: p.is_available !== false,
         sellingPrice,
@@ -79,7 +72,6 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // خلاصه تراز مالی کل استودیو
     const summary = {
       totalInventoryAssets: productFinancials.reduce((acc, p) => acc + (p.stock * p.purchasePrice), 0),
       totalMonthlySalesGross: productFinancials.reduce((acc, p) => acc + p.totalRevenueMonthly, 0),
@@ -100,7 +92,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    const session = await verifyAdminSession(req);
+    if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
@@ -111,7 +104,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "شناسه کالا الزامی است." }, { status: 400 });
     }
 
-    // ۱. دریافت کالا
     const { data: product } = await supabaseAdmin.from("products").select("*").eq("id", productId).single();
     if (!product) {
       return NextResponse.json({ success: false, message: "کالا یافت نشد." }, { status: 404 });
@@ -121,7 +113,6 @@ export async function POST(req: NextRequest) {
     const newStock = Math.max(0, currentStock + Number(stockDelta || 0));
     const newPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : (product.purchase_price || 0);
 
-    // ۲. آپدیت کالا در دیتابیس
     await supabaseAdmin.from("products").update({
       stock: newStock,
       purchase_price: newPurchasePrice,
@@ -129,7 +120,6 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     }).eq("id", productId);
 
-    // ۳. لاگ سوابق انبارداری در صورت وجود جدول
     try {
       await supabaseAdmin.from("inventory_logs").insert([{
         id: "log_" + Date.now(),

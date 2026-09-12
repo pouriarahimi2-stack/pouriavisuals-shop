@@ -6,11 +6,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز به اطلاعات پیشخوان." }, { status: 401 });
     }
 
-    // واکشی همزمان و موازی اطلاعات کل جداول دیتابیس
     const [
       prodsRes,
       ordersRes,
@@ -37,7 +37,6 @@ export async function GET(req: NextRequest) {
     const coupons = couponsRes.data || [];
     const customers = crmRes.data || [];
 
-    // محاسبات مالی و انبار
     const totalSales = orders.reduce((sum, o: any) => {
       const val = Number(o.final_amount || o.total_amount || 0);
       return o.status !== "cancelled" ? sum + val : sum;
@@ -51,7 +50,6 @@ export async function GET(req: NextRequest) {
       return sum + (stockNum * buyPrice);
     }, 0);
 
-    // محاسبات ارتباط با مشتریان
     const unreadMessages = messages.filter((m: any) => !m.is_read || m.status === "pending").length;
     const vipCustomersCount = customers.filter((c: any) => c.lifecycle_stage === "vip" || (c.total_spent && c.total_spent > 100000000)).length;
 

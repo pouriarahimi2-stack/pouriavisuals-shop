@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Step 20: Technical Comparison Matrix & Product Gallery Polish (fix.js)
+ * AXON CORE - Master Senior Engineer System Fix & Production Hardening (fix.js)
  */
 
 const fs = require('fs');
@@ -11,142 +11,337 @@ function writeFile(relPath, content) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
+  console.log(`\x1b[32m✔ اصلاح شد: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[36m[STEP-20]\x1b[0m پیاده‌سازی ماتریس مقایسه فنی و پولیش نهایی کاتالوگ مانیتورها...");
+console.log("\x1b[36m[AXON-SENIOR-AUDIT]\x1b[0m آغاز ترمیم باگ‌های امنیتی، سئو و هماهنگی Next.js 15...");
 
 // =============================================================================
-// ۱. ایجاد کامپوننت مقایسه فنی (components/ProductCompareModal.tsx)
+// ۱. ترمیم شکاف امنیتی روت حسابداری (افزودن قطعی await به verifyAdminSession)
 // =============================================================================
-const compareModalCode = `"use client";
+const fixedAccountingRoute = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
-import React from "react";
-import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
+export const dynamic = "force-dynamic";
 
-export interface CompareProductItem {
-  id: string | number;
-  title: string;
-  price: number;
-  image?: string;
-  category?: string;
-  specs?: Record<string, string>;
+export async function GET(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. لطفا مجددا وارد شوید." }, { status: 401 });
+    }
+
+    const [prodsRes, ordersRes] = await Promise.all([
+      supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }),
+      supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false }),
+    ]);
+
+    const products = prodsRes.data || [];
+    const orders = ordersRes.data || [];
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const monthlyOrders = orders.filter((o) => {
+      const orderDate = new Date(o.created_at || Date.now());
+      return orderDate >= thirtyDaysAgo && o.status !== "cancelled";
+    });
+
+    const productFinancials = products.map((p) => {
+      let unitsSoldMonthly = 0;
+      let totalRevenueMonthly = 0;
+
+      monthlyOrders.forEach((o) => {
+        const items = o.items || [];
+        items.forEach((item: any) => {
+          if (String(item.productId || item.product_id || item.id) === String(p.id)) {
+            const qty = Number(item.quantity || 1);
+            unitsSoldMonthly += qty;
+            totalRevenueMonthly += Number(item.price || p.price || 0) * qty;
+          }
+        });
+      });
+
+      const sellingPrice = Number(p.discountPrice || p.discount_price || p.price || 0);
+      const purchasePrice = Number(p.purchase_price || p.purchasePrice || Math.round(sellingPrice * 0.7));
+      const vatPerUnit = Math.round(sellingPrice * 0.1);
+      const netSellingRevenuePerUnit = sellingPrice - vatPerUnit;
+      const netProfitPerUnit = Math.max(0, netSellingRevenuePerUnit - purchasePrice);
+
+      const totalPurchaseCostMonthly = unitsSoldMonthly * purchasePrice;
+      const totalVatMonthly = Math.round(totalRevenueMonthly * 0.1);
+      const totalNetProfitMonthly = Math.max(0, (totalRevenueMonthly - totalVatMonthly) - totalPurchaseCostMonthly);
+      const profitMarginPercent = sellingPrice > 0 ? Math.round((netProfitPerUnit / sellingPrice) * 100) : 0;
+
+      return {
+        id: String(p.id),
+        title: p.title || p.name || "کالای بدون عنوان",
+        category: p.category || "تجهیزات تخصصی",
+        stock: p.stock !== undefined && p.stock !== null ? Number(p.stock) : 0,
+        isAvailable: p.is_available !== false,
+        sellingPrice,
+        purchasePrice,
+        vatPerUnit,
+        netProfitPerUnit,
+        profitMarginPercent,
+        unitsSoldMonthly,
+        totalRevenueMonthly,
+        totalPurchaseCostMonthly,
+        totalVatMonthly,
+        totalNetProfitMonthly,
+      };
+    });
+
+    const summary = {
+      totalInventoryAssets: productFinancials.reduce((acc, p) => acc + (p.stock * p.purchasePrice), 0),
+      totalMonthlySalesGross: productFinancials.reduce((acc, p) => acc + p.totalRevenueMonthly, 0),
+      totalMonthlyVAT: productFinancials.reduce((acc, p) => acc + p.totalVatMonthly, 0),
+      totalMonthlyNetProfit: productFinancials.reduce((acc, p) => acc + p.totalNetProfitMonthly, 0),
+      totalUnitsSold: productFinancials.reduce((acc, p) => acc + p.unitsSoldMonthly, 0),
+    };
+
+    return NextResponse.json({
+      success: true,
+      summary,
+      productFinancials,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
 }
 
-interface ProductCompareModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  products: CompareProductItem[];
+export async function POST(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { productId, purchasePrice, stockDelta, supplier, referenceNote } = body;
+
+    if (!productId) {
+      return NextResponse.json({ success: false, message: "شناسه کالا الزامی است." }, { status: 400 });
+    }
+
+    const { data: product } = await supabaseAdmin.from("products").select("*").eq("id", productId).single();
+    if (!product) {
+      return NextResponse.json({ success: false, message: "کالا یافت نشد." }, { status: 404 });
+    }
+
+    const currentStock = Number(product.stock || 0);
+    const newStock = Math.max(0, currentStock + Number(stockDelta || 0));
+    const newPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : (product.purchase_price || 0);
+
+    await supabaseAdmin.from("products").update({
+      stock: newStock,
+      purchase_price: newPurchasePrice,
+      is_available: newStock > 0,
+      updated_at: new Date().toISOString(),
+    }).eq("id", productId);
+
+    try {
+      await supabaseAdmin.from("inventory_logs").insert([{
+        id: "log_" + Date.now(),
+        product_id: productId,
+        product_title: product.title || product.name,
+        change_type: Number(stockDelta || 0) >= 0 ? "restock" : "adjustment",
+        quantity: Math.abs(Number(stockDelta || 0)),
+        cost_price: newPurchasePrice,
+        supplier: supplier || "تأمین‌کننده رسمی",
+        reference_note: referenceNote || "ثبت سیستمی انبارگردانی",
+        created_at: new Date().toISOString(),
+      }]);
+    } catch {}
+
+    return NextResponse.json({ success: true, message: "تراکنش انبار و بهای خرید در دیتابیس ذخیره شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
 }
+`;
+writeFile('app/api/accounting/route.ts', fixedAccountingRoute);
 
-export default function ProductCompareModal({
-  isOpen,
-  onClose,
-  products = [],
-}: ProductCompareModalProps) {
-  if (!isOpen || products.length === 0) return null;
+// =============================================================================
+// ۲. ترمیم روت آمار داشبورد ادمین (افزودن قطعی await به verifyAdminSession)
+// =============================================================================
+const fixedDashboardStatsRoute = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
-  const specKeys = [
-    { key: "resolution", label: "رزولوشن و تراکم پیکسل", defaultVal: "5K Retina (218 PPI)" },
-    { key: "color_gamut", label: "پوشش گاموت رنگ", defaultVal: "99% DCI-P3 (10-bit)" },
-    { key: "brightness", label: "روشنایی پایدار", defaultVal: "600 Nits SDR" },
-    { key: "ports", label: "درگاه‌های تاندربولت", defaultVal: "Thunderbolt 3 / 4 (96W PD)" },
-    { key: "calibration", label: "کالیبراسیون سخت‌افزاری", defaultVal: "جدول رنگ داخلی 3D LUT" },
-    { key: "panel_type", label: "نوع پنل", defaultVal: "IPS True Tone" },
-  ];
+export const dynamic = "force-dynamic";
 
+export async function GET(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز به اطلاعات پیشخوان." }, { status: 401 });
+    }
+
+    const [
+      prodsRes,
+      ordersRes,
+      msgsRes,
+      postsRes,
+      newsRes,
+      couponsRes,
+      crmRes
+    ] = await Promise.all([
+      supabaseAdmin.from("products").select("id, price, discount_price, stock, purchase_price, is_available"),
+      supabaseAdmin.from("orders").select("id, customer_name, phone, final_amount, total_amount, status, created_at").order("created_at", { ascending: false }),
+      supabaseAdmin.from("contact_messages").select("id, status, is_read"),
+      supabaseAdmin.from("posts").select("id"),
+      supabaseAdmin.from("tech_news").select("id").eq("is_published", true),
+      supabaseAdmin.from("coupons").select("id").eq("is_active", true),
+      supabaseAdmin.from("crm_customers").select("id, lifecycle_stage, total_spent")
+    ]);
+
+    const products = prodsRes.data || [];
+    const orders = ordersRes.data || [];
+    const messages = msgsRes.data || [];
+    const posts = postsRes.data || [];
+    const news = newsRes.data || [];
+    const coupons = couponsRes.data || [];
+    const customers = crmRes.data || [];
+
+    const totalSales = orders.reduce((sum, o: any) => {
+      const val = Number(o.final_amount || o.total_amount || 0);
+      return o.status !== "cancelled" ? sum + val : sum;
+    }, 0);
+
+    const pendingOrders = orders.filter((o: any) => o.status === "pending" || o.status === "paid" || o.status === "processing").length;
+    const lowStockCount = products.filter((p: any) => (p.stock !== null && p.stock !== undefined ? Number(p.stock) : 10) < 3).length;
+    const inventoryValuation = products.reduce((sum, p: any) => {
+      const stockNum = Number(p.stock || 0);
+      const buyPrice = Number(p.purchase_price || (Number(p.price || 0) * 0.7));
+      return sum + (stockNum * buyPrice);
+    }, 0);
+
+    const unreadMessages = messages.filter((m: any) => !m.is_read || m.status === "pending").length;
+    const vipCustomersCount = customers.filter((c: any) => c.lifecycle_stage === "vip" || (c.total_spent && c.total_spent > 100000000)).length;
+
+    return NextResponse.json({
+      success: true,
+      stats: {
+        totalProducts: products.length,
+        totalOrders: orders.length,
+        pendingOrders,
+        totalSales,
+        inventoryValuation,
+        lowStockCount,
+        unreadMessages,
+        totalCustomers: customers.length > 0 ? customers.length : new Set(orders.map((o: any) => o.phone).filter(Boolean)).size,
+        vipCustomersCount,
+        totalPosts: posts.length,
+        totalNews: news.length,
+        activeCoupons: coupons.length,
+      },
+      recentOrders: orders.slice(0, 7).map((o: any) => ({
+        id: o.id,
+        customerName: o.customer_name || "مشتری گرامی",
+        phone: o.phone || "---",
+        amount: Number(o.final_amount || o.total_amount || 0),
+        status: o.status,
+        date: o.created_at,
+      })),
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+`;
+writeFile('app/api/admin/dashboard-stats/route.ts', fixedDashboardStatsRoute);
+
+// =============================================================================
+// ۳. بهینه‌سازی فنی تگ‌های سئو و امنیت سربرگ‌ها در app/layout.tsx
+// =============================================================================
+const fixedRootLayout = `import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import LayoutShell from "@/components/LayoutShell";
+import { CartProvider } from "@/context/CartContext";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#0284c7",
+};
+
+export const metadata: Metadata = {
+  metadataBase: new URL("https://axoncore.ir"),
+  title: {
+    default: "آکسون کور | مرجع مانیتورهای تدوین ۵K و تجهیزات استودیو رنگ",
+    template: "%s | آکسون کور",
+  },
+  description: "تامین رسمی، کالیبراسیون و مشاوره فنی مانیتورهای ۵K استودیو دیسپلی، مک‌بوک پرو و درگاه‌های تاندربولت در ایران با گارانتی اصالت طلایی ۱۸ ماهه.",
+  alternates: {
+    canonical: "https://axoncore.ir",
+  },
+  openGraph: {
+    title: "آکسون کور | مرجع مانیتورهای تدوین ۵K و سخت‌افزار استودیو",
+    description: "تامین تخصصی مانیتورهای رتینا با تفکیک رنگ DCI-P3، درگاه‌های ۱۲۰Gbps تاندربولت و گارانتی اصالت طلایی.",
+    url: "https://axoncore.ir",
+    siteName: "آکسون کور",
+    locale: "fa_IR",
+    type: "website",
+    images: [
+      {
+        url: "https://axoncore.ir/placeholder.png",
+        width: 1200,
+        height: 630,
+        alt: "Axon Core Studio Displays",
+      },
+    ],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md font-sans select-none animate-fadeIn" dir="rtl">
-      <div className="relative w-full max-w-5xl max-h-[90vh] bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden text-[var(--text-primary)]">
-        {/* هدر مدال */}
-        <header className="p-4 sm:p-6 border-b border-[var(--card-border)] flex items-center justify-between gap-3">
-          <div>
-            <h3 className="font-black text-sm sm:text-base">جدول مقایسه فنی مانیتورهای استودیویی</h3>
-            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">مقایسه دقیق پارامترهای حیاتی اصلاح رنگ و تدوین تصویر</p>
-          </div>
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="w-9 h-9 rounded-2xl bg-[var(--input-bg)] hover:bg-rose-500 hover:text-white border border-[var(--card-border)] text-xs font-bold transition flex items-center justify-center cursor-pointer"
-          >
-            ✕
-          </button>
-        </header>
-
-        {/* بدنه جدول مقایسه‌ای با اسکرول افقی */}
-        <div className="flex-1 overflow-x-auto p-4 sm:p-6">
-          <table className="w-full min-w-[550px] border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-[var(--card-border)]">
-                <th className="p-3 text-right font-black text-[var(--text-secondary)] w-1/4">پارامتر سخت‌افزاری</th>
-                {products.map((p) => (
-                  <th key={p.id} className="p-3 text-center w-1/3">
-                    <div className="space-y-2 flex flex-col items-center">
-                      <div className="w-16 h-16 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1.5 flex items-center justify-center">
-                        <img src={p.image || "/placeholder.png"} alt={p.title} className="w-full h-full object-contain" />
-                      </div>
-                      <span className="font-bold line-clamp-2 max-w-[160px]">{p.title}</span>
-                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
-                        {formatPrice(p.price)} ت
-                      </span>
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--card-border)]">
-              {specKeys.map((item) => (
-                <tr key={item.key} className="hover:bg-[var(--input-bg)]/40 transition">
-                  <td className="p-3 font-bold text-[var(--text-secondary)]">{item.label}</td>
-                  {products.map((p) => (
-                    <td key={p.id} className="p-3 text-center font-medium font-mono text-[11px] text-[var(--text-primary)]">
-                      {(p.specs && p.specs[item.key]) || item.defaultVal}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <footer className="p-4 border-t border-[var(--card-border)] bg-[var(--input-bg)]/30 flex justify-end">
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="px-6 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition cursor-pointer"
-          >
-            بستن جدول مقایسه
-          </button>
-        </footer>
-      </div>
-    </div>
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
+      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
+        <CartProvider>
+          <LayoutShell>{children}</LayoutShell>
+        </CartProvider>
+      </body>
+    </html>
   );
 }
 `;
-writeFile('components/ProductCompareModal.tsx', compareModalCode);
+writeFile('app/layout.tsx', fixedRootLayout);
 
 // =============================================================================
-// ۲. بیلد کامل و دیپلوی در Vercel
+// ۴. اجرای بیلد کامل پروداکشن، بررسی و انتشار نهایی در ورسل
 // =============================================================================
 console.log("تست بیلد نهایی پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
+  console.log("\x1b[32m✔ تست بیلد کامپایل با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
 } catch (e) {
   console.error("خطای بیلد:", e.message);
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به مخزن گیت‌هاب و انتشار در ورسل...");
+console.log("ارسال تغییرات امنیتی و سئو به مخزن گیت‌هاب و انتشار در ورسل...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(compare-step20): implement hardware comparison modal matrix for studio monitors and finalize build"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "fix(security-audit): patch verifyAdminSession await vulnerability in accounting & dashboard APIs, enhance OpenGraph & RootLayout metadata"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -155,7 +350,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قدم بیستم با موفقیت در ورسل منتشر شد!\x1b[0m");
+  console.log("\x1b[32m✔ تمام باگ‌های شناسایی‌شده رفع، تست‌ها تایید و در ورسل دیپلوی شدند!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

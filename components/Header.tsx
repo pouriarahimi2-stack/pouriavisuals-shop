@@ -10,7 +10,12 @@ import { siteInfoService } from "@/services/siteInfoService";
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const { totalCount, openCart } = useCart();
+  const cartCtx = useCart();
+  
+  // خواندن امن تعداد اقلام از کانتکست یا محاسبه مستقیم از cartItems
+  const itemCount = (cartCtx as any).cartCount ?? (cartCtx as any).totalCount ?? (cartCtx.cartItems || []).reduce((acc: number, item: any) => acc + (item.quantity || 1), 0);
+  const openCart = cartCtx.openCart;
+
   const [siteName, setSiteName] = useState("آکسون | Axon");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,9 +70,8 @@ export default function Header() {
           <Link href="/contact" className="hover:text-[var(--accent-blue)] transition">تماس با ما</Link>
         </nav>
 
-        {/* دکمه‌های جستجو، حساب کاربری و سبد خرید */}
+        {/* بخش جستجو، اکانت و سبد خرید */}
         <div className="flex items-center gap-2.5">
-          {/* دکمه جست‌وجوی سراسری */}
           <button
             type="button"
             onClick={() => { soundEngine.playClick(); setSearchOpen(true); }}
@@ -79,7 +83,6 @@ export default function Header() {
             <kbd className="hidden lg:inline text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-slate-400">⌘K</kbd>
           </button>
 
-          {/* دکمه ورود به حساب */}
           <Link
             href="/login"
             onClick={() => soundEngine.playClick()}
@@ -89,19 +92,17 @@ export default function Header() {
             <span className="hidden sm:inline">ورود</span>
           </Link>
 
-          {/* دکمه سبد خرید با شمارنده زنده */}
           <button
             type="button"
-            onClick={() => { soundEngine.playClick(); openCart(); }}
+            onClick={() => { soundEngine.playClick(); openCart?.(); }}
             className="p-2.5 px-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black transition shadow-md shadow-blue-500/25 flex items-center gap-2 cursor-pointer hover:opacity-90"
           >
             <span>🛍️</span>
-            <span className="font-mono">{totalCount}</span>
+            <span className="font-mono">{itemCount}</span>
           </button>
         </div>
       </div>
 
-      {/* مدال جست‌وجوی سراسری محصولات */}
       {searchOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <form onSubmit={handleSearchSubmit} className="w-full max-w-xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-4 space-y-4">
@@ -120,7 +121,7 @@ export default function Header() {
               </button>
             </div>
             <div className="flex justify-between items-center text-[11px] text-[var(--text-secondary)]">
-              <span>اینتر را برای مشاهده نتایج کامل بزنید</span>
+              <span>اینتر را برای مشاهده نتایج بزنید</span>
               <button type="submit" className="px-4 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold">
                 جستجو در کاتالوگ
               </button>

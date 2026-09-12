@@ -7,7 +7,7 @@ import AddToCartButton from "@/components/AddToCartButton";
 import { formatPrice } from "@/lib/formatters";
 import type { Metadata } from "next";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120; // بازسازی خودکار هر ۲ دقیقه (ISR)
 
 interface PageProps {
   params: Promise<{ id: string }>;

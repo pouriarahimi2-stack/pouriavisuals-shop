@@ -1,156 +1,124 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import crypto from "crypto";
+import { calculateOrderDiscount } from "@/lib/couponValidator";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    const phone = searchParams.get("phone");
+
+    let query = supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false });
+
+    if (id) query = query.eq("id", id);
+    if (phone) query = query.eq("phone", phone);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, orders: data || [] });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { customer, items, coupon_code } = body;
+    const { customer_name, phone, province, city, postal_code, address, notes, items, coupon_code } = body;
 
-    const customerName = String(customer?.fullName || customer?.name || body.customer_name || "مشتری").trim();
-    const cleanPhone = String(customer?.phone || body.phone || "").trim().replace(/\D/g, "");
-    const address = String(customer?.address || body.address || "نشانی ثبت نشده").trim();
+    const cleanPhone = String(phone || "").trim().replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length !== 11) {
+      return NextResponse.json({ success: false, message: "شماره تماس ۱۱ رقمی معتبر الزامی است." }, { status: 400 });
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, message: "سبد خرید خالی است." }, { status: 400 });
     }
 
+    // ۱. استعلام قیمت‌های واقعی از جدول محصولات در دیتابیس (ضد دستکاری کلاینت)
+    const productIds = items.map((i: any) => i.id);
+    const { data: dbProducts } = await supabaseAdmin
+      .from("products")
+      .select("id, title, price, discount_price, stock, is_available")
+      .in("id", productIds);
+
+    const productMap = new Map((dbProducts || []).map((p: any) => [String(p.id), p]));
+
     let calculatedRawTotal = 0;
-    const verifiedItems: any[] = [];
-    const stockItemsForRpc: any[] = [];
+    const verifiedItems = items.map((it: any) => {
+      const realProd = productMap.get(String(it.id));
+      const unitPrice = realProd ? Number(realProd.discount_price || realProd.price) : Number(it.price || 0);
+      const qty = Math.max(1, Number(it.quantity || 1));
+      calculatedRawTotal += unitPrice * qty;
 
-    try {
-      const productIds = items.map((i: any) => String(i.productId || i.product_id || i.id));
-      const { data: dbProducts } = await supabaseAdmin
-        .from("products")
-        .select("id, title, price, discount_price, stock")
-        .in("id", productIds);
+      return {
+        id: it.id,
+        title: realProd?.title || it.title || "محصول استودیویی",
+        price: unitPrice,
+        quantity: qty,
+        image: it.image || null,
+      };
+    });
 
-      if (dbProducts && dbProducts.length > 0) {
-        for (const clientItem of items) {
-          const pId = String(clientItem.productId || clientItem.product_id || clientItem.id);
-          const dbProd = dbProducts.find((p) => String(p.id) === pId);
-          const qty = Math.max(1, Math.floor(Number(clientItem.quantity || 1)));
+    // ۲. بررسی کوپن تخفیف با قوانین سخت‌گیرانه (رفع باگ بند ۴.۸)
+    let finalDiscount = 0;
+    let appliedCoupon = null;
 
-          if (dbProd) {
-            const unitPrice = Number(dbProd.discount_price || dbProd.price || clientItem.price || 0);
-            calculatedRawTotal += unitPrice * qty;
-            verifiedItems.push({
-              product_id: dbProd.id,
-              title: dbProd.title,
-              price: unitPrice,
-              quantity: qty
-            });
-            stockItemsForRpc.push({
-              product_id: dbProd.id,
-              quantity: qty
-            });
-          } else {
-            const unitPrice = Number(clientItem.price || 0);
-            calculatedRawTotal += unitPrice * qty;
-            verifiedItems.push({
-              product_id: pId,
-              title: clientItem.title || clientItem.name || "کالا",
-              price: unitPrice,
-              quantity: qty
-            });
-          }
-        }
-      } else {
-        for (const clientItem of items) {
-          const qty = Number(clientItem.quantity || 1);
-          const unitPrice = Number(clientItem.price || 0);
-          calculatedRawTotal += unitPrice * qty;
-          verifiedItems.push({
-            product_id: String(clientItem.id || "item"),
-            title: clientItem.title || clientItem.name || "کالا",
-            price: unitPrice,
-            quantity: qty
-          });
-        }
-      }
-    } catch {
-      for (const clientItem of items) {
-        const qty = Number(clientItem.quantity || 1);
-        const unitPrice = Number(clientItem.price || 0);
-        calculatedRawTotal += unitPrice * qty;
-        verifiedItems.push({
-          product_id: String(clientItem.id || "item"),
-          title: clientItem.title || clientItem.name || "کالا",
-          price: unitPrice,
-          quantity: qty
-        });
-      }
-    }
-
-    let discountAmount = 0;
     if (coupon_code) {
-      try {
-        const cleanCoupon = String(coupon_code).trim().toUpperCase();
-        const { data: couponRecord } = await supabaseAdmin
-          .from("coupons")
-          .select("*")
-          .eq("code", cleanCoupon)
-          .maybeSingle();
+      const cleanCoupon = String(coupon_code).trim().toUpperCase();
+      const { data: couponRecord } = await supabaseAdmin
+        .from("coupons")
+        .select("*")
+        .eq("code", cleanCoupon)
+        .maybeSingle();
 
-        if (couponRecord) {
-          const val = Number(couponRecord.value || couponRecord.discount_value || 0);
-          discountAmount = Math.round((calculatedRawTotal * val) / 100);
-        }
-      } catch {}
+      const validation = calculateOrderDiscount(couponRecord, calculatedRawTotal);
+      if (validation.valid) {
+        finalDiscount = validation.discountAmount;
+        appliedCoupon = cleanCoupon;
+      }
     }
 
-    const finalCalculatedPayable = Math.max(0, calculatedRawTotal - discountAmount);
-    const orderNumber = `AX-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+    const payableAmount = Math.max(0, calculatedRawTotal - finalDiscount);
+    const orderNumber = "AXON-" + Date.now().toString().slice(-6) + "-" + Math.random().toString(36).substring(2, 5).toUpperCase();
 
-    const orderRecord = {
-      id: orderNumber,
+    const orderPayload = {
       order_number: orderNumber,
-      customer_name: customerName,
-      phone: cleanPhone || "09120000000",
-      province: customer?.province || body.province || "تهران",
-      city: customer?.city || body.city || "تهران",
-      address: address,
-      postal_code: customer?.postalCode || body.postal_code || null,
+      customer_name: String(customer_name || "مشتری").trim(),
+      phone: cleanPhone,
+      province: province || "تهران",
+      city: city || "تهران",
+      postal_code: postal_code || null,
+      address: String(address || "").trim(),
+      notes: notes || null,
       items: verifiedItems,
       total_amount: calculatedRawTotal,
-      discount_amount: discountAmount,
-      final_amount: finalCalculatedPayable,
+      discount_amount: finalDiscount,
+      final_amount: payableAmount,
+      coupon_code: appliedCoupon,
       status: "pending",
       payment_status: "unpaid",
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
-    let orderSaved = false;
-    try {
-      const { error: insertErr } = await supabaseAdmin.from("orders").insert([orderRecord]);
-      if (!insertErr) {
-        orderSaved = true;
-        if (stockItemsForRpc.length > 0) {
-          await supabaseAdmin.rpc("reserve_order_stock", { p_items: stockItemsForRpc }).catch(() => {});
-        }
-      }
-    } catch (e) {
-      console.warn("DB insert exception warning:", e);
-    }
+    const { data: createdOrder, error: orderErr } = await supabaseAdmin
+      .from("orders")
+      .insert([orderPayload])
+      .select()
+      .single();
 
-    if (!orderSaved) {
-      if (typeof window !== "undefined") {
-        localStorage.setItem("fallback_order_" + orderNumber, JSON.stringify(orderRecord));
-      }
-    }
+    if (orderErr) throw orderErr;
 
     return NextResponse.json({
       success: true,
-      order: orderRecord,
-      orderId: orderNumber,
-      orderNumber: orderNumber,
-      payableAmount: finalCalculatedPayable
+      message: "سفارش با موفقیت ثبت شد.",
+      order: createdOrder,
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: "خطا در ثبت سفارش." }, { status: 200 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

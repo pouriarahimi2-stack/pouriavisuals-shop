@@ -1,25 +1,4 @@
-/**
- * AXON CORE - Step 20: Technical Comparison Matrix & Product Gallery Polish (fix.js)
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(process.cwd(), relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ذخیره شد: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[36m[STEP-20]\x1b[0m پیاده‌سازی ماتریس مقایسه فنی و پولیش نهایی کاتالوگ مانیتورها...");
-
-// =============================================================================
-// ۱. ایجاد کامپوننت مقایسه فنی (components/ProductCompareModal.tsx)
-// =============================================================================
-const compareModalCode = `"use client";
+"use client";
 
 import React from "react";
 import { soundEngine } from "@/lib/soundEngine";
@@ -126,36 +105,4 @@ export default function ProductCompareModal({
       </div>
     </div>
   );
-}
-`;
-writeFile('components/ProductCompareModal.tsx', compareModalCode);
-
-// =============================================================================
-// ۲. بیلد کامل و دیپلوی در Vercel
-// =============================================================================
-console.log("تست بیلد نهایی پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-console.log("ارسال تغییرات به مخزن گیت‌هاب و انتشار در ورسل...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(compare-step20): implement hardware comparison modal matrix for studio monitors and finalize build"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ قدم بیستم با موفقیت در ورسل منتشر شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

@@ -1,73 +1,96 @@
 import React from "react";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
-import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
-import ProductList from "@/components/ProductList";
-import ProductExplodedView from "@/components/ProductExplodedView";
-import { productService } from "@/services/productService";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
+import DynamicHomeSections from "@/components/DynamicHomeSections";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
+export const metadata: Metadata = {
+  title: "آکسون کور | مرجع مانیتورهای ۵K، تجهیزات تدوین و استودیو رنگ",
+  description: "عرضه تخصصی مانیتورهای استودیو دیسپلی، ۵K رتینا، پردازنده‌های گرافیکی و کابل‌های تاندربولت با گارانتی اصالت طلایی و تست سلامت پنل در آکسون.",
+  alternates: {
+    canonical: "https://axoncore.ir",
+  },
+  openGraph: {
+    title: "آکسون کور | تجهیزات تخصصی استودیو و تدوین",
+    description: "تامین رسمی مانیتورهای کالیبره ۵K و تجهیزات حرفه‌ای تصویر در ایران.",
+    url: "https://axoncore.ir",
+    type: "website",
+  },
+};
+
 export default async function HomePage() {
-  let initialProducts: any[] = [];
-  let pageContent: any = null;
+  let products = FLAGSHIP_7_PRODUCTS;
+  let banners: any[] = [];
 
   try {
-    initialProducts = await productService.getAll();
-  } catch {
-    initialProducts = [];
-  }
+    if (supabaseAdmin) {
+      const [prodRes, bannerRes] = await Promise.all([
+        supabaseAdmin.from("products").select("*").eq("is_available", true).order("created_at", { ascending: false }).limit(16),
+        supabaseAdmin.from("banners").select("*").order("created_at", { ascending: false }).limit(6),
+      ]);
 
-  try {
-    const { data } = await supabaseAdmin
-      .from("modular_pages")
-      .select("*")
-      .eq("slug", "home")
-      .maybeSingle();
-
-    if (data && data.puck_data) {
-      pageContent = data.puck_data;
+      if (prodRes.data && prodRes.data.length > 0) {
+        products = prodRes.data;
+      }
+      if (bannerRes.data) {
+        banners = bannerRes.data;
+      }
     }
   } catch {}
 
+  const baseUrl = "https://axoncore.ir";
+
+  // ۱. اسکیمای ساختاریافته Organization
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "آکسون کور | Axon Core",
+    "url": baseUrl,
+    "logo": `${baseUrl}/favicon.ico`,
+    "description": "مرجع تخصصی مانیتورهای تدوین رنگ ۵K و تجهیزات استودیویی در ایران",
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+98-21-00000000",
+      "contactType": "customer service",
+      "areaServed": "IR",
+      "availableLanguage": ["Persian", "English"],
+    },
+    "sameAs": [
+      "https://instagram.com/axoncore.ir",
+      "https://youtube.com/@axoncore",
+    ],
+  };
+
+  // ۲. اسکیمای WebSite با قابلیت Sitelinks Searchbox برای گوگل
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "آکسون کور",
+    "url": baseUrl,
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": `${baseUrl}/products?search={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
-    <div className="w-full flex flex-col min-h-screen font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      {/* هیرو ۳D اصلی */}
-      <section className="w-full relative overflow-hidden py-8 text-center" dir="rtl">
-        <div className="max-w-4xl mx-auto space-y-4 px-4 relative z-10">
-          <span className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-black inline-block">
-            🚀 مرجع تخصصی مانیتورهای ۵K استودیو
-          </span>
-          <h1 className="text-3xl sm:text-5xl font-black leading-tight text-white">
-            دیدن واقعیت رنگ‌ها بدون مصالحه و خطا
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
-            تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.
-          </p>
-        </div>
-        <div className="w-full h-[450px] relative overflow-hidden mt-4">
-          <Hero3DCanvas />
-        </div>
-      </section>
+    <div className="font-sans select-none text-[var(--text-primary)] space-y-12" dir="rtl">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
 
-      {/* اسلایدر پرسپکتیو */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6">
-        <ProductPerspectiveSlider />
-      </div>
-
-      {/* کاتالوگ محصولات */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6">
-        <div className="text-center space-y-2 mb-8">
-          <h2 className="text-2xl font-black">کاتالوگ تجهیزات تخصصی و مانیتورها</h2>
-          <p className="text-xs text-slate-400">تمامی کالاها با گارانتی اصالت طلایی و تست سلامت فیزیکی عرضه می‌شوند</p>
-        </div>
-        <ProductList initialProducts={initialProducts || []} />
-      </div>
-
-      {/* کالبدشکافی ۳D سخت‌افزار */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-12">
-        <ProductExplodedView productTitle="Apple Studio Display 5K Retina" />
-      </div>
+      <DynamicHomeSections initialProducts={products} initialBanners={banners} />
     </div>
   );
 }

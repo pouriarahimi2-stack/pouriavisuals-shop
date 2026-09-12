@@ -1,25 +1,4 @@
-/**
- * AXON CORE - Fix DynamicHomeSections Module & Finalize SSR Homepage (fix.js)
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(process.cwd(), relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ایجاد شد: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[36m[AXON-FIX]\x1b[0m ایجاد کامپوننت DynamicHomeSections و رفع خطای ماژول...");
-
-// =============================================================================
-// ۱. ایجاد components/DynamicHomeSections.tsx
-// =============================================================================
-const dynamicHomeSectionsCode = `"use client";
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -125,11 +104,11 @@ export default function DynamicHomeSections({
                 soundEngine.playClick();
                 setActiveCategory("all");
               }}
-              className={\`px-3.5 py-2 rounded-xl text-xs font-black transition whitespace-nowrap cursor-pointer \${
+              className={`px-3.5 py-2 rounded-xl text-xs font-black transition whitespace-nowrap cursor-pointer ${
                 activeCategory === "all"
                   ? "bg-[var(--accent-blue)] text-white shadow-sm"
                   : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-              }\`}
+              }`}
             >
               همه ({initialProducts.length})
             </button>
@@ -140,11 +119,11 @@ export default function DynamicHomeSections({
                   soundEngine.playClick();
                   setActiveCategory(cat);
                 }}
-                className={\`px-3.5 py-2 rounded-xl text-xs font-black transition whitespace-nowrap cursor-pointer \${
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition whitespace-nowrap cursor-pointer ${
                   activeCategory === cat
                     ? "bg-[var(--accent-blue)] text-white shadow-sm"
                     : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-                }\`}
+                }`}
               >
                 {cat}
               </button>
@@ -180,36 +159,4 @@ export default function DynamicHomeSections({
       </section>
     </div>
   );
-}
-`;
-writeFile('components/DynamicHomeSections.tsx', dynamicHomeSectionsCode);
-
-// =============================================================================
-// ۲. بیلد و انتشار در ورسل
-// =============================================================================
-console.log("تست بیلد کامل (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بیلد پروژه با موفقیت ۱۰۰٪ پاس شد.\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-console.log("ارسال تغییرات به مخزن گیت‌هاب و انتشار در ورسل...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(homepage): add DynamicHomeSections component and complete SSR homepage build"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه اصلی با موفقیت بیلد و در ورسل منتشر شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

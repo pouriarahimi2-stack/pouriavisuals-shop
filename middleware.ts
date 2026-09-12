@@ -1,37 +1,46 @@
-// File Path: middleware.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { verifyPayload } from "./lib/session";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyPayload, COOKIE_NAME } from "@/lib/session";
 
-export function middleware(req: NextRequest) {
+export const config = {
+  matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
+  ],
+};
+
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
-    const sessionToken =
-      req.cookies.get("admin_session_token")?.value ||
-      req.cookies.get("pv_admin_session")?.value;
+  // روت‌های مجاز بدون نیاز به ورود
+  if (
+    pathname === "/admin/login" ||
+    pathname === "/api/admin/login" ||
+    pathname.startsWith("/_next") ||
+    pathname.includes("favicon.ico")
+  ) {
+    return NextResponse.next();
+  }
 
-    if (!sessionToken) {
-      const loginUrl = new URL("/admin/login", req.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
+  const token = req.cookies.get(COOKIE_NAME)?.value;
+  const session = await verifyPayload(token);
+
+  if (!session) {
+    // در صورت نامعتبر یا منقضی بودن سشن
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { success: false, message: "نشست امنیتی نامعتبر یا منقضی شده است. لطفا مجدداً وارد شوید." },
+        { status: 401 }
+      );
     }
 
-    const payload = verifyPayload(sessionToken);
+    const loginUrl = new URL("/admin/login", req.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    const response = NextResponse.redirect(loginUrl);
 
-    if (!payload || !payload.username || !payload.role) {
-      const loginUrl = new URL("/admin/login", req.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      const res = NextResponse.redirect(loginUrl);
-      res.cookies.delete("admin_session_token");
-      res.cookies.delete("pv_admin_session");
-      return res;
-    }
+    // پاکسازی کوکی نامعتبر
+    response.cookies.delete(COOKIE_NAME);
+    return response;
   }
 
   return NextResponse.next();
 }
-
-export const config = {
-  matcher: ["/admin/:path*"],
-};

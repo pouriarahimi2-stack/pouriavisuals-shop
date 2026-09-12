@@ -1,21 +1,16 @@
-// File Path: app/api/admin/session/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPayload } from "@/lib/session";
+import { verifyPayload, COOKIE_NAME } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const token =
-      req.cookies.get("admin_session_token")?.value ||
-      req.cookies.get("pv_admin_session")?.value;
-
+    const token = req.cookies.get(COOKIE_NAME)?.value;
     if (!token) {
       return NextResponse.json({ authenticated: false }, { status: 200 });
     }
 
-    const payload = verifyPayload(token);
-
+    const payload = await verifyPayload(token);
     if (payload && payload.username && payload.role) {
       return NextResponse.json({
         authenticated: true,

@@ -1,7 +1,6 @@
-// File Path: app/api/admin/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { signPayload } from "@/lib/session";
+import { signPayload, COOKIE_NAME } from "@/lib/session";
 import { authSecurity } from "@/lib/authSecurity";
 
 export const dynamic = "force-dynamic";
@@ -73,7 +72,8 @@ export async function POST(req: NextRequest) {
 
     authSecurity.resetAttempts(clientIp);
 
-    const token = signPayload({
+    // صدور توکن HMAC استاندارد با انقضای ۷۲ ساعته
+    const token = await signPayload({
       id: String(adminUser.id),
       username: adminUser.username,
       role: adminUser.role || "superadmin",
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     const isProd = process.env.NODE_ENV === "production";
     const response = NextResponse.json({
       success: true,
-      message: "ورود با موفقیت انجام شد.",
+      message: "ورود امن با موفقیت انجام شد.",
       redirectUrl: "/admin",
       user: {
         id: adminUser.id,
@@ -93,21 +93,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    response.cookies.set("admin_session_token", token, {
+    // تنها یک کوکی استاندارد با حداکثر پرچم‌های امنیتی
+    response.cookies.set(COOKIE_NAME, token, {
       httpOnly: true,
       secure: isProd,
       sameSite: "lax",
       path: "/",
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: 72 * 60 * 60,
     });
 
-    response.cookies.set("pv_admin_session", token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
-    });
+    // پاکسازی کامل کوکی تکراری منسوخ‌شده
+    response.cookies.delete("pv_admin_session");
 
     return response;
   } catch (err: any) {

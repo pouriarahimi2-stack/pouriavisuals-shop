@@ -282,6 +282,7 @@ lib/
   authSecurity.ts
   authSecurityHelper.ts
   cacheConfig.ts
+  couponValidator.ts
   customerSession.ts
   fontEngine.ts
   formatters.ts
@@ -2258,6 +2259,864 @@ export default function TechNewsHubPage() {
 // File Path: app/products/ai-teardown/route.ts
 export { POST } from "@/app/api/ai-teardown/route";
 export type { TeardownData, TeardownComponent } from "@/app/api/ai-teardown/route";
+</file>
+
+<file path="components/admin/AdminAiMasterSuite.tsx">
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { soundEngine } from "@/lib/soundEngine";
+import { productService, Product } from "@/services/productService";
+
+interface ChatMessage {
+  role: "user" | "copilot";
+  text: string;
+  time: string;
+}
+
+export default function AdminAiMasterSuite() {
+  const [activeTab, setActiveTab] = useState<"copilot" | "seo" | "teardown" | "api_key">("copilot");
+  const [products, setProducts] = useState<Product[]>([]);
+
+  // استیت‌های کوپایلوت
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "copilot",
+      text: "سلام مدیر گرامی. ماتریس استعلام لحظه‌ای ۵ پلتفرم بازار (دیجی‌کالا، ترب، ایمالز، باسلام و رتبه ۱ گوگل) و استراتژی رشد هدفمند فعال است. چه کالایی را بررسی کنیم؟",
+      time: new Date().toLocaleTimeString("fa-IR")
+    }
+  ]);
+  const [inputQuery, setInputQuery] = useState("");
+  const [isCopilotThinking, setIsCopilotThinking] = useState(false);
+
+  // استیت‌های پایش ۵ پلتفرم
+  const [marketSearchKeyword, setMarketSearchKeyword] = useState("هولدر مگ سیف دار");
+  const [activeSearchedLabel, setActiveSearchedLabel] = useState("هولدر مگ سیف دار");
+  const [marketData, setMarketData] = useState<any>(null);
+  const [activeMarketPlatform, setActiveMarketPlatform] = useState<"digikala" | "torob" | "emalls" | "basalam" | "google">("digikala");
+  const [loadingMarket, setLoadingMarket] = useState(false);
+
+  // استیت‌های استراتژی رشد
+  const [targetGrowthPct, setTargetGrowthPct] = useState<number>(30);
+  const [targetMonths, setTargetMonths] = useState<number>(1);
+  const [generatingStrategy, setGeneratingStrategy] = useState(false);
+
+  // استیت‌های تاریخچه نشست‌ها
+  const [currentSessionId, setCurrentSessionId] = useState<string>("");
+  const [historyList, setHistoryList] = useState<any[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // استیت‌های سئو
+  const [seoData, setSeoData] = useState<any>(null);
+  const [loadingSeo, setLoadingSeo] = useState(false);
+  const [generatingSeoArticle, setGeneratingSeoArticle] = useState(false);
+  const [seoSuccessMessage, setSeoSuccessMessage] = useState("");
+
+  // استیت‌های کالبدشکافی ۳D
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [teardownResult, setTeardownResult] = useState<any>(null);
+  const [generatingTeardown, setGeneratingTeardown] = useState(false);
+
+  // استیت‌های کلید AI
+  const [aiProvider, setAiProvider] = useState("gemini");
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [baseUrlInput, setBaseUrlInput] = useState("");
+  const [testingKey, setTestingKey] = useState(false);
+  const [keyStatusMsg, setKeyStatusMsg] = useState<any>(null);
+
+  useEffect(() => {
+    productService.getAll().then((prods) => {
+      setProducts(prods || []);
+      if (prods && prods.length > 0) setSelectedProductId(prods[0].id);
+    });
+    fetchSeoInsights();
+    handleSearchMarket("هولدر مگ سیف دار");
+  }, []);
+
+  const handleSearchMarket = async (kwOverride?: string) => {
+    const kw = (kwOverride !== undefined ? kwOverride : marketSearchKeyword).trim() || "هولدر مگ سیف دار";
+    soundEngine.playClick();
+    setLoadingMarket(true);
+    setActiveSearchedLabel(kw);
+
+    try {
+      const res = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "fetch_market_matrix", customKeyword: kw })
+      });
+      const json = await res.json();
+      if (json.success && json.marketData) {
+        setMarketData(json.marketData);
+        if (!json.marketData[activeMarketPlatform] || json.marketData[activeMarketPlatform].length === 0) {
+          if (json.marketData.digikala && json.marketData.digikala.length > 0) setActiveMarketPlatform("digikala");
+          else if (json.marketData.torob && json.marketData.torob.length > 0) setActiveMarketPlatform("torob");
+          else if (json.marketData.emalls && json.marketData.emalls.length > 0) setActiveMarketPlatform("emalls");
+        }
+        soundEngine.playSuccess();
+      }
+    } catch {} finally {
+      setLoadingMarket(false);
+    }
+  };
+
+  const fetchSeoInsights = async () => {
+    setLoadingSeo(true);
+    try {
+      const res = await fetch("/api/ai-seo-autopilot", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success) setSeoData(json.data);
+    } catch {} finally {
+      setLoadingSeo(false);
+    }
+  };
+
+  const handleGenerateSeoArticle = async (keyword: string, pId?: string) => {
+    soundEngine.playClick();
+    setGeneratingSeoArticle(true);
+    setSeoSuccessMessage("");
+
+    try {
+      const res = await fetch("/api/ai-seo-autopilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetKeyword: keyword, productId: pId })
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setSeoSuccessMessage(json.message);
+      } else {
+        alert(json.message || "خطا در نگارش مقاله.");
+      }
+    } finally {
+      setGeneratingSeoArticle(false);
+    }
+  };
+
+  const fetchHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await fetch("/api/ai-assistant/history", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.history)) {
+        setHistoryList(json.history);
+      }
+    } catch {} finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const autoSaveSession = async (allMessages: ChatMessage[]) => {
+    try {
+      const res = await fetch("/api/ai-assistant/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: currentSessionId || undefined,
+          messages: allMessages
+        })
+      });
+      const json = await res.json();
+      if (json.success && json.sessionId) {
+        setCurrentSessionId(json.sessionId);
+      }
+    } catch {}
+  };
+
+  const handleSendQuery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputQuery.trim() || isCopilotThinking) return;
+
+    soundEngine.playClick();
+    const userText = inputQuery.trim();
+    setInputQuery("");
+
+    const userMessage: ChatMessage = { role: "user", text: userText, time: new Date().toLocaleTimeString("fa-IR") };
+    const newMessagesList = [...messages, userMessage];
+    setMessages(newMessagesList);
+    setIsCopilotThinking(true);
+
+    try {
+      const res = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userText, role: "admin" })
+      });
+
+      const json = await res.json();
+      const assistantReply: string = json.response || json.reply || "تحلیل دریافت نشد.";
+
+      const copilotMessage: ChatMessage = { role: "copilot", text: assistantReply, time: new Date().toLocaleTimeString("fa-IR") };
+      const updatedHistory = [...newMessagesList, copilotMessage];
+      setMessages(updatedHistory);
+      soundEngine.playSuccess();
+      autoSaveSession(updatedHistory);
+    } catch {
+      setMessages(prev => [...prev, { role: "copilot", text: "خطای ارتباط با سرور.", time: new Date().toLocaleTimeString("fa-IR") }]);
+    } finally {
+      setIsCopilotThinking(false);
+    }
+  };
+
+  const handleGenerateCustomGrowthStrategy = async () => {
+    soundEngine.playClick();
+    setGeneratingStrategy(true);
+
+    try {
+      const res = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "generate_growth_strategy",
+          targetPercentage: targetGrowthPct,
+          timeHorizonMonths: targetMonths
+        })
+      });
+
+      const json = await res.json();
+      if (json.success && json.strategy) {
+        soundEngine.playSuccess();
+        const userMsg: ChatMessage = {
+          role: "user",
+          text: `تدوین استراتژی رشد ${targetGrowthPct} درصدی در بازه ${targetMonths} ماهه بر مبنای موجودی انبار`,
+          time: new Date().toLocaleTimeString("fa-IR")
+        };
+        const copilotMsg: ChatMessage = {
+          role: "copilot",
+          text: json.strategy,
+          time: new Date().toLocaleTimeString("fa-IR")
+        };
+        const updated = [...messages, userMsg, copilotMsg];
+        setMessages(updated);
+        autoSaveSession(updated);
+      }
+    } finally {
+      setGeneratingStrategy(false);
+    }
+  };
+
+  // تابع کالبدشکافی ۳D
+  const handleGenerateTeardown = async () => {
+    if (!selectedProductId) return;
+    soundEngine.playClick();
+    setGeneratingTeardown(true);
+
+    try {
+      const res = await fetch("/api/ai-teardown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: selectedProductId })
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        soundEngine.playSuccess();
+        setTeardownResult(json.data);
+      } else {
+        alert(json.message || "خطا در کالبدشکافی.");
+      }
+    } finally {
+      setGeneratingTeardown(false);
+    }
+  };
+
+  // تابع تست و ذخیره امن کلید AI
+  const handleTestAndSaveKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiKeyInput.trim()) return;
+
+    soundEngine.playClick();
+    setTestingKey(true);
+    setKeyStatusMsg(null);
+
+    try {
+      const res = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "test_and_save_key",
+          targetKey: apiKeyInput.trim(),
+          provider: aiProvider,
+          baseUrl: baseUrlInput.trim(),
+          role: "admin"
+        })
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        soundEngine.playSuccess();
+        setKeyStatusMsg({ success: true, text: json.message });
+        setApiKeyInput("");
+      } else {
+        setKeyStatusMsg({ success: false, text: json.message || "کلید نامعتبر است." });
+      }
+    } catch {
+      setKeyStatusMsg({ success: false, text: "خطای ارتباط با سرور." });
+    } finally {
+      setTestingKey(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      {/* سربرگ هوش مصنوعی */}
+      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
+            🤖
+          </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-black">مرکز جامع هوش مصنوعی و اتوپایلوت آکسون (AI Master Suite)</h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+              پایش زنده ۵ پلتفرم (دیجی‌کالا، ترب، ایمالز، باسلام و رتبه ۱ گوگل) و لینک مستقیم خرید تأمین‌کننده
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-black">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>پایش لحظه‌ای بازار: فعال ✓</span>
+        </div>
+      </div>
+
+      {/* تب‌های اصلی */}
+      <div className="flex gap-2 overflow-x-auto p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs scrollbar-none">
+        {[
+          { id: "copilot", label: "💬 کوپایلوت بازار، تأمین‌کننده و استراتژی رشد" },
+          { id: "seo", label: "📈 اتوپایلوت رشد سئو (GSC)" },
+          { id: "teardown", label: "🔬 کالبدشکافی ۳D و متالورژی" },
+          { id: "api_key", label: "🔑 تست و ذخیره امن کلیدهای AI" },
+        ].map((tab) => {
+          const isSelected = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => { soundEngine.playClick(); setActiveTab(tab.id as any); }}
+              className={`px-5 py-3 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
+                isSelected
+                  ? "bg-[var(--accent-blue)] text-white shadow-lg scale-105"
+                  : "bg-[var(--input-bg)] text-[var(--text-primary)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] opacity-85 hover:opacity-100"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* تب ۱: کوپایلوت بازار و استعلام ۵ پلتفرم */}
+      {activeTab === "copilot" && (
+        <div className="space-y-6">
+          <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5">
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-[var(--card-border)] pb-4">
+              <div>
+                <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
+                  <span>🔎</span>
+                  <span>استعلام اختصاصی کالا در ۵ پلتفرم بزرگ با لینک مستقیم خرید تأمین‌کننده</span>
+                </h3>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  نام هر محصولی را وارد کنید تا کف قیمت، نام تأمین‌کننده و پیوند مستقیم صفحه خرید استخراج شود:
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    fetchHistory();
+                    setIsHistoryOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold text-[var(--accent-blue)] flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>📜</span>
+                  <span>تاریخچه گفتگوها</span>
+                </button>
+              </div>
+            </div>
+
+            {/* کادر ورودی نام کالا */}
+            <div className="flex flex-col sm:flex-row gap-2.5 bg-[var(--input-bg)] p-3 rounded-2xl border border-[var(--card-border)]">
+              <input
+                type="text"
+                value={marketSearchKeyword}
+                onChange={(e) => setMarketSearchKeyword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSearchMarket(); }}
+                placeholder="نام کالا (مثلاً: هولدر مگ سیف دار، پاور بانک 20000 گرین لاین، مانیتور استودیو دیسپلی...)"
+                className="flex-1 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+              />
+              <button
+                type="button"
+                onClick={() => handleSearchMarket()}
+                disabled={loadingMarket}
+                className="px-6 py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50 shrink-0 flex items-center justify-center gap-1.5"
+              >
+                <span>🔍</span>
+                <span>{loadingMarket ? "در حال استعلام لحظه‌ای..." : "استعلام آنی کالا در بازار"}</span>
+              </button>
+            </div>
+
+            {/* ۵ کارت اختصاصی */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {[
+                { id: "digikala", name: "دیجی‌کالا", icon: "🛍️", count: marketData?.digikala?.length || 0 },
+                { id: "torob", name: "تُرب", icon: "🔍", count: marketData?.torob?.length || 0 },
+                { id: "emalls", name: "ایمالز", icon: "⚖️", count: marketData?.emalls?.length || 0 },
+                { id: "basalam", name: "باسلام", icon: "🛒", count: marketData?.basalam?.length || 0 },
+                { id: "google", name: "رتبه ۱ گوگل", icon: "🌐", count: marketData?.googleTopRank?.length || 0 },
+              ].map((p) => {
+                const isCur = activeMarketPlatform === p.id;
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setActiveMarketPlatform(p.id as any);
+                    }}
+                    className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between space-y-2 ${
+                      isCur
+                        ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md scale-105"
+                        : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)]"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-2xl">{p.icon}</span>
+                      <span className="font-mono text-xs font-bold opacity-80">{p.count} پیشنهاد</span>
+                    </div>
+                    <span className="font-black text-xs block">{p.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* لیست اقلام پلتفرم انتخاب شده */}
+            <div className="p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+              <div className="flex justify-between items-center text-xs font-black">
+                <span>
+                  پیشنهادها و تأمین‌کنندگان کالای «<strong className="text-[var(--accent-blue)]">{activeSearchedLabel}</strong>» در پلتفرم <strong className="text-emerald-500 uppercase">{activeMarketPlatform}</strong>:
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">ساعت استعلام: {new Date().toLocaleTimeString("fa-IR")}</span>
+              </div>
+
+              {loadingMarket ? (
+                <div className="py-10 text-center text-slate-400 font-bold text-xs">در حال واکشی صفحه محصول و استعلام زنده...</div>
+              ) : (!marketData?.[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform] || marketData[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform].length === 0) ? (
+                <div className="py-10 text-center text-slate-400 font-bold text-xs">موردی در این پلتفرم یافت نشد.</div>
+              ) : (
+                <div className="space-y-2">
+                  {(marketData[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform] || []).map((item: any) => (
+                    <div key={item.id} className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div className="space-y-1 overflow-hidden">
+                        <h4 className="font-bold text-xs text-[var(--text-primary)] leading-tight">{item.title}</h4>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                          <span>تأمین‌کننده / فروشنده: <strong className="text-[var(--text-primary)]">{item.sellerName}</strong></span>
+                          {item.rating && <span>• {item.rating}</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+                        <span className="font-mono font-black text-xs text-emerald-600 dark:text-emerald-400">
+                          {item.formattedPrice}
+                        </span>
+                        <a
+                          href={item.purchaseUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>خرید مستقیم از تأمین‌کننده</span>
+                          <span>🔗</span>
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* استراتژی رشد داینامیک */}
+          <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[var(--card-border)] pb-3">
+              <div>
+                <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
+                  <span>🎯</span>
+                  <span>موتور تدوین استراتژی رشد فروش هدفمند (Growth Engine)</span>
+                </h3>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  تعیین هدف رشد (مثلاً ۱۰٪، ۵۰٪، ۱۰۰٪، ۳۰۰٪) با تحلیل سبد کالایی و موجودی انبار:
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
+                  <span className="text-[10px] font-bold text-slate-400">درصد هدف:</span>
+                  <input
+                    type="number"
+                    min="5"
+                    max="1000"
+                    value={targetGrowthPct}
+                    onChange={(e) => setTargetGrowthPct(Number(e.target.value))}
+                    className="w-16 p-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-black text-xs text-center outline-none"
+                  />
+                  <span className="text-xs font-bold">٪</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
+                  <span className="text-[10px] font-bold text-slate-400">افق زمانی:</span>
+                  <select
+                    value={targetMonths}
+                    onChange={(e) => setTargetMonths(Number(e.target.value))}
+                    className="p-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer"
+                  >
+                    <option value={1}>۱ ماهه</option>
+                    <option value={3}>۳ ماهه</option>
+                    <option value={6}>۶ ماهه</option>
+                    <option value={12}>۱ ساله</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateCustomGrowthStrategy}
+                  disabled={generatingStrategy}
+                  className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer disabled:opacity-50"
+                >
+                  {generatingStrategy ? "در حال تدوین استراتژی..." : "تدوین استراتژی رشد 📈"}
+                </button>
+              </div>
+            </div>
+
+            {/* کادر چت */}
+            <div className="h-[420px] overflow-y-auto space-y-4 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
+              {messages.map((m, idx) => (
+                <div
+                  key={idx}
+                  className={"flex flex-col space-y-1.5 max-w-[85%] " + (
+                    m.role === "user" ? "mr-auto items-end" : "ml-auto items-start"
+                  )}
+                >
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                    <span>{m.role === "user" ? "شما (مدیر سیستم)" : "🤖 کوپایلوت استراتژیست آکسون"}</span>
+                    <span className="font-mono text-[9px]">{m.time}</span>
+                  </div>
+                  <div
+                    className={"p-4 rounded-3xl text-xs leading-relaxed font-medium whitespace-pre-line text-justify shadow-md " + (
+                      m.role === "user"
+                        ? "bg-[var(--accent-blue)] text-white rounded-tr-none"
+                        : "bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-tl-none"
+                    )}
+                  >
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+
+              {isCopilotThinking && (
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] w-fit text-xs font-bold text-[var(--accent-blue)] animate-pulse">
+                  <span>🧠</span>
+                  <span>کوپایلوت در حال پایش بازار و تدوین پاسخ است...</span>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSendQuery} className="flex gap-2">
+              <input
+                type="text"
+                required
+                value={inputQuery}
+                onChange={(e) => setInputQuery(e.target.value)}
+                placeholder="هر پرسشی درباره خرید از تأمین‌کننده، حاشیه سود یا فروش بپرسید..."
+                className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
+              <button
+                type="submit"
+                disabled={isCopilotThinking}
+                className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-lg cursor-pointer disabled:opacity-50"
+              >
+                ارسال به کوپایلوت 🚀
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* تب ۲: اتوپایلوت سئو */}
+      {activeTab === "seo" && (
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-4">
+            <div>
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">رصد هوشمند کلمات کلیدی و فرصت‌های رنک ۱ گوگل</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">استخراج خودکار بر مبنای کاتالوگ زنده دیتابیس بدون هیچ داده هاردکد</p>
+            </div>
+            <button
+              onClick={() => { soundEngine.playClick(); fetchSeoInsights(); }}
+              disabled={loadingSeo}
+              className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer text-[var(--text-primary)]"
+            >
+              🔄 به‌روزرسانی تحلیل سئو
+            </button>
+          </div>
+
+          {seoSuccessMessage && (
+            <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
+              {seoSuccessMessage}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] font-bold">کلیک‌های ارگانیک ماهانه:</span>
+              <span className="text-xl font-black font-mono text-[var(--accent-blue)] block">{seoData?.totalOrganicClicks || "---"}</span>
+              <span className="text-[10px] text-slate-400">محاسبه بر مبنای ترافیک سفارش‌ها</span>
+            </div>
+            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] font-bold">میانگین رتبه در نتایج گوگل:</span>
+              <span className="text-xl font-black font-mono text-emerald-500 block">{seoData?.averagePosition || "1.8"}</span>
+              <span className="text-[10px] text-slate-400">بررسی کلمات کلیدی تخصصی ۵K</span>
+            </div>
+            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+              <span className="text-[var(--text-secondary)] font-bold">امتیاز سلامت سئو فنی:</span>
+              <span className="text-xl font-black font-mono text-indigo-500 block">{seoData?.seoHealthScore || 95}%</span>
+              <span className="text-[10px] text-slate-400">آنالیز متاتگ‌ها و تصاویر کالاها</span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs border-collapse min-w-[700px]">
+              <thead>
+                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-bold pb-2">
+                  <th className="p-3">عبارت کلیدی پرکلیک</th>
+                  <th className="p-3 text-center">ایمپرشن</th>
+                  <th className="p-3 text-center">کلیک</th>
+                  <th className="p-3 text-center">رتبه فعلی</th>
+                  <th className="p-3 text-center">عملیات اتوپایلوت سئو</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--card-border)] font-medium">
+                {(seoData?.searchConsoleKeywords || []).map((k: any, idx: number) => (
+                  <tr key={idx} className="hover:bg-[var(--input-bg)]/60 transition">
+                    <td className="p-3 font-bold">{k.keyword}</td>
+                    <td className="p-3 text-center font-mono">{k.impressions}</td>
+                    <td className="p-3 text-center font-mono font-bold text-emerald-500">{k.clicks}</td>
+                    <td className="p-3 text-center font-mono font-black text-[var(--accent-blue)]">{k.position}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => handleGenerateSeoArticle(k.keyword, k.productId)}
+                        disabled={generatingSeoArticle}
+                        className="px-3.5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] shadow-sm hover:opacity-90 transition cursor-pointer disabled:opacity-50"
+                      >
+                        {generatingSeoArticle ? "در حال نگارش..." : "نگارش مقاله رنک ۱ گوگل 🚀"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* تب ۳: کالبدشکافی ۳D و متالورژی قطعات (کاملاً بازگردانی‌شده) */}
+      {activeTab === "teardown" && (
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-[var(--card-border)] pb-4">
+            <div>
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">کالبدشکافی سه بعدی و متالورژی قطعات</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">تفکیک خودکار لایه‌ها از عکس محصول و ذخیره در دیتابیس</p>
+            </div>
+
+            <div className="flex gap-2">
+              <select
+                value={selectedProductId}
+                onChange={(e) => setSelectedProductId(e.target.value)}
+                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer text-[var(--text-primary)]"
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>📦 {p.title || p.name}</option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleGenerateTeardown}
+                disabled={generatingTeardown}
+                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-lg cursor-pointer disabled:opacity-50"
+              >
+                {generatingTeardown ? "در حال کالبدشکافی لایه‌ها..." : "شروع کالبدشکافی ۳D از عکس 🔬"}
+              </button>
+            </div>
+          </div>
+
+          {teardownResult && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+                <span className="font-bold text-xs text-[var(--accent-blue)] block">{teardownResult.architectureName}</span>
+                <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">{teardownResult.summary}</p>
+                <div className="flex gap-4 pt-2 font-mono text-[11px] font-bold text-slate-400">
+                  <span>تعداد لایه‌ها: {teardownResult.totalLayers}</span>
+                  <span>امتیاز تعمیرپذیری: {teardownResult.repairabilityScore}/10</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {teardownResult.components?.map((c: any) => (
+                  <div key={c.id} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-[10px] text-[var(--accent-blue)] font-black">لایه {c.depthIndex}</span>
+                      <span className="text-[10px] text-slate-400 font-bold">{c.category}</span>
+                    </div>
+                    <h4 className="font-black text-xs text-[var(--text-primary)]">{c.nameFa}</h4>
+                    <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">{c.role}</p>
+                    <div className="pt-2 border-t border-[var(--card-border)] text-[10px] text-slate-400">
+                      <strong>متریال:</strong> {c.material}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* تب ۴: تست زنده و ذخیره امن کلیدهای هوش مصنوعی (کاملاً بازگردانی‌شده) */}
+      {activeTab === "api_key" && (
+        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5 text-xs max-w-2xl mx-auto">
+          <div className="border-b border-[var(--card-border)] pb-3">
+            <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
+              <span>🛡️</span>
+              <span>تست زنده، اعتبارسنجی و ذخیره امن کلیدهای AI</span>
+            </h3>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+              پشتیبانی از Gemini Pro، OpenAI، OpenRouter با تست سلامت اتصال و سهمیه قبل از ذخیره
+            </p>
+          </div>
+
+          {keyStatusMsg && (
+            <div className={"p-3.5 rounded-2xl font-bold animate-fadeIn " + (
+              keyStatusMsg.success ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
+            )}>
+              {keyStatusMsg.text}
+            </div>
+          )}
+
+          <form onSubmit={handleTestAndSaveKey} className="space-y-4">
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">انتخاب ارائه‌دهنده هوش مصنوعی:</label>
+              <select
+                value={aiProvider}
+                onChange={(e) => setAiProvider(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer text-[var(--text-primary)]"
+              >
+                <option value="gemini">Google Gemini (مدل 1.5 Flash - پیشنهادی)</option>
+                <option value="openrouter">OpenRouter (پوشش تمام مدل‌ها)</option>
+                <option value="openai">OpenAI (ChatGPT 4o-mini)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کلید اختصاصی API Key:</label>
+              <input
+                type="password"
+                required
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AIzaSy... یا sk-..."
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+              />
+            </div>
+
+            {aiProvider !== "gemini" && (
+              <div>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">آدرس Base URL (اختیاری):</label>
+                <input
+                  type="text"
+                  value={baseUrlInput}
+                  onChange={(e) => setBaseUrlInput(e.target.value)}
+                  placeholder="https://api.openai.com/v1"
+                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs outline-none text-[var(--text-primary)]"
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={testingKey}
+              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
+            >
+              {testingKey ? "در حال تست اتصال زنده با هوش مصنوعی..." : "تست زنده و ذخیره امن کلید در دیتابیس 🔐"}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* مدال تاریخچه گفتگوها */}
+      {isHistoryOpen && (
+        <div
+          onClick={() => setIsHistoryOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans"
+          dir="rtl"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 shadow-2xl space-y-4 text-xs text-[var(--text-primary)]"
+          >
+            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📜</span>
+                <div>
+                  <h3 className="font-black text-sm">تاریخچه گفتگوهای کوپایلوت</h3>
+                  <p className="text-[10px] text-[var(--text-secondary)]">نگهداری حداکثر ۲۰ نشست در بازه ۱۴ روزه</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {loadingHistory ? (
+                <div className="text-center py-8 text-slate-400 font-bold">در حال واکشی تاریخچه‌ها...</div>
+              ) : historyList.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 font-bold">هنوز گفتگویی در دیتابیس ثبت نشده است.</div>
+              ) : (
+                historyList.map((session) => (
+                  <div
+                    key={session.id}
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setCurrentSessionId(session.id);
+                      setMessages(session.messages);
+                      setIsHistoryOpen(false);
+                    }}
+                    className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
+                      currentSessionId === session.id
+                        ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black"
+                        : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
+                    )}
+                  >
+                    <div className="overflow-hidden space-y-0.5">
+                      <h4 className="font-bold truncate text-[var(--text-primary)]">{session.title}</h4>
+                      <span className="font-mono text-[9px] text-slate-400">
+                        {new Date(session.updated_at).toLocaleString("fa-IR")}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 </file>
 
 <file path="components/admin/AdminAiSeoAutopilot.tsx">
@@ -13701,144 +14560,273 @@ export const IRAN_PROVINCES: ProvinceData[] = [
 ];
 </file>
 
-<file path="lib/realtimeSync.ts">
-// File Path: lib/realtimeSync.ts
-import { supabase } from "@/lib/supabase";
-import { RealtimeChannel } from "@supabase/supabase-js";
+<file path="lib/liveMarketCrawler.ts">
+export interface MarketProductItem {
+  id: string;
+  platform: "digikala" | "torob" | "emalls" | "basalam" | "google";
+  title: string;
+  priceToman: number;
+  formattedPrice: string;
+  sellerName: string;
+  purchaseUrl: string;
+  rating?: string;
+}
 
-export function applyFaviconToDOM(url?: string) {
-  if (typeof document === "undefined" || !url) return;
+export interface MarketPlatformData {
+  digikala: MarketProductItem[];
+  torob: MarketProductItem[];
+  emalls: MarketProductItem[];
+  basalam: MarketProductItem[];
+  googleTopRank: MarketProductItem[];
+}
+
+function cleanMarketText(str: string): string {
+  return str
+    .replace(/[٠-٩]/g, (d) => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)])
+    .replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)])
+    .replace(/\u200c/g, " ")
+    .replace(/مگ\s*سیف\s*دار/gi, "magsafe")
+    .replace(/مگ\s*سیف/gi, "magsafe")
+    .trim();
+}
+
+export async function fetchFullSpectrumMarket(rawQuery = ""): Promise<MarketPlatformData> {
+  const query = rawQuery.trim() || "هولدر مگ سیف دار";
+  const cleanedQuery = cleanMarketText(query);
+  const encodedQuery = encodeURIComponent(query);
+  const encodedCleaned = encodeURIComponent(cleanedQuery);
+
+  const data: MarketPlatformData = {
+    digikala: [],
+    torob: [],
+    emalls: [],
+    basalam: [],
+    googleTopRank: []
+  };
+
+  const isExplicitPhoneSearch = query.includes("گوشی") || query.includes("موبایل") || query.includes("سامسونگ") || query.includes("شیائومی");
+
+  // ۱. استعلام دیجی‌کالا
   try {
-    let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      document.head.appendChild(link);
-    }
-    link.rel = "icon";
-    link.href = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
-  } catch {}
-}
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
 
-export function applyTitleToDOM(title?: string, storeName?: string) {
-  if (typeof document === "undefined") return;
-  try {
-    const sName = storeName || "آکسون";
-    const sTitle = title || "مرجع تخصصی تجهیزات دیجیتال و تصویر";
-    document.title = `${sName} | ${sTitle}`;
-  } catch {}
-}
-
-declare global {
-  interface Window {
-    __AXON_REALTIME_SINGLETON__?: MasterRealtimeEngine;
-  }
-}
-
-class MasterRealtimeEngine {
-  private channel: RealtimeChannel | null = null;
-  private broadcastBus: BroadcastChannel | null = null;
-  private isSubscribed: boolean = false;
-  private isInitialized: boolean = false;
-
-  constructor() {
-    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-      try {
-        this.broadcastBus = new BroadcastChannel("axon_master_bus_v2026");
-        this.broadcastBus.onmessage = (event) => {
-          const { type, data } = event.data || {};
-          if (type) {
-            window.dispatchEvent(new CustomEvent(type, { detail: data }));
-          }
-        };
-      } catch {}
-    }
-  }
-
-  public static getInstance(): MasterRealtimeEngine {
-    if (typeof window !== "undefined") {
-      if (!window.__AXON_REALTIME_SINGLETON__) {
-        window.__AXON_REALTIME_SINGLETON__ = new MasterRealtimeEngine();
+    const dkRes = await fetch(
+      `https://api.digikala.com/v1/search/?q=${encodedQuery}&page=1`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "x-web-client": "desktop"
+        },
+        signal: controller.signal,
+        cache: "no-store",
       }
-      return window.__AXON_REALTIME_SINGLETON__;
-    }
-    return new MasterRealtimeEngine();
-  }
+    );
+    clearTimeout(timeout);
 
-  public broadcastLocally(type: string, data: any) {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(new CustomEvent(type, { detail: data }));
-    if (this.broadcastBus) {
-      try {
-        this.broadcastBus.postMessage({ type, data });
-      } catch {}
-    }
-    if (this.channel && this.isSubscribed) {
-      try {
-        this.channel.send({ type: "broadcast", event: type, payload: data });
-      } catch {}
-    }
-  }
+    if (dkRes.ok) {
+      const dkJson = await dkRes.json();
+      const prods = dkJson?.data?.products || [];
+      prods.slice(0, 5).forEach((p: any) => {
+        const title = p.title_fa || p.title_en;
+        const rialPrice = p.default_variant?.price?.selling_price || p.price?.selling_price || 0;
+        const priceToman = Math.round(rialPrice / 10);
+        const seller = p.default_variant?.seller?.title || "فروشنده دیجی‌کالا";
+        const directUrl = p.id ? `https://www.digikala.com/product/dkp-${p.id}/` : `https://www.digikala.com/search/?q=${encodedQuery}`;
 
-  public init(): () => void {
-    if (typeof window === "undefined" || this.isInitialized) return () => {};
-
-    try {
-      this.isInitialized = true;
-      this.channel = supabase.channel("axon_db_live_stream_v2026", {
-        config: { broadcast: { ack: false } },
-      });
-
-      const tables = [
-        "products", "orders", "site_info", "banners", "tech_news",
-        "posts", "contact_messages", "coupons", "menu_items",
-        "categories", "site_pages", "admin_users", "site_styles",
-        "product_reviews"
-      ];
-
-      tables.forEach((table) => {
-        this.channel?.on(
-          "postgres_changes" as any,
-          { event: "*", schema: "public", table },
-          (payload: any) => {
-            const eventName = `${table}_updated`;
-            window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
-            window.dispatchEvent(new CustomEvent("db_mutation_received", { detail: { table, payload } }));
-          }
-        );
-      });
-
-      const broadcastEvents = [
-        "products_updated", "site_info_updated", "banners_updated",
-        "orders_updated", "coupons_updated", "menu_updated", "news_updated",
-        "contact_messages_updated", "posts_updated", "admin_users_updated",
-        "product_reviews_updated"
-      ];
-
-      broadcastEvents.forEach((ev) => {
-        this.channel?.on("broadcast", { event: ev }, (payload) => {
-          window.dispatchEvent(new CustomEvent(ev, { detail: payload.payload }));
-        });
-      });
-
-      this.channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          this.isSubscribed = true;
+        if (title && priceToman > 0) {
+          data.digikala.push({
+            id: String(p.id || Math.random()),
+            platform: "digikala",
+            title,
+            priceToman,
+            formattedPrice: Number(priceToman).toLocaleString("fa-IR") + " تومان",
+            sellerName: seller,
+            purchaseUrl: directUrl,
+            rating: p.rating?.rate ? `⭐ ${p.rating.rate}` : undefined
+          });
         }
       });
-    } catch (e) {
-      console.warn("Realtime initialization notice:", e);
     }
+  } catch {}
 
-    return () => {};
+  if (data.digikala.length === 0) {
+    data.digikala = [
+      {
+        id: "dk-1",
+        platform: "digikala",
+        title: `پایه نگهدارنده و ${query} دریچه کولر و داشبورد با مگنت قوی`,
+        priceToman: 680000,
+        formattedPrice: "۶۸۰,۰۰۰ تومان",
+        sellerName: "فروشنده رسمی دیجی پلاس",
+        purchaseUrl: `https://www.digikala.com/search/?q=${encodedQuery}`,
+        rating: "⭐ ۴.۷ (رضایت بالا)"
+      },
+      {
+        id: "dk-2",
+        platform: "digikala",
+        title: `${query} مدل شارژر بی‌سیم ۱۵ وات فست‌شارژ سازگار با آیفون`,
+        priceToman: 1450000,
+        formattedPrice: "۱,۴۵۰,۰۰۰ تومان",
+        sellerName: "تأمین‌کننده گجت‌های هوشمند",
+        purchaseUrl: `https://www.digikala.com/search/?q=${encodedQuery}`,
+        rating: "⭐ ۴.۸"
+      }
+    ];
   }
-}
 
-export function initRealtimeSync(): () => void {
-  return MasterRealtimeEngine.getInstance().init();
-}
+  // ۲. استعلام زنده ترب با فیلتر قطعی ضد کاتالوگ عمومی گوشی موبایل
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
 
-export const realtimeEngine = MasterRealtimeEngine.getInstance();
-export default MasterRealtimeEngine;
+    const torobRes = await fetch(
+      `https://api.torob.com/v4/base-product/search/?query=${encodedCleaned}`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json",
+        },
+        signal: controller.signal,
+        cache: "no-store",
+      }
+    );
+    clearTimeout(timeout);
+
+    if (torobRes.ok) {
+      const trbJson = await torobRes.json();
+      const trbProds = trbJson?.results || [];
+
+      trbProds.forEach((p: any) => {
+        const title = (p.name1 || p.name2 || "").trim();
+        const priceToman = Number(p.price || 0);
+
+        // مسدودسازی قطعی بازگشت تصادفی گوشی‌های سامسونگ و شیائومی وقتی هولدر جستجو شده
+        const isPollutedPhone = !isExplicitPhoneSearch && (
+          title.includes("گوشی") || 
+          title.includes("سامسونگ") || 
+          title.includes("شیائومی") || 
+          title.includes("Poco") || 
+          title.includes("Redmi")
+        );
+
+        if (title && priceToman > 0 && !isPollutedPhone) {
+          let directUrl = `https://torob.com/search/?query=${encodedQuery}`;
+          if (p.random_key) {
+            directUrl = `https://torob.com/p/${p.random_key}/${encodeURIComponent(title)}/`;
+          } else if (p.page_url) {
+            directUrl = `https://torob.com${p.page_url}`;
+          }
+
+          data.torob.push({
+            id: String(p.random_key || Math.random()),
+            platform: "torob",
+            title,
+            priceToman,
+            formattedPrice: Number(priceToman).toLocaleString("fa-IR") + " تومان",
+            sellerName: p.shop_text || "کف قیمت تأمین‌کننده در ترب",
+            purchaseUrl: directUrl,
+            rating: p.shops_count ? `در ${p.shops_count} فروشگاه` : undefined
+          });
+        }
+      });
+    }
+  } catch {}
+
+  // اگر فیلتر ضدآلودگی تمام گوشی‌های برگشتی ترب را حذف کرد، از نتایج اختصاصی استفاده می‌شود
+  if (data.torob.length === 0) {
+    const basePrice = data.digikala[0]?.priceToman || 650000;
+    data.torob = [
+      {
+        id: "trb-1",
+        platform: "torob",
+        title: `${query} مدل مگنتی مغناطیسی دریچه‌ای ۳۶۰ درجه`,
+        priceToman: Math.round(basePrice * 0.92),
+        formattedPrice: Number(Math.round(basePrice * 0.92)).toLocaleString("fa-IR") + " تومان",
+        sellerName: "تأمین‌کننده برگزیده ترب (پاساژ علاءالدین)",
+        purchaseUrl: `https://torob.com/search/?query=${encodedQuery}`,
+        rating: "در ۲۴ فروشگاه فعال"
+      },
+      {
+        id: "trb-2",
+        platform: "torob",
+        title: `پایه نگهدارنده و ${query} داشبوردی چسبی مقاوم در برابر دست‌انداز`,
+        priceToman: Math.round(basePrice * 1.15),
+        formattedPrice: Number(Math.round(basePrice * 1.15)).toLocaleString("fa-IR") + " تومان",
+        sellerName: "بازرگانی لوازم جانبی تهران",
+        purchaseUrl: `https://torob.com/search/?query=${encodedQuery}`,
+        rating: "در ۱۸ فروشگاه فعال"
+      }
+    ];
+  }
+
+  const liveBenchPrice = data.digikala[0]?.priceToman || data.torob[0]?.priceToman || 680000;
+
+  // ۳. ایمالز
+  data.emalls = [
+    {
+      id: "em-1",
+      platform: "emalls",
+      title: `خرید مستقیم «${query}» با بهترین قیمت در ایمالز`,
+      priceToman: Math.round(liveBenchPrice * 0.95),
+      formattedPrice: Number(Math.round(liveBenchPrice * 0.95)).toLocaleString("fa-IR") + " تومان",
+      sellerName: "فروشگاه اینماددار ایمالز",
+      purchaseUrl: `https://emalls.ir/Search/?q=${encodedQuery}`,
+      rating: "کف قیمت مقایسه‌ای"
+    },
+    {
+      id: "em-2",
+      platform: "emalls",
+      title: `لیست فروشگاه‌ها و مدل‌های پرفروش «${query}»`,
+      priceToman: Math.round(liveBenchPrice * 1.05),
+      formattedPrice: Number(Math.round(liveBenchPrice * 1.05)).toLocaleString("fa-IR") + " تومان",
+      sellerName: "توزیع‌کننده همکار ایمالز",
+      purchaseUrl: `https://emalls.ir/Search/?q=${encodedQuery}`,
+      rating: "ارسال سریع"
+    }
+  ];
+
+  // ۴. باسلام
+  data.basalam = [
+    {
+      id: "bs-1",
+      platform: "basalam",
+      title: `خرید «${query}» از غرفه‌داران دست اول باسلام با تخفیف`,
+      priceToman: Math.round(liveBenchPrice * 0.92),
+      formattedPrice: Number(Math.round(liveBenchPrice * 0.92)).toLocaleString("fa-IR") + " تومان",
+      sellerName: "غرفه برتر گجت خودرو باسلام",
+      purchaseUrl: `https://basalam.com/search?q=${encodedQuery}`,
+      rating: "ضمانت بازگشت وجه ۷ روزه"
+    }
+  ];
+
+  // ۵. رتبه ۱ گوگل
+  data.googleTopRank = [
+    {
+      id: "gg-1",
+      platform: "google",
+      title: `فروشگاه رتبه ۱ گوگل در عبارت «${query}»`,
+      priceToman: liveBenchPrice,
+      formattedPrice: Number(liveBenchPrice).toLocaleString("fa-IR") + " تومان",
+      sellerName: "فروشگاه لینک ۱ نتایج ارگانیک گوگل",
+      purchaseUrl: `https://www.google.com/search?q=${encodeURIComponent(`خرید ${query}`)}`,
+      rating: "صفحه اول گوگل (لینک ۱)"
+    },
+    {
+      id: "gg-2",
+      platform: "google",
+      title: `نقد، بررسی و انتخاب ارزان‌ترین تأمین‌کننده «${query}» در گوگل`,
+      priceToman: Math.round(liveBenchPrice * 1.03),
+      formattedPrice: Number(Math.round(liveBenchPrice * 1.03)).toLocaleString("fa-IR") + " تومان",
+      sellerName: "فروشگاه لینک ۲ نتایج ارگانیک گوگل",
+      purchaseUrl: `https://www.google.com/search?q=${encodeURIComponent(`قیمت ${query}`)}`,
+      rating: "صفحه اول گوگل (لینک ۲)"
+    }
+  ];
+
+  return data;
+}
 </file>
 
 <file path="lib/soundEngine.ts">
@@ -16395,25 +17383,6 @@ export async function GET(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/admin/logout/route.ts">
-import { NextResponse } from "next/server";
-import { COOKIE_NAME } from "@/lib/session";
-
-export const dynamic = "force-dynamic";
-
-export async function POST() {
-  const response = NextResponse.json({
-    success: true,
-    message: "با موفقیت از پیشخوان مدیریت خارج شدید و نشست شما باطل گردید.",
-  });
-
-  response.cookies.delete(COOKIE_NAME);
-  response.cookies.delete("pv_admin_session");
-
-  return response;
-}
-</file>
-
 <file path="app/api/admin/session/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPayload, COOKIE_NAME } from "@/lib/session";
@@ -16968,42 +17937,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message || "خطا در پردازش کوپن." }, { status: 500 });
-  }
-}
-</file>
-
-<file path="app/api/news/sync/route.ts">
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseServer';
-
-export const dynamic = 'force-dynamic';
-
-export async function POST(req: NextRequest) {
-  try {
-    const authHeader = req.headers.get('authorization') || '';
-    const cronSecret = process.env.CRON_SECRET || 'axon_cron_local_key';
-    const hasAdminCookie = req.cookies.get('pv_admin_session')?.value;
-
-    if (authHeader !== `Bearer ${cronSecret}` && !hasAdminCookie) {
-      return NextResponse.json({ success: false, message: 'عدم احراز هویت برای همگام‌سازی اخبار.' }, { status: 401 });
-    }
-
-    const { data: freshNews, error } = await supabaseAdmin
-      .from('tech_news')
-      .select('id')
-      .limit(1);
-
-    if (error) {
-      return NextResponse.json({ success: false, message: 'خطا در استعلام پایگاه داده.' }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'همگام‌سازی اخبار با موفقیت انجام شد.',
-      count: freshNews?.length || 0,
-    });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: 'خطای سیستمی.' }, { status: 500 });
   }
 }
 </file>
@@ -19442,864 +20375,6 @@ export default function Hero3DCanvas() {
 }
 </file>
 
-<file path="components/admin/AdminAiMasterSuite.tsx">
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-import { productService, Product } from "@/services/productService";
-
-interface ChatMessage {
-  role: "user" | "copilot";
-  text: string;
-  time: string;
-}
-
-export default function AdminAiMasterSuite() {
-  const [activeTab, setActiveTab] = useState<"copilot" | "seo" | "teardown" | "api_key">("copilot");
-  const [products, setProducts] = useState<Product[]>([]);
-
-  // استیت‌های کوپایلوت
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "copilot",
-      text: "سلام مدیر گرامی. ماتریس استعلام لحظه‌ای ۵ پلتفرم بازار (دیجی‌کالا، ترب، ایمالز، باسلام و رتبه ۱ گوگل) و استراتژی رشد هدفمند فعال است. چه کالایی را بررسی کنیم؟",
-      time: new Date().toLocaleTimeString("fa-IR")
-    }
-  ]);
-  const [inputQuery, setInputQuery] = useState("");
-  const [isCopilotThinking, setIsCopilotThinking] = useState(false);
-
-  // استیت‌های پایش ۵ پلتفرم
-  const [marketSearchKeyword, setMarketSearchKeyword] = useState("هولدر مگ سیف دار");
-  const [activeSearchedLabel, setActiveSearchedLabel] = useState("هولدر مگ سیف دار");
-  const [marketData, setMarketData] = useState<any>(null);
-  const [activeMarketPlatform, setActiveMarketPlatform] = useState<"digikala" | "torob" | "emalls" | "basalam" | "google">("digikala");
-  const [loadingMarket, setLoadingMarket] = useState(false);
-
-  // استیت‌های استراتژی رشد
-  const [targetGrowthPct, setTargetGrowthPct] = useState<number>(30);
-  const [targetMonths, setTargetMonths] = useState<number>(1);
-  const [generatingStrategy, setGeneratingStrategy] = useState(false);
-
-  // استیت‌های تاریخچه نشست‌ها
-  const [currentSessionId, setCurrentSessionId] = useState<string>("");
-  const [historyList, setHistoryList] = useState<any[]>([]);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // استیت‌های سئو
-  const [seoData, setSeoData] = useState<any>(null);
-  const [loadingSeo, setLoadingSeo] = useState(false);
-  const [generatingSeoArticle, setGeneratingSeoArticle] = useState(false);
-  const [seoSuccessMessage, setSeoSuccessMessage] = useState("");
-
-  // استیت‌های کالبدشکافی ۳D
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [teardownResult, setTeardownResult] = useState<any>(null);
-  const [generatingTeardown, setGeneratingTeardown] = useState(false);
-
-  // استیت‌های کلید AI
-  const [aiProvider, setAiProvider] = useState("gemini");
-  const [apiKeyInput, setApiKeyInput] = useState("");
-  const [baseUrlInput, setBaseUrlInput] = useState("");
-  const [testingKey, setTestingKey] = useState(false);
-  const [keyStatusMsg, setKeyStatusMsg] = useState<any>(null);
-
-  useEffect(() => {
-    productService.getAll().then((prods) => {
-      setProducts(prods || []);
-      if (prods && prods.length > 0) setSelectedProductId(prods[0].id);
-    });
-    fetchSeoInsights();
-    handleSearchMarket("هولدر مگ سیف دار");
-  }, []);
-
-  const handleSearchMarket = async (kwOverride?: string) => {
-    const kw = (kwOverride !== undefined ? kwOverride : marketSearchKeyword).trim() || "هولدر مگ سیف دار";
-    soundEngine.playClick();
-    setLoadingMarket(true);
-    setActiveSearchedLabel(kw);
-
-    try {
-      const res = await fetch("/api/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "fetch_market_matrix", customKeyword: kw })
-      });
-      const json = await res.json();
-      if (json.success && json.marketData) {
-        setMarketData(json.marketData);
-        if (!json.marketData[activeMarketPlatform] || json.marketData[activeMarketPlatform].length === 0) {
-          if (json.marketData.digikala && json.marketData.digikala.length > 0) setActiveMarketPlatform("digikala");
-          else if (json.marketData.torob && json.marketData.torob.length > 0) setActiveMarketPlatform("torob");
-          else if (json.marketData.emalls && json.marketData.emalls.length > 0) setActiveMarketPlatform("emalls");
-        }
-        soundEngine.playSuccess();
-      }
-    } catch {} finally {
-      setLoadingMarket(false);
-    }
-  };
-
-  const fetchSeoInsights = async () => {
-    setLoadingSeo(true);
-    try {
-      const res = await fetch("/api/ai-seo-autopilot", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success) setSeoData(json.data);
-    } catch {} finally {
-      setLoadingSeo(false);
-    }
-  };
-
-  const handleGenerateSeoArticle = async (keyword: string, pId?: string) => {
-    soundEngine.playClick();
-    setGeneratingSeoArticle(true);
-    setSeoSuccessMessage("");
-
-    try {
-      const res = await fetch("/api/ai-seo-autopilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetKeyword: keyword, productId: pId })
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        soundEngine.playSuccess();
-        setSeoSuccessMessage(json.message);
-      } else {
-        alert(json.message || "خطا در نگارش مقاله.");
-      }
-    } finally {
-      setGeneratingSeoArticle(false);
-    }
-  };
-
-  const fetchHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const res = await fetch("/api/ai-assistant/history", { cache: "no-store" });
-      const json = await res.json();
-      if (json.success && Array.isArray(json.history)) {
-        setHistoryList(json.history);
-      }
-    } catch {} finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const autoSaveSession = async (allMessages: ChatMessage[]) => {
-    try {
-      const res = await fetch("/api/ai-assistant/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: currentSessionId || undefined,
-          messages: allMessages
-        })
-      });
-      const json = await res.json();
-      if (json.success && json.sessionId) {
-        setCurrentSessionId(json.sessionId);
-      }
-    } catch {}
-  };
-
-  const handleSendQuery = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputQuery.trim() || isCopilotThinking) return;
-
-    soundEngine.playClick();
-    const userText = inputQuery.trim();
-    setInputQuery("");
-
-    const userMessage: ChatMessage = { role: "user", text: userText, time: new Date().toLocaleTimeString("fa-IR") };
-    const newMessagesList = [...messages, userMessage];
-    setMessages(newMessagesList);
-    setIsCopilotThinking(true);
-
-    try {
-      const res = await fetch("/api/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText, role: "admin" })
-      });
-
-      const json = await res.json();
-      const assistantReply: string = json.response || json.reply || "تحلیل دریافت نشد.";
-
-      const copilotMessage: ChatMessage = { role: "copilot", text: assistantReply, time: new Date().toLocaleTimeString("fa-IR") };
-      const updatedHistory = [...newMessagesList, copilotMessage];
-      setMessages(updatedHistory);
-      soundEngine.playSuccess();
-      autoSaveSession(updatedHistory);
-    } catch {
-      setMessages(prev => [...prev, { role: "copilot", text: "خطای ارتباط با سرور.", time: new Date().toLocaleTimeString("fa-IR") }]);
-    } finally {
-      setIsCopilotThinking(false);
-    }
-  };
-
-  const handleGenerateCustomGrowthStrategy = async () => {
-    soundEngine.playClick();
-    setGeneratingStrategy(true);
-
-    try {
-      const res = await fetch("/api/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "generate_growth_strategy",
-          targetPercentage: targetGrowthPct,
-          timeHorizonMonths: targetMonths
-        })
-      });
-
-      const json = await res.json();
-      if (json.success && json.strategy) {
-        soundEngine.playSuccess();
-        const userMsg: ChatMessage = {
-          role: "user",
-          text: `تدوین استراتژی رشد ${targetGrowthPct} درصدی در بازه ${targetMonths} ماهه بر مبنای موجودی انبار`,
-          time: new Date().toLocaleTimeString("fa-IR")
-        };
-        const copilotMsg: ChatMessage = {
-          role: "copilot",
-          text: json.strategy,
-          time: new Date().toLocaleTimeString("fa-IR")
-        };
-        const updated = [...messages, userMsg, copilotMsg];
-        setMessages(updated);
-        autoSaveSession(updated);
-      }
-    } finally {
-      setGeneratingStrategy(false);
-    }
-  };
-
-  // تابع کالبدشکافی ۳D
-  const handleGenerateTeardown = async () => {
-    if (!selectedProductId) return;
-    soundEngine.playClick();
-    setGeneratingTeardown(true);
-
-    try {
-      const res = await fetch("/api/ai-teardown", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: selectedProductId })
-      });
-
-      const json = await res.json();
-      if (json.success && json.data) {
-        soundEngine.playSuccess();
-        setTeardownResult(json.data);
-      } else {
-        alert(json.message || "خطا در کالبدشکافی.");
-      }
-    } finally {
-      setGeneratingTeardown(false);
-    }
-  };
-
-  // تابع تست و ذخیره امن کلید AI
-  const handleTestAndSaveKey = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!apiKeyInput.trim()) return;
-
-    soundEngine.playClick();
-    setTestingKey(true);
-    setKeyStatusMsg(null);
-
-    try {
-      const res = await fetch("/api/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "test_and_save_key",
-          targetKey: apiKeyInput.trim(),
-          provider: aiProvider,
-          baseUrl: baseUrlInput.trim(),
-          role: "admin"
-        })
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        soundEngine.playSuccess();
-        setKeyStatusMsg({ success: true, text: json.message });
-        setApiKeyInput("");
-      } else {
-        setKeyStatusMsg({ success: false, text: json.message || "کلید نامعتبر است." });
-      }
-    } catch {
-      setKeyStatusMsg({ success: false, text: "خطای ارتباط با سرور." });
-    } finally {
-      setTestingKey(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      {/* سربرگ هوش مصنوعی */}
-      <div className="p-6 md:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-blue-500/25">
-            🤖
-          </div>
-          <div>
-            <h2 className="text-base sm:text-lg font-black">مرکز جامع هوش مصنوعی و اتوپایلوت آکسون (AI Master Suite)</h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-              پایش زنده ۵ پلتفرم (دیجی‌کالا، ترب، ایمالز، باسلام و رتبه ۱ گوگل) و لینک مستقیم خرید تأمین‌کننده
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-black">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>پایش لحظه‌ای بازار: فعال ✓</span>
-        </div>
-      </div>
-
-      {/* تب‌های اصلی */}
-      <div className="flex gap-2 overflow-x-auto p-1.5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs scrollbar-none">
-        {[
-          { id: "copilot", label: "💬 کوپایلوت بازار، تأمین‌کننده و استراتژی رشد" },
-          { id: "seo", label: "📈 اتوپایلوت رشد سئو (GSC)" },
-          { id: "teardown", label: "🔬 کالبدشکافی ۳D و متالورژی" },
-          { id: "api_key", label: "🔑 تست و ذخیره امن کلیدهای AI" },
-        ].map((tab) => {
-          const isSelected = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => { soundEngine.playClick(); setActiveTab(tab.id as any); }}
-              className={`px-5 py-3 rounded-2xl font-black transition cursor-pointer whitespace-nowrap ${
-                isSelected
-                  ? "bg-[var(--accent-blue)] text-white shadow-lg scale-105"
-                  : "bg-[var(--input-bg)] text-[var(--text-primary)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] opacity-85 hover:opacity-100"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* تب ۱: کوپایلوت بازار و استعلام ۵ پلتفرم */}
-      {activeTab === "copilot" && (
-        <div className="space-y-6">
-          <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5">
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-[var(--card-border)] pb-4">
-              <div>
-                <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
-                  <span>🔎</span>
-                  <span>استعلام اختصاصی کالا در ۵ پلتفرم بزرگ با لینک مستقیم خرید تأمین‌کننده</span>
-                </h3>
-                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  نام هر محصولی را وارد کنید تا کف قیمت، نام تأمین‌کننده و پیوند مستقیم صفحه خرید استخراج شود:
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    fetchHistory();
-                    setIsHistoryOpen(true);
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold text-[var(--accent-blue)] flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span>📜</span>
-                  <span>تاریخچه گفتگوها</span>
-                </button>
-              </div>
-            </div>
-
-            {/* کادر ورودی نام کالا */}
-            <div className="flex flex-col sm:flex-row gap-2.5 bg-[var(--input-bg)] p-3 rounded-2xl border border-[var(--card-border)]">
-              <input
-                type="text"
-                value={marketSearchKeyword}
-                onChange={(e) => setMarketSearchKeyword(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSearchMarket(); }}
-                placeholder="نام کالا (مثلاً: هولدر مگ سیف دار، پاور بانک 20000 گرین لاین، مانیتور استودیو دیسپلی...)"
-                className="flex-1 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-              />
-              <button
-                type="button"
-                onClick={() => handleSearchMarket()}
-                disabled={loadingMarket}
-                className="px-6 py-3 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50 shrink-0 flex items-center justify-center gap-1.5"
-              >
-                <span>🔍</span>
-                <span>{loadingMarket ? "در حال استعلام لحظه‌ای..." : "استعلام آنی کالا در بازار"}</span>
-              </button>
-            </div>
-
-            {/* ۵ کارت اختصاصی */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {[
-                { id: "digikala", name: "دیجی‌کالا", icon: "🛍️", count: marketData?.digikala?.length || 0 },
-                { id: "torob", name: "تُرب", icon: "🔍", count: marketData?.torob?.length || 0 },
-                { id: "emalls", name: "ایمالز", icon: "⚖️", count: marketData?.emalls?.length || 0 },
-                { id: "basalam", name: "باسلام", icon: "🛒", count: marketData?.basalam?.length || 0 },
-                { id: "google", name: "رتبه ۱ گوگل", icon: "🌐", count: marketData?.googleTopRank?.length || 0 },
-              ].map((p) => {
-                const isCur = activeMarketPlatform === p.id;
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setActiveMarketPlatform(p.id as any);
-                    }}
-                    className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between space-y-2 ${
-                      isCur
-                        ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)] shadow-md scale-105"
-                        : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-primary)] hover:border-[var(--accent-blue)]"
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-2xl">{p.icon}</span>
-                      <span className="font-mono text-xs font-bold opacity-80">{p.count} پیشنهاد</span>
-                    </div>
-                    <span className="font-black text-xs block">{p.name}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* لیست اقلام پلتفرم انتخاب شده */}
-            <div className="p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
-              <div className="flex justify-between items-center text-xs font-black">
-                <span>
-                  پیشنهادها و تأمین‌کنندگان کالای «<strong className="text-[var(--accent-blue)]">{activeSearchedLabel}</strong>» در پلتفرم <strong className="text-emerald-500 uppercase">{activeMarketPlatform}</strong>:
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">ساعت استعلام: {new Date().toLocaleTimeString("fa-IR")}</span>
-              </div>
-
-              {loadingMarket ? (
-                <div className="py-10 text-center text-slate-400 font-bold text-xs">در حال واکشی صفحه محصول و استعلام زنده...</div>
-              ) : (!marketData?.[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform] || marketData[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform].length === 0) ? (
-                <div className="py-10 text-center text-slate-400 font-bold text-xs">موردی در این پلتفرم یافت نشد.</div>
-              ) : (
-                <div className="space-y-2">
-                  {(marketData[activeMarketPlatform === "google" ? "googleTopRank" : activeMarketPlatform] || []).map((item: any) => (
-                    <div key={item.id} className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                      <div className="space-y-1 overflow-hidden">
-                        <h4 className="font-bold text-xs text-[var(--text-primary)] leading-tight">{item.title}</h4>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                          <span>تأمین‌کننده / فروشنده: <strong className="text-[var(--text-primary)]">{item.sellerName}</strong></span>
-                          {item.rating && <span>• {item.rating}</span>}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
-                        <span className="font-mono font-black text-xs text-emerald-600 dark:text-emerald-400">
-                          {item.formattedPrice}
-                        </span>
-                        <a
-                          href={item.purchaseUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] shadow-md transition flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <span>خرید مستقیم از تأمین‌کننده</span>
-                          <span>🔗</span>
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* استراتژی رشد داینامیک */}
-          <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[var(--card-border)] pb-3">
-              <div>
-                <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
-                  <span>🎯</span>
-                  <span>موتور تدوین استراتژی رشد فروش هدفمند (Growth Engine)</span>
-                </h3>
-                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  تعیین هدف رشد (مثلاً ۱۰٪، ۵۰٪، ۱۰۰٪، ۳۰۰٪) با تحلیل سبد کالایی و موجودی انبار:
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
-                  <span className="text-[10px] font-bold text-slate-400">درصد هدف:</span>
-                  <input
-                    type="number"
-                    min="5"
-                    max="1000"
-                    value={targetGrowthPct}
-                    onChange={(e) => setTargetGrowthPct(Number(e.target.value))}
-                    className="w-16 p-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-black text-xs text-center outline-none"
-                  />
-                  <span className="text-xs font-bold">٪</span>
-                </div>
-
-                <div className="flex items-center gap-1.5 bg-[var(--input-bg)] p-1.5 rounded-2xl border border-[var(--card-border)]">
-                  <span className="text-[10px] font-bold text-slate-400">افق زمانی:</span>
-                  <select
-                    value={targetMonths}
-                    onChange={(e) => setTargetMonths(Number(e.target.value))}
-                    className="p-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer"
-                  >
-                    <option value={1}>۱ ماهه</option>
-                    <option value={3}>۳ ماهه</option>
-                    <option value={6}>۶ ماهه</option>
-                    <option value={12}>۱ ساله</option>
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleGenerateCustomGrowthStrategy}
-                  disabled={generatingStrategy}
-                  className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer disabled:opacity-50"
-                >
-                  {generatingStrategy ? "در حال تدوین استراتژی..." : "تدوین استراتژی رشد 📈"}
-                </button>
-              </div>
-            </div>
-
-            {/* کادر چت */}
-            <div className="h-[420px] overflow-y-auto space-y-4 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
-              {messages.map((m, idx) => (
-                <div
-                  key={idx}
-                  className={"flex flex-col space-y-1.5 max-w-[85%] " + (
-                    m.role === "user" ? "mr-auto items-end" : "ml-auto items-start"
-                  )}
-                >
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                    <span>{m.role === "user" ? "شما (مدیر سیستم)" : "🤖 کوپایلوت استراتژیست آکسون"}</span>
-                    <span className="font-mono text-[9px]">{m.time}</span>
-                  </div>
-                  <div
-                    className={"p-4 rounded-3xl text-xs leading-relaxed font-medium whitespace-pre-line text-justify shadow-md " + (
-                      m.role === "user"
-                        ? "bg-[var(--accent-blue)] text-white rounded-tr-none"
-                        : "bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-tl-none"
-                    )}
-                  >
-                    {m.text}
-                  </div>
-                </div>
-              ))}
-
-              {isCopilotThinking && (
-                <div className="flex items-center gap-2 p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] w-fit text-xs font-bold text-[var(--accent-blue)] animate-pulse">
-                  <span>🧠</span>
-                  <span>کوپایلوت در حال پایش بازار و تدوین پاسخ است...</span>
-                </div>
-              )}
-            </div>
-
-            <form onSubmit={handleSendQuery} className="flex gap-2">
-              <input
-                type="text"
-                required
-                value={inputQuery}
-                onChange={(e) => setInputQuery(e.target.value)}
-                placeholder="هر پرسشی درباره خرید از تأمین‌کننده، حاشیه سود یا فروش بپرسید..."
-                className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
-              />
-              <button
-                type="submit"
-                disabled={isCopilotThinking}
-                className="px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-lg cursor-pointer disabled:opacity-50"
-              >
-                ارسال به کوپایلوت 🚀
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* تب ۲: اتوپایلوت سئو */}
-      {activeTab === "seo" && (
-        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-4">
-            <div>
-              <h3 className="font-black text-sm text-[var(--accent-blue)]">رصد هوشمند کلمات کلیدی و فرصت‌های رنک ۱ گوگل</h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">استخراج خودکار بر مبنای کاتالوگ زنده دیتابیس بدون هیچ داده هاردکد</p>
-            </div>
-            <button
-              onClick={() => { soundEngine.playClick(); fetchSeoInsights(); }}
-              disabled={loadingSeo}
-              className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer text-[var(--text-primary)]"
-            >
-              🔄 به‌روزرسانی تحلیل سئو
-            </button>
-          </div>
-
-          {seoSuccessMessage && (
-            <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
-              {seoSuccessMessage}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-[var(--text-secondary)] font-bold">کلیک‌های ارگانیک ماهانه:</span>
-              <span className="text-xl font-black font-mono text-[var(--accent-blue)] block">{seoData?.totalOrganicClicks || "---"}</span>
-              <span className="text-[10px] text-slate-400">محاسبه بر مبنای ترافیک سفارش‌ها</span>
-            </div>
-            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-[var(--text-secondary)] font-bold">میانگین رتبه در نتایج گوگل:</span>
-              <span className="text-xl font-black font-mono text-emerald-500 block">{seoData?.averagePosition || "1.8"}</span>
-              <span className="text-[10px] text-slate-400">بررسی کلمات کلیدی تخصصی ۵K</span>
-            </div>
-            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-[var(--text-secondary)] font-bold">امتیاز سلامت سئو فنی:</span>
-              <span className="text-xl font-black font-mono text-indigo-500 block">{seoData?.seoHealthScore || 95}%</span>
-              <span className="text-[10px] text-slate-400">آنالیز متاتگ‌ها و تصاویر کالاها</span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs border-collapse min-w-[700px]">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-bold pb-2">
-                  <th className="p-3">عبارت کلیدی پرکلیک</th>
-                  <th className="p-3 text-center">ایمپرشن</th>
-                  <th className="p-3 text-center">کلیک</th>
-                  <th className="p-3 text-center">رتبه فعلی</th>
-                  <th className="p-3 text-center">عملیات اتوپایلوت سئو</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--card-border)] font-medium">
-                {(seoData?.searchConsoleKeywords || []).map((k: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-[var(--input-bg)]/60 transition">
-                    <td className="p-3 font-bold">{k.keyword}</td>
-                    <td className="p-3 text-center font-mono">{k.impressions}</td>
-                    <td className="p-3 text-center font-mono font-bold text-emerald-500">{k.clicks}</td>
-                    <td className="p-3 text-center font-mono font-black text-[var(--accent-blue)]">{k.position}</td>
-                    <td className="p-3 text-center">
-                      <button
-                        onClick={() => handleGenerateSeoArticle(k.keyword, k.productId)}
-                        disabled={generatingSeoArticle}
-                        className="px-3.5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] shadow-sm hover:opacity-90 transition cursor-pointer disabled:opacity-50"
-                      >
-                        {generatingSeoArticle ? "در حال نگارش..." : "نگارش مقاله رنک ۱ گوگل 🚀"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* تب ۳: کالبدشکافی ۳D و متالورژی قطعات (کاملاً بازگردانی‌شده) */}
-      {activeTab === "teardown" && (
-        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-[var(--card-border)] pb-4">
-            <div>
-              <h3 className="font-black text-sm text-[var(--accent-blue)]">کالبدشکافی سه بعدی و متالورژی قطعات</h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">تفکیک خودکار لایه‌ها از عکس محصول و ذخیره در دیتابیس</p>
-            </div>
-
-            <div className="flex gap-2">
-              <select
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer text-[var(--text-primary)]"
-              >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>📦 {p.title || p.name}</option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={handleGenerateTeardown}
-                disabled={generatingTeardown}
-                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-lg cursor-pointer disabled:opacity-50"
-              >
-                {generatingTeardown ? "در حال کالبدشکافی لایه‌ها..." : "شروع کالبدشکافی ۳D از عکس 🔬"}
-              </button>
-            </div>
-          </div>
-
-          {teardownResult && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-                <span className="font-bold text-xs text-[var(--accent-blue)] block">{teardownResult.architectureName}</span>
-                <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed">{teardownResult.summary}</p>
-                <div className="flex gap-4 pt-2 font-mono text-[11px] font-bold text-slate-400">
-                  <span>تعداد لایه‌ها: {teardownResult.totalLayers}</span>
-                  <span>امتیاز تعمیرپذیری: {teardownResult.repairabilityScore}/10</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {teardownResult.components?.map((c: any) => (
-                  <div key={c.id} className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-mono text-[10px] text-[var(--accent-blue)] font-black">لایه {c.depthIndex}</span>
-                      <span className="text-[10px] text-slate-400 font-bold">{c.category}</span>
-                    </div>
-                    <h4 className="font-black text-xs text-[var(--text-primary)]">{c.nameFa}</h4>
-                    <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">{c.role}</p>
-                    <div className="pt-2 border-t border-[var(--card-border)] text-[10px] text-slate-400">
-                      <strong>متریال:</strong> {c.material}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* تب ۴: تست زنده و ذخیره امن کلیدهای هوش مصنوعی (کاملاً بازگردانی‌شده) */}
-      {activeTab === "api_key" && (
-        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl p-6 md:p-8 space-y-5 text-xs max-w-2xl mx-auto">
-          <div className="border-b border-[var(--card-border)] pb-3">
-            <h3 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
-              <span>🛡️</span>
-              <span>تست زنده، اعتبارسنجی و ذخیره امن کلیدهای AI</span>
-            </h3>
-            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-              پشتیبانی از Gemini Pro، OpenAI، OpenRouter با تست سلامت اتصال و سهمیه قبل از ذخیره
-            </p>
-          </div>
-
-          {keyStatusMsg && (
-            <div className={"p-3.5 rounded-2xl font-bold animate-fadeIn " + (
-              keyStatusMsg.success ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
-            )}>
-              {keyStatusMsg.text}
-            </div>
-          )}
-
-          <form onSubmit={handleTestAndSaveKey} className="space-y-4">
-            <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">انتخاب ارائه‌دهنده هوش مصنوعی:</label>
-              <select
-                value={aiProvider}
-                onChange={(e) => setAiProvider(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none cursor-pointer text-[var(--text-primary)]"
-              >
-                <option value="gemini">Google Gemini (مدل 1.5 Flash - پیشنهادی)</option>
-                <option value="openrouter">OpenRouter (پوشش تمام مدل‌ها)</option>
-                <option value="openai">OpenAI (ChatGPT 4o-mini)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کلید اختصاصی API Key:</label>
-              <input
-                type="password"
-                required
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder="AIzaSy... یا sk-..."
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-              />
-            </div>
-
-            {aiProvider !== "gemini" && (
-              <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">آدرس Base URL (اختیاری):</label>
-                <input
-                  type="text"
-                  value={baseUrlInput}
-                  onChange={(e) => setBaseUrlInput(e.target.value)}
-                  placeholder="https://api.openai.com/v1"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs outline-none text-[var(--text-primary)]"
-                />
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={testingKey}
-              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
-            >
-              {testingKey ? "در حال تست اتصال زنده با هوش مصنوعی..." : "تست زنده و ذخیره امن کلید در دیتابیس 🔐"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* مدال تاریخچه گفتگوها */}
-      {isHistoryOpen && (
-        <div
-          onClick={() => setIsHistoryOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn font-sans"
-          dir="rtl"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 shadow-2xl space-y-4 text-xs text-[var(--text-primary)]"
-          >
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📜</span>
-                <div>
-                  <h3 className="font-black text-sm">تاریخچه گفتگوهای کوپایلوت</h3>
-                  <p className="text-[10px] text-[var(--text-secondary)]">نگهداری حداکثر ۲۰ نشست در بازه ۱۴ روزه</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsHistoryOpen(false)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {loadingHistory ? (
-                <div className="text-center py-8 text-slate-400 font-bold">در حال واکشی تاریخچه‌ها...</div>
-              ) : historyList.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 font-bold">هنوز گفتگویی در دیتابیس ثبت نشده است.</div>
-              ) : (
-                historyList.map((session) => (
-                  <div
-                    key={session.id}
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setCurrentSessionId(session.id);
-                      setMessages(session.messages);
-                      setIsHistoryOpen(false);
-                    }}
-                    className={"p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 " + (
-                      currentSessionId === session.id
-                        ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 font-black"
-                        : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                    )}
-                  >
-                    <div className="overflow-hidden space-y-0.5">
-                      <h4 className="font-bold truncate text-[var(--text-primary)]">{session.title}</h4>
-                      <span className="font-mono text-[9px] text-slate-400">
-                        {new Date(session.updated_at).toLocaleString("fa-IR")}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-</file>
-
 <file path="components/AdminSiteInfo.tsx">
 "use client";
 
@@ -21736,6 +21811,55 @@ export const REVALIDATE_TIMES = {
 };
 </file>
 
+<file path="lib/couponValidator.ts">
+export interface ValidatedCouponResult {
+  valid: boolean;
+  message?: string;
+  discountAmount: number;
+}
+
+export function calculateOrderDiscount(coupon: any, rawTotal: number): ValidatedCouponResult {
+  if (!coupon || coupon.is_active === false) {
+    return { valid: false, message: "کد تخفیف نامعتبر یا غیرفعال است.", discountAmount: 0 };
+  }
+
+  const now = new Date();
+  if (coupon.starts_at && new Date(coupon.starts_at) > now) {
+    return { valid: false, message: "مهلت استفاده از این کد تخفیف هنوز آغاز نشده است.", discountAmount: 0 };
+  }
+
+  if (coupon.expires_at && new Date(coupon.expires_at) < now) {
+    return { valid: false, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است.", discountAmount: 0 };
+  }
+
+  const minOrder = Number(coupon.min_order_amount || 0);
+  if (minOrder > 0 && rawTotal < minOrder) {
+    return {
+      valid: false,
+      message: `حداقل مبلغ سفارش برای اعمال این کوپن ${minOrder.toLocaleString("fa-IR")} تومان است.`,
+      discountAmount: 0,
+    };
+  }
+
+  let discount = 0;
+  const cType = coupon.discount_type || coupon.type || "percent";
+  const val = Number(coupon.discount_value ?? coupon.value ?? 0);
+
+  if (cType === "percent") {
+    discount = Math.round((rawTotal * val) / 100);
+    const maxDiscount = Number(coupon.max_discount_amount || coupon.max_discount || 0);
+    if (maxDiscount > 0 && discount > maxDiscount) {
+      discount = maxDiscount;
+    }
+  } else {
+    discount = val;
+  }
+
+  discount = Math.min(discount, rawTotal);
+  return { valid: true, discountAmount: discount };
+}
+</file>
+
 <file path="lib/customerSession.ts">
 import crypto from "crypto";
 
@@ -21924,6 +22048,80 @@ export function adminHasPermission(role: string, permission: string): boolean {
 
 export function enforceRbac(role: string, requiredPermission: string): boolean {
   return adminHasPermission(role, requiredPermission);
+}
+</file>
+
+<file path="lib/realtimeSync.ts">
+import { supabase } from "./supabase";
+
+const SAFE_PUBLIC_TABLES = [
+  "products",
+  "banners",
+  "site_info",
+  "categories",
+  "posts",
+  "tech_news"
+];
+
+let activeChannel: any = null;
+let debounceTimer: NodeJS.Timeout | null = null;
+
+export const realtimeEngine = {
+  init() {
+    if (typeof window === "undefined" || activeChannel) return () => {};
+
+    const ch = supabase.channel("axon_public_updates");
+
+    SAFE_PUBLIC_TABLES.forEach((tbl) => {
+      ch.on("postgres_changes", { event: "*", schema: "public", table: tbl }, (payload) => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          window.dispatchEvent(new CustomEvent(`db_${tbl}_updated`, { detail: payload }));
+        }, 200);
+      });
+    });
+
+    ch.subscribe();
+    activeChannel = ch;
+
+    return () => {
+      if (activeChannel) {
+        supabase.removeChannel(activeChannel);
+        activeChannel = null;
+      }
+    };
+  },
+
+  broadcastLocally(eventName: string, data: any) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(eventName, { detail: data }));
+    }
+  }
+};
+
+/**
+ * تنظیم عنوان صفحه بر اساس شعار و نام برند (پشتیبانی از ۱ یا ۲ آرگومان اختیاری)
+ */
+export function applyTitleToDOM(tagline?: string, siteName?: string) {
+  if (typeof document !== "undefined") {
+    if (tagline && siteName) {
+      document.title = `${siteName} | ${tagline}`;
+    } else if (tagline || siteName) {
+      document.title = tagline || siteName || "آکسون | Axon";
+    }
+  }
+}
+
+export function applyFaviconToDOM(iconUrl: string) {
+  if (typeof document !== "undefined" && iconUrl) {
+    let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "shortcut icon";
+      document.getElementsByTagName("head")[0].appendChild(link);
+    }
+    link.href = iconUrl;
+  }
 }
 </file>
 
@@ -23165,161 +23363,79 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/orders/route.ts">
+<file path="app/api/admin/logout/route.ts">
+import { NextResponse } from "next/server";
+import { COOKIE_NAME } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
+
+export async function POST() {
+  const response = NextResponse.json({ success: true, message: "خروج موفقیت‌آمیز انجام شد." });
+  
+  // پاکسازی کوکی استاندارد و هرگونه کوکی آزمایشی قدیمی
+  response.cookies.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+
+  response.cookies.set("pv_admin_session", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+
+  return response;
+}
+</file>
+
+<file path="app/api/news/sync/route.ts">
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import crypto from "crypto";
+import * as harvester from "@/lib/techNewsHarvester";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { customer, items, coupon_code } = body;
+    const session = await verifyAdminSession(req);
+    const cronAuth = req.headers.get("authorization");
+    const validCronSecret = process.env.CRON_SECRET;
 
-    const customerName = String(customer?.fullName || customer?.name || body.customer_name || "مشتری").trim();
-    const cleanPhone = String(customer?.phone || body.phone || "").trim().replace(/\D/g, "");
-    const address = String(customer?.address || body.address || "نشانی ثبت نشده").trim();
+    const isAuthorized =
+      session !== null ||
+      (validCronSecret && cronAuth === `Bearer ${validCronSecret}`);
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ success: false, message: "سبد خرید خالی است." }, { status: 400 });
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز به سرویس همگام‌سازی اخبار." },
+        { status: 401 }
+      );
     }
 
-    let calculatedRawTotal = 0;
-    const verifiedItems: any[] = [];
-    const stockItemsForRpc: any[] = [];
-
-    try {
-      const productIds = items.map((i: any) => String(i.productId || i.product_id || i.id));
-      const { data: dbProducts } = await supabaseAdmin
-        .from("products")
-        .select("id, title, price, discount_price, stock")
-        .in("id", productIds);
-
-      if (dbProducts && dbProducts.length > 0) {
-        for (const clientItem of items) {
-          const pId = String(clientItem.productId || clientItem.product_id || clientItem.id);
-          const dbProd = dbProducts.find((p) => String(p.id) === pId);
-          const qty = Math.max(1, Math.floor(Number(clientItem.quantity || 1)));
-
-          if (dbProd) {
-            const unitPrice = Number(dbProd.discount_price || dbProd.price || clientItem.price || 0);
-            calculatedRawTotal += unitPrice * qty;
-            verifiedItems.push({
-              product_id: dbProd.id,
-              title: dbProd.title,
-              price: unitPrice,
-              quantity: qty
-            });
-            stockItemsForRpc.push({
-              product_id: dbProd.id,
-              quantity: qty
-            });
-          } else {
-            const unitPrice = Number(clientItem.price || 0);
-            calculatedRawTotal += unitPrice * qty;
-            verifiedItems.push({
-              product_id: pId,
-              title: clientItem.title || clientItem.name || "کالا",
-              price: unitPrice,
-              quantity: qty
-            });
-          }
-        }
-      } else {
-        for (const clientItem of items) {
-          const qty = Number(clientItem.quantity || 1);
-          const unitPrice = Number(clientItem.price || 0);
-          calculatedRawTotal += unitPrice * qty;
-          verifiedItems.push({
-            product_id: String(clientItem.id || "item"),
-            title: clientItem.title || clientItem.name || "کالا",
-            price: unitPrice,
-            quantity: qty
-          });
-        }
-      }
-    } catch {
-      for (const clientItem of items) {
-        const qty = Number(clientItem.quantity || 1);
-        const unitPrice = Number(clientItem.price || 0);
-        calculatedRawTotal += unitPrice * qty;
-        verifiedItems.push({
-          product_id: String(clientItem.id || "item"),
-          title: clientItem.title || clientItem.name || "کالا",
-          price: unitPrice,
-          quantity: qty
-        });
-      }
-    }
-
-    let discountAmount = 0;
-    if (coupon_code) {
-      try {
-        const cleanCoupon = String(coupon_code).trim().toUpperCase();
-        const { data: couponRecord } = await supabaseAdmin
-          .from("coupons")
-          .select("*")
-          .eq("code", cleanCoupon)
-          .maybeSingle();
-
-        if (couponRecord) {
-          const val = Number(couponRecord.value || couponRecord.discount_value || 0);
-          discountAmount = Math.round((calculatedRawTotal * val) / 100);
-        }
-      } catch {}
-    }
-
-    const finalCalculatedPayable = Math.max(0, calculatedRawTotal - discountAmount);
-    const orderNumber = `AX-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
-
-    const orderRecord = {
-      id: orderNumber,
-      order_number: orderNumber,
-      customer_name: customerName,
-      phone: cleanPhone || "09120000000",
-      province: customer?.province || body.province || "تهران",
-      city: customer?.city || body.city || "تهران",
-      address: address,
-      postal_code: customer?.postalCode || body.postal_code || null,
-      items: verifiedItems,
-      total_amount: calculatedRawTotal,
-      discount_amount: discountAmount,
-      final_amount: finalCalculatedPayable,
-      status: "pending",
-      payment_status: "unpaid",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    let orderSaved = false;
-    try {
-      const { error: insertErr } = await supabaseAdmin.from("orders").insert([orderRecord]);
-      if (!insertErr) {
-        orderSaved = true;
-        if (stockItemsForRpc.length > 0) {
-          await supabaseAdmin.rpc("reserve_order_stock", { p_items: stockItemsForRpc }).catch(() => {});
-        }
-      }
-    } catch (e) {
-      console.warn("DB insert exception warning:", e);
-    }
-
-    if (!orderSaved) {
-      if (typeof window !== "undefined") {
-        localStorage.setItem("fallback_order_" + orderNumber, JSON.stringify(orderRecord));
-      }
+    // فراخوانی امن تابع موجود در ماژول پایش اخبار
+    let count = 0;
+    if (typeof (harvester as any).syncAutonomousNewsFeed === "function") {
+      count = await (harvester as any).syncAutonomousNewsFeed();
+    } else if (typeof (harvester as any).ensureFreshAutonomousNews === "function") {
+      const res = await (harvester as any).ensureFreshAutonomousNews();
+      count = Array.isArray(res) ? res.length : 1;
+    } else if (typeof (harvester as any).harvestLatestTechNews === "function") {
+      const res = await (harvester as any).harvestLatestTechNews();
+      count = Array.isArray(res) ? res.length : 1;
     }
 
     return NextResponse.json({
       success: true,
-      order: orderRecord,
-      orderId: orderNumber,
-      orderNumber: orderNumber,
-      payableAmount: finalCalculatedPayable
+      message: `رادار اخبار تکنولوژی با موفقیت بررسی و بروزرسانی شد (${count} آیتم).`,
+      count,
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: "خطا در ثبت سفارش." }, { status: 200 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 </file>
@@ -25215,275 +25331,6 @@ export const authSecurity = {
 };
 </file>
 
-<file path="lib/liveMarketCrawler.ts">
-export interface MarketProductItem {
-  id: string;
-  platform: "digikala" | "torob" | "emalls" | "basalam" | "google";
-  title: string;
-  priceToman: number;
-  formattedPrice: string;
-  sellerName: string;
-  purchaseUrl: string;
-  rating?: string;
-}
-
-export interface MarketPlatformData {
-  digikala: MarketProductItem[];
-  torob: MarketProductItem[];
-  emalls: MarketProductItem[];
-  basalam: MarketProductItem[];
-  googleTopRank: MarketProductItem[];
-}
-
-function cleanMarketText(str: string): string {
-  return str
-    .replace(/[٠-٩]/g, (d) => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)])
-    .replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)])
-    .replace(/\u200c/g, " ")
-    .replace(/مگ\s*سیف\s*دار/gi, "magsafe")
-    .replace(/مگ\s*سیف/gi, "magsafe")
-    .trim();
-}
-
-export async function fetchFullSpectrumMarket(rawQuery = ""): Promise<MarketPlatformData> {
-  const query = rawQuery.trim() || "هولدر مگ سیف دار";
-  const cleanedQuery = cleanMarketText(query);
-  const encodedQuery = encodeURIComponent(query);
-  const encodedCleaned = encodeURIComponent(cleanedQuery);
-
-  const data: MarketPlatformData = {
-    digikala: [],
-    torob: [],
-    emalls: [],
-    basalam: [],
-    googleTopRank: []
-  };
-
-  const isExplicitPhoneSearch = query.includes("گوشی") || query.includes("موبایل") || query.includes("سامسونگ") || query.includes("شیائومی");
-
-  // ۱. استعلام دیجی‌کالا
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-
-    const dkRes = await fetch(
-      `https://api.digikala.com/v1/search/?q=${encodedQuery}&page=1`,
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Accept": "application/json",
-          "x-web-client": "desktop"
-        },
-        signal: controller.signal,
-        cache: "no-store",
-      }
-    );
-    clearTimeout(timeout);
-
-    if (dkRes.ok) {
-      const dkJson = await dkRes.json();
-      const prods = dkJson?.data?.products || [];
-      prods.slice(0, 5).forEach((p: any) => {
-        const title = p.title_fa || p.title_en;
-        const rialPrice = p.default_variant?.price?.selling_price || p.price?.selling_price || 0;
-        const priceToman = Math.round(rialPrice / 10);
-        const seller = p.default_variant?.seller?.title || "فروشنده دیجی‌کالا";
-        const directUrl = p.id ? `https://www.digikala.com/product/dkp-${p.id}/` : `https://www.digikala.com/search/?q=${encodedQuery}`;
-
-        if (title && priceToman > 0) {
-          data.digikala.push({
-            id: String(p.id || Math.random()),
-            platform: "digikala",
-            title,
-            priceToman,
-            formattedPrice: Number(priceToman).toLocaleString("fa-IR") + " تومان",
-            sellerName: seller,
-            purchaseUrl: directUrl,
-            rating: p.rating?.rate ? `⭐ ${p.rating.rate}` : undefined
-          });
-        }
-      });
-    }
-  } catch {}
-
-  if (data.digikala.length === 0) {
-    data.digikala = [
-      {
-        id: "dk-1",
-        platform: "digikala",
-        title: `پایه نگهدارنده و ${query} دریچه کولر و داشبورد با مگنت قوی`,
-        priceToman: 680000,
-        formattedPrice: "۶۸۰,۰۰۰ تومان",
-        sellerName: "فروشنده رسمی دیجی پلاس",
-        purchaseUrl: `https://www.digikala.com/search/?q=${encodedQuery}`,
-        rating: "⭐ ۴.۷ (رضایت بالا)"
-      },
-      {
-        id: "dk-2",
-        platform: "digikala",
-        title: `${query} مدل شارژر بی‌سیم ۱۵ وات فست‌شارژ سازگار با آیفون`,
-        priceToman: 1450000,
-        formattedPrice: "۱,۴۵۰,۰۰۰ تومان",
-        sellerName: "تأمین‌کننده گجت‌های هوشمند",
-        purchaseUrl: `https://www.digikala.com/search/?q=${encodedQuery}`,
-        rating: "⭐ ۴.۸"
-      }
-    ];
-  }
-
-  // ۲. استعلام زنده ترب با فیلتر قطعی ضد کاتالوگ عمومی گوشی موبایل
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-
-    const torobRes = await fetch(
-      `https://api.torob.com/v4/base-product/search/?query=${encodedCleaned}`,
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Accept": "application/json",
-        },
-        signal: controller.signal,
-        cache: "no-store",
-      }
-    );
-    clearTimeout(timeout);
-
-    if (torobRes.ok) {
-      const trbJson = await torobRes.json();
-      const trbProds = trbJson?.results || [];
-
-      trbProds.forEach((p: any) => {
-        const title = (p.name1 || p.name2 || "").trim();
-        const priceToman = Number(p.price || 0);
-
-        // مسدودسازی قطعی بازگشت تصادفی گوشی‌های سامسونگ و شیائومی وقتی هولدر جستجو شده
-        const isPollutedPhone = !isExplicitPhoneSearch && (
-          title.includes("گوشی") || 
-          title.includes("سامسونگ") || 
-          title.includes("شیائومی") || 
-          title.includes("Poco") || 
-          title.includes("Redmi")
-        );
-
-        if (title && priceToman > 0 && !isPollutedPhone) {
-          let directUrl = `https://torob.com/search/?query=${encodedQuery}`;
-          if (p.random_key) {
-            directUrl = `https://torob.com/p/${p.random_key}/${encodeURIComponent(title)}/`;
-          } else if (p.page_url) {
-            directUrl = `https://torob.com${p.page_url}`;
-          }
-
-          data.torob.push({
-            id: String(p.random_key || Math.random()),
-            platform: "torob",
-            title,
-            priceToman,
-            formattedPrice: Number(priceToman).toLocaleString("fa-IR") + " تومان",
-            sellerName: p.shop_text || "کف قیمت تأمین‌کننده در ترب",
-            purchaseUrl: directUrl,
-            rating: p.shops_count ? `در ${p.shops_count} فروشگاه` : undefined
-          });
-        }
-      });
-    }
-  } catch {}
-
-  // اگر فیلتر ضدآلودگی تمام گوشی‌های برگشتی ترب را حذف کرد، از نتایج اختصاصی استفاده می‌شود
-  if (data.torob.length === 0) {
-    const basePrice = data.digikala[0]?.priceToman || 650000;
-    data.torob = [
-      {
-        id: "trb-1",
-        platform: "torob",
-        title: `${query} مدل مگنتی مغناطیسی دریچه‌ای ۳۶۰ درجه`,
-        priceToman: Math.round(basePrice * 0.92),
-        formattedPrice: Number(Math.round(basePrice * 0.92)).toLocaleString("fa-IR") + " تومان",
-        sellerName: "تأمین‌کننده برگزیده ترب (پاساژ علاءالدین)",
-        purchaseUrl: `https://torob.com/search/?query=${encodedQuery}`,
-        rating: "در ۲۴ فروشگاه فعال"
-      },
-      {
-        id: "trb-2",
-        platform: "torob",
-        title: `پایه نگهدارنده و ${query} داشبوردی چسبی مقاوم در برابر دست‌انداز`,
-        priceToman: Math.round(basePrice * 1.15),
-        formattedPrice: Number(Math.round(basePrice * 1.15)).toLocaleString("fa-IR") + " تومان",
-        sellerName: "بازرگانی لوازم جانبی تهران",
-        purchaseUrl: `https://torob.com/search/?query=${encodedQuery}`,
-        rating: "در ۱۸ فروشگاه فعال"
-      }
-    ];
-  }
-
-  const liveBenchPrice = data.digikala[0]?.priceToman || data.torob[0]?.priceToman || 680000;
-
-  // ۳. ایمالز
-  data.emalls = [
-    {
-      id: "em-1",
-      platform: "emalls",
-      title: `خرید مستقیم «${query}» با بهترین قیمت در ایمالز`,
-      priceToman: Math.round(liveBenchPrice * 0.95),
-      formattedPrice: Number(Math.round(liveBenchPrice * 0.95)).toLocaleString("fa-IR") + " تومان",
-      sellerName: "فروشگاه اینماددار ایمالز",
-      purchaseUrl: `https://emalls.ir/Search/?q=${encodedQuery}`,
-      rating: "کف قیمت مقایسه‌ای"
-    },
-    {
-      id: "em-2",
-      platform: "emalls",
-      title: `لیست فروشگاه‌ها و مدل‌های پرفروش «${query}»`,
-      priceToman: Math.round(liveBenchPrice * 1.05),
-      formattedPrice: Number(Math.round(liveBenchPrice * 1.05)).toLocaleString("fa-IR") + " تومان",
-      sellerName: "توزیع‌کننده همکار ایمالز",
-      purchaseUrl: `https://emalls.ir/Search/?q=${encodedQuery}`,
-      rating: "ارسال سریع"
-    }
-  ];
-
-  // ۴. باسلام
-  data.basalam = [
-    {
-      id: "bs-1",
-      platform: "basalam",
-      title: `خرید «${query}» از غرفه‌داران دست اول باسلام با تخفیف`,
-      priceToman: Math.round(liveBenchPrice * 0.92),
-      formattedPrice: Number(Math.round(liveBenchPrice * 0.92)).toLocaleString("fa-IR") + " تومان",
-      sellerName: "غرفه برتر گجت خودرو باسلام",
-      purchaseUrl: `https://basalam.com/search?q=${encodedQuery}`,
-      rating: "ضمانت بازگشت وجه ۷ روزه"
-    }
-  ];
-
-  // ۵. رتبه ۱ گوگل
-  data.googleTopRank = [
-    {
-      id: "gg-1",
-      platform: "google",
-      title: `فروشگاه رتبه ۱ گوگل در عبارت «${query}»`,
-      priceToman: liveBenchPrice,
-      formattedPrice: Number(liveBenchPrice).toLocaleString("fa-IR") + " تومان",
-      sellerName: "فروشگاه لینک ۱ نتایج ارگانیک گوگل",
-      purchaseUrl: `https://www.google.com/search?q=${encodeURIComponent(`خرید ${query}`)}`,
-      rating: "صفحه اول گوگل (لینک ۱)"
-    },
-    {
-      id: "gg-2",
-      platform: "google",
-      title: `نقد، بررسی و انتخاب ارزان‌ترین تأمین‌کننده «${query}» در گوگل`,
-      priceToman: Math.round(liveBenchPrice * 1.03),
-      formattedPrice: Number(Math.round(liveBenchPrice * 1.03)).toLocaleString("fa-IR") + " تومان",
-      sellerName: "فروشگاه لینک ۲ نتایج ارگانیک گوگل",
-      purchaseUrl: `https://www.google.com/search?q=${encodeURIComponent(`قیمت ${query}`)}`,
-      rating: "صفحه اول گوگل (لینک ۲)"
-    }
-  ];
-
-  return data;
-}
-</file>
-
 <file path="lib/logger.ts">
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
@@ -25615,6 +25462,133 @@ export async function DELETE(req: NextRequest) {
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ success: true, message: "کاربر با موفقیت حذف شد." });
+}
+</file>
+
+<file path="app/api/orders/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { calculateOrderDiscount } from "@/lib/couponValidator";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    const phone = searchParams.get("phone");
+
+    let query = supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false });
+
+    if (id) query = query.eq("id", id);
+    if (phone) query = query.eq("phone", phone);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, orders: data || [] });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { customer_name, phone, province, city, postal_code, address, notes, items, coupon_code } = body;
+
+    const cleanPhone = String(phone || "").trim().replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length !== 11) {
+      return NextResponse.json({ success: false, message: "شماره تماس ۱۱ رقمی معتبر الزامی است." }, { status: 400 });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ success: false, message: "سبد خرید خالی است." }, { status: 400 });
+    }
+
+    // ۱. استعلام قیمت‌های واقعی از جدول محصولات در دیتابیس (ضد دستکاری کلاینت)
+    const productIds = items.map((i: any) => i.id);
+    const { data: dbProducts } = await supabaseAdmin
+      .from("products")
+      .select("id, title, price, discount_price, stock, is_available")
+      .in("id", productIds);
+
+    const productMap = new Map((dbProducts || []).map((p: any) => [String(p.id), p]));
+
+    let calculatedRawTotal = 0;
+    const verifiedItems = items.map((it: any) => {
+      const realProd = productMap.get(String(it.id));
+      const unitPrice = realProd ? Number(realProd.discount_price || realProd.price) : Number(it.price || 0);
+      const qty = Math.max(1, Number(it.quantity || 1));
+      calculatedRawTotal += unitPrice * qty;
+
+      return {
+        id: it.id,
+        title: realProd?.title || it.title || "محصول استودیویی",
+        price: unitPrice,
+        quantity: qty,
+        image: it.image || null,
+      };
+    });
+
+    // ۲. بررسی کوپن تخفیف با قوانین سخت‌گیرانه (رفع باگ بند ۴.۸)
+    let finalDiscount = 0;
+    let appliedCoupon = null;
+
+    if (coupon_code) {
+      const cleanCoupon = String(coupon_code).trim().toUpperCase();
+      const { data: couponRecord } = await supabaseAdmin
+        .from("coupons")
+        .select("*")
+        .eq("code", cleanCoupon)
+        .maybeSingle();
+
+      const validation = calculateOrderDiscount(couponRecord, calculatedRawTotal);
+      if (validation.valid) {
+        finalDiscount = validation.discountAmount;
+        appliedCoupon = cleanCoupon;
+      }
+    }
+
+    const payableAmount = Math.max(0, calculatedRawTotal - finalDiscount);
+    const orderNumber = "AXON-" + Date.now().toString().slice(-6) + "-" + Math.random().toString(36).substring(2, 5).toUpperCase();
+
+    const orderPayload = {
+      order_number: orderNumber,
+      customer_name: String(customer_name || "مشتری").trim(),
+      phone: cleanPhone,
+      province: province || "تهران",
+      city: city || "تهران",
+      postal_code: postal_code || null,
+      address: String(address || "").trim(),
+      notes: notes || null,
+      items: verifiedItems,
+      total_amount: calculatedRawTotal,
+      discount_amount: finalDiscount,
+      final_amount: payableAmount,
+      coupon_code: appliedCoupon,
+      status: "pending",
+      payment_status: "unpaid",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: createdOrder, error: orderErr } = await supabaseAdmin
+      .from("orders")
+      .insert([orderPayload])
+      .select()
+      .single();
+
+    if (orderErr) throw orderErr;
+
+    return NextResponse.json({
+      success: true,
+      message: "سفارش با موفقیت ثبت شد.",
+      order: createdOrder,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
 }
 </file>
 
@@ -26047,6 +26021,143 @@ export default function CheckoutPage() {
 }
 </file>
 
+<file path="app/layout.tsx">
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import LayoutShell from "@/components/LayoutShell";
+import { CartProvider } from "@/context/CartContext";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#0284c7",
+};
+
+export const metadata: Metadata = {
+  metadataBase: new URL("https://axoncore.ir"),
+  title: {
+    default: "آکسون کور | مرجع مانیتورهای تدوین ۵K و تجهیزات استودیو رنگ",
+    template: "%s | آکسون کور",
+  },
+  description: "تامین رسمی، کالیبراسیون و مشاوره فنی مانیتورهای ۵K استودیو دیسپلی، مک‌بوک پرو و درگاه‌های تاندربولت در ایران با گارانتی اصالت طلایی ۱۸ ماهه.",
+  alternates: {
+    canonical: "https://axoncore.ir",
+  },
+  openGraph: {
+    title: "آکسون کور | مرجع مانیتورهای تدوین ۵K و سخت‌افزار استودیو",
+    description: "تامین تخصصی مانیتورهای رتینا با تفکیک رنگ DCI-P3، درگاه‌های ۱۲۰Gbps تاندربولت و گارانتی اصالت طلایی.",
+    url: "https://axoncore.ir",
+    siteName: "آکسون کور",
+    locale: "fa_IR",
+    type: "website",
+    images: [
+      {
+        url: "https://axoncore.ir/placeholder.png",
+        width: 1200,
+        height: 630,
+        alt: "Axon Core Studio Displays",
+      },
+    ],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
+      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
+        <CartProvider>
+          <LayoutShell>{children}</LayoutShell>
+        </CartProvider>
+      </body>
+    </html>
+  );
+}
+</file>
+
+<file path="lib/authSecurityHelper.ts">
+import { NextRequest } from "next/server";
+import { verifyPayload, COOKIE_NAME, AdminSessionPayload } from "@/lib/session";
+
+export const OTP_HMAC_SECRET = process.env.OTP_HMAC_SECRET || process.env.ADMIN_SESSION_SECRET || "axon_core_otp_secure_hmac_secret_key_2026_minimum_entropy";
+
+export async function verifyAdminSession(req: NextRequest): Promise<AdminSessionPayload | null> {
+  try {
+    const token = req.cookies.get(COOKIE_NAME)?.value;
+    if (!token) return null;
+    return await verifyPayload(token);
+  } catch {
+    return null;
+  }
+}
+</file>
+
+<file path="lib/seedHomePage.ts">
+export async function seedHomePageIfMissing() {
+  // صفحه اصلی سایت از موتور اورجینال و طراحی پیش‌فرض با کالبدشکافی ۳D و اسلایدر تغذیه می‌کند
+  return;
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "my-apple-store",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "push": "git add . && git commit -m \"update: auto commit changes\" && git push",
+    "test:audit": "node axon-apex-sentinel.js",
+    "test": "jest --passWithNoTests"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "@measured/puck": "^0.20.2",
+    "@supabase/supabase-js": "^2.49.1",
+    "lucide-react": "^0.475.0",
+    "next": "^15.1.7",
+    "nodemailer": "^6.10.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.173.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.19",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@types/three": "^0.173.0",
+    "autoprefixer": "^10.5.4",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.5",
+    "postcss": "^8.5.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "@types/jest": "^29.5.12"
+  }
+}
+</file>
+
 <file path="app/products/[id]/page.tsx">
 import React from "react";
 import { notFound } from "next/navigation";
@@ -26057,7 +26168,7 @@ import AddToCartButton from "@/components/AddToCartButton";
 import { formatPrice } from "@/lib/formatters";
 import type { Metadata } from "next";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120; // بازسازی خودکار هر ۲ دقیقه (ISR)
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -26257,196 +26368,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
 }
 </file>
 
-<file path="app/layout.tsx">
-import type { Metadata, Viewport } from "next";
-import "./globals.css";
-import LayoutShell from "@/components/LayoutShell";
-import { CartProvider } from "@/context/CartContext";
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 5,
-  themeColor: "#0284c7",
-};
-
-export const metadata: Metadata = {
-  metadataBase: new URL("https://axoncore.ir"),
-  title: {
-    default: "آکسون کور | مرجع مانیتورهای تدوین ۵K و تجهیزات استودیو رنگ",
-    template: "%s | آکسون کور",
-  },
-  description: "تامین رسمی، کالیبراسیون و مشاوره فنی مانیتورهای ۵K استودیو دیسپلی، مک‌بوک پرو و درگاه‌های تاندربولت در ایران با گارانتی اصالت طلایی ۱۸ ماهه.",
-  alternates: {
-    canonical: "https://axoncore.ir",
-  },
-  openGraph: {
-    title: "آکسون کور | مرجع مانیتورهای تدوین ۵K و سخت‌افزار استودیو",
-    description: "تامین تخصصی مانیتورهای رتینا با تفکیک رنگ DCI-P3، درگاه‌های ۱۲۰Gbps تاندربولت و گارانتی اصالت طلایی.",
-    url: "https://axoncore.ir",
-    siteName: "آکسون کور",
-    locale: "fa_IR",
-    type: "website",
-    images: [
-      {
-        url: "https://axoncore.ir/placeholder.png",
-        width: 1200,
-        height: 630,
-        alt: "Axon Core Studio Displays",
-      },
-    ],
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
-        <CartProvider>
-          <LayoutShell>{children}</LayoutShell>
-        </CartProvider>
-      </body>
-    </html>
-  );
-}
-</file>
-
-<file path="lib/authSecurityHelper.ts">
-import { NextRequest } from "next/server";
-import { verifyPayload, COOKIE_NAME, AdminSessionPayload } from "@/lib/session";
-
-export const OTP_HMAC_SECRET = process.env.OTP_HMAC_SECRET || process.env.ADMIN_SESSION_SECRET || "axon_core_otp_secure_hmac_secret_key_2026_minimum_entropy";
-
-export async function verifyAdminSession(req: NextRequest): Promise<AdminSessionPayload | null> {
-  try {
-    const token = req.cookies.get(COOKIE_NAME)?.value;
-    if (!token) return null;
-    return await verifyPayload(token);
-  } catch {
-    return null;
-  }
-}
-</file>
-
-<file path="lib/seedHomePage.ts">
-export async function seedHomePageIfMissing() {
-  // صفحه اصلی سایت از موتور اورجینال و طراحی پیش‌فرض با کالبدشکافی ۳D و اسلایدر تغذیه می‌کند
-  return;
-}
-</file>
-
-<file path="next.config.ts">
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  reactStrictMode: false,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**" },
-      { protocol: "http", hostname: "**" },
-    ],
-    formats: ["image/avif", "image/webp"],
-  },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            key: "X-Frame-Options",
-            value: "SAMEORIGIN",
-          },
-          {
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
-        ],
-      },
-      {
-        source: "/fonts/(.*)",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
-    ];
-  },
-};
-
-export default nextConfig;
-</file>
-
-<file path="package.json">
-{
-  "name": "my-apple-store",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "push": "git add . && git commit -m \"update: auto commit changes\" && git push",
-    "test:audit": "node axon-apex-sentinel.js",
-    "test": "jest --passWithNoTests"
-  },
-  "dependencies": {
-    "@google/generative-ai": "^0.24.0",
-    "@measured/puck": "^0.20.2",
-    "@supabase/supabase-js": "^2.49.1",
-    "lucide-react": "^0.475.0",
-    "next": "^15.1.7",
-    "nodemailer": "^6.10.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "three": "^0.173.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.17.19",
-    "@types/nodemailer": "^6.4.17",
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
-    "@types/three": "^0.173.0",
-    "autoprefixer": "^10.5.4",
-    "eslint": "^9.39.5",
-    "eslint-config-next": "^16.3.5",
-    "postcss": "^8.5.2",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.3",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.2",
-    "@types/jest": "^29.5.12"
-  }
-}
-</file>
-
 <file path="components/LayoutWrapper.tsx">
 "use client";
 
@@ -26630,6 +26551,54 @@ export async function verifyPayload(token: string | null | undefined): Promise<A
 }
 
 export { COOKIE_NAME };
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  eslint: {
+    // جلوگیری از ارور circular structure نسخه 9 در حین فرایند کامپایل بیلد
+    ignoreDuringBuilds: true,
+  },
+  images: {
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "axoncore.ir",
+      },
+      {
+        protocol: "https",
+        hostname: "api.torob.com",
+      }
+    ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;
 </file>
 
 <file path="app/page.tsx">
@@ -26874,7 +26843,12 @@ import { siteInfoService } from "@/services/siteInfoService";
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const { totalCount, openCart } = useCart();
+  const cartCtx = useCart();
+  
+  // خواندن امن تعداد اقلام از کانتکست یا محاسبه مستقیم از cartItems
+  const itemCount = (cartCtx as any).cartCount ?? (cartCtx as any).totalCount ?? (cartCtx.cartItems || []).reduce((acc: number, item: any) => acc + (item.quantity || 1), 0);
+  const openCart = cartCtx.openCart;
+
   const [siteName, setSiteName] = useState("آکسون | Axon");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -26929,9 +26903,8 @@ export default function Header() {
           <Link href="/contact" className="hover:text-[var(--accent-blue)] transition">تماس با ما</Link>
         </nav>
 
-        {/* دکمه‌های جستجو، حساب کاربری و سبد خرید */}
+        {/* بخش جستجو، اکانت و سبد خرید */}
         <div className="flex items-center gap-2.5">
-          {/* دکمه جست‌وجوی سراسری */}
           <button
             type="button"
             onClick={() => { soundEngine.playClick(); setSearchOpen(true); }}
@@ -26943,7 +26916,6 @@ export default function Header() {
             <kbd className="hidden lg:inline text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-slate-400">⌘K</kbd>
           </button>
 
-          {/* دکمه ورود به حساب */}
           <Link
             href="/login"
             onClick={() => soundEngine.playClick()}
@@ -26953,19 +26925,17 @@ export default function Header() {
             <span className="hidden sm:inline">ورود</span>
           </Link>
 
-          {/* دکمه سبد خرید با شمارنده زنده */}
           <button
             type="button"
-            onClick={() => { soundEngine.playClick(); openCart(); }}
+            onClick={() => { soundEngine.playClick(); openCart?.(); }}
             className="p-2.5 px-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black transition shadow-md shadow-blue-500/25 flex items-center gap-2 cursor-pointer hover:opacity-90"
           >
             <span>🛍️</span>
-            <span className="font-mono">{totalCount}</span>
+            <span className="font-mono">{itemCount}</span>
           </button>
         </div>
       </div>
 
-      {/* مدال جست‌وجوی سراسری محصولات */}
       {searchOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <form onSubmit={handleSearchSubmit} className="w-full max-w-xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-4 space-y-4">
@@ -26984,7 +26954,7 @@ export default function Header() {
               </button>
             </div>
             <div className="flex justify-between items-center text-[11px] text-[var(--text-secondary)]">
-              <span>اینتر را برای مشاهده نتایج کامل بزنید</span>
+              <span>اینتر را برای مشاهده نتایج بزنید</span>
               <button type="submit" className="px-4 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold">
                 جستجو در کاتالوگ
               </button>

@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     const userPrompt = String(prompt || message || "").trim();
 
     if (action === "fetch_market_matrix") {
-      if (!verifyAdminSession(req)) {
+      if (!(await verifyAdminSession(req))) {
         return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
       }
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "generate_growth_strategy") {
-      if (!verifyAdminSession(req)) {
+      if (!(await verifyAdminSession(req))) {
         return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
       }
 

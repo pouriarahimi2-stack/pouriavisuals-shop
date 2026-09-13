@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 // واکشی کل اطلاعات CRM همراه با ادغام سفارشات ثبت‌شده
 export async function GET(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    if (!(await verifyAdminSession(req))) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
 // ایجاد دستی مشتری جدید یا ویرایش پرونده
 export async function POST(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    if (!(await verifyAdminSession(req))) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
 // حذف مشتری از CRM
 export async function DELETE(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    if (!(await verifyAdminSession(req))) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 

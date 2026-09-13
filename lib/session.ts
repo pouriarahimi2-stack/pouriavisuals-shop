@@ -1,5 +1,5 @@
 /**
- * Enterprise HMAC-SHA256 Session Engine (Edge & Node.js Compatible)
+ * Strict Cryptographic Session Engine
  */
 
 export interface AdminSessionPayload {
@@ -12,28 +12,15 @@ export interface AdminSessionPayload {
   exp: number;
 }
 
-const COOKIE_NAME = "admin_session_token";
-const SESSION_EXPIRY_SECONDS = 72 * 60 * 60; // ۷۲ ساعت
+export const COOKIE_NAME = "admin_session_token";
+const SESSION_EXPIRY_SECONDS = 72 * 60 * 60; // 72 hours
 
 function getSecretKey(): string {
-  // ۱. اولویت اول: کلید اختصاصی تنظیم‌شده در متغیرهای ورسل
-  if (process.env.ADMIN_SESSION_SECRET && process.env.ADMIN_SESSION_SECRET.trim().length >= 16) {
-    return process.env.ADMIN_SESSION_SECRET.trim();
+  const secret = process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret || secret.trim().length < 16) {
+    throw new Error("FATAL SECURITY ERROR: ADMIN_SESSION_SECRET is missing. Refusing to boot insecurely.");
   }
-
-  // ۲. اولویت دوم: استفاده از کلید محرمانه سرویس سوپابیس سرور (کلیدی امن و خصوصی که فقط در سمت سرور وجود دارد)
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY.trim().length >= 16) {
-    return process.env.SUPABASE_SERVICE_ROLE_KEY.trim();
-  }
-
-  // ۳. اولویت سوم: هش غیرقابل بازگشت کلید سوپابیس برای پایداری ۱۰۰٪ سیستم
-  const fallbackSource = process.env.NEXT_PUBLIC_SUPABASE_URL || "axon_core_studio_master_cluster_2026";
-  let hash = 0;
-  for (let i = 0; i < fallbackSource.length; i++) {
-    hash = ((hash << 5) - hash) + fallbackSource.charCodeAt(i);
-    hash |= 0;
-  }
-  return "axon_core_vault_hmac_256_bit_secure_token_" + Math.abs(hash) + "_studio_production_resilient_key";
+  return secret.trim();
 }
 
 function base64UrlEncode(str: string): string {
@@ -46,9 +33,7 @@ function base64UrlEncode(str: string): string {
 
 function base64UrlDecode(str: string): string {
   let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (base64.length % 4) {
-    base64 += "=";
-  }
+  while (base64.length % 4) base64 += "=";
   return Buffer.from(base64, "base64").toString("utf8");
 }
 
@@ -62,9 +47,7 @@ function bufferToBase64Url(buffer: ArrayBuffer): string {
 
 function base64UrlToUint8Array(str: string): Uint8Array {
   let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (base64.length % 4) {
-    base64 += "=";
-  }
+  while (base64.length % 4) base64 += "=";
   return new Uint8Array(Buffer.from(base64, "base64"));
 }
 
@@ -98,21 +81,16 @@ export async function signPayload(
   };
 
   const header = { alg: "HS256", typ: "JWT" };
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+  const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
 
   const key = await getCryptoKey("sign");
   const enc = new TextEncoder();
   const signatureBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(unsignedToken));
-  const signature = bufferToBase64Url(signatureBuffer);
-
-  return `${unsignedToken}.${signature}`;
+  return `${unsignedToken}.${bufferToBase64Url(signatureBuffer)}`;
 }
 
 export async function verifyPayload(token: string | null | undefined): Promise<AdminSessionPayload | null> {
   if (!token || typeof token !== "string") return null;
-
   const parts = token.split(".");
   if (parts.length !== 3) return null;
 
@@ -132,19 +110,10 @@ export async function verifyPayload(token: string | null | undefined): Promise<A
     );
 
     if (!isValid) return null;
-
-    const payloadJson = base64UrlDecode(encodedPayload);
-    const payload: AdminSessionPayload = JSON.parse(payloadJson);
-
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && now > payload.exp) {
-      return null;
-    }
-
+    const payload: AdminSessionPayload = JSON.parse(base64UrlDecode(encodedPayload));
+    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
     return payload;
   } catch {
     return null;
   }
 }
-
-export { COOKIE_NAME };

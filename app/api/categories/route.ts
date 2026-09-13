@@ -20,7 +20,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    if (!(await verifyAdminSession(req))) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    if (!(await verifyAdminSession(req))) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
@@ -90,7 +90,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    if (!verifyAdminSession(req)) {
+    if (!(await verifyAdminSession(req))) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 

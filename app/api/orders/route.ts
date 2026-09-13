@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { calculateOrderDiscount } from "@/lib/couponValidator";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    // الزامی بودن قطعی احراز هویت ادمین برای دیدن لیست سفارش‌ها
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز: مشاهده سفارش‌ها نیازمند ورود مدیر سیستم است." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     const phone = searchParams.get("phone");
 
     let query = supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false });
-
     if (id) query = query.eq("id", id);
     if (phone) query = query.eq("phone", phone);
 
@@ -31,14 +40,13 @@ export async function POST(req: NextRequest) {
 
     const cleanPhone = String(phone || "").trim().replace(/\D/g, "");
     if (!cleanPhone || cleanPhone.length !== 11) {
-      return NextResponse.json({ success: false, message: "شماره تماس ۱۱ رقمی معتبر الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شماره تماس معتبر ۱۱ رقمی الزامی است." }, { status: 400 });
     }
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, message: "سبد خرید خالی است." }, { status: 400 });
     }
 
-    // ۱. استعلام قیمت‌های واقعی از جدول محصولات در دیتابیس (ضد دستکاری کلاینت)
     const productIds = items.map((i: any) => i.id);
     const { data: dbProducts } = await supabaseAdmin
       .from("products")
@@ -56,16 +64,16 @@ export async function POST(req: NextRequest) {
 
       return {
         id: it.id,
-        title: realProd?.title || it.title || "محصول استودیویی",
+        title: realProd?.title || it.title || "کالای استودیو",
         price: unitPrice,
         quantity: qty,
         image: it.image || null,
       };
     });
 
-    // ۲. بررسی کوپن تخفیف با قوانین سخت‌گیرانه (رفع باگ بند ۴.۸)
     let finalDiscount = 0;
     let appliedCoupon = null;
+    let couponRecordToUpdate: any = null;
 
     if (coupon_code) {
       const cleanCoupon = String(coupon_code).trim().toUpperCase();
@@ -79,6 +87,7 @@ export async function POST(req: NextRequest) {
       if (validation.valid) {
         finalDiscount = validation.discountAmount;
         appliedCoupon = cleanCoupon;
+        couponRecordToUpdate = couponRecord;
       }
     }
 
@@ -112,6 +121,15 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (orderErr) throw orderErr;
+
+    // افزایش شمارنده مصرف کوپن برای جلوگیری از استفاده نامحدود
+    if (couponRecordToUpdate) {
+      const currentUsed = Number(couponRecordToUpdate.used_count || 0);
+      await supabaseAdmin
+        .from("coupons")
+        .update({ used_count: currentUsed + 1 })
+        .eq("id", couponRecordToUpdate.id);
+    }
 
     return NextResponse.json({
       success: true,

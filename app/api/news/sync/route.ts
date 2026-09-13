@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as harvester from "@/lib/techNewsHarvester";
+import { ensureFreshAutonomousNews } from "@/lib/techNewsHarvester";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
@@ -21,21 +21,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // فراخوانی امن تابع موجود در ماژول پایش اخبار
-    let count = 0;
-    if (typeof (harvester as any).syncAutonomousNewsFeed === "function") {
-      count = await (harvester as any).syncAutonomousNewsFeed();
-    } else if (typeof (harvester as any).ensureFreshAutonomousNews === "function") {
-      const res = await (harvester as any).ensureFreshAutonomousNews();
-      count = Array.isArray(res) ? res.length : 1;
-    } else if (typeof (harvester as any).harvestLatestTechNews === "function") {
-      const res = await (harvester as any).harvestLatestTechNews();
-      count = Array.isArray(res) ? res.length : 1;
-    }
+    const items = await ensureFreshAutonomousNews();
+    const count = Array.isArray(items) ? items.length : 0;
 
     return NextResponse.json({
       success: true,
-      message: `رادار اخبار تکنولوژی با موفقیت بررسی و بروزرسانی شد (${count} آیتم).`,
+      message: `رادار اخبار با موفقیت پایش و بروزرسانی شد (${count} خبر).`,
       count,
     });
   } catch (err: any) {

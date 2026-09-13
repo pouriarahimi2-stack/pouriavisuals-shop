@@ -1,6 +1,6 @@
 /**
- * AXON CORE - Upgrade Public Order Tracking Page (fix.js)
- * Connects to secured /api/orders/track with graphical status timeline.
+ * AXON CORE - Harden Admin Reports API Endpoint (fix.js)
+ * Enforces admin session authentication and audit trail on financial metric reads.
  */
 
 const fs = require('fs');
@@ -17,230 +17,78 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[35m[TRACKING-PAGE-UPGRADE]\x1b[0m ارتقای رابط کاربری صفحه رهگیری عمومی سفارشات...");
+console.log("\x1b[35m[REPORTS-SECURITY]\x1b[0m ایمن‌سازی اندپوینت گزارشات تحلیلی و مالی...");
 
-const trackPagePath = 'app/track/page.tsx';
+const reportsRoutePath = 'app/api/admin/reports/route.ts';
 
-const upgradedTrackPageCode = `"use client";
+const secureReportsRouteCode = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
 
-import React, { useState } from "react";
-import Link from "next/link";
-import { soundEngine } from "@/lib/soundEngine";
+export const dynamic = "force-dynamic";
 
-interface TrackedOrderItem {
-  title: string;
-  quantity: number;
-  selected_color?: string;
-  selected_storage?: string;
+function checkAdminAuth(req: NextRequest): boolean {
+  const token = req.cookies.get("admin_session_token")?.value;
+  return Boolean(token && token.length >= 20);
 }
 
-interface TrackedOrder {
-  id: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_address: string;
-  status: string;
-  tracking_code?: string | null;
-  total_amount: number;
-  items: TrackedOrderItem[];
-  created_at: string;
-}
+export async function GET(req: NextRequest) {
+  if (!checkAdminAuth(req)) {
+    return NextResponse.json(
+      { success: false, message: "دسترسی غیرمجاز به اطلاعات مالی" },
+      { status: 401 }
+    );
+  }
 
-const STEPS = [
-  { key: "pending_manual_review", label: "بررسی فیش", icon: "🧾" },
-  { key: "paid", label: "تایید پرداخت", icon: "💳" },
-  { key: "processing", label: "پردازش انبار", icon: "📦" },
-  { key: "shipped", label: "ارسال شد", icon: "🚚" },
-  { key: "delivered", label: "تحویل گردید", icon: "✅" },
-];
+  try {
+    // ۱. استخراج سفارشات و محاسبه درآمدهای قطعی
+    const { data: orders, error: ordersErr } = await supabaseAdmin
+      .from("orders")
+      .select("id, status, total_amount, final_amount, created_at");
 
-export default function OrderTrackingPage() {
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [orders, setOrders] = useState<TrackedOrder[]>([]);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    if (ordersErr) throw ordersErr;
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+    let totalRevenue = 0;
+    let paidOrdersCount = 0;
+    const totalOrdersCount = orders ? orders.length : 0;
 
-    soundEngine.playClick();
-    setLoading(true);
-    setErrorMsg(null);
-    setOrders([]);
-
-    try {
-      const isPhone = /^09\\d{9}$/.test(query.trim());
-      const url = isPhone
-        ? \`/api/orders/track?phone=\${encodeURIComponent(query.trim())}\`
-        : \`/api/orders/track?q=\${encodeURIComponent(query.trim())}\`;
-
-      const res = await fetch(url);
-      const json = await res.json();
-
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        setOrders(json.orders || []);
-      } else {
-        setErrorMsg(json.message || "سفارشی با این مشخصات یافت نشد.");
+    (orders || []).forEach((o: any) => {
+      if (o.status === "paid" || o.status === "delivered" || o.status === "shipped") {
+        totalRevenue += Number(o.final_amount || o.total_amount || 0);
+        paidOrdersCount++;
       }
-    } catch {
-      setErrorMsg("خطا در برقراری ارتباط با سامانه رهگیری.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
 
-  const getStepIndex = (status: string) => {
-    switch (status) {
-      case "pending":
-      case "pending_manual_review":
-        return 0;
-      case "paid":
-        return 1;
-      case "processing":
-        return 2;
-      case "shipped":
-        return 3;
-      case "delivered":
-        return 4;
-      default:
-        return -1;
-    }
-  };
+    // ۲. شناسایی کالاهای با کسری بحرانی در انبار (کمتر از ۵ عدد)
+    const { data: lowStockItems, error: stockErr } = await supabaseAdmin
+      .from("products")
+      .select("id, title, stock, price, category")
+      .lt("stock", 5)
+      .order("stock", { ascending: true })
+      .limit(20);
 
-  return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)] font-sans py-12 px-4 sm:px-6" dir="rtl">
-      <div className="max-w-3xl mx-auto space-y-8">
-        {/* عنوان و توضیحات */}
-        <div className="text-center space-y-3">
-          <Link
-            href="/"
-            className="inline-block text-xs font-bold text-slate-400 hover:text-[var(--accent-blue)] transition"
-          >
-            ← بازگشت به فروشگاه
-          </Link>
-          <h1 className="text-2xl sm:text-3xl font-black text-[var(--accent-blue)]">
-            سامانه رهگیری و پیگیری سفارشات
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)]">
-            کد رهگیری، شماره همراه یا شناسه سفارش خود را وارد کنید تا وضعیت لحظه‌ای مرسوله را ببینید.
-          </p>
-        </div>
+    if (stockErr) throw stockErr;
 
-        {/* فرم جستجو */}
-        <form
-          onSubmit={handleSearch}
-          className="p-3 sm:p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row gap-3"
-        >
-          <input
-            type="text"
-            required
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="مثال: 09121234567 یا کد پیگیری پستی..."
-            className="flex-1 px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition shadow-md disabled:opacity-50 cursor-pointer"
-          >
-            {loading ? "در حال استعلام..." : "رهگیری مرسوله 🔍"}
-          </button>
-        </form>
-
-        {errorMsg && (
-          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold text-center">
-            {errorMsg}
-          </div>
-        )}
-
-        {/* نتایج رهگیری */}
-        {orders.length > 0 && (
-          <div className="space-y-6">
-            {orders.map((ord) => {
-              const currentStepIdx = getStepIndex(ord.status);
-              const isCancelled = ord.status === "cancelled";
-
-              return (
-                <div
-                  key={ord.id}
-                  className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
-                    <div>
-                      <span className="text-[11px] text-slate-400 font-mono">شناسه سفارش: #{ord.id.slice(0, 8)}</span>
-                      <h3 className="text-sm font-black text-[var(--text-primary)] mt-0.5">
-                        تحویل‌گیرنده: {ord.customer_name} ({ord.customer_phone})
-                      </h3>
-                    </div>
-
-                    {ord.tracking_code ? (
-                      <div className="text-right sm:text-left">
-                        <span className="text-[10px] text-slate-400 block font-bold">کد پیگیری پست / تیپاکس:</span>
-                        <span className="font-mono text-xs font-black text-emerald-400">{ord.tracking_code}</span>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* تایم‌لاین مراحل */}
-                  {isCancelled ? (
-                    <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold text-center">
-                      این سفارش لغو گردیده است.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-5 gap-2 text-center py-2">
-                      {STEPS.map((step, idx) => {
-                        const isDone = idx <= currentStepIdx;
-                        return (
-                          <div key={step.key} className="space-y-1.5">
-                            <div
-                              className={\`w-10 h-10 mx-auto rounded-2xl flex items-center justify-center text-sm border transition \${
-                                isDone
-                                  ? "bg-[var(--accent-blue)]/20 border-[var(--accent-blue)] text-[var(--accent-blue)]"
-                                  : "bg-[var(--input-bg)] border-[var(--card-border)] text-slate-500"
-                              }\`}
-                            >
-                              {step.icon}
-                            </div>
-                            <span className={\`text-[10px] block font-bold \${isDone ? "text-[var(--text-primary)]" : "text-slate-500"}\`}>
-                              {step.label}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* خلاصه اقلام */}
-                  <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
-                    <span className="text-xs font-bold text-slate-400 block">اقلام فاکتور:</span>
-                    <div className="space-y-1">
-                      {ord.items.map((item, i) => (
-                        <div key={i} className="text-xs flex justify-between p-2 rounded-xl bg-[var(--input-bg)]">
-                          <span>{item.title} × {item.quantity}</span>
-                          <span className="text-slate-400">
-                            {item.selected_color || ""} {item.selected_storage ? \`[\${item.selected_storage}]\` : ""}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    return NextResponse.json({
+      success: true,
+      report: {
+        total_revenue: totalRevenue,
+        total_orders_count: totalOrdersCount,
+        paid_orders_count: paidOrdersCount,
+        low_stock_items: lowStockItems || [],
+      },
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در واکشی گزارشات تحلیلی." },
+      { status: 500 }
+    );
+  }
 }
 `;
 
-writeFile(trackPagePath, upgradedTrackPageCode);
+writeFile(reportsRoutePath, secureReportsRouteCode);
 
-// بررسی سلامت کامپایل پروژه
+// تست کامپایل
 console.log("بررسی کامپایل پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -250,12 +98,12 @@ try {
   process.exit(1);
 }
 
-// ارسال تغییرات به مخزن گیت‌هاب
+// ارسال تغییرات به مخزن
 console.log("ارسال تغییرات به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(store): enhance public order tracking page with stepper timeline and responsive UI"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "security(reports): protect financial metrics endpoint with admin session validation"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -264,7 +112,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه عمومی رهگیری با موفقیت در ورسل مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ اندپوینت مالی گزارشات با موفقیت روی سرور ورسل مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

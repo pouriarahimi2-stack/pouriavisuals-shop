@@ -3,67 +3,60 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
+function checkAdminAuth(req: NextRequest): boolean {
+  const token = req.cookies.get("admin_session_token")?.value;
+  return Boolean(token && token.length >= 20);
+}
+
 export async function GET(req: NextRequest) {
+  if (!checkAdminAuth(req)) {
+    return NextResponse.json(
+      { success: false, message: "دسترسی غیرمجاز به اطلاعات مالی" },
+      { status: 401 }
+    );
+  }
+
   try {
-    const adminToken = req.cookies.get("admin_session_token")?.value;
-    if (!adminToken || adminToken.length < 20) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
-    }
+    // ۱. استخراج سفارشات و محاسبه درآمدهای قطعی
+    const { data: orders, error: ordersErr } = await supabaseAdmin
+      .from("orders")
+      .select("id, status, total_amount, final_amount, created_at");
 
-    // ۱. دریافت سفارش‌ها و محصولات به صورت همزمان
-    const [ordersRes, productsRes] = await Promise.all([
-      supabaseAdmin
-        .from("orders")
-        .select("id, status, total_amount, final_amount, created_at, items"),
-      supabaseAdmin
-        .from("products")
-        .select("id, title, stock, price, discount_price")
-        .order("stock", { ascending: true }),
-    ]);
+    if (ordersErr) throw ordersErr;
 
-    if (ordersRes.error) throw ordersRes.error;
-    if (productsRes.error) throw productsRes.error;
-
-    const orders = ordersRes.data || [];
-    const products = productsRes.data || [];
-
-    // ۲. تحلیل مبالغ و وضعیت سفارش‌ها
     let totalRevenue = 0;
-    let pendingManualReviews = 0;
-    let successfulOrdersCount = 0;
+    let paidOrdersCount = 0;
+    const totalOrdersCount = orders ? orders.length : 0;
 
-    for (const ord of orders) {
-      if (ord.status === "pending_manual_review") {
-        pendingManualReviews++;
+    (orders || []).forEach((o: any) => {
+      if (o.status === "paid" || o.status === "delivered" || o.status === "shipped") {
+        totalRevenue += Number(o.final_amount || o.total_amount || 0);
+        paidOrdersCount++;
       }
-      if (["paid", "processing", "shipped", "delivered"].includes(ord.status)) {
-        successfulOrdersCount++;
-        totalRevenue += Number(ord.final_amount || ord.total_amount || 0);
-      }
-    }
+    });
 
-    // ۳. هشدار کالاهای رو به اتمام (موجودی کمتر از ۵ عدد)
-    const lowStockItems = products.filter((p) => typeof p.stock === "number" && p.stock < 5);
+    // ۲. شناسایی کالاهای با کسری بحرانی در انبار (کمتر از ۵ عدد)
+    const { data: lowStockItems, error: stockErr } = await supabaseAdmin
+      .from("products")
+      .select("id, title, stock, price, category")
+      .lt("stock", 5)
+      .order("stock", { ascending: true })
+      .limit(20);
 
-    // ۴. ساختار خلاصه گزارش
-    const summary = {
-      total_revenue: totalRevenue,
-      successful_orders: successfulOrdersCount,
-      total_orders: orders.length,
-      pending_manual_reviews: pendingManualReviews,
-      total_products: products.length,
-      low_stock_count: lowStockItems.length,
-      low_stock_items: lowStockItems.slice(0, 10),
-      generated_at: new Date().toISOString(),
-    };
+    if (stockErr) throw stockErr;
 
     return NextResponse.json({
       success: true,
-      report: summary,
+      report: {
+        total_revenue: totalRevenue,
+        total_orders_count: totalOrdersCount,
+        paid_orders_count: paidOrdersCount,
+        low_stock_items: lowStockItems || [],
+      },
     });
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: err.message || "خطا در تولید گزارش فروش." },
+      { success: false, message: err.message || "خطا در واکشی گزارشات تحلیلی." },
       { status: 500 }
     );
   }

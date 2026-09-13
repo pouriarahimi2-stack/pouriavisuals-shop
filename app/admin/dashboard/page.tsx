@@ -1,33 +1,4 @@
-/**
- * AXON CORE - Admin Analytics Dashboard & KPI Cards Integration (fix.js)
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ایجاد/اصلاح شد: ${relPath}\x1b[0m`);
-}
-
-function readFile(relPath) {
-  const full = path.join(ROOT, relPath);
-  if (!fs.existsSync(full)) return null;
-  return fs.readFileSync(full, 'utf8');
-}
-
-console.log("\x1b[35m[DASHBOARD-UI]\x1b[0m ایجاد صفحه داشبورد مدیریتی جامع و شاخص‌های تحلیلی...");
-
-// =============================================================================
-// ۱. ایجاد صفحه داشبورد تحلیلی در app/admin/dashboard/page.tsx
-// =============================================================================
-const dashboardPageCode = `"use client";
+"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -201,56 +172,4 @@ export default function AdminDashboardPage() {
       </div>
     </div>
   );
-}
-`;
-
-writeFile('app/admin/dashboard/page.tsx', dashboardPageCode);
-
-// =============================================================================
-// ۲. افزودن لینک پیشخوان به ابتدای سایدبار ادمین (components/admin/AdminSidebar.tsx)
-// =============================================================================
-const sidebarPath = 'components/admin/AdminSidebar.tsx';
-let sidebarContent = readFile(sidebarPath);
-
-if (sidebarContent && !sidebarContent.includes('/admin/dashboard')) {
-  // اضافه کردن داشبورد به عنوان نخستین آیتم سایدبار
-  sidebarContent = sidebarContent.replace(
-    /const\s+NAV_ITEMS\s*=\s*\[/,
-    `const NAV_ITEMS = [\n      { id: "dashboard", title: "میز فرمان و آمار", href: "/admin/dashboard", icon: "📊" },`
-  );
-  writeFile(sidebarPath, sidebarContent);
-  console.log("\x1b[32m✔ لینک داشبورد به سایدبار مدیریت اضافه شد.\x1b[0m");
-}
-
-// =============================================================================
-// ۳. کامپایل و تست صحت پروژه
-// =============================================================================
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// =============================================================================
-// ۴. پوش به گیت‌هاب
-// =============================================================================
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(admin): create comprehensive analytics dashboard page with realtime KPI cards and low-stock alerts"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه داشبورد مدیریتی با موفقیت روی سرور Vercel مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

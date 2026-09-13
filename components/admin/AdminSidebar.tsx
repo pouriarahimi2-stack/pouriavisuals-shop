@@ -53,6 +53,7 @@ const navGroups: NavGroup[] = [
       { id: "backup", title: "پشتیبان‌گیری دیتابیس", href: "/admin/backup", icon: "💾" },
       { id: "change_pin", title: "مدیریت حساب و کلمه عبور", href: "/admin/change-pin", icon: "🔐" },
       { id: "audit_logs", title: "لاگ‌ها و وقایع امنیتی", href: "/admin/audit-logs", icon: "🛡️" },
+      { id: "roles", title: "مدیریت نقش‌ها و RBAC", href: "/admin/roles", icon: "👥" },
     ],
   },
 ];

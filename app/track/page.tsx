@@ -1,27 +1,4 @@
-/**
- * AXON CORE - Upgrade Public Order Tracking Page (fix.js)
- * Connects to secured /api/orders/track with graphical status timeline.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[TRACKING-PAGE-UPGRADE]\x1b[0m ارتقای رابط کاربری صفحه رهگیری عمومی سفارشات...");
-
-const trackPagePath = 'app/track/page.tsx';
-
-const upgradedTrackPageCode = `"use client";
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -70,10 +47,10 @@ export default function OrderTrackingPage() {
     setOrders([]);
 
     try {
-      const isPhone = /^09\\d{9}$/.test(query.trim());
+      const isPhone = /^09\d{9}$/.test(query.trim());
       const url = isPhone
-        ? \`/api/orders/track?phone=\${encodeURIComponent(query.trim())}\`
-        : \`/api/orders/track?q=\${encodeURIComponent(query.trim())}\`;
+        ? `/api/orders/track?phone=${encodeURIComponent(query.trim())}`
+        : `/api/orders/track?q=${encodeURIComponent(query.trim())}`;
 
       const res = await fetch(url);
       const json = await res.json();
@@ -196,15 +173,15 @@ export default function OrderTrackingPage() {
                         return (
                           <div key={step.key} className="space-y-1.5">
                             <div
-                              className={\`w-10 h-10 mx-auto rounded-2xl flex items-center justify-center text-sm border transition \${
+                              className={`w-10 h-10 mx-auto rounded-2xl flex items-center justify-center text-sm border transition ${
                                 isDone
                                   ? "bg-[var(--accent-blue)]/20 border-[var(--accent-blue)] text-[var(--accent-blue)]"
                                   : "bg-[var(--input-bg)] border-[var(--card-border)] text-slate-500"
-                              }\`}
+                              }`}
                             >
                               {step.icon}
                             </div>
-                            <span className={\`text-[10px] block font-bold \${isDone ? "text-[var(--text-primary)]" : "text-slate-500"}\`}>
+                            <span className={`text-[10px] block font-bold ${isDone ? "text-[var(--text-primary)]" : "text-slate-500"}`}>
                               {step.label}
                             </span>
                           </div>
@@ -221,7 +198,7 @@ export default function OrderTrackingPage() {
                         <div key={i} className="text-xs flex justify-between p-2 rounded-xl bg-[var(--input-bg)]">
                           <span>{item.title} × {item.quantity}</span>
                           <span className="text-slate-400">
-                            {item.selected_color || ""} {item.selected_storage ? \`[\${item.selected_storage}]\` : ""}
+                            {item.selected_color || ""} {item.selected_storage ? `[${item.selected_storage}]` : ""}
                           </span>
                         </div>
                       ))}
@@ -235,36 +212,4 @@ export default function OrderTrackingPage() {
       </div>
     </div>
   );
-}
-`;
-
-writeFile(trackPagePath, upgradedTrackPageCode);
-
-// بررسی سلامت کامپایل پروژه
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال تغییرات به مخزن گیت‌هاب
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(store): enhance public order tracking page with stepper timeline and responsive UI"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه عمومی رهگیری با موفقیت در ورسل مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

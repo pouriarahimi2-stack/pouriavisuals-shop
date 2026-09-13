@@ -1,27 +1,4 @@
-/**
- * AXON CORE - Harden Admin Orders Route with State Machine, Stock Deduction & Audit Logging (fix.js)
- * Preserves all existing order schemas, receipts, and items.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[ORDERS-ADMIN-SECURITY]\x1b[0m مقاوم‌سازی مدیریت وضعیت سفارشات و کسر هوشمند انبار...");
-
-const ordersRoutePath = 'app/api/admin/orders/route.ts';
-
-const secureOrdersRouteCode = `import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +28,7 @@ async function logAudit(req: NextRequest, action: string, targetId: string, deta
     await supabaseAdmin.from("admin_audit_logs").insert({
       admin_username: "admin",
       action,
-      target_resource: \`order:\${targetId}\`,
+      target_resource: `order:${targetId}`,
       details,
       ip_address: clientIp,
       created_at: new Date().toISOString(),
@@ -184,36 +161,4 @@ export async function PUT(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-`;
-
-writeFile(ordersRoutePath, secureOrdersRouteCode);
-
-// کامپایل بیلد و ارزیابی سلامت تایپ‌ها
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال به گیت‌هاب
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(orders): enforce valid state machine, auto-deduct stock on paid status, and log admin audit trails"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ مدیریت هوشمند سفارشات با موفقیت روی سرور ورسل مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

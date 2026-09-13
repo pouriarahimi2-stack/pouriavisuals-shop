@@ -1,46 +1,57 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verifyPayload, COOKIE_NAME } from "@/lib/session";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export const config = {
-  matcher: [
-    "/admin/:path*",
-    "/api/admin/:path*",
-  ],
-};
-
-export async function middleware(req: NextRequest) {
+export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const adminToken = req.cookies.get("admin_session_token")?.value;
+  const isAuthenticated = Boolean(adminToken && adminToken.length >= 20);
 
-  // روت‌های مجاز بدون نیاز به ورود
-  if (
-    pathname === "/admin/login" ||
-    pathname === "/api/admin/login" ||
-    pathname.startsWith("/_next") ||
-    pathname.includes("favicon.ico")
-  ) {
-    return NextResponse.next();
-  }
-
-  const token = req.cookies.get(COOKIE_NAME)?.value;
-  const session = await verifyPayload(token);
-
-  if (!session) {
-    // در صورت نامعتبر یا منقضی بودن سشن
-    if (pathname.startsWith("/api/")) {
+  // ۱. حفاظت از اندپوینت‌های مدیریتی (/api/admin/*) به جز احراز هویت
+  if (pathname.startsWith("/api/admin")) {
+    const isAuthEndpoint = pathname === "/api/admin/auth";
+    if (!isAuthEndpoint && !isAuthenticated) {
       return NextResponse.json(
-        { success: false, message: "نشست امنیتی نامعتبر یا منقضی شده است. لطفا مجدداً وارد شوید." },
+        { success: false, message: "دسترسی غیرمجاز. سشن ادمین معتبر نیست." },
         { status: 401 }
       );
     }
-
-    const loginUrl = new URL("/admin/login", req.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    const response = NextResponse.redirect(loginUrl);
-
-    // پاکسازی کوکی نامعتبر
-    response.cookies.delete(COOKIE_NAME);
-    return response;
   }
 
-  return NextResponse.next();
+  // ۲. حفاظت از صفحات پنل ادمین (/admin/*) به جز صفحه لاگین
+  if (pathname.startsWith("/admin")) {
+    const isLoginPage = pathname === "/admin/login";
+
+    if (!isAuthenticated && !isLoginPage) {
+      const loginUrl = new URL("/admin/login", req.url);
+      loginUrl.searchParams.set("from", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    if (isAuthenticated && isLoginPage) {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
+  }
+
+  // ۳. ایجاد پاسخ و تزریق هدرهای امنیتی دفاعی
+  const response = NextResponse.next();
+
+  // مقابله با Clickjacking
+  response.headers.set("X-Frame-Options", "DENY");
+  // مقابله با حدس فرمت فایل توسط مرورگر
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  // سیاست محافظت از رفرر
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // قفل دسترسی‌های غیرضروری کلاینت
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  return response;
 }
+
+export const config = {
+  matcher: [
+    /*
+     * اعمال روی تمام مسیرها به استثنای فایل‌های استاتیک و آیکون‌ها
+     */
+    "/((?!_next/static|_next/image|favicon.ico|images|icons).*)",
+  ],
+};

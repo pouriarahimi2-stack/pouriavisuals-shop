@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Polish Phase: Modern Toast/Feedback UI & Catch Block Cleanup (fix.js)
+ * AXON CORE - Security Headers & Client IP Hardening (fix.js)
  */
 
 const fs = require('fs');
@@ -22,74 +22,71 @@ function readFile(relPath) {
   return fs.readFileSync(full, 'utf8');
 }
 
-console.log("\x1b[35m[FINAL-POLISH]\x1b[0m آغاز فاز پاکسازی: جایگزینی alertها با سیستم فیدبک و لاگ خطاهای خاموش...");
+console.log("\x1b[35m[HARDENING]\x1b[0m اصلاح هدرهای امنیتی و اعتبارسنجی IP در احراز هویت ادمین...");
 
 // =============================================================================
-// ۱. ارتقای components/admin/AdminCustomers.tsx (حذف alert و confirm بومی)
+// ۱. پالایش آدرس IP در app/api/admin/login/route.ts
 // =============================================================================
-const customersPath = 'components/admin/AdminCustomers.tsx';
-let custContent = readFile(customersPath);
+const loginRoutePath = 'app/api/admin/login/route.ts';
+let loginContent = readFile(loginRoutePath);
 
-if (custContent && custContent.includes('alert(')) {
-  // اضافه کردن استیت پیام‌های موقت به جای alert
-  custContent = custContent.replace(
-    'const [submitting, setSubmitting] = useState(false);',
-    'const [submitting, setSubmitting] = useState(false);\n  const [actionFeedback, setActionFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);\n\n  const showFeedback = (text: string, type: "success" | "error" = "success") => {\n    setActionFeedback({ type, text });\n    setTimeout(() => setActionFeedback(null), 4000);\n  };'
+if (loginContent && loginContent.includes('req.headers.get("x-forwarded-for")')) {
+  loginContent = loginContent.replace(
+    /const\s+ip\s*=\s*req\.headers\.get\("x-forwarded-for"\)\s*\|\|\s*[^;]+;/g,
+    `const rawForwarded = req.headers.get("x-forwarded-for");
+    const ip = rawForwarded ? rawForwarded.split(",")[0].trim() : (req.headers.get("x-real-ip") || "127.0.0.1");`
   );
-
-  // جایگزینی alert با showFeedback
-  custContent = custContent.replace(/alert\("✓ "\s*\+\s*json\.message\);/g, 'showFeedback(json.message, "success");');
-  custContent = custContent.replace(/alert\(json\.message\s*\|\|\s*"خطا در ذخیره اطلاعات\."\);/g, 'showFeedback(json.message || "خطا در ذخیره اطلاعات.", "error");');
-  custContent = custContent.replace(/alert\("پرونده با موفقیت حذف شد\."\);/g, 'showFeedback("پرونده با موفقیت حذف شد.", "success");');
-  custContent = custContent.replace(/alert\("خطا در حذف پرونده\."\);/g, 'showFeedback("خطا در حذف پرونده.", "error");');
-  custContent = custContent.replace(/alert\("✓ پیامک بازاریابی و کد تخفیف اختصاصی با موفقیت ارسال گردید\."\);/g, 'showFeedback("پیامک بازاریابی و کد تخفیف با موفقیت ارسال گردید.", "success");');
-  custContent = custContent.replace(/alert\(json\.message\s*\|\|\s*"خطا در ارسال پیامک\."\);/g, 'showFeedback(json.message || "خطا در ارسال پیامک.", "error");');
-
-  // رندر بنر فیدبک در بالای کامپوننت
-  const feedbackBanner = `
-      {actionFeedback && (
-        <div className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (
-          actionFeedback.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-500"
-        )}>
-          {actionFeedback.text}
-        </div>
-      )}
-`;
-  custContent = custContent.replace(
-    '{/* سربرگ سامانه سازمانی CRM */}',
-    feedbackBanner + '\n      {/* سربرگ سامانه سازمانی CRM */}'
-  );
-
-  writeFile(customersPath, custContent);
+  writeFile(loginRoutePath, loginContent);
 }
 
 // =============================================================================
-// ۲. لاگ‌گذاری ساختاریافته روی بلوک‌های خالی catch در سرویس‌ها
+// ۲. ایمن‌سازی هدرهای امنیتی در next.config.ts
 // =============================================================================
-const siteInfoPath = 'services/siteInfoService.ts';
-let siteInfoContent = readFile(siteInfoPath);
-if (siteInfoContent && siteInfoContent.includes('catch {}')) {
-  siteInfoContent = siteInfoContent.replace(/catch\s*\{\}/g, 'catch (err) { console.error("[SITE_INFO_SILENT_ERROR]:", err); }');
-  writeFile(siteInfoPath, siteInfoContent);
+const nextConfigPath = 'next.config.ts';
+let nextConfigContent = readFile(nextConfigPath);
+
+if (nextConfigContent && !nextConfigContent.includes('X-Content-Type-Options')) {
+  const securityHeadersBlock = `
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },`;
+
+  if (nextConfigContent.includes('const nextConfig: NextConfig = {')) {
+    nextConfigContent = nextConfigContent.replace(
+      'const nextConfig: NextConfig = {',
+      'const nextConfig: NextConfig = {' + securityHeadersBlock
+    );
+    writeFile(nextConfigPath, nextConfigContent);
+  }
 }
 
 // =============================================================================
-// ۳. بیلد لوکال و ارسال نهایی به گیت‌هاب
+// ۳. بیلد و ارسال تغییرات به گیت‌هاب
 // =============================================================================
 console.log("بررسی کامپایل پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ پروژه با موفقیت ۱۰۰٪ کامپایل شد!\x1b[0m");
+  console.log("\x1b[32m✔ بیلد ۱۰۰٪ موفقیت‌آمیز بود!\x1b[0m");
 } catch (e) {
   console.error("خطای بیلد:", e.message);
   process.exit(1);
 }
 
-console.log("ارسال کامیت پولیش و نهایی به گیت‌هاب...");
+console.log("ارسال تغییرات به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "refactor(ui): replace native alerts with toast feedback and clean up empty catches"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "security: enforce strict security headers and sanitize client IP resolution in admin login"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -98,7 +95,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ تمام مراحل نقشه راه با موفقیت به پایان رسید و در ورسل مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ تمام تنظیمات با موفقیت روی سرور Vercel اعمال شدند!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

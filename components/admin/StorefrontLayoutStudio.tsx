@@ -16,6 +16,7 @@ export default function StorefrontLayoutStudio() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [config, setConfig] = useState<HomepageLayoutConfig>(DEFAULT_HOMEPAGE_LAYOUT_CONFIG);
   const [saving, setSaving] = useState(false);
+  const [viewportMode, setViewportMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // استیت‌های افزودن پیوند جدید به دسترسی سریع
@@ -193,6 +194,31 @@ export default function StorefrontLayoutStudio() {
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
             کنترل بلادرنگ تمامی ستون‌های فوتر، ویرایش و افزودن مجوزها و گواهی‌ها و رفتار هوشمند دکمه چت
           </p>
+        </div>
+
+        
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+          <button
+            type="button"
+            onClick={() => setViewportMode("desktop")}
+            className={"px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer " + (viewportMode === "desktop" ? "bg-[var(--accent-blue)] text-white" : "text-[var(--text-secondary)]")}
+          >
+            💻 دسکتاپ
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewportMode("tablet")}
+            className={"px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer " + (viewportMode === "tablet" ? "bg-[var(--accent-blue)] text-white" : "text-[var(--text-secondary)]")}
+          >
+            📟 تبلت
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewportMode("mobile")}
+            className={"px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer " + (viewportMode === "mobile" ? "bg-[var(--accent-blue)] text-white" : "text-[var(--text-secondary)]")}
+          >
+            📱 موبایل
+          </button>
         </div>
 
         <button

@@ -13,6 +13,7 @@ export default function PageBuilder() {
   const [metaDescription, setMetaDescription] = useState("");
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [isPublished, setIsPublished] = useState(true);
+  const [deviceView, setDeviceView] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -222,6 +223,44 @@ export default function PageBuilder() {
               </div>
             </div>
 
+            
+            {/* نوار انتخاب نمای دستگاه (دسکتاپ / تبلت / موبایل) */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+              <span className="font-bold text-xs text-[var(--text-secondary)]">📱 نمای پیش‌نمایش اندازه صفحه:</span>
+              <div className="flex gap-1.5 p-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
+                <button
+                  type="button"
+                  onClick={() => setDeviceView("desktop")}
+                  className={"px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1.5 " + (
+                    deviceView === "desktop" ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-[var(--text-secondary)] hover:text-white"
+                  )}
+                >
+                  <span>💻</span>
+                  <span>دسکتاپ (100%)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeviceView("tablet")}
+                  className={"px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1.5 " + (
+                    deviceView === "tablet" ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-[var(--text-secondary)] hover:text-white"
+                  )}
+                >
+                  <span>📟</span>
+                  <span>تبلت (768px)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeviceView("mobile")}
+                  className={"px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1.5 " + (
+                    deviceView === "mobile" ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-[var(--text-secondary)] hover:text-white"
+                  )}
+                >
+                  <span>📱</span>
+                  <span>موبایل (390px)</span>
+                </button>
+              </div>
+            </div>
+
             <div className="border-t border-[var(--card-border)] pt-6 space-y-4">
               <div className="flex flex-wrap justify-between items-center gap-2">
                 <span className="text-xs font-black">🧱 افزودن بخش ساختاری جدید:</span>
@@ -247,7 +286,7 @@ export default function PageBuilder() {
                 </div>
               </div>
 
-              <div className="space-y-4 pt-2">
+              <div className={"space-y-4 pt-2 transition-all duration-300 mx-auto " + (deviceView === "mobile" ? "max-w-[390px] border-x-2 border-dashed border-[var(--accent-blue)]/50 px-2" : deviceView === "tablet" ? "max-w-[768px] border-x-2 border-dashed border-[var(--accent-blue)]/30 px-3" : "w-full")}>
                 {blocks.map((block, idx) => (
                   <div key={block.id} className="p-4 sm:p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3 shadow-sm">
                     <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-2.5">

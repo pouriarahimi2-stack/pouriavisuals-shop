@@ -1,13 +1,36 @@
-import sanitizeHtml from "sanitize-html";
 import { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import sanitizeHtml from "sanitize-html";
 
 export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ slug: string }>;
+}
+
+function sanitizeNewsHtml(html: string): string {
+  if (!html) return "";
+  return sanitizeHtml(html, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      "img",
+      "h1",
+      "h2",
+      "h3",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "th",
+      "td",
+    ]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      "*": ["class", "style"],
+      img: ["src", "alt", "width", "height"],
+    },
+  });
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -33,19 +56,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-
-function sanitizeNewsHtml(html: string): string {
-  if (!html) return "";
-  return sanitizeHtml(html, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2", "h3", "table", "thead", "tbody", "tr", "th", "td"]),
-    allowedAttributes: {
-      ...sanitizeHtml.defaults.allowedAttributes,
-      "*": ["class", "style"],
-      "img": ["src", "alt", "width", "height"],
-    }
-  });
-}
-
 export default async function NewsDetailPage({ params }: Props) {
   const { slug } = await params;
   const { data: article } = await supabaseAdmin
@@ -56,7 +66,6 @@ export default async function NewsDetailPage({ params }: Props) {
 
   if (!article) notFound();
 
-  // تولید اسکیما استاندارد JSON-LD گوگل برای NewsArticle
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",

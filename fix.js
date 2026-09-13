@@ -1,6 +1,6 @@
 /**
- * AXON CORE - Upgrade Admin Sidebar with Full Navigation & Secure Logout (fix.js)
- * Ensures all hardened routes are represented with active path recognition.
+ * AXON CORE - Harden Public Order Tracking Route with Data Masking (fix.js)
+ * Preserves all public order status lookups while masking PII.
  */
 
 const fs = require('fs');
@@ -17,126 +17,103 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[35m[SIDEBAR-UPGRADE]\x1b[0m بازطراحی و ارتقای کامل سایدبار ناوبری ادمین...");
+console.log("\x1b[35m[PUBLIC-TRACKING-SECURITY]\x1b[0m مقاوم‌سازی اندپوینت رهگیری عمومی مرسوله با ماسک اطلاعات شخصی...");
 
-const sidebarPath = 'components/admin/AdminSidebar.tsx';
+const trackRoutePath = 'app/api/orders/track/route.ts';
 
-const upgradedSidebarCode = `"use client";
+const secureTrackRouteCode = `import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
 
-import React from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { soundEngine } from "@/lib/soundEngine";
+export const dynamic = "force-dynamic";
 
-interface NavItem {
-  id: string;
-  title: string;
-  href: string;
-  icon: string;
+function maskPhoneNumber(phone?: string): string {
+  if (!phone || phone.length < 7) return "***";
+  return phone.slice(0, 4) + "***" + phone.slice(-4);
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", title: "داشبورد اصلی", href: "/admin/dashboard", icon: "⚡" },
-  { id: "orders", title: "مدیریت سفارشات", href: "/admin/orders", icon: "📦" },
-  { id: "products", title: "کاتالوگ محصولات", href: "/admin/products", icon: "💻" },
-  { id: "coupons", title: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
-  { id: "banners", title: "بنرها و اسلایدر", href: "/admin/banners", icon: "🖼️" },
-  { id: "news", title: "اخبار و مقالات", href: "/admin/news", icon: "📰" },
-  { id: "reports", title: "گزارشات و انبار", href: "/admin/reports", icon: "📈" },
-  { id: "audit-logs", title: "لاگ‌های امنیتی", href: "/admin/audit-logs", icon: "🛡️" },
-  { id: "backup", title: "پشتیبان‌گیری داده‌ها", href: "/admin/backup", icon: "💾" },
-  { id: "settings", title: "تنظیمات فروشگاه", href: "/admin/settings", icon: "⚙️" },
-];
+function maskAddress(addr?: string): string {
+  if (!addr || addr.length < 10) return "***";
+  const parts = addr.split(" ");
+  if (parts.length <= 2) return addr.slice(0, 5) + "...";
+  return parts.slice(0, 2).join(" ") + " ... (محفوظ)";
+}
 
-export default function AdminSidebar() {
-  const pathname = usePathname();
-  const router = useRouter();
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const query = searchParams.get("q")?.trim();
+    const phone = searchParams.get("phone")?.trim();
 
-  const handleLogout = async () => {
-    soundEngine.playClick();
-    try {
-      await fetch("/api/admin/auth", { method: "DELETE" });
-    } catch {
-      // ادامه خروج حتی در صورت خطای شبکه
-    } finally {
-      router.push("/admin/login");
-      router.refresh();
+    if (!query && !phone) {
+      return NextResponse.json(
+        { success: false, message: "شماره سفارش، کد رهگیری پستی یا شماره همراه الزامی است." },
+        { status: 400 }
+      );
     }
-  };
 
-  return (
-    <aside
-      className="w-64 bg-[var(--modal-bg)] border-l border-[var(--card-border)] flex flex-col justify-between shrink-0 h-screen sticky top-0 font-sans"
-      dir="rtl"
-    >
-      {/* بخش لوگو و برند */}
-      <div className="p-6 border-b border-[var(--card-border)]">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[var(--accent-blue)] to-blue-500 flex items-center justify-center text-white font-black text-lg shadow-lg">
-            A
-          </div>
-          <div>
-            <h2 className="font-black text-sm text-[var(--text-primary)] tracking-wide">
-              آکسون کور
-            </h2>
-            <span className="text-[10px] text-[var(--accent-blue)] font-bold block uppercase tracking-wider">
-              Control Panel v1.0
-            </span>
-          </div>
-        </div>
-      </div>
+    let dbQuery = supabaseAdmin.from("orders").select("*");
 
-      {/* منوی ناوبری اصلی */}
-      <nav className="p-4 space-y-1 overflow-y-auto flex-1 custom-scrollbar">
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              onClick={() => soundEngine.playClick()}
-              className={\`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all \${
-                isActive
-                  ? "bg-[var(--accent-blue)] text-white shadow-md shadow-blue-500/20"
-                  : "text-[var(--text-secondary)] hover:text-white hover:bg-[var(--input-bg)]"
-              }\`}
-            >
-              <span className="text-base">{item.icon}</span>
-              <span>{item.title}</span>
-            </Link>
-          );
-        })}
-      </nav>
+    if (query) {
+      // جستجو هم بر اساس آیدی سفارش و هم کد رهگیری پستی
+      if (query.includes("-") || query.length >= 20) {
+        dbQuery = dbQuery.eq("id", query);
+      } else {
+        dbQuery = dbQuery.or(\`id.ilike.%\${query}%,tracking_code.eq.\${query}\`);
+      }
+    }
 
-      {/* بخش پایین سایدبار و دکمه خروج */}
-      <div className="p-4 border-t border-[var(--card-border)] space-y-2">
-        <Link
-          href="/"
-          target="_blank"
-          onClick={() => soundEngine.playClick()}
-          className="flex items-center justify-between px-3.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 hover:text-white hover:bg-[var(--input-bg)] transition"
-        >
-          <span className="flex items-center gap-2">
-            <span>🌐</span> مشاهده فروشگاه
-          </span>
-          <span className="text-xs font-mono">↗</span>
-        </Link>
+    if (phone) {
+      const cleanPhone = phone.replace("+98", "0");
+      dbQuery = dbQuery.eq("customer_phone", cleanPhone);
+    }
 
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-        >
-          <span>🚪</span> خروج از مدیریت
-        </button>
-      </div>
-    </aside>
-  );
+    const { data: orders, error } = await dbQuery.order("created_at", { ascending: false }).limit(5);
+
+    if (error) throw error;
+
+    if (!orders || orders.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "سفارشی با این مشخصات در سیستم یافت نشد." },
+        { status: 404 }
+      );
+    }
+
+    // پالایش اطلاعات شخصی (PII Masking)
+    const sanitizedOrders = orders.map((o) => ({
+      id: o.id,
+      customer_name: o.customer_name ? o.customer_name[0] + "***" : "مشتری گرامی",
+      customer_phone: maskPhoneNumber(o.customer_phone),
+      customer_address: maskAddress(o.customer_address),
+      status: o.status,
+      tracking_code: o.tracking_code || null,
+      total_amount: o.final_amount || o.total_amount,
+      items: Array.isArray(o.items)
+        ? o.items.map((i: any) => ({
+            title: i.title,
+            quantity: i.quantity,
+            selected_color: i.selected_color,
+            selected_storage: i.selected_storage,
+          }))
+        : [],
+      created_at: o.created_at,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      orders: sanitizedOrders,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در پیگیری وضعیت مرسوله." },
+      { status: 500 }
+    );
+  }
 }
 `;
 
-writeFile(sidebarPath, upgradedSidebarCode);
+writeFile(trackRoutePath, secureTrackRouteCode);
 
-// تست کامپایل پروژه
+// تست کامپایل
 console.log("بررسی کامپایل پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -146,12 +123,12 @@ try {
   process.exit(1);
 }
 
-// ارسال به مخزن گیت‌هاب
+// ارسال تغییرات به مخزن
 console.log("ارسال تغییرات به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(admin): modernize AdminSidebar with full navigation links and server-cleared session logout"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "security(tracking): harden public order tracking API with PII masking and multi-param lookup"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -160,7 +137,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ سایدبار ادمین با موفقیت روی سرور ورسل مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ اندپوینت رهگیری مرسولات با موفقیت در ورسل مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

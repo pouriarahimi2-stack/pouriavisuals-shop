@@ -1,30 +1,4 @@
-/**
- * AXON CORE - Secure Admin Media Upload Route (fix.js)
- * Preserves all existing functionality and upgrades storage security.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[STORAGE-SECURITY]\x1b[0m ارتقای امنیت آپلود سنتر و اعتبارسنجی سخت‌گیرانه فایل‌ها...");
-
-// =============================================================================
-// ارتقای امن اندپوینت آپلود مدیا (app/api/admin/upload/route.ts)
-// =============================================================================
-const uploadRoutePath = 'app/api/admin/upload/route.ts';
-
-const secureUploadCode = `import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -84,8 +58,8 @@ export async function POST(req: NextRequest) {
 
     // ۵. نام‌گذاری تصادفی و خنثی‌سازی حملات نام فایل
     const originalExt = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "webp";
-    const cleanFileName = \`\${Date.now()}-\${Math.random().toString(36).substring(2, 10)}.\${originalExt}\`;
-    const filePath = \`uploads/\${cleanFileName}\`;
+    const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${originalExt}`;
+    const filePath = `uploads/${cleanFileName}`;
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -124,36 +98,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-`;
-
-writeFile(uploadRoutePath, secureUploadCode);
-
-// کامپایل و تست یکپارچگی بیلد
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال تغییرات به مخزن
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(storage): harden admin upload route with strict MIME verification, size cap, and sanitized naming"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ ارتقای امنیت آپلود سنتر با موفقیت روی سرور مستقر شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

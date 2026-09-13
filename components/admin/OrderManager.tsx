@@ -127,9 +127,9 @@ export default function OrderManager() {
                       o.status === "shipped" ? "bg-blue-500/15 text-blue-500" :
                       o.status === "paid" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" :
                       o.status === "delivered" ? "bg-purple-500/15 text-purple-500" :
-                      o.status === "cancelled" ? "bg-rose-500/15 text-rose-500" : "bg-amber-500/15 text-amber-500"
+                      o.status === "cancelled" ? "bg-rose-500/15 text-rose-500" : (o.status as string) === "pending_manual_review" ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 animate-pulse" : "bg-slate-500/15 text-slate-400"
                     }`}>
-                      {o.status === "shipped" ? "ارسال شده 🚚" : o.status === "paid" ? "پرداخت شده ✓" : o.status === "delivered" ? "تحویل داده شده" : o.status === "cancelled" ? "لغو شده" : "در انتظار"}
+                      {o.status === "shipped" ? "ارسال شده 🚚" : o.status === "paid" ? "پرداخت شده ✓" : o.status === "delivered" ? "تحویل داده شده" : o.status === "cancelled" ? "لغو شده" : (o.status as string) === "pending_manual_review" ? "بررسی واریز ⚠️" : "در انتظار"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)]">
@@ -163,6 +163,26 @@ export default function OrderManager() {
                 </button>
               </div>
 
+              
+              {(selectedOrder.status as string) === "pending_manual_review" && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="font-bold text-xs text-amber-400 block">⚠️ این سفارش نیازمند تایید پرداخت دستی است</span>
+                    <p className="text-[11px] text-slate-300">در صورت دریافت فیش یا تایید مبلغ، روی دکمه مقابل کلیک کنید تا سفارش پرداخت‌شده ثبت گردد.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusInput("paid");
+                      soundEngine.playSuccess();
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition shadow-md cursor-pointer shrink-0"
+                  >
+                    ✓ تایید دریافت وجه و تسویه
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--card-border)]">
                 <div><span className="text-[var(--text-secondary)] font-bold">شماره تماس:</span> <span className="font-mono font-bold mr-1">{selectedOrder.customer?.phone || selectedOrder.phone}</span></div>
                 <div><span className="text-[var(--text-secondary)] font-bold">کد پستی ۱۰ رقمی:</span> <span className="font-mono font-bold mr-1">{selectedOrder.customer?.postalCode || selectedOrder.postalCode || "---"}</span></div>
@@ -178,6 +198,7 @@ export default function OrderManager() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer"
                   >
                     <option value="pending">در انتظار پرداخت</option>
+                    <option value="pending_manual_review">⚠️ در انتظار تایید واریز دستی ادمین</option>
                     <option value="paid">پرداخت شده و در حال آماده‌سازی</option>
                     <option value="processing">در حال بسته‌بندی استودیویی</option>
                     <option value="shipped">تحویل به شرکت پست (ارسال شد)</option>

@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Security Headers & Client IP Hardening (fix.js)
+ * AXON CORE - Fix Type Narrowing in OrderManager.tsx (fix.js)
  */
 
 const fs = require('fs');
@@ -8,85 +8,45 @@ const { execSync } = require('child_process');
 
 const ROOT = process.cwd();
 
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ اصلاح شد: ${relPath}\x1b[0m`);
-}
+console.log("\x1b[36m[TYPE-FIX]\x1b[0m اصلاح زنجیره ترنری وضعیت سفارش در components/admin/OrderManager.tsx...");
 
-function readFile(relPath) {
-  const full = path.join(ROOT, relPath);
-  if (!fs.existsSync(full)) return null;
-  return fs.readFileSync(full, 'utf8');
-}
+const orderManagerPath = path.join(ROOT, 'components/admin/OrderManager.tsx');
 
-console.log("\x1b[35m[HARDENING]\x1b[0m اصلاح هدرهای امنیتی و اعتبارسنجی IP در احراز هویت ادمین...");
+if (fs.existsSync(orderManagerPath)) {
+  let content = fs.readFileSync(orderManagerPath, 'utf8');
 
-// =============================================================================
-// ۱. پالایش آدرس IP در app/api/admin/login/route.ts
-// =============================================================================
-const loginRoutePath = 'app/api/admin/login/route.ts';
-let loginContent = readFile(loginRoutePath);
-
-if (loginContent && loginContent.includes('req.headers.get("x-forwarded-for")')) {
-  loginContent = loginContent.replace(
-    /const\s+ip\s*=\s*req\.headers\.get\("x-forwarded-for"\)\s*\|\|\s*[^;]+;/g,
-    `const rawForwarded = req.headers.get("x-forwarded-for");
-    const ip = rawForwarded ? rawForwarded.split(",")[0].trim() : (req.headers.get("x-real-ip") || "127.0.0.1");`
+  // ۱. اصلاح تایپ‌کست وضعیت جهت جلوگیری از خطای Narrowing تایپ‌اسکریپت
+  content = content.replace(
+    /o\.status === "pending_manual_review"/g,
+    '(o.status as string) === "pending_manual_review"'
   );
-  writeFile(loginRoutePath, loginContent);
+
+  // ۲. اصلاح شرط سلکت باکس در صورت استفاده
+  content = content.replace(
+    /selectedOrder\.status === "pending_manual_review"/g,
+    '(selectedOrder.status as string) === "pending_manual_review"'
+  );
+
+  fs.writeFileSync(orderManagerPath, content, 'utf8');
+  console.log("\x1b[32m✔ عبارات مقایسه با تایپ‌کست امن اصلاح شد.\x1b[0m");
 }
 
-// =============================================================================
-// ۲. ایمن‌سازی هدرهای امنیتی در next.config.ts
-// =============================================================================
-const nextConfigPath = 'next.config.ts';
-let nextConfigContent = readFile(nextConfigPath);
-
-if (nextConfigContent && !nextConfigContent.includes('X-Content-Type-Options')) {
-  const securityHeadersBlock = `
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-        ],
-      },
-    ];
-  },`;
-
-  if (nextConfigContent.includes('const nextConfig: NextConfig = {')) {
-    nextConfigContent = nextConfigContent.replace(
-      'const nextConfig: NextConfig = {',
-      'const nextConfig: NextConfig = {' + securityHeadersBlock
-    );
-    writeFile(nextConfigPath, nextConfigContent);
-  }
-}
-
-// =============================================================================
-// ۳. بیلد و ارسال تغییرات به گیت‌هاب
-// =============================================================================
+// بررسی کامپایل بیلد
 console.log("بررسی کامپایل پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ بیلد ۱۰۰٪ موفقیت‌آمیز بود!\x1b[0m");
+  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
 } catch (e) {
   console.error("خطای بیلد:", e.message);
   process.exit(1);
 }
 
+// ارسال تغییرات به گیت‌هاب
 console.log("ارسال تغییرات به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security: enforce strict security headers and sanitize client IP resolution in admin login"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "fix(types): cast status check in OrderManager to prevent narrowing conflict"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -95,7 +55,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ تمام تنظیمات با موفقیت روی سرور Vercel اعمال شدند!\x1b[0m");
+  console.log("\x1b[32m✔ تغییرات با موفقیت روی سرور Vercel دیپلوی شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

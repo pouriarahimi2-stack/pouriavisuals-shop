@@ -1,5 +1,6 @@
 /**
- * AXON CORE - Ensure MediaUploadModal and Products UI Integration (fix.js)
+ * AXON CORE - Upgrade Admin Banners Management Page (fix.js)
+ * Integrates MediaUploadModal and connects with secured /api/admin/banners.
  */
 
 const fs = require('fs');
@@ -13,318 +14,82 @@ function writeFile(relPath, content) {
   const dir = path.dirname(fullPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ایجاد/بروزرسانی شد: ${relPath}\x1b[0m`);
+  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[35m[PRODUCTS-UI-FIX]\x1b[0m ایجاد کامپوننت MediaUploadModal و اتصال به Products Page...");
+console.log("\x1b[35m[BANNERS-UI-UPGRADE]\x1b[0m ادغام مودال بارگذاری با صفحه مدیریت بنرها...");
 
-// =============================================================================
-// ۱. اطمینان از وجود components/admin/MediaUploadModal.tsx
-// =============================================================================
-const modalComponentCode = `"use client";
+const bannersPagePath = 'app/admin/banners/page.tsx';
 
-import React, { useState, useRef } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-
-interface MediaUploadModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onUploadSuccess: (url: string) => void;
-  bucket?: string;
-}
-
-export default function MediaUploadModal({
-  isOpen,
-  onClose,
-  onUploadSuccess,
-  bucket = "products",
-}: MediaUploadModalProps) {
-  const [dragActive, setDragActive] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  if (!isOpen) return null;
-
-  const handleFile = async (file: File) => {
-    setErrorMsg(null);
-
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg("حجم فایل نباید بیش از ۵ مگابایت باشد.");
-      return;
-    }
-
-    if (!file.type.startsWith("image/")) {
-      setErrorMsg("تنها فایل‌های تصویری مجاز هستند.");
-      return;
-    }
-
-    setPreviewUrl(URL.createObjectURL(file));
-    setUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("bucket", bucket);
-
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        soundEngine.playSuccess();
-        onUploadSuccess(data.url);
-        onClose();
-      } else {
-        setErrorMsg(data.message || "خطا در بارگذاری تصویر.");
-      }
-    } catch {
-      setErrorMsg("ارتباط با سرور برقرار نشد.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" dir="rtl">
-      <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5">
-        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-          <h3 className="text-sm font-black text-[var(--text-primary)] flex items-center gap-2">
-            <span>🖼️</span> بارگذاری امن مدیا
-          </h3>
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="text-slate-400 hover:text-white transition text-xs font-mono"
-          >
-            ✕
-          </button>
-        </div>
-
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-bold text-center">
-            {errorMsg}
-          </div>
-        )}
-
-        <div
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={\`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[180px] \${
-            dragActive
-              ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
-              : "border-[var(--card-border)] hover:border-slate-400 bg-[var(--input-bg)]"
-          }\`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/svg+xml"
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                handleFile(e.target.files[0]);
-              }
-            }}
-          />
-
-          {previewUrl ? (
-            <div className="space-y-2">
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="w-24 h-24 object-cover rounded-xl mx-auto border border-[var(--card-border)]"
-              />
-              <span className="text-[11px] text-slate-400 block font-sans">
-                {uploading ? "در حال ارسال و پالایش امنیتی..." : "آماده بارگذاری"}
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <span className="text-3xl block">☁️</span>
-              <span className="text-xs font-bold text-[var(--text-primary)] block">
-                فایل را اینجا بکشید یا برای انتخاب کلیک کنید
-              </span>
-              <span className="text-[10px] text-slate-400 block">
-                فرمت‌های مجاز: PNG, WebP, JPG, SVG (حداکثر ۵ مگابایت)
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => {
-              soundEngine.playClick();
-              onClose();
-            }}
-            className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-slate-300 font-bold hover:opacity-80 transition disabled:opacity-50"
-          >
-            انصراف
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-`;
-
-writeFile('components/admin/MediaUploadModal.tsx', modalComponentCode);
-
-// =============================================================================
-// ۲. صفحه محصولات (app/admin/products/page.tsx)
-// =============================================================================
-const productsPageCode = `"use client";
+const upgradedBannersPageCode = `"use client";
 
 import React, { useEffect, useState } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import MediaUploadModal from "@/components/admin/MediaUploadModal";
 
-interface Product {
+interface Banner {
   id: string;
   title: string;
-  category: string;
-  price: number;
-  discount_price?: number | null;
-  stock: number;
-  images: string[];
-  description?: string;
-  colors?: string[];
-  storage_options?: string[];
+  image_url: string;
+  link_url?: string | null;
+  is_active: boolean;
+  created_at?: string;
 }
 
-export default function AdminProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+export default function AdminBannersPage() {
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [colorInput, setColorInput] = useState("");
-  const [storageInput, setStorageInput] = useState("");
 
-  const [form, setForm] = useState<{
-    id?: string;
-    title: string;
-    category: string;
-    price: number | "";
-    discount_price: number | "";
-    stock: number | "";
-    images: string[];
-    description: string;
-    colors: string[];
-    storage_options: string[];
-  }>({
+  const [form, setForm] = useState({
     title: "",
-    category: "smartphones",
-    price: "",
-    discount_price: "",
-    stock: "",
-    images: [],
-    description: "",
-    colors: [],
-    storage_options: [],
+    image_url: "",
+    link_url: "",
+    is_active: true,
   });
 
-  const fetchProducts = async () => {
+  const fetchBanners = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/reports");
-      const prodRes = await fetch("/api/products?limit=100").catch(() => null);
-      if (prodRes && prodRes.ok) {
-        const json = await prodRes.json();
-        setProducts(json.products || []);
-      } else {
-        const repJson = await res.json();
-        if (repJson.report?.low_stock_items) {
-          setProducts(repJson.report.low_stock_items);
-        }
+      const res = await fetch("/api/admin/banners");
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setBanners(json.banners || []);
       }
     } catch {
-      console.error("خطا در واکشی کاتالوگ محصولات.");
+      console.error("خطا در دریافت بنرهای ویترین.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchBanners();
   }, []);
 
   const handleOpenCreate = () => {
     soundEngine.playClick();
-    setEditingProduct(null);
     setForm({
       title: "",
-      category: "smartphones",
-      price: "",
-      discount_price: "",
-      stock: 10,
-      images: [],
-      description: "",
-      colors: ["مشکی", "تیتانیوم"],
-      storage_options: ["256GB", "512GB"],
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEdit = (p: Product) => {
-    soundEngine.playClick();
-    setEditingProduct(p);
-    setForm({
-      id: p.id,
-      title: p.title,
-      category: p.category || "smartphones",
-      price: p.price,
-      discount_price: p.discount_price ?? "",
-      stock: p.stock,
-      images: Array.isArray(p.images) ? p.images : [],
-      description: p.description || "",
-      colors: Array.isArray(p.colors) ? p.colors : [],
-      storage_options: Array.isArray(p.storage_options) ? p.storage_options : [],
+      image_url: "",
+      link_url: "",
+      is_active: true,
     });
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این محصول از کاتالوگ اطمینان دارید؟")) return;
+    if (!confirm("آیا از حذف این بنر از اسلایدر ویترین اطمینان دارید؟")) return;
     soundEngine.playClick();
     try {
-      const res = await fetch(\`/api/admin/products?id=\${id}\`, { method: "DELETE" });
+      const res = await fetch(\`/api/admin/banners?id=\${id}\`, { method: "DELETE" });
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        fetchProducts();
+        fetchBanners();
       } else {
-        alert(json.message || "خطا در حذف محصول.");
+        alert(json.message || "خطا در حذف بنر.");
       }
     } catch {
       alert("ارتباط با سرور برقرار نشد.");
@@ -335,38 +100,25 @@ export default function AdminProductsPage() {
     e.preventDefault();
     soundEngine.playClick();
 
-    if (Number(form.price) < 0 || Number(form.stock) < 0) {
-      alert("قیمت یا موجودی نمی‌تواند منفی باشد.");
+    if (!form.image_url) {
+      alert("لطفاً ابتدا تصویر بنر را بارگذاری کنید.");
       return;
     }
-
-    if (form.discount_price && Number(form.discount_price) > Number(form.price)) {
-      alert("قیمت با تخفیف نمی‌تواند بیشتر از قیمت اصلی باشد.");
-      return;
-    }
-
-    const payload = {
-      ...form,
-      price: Number(form.price),
-      discount_price: form.discount_price ? Number(form.discount_price) : null,
-      stock: Number(form.stock),
-    };
 
     try {
-      const method = editingProduct ? "PUT" : "POST";
-      const res = await fetch("/api/admin/products", {
-        method,
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(form),
       });
 
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
         setIsModalOpen(false);
-        fetchProducts();
+        fetchBanners();
       } else {
-        alert(json.message || "خطا در ذخیره‌سازی مشخصات محصول.");
+        alert(json.message || "خطا در ایجاد بنر جدید.");
       }
     } catch {
       alert("خطا در ارسال اطلاعات به سرور.");
@@ -375,13 +127,14 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
+      {/* هدر صفحه */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>💻</span> مدیریت کاتالوگ و انبار کالاها
+            <span>🖼️</span> مدیریت بنرهای تبلیغاتی و اسلایدرها
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تعریف محصولات، مدیریت گالری تصاویر، قیمت‌گذاری و متغیرهای رنگ و حافظه
+            پیکربندی بنرهای پویا در صفحه اصلی، اسلایدر ویژه تخفیف‌ها و کمپین‌ها
           </p>
         </div>
 
@@ -389,91 +142,71 @@ export default function AdminProductsPage() {
           onClick={handleOpenCreate}
           className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md flex items-center gap-2 cursor-pointer"
         >
-          <span>➕</span> افزودن محصول جدید
+          <span>➕</span> افزودن بنر جدید
         </button>
       </div>
 
+      {/* گرید کارت‌های بنر */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         {loading ? (
-          <div className="p-12 text-center text-xs text-slate-400">در حال دریافت محصولات...</div>
-        ) : products.length === 0 ? (
-          <div className="p-12 text-center text-xs text-slate-400">محصولی در کاتالوگ یافت نشد.</div>
+          <div className="p-12 text-center text-xs text-slate-400">در حال دریافت بنرها...</div>
+        ) : banners.length === 0 ? (
+          <div className="p-12 text-center text-xs text-slate-400">هیچ بنری ثبت نشده است.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
-                  <th className="pb-3 px-3">تصویر</th>
-                  <th className="pb-3 px-3">عنوان محصول</th>
-                  <th className="pb-3 px-3">قیمت اصلی</th>
-                  <th className="pb-3 px-3">قیمت تخفیف</th>
-                  <th className="pb-3 px-3">موجودی انبار</th>
-                  <th className="pb-3 px-3 text-left">عملیات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--card-border)]">
-                {products.map((p) => (
-                  <tr key={p.id} className="hover:bg-[var(--input-bg)]/40 transition">
-                    <td className="py-3 px-3">
-                      {p.images && p.images[0] ? (
-                        <img
-                          src={p.images[0]}
-                          alt={p.title}
-                          className="w-10 h-10 object-cover rounded-xl border border-[var(--card-border)]"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs">
-                          📦
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-3 font-bold text-[var(--text-primary)]">{p.title}</td>
-                    <td className="py-3 px-3 font-mono">
-                      {Number(p.price).toLocaleString("fa-IR")} تومان
-                    </td>
-                    <td className="py-3 px-3 font-mono text-emerald-400">
-                      {p.discount_price ? \`\${Number(p.discount_price).toLocaleString("fa-IR")} تومان\` : "—"}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={\`px-2.5 py-1 rounded-xl font-mono text-xs font-bold \${
-                          p.stock < 5
-                            ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                            : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                        }\`}
-                      >
-                        {p.stock} عدد
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-left space-x-2 space-x-reverse">
-                      <button
-                        onClick={() => handleOpenEdit(p)}
-                        className="px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:bg-[var(--card-border)] transition"
-                      >
-                        ویرایش
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        className="px-3 py-1 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 transition"
-                      >
-                        حذف
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {banners.map((b) => (
+              <div
+                key={b.id}
+                className="rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] overflow-hidden flex flex-col justify-between shadow-sm group hover:border-[var(--accent-blue)] transition"
+              >
+                <div className="relative aspect-[16/8] bg-black/20 overflow-hidden">
+                  <img
+                    src={b.image_url}
+                    alt={b.title || "Banner visual"}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <span
+                    className={\`absolute top-3 right-3 px-2.5 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md \${
+                      b.is_active
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                        : "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    }\`}
+                  >
+                    {b.is_active ? "فعال در ویترین" : "غیرفعال"}
+                  </span>
+                </div>
+
+                <div className="p-4 space-y-2">
+                  <h3 className="text-xs font-bold text-[var(--text-primary)] truncate">
+                    {b.title || "بدون عنوان"}
+                  </h3>
+                  {b.link_url && (
+                    <span className="text-[11px] font-mono text-slate-400 block truncate" dir="ltr">
+                      🔗 {b.link_url}
+                    </span>
+                  )}
+
+                  <div className="pt-2 flex justify-end border-t border-[var(--card-border)]">
+                    <button
+                      onClick={() => handleDelete(b.id)}
+                      className="px-3 py-1 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs transition"
+                    >
+                      حذف بنر
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
+      {/* مودال ایجاد بنر */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto space-y-5">
+          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black text-[var(--text-primary)]">
-                {editingProduct ? "✏️ ویرایش مشخصات کالا" : "➕ ایجاد کالای جدید"}
-              </h3>
+              <h3 className="text-sm font-black text-[var(--text-primary)]">➕ ثبت بنر تبلیغاتی جدید</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-slate-400 hover:text-white transition font-mono"
@@ -483,149 +216,68 @@ export default function AdminProductsPage() {
             </div>
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">نام و مدل کالا:</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی:</label>
-                  <select
-                    value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none"
-                  >
-                    <option value="smartphones">گوشی‌های هوشمند</option>
-                    <option value="laptops">لپ‌تاپ و اولترابوک</option>
-                    <option value="audio">هدفون و سیستم صوتی</option>
-                    <option value="accessories">لوازم جانبی</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">قیمت اصلی (تومان):</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={form.price}
-                    onChange={(e) => setForm({ ...form, price: e.target.value === "" ? "" : Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">قیمت با تخفیف (اختیاری):</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.discount_price}
-                    onChange={(e) => setForm({ ...form, discount_price: e.target.value === "" ? "" : Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">موجودی انبار:</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value === "" ? "" : Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[var(--text-secondary)]">گالری تصاویر کالا:</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsUploadOpen(true)}
-                    className="px-3 py-1 rounded-xl bg-[var(--accent-blue)] text-white text-[11px] font-bold hover:opacity-90 transition"
-                  >
-                    ☁️ بارگذاری تصویر جدید
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap min-h-[60px] p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-                  {form.images.map((img, idx) => (
-                    <div key={idx} className="relative group">
-                      <img
-                        src={img}
-                        alt="Product visual"
-                        className="w-14 h-14 object-cover rounded-xl border border-[var(--card-border)]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setForm({ ...form, images: form.images.filter((_, i) => i !== idx) })}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center shadow"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {form.images.length === 0 && (
-                    <span className="text-slate-400 text-xs">هنوز تصویری اضافه نشده است.</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-[var(--text-secondary)]">رنگ‌بندی‌های مجاز:</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={colorInput}
-                    onChange={(e) => setColorInput(e.target.value)}
-                    placeholder="مثال: نقره‌ای"
-                    className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (colorInput.trim()) {
-                        setForm({ ...form, colors: [...form.colors, colorInput.trim()] });
-                        setColorInput("");
-                      }
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--card-border)] text-xs font-bold"
-                  >
-                    افزودن رنگ
-                  </button>
-                </div>
-                <div className="flex gap-1.5 flex-wrap pt-1">
-                  {form.colors.map((c, i) => (
-                    <span key={i} className="px-2.5 py-0.5 rounded-lg bg-[var(--card-border)] text-xs flex items-center gap-1">
-                      {c}
-                      <button
-                        type="button"
-                        onClick={() => setForm({ ...form, colors: form.colors.filter((_, idx) => idx !== i) })}
-                        className="text-rose-400 text-[10px]"
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">توضیحات و مشخصات فنی:</label>
-                <textarea
-                  rows={3}
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                  عنوان یا توضیح کوتاه بنر:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="مثال: جشنواره ویژه عیدانه آکسون کور"
                   className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[var(--text-secondary)]">تصویر بنر:</label>
+                {form.image_url ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-[var(--card-border)] aspect-[16/8]">
+                    <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, image_url: "" })}
+                      className="absolute top-2 left-2 px-2.5 py-1 rounded-xl bg-rose-600 text-white text-[10px] font-bold shadow"
+                    >
+                      تغییر تصویر
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsUploadOpen(true)}
+                    className="w-full py-6 rounded-2xl border-2 border-dashed border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition flex flex-col items-center justify-center gap-1"
+                  >
+                    <span>☁️</span>
+                    انتخاب یا آپلود تصویر بنر
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                  لینک مقصد (اختیاری):
+                </label>
+                <input
+                  type="text"
+                  value={form.link_url}
+                  onChange={(e) => setForm({ ...form, link_url: e.target.value })}
+                  placeholder="/products یا https://..."
+                  dir="ltr"
+                  className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-xs font-bold text-[var(--text-primary)] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                  className="rounded accent-[var(--accent-blue)]"
+                />
+                نمایش فعال در ویترین سایت
+              </label>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
                 <button
@@ -639,7 +291,7 @@ export default function AdminProductsPage() {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md hover:opacity-90 transition"
                 >
-                  ذخیره کالا 💾
+                  ذخیره بنر 💾
                 </button>
               </div>
             </form>
@@ -647,12 +299,13 @@ export default function AdminProductsPage() {
         </div>
       )}
 
+      {/* مودال بارگذاری تصویر */}
       <MediaUploadModal
         isOpen={isUploadOpen}
-        bucket="products"
+        bucket="banners"
         onClose={() => setIsUploadOpen(false)}
         onUploadSuccess={(url) => {
-          setForm((prev) => ({ ...prev, images: [...prev.images, url] }));
+          setForm((prev) => ({ ...prev, image_url: url }));
         }}
       />
     </div>
@@ -660,9 +313,9 @@ export default function AdminProductsPage() {
 }
 `;
 
-writeFile('app/admin/products/page.tsx', productsPageCode);
+writeFile(bannersPagePath, upgradedBannersPageCode);
 
-// کامپایل و تست صحت پروژه
+// کامپایل و ارزیابی تایپ‌ها و ماژول‌ها
 console.log("بررسی کامپایل پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -677,7 +330,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "fix(admin): bundle MediaUploadModal and connect to products page with build verification"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(admin): upgrade banners page with live upload modal integration and safe url persistence"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -686,7 +339,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ مشکل بیلد رفع شد و با موفقیت روی ورسل مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ صفحه بنرها با موفقیت روی سرور ورسل مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

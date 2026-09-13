@@ -1,6 +1,6 @@
 /**
- * AXON CORE - Harden Admin Database Backup Route (fix.js)
- * Generates an encrypted/structured multi-table snapshot with audit logging.
+ * AXON CORE - Upgrade Admin Orders Management Page (fix.js)
+ * Connects directly to secured PUT /api/admin/orders with postal tracking input.
  */
 
 const fs = require('fs');
@@ -17,108 +17,260 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[35m[BACKUP-SECURITY]\x1b[0m ارتقای اندپوینت پشتیبان‌گیری جامع دیتابیس و ثبت لاگ امنیتی...");
+console.log("\x1b[35m[ORDERS-UI-UPGRADE]\x1b[0m ارتقای رابط کاربری مدیریت سفارشات و کد رهگیری پستی...");
 
-const backupRoutePath = 'app/api/admin/backup/route.ts';
+const ordersPagePath = 'app/admin/orders/page.tsx';
 
-const secureBackupRouteCode = `import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+const ordersPageCode = `"use client";
 
-export const dynamic = "force-dynamic";
+import React, { useEffect, useState } from "react";
+import { soundEngine } from "@/lib/soundEngine";
 
-function checkAdminAuth(req: NextRequest): boolean {
-  const token = req.cookies.get("admin_session_token")?.value;
-  return Boolean(token && token.length >= 20);
+interface OrderItem {
+  title: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  selected_color?: string;
+  selected_storage?: string;
 }
 
-export async function GET(req: NextRequest) {
-  if (!checkAdminAuth(req)) {
-    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+interface Order {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  postal_code?: string;
+  status: string;
+  total_amount: number;
+  discount_amount?: number;
+  final_amount?: number;
+  coupon_code?: string;
+  tracking_code?: string;
+  created_at: string;
+  items: OrderItem[];
+}
 
-  try {
-    // ۱. استخراج اطلاعات تمامی جداول کلیدی به صورت موازی
-    const [
-      productsRes,
-      ordersRes,
-      siteInfoRes,
-      bannersRes,
-      newsRes,
-      couponsRes,
-      auditLogsRes,
-    ] = await Promise.all([
-      supabaseAdmin.from("products").select("*"),
-      supabaseAdmin.from("orders").select("*"),
-      supabaseAdmin.from("site_info").select("*"),
-      supabaseAdmin.from("banners").select("*"),
-      supabaseAdmin.from("news").select("*"),
-      supabaseAdmin.from("coupons").select("*"),
-      supabaseAdmin.from("admin_audit_logs").select("*").limit(200),
-    ]);
+const STATUS_OPTIONS = [
+  { value: "all", label: "همه سفارشات" },
+  { value: "pending_manual_review", label: "در انتظار بررسی واریز" },
+  { value: "paid", label: "پرداخت تایید شد (کسر موجودی)" },
+  { value: "processing", label: "در حال پردازش در انبار" },
+  { value: "shipped", label: "ارسال شد" },
+  { value: "delivered", label: "تحویل گردید" },
+  { value: "cancelled", label: "لغو شده" },
+];
 
-    const backupData = {
-      meta: {
-        app: "AXON CORE",
-        version: "1.0.0",
-        timestamp: new Date().toISOString(),
-        tables_count: 7,
-      },
-      data: {
-        products: productsRes.data || [],
-        orders: ordersRes.data || [],
-        site_info: siteInfoRes.data || [],
-        banners: bannersRes.data || [],
-        news: newsRes.data || [],
-        coupons: couponsRes.data || [],
-        admin_audit_logs: auditLogsRes.data || [],
-      },
-    };
+export default function AdminOrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [filter, setFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [trackingInputs, setTrackingInputs] = useState<Record<string, string>>({});
 
-    // ۲. ثبت رویداد بکاپ‌گیری در لاگ امنیتی سیستم
-    const clientIp =
-      req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-      req.headers.get("x-real-ip") ||
-      "local";
-
+  const fetchOrders = async (status = filter) => {
     try {
-      await supabaseAdmin.from("admin_audit_logs").insert({
-        admin_username: "admin",
-        action: "DATABASE_BACKUP_EXPORT",
-        target_resource: "database:full_snapshot",
-        details: {
-          products_count: backupData.data.products.length,
-          orders_count: backupData.data.orders.length,
-        },
-        ip_address: clientIp,
-        created_at: new Date().toISOString(),
-      });
-    } catch (auditErr) {
-      console.error("[AUDIT_BACKUP_LOG_ERROR]:", auditErr);
+      setLoading(true);
+      const url = status === "all" ? "/api/admin/orders" : \`/api/admin/orders?status=\${status}\`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOrders(data.orders || []);
+      }
+    } catch {
+      console.error("خطا در واکشی سفارشات.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // ۳. ارسال پاسخ با فرمت دانلودی JSON
-    const timestampStr = new Date().toISOString().replace(/[:.]/g, "-");
-    const fileName = \`axon-backup-\${timestampStr}.json\`;
+  useEffect(() => {
+    fetchOrders(filter);
+  }, [filter]);
 
-    return new NextResponse(JSON.stringify(backupData, null, 2), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": \`attachment; filename="\${fileName}"\`,
-      },
-    });
-  } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: err.message || "خطا در تولید فایل پشتیبان." },
-      { status: 500 }
-    );
-  }
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    soundEngine.playClick();
+    setUpdatingId(orderId);
+    try {
+      const tracking = trackingInputs[orderId];
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: orderId,
+          status: newStatus,
+          tracking_code: tracking,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        soundEngine.playSuccess();
+        fetchOrders(filter);
+      } else {
+        alert(data.message || "خطا در تغییر وضعیت سفارش.");
+      }
+    } catch {
+      alert("ارتباط با سرور برقرار نشد.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending_manual_review":
+        return "bg-amber-500/15 border-amber-500/30 text-amber-400";
+      case "paid":
+      case "delivered":
+        return "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
+      case "processing":
+      case "shipped":
+        return "bg-blue-500/15 border-blue-500/30 text-blue-400";
+      case "cancelled":
+        return "bg-rose-500/15 border-rose-500/30 text-rose-400";
+      default:
+        return "bg-slate-500/15 border-slate-500/30 text-slate-400";
+    }
+  };
+
+  return (
+    <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
+      {/* هدر صفحه و فیلترها */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>📦</span> مدیریت جامع سفارشات و انبار
+          </h1>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
+            بررسی پرداخت‌ها، تغییر وضعیت پردازش و ثبت بارنامه‌های پستی مشتریان
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => {
+                soundEngine.playClick();
+                setFilter(opt.value);
+              }}
+              className={\`px-3 py-1.5 rounded-xl text-xs font-bold transition border \${
+                filter === opt.value
+                  ? "bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white"
+                  : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:text-white"
+              }\`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* لیست سفارشات */}
+      {loading ? (
+        <div className="p-12 text-center text-xs text-slate-400">در حال دریافت سفارشات...</div>
+      ) : orders.length === 0 ? (
+        <div className="p-12 text-center text-xs text-slate-400 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl">
+          هیچ سفارشی در این وضعیت یافت نشد.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orders.map((ord) => (
+            <div
+              key={ord.id}
+              className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-4"
+            >
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs text-slate-400">#{ord.id.slice(0, 8)}</span>
+                  <span className="font-black text-sm text-[var(--text-primary)]">{ord.customer_name}</span>
+                  <span className="font-mono text-xs text-slate-400">{ord.customer_phone}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={\`px-3 py-1 rounded-xl border text-xs font-bold \${getStatusBadge(ord.status)}\`}>
+                    {STATUS_OPTIONS.find((s) => s.value === ord.status)?.label || ord.status}
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {new Date(ord.created_at).toLocaleDateString("fa-IR")}
+                  </span>
+                </div>
+              </div>
+
+              {/* آدرس و اقلام */}
+              <div className="text-xs text-[var(--text-secondary)]">
+                <span className="font-bold text-[var(--text-primary)]">آدرس تحویل: </span>
+                {ord.customer_address} {ord.postal_code && \`(کد پستی: \${ord.postal_code})\`}
+              </div>
+
+              <div className="space-y-1.5">
+                {Array.isArray(ord.items) &&
+                  ord.items.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]"
+                    >
+                      <span className="font-bold text-[var(--text-primary)]">
+                        {item.title} × {item.quantity}
+                        {item.selected_color && <span className="mr-2 text-slate-400">({item.selected_color})</span>}
+                        {item.selected_storage && <span className="mr-1 text-slate-400">[{item.selected_storage}]</span>}
+                      </span>
+                      <span className="font-mono text-slate-300">
+                        {Number(item.total_price || item.unit_price * item.quantity).toLocaleString("fa-IR")} تومان
+                      </span>
+                    </div>
+                  ))}
+              </div>
+
+              {/* مبلغ نهایی و فیلدهای تغییر وضعیت */}
+              <div className="border-t border-[var(--card-border)] pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs text-slate-400">مبلغ نهایی: </span>
+                  <span className="text-sm font-black text-emerald-400 font-mono">
+                    {Number(ord.final_amount || ord.total_amount).toLocaleString("fa-IR")} تومان
+                  </span>
+                  {ord.coupon_code && (
+                    <span className="mr-2 text-[11px] text-amber-400 font-mono">(کوپن: {ord.coupon_code})</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+                  <input
+                    type="text"
+                    placeholder="کد پیگیری پستی..."
+                    defaultValue={ord.tracking_code || ""}
+                    onChange={(e) =>
+                      setTrackingInputs((prev) => ({ ...prev, [ord.id]: e.target.value }))
+                    }
+                    className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
+                  />
+
+                  <select
+                    disabled={updatingId === ord.id}
+                    value={ord.status}
+                    onChange={(e) => handleStatusChange(ord.id, e.target.value)}
+                    className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-bold focus:outline-none cursor-pointer disabled:opacity-50"
+                  >
+                    {STATUS_OPTIONS.filter((s) => s.value !== "all").map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 `;
 
-writeFile(backupRoutePath, secureBackupRouteCode);
+writeFile(ordersPagePath, ordersPageCode);
 
-// تست کامپایل بیلد
+// تست کامپایل
 console.log("بررسی کامپایل پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -128,12 +280,12 @@ try {
   process.exit(1);
 }
 
-// ارسال تغییرات به مخزن گیت‌هاب
+// ارسال تغییرات به مخزن
 console.log("ارسال تغییرات به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(backup): harden database snapshot endpoint with full multi-table export and audit logging"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(admin): enhance orders management page with live status updating and postal tracking code support"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -142,7 +294,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ روت پشتیبان‌گیری پایگاه داده با موفقیت در ورسل مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ صفحه مدیریت سفارشات با موفقیت روی ورسل مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

@@ -1,27 +1,4 @@
-/**
- * AXON CORE - Harden Admin Site Settings Route with Audit Logging (fix.js)
- * Preserves all existing site_info configurations.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[SETTINGS-SECURITY]\x1b[0m ارتقای امنیت روت تنظیمات سراسری سایت و ثبت رویدادها...");
-
-const settingsRoutePath = 'app/api/admin/settings/route.ts';
-
-const secureSettingsRouteCode = `import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -137,36 +114,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-`;
-
-writeFile(settingsRoutePath, secureSettingsRouteCode);
-
-// تست کامپایل بیلد
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال تغییرات به مخزن گیت‌هاب
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(settings): harden site_info route with session verification and audit tracking"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ تنظیمات ایمن‌شده سایت روی ورسل مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

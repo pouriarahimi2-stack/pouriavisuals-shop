@@ -1,94 +1,89 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { soundEngine } from "@/lib/soundEngine";
-import { userBehavior } from "@/lib/userBehavior";
+import AddToCartButton from "./AddToCartButton";
 import { formatPrice } from "@/lib/formatters";
-import ProductExplodedView from "@/components/ProductExplodedView";
-import AddToCartButton from "@/components/AddToCartButton";
 
-export default function ProductCard({ product }: { product: any }) {
+interface ProductCardProps {
+  product: any;
+  onOpenQuickView?: (product: any) => void;
+}
+
+export default function ProductCard({ product, onOpenQuickView }: ProductCardProps) {
   const [mounted, setMounted] = useState(false);
-  const [isTeardownOpen, setIsTeardownOpen] = useState(false);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const title = product.title || product.title_fa || product.name || "کالای تکنولوژی";
-  const price = Number(product.price) || 55800000;
-  const discountPrice = product.discountPrice ? Number(product.discountPrice) : (product.discount_price ? Number(product.discount_price) : undefined);
-  const currentPrice = discountPrice || price;
-  const stockCount = product.stock !== undefined ? Number(product.stock) : 10;
-  const mainImage = product.images?.[0] || product.image || "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600";
-  const category = product.category || "تکنولوژی";
-  const isAvailable = product.is_available !== false && stockCount > 0;
+  const title = product?.title || product?.name || "محصول استودیو";
+  const mainImage =
+    (product?.images && product.images[0]) ||
+    product?.image ||
+    "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800";
+
+  const price = Number(product?.price || 0);
+  const discountPrice = product?.discount_price ? Number(product.discount_price) : null;
+  const isAvailable = product?.is_available !== false && (product?.stock === undefined || Number(product.stock) > 0);
 
   return (
-    <>
-      <div
-        onClick={() => userBehavior.trackProductView(product.id, category)}
-        className="glass-morphism rounded-[2.2rem] overflow-hidden p-5 flex flex-col justify-between group select-none relative"
-        dir="rtl"
-      >
+    <div
+      className="group relative rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] p-4 transition-all duration-300 shadow-md flex flex-col justify-between font-sans select-none"
+      dir="rtl"
+    >
+      <div>
         <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
-          <Link href={"/products/" + product.id} className="w-full h-full flex items-center justify-center">
-            <img src={mainImage} alt={title} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
+          <Link href={"/products/" + product.id} className="w-full h-full relative block">
+            <Image
+              src={mainImage}
+              alt={title}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              loading="lazy"
+              className="object-contain transition-transform duration-500 group-hover:scale-105"
+            />
           </Link>
-          
+
           <span className="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-md text-white text-[10px] px-3 py-1 rounded-full font-bold border border-white/10">
-            {category}
+            {product?.category || "تخصصی"}
           </span>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              soundEngine.playExplodeShift();
-              setIsTeardownOpen(true);
-            }}
-            className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-blue-600 text-white font-bold text-[10px] border border-white/20 backdrop-blur-md transition flex items-center gap-1 shadow-md cursor-pointer"
-            title="مشاهده کالبدشکافی ۳D"
-          >
-            <span>🧬</span>
-            <span>کالبدشکافی ۳D</span>
-          </button>
         </div>
 
-        <div className="space-y-2 mb-4 text-right flex-grow">
-          <span className="text-[var(--accent-blue)] text-xs font-bold block">{product.brand || "Apple"}</span>
-          <Link href={"/products/" + product.id}>
-            <h3 className="text-sm font-bold text-[var(--text-primary)] line-clamp-2 leading-snug hover:text-[var(--accent-blue)] transition">{title}</h3>
-          </Link>
-          <p className="text-xs text-[var(--text-secondary)] line-clamp-2 font-medium leading-relaxed">{product.short_description || product.description || "دارای گارانتی اصالت طلایی و ارسال پیشتاز"}</p>
-        </div>
-
-        <div className="pt-3 border-t border-[var(--card-border)] space-y-3 mt-auto">
-          <div className="flex justify-between items-center flex-row-reverse">
-            <span className="text-base font-mono font-black text-[var(--text-primary)]" suppressHydrationWarning>{formatPrice(currentPrice)} تومان</span>
-            <span className="text-[10px] font-bold text-emerald-500">{isAvailable ? "موجود ✓" : "ناموجود"}</span>
-          </div>
-
-          <AddToCartButton
-            product={{
-              id: product.id,
-              title,
-              price: currentPrice,
-              image: mainImage,
-              stock: stockCount,
-              category,
-            }}
-          />
-        </div>
+        <Link href={"/products/" + product.id} className="block space-y-1">
+          <h3 className="font-black text-xs sm:text-sm text-[var(--text-primary)] line-clamp-2 leading-snug group-hover:text-[var(--accent-blue)] transition">
+            {title}
+          </h3>
+          <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1 font-medium">
+            {product?.warranty || "گارانتی اصالت طلایی"}
+          </p>
+        </Link>
       </div>
 
-      <ProductExplodedView
-        productId={product.id}
-        productTitle={title}
-        category={category}
-        isOpen={isTeardownOpen}
-        onClose={() => setIsTeardownOpen(false)}
-      />
-    </>
+      <div className="pt-4 mt-2 border-t border-[var(--card-border)] space-y-3">
+        <div className="flex items-baseline justify-between" suppressHydrationWarning>
+          <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
+          <div className="text-left font-mono">
+            {discountPrice ? (
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-slate-400 line-through">
+                  {mounted ? formatPrice(price) : ""}
+                </span>
+                <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400">
+                  {mounted ? formatPrice(discountPrice) : ""} تومان
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs sm:text-sm font-black text-[var(--text-primary)]">
+                {mounted ? formatPrice(price) : ""} تومان
+              </span>
+            )}
+          </div>
+        </div>
+
+        <AddToCartButton product={product} />
+      </div>
+    </div>
   );
 }

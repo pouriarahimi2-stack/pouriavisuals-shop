@@ -1,27 +1,4 @@
-/**
- * AXON CORE - Upgrade Admin Reports & Stock Alert Management (fix.js)
- * Live stock warning resolution and sales breakdown directly connected to /api/admin/reports.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[REPORTS-UI-UPGRADE]\x1b[0m ارتقای صفحه گزارش‌های تحلیلی و رفع سریع کسری انبار...");
-
-const reportsPagePath = 'app/admin/reports/page.tsx';
-
-const upgradedReportsPageCode = `"use client";
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { soundEngine } from "@/lib/soundEngine";
@@ -134,7 +111,7 @@ export default function AdminReportsPage() {
         <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
           <span className="text-xs text-slate-400 block">درآمد ناخالص تاییدشده</span>
           <div className="text-xl font-black font-mono text-emerald-400">
-            {loading ? "..." : \`\${Number(report.total_revenue || 0).toLocaleString("fa-IR")} تومان\`}
+            {loading ? "..." : `${Number(report.total_revenue || 0).toLocaleString("fa-IR")} تومان`}
           </div>
           <span className="text-[11px] text-slate-400">محاسبه‌شده از سفارشات پرداخت‌شده</span>
         </div>
@@ -145,7 +122,7 @@ export default function AdminReportsPage() {
             {loading
               ? "..."
               : report.total_orders_count > 0
-              ? \`\${Math.round((report.paid_orders_count / report.total_orders_count) * 100)}%\`
+              ? `${Math.round((report.paid_orders_count / report.total_orders_count) * 100)}%`
               : "۰٪"}
           </div>
           <span className="text-[11px] text-slate-400">
@@ -156,7 +133,7 @@ export default function AdminReportsPage() {
         <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
           <span className="text-xs text-slate-400 block">کالاهای بحرانی (رو به اتمام)</span>
           <div className="text-xl font-black font-mono text-rose-400">
-            {loading ? "..." : \`\${report.low_stock_items?.length || 0} قلم\`}
+            {loading ? "..." : `${report.low_stock_items?.length || 0} قلم`}
           </div>
           <span className="text-[11px] text-slate-400">نیازمند شارژ سریع انبار</span>
         </div>
@@ -230,36 +207,4 @@ export default function AdminReportsPage() {
       </div>
     </div>
   );
-}
-`;
-
-writeFile(reportsPagePath, upgradedReportsPageCode);
-
-// تست کامپایل
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال تغییرات به مخزن
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(admin): upgrade reports page with live stock analytics and quick restocking actions"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه گزارش‌ها و مانیتورینگ انبار با موفقیت روی ورسل مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

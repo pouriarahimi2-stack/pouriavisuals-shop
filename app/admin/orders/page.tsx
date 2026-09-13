@@ -44,6 +44,7 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [trackingInputs, setTrackingInputs] = useState<Record<string, string>>({});
+  const [sendSmsMap, setSendSmsMap] = useState<Record<string, boolean>>({});
 
   const fetchOrders = async (status = filter) => {
     try {
@@ -65,16 +66,19 @@ export default function AdminOrdersPage() {
     fetchOrders(filter);
   }, [filter]);
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
+  const handleStatusChange = async (order: Order, newStatus: string) => {
     soundEngine.playClick();
-    setUpdatingId(orderId);
+    setUpdatingId(order.id);
+    const tracking = trackingInputs[order.id] || order.tracking_code;
+    const shouldSendSms = sendSmsMap[order.id] !== false; // پیش‌فرض فعال
+
     try {
-      const tracking = trackingInputs[orderId];
+      // ۱. به‌روزرسانی وضعیت سفارش در دیتابیس
       const res = await fetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: orderId,
+          id: order.id,
           status: newStatus,
           tracking_code: tracking,
         }),
@@ -82,6 +86,25 @@ export default function AdminOrdersPage() {
 
       const data = await res.json();
       if (res.ok && data.success) {
+        // ۲. ارسال پیامک به خریدار در صورت تایید و انتخاب وضعیت‌های مهم
+        if (shouldSendSms && ["paid", "shipped", "delivered"].includes(newStatus)) {
+          try {
+            await fetch("/api/admin/sms/order-status", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: order.id,
+                phone: order.customer_phone,
+                status: newStatus,
+                customerName: order.customer_name,
+                trackingCode: tracking,
+              }),
+            });
+          } catch (smsErr) {
+            console.error("خطا در ارسال پیامک خودکار:", smsErr);
+          }
+        }
+
         soundEngine.playSuccess();
         fetchOrders(filter);
       } else {
@@ -120,7 +143,7 @@ export default function AdminOrdersPage() {
             <span>📦</span> مدیریت جامع سفارشات و انبار
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            بررسی پرداخت‌ها، تغییر وضعیت پردازش و ثبت بارنامه‌های پستی مشتریان
+            بررسی پرداخت‌ها، تغییر وضعیت پردازش، ثبت بارنامه‌های پستی و دیسپچ پیامک‌های مشتری
           </p>
         </div>
 
@@ -199,7 +222,7 @@ export default function AdminOrdersPage() {
                   ))}
               </div>
 
-              {/* مبلغ نهایی و فیلدهای تغییر وضعیت */}
+              {/* مبلغ نهایی، گزینه‌ها و تغییر وضعیت */}
               <div className="border-t border-[var(--card-border)] pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <span className="text-xs text-slate-400">مبلغ نهایی: </span>
@@ -211,7 +234,19 @@ export default function AdminOrdersPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+                <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+                  <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={sendSmsMap[ord.id] !== false}
+                      onChange={(e) =>
+                        setSendSmsMap((prev) => ({ ...prev, [ord.id]: e.target.checked }))
+                      }
+                      className="rounded accent-[var(--accent-blue)]"
+                    />
+                    ارسال پیامک تغییر وضعیت
+                  </label>
+
                   <input
                     type="text"
                     placeholder="کد پیگیری پستی..."
@@ -225,7 +260,7 @@ export default function AdminOrdersPage() {
                   <select
                     disabled={updatingId === ord.id}
                     value={ord.status}
-                    onChange={(e) => handleStatusChange(ord.id, e.target.value)}
+                    onChange={(e) => handleStatusChange(ord, e.target.value)}
                     className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-bold focus:outline-none cursor-pointer disabled:opacity-50"
                   >
                     {STATUS_OPTIONS.filter((s) => s.value !== "all").map((opt) => (

@@ -1,27 +1,4 @@
-/**
- * AXON CORE - Harden Admin Authentication & RBAC Session Engine (fix.js)
- * Preserves all existing session cookie structures while adding brute-force logging.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[AUTH-SECURITY]\x1b[0m ارتقای امنیت موتور احراز هویت، RBAC و ثبت لاگ ورودهای مشکوک...");
-
-const authRoutePath = 'app/api/admin/auth/route.ts';
-
-const secureAuthRouteCode = `import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -101,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     // تولید توکن تصادفی با امضای زمانی
-    const sessionToken = \`axon_sec_\${Date.now()}_\${Math.random().toString(36).substring(2, 12)}\${Math.random().toString(36).substring(2, 12)}\`;
+    const sessionToken = `axon_sec_${Date.now()}_${Math.random().toString(36).substring(2, 12)}${Math.random().toString(36).substring(2, 12)}`;
 
     await logAudit(req, "ADMIN_LOGIN_SUCCESS", cleanUsername, "SUCCESS");
 
@@ -156,36 +133,4 @@ export async function DELETE(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
-}
-`;
-
-writeFile(authRoutePath, secureAuthRouteCode);
-
-// کامپایل و تست صحت پروژه
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال تغییرات به مخزن گیت‌هاب
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(auth): harden session issuance, protect against timing attacks, and record login audits"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ ماژول احراز هویت با موفقیت روی سرور ورسل مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

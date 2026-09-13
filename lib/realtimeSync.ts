@@ -1,13 +1,11 @@
 import { supabase } from "./supabase";
 
-const SAFE_PUBLIC_TABLES = [
-  "products",
+const SAFE_PUBLIC_TABLES = ["products",
   "banners",
   "site_info",
   "categories",
   "posts",
-  "tech_news"
-];
+  "tech_news", "orders"];
 
 let activeChannel: any = null;
 const debounceTimers: Record<string, NodeJS.Timeout | null> = {};

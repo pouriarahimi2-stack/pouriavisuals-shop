@@ -1,27 +1,4 @@
-/**
- * AXON CORE - Secure Server-Side Order Price & Integrity Verification (fix.js)
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ایجاد/اصلاح شد: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[ORDER-INTEGRITY]\x1b[0m مقاوم‌سازی روت ثبت سفارش و اعتبارسنجی قیمت‌ها در سرور...");
-
-// مسیر روت ثبت سفارش
-const orderCreatePath = 'app/api/orders/create/route.ts';
-
-const secureOrderCreateCode = `import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanPhone = String(customer_phone).trim().replace("+98", "0");
-    if (!/^09\\d{9}$/.test(cleanPhone)) {
+    if (!/^09\d{9}$/.test(cleanPhone)) {
       return NextResponse.json({ success: false, message: "شماره موبایل گیرنده نامعتبر است." }, { status: 400 });
     }
 
@@ -71,7 +48,7 @@ export async function POST(req: NextRequest) {
     for (const item of items as OrderItemPayload[]) {
       const dbProd = productMap.get(String(item.product_id));
       if (!dbProd) {
-        return NextResponse.json({ success: false, message: \`محصول با شناسه \${item.product_id} در انبار یافت نشد.\` }, { status: 400 });
+        return NextResponse.json({ success: false, message: `محصول با شناسه ${item.product_id} در انبار یافت نشد.` }, { status: 400 });
       }
 
       const qty = Math.max(1, Number(item.quantity) || 1);
@@ -163,36 +140,4 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message || "خطا در ایجاد سفارش." }, { status: 500 });
   }
-}
-`;
-
-writeFile(orderCreatePath, secureOrderCreateCode);
-
-// کامپایل و تست صحت پروژه
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال تغییرات به گیت‌هاب
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(checkout): recalculate order prices and coupon discounts server-side to prevent price tampering"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ روت ایمن ثبت سفارش با موفقیت روی ورسل مستقر شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

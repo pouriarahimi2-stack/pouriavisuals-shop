@@ -5,57 +5,24 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
 
-interface NavGroup {
-  group: string;
-  items: {
-    id: string;
-    title: string;
-    href: string;
-    icon: string;
-    badge?: string;
-  }[];
+interface NavItem {
+  id: string;
+  title: string;
+  href: string;
+  icon: string;
 }
 
-const navGroups: NavGroup[] = [
-  {
-    group: "فروشگاه و محصولات",
-    items: [
-      { id: "dashboard", title: "داشبورد و آمار زنده", href: "/admin", icon: "📊" },
-      { id: "products", title: "کاتالوگ کالاها", href: "/admin/products", icon: "📦" },
-      { id: "inventory", title: "حسابداری، سود و انبارداری", href: "/admin/inventory", icon: "📥" },
-      { id: "orders", title: "سفارش‌ها و فاکتورها", href: "/admin/orders", icon: "📄" },
-      { id: "coupons", title: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
-    ],
-  },
-  {
-    group: "مخاطبان و ارتباطات",
-    items: [
-      { id: "customers", title: "باشگاه مشتریان (CRM)", href: "/admin/customers", icon: "👥" },
-      { id: "messages", title: "پیام‌ها و تیکت‌ها", href: "/admin/messages", icon: "📩" },
-    ],
-  },
-  {
-    group: "محتوا، سئو و هوش مصنوعی",
-    items: [
-      { id: "blog", title: "مجله و مقالات سئو", href: "/admin/blog", icon: "📚" },
-      { id: "news", title: "اخبار تکنولوژی", href: "/admin/news", icon: "📡" },
-      { id: "ai_suite", title: "هوش مصنوعی Master Suite", href: "/admin/ai", icon: "🤖" },
-      { id: "pages", title: "صفحه‌ساز ماژولار", href: "/admin/pages", icon: "🏗️" },
-    ],
-  },
-  {
-    group: "طراحی و امنیت پایه",
-    items: [
-      { id: "banners", title: "اسلایدر صفحه نخست", href: "/admin/banners", icon: "🖼️" },
-      { id: "menu", title: "منوها و دسته‌بندی‌ها", href: "/admin/menu", icon: "🔗" },
-      { id: "styles", title: "هویت بصری و فونت", href: "/admin/styles", icon: "🎨" },
-      { id: "site_info", title: "تنظیمات عمومی سایت", href: "/admin/settings", icon: "⚙️" },
-      { id: "backup", title: "پشتیبان‌گیری دیتابیس", href: "/admin/backup", icon: "💾" },
-      { id: "change_pin", title: "مدیریت حساب و کلمه عبور", href: "/admin/change-pin", icon: "🔐" },
-      { id: "audit_logs", title: "لاگ‌ها و وقایع امنیتی", href: "/admin/audit-logs", icon: "🛡️" },
-      { id: "roles", title: "مدیریت نقش‌ها و RBAC", href: "/admin/roles", icon: "👥" },
-    ],
-  },
+const NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", title: "داشبورد اصلی", href: "/admin/dashboard", icon: "⚡" },
+  { id: "orders", title: "مدیریت سفارشات", href: "/admin/orders", icon: "📦" },
+  { id: "products", title: "کاتالوگ محصولات", href: "/admin/products", icon: "💻" },
+  { id: "coupons", title: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
+  { id: "banners", title: "بنرها و اسلایدر", href: "/admin/banners", icon: "🖼️" },
+  { id: "news", title: "اخبار و مقالات", href: "/admin/news", icon: "📰" },
+  { id: "reports", title: "گزارشات و انبار", href: "/admin/reports", icon: "📈" },
+  { id: "audit-logs", title: "لاگ‌های امنیتی", href: "/admin/audit-logs", icon: "🛡️" },
+  { id: "backup", title: "پشتیبان‌گیری داده‌ها", href: "/admin/backup", icon: "💾" },
+  { id: "settings", title: "تنظیمات فروشگاه", href: "/admin/settings", icon: "⚙️" },
 ];
 
 export default function AdminSidebar() {
@@ -64,84 +31,79 @@ export default function AdminSidebar() {
 
   const handleLogout = async () => {
     soundEngine.playClick();
-    if (!confirm("آیا قصد خروج از پیشخوان مدیریت را دارید؟")) return;
     try {
-      await fetch("/api/admin/logout", { method: "POST" });
+      await fetch("/api/admin/auth", { method: "DELETE" });
+    } catch {
+      // ادامه خروج حتی در صورت خطای شبکه
+    } finally {
       router.push("/admin/login");
       router.refresh();
-    } catch {
-      router.push("/admin/login");
     }
   };
 
   return (
-    <aside className="w-72 bg-[var(--modal-bg)] border-l border-[var(--card-border)] flex flex-col justify-between p-5 min-h-screen select-none font-sans" dir="rtl">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center text-lg font-black shadow-lg">
-              ⚡
-            </span>
-            <div>
-              <h1 className="text-sm font-black text-[var(--text-primary)]">پیشخوان آکسون</h1>
-              <p className="text-[10px] text-[var(--text-secondary)] font-medium">مدیریت تخصصی استودیو</p>
-            </div>
+    <aside
+      className="w-64 bg-[var(--modal-bg)] border-l border-[var(--card-border)] flex flex-col justify-between shrink-0 h-screen sticky top-0 font-sans"
+      dir="rtl"
+    >
+      {/* بخش لوگو و برند */}
+      <div className="p-6 border-b border-[var(--card-border)]">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[var(--accent-blue)] to-blue-500 flex items-center justify-center text-white font-black text-lg shadow-lg">
+            A
           </div>
-          <Link
-            href="/"
-            target="_blank"
-            className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
-            title="مشاهده ویترین سایت"
-          >
-            ↗
-          </Link>
+          <div>
+            <h2 className="font-black text-sm text-[var(--text-primary)] tracking-wide">
+              آکسون کور
+            </h2>
+            <span className="text-[10px] text-[var(--accent-blue)] font-bold block uppercase tracking-wider">
+              Control Panel v1.0
+            </span>
+          </div>
         </div>
-
-        <nav className="space-y-5 overflow-y-auto max-h-[calc(100vh-180px)] pr-1">
-          {navGroups.map((group) => (
-            <div key={group.group} className="space-y-1.5">
-              <span className="text-[10px] font-black text-[var(--text-secondary)] px-2 block uppercase tracking-wider">
-                {group.group}
-              </span>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      onClick={() => soundEngine.playClick()}
-                      className={"flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition duration-200 " + (
-                        isActive
-                          ? "bg-[var(--accent-blue)] text-white shadow-md shadow-blue-500/20"
-                          : "text-[var(--text-primary)] hover:bg-[var(--input-bg)] border border-transparent"
-                      )}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-sm">{item.icon}</span>
-                        <span>{item.title}</span>
-                      </div>
-                      {item.badge && (
-                        <span className="px-2 py-0.5 rounded-lg text-[9px] bg-white/20 text-white font-mono font-black">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
       </div>
 
-      <div className="pt-4 border-t border-[var(--card-border)]">
+      {/* منوی ناوبری اصلی */}
+      <nav className="p-4 space-y-1 overflow-y-auto flex-1 custom-scrollbar">
+        {NAV_ITEMS.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              onClick={() => soundEngine.playClick()}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                isActive
+                  ? "bg-[var(--accent-blue)] text-white shadow-md shadow-blue-500/20"
+                  : "text-[var(--text-secondary)] hover:text-white hover:bg-[var(--input-bg)]"
+              }`}
+            >
+              <span className="text-base">{item.icon}</span>
+              <span>{item.title}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* بخش پایین سایدبار و دکمه خروج */}
+      <div className="p-4 border-t border-[var(--card-border)] space-y-2">
+        <Link
+          href="/"
+          target="_blank"
+          onClick={() => soundEngine.playClick()}
+          className="flex items-center justify-between px-3.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 hover:text-white hover:bg-[var(--input-bg)] transition"
+        >
+          <span className="flex items-center gap-2">
+            <span>🌐</span> مشاهده فروشگاه
+          </span>
+          <span className="text-xs font-mono">↗</span>
+        </Link>
+
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500 hover:text-white border border-rose-500/20 text-rose-500 text-xs font-black transition cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
         >
-          <span>🚪</span>
-          <span>خروج از حساب ادمین</span>
+          <span>🚪</span> خروج از مدیریت
         </button>
       </div>
     </aside>

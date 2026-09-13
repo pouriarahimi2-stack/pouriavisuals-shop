@@ -1,3 +1,4 @@
+// File Path: components/ContactDock.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -32,14 +33,6 @@ export default function ContactDock() {
 
   const loadDockSettings = async () => {
     try {
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem("axon_contact_dock_keys_v2026");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) setDockKeys(parsed);
-        }
-      }
-
       const info = await siteInfoService.getSiteInfo();
       if (info) {
         if ((info as any).contact_dock_title) {
@@ -47,9 +40,6 @@ export default function ContactDock() {
         }
         if ((info as any).contact_dock_items && Array.isArray((info as any).contact_dock_items) && (info as any).contact_dock_items.length > 0) {
           setDockKeys((info as any).contact_dock_items);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("axon_contact_dock_keys_v2026", JSON.stringify((info as any).contact_dock_items));
-          }
         }
       }
     } catch {}
@@ -69,7 +59,7 @@ export default function ContactDock() {
     window.addEventListener("site_info_updated", handleUpdate);
 
     const channel = supabase
-      .channel("realtime-dock-keys-popup")
+      .channel("realtime-dock-keys-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
         loadDockSettings();
       })
@@ -86,7 +76,7 @@ export default function ContactDock() {
   return (
     <div className="flex flex-col items-center justify-center space-y-4 font-sans select-none py-6 overflow-visible" dir="rtl">
       
-      {/* عنوان بالای داک با نشانگر نئونی پالس‌دار */}
+      {/* عنوان بالای داک */}
       <div className="flex items-center gap-2">
         <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-blue)] shadow-[0_0_12px_var(--accent-blue)] animate-pulse" />
         <span className="text-xs font-black text-[var(--text-primary)]">
@@ -94,7 +84,7 @@ export default function ContactDock() {
         </span>
       </div>
 
-      {/* محفظه کپسولی تیره با استایل دقیق شبیه ویدیو و ترتیب LTR */}
+      {/* محفظه کپسولی تیره با ترتیب LTR */}
       <div
         className="p-3 sm:p-3.5 px-4 sm:px-6 rounded-full bg-[#0b0f19]/95 border border-slate-800/90 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex items-center justify-center gap-2 sm:gap-3 relative overflow-visible"
         dir="ltr"
@@ -120,7 +110,7 @@ export default function ContactDock() {
                 }
               }}
             >
-              {/* پاپ‌آپ کارتی شناور بالا (دقیقاً مطابق رفتار ویدیو) */}
+              {/* پاپ‌آپ شناور بالا */}
               <div
                 className={`absolute -top-20 pointer-events-none transition-all duration-300 ease-out z-50 flex flex-col items-center ${
                   isActive
@@ -145,14 +135,13 @@ export default function ContactDock() {
                   </div>
                 </div>
 
-                {/* فلش یا مثلث پایین پاپ‌آپ */}
                 <div
                   className="w-2.5 h-2.5 -mt-1 rotate-45 bg-[#0f172a] border-r border-b"
                   style={{ borderColor: accent }}
                 />
               </div>
 
-              {/* کلید مکانیکی با افکت جهش به بالا و روشن شدن نئونی هنگام هاور */}
+              {/* کلید مکانیکی */}
               <button
                 type="button"
                 className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center font-black text-sm sm:text-base text-white transition-all duration-300 cursor-pointer relative group"
@@ -173,7 +162,6 @@ export default function ContactDock() {
                   {k.letter}
                 </span>
 
-                {/* خط نورانی باریک زیر دکمه فعال */}
                 {isActive && (
                   <span
                     className="absolute bottom-1 w-2.5 h-0.5 rounded-full"
@@ -185,10 +173,6 @@ export default function ContactDock() {
           );
         })}
       </div>
-
-      <span className="text-[10px] text-slate-400 font-medium">
-        برای مشاهده امکانات، ماوس را روی کلیدها ببرید یا کلیک کنید
-      </span>
     </div>
   );
 }

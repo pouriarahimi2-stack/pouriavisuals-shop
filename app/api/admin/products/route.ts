@@ -1,27 +1,4 @@
-/**
- * AXON CORE - Harden Admin Products Route with Integrity Checks & Audit Logging (fix.js)
- * Preserves all existing product structures, colors, and storage variants.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[PRODUCT-SECURITY]\x1b[0m ارتقای اندپوینت مدیریت محصولات و اعتبارسنجی انبار...");
-
-const productsRoutePath = 'app/api/admin/products/route.ts';
-
-const secureProductsRouteCode = `import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +20,7 @@ async function logAudit(req: NextRequest, action: string, targetId: string, deta
     await supabaseAdmin.from("admin_audit_logs").insert({
       admin_username: "admin",
       action,
-      target_resource: \`product:\${targetId}\`,
+      target_resource: `product:${targetId}`,
       details,
       ip_address: clientIp,
       created_at: new Date().toISOString(),
@@ -202,36 +179,4 @@ export async function DELETE(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message || "خطا در حذف محصول." }, { status: 500 });
   }
-}
-`;
-
-writeFile(productsRoutePath, secureProductsRouteCode);
-
-// کامپایل و تست صحت پروژه
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال تغییرات به گیت‌هاب
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(products): enforce price/stock validation and admin audit logging in products route"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ ارتقای امنیت محصولات با موفقیت در ورسل مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

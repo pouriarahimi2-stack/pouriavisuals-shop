@@ -1,33 +1,37 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 
-interface AuditLogItem {
+interface AuditLog {
   id: string;
-  admin_username?: string;
+  admin_username: string;
   action: string;
-  target_resource?: string;
-  details?: any;
-  ip_address?: string;
+  target_resource: string;
+  details: any;
+  ip_address: string;
   created_at: string;
 }
 
-export default function AuditLogsPage() {
-  const [logs, setLogs] = useState<AuditLogItem[]>([]);
+export default function AdminAuditLogsPage() {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const fetchLogs = async () => {
-    setLoading(true);
     try {
-      const res = await fetch("/api/admin/audit-logs", { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        setLogs(json.logs || json.data || []);
+      setLoading(true);
+      setError(null);
+      const res = await fetch("/api/admin/audit-logs?limit=50");
+      if (!res.ok) throw new Error("خطا در دریافت لاگ‌ها از سرور");
+      const json = await res.json();
+      if (json.success) {
+        setLogs(json.logs);
+      } else {
+        throw new Error(json.message || "خطا در واکشی اطلاعات.");
       }
-    } catch (e) {
-      console.error("Audit log fetch error:", e);
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -37,86 +41,91 @@ export default function AuditLogsPage() {
     fetchLogs();
   }, []);
 
-  const filtered = logs.filter(
-    (l) =>
-      (l.admin_username || "").toLowerCase().includes(search.toLowerCase()) ||
-      (l.action || "").toLowerCase().includes(search.toLowerCase()) ||
-      (l.target_resource || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const getBadgeStyle = (action: string) => {
+    if (action.includes("DELETE")) return "bg-rose-500/15 border-rose-500/30 text-rose-400";
+    if (action.includes("CREATE") || action.includes("INSERT")) return "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
+    if (action.includes("UPDATE")) return "bg-amber-500/15 border-amber-500/30 text-amber-400";
+    return "bg-blue-500/15 border-blue-500/30 text-blue-400";
+  };
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🛡️</span> گزارش وقایع و لاگ‌های امنیتی سیستم (Audit Logs)
-          </h2>
+          <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🛡️</span> دفتر کل وقایع امنیتی (Audit Logs)
+          </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ثبت و پایش دقیق تغییرات، لاگین‌ها و عملیات‌های ادمین‌ها در دیتابیس
+            گزارش رسمی و تغییرناپذیر اقدامات مدیریتی، لاگ تغییرات سفارشات، محصولات و پیکربندی‌های حساس
           </p>
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              fetchLogs();
-            }}
-            className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer flex items-center gap-2"
-          >
-            <span>🔄</span>
-            <span>به‌روزرسانی</span>
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            soundEngine.playClick();
+            fetchLogs();
+          }}
+          className="px-4 py-2 rounded-2xl bg-[var(--input-bg)] hover:bg-[var(--card-border)] border border-[var(--card-border)] text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+        >
+          <span>🔄</span> تازه‌سازی وقایع
+        </button>
       </div>
 
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-        <div className="w-full sm:w-72">
-          <input
-            type="text"
-            placeholder="🔍 جستجو در عملیات، کاربر، منبع..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
-          />
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-bold">
+          {error}
         </div>
+      )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs border-collapse min-w-[700px]">
-            <thead>
-              <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black text-[11px] pb-3">
-                <th className="p-3">کاربر مدیر</th>
-                <th className="p-3">عملیات</th>
-                <th className="p-3">منبع هدف</th>
-                <th className="p-3">آدرس IP</th>
-                <th className="p-3 text-left">زمان وقوع</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--card-border)] font-medium">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400 font-bold">در حال بارگذاری لاگ‌های امنیتی...</td>
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-xs text-slate-400">در حال بارگذاری سوابق امنیتی...</div>
+        ) : logs.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-400 font-bold">هیچ رخدادی هنوز ثبت نشده است.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead>
+                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
+                  <th className="pb-3 px-3">نوع عملیات</th>
+                  <th className="pb-3 px-3">منبع هدف</th>
+                  <th className="pb-3 px-3">ادمین</th>
+                  <th className="pb-3 px-3">آدرس IP</th>
+                  <th className="pb-3 px-3">تاریخ و زمان</th>
+                  <th className="pb-3 px-3">جزئیات</th>
                 </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400 font-bold">هیچ رخدادی ثبت نشده است.</td>
-                </tr>
-              ) : (
-                filtered.map((log) => (
-                  <tr key={log.id} className="hover:bg-[var(--input-bg)]/60 transition">
-                    <td className="p-3 font-mono font-bold text-[var(--accent-blue)]">{log.admin_username || "system"}</td>
-                    <td className="p-3 font-bold text-[var(--text-primary)]">{log.action}</td>
-                    <td className="p-3 font-mono text-slate-400">{log.target_resource || "---"}</td>
-                    <td className="p-3 font-mono text-xs">{log.ip_address || "لوکال / نامشخص"}</td>
-                    <td className="p-3 text-left font-mono text-[10px] text-slate-400">
-                      {log.created_at ? new Date(log.created_at).toLocaleString("fa-IR") : "---"}
+              </thead>
+              <tbody className="divide-y divide-[var(--card-border)]">
+                {logs.map((log) => (
+                  <tr key={log.id} className="hover:bg-[var(--input-bg)]/40 transition">
+                    <td className="py-3.5 px-3">
+                      <span className={`px-2.5 py-1 rounded-xl border text-[11px] font-mono font-bold ${getBadgeStyle(log.action)}`}>
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-3 font-mono text-[var(--text-primary)] font-bold">
+                      {log.target_resource}
+                    </td>
+                    <td className="py-3.5 px-3 text-[var(--text-secondary)]">
+                      {log.admin_username}
+                    </td>
+                    <td className="py-3.5 px-3 font-mono text-slate-400 text-[11px]">
+                      {log.ip_address}
+                    </td>
+                    <td className="py-3.5 px-3 text-slate-400 text-[11px] font-mono">
+                      {new Date(log.created_at).toLocaleString("fa-IR")}
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <span className="font-mono text-[10px] text-slate-500 truncate max-w-[200px] block" title={JSON.stringify(log.details)}>
+                        {JSON.stringify(log.details)}
+                      </span>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

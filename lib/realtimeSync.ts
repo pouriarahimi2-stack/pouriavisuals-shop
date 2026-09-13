@@ -10,7 +10,7 @@ const SAFE_PUBLIC_TABLES = [
 ];
 
 let activeChannel: any = null;
-let debounceTimer: NodeJS.Timeout | null = null;
+const debounceTimers: Record<string, NodeJS.Timeout | null> = {};
 
 export const realtimeEngine = {
   init() {
@@ -20,8 +20,8 @@ export const realtimeEngine = {
 
     SAFE_PUBLIC_TABLES.forEach((tbl) => {
       ch.on("postgres_changes", { event: "*", schema: "public", table: tbl }, (payload) => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
+        if (debounceTimers[tbl]) clearTimeout(debounceTimers[tbl] as NodeJS.Timeout);
+        debounceTimers[tbl] = setTimeout(() => {
           window.dispatchEvent(new CustomEvent(`db_${tbl}_updated`, { detail: payload }));
         }, 200);
       });

@@ -1,53 +1,118 @@
-// File Path: lib/customerSession.ts
-import crypto from "crypto";
-
-export const CUSTOMER_COOKIE_NAME = "customer_session_token";
-
-const SECRET =
-  process.env.CUSTOMER_JWT_SECRET ||
-  process.env.ADMIN_SESSION_SECRET ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "axon_customer_fallback_secret_key_2026_min_32_bytes";
-
 export interface CustomerSessionPayload {
   id: string;
   phone: string;
   username?: string;
-  email?: string;
   name?: string;
+  email?: string;
+  sid: string;
+  iat: number;
   exp: number;
 }
 
-export function signCustomerPayload(user: {
-  id: string;
-  phone: string;
-  username?: string;
-  email?: string;
-  name?: string;
-}): string {
-  const payload: CustomerSessionPayload = {
-    ...user,
-    exp: Date.now() + 30 * 24 * 60 * 60 * 1000, // ۳۰ روز اعتبار
-  };
+export const CUSTOMER_COOKIE_NAME = "customer_session_token";
+const SESSION_EXPIRY_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
-  const str = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = crypto.createHmac("sha256", SECRET).update(str).digest("base64url");
-  return `${str}.${signature}`;
+function getCustomerSecretKey(): string {
+  const secret = process.env.CUSTOMER_JWT_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret || secret.trim().length < 16) {
+    throw new Error("FATAL SECURITY ERROR: CUSTOMER_JWT_SECRET is missing. Refusing to boot insecurely.");
+  }
+  return secret.trim();
 }
 
-export function verifyCustomerToken(token: string | null | undefined): CustomerSessionPayload | null {
+function base64UrlEncode(str: string): string {
+  return Buffer.from(str)
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+function base64UrlDecode(str: string): string {
+  let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4) base64 += "=";
+  return Buffer.from(base64, "base64").toString("utf8");
+}
+
+function bufferToBase64Url(buffer: ArrayBuffer): string {
+  return Buffer.from(buffer)
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+function base64UrlToUint8Array(str: string): Uint8Array {
+  let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4) base64 += "=";
+  return new Uint8Array(Buffer.from(base64, "base64"));
+}
+
+async function getCryptoKey(usage: "sign" | "verify"): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const secretBuffer = enc.encode(getCustomerSecretKey());
+  return await crypto.subtle.importKey(
+    "raw",
+    secretBuffer,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    [usage]
+  );
+}
+
+export async function signCustomerPayload(
+  data: Omit<CustomerSessionPayload, "iat" | "exp" | "sid"> & { expSeconds?: number; sid?: string }
+): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const expSeconds = data.expSeconds || SESSION_EXPIRY_SECONDS;
+  const sid = data.sid || "csid_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+
+  const payload: CustomerSessionPayload = {
+    id: data.id,
+    phone: data.phone,
+    username: data.username,
+    email: data.email,
+    sid,
+    iat: now,
+    exp: now + expSeconds,
+  };
+
+  const header = { alg: "HS256", typ: "JWT" };
+  const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
+
+  const key = await getCryptoKey("sign");
+  const enc = new TextEncoder();
+  const signatureBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(unsignedToken));
+  return `${unsignedToken}.${bufferToBase64Url(signatureBuffer)}`;
+}
+
+export async function verifyCustomerPayload(token: string | null | undefined): Promise<CustomerSessionPayload | null> {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+
+  const [encodedHeader, encodedPayload, signature] = parts;
+  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+
   try {
-    if (!token || typeof token !== "string" || !token.includes(".")) return null;
-    const [payloadStr, signature] = token.split(".");
-    const expectedSig = crypto.createHmac("sha256", SECRET).update(payloadStr).digest("base64url");
+    const key = await getCryptoKey("verify");
+    const enc = new TextEncoder();
+    const signatureBytes = base64UrlToUint8Array(signature);
 
-    if (signature !== expectedSig) return null;
+    const isValid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signatureBytes as any,
+      enc.encode(unsignedToken)
+    );
 
-    const payload: CustomerSessionPayload = JSON.parse(Buffer.from(payloadStr, "base64url").toString("utf-8"));
-    if (Date.now() > payload.exp) return null;
-
+    if (!isValid) return null;
+    const payload: CustomerSessionPayload = JSON.parse(base64UrlDecode(encodedPayload));
+    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
     return payload;
   } catch {
     return null;
   }
 }
+
+export const verifyCustomerToken = verifyCustomerPayload;

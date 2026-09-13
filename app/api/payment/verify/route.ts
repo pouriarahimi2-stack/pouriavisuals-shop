@@ -1,14 +1,12 @@
-// File Path: app/api/payment/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { smsService } from "@/services/smsService";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { orderId, authority } = body;
+    const { orderId } = body;
 
     if (!orderId) {
       return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
@@ -21,59 +19,36 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (error || !order) {
-      return NextResponse.json({ success: false, message: "سفارش مورد نظر در پایگاه داده یافت نشد." }, { status: 404 });
+      return NextResponse.json({ success: false, message: "سفارش مورد نظر یافت نشد." }, { status: 404 });
     }
 
-    const trackingRef = "TXN-" + Date.now().toString().slice(-8);
     const payableAmount = Number(order.final_amount || order.total_amount || 0);
+    const trackingRef = "SANDBOX-" + Date.now().toString().slice(-8);
 
-    // به‌روزرسانی وضعیت فاکتور به پرداخت‌شده
+    // ثبت در وضعیت نیازمند تایید دستی مدیر (عدم تغییر به paid خودکار)
     const { error: updateErr } = await supabaseAdmin
       .from("orders")
       .update({
-        payment_status: "paid",
-        status: "paid",
-        payment_method: "online_gateway",
-        notes: `${order.notes || ""} | کد تراکنش بانکی: ${trackingRef}`.trim(),
+        payment_status: "pending_manual_review",
+        status: "pending_manual_review",
+        payment_method: "sandbox_manual_verification",
+        notes: `${order.notes || ""} | در انتظار تایید واریز دستی توسط ادمین: ${trackingRef}`.trim(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", order.id);
 
-    if (updateErr) {
-      throw updateErr;
-    }
-
-    // کسر خودکار موجودی انبار برای اقلام خریداری شده
-    if (Array.isArray(order.items)) {
-      for (const it of order.items) {
-        const prodId = it.productId || it.product_id || it.id;
-        const qty = Number(it.quantity || 1);
-        if (prodId) {
-          try {
-            const { data: prod } = await supabaseAdmin.from("products").select("stock").eq("id", prodId).single();
-            if (prod && prod.stock !== null && prod.stock !== undefined) {
-              const nextStock = Math.max(0, Number(prod.stock) - qty);
-              await supabaseAdmin.from("products").update({ stock: nextStock, is_available: nextStock > 0 }).eq("id", prodId);
-            }
-          } catch {}
-        }
-      }
-    }
-
-    // ارسال پیامک تایید پرداخت به شماره مشتری
-    if (order.phone) {
-      await smsService.sendOrderPaidConfirmation(order.phone, String(order.order_number || order.id), payableAmount).catch(() => {});
-    }
+    if (updateErr) throw updateErr;
 
     return NextResponse.json({
       success: true,
-      message: "تراکنش بانکی با موفقیت تایید و سفارش نهایی گردید.",
+      sandbox: true,
+      message: "سفارش شما در وضعیت بررسی و تایید دستی توسط مدیریت قرار گرفت.",
       trackingRef,
       orderId: order.id,
       amount: payableAmount,
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || "خطا در تایید تراکنش بانکی." }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 

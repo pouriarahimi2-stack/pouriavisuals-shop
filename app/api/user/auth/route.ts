@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
         name: created.username,
       };
 
-      const token = signCustomerPayload(userObj);
+      const token = await signCustomerPayload(userObj);
       const res = NextResponse.json({ success: true, message: "ثبت‌نام با موفقیت انجام شد.", user: userObj });
       
       res.cookies.set(CUSTOMER_COOKIE_NAME, token, {
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         name: customer.username || customer.phone,
       };
 
-      const token = signCustomerPayload(userObj);
+      const token = await signCustomerPayload(userObj);
       const res = NextResponse.json({ success: true, message: "ورود با موفقیت انجام شد.", user: userObj });
       
       res.cookies.set(CUSTOMER_COOKIE_NAME, token, {

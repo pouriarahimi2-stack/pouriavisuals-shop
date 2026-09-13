@@ -1,3 +1,4 @@
+import sanitizeHtml from "sanitize-html";
 import { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import Link from "next/link";
@@ -35,10 +36,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 function sanitizeNewsHtml(html: string): string {
   if (!html) return "";
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/on\w+="[^"]*"/gi, "")
-    .replace(/javascript:[^"']*/gi, "");
+  return sanitizeHtml(html, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2", "h3", "table", "thead", "tbody", "tr", "th", "td"]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      "*": ["class", "style"],
+      "img": ["src", "alt", "width", "height"],
+    }
+  });
 }
 
 export default async function NewsDetailPage({ params }: Props) {

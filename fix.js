@@ -1,5 +1,5 @@
 /**
- * AXON CORE - Phase 3: Responsive Viewport Switcher (fix.js)
+ * AXON CORE - Polish Phase: Modern Toast/Feedback UI & Catch Block Cleanup (fix.js)
  */
 
 const fs = require('fs');
@@ -22,138 +22,74 @@ function readFile(relPath) {
   return fs.readFileSync(full, 'utf8');
 }
 
-console.log("\x1b[35m[PHASE-3]\x1b[0m آغاز فاز ۳: پیاده‌سازی سوییچ پیش‌نمایش واکنش‌گرا (موبایل، تبلت، دسکتاپ)...");
+console.log("\x1b[35m[FINAL-POLISH]\x1b[0m آغاز فاز پاکسازی: جایگزینی alertها با سیستم فیدبک و لاگ خطاهای خاموش...");
 
 // =============================================================================
-// ۱. افزودن سوییچ حالت دستگاه به components/admin/PageBuilder.tsx
+// ۱. ارتقای components/admin/AdminCustomers.tsx (حذف alert و confirm بومی)
 // =============================================================================
-const pageBuilderPath = 'components/admin/PageBuilder.tsx';
-let pbContent = readFile(pageBuilderPath);
+const customersPath = 'components/admin/AdminCustomers.tsx';
+let custContent = readFile(customersPath);
 
-if (pbContent && !pbContent.includes('deviceView')) {
-  // اضافه کردن استیت انتخاب دستگاه
-  pbContent = pbContent.replace(
-    'const [isPublished, setIsPublished] = useState(true);',
-    'const [isPublished, setIsPublished] = useState(true);\n  const [deviceView, setDeviceView] = useState<"desktop" | "tablet" | "mobile">("desktop");'
+if (custContent && custContent.includes('alert(')) {
+  // اضافه کردن استیت پیام‌های موقت به جای alert
+  custContent = custContent.replace(
+    'const [submitting, setSubmitting] = useState(false);',
+    'const [submitting, setSubmitting] = useState(false);\n  const [actionFeedback, setActionFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);\n\n  const showFeedback = (text: string, type: "success" | "error" = "success") => {\n    setActionFeedback({ type, text });\n    setTimeout(() => setActionFeedback(null), 4000);\n  };'
   );
 
-  // دکمه‌های سوییچ نوار ابزار پیش‌نمایش
-  const deviceSwitcherToolbar = `
-            {/* نوار انتخاب نمای دستگاه (دسکتاپ / تبلت / موبایل) */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-              <span className="font-bold text-xs text-[var(--text-secondary)]">📱 نمای پیش‌نمایش اندازه صفحه:</span>
-              <div className="flex gap-1.5 p-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)]">
-                <button
-                  type="button"
-                  onClick={() => setDeviceView("desktop")}
-                  className={"px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1.5 " + (
-                    deviceView === "desktop" ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-[var(--text-secondary)] hover:text-white"
-                  )}
-                >
-                  <span>💻</span>
-                  <span>دسکتاپ (100%)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeviceView("tablet")}
-                  className={"px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1.5 " + (
-                    deviceView === "tablet" ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-[var(--text-secondary)] hover:text-white"
-                  )}
-                >
-                  <span>📟</span>
-                  <span>تبلت (768px)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeviceView("mobile")}
-                  className={"px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1.5 " + (
-                    deviceView === "mobile" ? "bg-[var(--accent-blue)] text-white shadow-sm" : "text-[var(--text-secondary)] hover:text-white"
-                  )}
-                >
-                  <span>📱</span>
-                  <span>موبایل (390px)</span>
-                </button>
-              </div>
-            </div>
-`;
+  // جایگزینی alert با showFeedback
+  custContent = custContent.replace(/alert\("✓ "\s*\+\s*json\.message\);/g, 'showFeedback(json.message, "success");');
+  custContent = custContent.replace(/alert\(json\.message\s*\|\|\s*"خطا در ذخیره اطلاعات\."\);/g, 'showFeedback(json.message || "خطا در ذخیره اطلاعات.", "error");');
+  custContent = custContent.replace(/alert\("پرونده با موفقیت حذف شد\."\);/g, 'showFeedback("پرونده با موفقیت حذف شد.", "success");');
+  custContent = custContent.replace(/alert\("خطا در حذف پرونده\."\);/g, 'showFeedback("خطا در حذف پرونده.", "error");');
+  custContent = custContent.replace(/alert\("✓ پیامک بازاریابی و کد تخفیف اختصاصی با موفقیت ارسال گردید\."\);/g, 'showFeedback("پیامک بازاریابی و کد تخفیف با موفقیت ارسال گردید.", "success");');
+  custContent = custContent.replace(/alert\(json\.message\s*\|\|\s*"خطا در ارسال پیامک\."\);/g, 'showFeedback(json.message || "خطا در ارسال پیامک.", "error");');
 
-  pbContent = pbContent.replace(
-    '<div className="border-t border-[var(--card-border)] pt-6 space-y-4">',
-    deviceSwitcherToolbar + '\n            <div className="border-t border-[var(--card-border)] pt-6 space-y-4">'
-  );
-
-  // قاب کانتینر بلوک‌ها با عرض وابسته به نمای انتخاب شده
-  pbContent = pbContent.replace(
-    '<div className="space-y-4 pt-2">',
-    '<div className={"space-y-4 pt-2 transition-all duration-300 mx-auto " + (deviceView === "mobile" ? "max-w-[390px] border-x-2 border-dashed border-[var(--accent-blue)]/50 px-2" : deviceView === "tablet" ? "max-w-[768px] border-x-2 border-dashed border-[var(--accent-blue)]/30 px-3" : "w-full")}>'
-  );
-
-  writeFile(pageBuilderPath, pbContent);
-}
-
-// =============================================================================
-// ۲. افزودن سوییچ حالت دستگاه به components/admin/StorefrontLayoutStudio.tsx
-// =============================================================================
-const studioPath = 'components/admin/StorefrontLayoutStudio.tsx';
-let studioContent = readFile(studioPath);
-
-if (studioContent && !studioContent.includes('viewportMode')) {
-  studioContent = studioContent.replace(
-    'const [saving, setSaving] = useState(false);',
-    'const [saving, setSaving] = useState(false);\n  const [viewportMode, setViewportMode] = useState<"desktop" | "tablet" | "mobile">("desktop");'
-  );
-
-  const studioToolbar = `
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-          <button
-            type="button"
-            onClick={() => setViewportMode("desktop")}
-            className={"px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer " + (viewportMode === "desktop" ? "bg-[var(--accent-blue)] text-white" : "text-[var(--text-secondary)]")}
-          >
-            💻 دسکتاپ
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewportMode("tablet")}
-            className={"px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer " + (viewportMode === "tablet" ? "bg-[var(--accent-blue)] text-white" : "text-[var(--text-secondary)]")}
-          >
-            📟 تبلت
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewportMode("mobile")}
-            className={"px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer " + (viewportMode === "mobile" ? "bg-[var(--accent-blue)] text-white" : "text-[var(--text-secondary)]")}
-          >
-            📱 موبایل
-          </button>
+  // رندر بنر فیدبک در بالای کامپوننت
+  const feedbackBanner = `
+      {actionFeedback && (
+        <div className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (
+          actionFeedback.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-500"
+        )}>
+          {actionFeedback.text}
         </div>
+      )}
 `;
-
-  studioContent = studioContent.replace(
-    '<button\n          type="button"\n          onClick={() => handleSave()}',
-    studioToolbar + '\n        <button\n          type="button"\n          onClick={() => handleSave()}'
+  custContent = custContent.replace(
+    '{/* سربرگ سامانه سازمانی CRM */}',
+    feedbackBanner + '\n      {/* سربرگ سامانه سازمانی CRM */}'
   );
 
-  writeFile(studioPath, studioContent);
+  writeFile(customersPath, custContent);
 }
 
 // =============================================================================
-// ۳. بیلد لوکال و پوش به مخزن گیت‌هاب
+// ۲. لاگ‌گذاری ساختاریافته روی بلوک‌های خالی catch در سرویس‌ها
+// =============================================================================
+const siteInfoPath = 'services/siteInfoService.ts';
+let siteInfoContent = readFile(siteInfoPath);
+if (siteInfoContent && siteInfoContent.includes('catch {}')) {
+  siteInfoContent = siteInfoContent.replace(/catch\s*\{\}/g, 'catch (err) { console.error("[SITE_INFO_SILENT_ERROR]:", err); }');
+  writeFile(siteInfoPath, siteInfoContent);
+}
+
+// =============================================================================
+// ۳. بیلد لوکال و ارسال نهایی به گیت‌هاب
 // =============================================================================
 console.log("بررسی کامپایل پروژه (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
+  console.log("\x1b[32m✔ پروژه با موفقیت ۱۰۰٪ کامپایل شد!\x1b[0m");
 } catch (e) {
   console.error("خطای بیلد:", e.message);
   process.exit(1);
 }
 
-console.log("ارسال تغییرات فاز ۳ به گیت‌هاب...");
+console.log("ارسال کامیت پولیش و نهایی به گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(admin): phase 3 - add multi-device viewport switcher (desktop, tablet, mobile) to PageBuilder and Storefront Studio"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "refactor(ui): replace native alerts with toast feedback and clean up empty catches"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -162,7 +98,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ فاز ۳ با موفقیت روی سرور ورسل مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ تمام مراحل نقشه راه با موفقیت به پایان رسید و در ورسل مستقر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

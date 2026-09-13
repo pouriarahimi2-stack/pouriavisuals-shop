@@ -37,6 +37,12 @@ export default function AdminCustomers() {
   const [rewardCouponCode, setRewardCouponCode] = useState("");
   const [sendingSms, setSendingSms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const showFeedback = (text: string, type: "success" | "error" = "success") => {
+    setActionFeedback({ type, text });
+    setTimeout(() => setActionFeedback(null), 4000);
+  };
 
   const fetchCrmData = async () => {
     try {
@@ -108,11 +114,11 @@ export default function AdminCustomers() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        alert("✓ " + json.message);
+        showFeedback(json.message, "success");
         setIsModalOpen(false);
         fetchCrmData();
       } else {
-        alert(json.message || "خطا در ذخیره اطلاعات.");
+        showFeedback(json.message || "خطا در ذخیره اطلاعات.", "error");
       }
     } finally {
       setSubmitting(false);
@@ -129,11 +135,11 @@ export default function AdminCustomers() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        alert("پرونده با موفقیت حذف شد.");
+        showFeedback("پرونده با موفقیت حذف شد.", "success");
         fetchCrmData();
       }
     } catch {
-      alert("خطا در حذف پرونده.");
+      showFeedback("خطا در حذف پرونده.", "error");
     }
   };
 
@@ -178,12 +184,12 @@ export default function AdminCustomers() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        alert("✓ پیامک بازاریابی و کد تخفیف اختصاصی با موفقیت ارسال گردید.");
+        showFeedback("پیامک بازاریابی و کد تخفیف با موفقیت ارسال گردید.", "success");
         setIsSmsModalOpen(false);
         setSmsText("");
         setRewardCouponCode("");
       } else {
-        alert(json.message || "خطا در ارسال پیامک.");
+        showFeedback(json.message || "خطا در ارسال پیامک.", "error");
       }
     } finally {
       setSendingSms(false);
@@ -214,6 +220,15 @@ export default function AdminCustomers() {
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       
+      
+      {actionFeedback && (
+        <div className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (
+          actionFeedback.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-500"
+        )}>
+          {actionFeedback.text}
+        </div>
+      )}
+
       {/* سربرگ سامانه سازمانی CRM */}
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>

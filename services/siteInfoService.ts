@@ -347,7 +347,7 @@ export const siteInfoService = {
                 ? JSON.parse(data.homepage_layout_config)
                 : data.homepage_layout_config;
               parsedLayout = { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG, ...incoming };
-            } catch {}
+            } catch (err) { console.error("[SITE_INFO_SILENT_ERROR]:", err); }
           }
 
           let parsedSecurity: AuthSecurityConfig = DEFAULT_AUTH_SECURITY_CONFIG;
@@ -360,7 +360,7 @@ export const siteInfoService = {
                 adminDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.adminDeck, ...(incomingSec.adminDeck || {}) },
                 userDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.userDeck, ...(incomingSec.userDeck || {}) },
               };
-            } catch {}
+            } catch (err) { console.error("[SITE_INFO_SILENT_ERROR]:", err); }
           }
 
           const mapped: SiteInfo = {

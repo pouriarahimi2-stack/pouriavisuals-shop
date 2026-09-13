@@ -1,27 +1,4 @@
-/**
- * AXON CORE - Harden Admin News & Articles Route with Sanitization & Audit Trails (fix.js)
- * Preserves all existing blog/news schemas and published states.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
-}
-
-console.log("\x1b[35m[NEWS-SECURITY]\x1b[0m مقاوم‌سازی روت مدیریت اخبار و مقالات سایت...");
-
-const newsRoutePath = 'app/api/admin/news/route.ts';
-
-const secureNewsRouteCode = `import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +18,7 @@ async function logAudit(req: NextRequest, action: string, targetId: string, deta
     await supabaseAdmin.from("admin_audit_logs").insert({
       admin_username: "admin",
       action,
-      target_resource: \`news:\${targetId}\`,
+      target_resource: `news:${targetId}`,
       details,
       ip_address: clientIp,
       created_at: new Date().toISOString(),
@@ -55,8 +32,8 @@ function sanitizeSlug(text: string): string {
   return text
     .trim()
     .toLowerCase()
-    .replace(/[^\u0600-\u06FFa-z0-9\\s-]/g, "")
-    .replace(/\\s+/g, "-")
+    .replace(/[^؀-ۿa-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 100);
 }
@@ -100,7 +77,7 @@ export async function POST(req: NextRequest) {
     const generatedSlug = slug ? sanitizeSlug(slug) : sanitizeSlug(title);
 
     // پالایش پایه‌ای از اسکریپت‌های مخرب
-    const cleanContent = typeof content === "string" ? content.replace(/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi, "") : "";
+    const cleanContent = typeof content === "string" ? content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "") : "";
 
     const payload = {
       title: title.trim(),
@@ -155,7 +132,7 @@ export async function PUT(req: NextRequest) {
       updates.slug = sanitizeSlug(updates.slug);
     }
     if (updates.content && typeof updates.content === "string") {
-      updates.content = updates.content.replace(/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi, "");
+      updates.content = updates.content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
     }
     updates.updated_at = new Date().toISOString();
 
@@ -212,36 +189,4 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-`;
-
-writeFile(newsRoutePath, secureNewsRouteCode);
-
-// کامپایل و تست صحت پروژه
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-// ارسال تغییرات به مخزن گیت‌هاب
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "security(news): sanitize HTML scripts, enforce safe slugging, and log admin audit trails"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ امنیت مقالات و اخبار با موفقیت در ورسل مستقر گردید!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

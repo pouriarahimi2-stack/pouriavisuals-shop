@@ -1,189 +1,105 @@
-// File Path: services/orderService.ts
-import { supabase } from "@/lib/supabase";
-
-export interface OrderItem {
-  productId?: string | number;
-  product_id?: string | number;
-  title: string;
-  name?: string;
-  price: number;
-  quantity: number;
-  image?: string;
-}
-
 export interface Order {
   id: string;
   orderNumber?: string;
   order_number?: string;
   customerName?: string;
   customer_name?: string;
-  phone: string;
-  province?: string;
-  city?: string;
-  address: string;
+  phone?: string;
+  customer_phone?: string;
   postalCode?: string;
   postal_code?: string;
-  notes?: string;
-  items: OrderItem[];
-  totalAmount: number;
+  address?: string;
+  status?: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+  paymentStatus?: "unpaid" | "successful" | "failed";
+  payment_status?: string;
+  totalAmount?: number;
   total_amount?: number;
+  finalAmount?: number;
+  final_amount?: number;
   discountAmount?: number;
   discount_amount?: number;
-  finalAmount: number;
-  final_amount?: number;
   couponCode?: string;
   coupon_code?: string;
-  status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
-  payment_status?: "pending" | "paid" | "failed";
-  paymentStatus?: "pending" | "paid" | "failed";
   trackingCode?: string;
   tracking_code?: string;
+  items?: any[];
+  notes?: string;
+  customer?: any;
   created_at?: string;
-  updated_at?: string;
-  customer?: {
-    fullName?: string;
-    name?: string;
-    phone: string;
-    address: string;
-    postalCode?: string;
-    province?: string;
-    city?: string;
-    notes?: string;
-  };
-}
-
-export function normalizeOrder(o: any): Order {
-  const customerName = o.customer_name || o.customerName || o.customer?.fullName || o.customer?.name || "خریدار محترم";
-  const phone = o.phone || o.customer?.phone || "";
-  const address = o.address || o.customer?.address || "";
-  const postalCode = o.postal_code || o.postalCode || o.customer?.postalCode || undefined;
-  const province = o.province || o.customer?.province || undefined;
-  const city = o.city || o.customer?.city || undefined;
-  const totalAmount = Number(o.total_amount || o.totalAmount || 0);
-  const finalAmount = Number(o.final_amount || o.finalAmount || totalAmount);
-  const discountAmount = Number(o.discount_amount || o.discountAmount || 0);
-
-  return {
-    ...o,
-    id: String(o.id || o.order_number || ""),
-    orderNumber: String(o.order_number || o.id || ""),
-    order_number: String(o.order_number || o.id || ""),
-    customerName,
-    customer_name: customerName,
-    phone,
-    address,
-    postalCode,
-    postal_code: postalCode,
-    province,
-    city,
-    totalAmount,
-    total_amount: totalAmount,
-    finalAmount,
-    final_amount: finalAmount,
-    discountAmount,
-    discount_amount: discountAmount,
-    status: o.status || "pending",
-    payment_status: o.payment_status || o.paymentStatus || "pending",
-    items: Array.isArray(o.items) ? o.items : [],
-    customer: {
-      fullName: customerName,
-      name: customerName,
-      phone,
-      address,
-      postalCode,
-      province,
-      city,
-      notes: o.notes || o.customer?.notes,
-    },
-  };
+  createdAt?: string;
 }
 
 export const orderService = {
   async getAll(): Promise<Order[]> {
     try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error || !data) return [];
-      return data.map(normalizeOrder);
-    } catch {
+      const res = await fetch("/api/orders", { cache: "no-store" });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return (json.orders || json.data || []).map(normalizeOrder);
+    } catch (err) {
+      console.error("[ORDER_SERVICE_GETALL_ERROR]:", err);
       return [];
     }
   },
 
-  async getById(id: string): Promise<Order | null> {
+  async getById(id: string | number): Promise<Order | null> {
     try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .or(`id.eq.${id},order_number.eq.${id}`)
-        .maybeSingle();
-
-      if (error || !data) return null;
-      return normalizeOrder(data);
-    } catch {
+      const cleanId = String(id).trim();
+      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(cleanId)}`, { cache: "no-store" });
+      if (!res.ok) return null;
+      const json = await res.json();
+      const list = json.orders || json.data || [];
+      if (Array.isArray(list) && list.length > 0) {
+        return normalizeOrder(list[0]);
+      }
+      return null;
+    } catch (err) {
+      console.error("[ORDER_SERVICE_GETBYID_ERROR]:", err);
       return null;
     }
   },
 
-  async create(orderPayload: any): Promise<Order | null> {
+  async create(orderData: any): Promise<{ success: boolean; order?: Order; message?: string }> {
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload),
+        body: JSON.stringify(orderData),
       });
-
       const json = await res.json();
-      if (res.ok && json.success && json.data) {
-        return normalizeOrder(json.data);
-      }
-      return null;
-    } catch (e) {
-      console.error("OrderService create error:", e);
-      return null;
+      return {
+        success: Boolean(json.success),
+        order: json.order ? normalizeOrder(json.order) : undefined,
+        message: json.message,
+      };
+    } catch (err: any) {
+      console.error("[ORDER_SERVICE_CREATE_ERROR]:", err);
+      return { success: false, message: err?.message || "خطا در برقراری ارتباط با سرور." };
     }
   },
 
-  async updateStatus(id: string | number, status: string, trackingCode?: string): Promise<boolean> {
+  async updateStatus(id: string | number, status: Order["status"], trackingCode?: string): Promise<boolean> {
     try {
-      const payload: Record<string, any> = {
-        status,
-        updated_at: new Date().toISOString(),
-      };
-      if (trackingCode) {
-        payload.tracking_code = trackingCode.trim();
-      }
-      if (status === "paid") {
-        payload.payment_status = "paid";
-      }
-
-      const { error } = await supabase.from("orders").update(payload).eq("id", id);
-      return !error;
-    } catch {
+      const res = await fetch("/api/orders/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status, tracking_code: trackingCode }),
+      });
+      return res.ok;
+    } catch (err) {
+      console.error("[ORDER_SERVICE_UPDATE_ERROR]:", err);
       return false;
     }
-  },
-
-  async trackOrder(query: string): Promise<Order[]> {
-    try {
-      const clean = query.replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString()).trim();
-      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(clean)}`, { cache: "no-store" });
-      const json = await res.json();
-
-      if (json.success && Array.isArray(json.data)) {
-        return json.data.map(normalizeOrder);
-      }
-      if (json.success && Array.isArray(json.orders)) {
-        return json.orders.map(normalizeOrder);
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  },
+  }
 };
 
-export default orderService;
+export function normalizeOrder(raw: any): Order {
+  return {
+    ...raw,
+    orderNumber: raw.order_number || raw.orderNumber || raw.id,
+    customerName: raw.customer_name || raw.customerName,
+    totalAmount: raw.total_amount || raw.totalAmount,
+    finalAmount: raw.final_amount || raw.finalAmount,
+    trackingCode: raw.tracking_code || raw.trackingCode,
+  };
+}

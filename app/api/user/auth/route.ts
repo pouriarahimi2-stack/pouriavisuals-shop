@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
+import { signCustomerPayload, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, phone, username, password, identifier } = body;
 
-    // حذف کامل و مسدودسازی جعل oauth_sync
     if (action === "oauth_sync") {
       return NextResponse.json(
         { success: false, message: "ثبت مستقیم OAuth بدون تاییدیه توکن رسمی گوگل/اپل مسدود است." },
@@ -58,7 +58,18 @@ export async function POST(req: NextRequest) {
       const { data: created, error } = await supabaseAdmin.from("customers").insert([newCustomer]).select().single();
       if (error) throw error;
 
-      return NextResponse.json({ success: true, user: { id: created.id, phone: created.phone, username: created.username } });
+      // صدور کوکی نشست رمزنگاری شده سمت سرور
+      const token = await signCustomerPayload({ id: created.id, phone: created.phone, username: created.username });
+      const response = NextResponse.json({ success: true, user: { id: created.id, phone: created.phone, username: created.username } });
+      response.cookies.set(CUSTOMER_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+
+      return response;
     }
 
     if (action === "login_credentials") {
@@ -75,11 +86,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: "اطلاعات ورود نامعتبر است." }, { status: 401 });
       }
 
-      return NextResponse.json({ success: true, user: { id: customer.id, phone: customer.phone, username: customer.username } });
+      const token = await signCustomerPayload({ id: customer.id, phone: customer.phone, username: customer.username });
+      const response = NextResponse.json({ success: true, user: { id: customer.id, phone: customer.phone, username: customer.username } });
+      response.cookies.set(CUSTOMER_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+
+      return response;
     }
 
     return NextResponse.json({ success: false, message: "اکشن نامعتبر است." }, { status: 400 });
   } catch (err: any) {
+    console.error("[USER_AUTH_ERROR]:", err);
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

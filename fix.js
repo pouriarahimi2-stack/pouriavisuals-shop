@@ -1,124 +1,146 @@
 /**
- * AXON CORE - Fix ProductCard duplicate JSX attributes (fix.js)
+ * AXON CORE - Add create method to orderService & pass build (fix.js)
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log("\x1b[36m[HOTFIX]\x1b[0m بازنویسی استاندارد و بدون باگ components/ProductCard.tsx...");
-
-const productCardCleanCode = `"use client";
-
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import AddToCartButton from "./AddToCartButton";
-import { formatPrice } from "@/lib/formatters";
-
-interface ProductCardProps {
-  product: any;
-  onOpenQuickView?: (product: any) => void;
+function writeFile(relPath, content) {
+  const fullPath = path.join(process.cwd(), relPath);
+  const dir = path.dirname(fullPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
+  console.log(`\x1b[32m✔ فایل اصلاح شد: ${relPath}\x1b[0m`);
 }
 
-export default function ProductCard({ product, onOpenQuickView }: ProductCardProps) {
-  const [mounted, setMounted] = useState(false);
+console.log("\x1b[36m[HOTFIX]\x1b[0m افزودن متد create به سرویس orderService...");
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+const orderServiceCode = `export interface Order {
+  id: string;
+  orderNumber?: string;
+  order_number?: string;
+  customerName?: string;
+  customer_name?: string;
+  phone?: string;
+  customer_phone?: string;
+  postalCode?: string;
+  postal_code?: string;
+  address?: string;
+  status?: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+  paymentStatus?: "unpaid" | "successful" | "failed";
+  payment_status?: string;
+  totalAmount?: number;
+  total_amount?: number;
+  finalAmount?: number;
+  final_amount?: number;
+  discountAmount?: number;
+  discount_amount?: number;
+  couponCode?: string;
+  coupon_code?: string;
+  trackingCode?: string;
+  tracking_code?: string;
+  items?: any[];
+  notes?: string;
+  customer?: any;
+  created_at?: string;
+  createdAt?: string;
+}
 
-  const title = product?.title || product?.name || "محصول استودیو";
-  const mainImage =
-    (product?.images && product.images[0]) ||
-    product?.image ||
-    "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800";
+export const orderService = {
+  async getAll(): Promise<Order[]> {
+    try {
+      const res = await fetch("/api/orders", { cache: "no-store" });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return (json.orders || json.data || []).map(normalizeOrder);
+    } catch (err) {
+      console.error("[ORDER_SERVICE_GETALL_ERROR]:", err);
+      return [];
+    }
+  },
 
-  const price = Number(product?.price || 0);
-  const discountPrice = product?.discount_price ? Number(product.discount_price) : null;
-  const isAvailable = product?.is_available !== false && (product?.stock === undefined || Number(product.stock) > 0);
+  async getById(id: string | number): Promise<Order | null> {
+    try {
+      const cleanId = String(id).trim();
+      const res = await fetch(\`/api/orders/track?query=\${encodeURIComponent(cleanId)}\`, { cache: "no-store" });
+      if (!res.ok) return null;
+      const json = await res.json();
+      const list = json.orders || json.data || [];
+      if (Array.isArray(list) && list.length > 0) {
+        return normalizeOrder(list[0]);
+      }
+      return null;
+    } catch (err) {
+      console.error("[ORDER_SERVICE_GETBYID_ERROR]:", err);
+      return null;
+    }
+  },
 
-  return (
-    <div
-      className="group relative rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] p-4 transition-all duration-300 shadow-md flex flex-col justify-between font-sans select-none"
-      dir="rtl"
-    >
-      <div>
-        <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
-          <Link href={"/products/" + product.id} className="w-full h-full relative block">
-            <Image
-              src={mainImage}
-              alt={title}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              loading="lazy"
-              className="object-contain transition-transform duration-500 group-hover:scale-105"
-            />
-          </Link>
+  async create(orderData: any): Promise<{ success: boolean; order?: Order; message?: string }> {
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      });
+      const json = await res.json();
+      return {
+        success: Boolean(json.success),
+        order: json.order ? normalizeOrder(json.order) : undefined,
+        message: json.message,
+      };
+    } catch (err: any) {
+      console.error("[ORDER_SERVICE_CREATE_ERROR]:", err);
+      return { success: false, message: err?.message || "خطا در برقراری ارتباط با سرور." };
+    }
+  },
 
-          <span className="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-md text-white text-[10px] px-3 py-1 rounded-full font-bold border border-white/10">
-            {product?.category || "تخصصی"}
-          </span>
-        </div>
+  async updateStatus(id: string | number, status: Order["status"], trackingCode?: string): Promise<boolean> {
+    try {
+      const res = await fetch("/api/orders/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status, tracking_code: trackingCode }),
+      });
+      return res.ok;
+    } catch (err) {
+      console.error("[ORDER_SERVICE_UPDATE_ERROR]:", err);
+      return false;
+    }
+  }
+};
 
-        <Link href={"/products/" + product.id} className="block space-y-1">
-          <h3 className="font-black text-xs sm:text-sm text-[var(--text-primary)] line-clamp-2 leading-snug group-hover:text-[var(--accent-blue)] transition">
-            {title}
-          </h3>
-          <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1 font-medium">
-            {product?.warranty || "گارانتی اصالت طلایی"}
-          </p>
-        </Link>
-      </div>
-
-      <div className="pt-4 mt-2 border-t border-[var(--card-border)] space-y-3">
-        <div className="flex items-baseline justify-between" suppressHydrationWarning>
-          <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
-          <div className="text-left font-mono">
-            {discountPrice ? (
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] text-slate-400 line-through">
-                  {mounted ? formatPrice(price) : ""}
-                </span>
-                <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400">
-                  {mounted ? formatPrice(discountPrice) : ""} تومان
-                </span>
-              </div>
-            ) : (
-              <span className="text-xs sm:text-sm font-black text-[var(--text-primary)]">
-                {mounted ? formatPrice(price) : ""} تومان
-              </span>
-            )}
-          </div>
-        </div>
-
-        <AddToCartButton product={product} />
-      </div>
-    </div>
-  );
+export function normalizeOrder(raw: any): Order {
+  return {
+    ...raw,
+    orderNumber: raw.order_number || raw.orderNumber || raw.id,
+    customerName: raw.customer_name || raw.customerName,
+    totalAmount: raw.total_amount || raw.totalAmount,
+    finalAmount: raw.final_amount || raw.finalAmount,
+    trackingCode: raw.tracking_code || raw.trackingCode,
+  };
 }
 `;
-
-fs.writeFileSync(path.join(process.cwd(), 'components/ProductCard.tsx'), productCardCleanCode.trim() + '\n', 'utf8');
-console.log("\x1b[32m✔ کامپوننت ProductCard با استفاده استاندارد از Image کاملاً بازنویسی شد.\x1b[0m");
+writeFile('services/orderService.ts', orderServiceCode);
 
 // =============================================================================
-// بررسی بیلد و ارسال نهایی
+// تست بیلد لوکال و پوش به مخزن گیت‌هاب
 // =============================================================================
-console.log("بررسی کامپایل بیلد نهایی (npm run build)...");
+console.log("تست بیلد لوکال (npm run build)...");
 try {
   execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ تمام مراحل کامپایل با موفقیت کامل پاس شدند!\x1b[0m");
+  console.log("\x1b[32m✔ کامپایل بیلد با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
 } catch (e) {
   console.error("خطای بیلد:", e.message);
   process.exit(1);
 }
 
-console.log("ارسال تغییرات به مخزن گیت‌هاب...");
+console.log("ارسال کامیت به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "fix(ProductCard): rewrite with clean next/image fill layout and valid JSX attributes"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "fix(orders): add create method to orderService to support CheckoutModal"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -127,7 +149,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ نسخه نهایی و تمیز پروژه با موفقیت در مخزن ثبت و در ورسل مستقر شد!\x1b[0m");
+  console.log("\x1b[32m✔ نسخه نهایی و پایدار با موفقیت روی گیت‌هاب ثبت و در ورسل مستقر شد!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

@@ -32,6 +32,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+
+function sanitizeNewsHtml(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/on\w+="[^"]*"/gi, "")
+    .replace(/javascript:[^"']*/gi, "");
+}
+
 export default async function NewsDetailPage({ params }: Props) {
   const { slug } = await params;
   const { data: article } = await supabaseAdmin
@@ -96,7 +105,7 @@ export default async function NewsDetailPage({ params }: Props) {
       </div>
 
       <div
-        dangerouslySetInnerHTML={{ __html: article.content }}
+        dangerouslySetInnerHTML={{ __html: sanitizeNewsHtml(article.content) }}
         className="prose dark:prose-invert max-w-none text-xs sm:text-sm leading-loose space-y-4 text-justify"
       />
 

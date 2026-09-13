@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyCustomerToken } from "@/lib/customerSession";
+import { verifyCustomerToken, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get("customer_session_token")?.value;
+    const token = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value;
     if (!token) {
-      return NextResponse.json({ authenticated: false }, { status: 200 });
+      return NextResponse.json({ authenticated: false, user: null }, { status: 200 });
     }
 
-    const payload = verifyCustomerToken(token);
+    const payload = await verifyCustomerToken(token);
     if (!payload) {
-      return NextResponse.json({ authenticated: false }, { status: 200 });
+      return NextResponse.json({ authenticated: false, user: null }, { status: 200 });
     }
 
     return NextResponse.json({
@@ -20,18 +20,11 @@ export async function GET(req: NextRequest) {
       user: {
         id: payload.id,
         phone: payload.phone,
-        username: payload.username,
-        email: payload.email,
-        name: payload.name,
+        username: payload.username || payload.phone,
+        email: (payload as any).email || null,
       },
     });
   } catch {
-    return NextResponse.json({ authenticated: false }, { status: 200 });
+    return NextResponse.json({ authenticated: false, user: null }, { status: 200 });
   }
-}
-
-export async function POST() {
-  const response = NextResponse.json({ success: true, message: "با موفقیت خارج شدید." });
-  response.cookies.delete("customer_session_token");
-  return response;
 }

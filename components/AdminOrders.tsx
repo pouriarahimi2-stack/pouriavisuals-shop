@@ -214,7 +214,7 @@ export default function AdminOrders() {
     printWindow.document.close();
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status?: string) => {
     switch (status) {
       case "paid":
         return <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-600 border border-emerald-500/20">پرداخت شده</span>;
@@ -439,7 +439,7 @@ export default function AdminOrders() {
               <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
                 <h4 className="font-black text-[var(--accent-blue)]">💳 اطلاعات مالی و پست:</h4>
                 <p><strong>مبلغ نهایی:</strong> <span className="font-mono font-black">{Number(selectedOrder.finalAmount || selectedOrder.final_amount || selectedOrder.totalAmount || (selectedOrder as any).total_amount || 0).toLocaleString("fa-IR")} تومان</span></p>
-                <p><strong>وضعیت سفارش:</strong> {getStatusBadge(selectedOrder.status)}</p>
+                <p><strong>وضعیت سفارش:</strong> {getStatusBadge(selectedOrder.status || "pending")}</p>
                 <p><strong>کد رهگیری پست:</strong> <span className="font-mono">{selectedOrder.trackingCode || selectedOrder.tracking_code || "صادر نشده"}</span></p>
               </div>
             </div>

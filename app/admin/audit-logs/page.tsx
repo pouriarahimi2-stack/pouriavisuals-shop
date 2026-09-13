@@ -1,33 +1,4 @@
-/**
- * AXON CORE - Phase 2: RBAC Route Enforcement & Audit Logs UI (fix.js)
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = process.cwd();
-
-function writeFile(relPath, content) {
-  const fullPath = path.join(ROOT, relPath);
-  const dir = path.dirname(fullPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(fullPath, content.trim() + '\n', 'utf8');
-  console.log(`\x1b[32m✔ ایجاد/اصلاح شد: ${relPath}\x1b[0m`);
-}
-
-function readFile(relPath) {
-  const full = path.join(ROOT, relPath);
-  if (!fs.existsSync(full)) return null;
-  return fs.readFileSync(full, 'utf8');
-}
-
-console.log("\x1b[35m[PHASE-2]\x1b[0m آغاز فاز ۲: اتصال گارد RBAC به روت‌ها و ساخت صفحه Audit Logs ادمین...");
-
-// =============================================================================
-// ۱. ساخت صفحه رابط کاربری گزارش رخدادهای سیستم (app/admin/audit-logs/page.tsx)
-// =============================================================================
-const auditLogsUiCode = `"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
@@ -149,49 +120,4 @@ export default function AuditLogsPage() {
       </div>
     </div>
   );
-}
-`;
-writeFile('app/admin/audit-logs/page.tsx', auditLogsUiCode);
-
-// =============================================================================
-// ۲. اضافه کردن آیتم Audit Logs به سایدبار ادمین (components/admin/AdminSidebar.tsx)
-// =============================================================================
-const sidebarPath = 'components/admin/AdminSidebar.tsx';
-let sidebarContent = readFile(sidebarPath);
-if (sidebarContent && !sidebarContent.includes('/admin/audit-logs')) {
-  sidebarContent = sidebarContent.replace(
-    `{ id: "change_pin", title: "مدیریت حساب و کلمه عبور", href: "/admin/change-pin", icon: "🔐" },`,
-    `{ id: "change_pin", title: "مدیریت حساب و کلمه عبور", href: "/admin/change-pin", icon: "🔐" },\n      { id: "audit_logs", title: "لاگ‌ها و وقایع امنیتی", href: "/admin/audit-logs", icon: "🛡️" },`
-  );
-  writeFile(sidebarPath, sidebarContent);
-}
-
-// =============================================================================
-// ۳. تست بیلد لوکال و پوش به مخزن گیت‌هاب
-// =============================================================================
-console.log("بررسی کامپایل پروژه (npm run build)...");
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log("\x1b[32m✔ کامپایل با موفقیت ۱۰۰٪ پاس شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای بیلد:", e.message);
-  process.exit(1);
-}
-
-console.log("ارسال تغییرات فاز ۲ به گیت‌هاب...");
-try {
-  execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
-  execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(admin): phase 2 - add Audit Logs UI to admin panel and link in sidebar"', { stdio: 'inherit' });
-
-  let branchName = 'main';
-  try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim() || 'main';
-  } catch {
-    branchName = 'main';
-  }
-  execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ فاز ۲ با موفقیت روی سرور ورسل مستقر شد!\x1b[0m");
-} catch (e) {
-  console.error("خطای گیت:", e.message);
 }

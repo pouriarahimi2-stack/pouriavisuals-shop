@@ -1,6 +1,6 @@
 /**
- * AXON CORE - Upgrade Admin Coupons Management Page (fix.js)
- * Connects directly to secured /api/admin/coupons with client-side validation and formatting.
+ * AXON CORE - Upgrade Admin Main Dashboard (fix.js)
+ * Integrates KPI metrics, low-stock warnings, recent orders, and security audit log previews.
  */
 
 const fs = require('fs');
@@ -17,455 +17,283 @@ function writeFile(relPath, content) {
   console.log(`\x1b[32m✔ ارتقا یافت: ${relPath}\x1b[0m`);
 }
 
-console.log("\x1b[35m[COUPONS-UI-UPGRADE]\x1b[0m ارتقای رابط کاربری مدیریت کدهای تخفیف و اتصال به API امن...");
+console.log("\x1b[35m[DASHBOARD-INTEGRATION]\x1b[0m ارتقای داشبورد مرکزی مدیریت با آمار زنده و ویجت‌های تحلیلی...");
 
-const couponsPagePath = 'app/admin/coupons/page.tsx';
+const dashboardPagePath = 'app/admin/dashboard/page.tsx';
 
-const upgradedCouponsPageCode = `"use client";
+const upgradedDashboardPageCode = `"use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
 
-interface Coupon {
-  id: string;
-  code: string;
-  discount_type: "percent" | "fixed";
-  discount_percent?: number | null;
-  discount_amount?: number | null;
-  min_purchase?: number | null;
-  max_discount?: number | null;
-  usage_limit?: number | null;
-  times_used?: number;
-  expires_at?: string | null;
-  description?: string | null;
-  is_active: boolean;
-  created_at?: string;
+interface DashboardMetrics {
+  totalSales: number;
+  totalOrders: number;
+  pendingOrdersCount: number;
+  lowStockCount: number;
+  recentOrders: any[];
+  recentLogs: any[];
 }
 
-export default function AdminCouponsPage() {
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
-
-  const [form, setForm] = useState<{
-    id?: string;
-    code: string;
-    discount_type: "percent" | "fixed";
-    discount_percent: number | "";
-    discount_amount: number | "";
-    min_purchase: number | "";
-    max_discount: number | "";
-    usage_limit: number | "";
-    expires_at: string;
-    description: string;
-    is_active: boolean;
-  }>({
-    code: "",
-    discount_type: "percent",
-    discount_percent: "",
-    discount_amount: "",
-    min_purchase: "",
-    max_discount: "",
-    usage_limit: 100,
-    expires_at: "",
-    description: "",
-    is_active: true,
+export default function AdminDashboardPage() {
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    totalSales: 0,
+    totalOrders: 0,
+    pendingOrdersCount: 0,
+    lowStockCount: 0,
+    recentOrders: [],
+    recentLogs: [],
   });
 
-  const fetchCoupons = async () => {
+  const [loading, setLoading] = useState(true);
+
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/coupons");
-      const json = await res.json();
-      if (res.ok && json.success) {
-        setCoupons(json.coupons || []);
+      const [ordersRes, reportsRes, logsRes] = await Promise.all([
+        fetch("/api/admin/orders").catch(() => null),
+        fetch("/api/admin/reports").catch(() => null),
+        fetch("/api/admin/audit-logs?limit=5").catch(() => null),
+      ]);
+
+      let totalSales = 0;
+      let totalOrders = 0;
+      let pendingOrdersCount = 0;
+      let recentOrders: any[] = [];
+      let lowStockCount = 0;
+      let recentLogs: any[] = [];
+
+      if (ordersRes && ordersRes.ok) {
+        const oData = await ordersRes.json();
+        const orders = oData.orders || [];
+        totalOrders = orders.length;
+        recentOrders = orders.slice(0, 5);
+
+        orders.forEach((o: any) => {
+          if (o.status === "paid" || o.status === "delivered") {
+            totalSales += Number(o.final_amount || o.total_amount || 0);
+          }
+          if (o.status === "pending_manual_review" || o.status === "pending") {
+            pendingOrdersCount++;
+          }
+        });
       }
-    } catch {
-      console.error("خطا در واکشی کدهای تخفیف.");
+
+      if (reportsRes && reportsRes.ok) {
+        const rData = await reportsRes.json();
+        lowStockCount = rData.report?.low_stock_items?.length || 0;
+      }
+
+      if (logsRes && logsRes.ok) {
+        const lData = await logsRes.json();
+        recentLogs = lData.logs || [];
+      }
+
+      setMetrics({
+        totalSales,
+        totalOrders,
+        pendingOrdersCount,
+        lowStockCount,
+        recentOrders,
+        recentLogs,
+      });
+    } catch (err) {
+      console.error("خطا در واکشی آمار داشبورد:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCoupons();
+    fetchDashboardData();
   }, []);
-
-  const handleOpenCreate = () => {
-    soundEngine.playClick();
-    setEditingCoupon(null);
-    setForm({
-      code: "",
-      discount_type: "percent",
-      discount_percent: 10,
-      discount_amount: "",
-      min_purchase: 500000,
-      max_discount: 200000,
-      usage_limit: 50,
-      expires_at: "",
-      description: "",
-      is_active: true,
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEdit = (c: Coupon) => {
-    soundEngine.playClick();
-    setEditingCoupon(c);
-    setForm({
-      id: c.id,
-      code: c.code,
-      discount_type: c.discount_type || "percent",
-      discount_percent: c.discount_percent ?? "",
-      discount_amount: c.discount_amount ?? "",
-      min_purchase: c.min_purchase ?? "",
-      max_discount: c.max_discount ?? "",
-      usage_limit: c.usage_limit ?? "",
-      expires_at: c.expires_at ? c.expires_at.slice(0, 10) : "",
-      description: c.description || "",
-      is_active: c.is_active !== false,
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این کد تخفیف اطمینان دارید؟")) return;
-    soundEngine.playClick();
-    try {
-      const res = await fetch(\`/api/admin/coupons?id=\${id}\`, { method: "DELETE" });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        fetchCoupons();
-      } else {
-        alert(json.message || "خطا در حذف کد تخفیف.");
-      }
-    } catch {
-      alert("ارتباط با سرور برقرار نشد.");
-    }
-  };
-
-  const handleCodeChange = (val: string) => {
-    const clean = val.toUpperCase().replace(/[^A-Z0-9_-]/g, "");
-    setForm((prev) => ({ ...prev, code: clean }));
-  };
-
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    soundEngine.playClick();
-
-    if (form.discount_type === "percent") {
-      const p = Number(form.discount_percent);
-      if (isNaN(p) || p <= 0 || p > 100) {
-        alert("درصد تخفیف باید عددی بین ۱ تا ۱۰۰ باشد.");
-        return;
-      }
-    } else {
-      const a = Number(form.discount_amount);
-      if (isNaN(a) || a <= 0) {
-        alert("مبلغ تخفیف ثابت نامعتبر است.");
-        return;
-      }
-    }
-
-    const payload = {
-      ...form,
-      discount_percent: form.discount_type === "percent" ? Number(form.discount_percent) : null,
-      discount_amount: form.discount_type === "fixed" ? Number(form.discount_amount) : null,
-      min_purchase: form.min_purchase ? Number(form.min_purchase) : null,
-      max_discount: form.max_discount ? Number(form.max_discount) : null,
-      usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
-      expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
-    };
-
-    try {
-      const method = editingCoupon ? "PUT" : "POST";
-      const res = await fetch("/api/admin/coupons", {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        setIsModalOpen(false);
-        fetchCoupons();
-      } else {
-        alert(json.message || "خطا در ذخیره‌سازی کوپن.");
-      }
-    } catch {
-      alert("خطا در ارتباط با سرور.");
-    }
-  };
 
   return (
     <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
-      {/* هدر صفحه */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* هدر داشبورد و میانبرها */}
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🏷️</span> مدیریت کوپن‌ها و کدهای تخفیف
+            <span>⚡</span> مرکز فرماندهی و داشبورد آکسون کور
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تعریف کمپین‌های تخفیفی درصدی و ریالی، کنترل محدودیت استفاده و انقضا
+            نمای کلی وضعیت مالی، سفارشات در انتظار اقدام، انبارداری و امنیت هسته
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md flex items-center gap-2 cursor-pointer"
-        >
-          <span>➕</span> ایجاد کوپن جدید
-        </button>
-      </div>
-
-      {/* جدول کوپن‌ها */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
-        {loading ? (
-          <div className="p-12 text-center text-xs text-slate-400">در حال واکشی کدهای تخفیف...</div>
-        ) : coupons.length === 0 ? (
-          <div className="p-12 text-center text-xs text-slate-400">هیچ کد تخفیفی یافت نشد.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
-                  <th className="pb-3 px-3">کد تخفیف</th>
-                  <th className="pb-3 px-3">نوع تخفیف</th>
-                  <th className="pb-3 px-3">مقدار</th>
-                  <th className="pb-3 px-3">حداقل خرید</th>
-                  <th className="pb-3 px-3">دفعات مصرف</th>
-                  <th className="pb-3 px-3">تاریخ انقضا</th>
-                  <th className="pb-3 px-3">وضعیت</th>
-                  <th className="pb-3 px-3 text-left">عملیات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--card-border)]">
-                {coupons.map((c) => (
-                  <tr key={c.id} className="hover:bg-[var(--input-bg)]/40 transition">
-                    <td className="py-3 px-3">
-                      <span className="font-mono font-black text-[13px] px-2.5 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--accent-blue)] tracking-wider">
-                        {c.code}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-slate-300">
-                      {c.discount_type === "percent" ? "درصدی" : "مبلغ ثابت"}
-                    </td>
-                    <td className="py-3 px-3 font-mono font-bold text-emerald-400">
-                      {c.discount_type === "percent"
-                        ? \`\${c.discount_percent}%\`
-                        : \`\${Number(c.discount_amount).toLocaleString("fa-IR")} ت\`}
-                    </td>
-                    <td className="py-3 px-3 font-mono text-slate-400">
-                      {c.min_purchase ? \`\${Number(c.min_purchase).toLocaleString("fa-IR")} ت\` : "بدون محدودیت"}
-                    </td>
-                    <td className="py-3 px-3 font-mono text-slate-300">
-                      {c.times_used || 0} / {c.usage_limit || "نامحدود"}
-                    </td>
-                    <td className="py-3 px-3 font-mono text-slate-400">
-                      {c.expires_at ? new Date(c.expires_at).toLocaleDateString("fa-IR") : "همیشگی"}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={\`px-2 py-0.5 rounded-lg text-[10px] font-bold border \${
-                          c.is_active
-                            ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                            : "bg-rose-500/15 border-rose-500/30 text-rose-400"
-                        }\`}
-                      >
-                        {c.is_active ? "فعال" : "غیرفعال"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-left space-x-2 space-x-reverse">
-                      <button
-                        onClick={() => handleOpenEdit(c)}
-                        className="px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:bg-[var(--card-border)] transition"
-                      >
-                        ویرایش
-                      </button>
-                      <button
-                        onClick={() => handleDelete(c.id)}
-                        className="px-3 py-1 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 transition"
-                      >
-                        حذف
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* مودال ایجاد و ویرایش کوپن */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black text-[var(--text-primary)]">
-                {editingCoupon ? "✏️ ویرایش کد تخفیف" : "➕ ایجاد کد تخفیف جدید"}
-              </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white transition font-mono"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
-                    کد تخفیف (لاتین):
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={form.code}
-                    onChange={(e) => handleCodeChange(e.target.value)}
-                    placeholder="SPRING1405"
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono uppercase focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">نوع تخفیف:</label>
-                  <select
-                    value={form.discount_type}
-                    onChange={(e) => setForm({ ...form, discount_type: e.target.value as "percent" | "fixed" })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none"
-                  >
-                    <option value="percent">درصدی (%)</option>
-                    <option value="fixed">مبلغ ثابت (تومان)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {form.discount_type === "percent" ? (
-                  <div>
-                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">درصد تخفیف (۱ تا ۱۰۰):</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      max={100}
-                      value={form.discount_percent}
-                      onChange={(e) => setForm({ ...form, discount_percent: e.target.value === "" ? "" : Number(e.target.value) })}
-                      className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">مبلغ تخفیف (تومان):</label>
-                    <input
-                      type="number"
-                      required
-                      min={1000}
-                      value={form.discount_amount}
-                      onChange={(e) => setForm({ ...form, discount_amount: e.target.value === "" ? "" : Number(e.target.value) })}
-                      className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">حداقل مبلغ خرید (تومان):</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.min_purchase}
-                    onChange={(e) => setForm({ ...form, min_purchase: e.target.value === "" ? "" : Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">حداکثر سقف تخفیف (تومان):</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.max_discount}
-                    onChange={(e) => setForm({ ...form, max_discount: e.target.value === "" ? "" : Number(e.target.value) })}
-                    placeholder="اختیاری برای درصدی"
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">سقف مجاز تعداد مصرف:</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.usage_limit}
-                    onChange={(e) => setForm({ ...form, usage_limit: e.target.value === "" ? "" : Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">تاریخ انقضا:</label>
-                <input
-                  type="date"
-                  value={form.expires_at}
-                  onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">توضیحات کوپن:</label>
-                <input
-                  type="text"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="مثال: ویژه اولین خرید کاربران جدید"
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <label className="flex items-center gap-2 text-xs font-bold text-[var(--text-primary)] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={form.is_active}
-                  onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                  className="rounded accent-[var(--accent-blue)]"
-                />
-                کوپن فعال و قابل استفاده در سبد خرید باشد
-              </label>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
-                >
-                  انصراف
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md hover:opacity-90 transition"
-                >
-                  ذخیره کوپن 💾
-                </button>
-              </div>
-            </form>
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href="/admin/products"
+            onClick={() => soundEngine.playClick()}
+            className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:bg-[var(--card-border)] text-xs font-bold transition flex items-center gap-1.5"
+          >
+            <span>➕</span> افزودن کالا
+          </Link>
+          <Link
+            href="/admin/backup"
+            onClick={() => soundEngine.playClick()}
+            className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:bg-[var(--card-border)] text-xs font-bold transition flex items-center gap-1.5"
+          >
+            <span>💾</span> نسخه پشتیبان
+          </Link>
+          <button
+            onClick={() => {
+              soundEngine.playClick();
+              fetchDashboardData();
+            }}
+            className="px-3.5 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition flex items-center gap-1.5 shadow"
+          >
+            <span>🔄</span> بروزرسانی
+          </button>
         </div>
-      )}
+      </div>
+
+      {/* کارت‌های آماری شاخص کلیدی (KPIs) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>مجموع فروش محقق‌شده</span>
+            <span className="text-lg">💰</span>
+          </div>
+          <div className="text-lg font-black font-mono text-emerald-400">
+            {loading ? "..." : \`\${metrics.totalSales.toLocaleString("fa-IR")} تومان\`}
+          </div>
+          <span className="text-[10px] text-slate-400 block font-sans">فاکتورهای پرداخت‌شده و تحویل‌شده</span>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>سفارشات در انتظار بررسی</span>
+            <span className="text-lg">⏳</span>
+          </div>
+          <div className="text-lg font-black font-mono text-amber-400">
+            {loading ? "..." : \`\${metrics.pendingOrdersCount} سفارش\`}
+          </div>
+          <span className="text-[10px] text-slate-400 block font-sans">نیازمند تأیید فیش واریزی</span>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>هشدار کسری انبار</span>
+            <span className="text-lg">⚠️</span>
+          </div>
+          <div className="text-lg font-black font-mono text-rose-400">
+            {loading ? "..." : \`\${metrics.lowStockCount} قلم کالا\`}
+          </div>
+          <span className="text-[10px] text-slate-400 block font-sans">موجودی کمتر از ۵ عدد</span>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>کل سفارشات ثبت‌شده</span>
+            <span className="text-lg">📦</span>
+          </div>
+          <div className="text-lg font-black font-mono text-[var(--accent-blue)]">
+            {loading ? "..." : \`\${metrics.totalOrders} رکورد\`}
+          </div>
+          <span className="text-[10px] text-slate-400 block font-sans">حجم کل تعاملات فروشگاه</span>
+        </div>
+      </div>
+
+      {/* بخش دو ستونه: آخرین سفارشات و آخرین وقایع امنیتی */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ستون آخرین سفارشات */}
+        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+            <h2 className="text-sm font-black text-[var(--text-primary)] flex items-center gap-2">
+              <span>🛍️</span> آخرین سفارشات ثبت‌شده
+            </h2>
+            <Link
+              href="/admin/orders"
+              className="text-[11px] text-[var(--accent-blue)] hover:underline font-bold"
+            >
+              مشاهده همه
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="p-8 text-center text-xs text-slate-400">در حال بارگذاری...</div>
+          ) : metrics.recentOrders.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-400">هیچ سفارشی ثبت نشده است.</div>
+          ) : (
+            <div className="space-y-2.5">
+              {metrics.recentOrders.map((ord) => (
+                <div
+                  key={ord.id}
+                  className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="font-bold text-[var(--text-primary)] block">{ord.customer_name}</span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {ord.customer_phone} • #{ord.id.slice(0, 8)}
+                    </span>
+                  </div>
+                  <div className="text-left">
+                    <span className="font-mono font-bold text-emerald-400 block">
+                      {Number(ord.final_amount || ord.total_amount).toLocaleString("fa-IR")} ت
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {new Date(ord.created_at).toLocaleDateString("fa-IR")}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ستون آخرین وقایع امنیتی */}
+        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+            <h2 className="text-sm font-black text-[var(--text-primary)] flex items-center gap-2">
+              <span>🛡️</span> آخرین لاگ‌های امنیتی (Audit Trails)
+            </h2>
+            <Link
+              href="/admin/audit-logs"
+              className="text-[11px] text-[var(--accent-blue)] hover:underline font-bold"
+            >
+              دفتر کل وقایع
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="p-8 text-center text-xs text-slate-400">در حال بارگذاری...</div>
+          ) : metrics.recentLogs.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-400">هیچ رخدادی ثبت نشده است.</div>
+          ) : (
+            <div className="space-y-2.5">
+              {metrics.recentLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between text-xs"
+                >
+                  <div className="space-y-0.5">
+                    <span className="px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-[10px] font-bold">
+                      {log.action}
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-300 block font-medium">
+                      {log.target_resource}
+                    </span>
+                  </div>
+                  <div className="text-left">
+                    <span className="font-mono text-[10px] text-slate-400 block">{log.ip_address}</span>
+                    <span className="font-mono text-[10px] text-slate-500 block">
+                      {new Date(log.created_at).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 `;
 
-writeFile(couponsPagePath, upgradedCouponsPageCode);
+writeFile(dashboardPagePath, upgradedDashboardPageCode);
 
 // کامپایل و تست صحت پروژه
 console.log("بررسی کامپایل پروژه (npm run build)...");
@@ -482,7 +310,7 @@ console.log("ارسال تغییرات به مخزن گیت‌هاب...");
 try {
   execSync('git config --global http.sslBackend openssl', { stdio: 'inherit' });
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git diff --cached --quiet || git commit -m "feat(admin): upgrade coupons management page with auto-formatting, client validations, and audit-logged API integration"', { stdio: 'inherit' });
+  execSync('git diff --cached --quiet || git commit -m "feat(admin): upgrade main dashboard with live KPIs, inventory alerts, and real-time audit preview"', { stdio: 'inherit' });
 
   let branchName = 'main';
   try {
@@ -491,7 +319,7 @@ try {
     branchName = 'main';
   }
   execSync('git push origin ' + branchName, { stdio: 'inherit' });
-  console.log("\x1b[32m✔ صفحه مدیریت کوپن‌ها با موفقیت روی سرور ورسل مستقر گردید!\x1b[0m");
+  console.log("\x1b[32m✔ داشبورد ارتقایافته مدیریت با موفقیت روی سرور ورسل مستقر گردید!\x1b[0m");
 } catch (e) {
   console.error("خطای گیت:", e.message);
 }

@@ -35,42 +35,21 @@ export default function Footer() {
   const address = siteInfo?.address || "شیراز - ستارخان";
 
   const contactItems: ContactItem[] = [
-    { char: "C", label: "تماس تلفنی مستقیم", value: phone, href: `tel:${phone}`, icon: "📞" },
-    { char: "O", label: "سفارشات و پیگیری", value: "سامانه رهگیری ۲۴ ساعته", href: "/track", icon: "📦" },
-    { char: "N", label: "نشانی انبار و تحویل", value: address, href: "/contact", icon: "📍" },
-    { char: "T", label: "تیکت و مشاوره آنلاین", value: "پاسخگویی کارشناسان استودیو", href: "/contact", icon: "✉️" },
-    { char: "A", label: "درباره آکسون کور", value: "اصالت کالا و تضمین کیفیت", href: "/about", icon: "🛡️" },
+    { char: "C", label: "تماس تلفنی", value: phone, href: `tel:${phone}`, icon: "📞" },
+    { char: "O", label: "پیگیری سفارش", value: "سامانه رهگیری ۲۴ ساعته", href: "/track", icon: "📦" },
+    { char: "N", label: "نشانی انبار", value: address, href: "/contact", icon: "📍" },
+    { char: "T", label: "تیکت پشتیبانی", value: "مشاوره آنلاین کارشناسان", href: "/contact", icon: "✉️" },
+    { char: "A", label: "درباره ما", value: "تضمین اصالت تجهیزات", href: "/about", icon: "🛡️" },
     { char: "C", label: "کانال تلگرام", value: "@AxonCore_Support", href: "https://t.me", icon: "✈️" },
     { char: "T", label: "پست الکترونیک", value: email, href: `mailto:${email}`, icon: "📧" },
   ];
 
   return (
-    <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors pt-12 pb-10 px-4 sm:px-6 lg:px-8 mt-20" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-12">
+    <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors pt-10 pb-8 px-4 sm:px-6 lg:px-8 mt-12" dir="rtl">
+      <div className="max-w-7xl mx-auto space-y-10">
         
-        {/* ۳ کارت گارانتی و ضمانت در بالای فوتر */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-[2rem] bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center text-center space-y-2 shadow-sm">
-            <span className="text-3xl">🛡️</span>
-            <h5 className="font-black text-xs text-[var(--text-primary)]">۱۸ ماه گارانتی اصالت طلایی</h5>
-            <p className="text-[11px] text-[var(--text-secondary)]">تضمین سلامت سخت‌افزاری پنل بدون پیکسل سوخته</p>
-          </div>
-
-          <div className="p-6 rounded-[2rem] bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center text-center space-y-2 shadow-sm">
-            <span className="text-3xl">⚡</span>
-            <h5 className="font-black text-xs text-[var(--text-primary)]">کالیبراسیون سخت‌افزاری</h5>
-            <p className="text-[11px] text-[var(--text-secondary)]">پوشش دقیق فضاهای رنگی DCI-P3 و Rec.709</p>
-          </div>
-
-          <div className="p-6 rounded-[2rem] bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center text-center space-y-2 shadow-sm">
-            <span className="text-3xl">📦</span>
-            <h5 className="font-black text-xs text-[var(--text-primary)]">ارسال فوق‌سریع و ایمن</h5>
-            <p className="text-[11px] text-[var(--text-secondary)]">بسته‌بندی اختصاصی ضدضربه به سراسر کشور</p>
-          </div>
-        </div>
-
-        {/* ۳ ستون اطلاعات اصلی فروشگاه (بدون باکس‌های متنی تماس تکراری) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start pt-6 border-t border-[var(--card-border)]">
+        {/* ستون‌های اطلاعات فوتر */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           
           {/* ستون راست: معرفی برند */}
           <div className="space-y-4">
@@ -116,7 +95,7 @@ export default function Footer() {
 
         </div>
 
-        {/* داک و نوار کپسولی مشکی انیمیشنی C-O-N-T-A-C-T با Tooltip و هاور تعاملی */}
+        {/* کپسول تعاملی C-O-N-T-A-C-T */}
         <div className="pt-6 border-t border-[var(--card-border)] flex flex-col items-center justify-center gap-4">
           <span className="text-xs font-bold text-[var(--text-secondary)]">شبکه‌های ارتباطی و اطلاعات تماس:</span>
           
@@ -135,7 +114,6 @@ export default function Footer() {
                   {item.char}
                 </Link>
 
-                {/* پاپ‌اور اختصاصی هاور حاوی اطلاعات تماس */}
                 {activeTooltip === idx && (
                   <div className="absolute bottom-12 z-50 flex flex-col items-center animate-fadeIn pointer-events-none" dir="rtl">
                     <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 text-white rounded-2xl p-3 shadow-2xl whitespace-nowrap text-center space-y-1">
@@ -155,7 +133,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* نوار پایانی و کپی‌رایت */}
+        {/* کپی‌رایت نهایی */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] pt-4 border-t border-[var(--card-border)]">
           <p>تمامی حقوق مادی و معنوی برای {storeName} محفوظ است © ۲۰۲۶</p>
           <p className="font-mono text-[11px]">نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)</p>

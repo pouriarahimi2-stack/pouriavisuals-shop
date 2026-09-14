@@ -27,50 +27,54 @@ export default function Footer() {
 
   return (
     <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors pt-12 pb-8 px-4 sm:px-6 lg:px-8 mt-20" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-10">
+      <div className="max-w-7xl mx-auto space-y-12">
         
-        {/* ۳ کارت کوچک منتقل شده از بالای صفحه به داخل فوتر */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-10 border-b border-[var(--card-border)]">
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-3.5 shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-lg shrink-0">📦</div>
-            <div>
-              <h5 className="font-black text-xs text-[var(--text-primary)]">ارسال فوق‌سریع و ایمن</h5>
-              <p className="text-[11px] text-[var(--text-secondary)]">بسته‌بندی اختصاصی ضدضربه سراسری</p>
-            </div>
+        {/* ۳ کارت بزرگ گارانتی منتقل شده از بالا به پایین صفحه */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-[2rem] bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center text-center space-y-2 shadow-sm">
+            <span className="text-3xl">🛡️</span>
+            <h5 className="font-black text-xs text-[var(--text-primary)]">۱۸ ماه گارانتی اصالت طلایی</h5>
+            <p className="text-[11px] text-[var(--text-secondary)]">تضمین سلامت سخت‌افزاری پنل بدون پیکسل سوخته</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-3.5 shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/15 text-orange-500 flex items-center justify-center text-lg shrink-0">⚡</div>
-            <div>
-              <h5 className="font-black text-xs text-[var(--text-primary)]">کالیبراسیون سخت‌افزاری</h5>
-              <p className="text-[11px] text-[var(--text-secondary)]">پوشش دقیق فضاهای رنگی DCI-P3</p>
-            </div>
+          <div className="p-6 rounded-[2rem] bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center text-center space-y-2 shadow-sm">
+            <span className="text-3xl">⚡</span>
+            <h5 className="font-black text-xs text-[var(--text-primary)]">کالیبراسیون سخت‌افزاری</h5>
+            <p className="text-[11px] text-[var(--text-secondary)]">پوشش دقیق فضاهای رنگی DCI-P3 و Rec.709</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-3.5 shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-500 flex items-center justify-center text-lg shrink-0">🛡️</div>
-            <div>
-              <h5 className="font-black text-xs text-[var(--text-primary)]">۱۸ ماه گارانتی اصالت طلایی</h5>
-              <p className="text-[11px] text-[var(--text-secondary)]">تضمین سلامت سخت‌افزاری پنل</p>
-            </div>
+          <div className="p-6 rounded-[2rem] bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center text-center space-y-2 shadow-sm">
+            <span className="text-3xl">📦</span>
+            <h5 className="font-black text-xs text-[var(--text-primary)]">ارسال فوق‌سریع و ایمن</h5>
+            <p className="text-[11px] text-[var(--text-secondary)]">بسته‌بندی اختصاصی ضدضربه به سراسر کشور</p>
           </div>
         </div>
 
-        {/* ۴ ستون اصلی فوتر (اطلاعات تماس، خدمات مشتریان، دسترسی سریع، معرفی برند) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-[var(--card-border)]">
+        {/* بخش اصلی فوتر شامل ستون‌ها و کارت‌های سفید اطلاعات تماس */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pt-6 border-t border-[var(--card-border)]">
           
-          {/* ستون اطلاعات تماس و دفاتر */}
-          <div className="space-y-3">
-            <h4 className="font-black text-xs text-[var(--text-primary)] tracking-wide">اطلاعات تماس و دفاتر</h4>
-            <div className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
-              <p>📞 تلفن پشتیبانی: <span className="font-mono font-bold text-[var(--text-primary)]" dir="ltr">{phone}</span></p>
-              <p>✉️ ایمیل: <span className="font-mono text-[var(--text-primary)]" dir="ltr">{email}</span></p>
-              <p>📍 نشانی تحویل و انبار: {address}</p>
+          {/* ستون راست: کارت‌های سفید اطلاعات تماس */}
+          <div className="lg:col-span-5 space-y-3">
+            <span className="text-xs font-black text-[var(--text-secondary)] block mb-2">اطلاعات تماس و دفاتر</span>
+            
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between text-xs shadow-sm">
+              <span className="text-[var(--text-secondary)]">تلفن پشتیبانی:</span>
+              <span className="font-mono font-black text-[var(--text-primary)]" dir="ltr">{phone}</span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between text-xs shadow-sm">
+              <span className="text-[var(--text-secondary)]">پست الکترونیک:</span>
+              <span className="font-mono text-[var(--text-primary)]" dir="ltr">{email}</span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between text-xs shadow-sm">
+              <span className="text-[var(--text-secondary)]">نشانی تحویل و انبار:</span>
+              <span className="font-medium text-[var(--text-primary)]">{address}</span>
             </div>
           </div>
 
-          {/* ستون خدمات مشتریان */}
-          <div className="space-y-3">
+          {/* ستون وسط: خدمات مشتریان */}
+          <div className="lg:col-span-2 space-y-3">
             <h4 className="font-black text-xs text-[var(--text-primary)] tracking-wide">خدمات مشتریان</h4>
             <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
               <li><Link href="/contact" className="hover:text-[var(--accent-blue)] transition">ثبت تیکت مشاوره</Link></li>
@@ -80,8 +84,8 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون دسترسی سریع */}
-          <div className="space-y-3">
+          {/* ستون وسط-چپ: دسترسی سریع */}
+          <div className="lg:col-span-2 space-y-3">
             <h4 className="font-black text-xs text-[var(--text-primary)] tracking-wide">دسترسی سریع</h4>
             <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
               <li><Link href="/products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ کالاها</Link></li>
@@ -91,10 +95,10 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون معرفی برند */}
-          <div className="space-y-4">
+          {/* ستون چپ: معرفی برند */}
+          <div className="lg:col-span-3 space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-md">
+              <div className="w-10 h-10 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1.5 flex items-center justify-center overflow-hidden shadow-sm">
                 {logoUrl ? (
                   <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
                 ) : (
@@ -102,11 +106,11 @@ export default function Footer() {
                 )}
               </div>
               <div>
-                <span className="font-black text-sm text-[var(--text-primary)] block tracking-tight">{storeName}</span>
+                <span className="font-black text-xs text-[var(--text-primary)] block tracking-tight">{storeName}</span>
                 <span className="text-[10px] text-[var(--accent-blue)] font-bold block">مرجع تخصصی دیجیتال و تکنولوژی</span>
               </div>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
+            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium">
               تأمین و عرضه پیشرفته‌ترین تجهیزات دیجیتال، گجت‌ها و سخت‌افزارهای رده‌بالا با تضمین اصالت و ارسال سریع به سراسر کشور.
             </p>
           </div>
@@ -114,7 +118,7 @@ export default function Footer() {
         </div>
 
         {/* کپی‌رایت نهایی */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] pt-2">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] pt-4 border-t border-[var(--card-border)]">
           <p>تمامی حقوق مادی و معنوی برای {storeName} محفوظ است © ۲۰۲۶</p>
           <p className="font-mono text-[11px]">کد رهگیری نماد / پشتیبانی فعال: ۲۷۴۲۴۵۳۴</p>
         </div>

@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!supabaseAdmin) {
-      return NextResponse.json({ success: false, message: "عدم دسترسی به پایگاه داده." }, { status: 500 });
+      return NextResponse.json({ success: false, message: "ارتباط با دیتابیس برقرار نیست." }, { status: 500 });
     }
 
     const { data: user, error } = await supabaseAdmin
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (error || !user) {
-      return NextResponse.json({ success: false, message: "شناسه یا کلمه عبور نادرست است." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "شناسه کاربری یا کلمه عبور نادرست است." }, { status: 401 });
     }
 
     const storedPass = String(user.password || user.pin || user.pin_hash || "").trim();
@@ -47,10 +47,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isMatch) {
-      return NextResponse.json({ success: false, message: "شناسه یا کلمه عبور نادرست است." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "شناسه کاربری یا کلمه عبور نادرست است." }, { status: 401 });
     }
 
-    // تولید توکن امضاشده
+    // تولید امضای امنیتی سشن
     const expTime = Date.now() + 7 * 24 * 60 * 60 * 1000;
     const payload = `${username}:${expTime}`;
     const signature = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
@@ -58,12 +58,13 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
+      token: sessionToken,
       redirectTo: "/admin/dashboard",
-      message: "ورود با موفقیت انجام شد.",
+      message: "ورود موفقیت‌آمیز بود.",
       user: { username: user.username, role: user.role || "superadmin" },
     });
 
-    // تنظیم کوکی سازگار با مرورگر در دامنه و پروکسی
+    // ست کردن کوکی استاندارد و کوکی بدون HttpOnly برای هماهنگی فرانت و سرور
     response.cookies.set("admin_session_token", sessionToken, {
       httpOnly: true,
       secure: true,

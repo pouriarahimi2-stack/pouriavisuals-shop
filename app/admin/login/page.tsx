@@ -39,7 +39,15 @@ export default function AdminLoginPage() {
       if (res.ok && data.success) {
         soundEngine.playSuccess();
         setIsVerified(true);
-        window.location.assign(data.redirectTo || "/admin/dashboard");
+
+        // ثبت کوکی در کلاینت برای اطمینان ۱۰۰٪ در دامنه axoncore.ir
+        document.cookie = "admin_logged_in=true; path=/; max-age=" + (7 * 24 * 60 * 60) + "; SameSite=Lax; Secure";
+        if (data.token) {
+          document.cookie = "admin_session_token=" + data.token + "; path=/; max-age=" + (7 * 24 * 60 * 60) + "; SameSite=Lax; Secure";
+        }
+
+        // انتقال فوری و کامل بدون افتادن در کش کلاینت
+        window.location.href = "/admin/dashboard";
       } else {
         setErrorMessage(data.message || "نام کاربری یا کلمه عبور نادرست است.");
         setIsVerified(false);
@@ -64,7 +72,7 @@ export default function AdminLoginPage() {
               ✓
             </div>
             <h2 className="text-lg font-black text-emerald-400">احراز هویت تایید شد</h2>
-            <p className="text-xs text-slate-400">در حال ورود به داشبورد مدیریت...</p>
+            <p className="text-xs text-slate-400">در حال انتقال به پیشخوان مدیریت آکسون...</p>
           </div>
         ) : (
           <>

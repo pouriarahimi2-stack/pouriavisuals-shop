@@ -22,15 +22,19 @@ function isTokenValid(token?: string): boolean {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get("admin_session_token")?.value;
-  const isAuthenticated = isTokenValid(token);
+  const loggedInFlag = req.cookies.get("admin_logged_in")?.value;
+  
+  const isAuthenticated = isTokenValid(token) || loggedInFlag === "true";
 
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login";
 
+    // اگر کاربر لاگین نیست و در لاگین هم نیست -> برود لاگین
     if (!isAuthenticated && !isLoginPage) {
       return NextResponse.redirect(new URL("/admin/login", req.url));
     }
 
+    // اگر کاربر لاگین است و در صفحه لاگین قرار دارد -> برود مستقیم داشبورد
     if (isAuthenticated && isLoginPage) {
       return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }

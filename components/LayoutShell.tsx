@@ -27,7 +27,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
           <>
             <Footer />
             <ContactDock />
-            <AIAssistantChat />
+            
             <CartDrawer />
           </>
         )}

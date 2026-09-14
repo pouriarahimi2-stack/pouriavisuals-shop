@@ -3,239 +3,170 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
-import { siteInfoService } from "@/services/siteInfoService";
-import { supabase } from "@/lib/supabase";
+import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 
 export default function Header() {
-  const router = useRouter();
-  const pathname = usePathname();
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
   const { cartItems, openCart } = useCart();
-
-  const totalQuantity = (cartItems || []).reduce((acc, item) => acc + (item.quantity || 1), 0);
-
-  const [siteName, setSiteName] = useState("آکسون | Axon");
-  const [logoUrl, setLogoUrl] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    siteInfoService.getSiteInfo().then((info) => {
-      if (info?.site_name) setSiteName(info.site_name);
-      if (info?.logo_url || info?.logoUrl) setLogoUrl(info.logo_url || info.logoUrl || "");
+    siteInfoService.getSiteInfo().then((data) => {
+      if (data) setSiteInfo(data);
     });
 
-    const handleSiteUpdate = (e: any) => {
-      if (e.detail?.site_name) setSiteName(e.detail.site_name);
-      if (e.detail?.logo_url || e.detail?.logoUrl) setLogoUrl(e.detail.logo_url || e.detail.logoUrl);
-    };
-    window.addEventListener("site_info_updated", handleSiteUpdate);
-
-    // وب‌سوکت بلادرنگ تنظیمات سایت
-    const ch = supabase
-      .channel("header-site-info-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, (payload: any) => {
-        if (payload.new?.site_name) setSiteName(payload.new.site_name);
-        if (payload.new?.logo_url) setLogoUrl(payload.new.logo_url);
-      })
-      .subscribe();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setSearchOpen((prev) => !prev);
-      }
-      if (e.key === "Escape") {
-        setSearchOpen(false);
-        setMobileMenuOpen(false);
+    const handleScroll = () => {
+      if (window.scrollY > 20) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("site_info_updated", handleSiteUpdate);
-      window.removeEventListener("keydown", handleKeyDown);
-      supabase.removeChannel(ch);
-    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // بستن منوی موبایل هنگام تغییر مسیر
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    soundEngine.playClick();
-    setSearchOpen(false);
-    router.push("/products?search=" + encodeURIComponent(searchQuery.trim()));
-  };
-
-  const navLinks = [
-    { title: "کاتالوگ کالاها", href: "/products", icon: "🛍️" },
-    { title: "رادار اخبار", href: "/news", icon: "📡" },
-    { title: "مجله سئو", href: "/blog", icon: "📚" },
-    { title: "پیگیری سفارش", href: "/track-order", icon: "🔍" },
-    { title: "درباره ما", href: "/about", icon: "🏢" },
-    { title: "تماس با ما", href: "/contact", icon: "📞" },
-  ];
+  const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+  const storeName = siteInfo?.siteName || siteInfo?.site_name || "Axon | آکسون";
+  const logoUrl = siteInfo?.logo_url || siteInfo?.logoUrl;
 
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-2xl bg-[var(--modal-bg)]/85 border-b border-[var(--card-border)] transition-colors duration-300 font-sans select-none" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-4">
-        
-        {/* دکمه همبرگر موبایل و لوگو */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              setMobileMenuOpen(!mobileMenuOpen);
-            }}
-            className="md:hidden w-10 h-10 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-base cursor-pointer hover:border-[var(--accent-blue)] transition"
-            aria-label="منوی ناوبری موبایل"
+    <>
+      <header
+        className="fixed top-0 left-0 right-0 z-40 flex justify-center px-4 sm:px-6 transition-all duration-300 pointer-events-none pt-3 sm:pt-4"
+        dir="rtl"
+      >
+        <div
+          className={`pointer-events-auto flex items-center justify-between w-full max-w-7xl px-4 sm:px-6 py-2.5 rounded-full border transition-all duration-300 font-sans select-none ${
+            isScrolled
+              ? "bg-[var(--modal-bg)]/90 backdrop-blur-2xl border-[var(--card-border)] shadow-2xl shadow-black/20 scale-[0.98] py-2"
+              : "bg-[var(--modal-bg)]/80 backdrop-blur-xl border-[var(--card-border)]/70 shadow-lg py-2.5"
+          }`}
+        >
+          {/* بخش راست: نشان و عنوان برند */}
+          <Link
+            href="/"
+            onClick={() => soundEngine.playClick()}
+            className="flex items-center gap-3 shrink-0 group"
           >
-            {mobileMenuOpen ? "✕" : "☰"}
-          </button>
-
-          <Link href="/" onClick={() => soundEngine.playClick()} className="flex items-center gap-2.5 group cursor-pointer">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/20 group-hover:scale-105 transition overflow-hidden">
+            <div className="w-10 h-10 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] p-1.5 flex items-center justify-center overflow-hidden shadow-sm group-hover:scale-105 transition-transform duration-300">
               {logoUrl ? (
-                <img src={logoUrl} alt={siteName} className="w-full h-full object-contain p-1" />
+                <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
               ) : (
-                <span>⚡</span>
+                <span className="text-lg text-[var(--accent-blue)] font-black">⚡</span>
               )}
             </div>
-            <div>
-              <span className="font-black text-sm sm:text-base tracking-tight text-[var(--text-primary)] block">{siteName}</span>
-              <span className="text-[10px] text-[var(--text-secondary)] block font-medium">مرجع مانیتورهای ۵K استودیو</span>
+            <div className="hidden sm:block">
+              <span className="font-black text-xs sm:text-sm text-[var(--text-primary)] block tracking-tight">
+                {storeName}
+              </span>
+              <span className="text-[10px] text-[var(--text-secondary)] font-bold block">
+                مرجع مانیتورهای ۵K استودیو
+              </span>
             </div>
           </Link>
-        </div>
 
-        {/* منوی ناوبری دسکتاپ */}
-        <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-[var(--text-secondary)]">
-          {navLinks.map((link) => {
-            const isActive = pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => soundEngine.playClick()}
-                className={`transition hover:text-[var(--accent-blue)] ${
-                  isActive ? "text-[var(--accent-blue)] font-black" : ""
-                }`}
-              >
-                {link.title}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* ابزارهای سرچ، اکانت و سبد خرید */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              setSearchOpen(true);
-            }}
-            className="p-2.5 sm:px-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
-            title="جستجوی سریع (Ctrl + K)"
-          >
-            <span>🔍</span>
-            <span className="hidden lg:inline text-[11px] text-[var(--text-secondary)]">جستجو در کالاها...</span>
-            <kbd className="hidden xl:inline text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 text-slate-400">⌘K</kbd>
-          </button>
-
-          <Link
-            href="/login"
-            onClick={() => soundEngine.playClick()}
-            className="p-2.5 sm:px-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
-          >
-            <span>👤</span>
-            <span className="hidden sm:inline">حساب کاربری</span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              openCart?.();
-            }}
-            className="p-2.5 sm:px-4 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black transition shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer hover:opacity-90 active:scale-95"
-            aria-label="باز کردن سبد خرید"
-          >
-            <span>🛍️</span>
-            <span className="font-mono">{totalQuantity}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* منوی کشویی تمام‌صفحه موبایل */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-t border-[var(--card-border)] bg-[var(--modal-bg)] p-5 space-y-4 shadow-2xl animate-fadeIn">
-          <nav className="grid grid-cols-2 gap-2 text-xs font-bold">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => {
-                  soundEngine.playClick();
-                  setMobileMenuOpen(false);
-                }}
-                className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2 hover:border-[var(--accent-blue)] transition"
-              >
-                <span>{link.icon}</span>
-                <span>{link.title}</span>
-              </Link>
-            ))}
+          {/* بخش وسط: پیوندهای ناوبری دسکتاپ */}
+          <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs font-bold text-[var(--text-secondary)]">
+            <Link
+              href="/products"
+              onClick={() => soundEngine.playClick()}
+              className="hover:text-[var(--accent-blue)] transition-colors py-1"
+            >
+              کاتالوگ کالاها
+            </Link>
+            <Link
+              href="/news"
+              onClick={() => soundEngine.playClick()}
+              className="hover:text-[var(--accent-blue)] transition-colors py-1"
+            >
+              رادار اخبار
+            </Link>
+            <Link
+              href="/blog"
+              onClick={() => soundEngine.playClick()}
+              className="hover:text-[var(--accent-blue)] transition-colors py-1"
+            >
+              مجله سئو
+            </Link>
+            <Link
+              href="/track"
+              onClick={() => soundEngine.playClick()}
+              className="hover:text-[var(--accent-blue)] transition-colors py-1"
+            >
+              پیگیری سفارش
+            </Link>
+            <Link
+              href="/about"
+              onClick={() => soundEngine.playClick()}
+              className="hover:text-[var(--accent-blue)] transition-colors py-1"
+            >
+              درباره ما
+            </Link>
+            <Link
+              href="/contact"
+              onClick={() => soundEngine.playClick()}
+              className="hover:text-[var(--accent-blue)] transition-colors py-1"
+            >
+              تماس با ما
+            </Link>
           </nav>
 
-          <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
-            <span>📞 پشتیبانی: ۰۹۳۷۶۱۱۰۲۰۰</span>
-            <Link href="/track-order" className="text-[var(--accent-blue)] font-black hover:underline">
-              رهگیری مرسوله ←
+          {/* بخش چپ: میانبر سرچ، دکمه حساب کاربری و کپسول سبد خرید */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* دکمه جستجو */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                window.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true })
+                );
+              }}
+              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs text-[var(--text-secondary)] font-medium transition cursor-pointer"
+            >
+              <span>🔍</span>
+              <span className="text-[11px]">جستجو در کالاها...</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--modal-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]">
+                ⌘K
+              </span>
+            </button>
+
+            {/* دکمه ورود / حساب کاربری */}
+            <Link
+              href="/login"
+              onClick={() => soundEngine.playClick()}
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition shadow-sm cursor-pointer"
+            >
+              <span>👤</span>
+              <span className="text-[11px] sm:text-xs">حساب کاربری</span>
             </Link>
+
+            {/* بج کپسولی سبد خرید */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                openCart();
+              }}
+              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 active:scale-95 transition cursor-pointer"
+            >
+              <span>🛍️</span>
+              <span className="font-mono text-xs" suppressHydrationWarning>
+                {totalCartCount}
+              </span>
+            </button>
           </div>
         </div>
-      )}
+      </header>
 
-      {/* مدال جستجوی سراسری هوشمند */}
-      {searchOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <form onSubmit={handleSearchSubmit} className="w-full max-w-xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl p-5 space-y-4">
-            <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-3">
-              <span className="text-xl">🔍</span>
-              <input
-                type="text"
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="جستجوی مانیتور ۵K، کابل تاندربولت، تجهیزات تدوین..."
-                className="w-full bg-transparent border-none outline-none font-bold text-xs sm:text-sm text-[var(--text-primary)]"
-              />
-              <button
-                type="button"
-                onClick={() => setSearchOpen(false)}
-                className="text-xs font-bold px-2.5 py-1 rounded-xl bg-[var(--input-bg)] hover:bg-rose-500 hover:text-white transition"
-              >
-                ESC
-              </button>
-            </div>
-            <div className="flex justify-between items-center text-[11px] text-[var(--text-secondary)]">
-              <span>کلید Enter را برای استعلام بزنید</span>
-              <button type="submit" className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-md">
-                جستجو در کاتالوگ 🚀
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </header>
+      {/* کامپوننت جستجوی سراسری کنترل‌شونده با کلیدهای ترکیبی */}
+      <AdminGlobalSearch />
+    </>
   );
 }

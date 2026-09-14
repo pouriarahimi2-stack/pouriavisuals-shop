@@ -4,7 +4,7 @@ import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_secure_production_fallback_2026_key";
+const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_core_fixed_session_secret_2026";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,20 +13,13 @@ export async function POST(req: NextRequest) {
     const password = String(body.password || body.pin || "").trim();
 
     if (!username || !password) {
-      return NextResponse.json(
-        { success: false, message: "شناسه کاربری و کلمه عبور الزامی است." },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "نام کاربری و کلمه عبور الزامی است." }, { status: 400 });
     }
 
     if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, message: "ارتباط با دیتابیس برقرار نشد." },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, message: "عدم دسترسی به پایگاه داده." }, { status: 500 });
     }
 
-    // استعلام مستقیم از جدول admin_users با کلاینت ادمین (Bypass RLS)
     const { data: user, error } = await supabaseAdmin
       .from("admin_users")
       .select("*")
@@ -34,15 +27,10 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (error || !user) {
-      return NextResponse.json(
-        { success: false, message: "شناسه کاربری یا کلمه عبور نادرست است." },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, message: "شناسه یا کلمه عبور نادرست است." }, { status: 401 });
     }
 
     const storedPass = String(user.password || user.pin || user.pin_hash || "").trim();
-
-    // بررسی تطابق با متن ساده یا هش
     let isMatch = (password === storedPass);
 
     if (!isMatch && storedPass.includes(":")) {
@@ -59,13 +47,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isMatch) {
-      return NextResponse.json(
-        { success: false, message: "شناسه کاربری یا کلمه عبور نادرست است." },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, message: "شناسه یا کلمه عبور نادرست است." }, { status: 401 });
     }
 
-    // صدور توکن استاندارد HMAC-SHA256
+    // تولید امضای امنیتی استاندارد
     const expTime = Date.now() + 7 * 24 * 60 * 60 * 1000;
     const payload = `${username}:${expTime}`;
     const signature = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
@@ -74,12 +59,10 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({
       success: true,
       message: "ورود با موفقیت انجام شد.",
-      user: {
-        username: user.username,
-        role: user.role || "superadmin",
-      },
+      user: { username: user.username, role: user.role || "superadmin" },
     });
 
+    // ست کردن کوکی استاندارد روی کل دامنه با تنظیمات سازگار با Next.js در پروداکشن
     response.cookies.set("admin_session_token", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -88,11 +71,16 @@ export async function POST(req: NextRequest) {
       maxAge: 7 * 24 * 60 * 60,
     });
 
+    response.cookies.set("admin_logged_in", "true", {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
     return response;
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: "خطای سرور در احراز هویت." },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: "خطای سرور" }, { status: 500 });
   }
 }

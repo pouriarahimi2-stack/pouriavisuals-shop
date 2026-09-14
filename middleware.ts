@@ -2,16 +2,16 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import crypto from "crypto";
 
-const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_secure_production_fallback_2026_key";
+const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_core_fixed_session_secret_2026";
 
-function verifyTokenSecure(token?: string): boolean {
+function isTokenValid(token?: string): boolean {
   if (!token || typeof token !== "string" || !token.includes(":")) return false;
   try {
     const parts = token.split(":");
     if (parts.length !== 3) return false;
-    const [username, expStr, sig] = parts;
+    const [user, expStr, sig] = parts;
     if (Date.now() > Number(expStr)) return false;
-    const payload = `${username}:${expStr}`;
+    const payload = `${user}:${expStr}`;
     const expectedSig = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
     return crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expectedSig, "hex"));
   } catch {
@@ -21,33 +21,26 @@ function verifyTokenSecure(token?: string): boolean {
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const adminToken = req.cookies.get("admin_session_token")?.value;
-  const isAuthenticated = verifyTokenSecure(adminToken);
+  const token = req.cookies.get("admin_session_token")?.value;
+  const isAuthenticated = isTokenValid(token);
 
-  // محافظت از API های ادمین
-  if (pathname.startsWith("/api/admin")) {
-    const isAuthEndpoint = pathname === "/api/admin/login" || pathname === "/api/admin/auth";
-    if (!isAuthEndpoint && !isAuthenticated) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
-    }
-  }
-
-  // محافظت از صفحات ادمین
+  // صفحات ادمین
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login";
-    
-    // اگر کاربر وارد نشده و در لاگین نیست -> برود لاگین
+
+    // کاربر وارد نشده است و می‌خواهد به ادمین برود -> ریدایرکت به لاگین
     if (!isAuthenticated && !isLoginPage) {
       const loginUrl = new URL("/admin/login", req.url);
       return NextResponse.redirect(loginUrl);
     }
 
-    // اگر کاربر وارد شده و در صفحه لاگین است -> برود مستقیم داشبورد
+    // کاربر قبلاً وارد شده و در صفحه لاگین است -> هدایت به داشبورد
     if (isAuthenticated && isLoginPage) {
-      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+      const dashboardUrl = new URL("/admin/dashboard", req.url);
+      return NextResponse.redirect(dashboardUrl);
     }
 
-    // اگر مسیر دقیقاً /admin بود -> برود داشبورد
+    // مسیر پیش‌فرض /admin به /admin/dashboard
     if (pathname === "/admin") {
       return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }
@@ -57,5 +50,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|icons).*)"],
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };

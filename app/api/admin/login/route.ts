@@ -1,92 +1,104 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { signPayload, COOKIE_NAME } from "@/lib/session";
-import { authSecurity } from "@/lib/authSecurity";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
+const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_secure_production_fallback_2026_key";
+
+function verifyPassword(inputPass: string, storedPass: string): boolean {
+  if (!storedPass) return false;
+
+  // ۱. بررسی فرمت scrypt (salt:hash)
+  if (storedPass.includes(":")) {
+    const parts = storedPass.split(":");
+    if (parts.length === 2) {
+      const [salt, storedHash] = parts;
+      const computedHash = crypto.scryptSync(inputPass, salt, 64).toString("hex");
+      try {
+        if (crypto.timingSafeEqual(Buffer.from(computedHash, "hex"), Buffer.from(storedHash, "hex"))) {
+          return true;
+        }
+      } catch {}
+    }
+  }
+
+  // ۲. بررسی هش SHA256
+  const sha256Hash = crypto.createHash("sha256").update(inputPass).digest("hex");
+  if (storedPass === sha256Hash) return true;
+
+  // ۳. بررسی متن خام (Plain text مانند 6110 موجود در دیتابیس)
+  return inputPass === storedPass;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const clientIp = req.headers.get("x-forwarded-for") || "local_admin";
-    const rateCheck = authSecurity.checkRateLimit(clientIp);
+    const body = await req.json();
+    const username = String(body.username || "").trim().toLowerCase();
+    const password = String(body.password || body.pin || "").trim();
 
-    if (!rateCheck.allowed) {
+    if (!username || !password) {
       return NextResponse.json(
-        {
-          success: false,
-          message: `به دلیل تلاش‌های ناموفق متعدد، دسترسی شما به مدت ${rateCheck.waitMinutes} دقیقه مسدود شد.`,
-        },
-        { status: 429 }
+        { success: false, message: "نام کاربری و کلمه عبور الزامی است." },
+        { status: 400 }
       );
     }
 
-    const body = await req.json();
-    const pinOrPassword = String(body.password || body.pin || "").trim();
-    const username = String(body.username || "").trim().toLowerCase();
+    // واکشی کاربر مدیر از دیتابیس Supabase
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("admin_users")
+      .select("*")
+      .eq("username", username)
+      .maybeSingle();
 
-    if (!username || !pinOrPassword) {
-      return NextResponse.json({ success: false, message: "شناسه کاربری و کلمه عبور الزامی است." }, { status: 400 });
+    if (userError || !user) {
+      return NextResponse.json(
+        { success: false, message: "کاربری با این مشخصات یافت نشد." },
+        { status: 401 }
+      );
     }
 
-    let adminUser: any = null;
+    const storedPass = String(user.password || user.pin || user.pin_hash || "");
+    const isValid = verifyPassword(password, storedPass);
 
-    if (supabaseAdmin) {
-      const { data } = await supabaseAdmin
-        .from("admin_users")
-        .select("*")
-        .eq("username", username)
-        .maybeSingle();
-
-      adminUser = data;
+    if (!isValid) {
+      return NextResponse.json(
+        { success: false, message: "کلمه عبور یا پین‌کد وارد شده نادرست است." },
+        { status: 401 }
+      );
     }
 
-    // عدم ایجاد خودکار ادمین؛ جلوگیری از مصالحه امنیتی
-    if (!adminUser) {
-      authSecurity.recordFailedAttempt(clientIp);
-      return NextResponse.json({ success: false, message: "کاربری با این مشخصات یافت نشد." }, { status: 401 });
-    }
+    // تولید توکن امن مطابق با فرمت HMAC اعتبارسنجی شده در middleware.ts
+    const expTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // ۷ روز اعتبار
+    const payload = `${username}:${expTime}`;
+    const signature = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
+    const sessionToken = `${payload}:${signature}`;
 
-    const isMatched = authSecurity.verifyPassword(pinOrPassword, adminUser.password || adminUser.password_hash || "");
-
-    if (!isMatched) {
-      authSecurity.recordFailedAttempt(clientIp);
-      return NextResponse.json({ success: false, message: "کلمه عبور یا پین‌کد وارد شده نادرست است." }, { status: 401 });
-    }
-
-    authSecurity.resetAttempts(clientIp);
-
-    const token = await signPayload({
-      id: String(adminUser.id),
-      username: adminUser.username,
-      role: adminUser.role || "superadmin",
-      full_name: adminUser.full_name || adminUser.username,
-    });
-
-    const isProd = process.env.NODE_ENV === "production";
     const response = NextResponse.json({
       success: true,
-      message: "ورود امن با موفقیت انجام شد.",
-      redirectUrl: "/admin",
+      message: "ورود با موفقیت انجام شد.",
       user: {
-        id: adminUser.id,
-        username: adminUser.username,
-        role: adminUser.role || "superadmin",
-        full_name: adminUser.full_name || "مدیر سیستم",
+        id: user.id,
+        username: user.username,
+        full_name: user.full_name,
+        role: user.role,
       },
     });
 
-    response.cookies.set(COOKIE_NAME, token, {
+    // ست کردن کوکی امنیتی
+    response.cookies.set("admin_session_token", sessionToken, {
       httpOnly: true,
-      secure: isProd,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 72 * 60 * 60,
+      maxAge: 7 * 24 * 60 * 60,
     });
-
-    response.cookies.delete("pv_admin_session");
 
     return response;
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || "خطای پردازش سرور." }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message || "خطای سرور در احراز هویت." },
+      { status: 500 }
+    );
   }
 }

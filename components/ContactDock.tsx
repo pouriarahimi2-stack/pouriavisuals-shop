@@ -19,7 +19,6 @@ export default function ContactDock() {
           className="group flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer border border-white/20 backdrop-blur-md"
           title="دستیار هوشمند آکسون"
         >
-          {/* لوگو یا آیکون SVG زنده متحرک */}
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 relative">
             <svg className="w-5 h-5 text-white animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2a10 10 0 0 1 7.54 16.6l1.46 2.4-3.02-.9A10 10 0 1 1 12 2z" />
@@ -31,7 +30,7 @@ export default function ContactDock() {
           </div>
 
           <div className="text-right pr-1">
-            <span className="text-[10px] uppercase font-mono tracking-wider opacity-85 block">Live AI</span>
+            <span className="text-[10px] uppercase font-mono tracking-wider opacity-85 block">LIVE AI</span>
             <span className="text-xs font-black tracking-tight block">دستیار هوشمند آکسون</span>
           </div>
         </button>

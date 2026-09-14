@@ -6,29 +6,29 @@ export const dynamic = "force-dynamic";
 
 const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_secure_production_fallback_2026_key";
 
-function verifyPassword(inputPass: string, storedPass: string): boolean {
-  if (!storedPass) return false;
+function verifyPasswordAgainstHash(inputPass: string, storedPass: string): boolean {
+  if (!storedPass || !inputPass) return false;
 
   // ۱. بررسی فرمت scrypt (salt:hash)
   if (storedPass.includes(":")) {
     const parts = storedPass.split(":");
     if (parts.length === 2) {
-      const [salt, storedHash] = parts;
-      const computedHash = crypto.scryptSync(inputPass, salt, 64).toString("hex");
+      const [salt, hash] = parts;
       try {
-        if (crypto.timingSafeEqual(Buffer.from(computedHash, "hex"), Buffer.from(storedHash, "hex"))) {
-          return true;
-        }
-      } catch {}
+        const computed = crypto.scryptSync(inputPass, salt, 64).toString("hex");
+        return crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(hash, "hex"));
+      } catch {
+        return false;
+      }
     }
   }
 
   // ۲. بررسی هش SHA256
-  const sha256Hash = crypto.createHash("sha256").update(inputPass).digest("hex");
-  if (storedPass === sha256Hash) return true;
+  const sha = crypto.createHash("sha256").update(inputPass).digest("hex");
+  if (storedPass === sha) return true;
 
-  // ۳. بررسی متن خام (Plain text مانند 6110 موجود در دیتابیس)
-  return inputPass === storedPass;
+  // ۳. بررسی مقدار متنی ذخیره‌شده فعلی در دیتابیس
+  return crypto.timingSafeEqual(Buffer.from(inputPass), Buffer.from(storedPass));
 }
 
 export async function POST(req: NextRequest) {
@@ -39,44 +39,51 @@ export async function POST(req: NextRequest) {
 
     if (!username || !password) {
       return NextResponse.json(
-        { success: false, message: "نام کاربری و کلمه عبور الزامی است." },
+        { success: false, message: "شناسه کاربری و کلمه عبور الزامی است." },
         { status: 400 }
       );
     }
 
-    // واکشی کاربر مدیر از دیتابیس Supabase
-    const { data: user, error: userError } = await supabaseAdmin
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, message: "ارتباط با پایگاه داده برقرار نیست." },
+        { status: 500 }
+      );
+    }
+
+    // استعلام مستقیم از جدول admin_users - هیچ کاربری بدون وجود در دیتابیس اجازه ورود ندارد
+    const { data: user, error } = await supabaseAdmin
       .from("admin_users")
-      .select("*")
+      .select("id, username, password, pin, pin_hash, role, full_name")
       .eq("username", username)
       .maybeSingle();
 
-    if (userError || !user) {
+    if (error || !user) {
       return NextResponse.json(
-        { success: false, message: "کاربری با این مشخصات یافت نشد." },
+        { success: false, message: "شناسه کاربری یا کلمه عبور نادرست است." },
         { status: 401 }
       );
     }
 
-    const storedPass = String(user.password || user.pin || user.pin_hash || "");
-    const isValid = verifyPassword(password, storedPass);
+    const targetStoredSecret = String(user.password || user.pin || user.pin_hash || "");
+    const isPasswordValid = verifyPasswordAgainstHash(password, targetStoredSecret);
 
-    if (!isValid) {
+    if (!isPasswordValid) {
       return NextResponse.json(
-        { success: false, message: "کلمه عبور یا پین‌کد وارد شده نادرست است." },
+        { success: false, message: "شناسه کاربری یا کلمه عبور نادرست است." },
         { status: 401 }
       );
     }
 
-    // تولید توکن امن مطابق با فرمت HMAC اعتبارسنجی شده در middleware.ts
-    const expTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // ۷ روز اعتبار
-    const payload = `${username}:${expTime}`;
+    // تولید توکن امن رمزنگاری‌شده با HMAC-SHA256 و تاریخ انقضا (۷ روز)
+    const expTime = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    const payload = `${user.username}:${expTime}`;
     const signature = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
     const sessionToken = `${payload}:${signature}`;
 
     const response = NextResponse.json({
       success: true,
-      message: "ورود با موفقیت انجام شد.",
+      message: "ورود موفقیت‌آمیز بود.",
       user: {
         id: user.id,
         username: user.username,
@@ -85,7 +92,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ست کردن کوکی امنیتی
     response.cookies.set("admin_session_token", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -97,7 +103,7 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: err.message || "خطای سرور در احراز هویت." },
+      { success: false, message: "خطای سرور در اعتبارسنجی هویت." },
       { status: 500 }
     );
   }

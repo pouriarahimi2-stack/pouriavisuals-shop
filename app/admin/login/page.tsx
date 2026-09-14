@@ -50,7 +50,7 @@ function AdminLoginComponent() {
         setIsVerified(true);
         // هدایت مستقیم و قطعی به پیشخوان
         setTimeout(() => {
-          window.location.href = redirectPath;
+          window.location.href = "/admin/dashboard";
         }, 600);
       } else {
         setErrorMessage(data.message || "نام کاربری یا کلمه عبور نادرست است.");

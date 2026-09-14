@@ -24,29 +24,36 @@ export function middleware(req: NextRequest) {
   const adminToken = req.cookies.get("admin_session_token")?.value;
   const isAuthenticated = verifyTokenSecure(adminToken);
 
+  // محافظت از API های ادمین
   if (pathname.startsWith("/api/admin")) {
-    const isAuthEndpoint = pathname === "/api/admin/auth" || pathname === "/api/admin/login";
+    const isAuthEndpoint = pathname === "/api/admin/login" || pathname === "/api/admin/auth";
     if (!isAuthEndpoint && !isAuthenticated) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. سشن امنیتی معتبر نیست." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
     }
   }
 
+  // محافظت از صفحات ادمین
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login";
+    
+    // اگر کاربر وارد نشده و در لاگین نیست -> برود لاگین
     if (!isAuthenticated && !isLoginPage) {
       const loginUrl = new URL("/admin/login", req.url);
-      loginUrl.searchParams.set("from", pathname);
       return NextResponse.redirect(loginUrl);
     }
+
+    // اگر کاربر وارد شده و در صفحه لاگین است -> برود مستقیم داشبورد
     if (isAuthenticated && isLoginPage) {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
+
+    // اگر مسیر دقیقاً /admin بود -> برود داشبورد
+    if (pathname === "/admin") {
       return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }
   }
 
-  const response = NextResponse.next();
-  response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

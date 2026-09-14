@@ -1,23 +1,40 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import crypto from "crypto";
+
+const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_secure_production_fallback_2026_key";
+
+function verifyTokenSecure(token?: string): boolean {
+  if (!token || typeof token !== "string" || !token.includes(":")) return false;
+  try {
+    const parts = token.split(":");
+    if (parts.length !== 3) return false;
+    const [username, expStr, sig] = parts;
+    if (Date.now() > Number(expStr)) return false;
+    
+    const payload = `${username}:${expStr}`;
+    const expectedSig = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expectedSig, "hex"));
+  } catch {
+    return false;
+  }
+}
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const adminToken = req.cookies.get("admin_session_token")?.value;
-  const isAuthenticated = Boolean(adminToken && adminToken.length >= 20);
+  const isAuthenticated = verifyTokenSecure(adminToken);
 
-  // ۱. حفاظت از اندپوینت‌های مدیریتی (/api/admin/*) به جز احراز هویت
   if (pathname.startsWith("/api/admin")) {
-    const isAuthEndpoint = pathname === "/api/admin/auth";
+    const isAuthEndpoint = pathname === "/api/admin/auth" || pathname === "/api/admin/login";
     if (!isAuthEndpoint && !isAuthenticated) {
       return NextResponse.json(
-        { success: false, message: "دسترسی غیرمجاز. سشن ادمین معتبر نیست." },
+        { success: false, message: "دسترسی غیرمجاز. سشن امنیتی معتبر نیست." },
         { status: 401 }
       );
     }
   }
 
-  // ۲. حفاظت از صفحات پنل ادمین (/admin/*) به جز صفحه لاگین
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login";
 
@@ -32,26 +49,15 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // ۳. ایجاد پاسخ و تزریق هدرهای امنیتی دفاعی
   const response = NextResponse.next();
-
-  // مقابله با Clickjacking
   response.headers.set("X-Frame-Options", "DENY");
-  // مقابله با حدس فرمت فایل توسط مرورگر
   response.headers.set("X-Content-Type-Options", "nosniff");
-  // سیاست محافظت از رفرر
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  // قفل دسترسی‌های غیرضروری کلاینت
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
   return response;
 }
 
 export const config = {
-  matcher: [
-    /*
-     * اعمال روی تمام مسیرها به استثنای فایل‌های استاتیک و آیکون‌ها
-     */
-    "/((?!_next/static|_next/image|favicon.ico|images|icons).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|icons).*)"],
 };

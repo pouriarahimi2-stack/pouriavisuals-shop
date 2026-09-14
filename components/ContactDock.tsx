@@ -1,4 +1,3 @@
-// File Path: components/ContactDock.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -10,7 +9,8 @@ export default function ContactDock() {
 
   return (
     <>
-      <div className="fixed bottom-6 left-6 z-50 flex items-center gap-3 select-none" dir="rtl">
+      {/* فقط یک ویجت متحرک SVG شیک در گوشه پایین چپ */}
+      <div className="fixed bottom-6 left-6 z-50 select-none" dir="rtl">
         <button
           onClick={() => {
             soundEngine.playClick();

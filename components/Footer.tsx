@@ -1,4 +1,3 @@
-// File Path: components/Footer.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -29,7 +28,7 @@ export default function Footer() {
     <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors pt-12 pb-8 px-4 sm:px-6 lg:px-8 mt-20" dir="rtl">
       <div className="max-w-7xl mx-auto space-y-12">
         
-        {/* ۳ کارت بزرگ گارانتی منتقل شده از بالا به پایین صفحه */}
+        {/* ۳ کارت گارانتی که از بالای صفحه منتقل شدند به فوتر */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-6 rounded-[2rem] bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center text-center space-y-2 shadow-sm">
             <span className="text-3xl">🛡️</span>
@@ -50,12 +49,12 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* بخش اصلی فوتر شامل ستون‌ها و کارت‌های سفید اطلاعات تماس */}
+        {/* ۴ ستون اصلی فوتر */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pt-6 border-t border-[var(--card-border)]">
           
-          {/* ستون راست: کارت‌های سفید اطلاعات تماس */}
-          <div className="lg:col-span-5 space-y-3">
-            <span className="text-xs font-black text-[var(--text-secondary)] block mb-2">اطلاعات تماس و دفاتر</span>
+          {/* اطلاعات تماس در کادرهای شیک و مجزا مطابق عکس */}
+          <div className="lg:col-span-4 space-y-3">
+            <span className="text-xs font-black text-[var(--text-secondary)] block mb-2">اطلاعات تماس و دفتر</span>
             
             <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between text-xs shadow-sm">
               <span className="text-[var(--text-secondary)]">تلفن پشتیبانی:</span>
@@ -73,18 +72,18 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* ستون وسط: خدمات مشتریان */}
+          {/* خدمات مشتریان */}
           <div className="lg:col-span-2 space-y-3">
             <h4 className="font-black text-xs text-[var(--text-primary)] tracking-wide">خدمات مشتریان</h4>
             <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
               <li><Link href="/contact" className="hover:text-[var(--accent-blue)] transition">ثبت تیکت مشاوره</Link></li>
-              <li><Link href="/about" className="hover:text-[var(--accent-blue)] transition">شرایط گارانتی و اصالت</Link></li>
+              <li><Link href="/about" className="hover:text-[var(--accent-blue)] transition">شرایط گارانتی طلایی</Link></li>
               <li><Link href="/track" className="hover:text-[var(--accent-blue)] transition">ضمانت بازگشت وجه ۷ روزه</Link></li>
-              <li><Link href="/products" className="hover:text-[var(--accent-blue)] transition">راهنمای تخصصی</Link></li>
+              <li><Link href="/products" className="hover:text-[var(--accent-blue)] transition">راهنمای کالیبراسیون</Link></li>
             </ul>
           </div>
 
-          {/* ستون وسط-چپ: دسترسی سریع */}
+          {/* دسترسی سریع */}
           <div className="lg:col-span-2 space-y-3">
             <h4 className="font-black text-xs text-[var(--text-primary)] tracking-wide">دسترسی سریع</h4>
             <ul className="space-y-2 text-xs text-[var(--text-secondary)] font-medium">
@@ -95,10 +94,10 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون چپ: معرفی برند */}
-          <div className="lg:col-span-3 space-y-3">
+          {/* برند و هویت */}
+          <div className="lg:col-span-4 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] p-1.5 flex items-center justify-center overflow-hidden shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] p-2 flex items-center justify-center overflow-hidden shadow-sm">
                 {logoUrl ? (
                   <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
                 ) : (
@@ -106,21 +105,37 @@ export default function Footer() {
                 )}
               </div>
               <div>
-                <span className="font-black text-xs text-[var(--text-primary)] block tracking-tight">{storeName}</span>
+                <span className="font-black text-sm text-[var(--text-primary)] block tracking-tight">{storeName}</span>
                 <span className="text-[10px] text-[var(--accent-blue)] font-bold block">مرجع تخصصی دیجیتال و تکنولوژی</span>
               </div>
             </div>
-            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed font-medium">
-              تأمین و عرضه پیشرفته‌ترین تجهیزات دیجیتال، گجت‌ها و سخت‌افزارهای رده‌بالا با تضمین اصالت و ارسال سریع به سراسر کشور.
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium">
+              تأمین و عرضه پیشرفته‌ترین تجهیزات دیجیتال، گجت‌ها و سخت‌افزارهای مدرن با تضمین اصالت و ارسال سریع به سراسر کشور.
             </p>
           </div>
 
         </div>
 
+        {/* کادر شبکه‌های ارتباطی با دکمه‌های کپسولی شیک CONTACT */}
+        <div className="pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <span className="text-xs font-bold text-[var(--text-secondary)]">شبکه‌های ارتباطی استودیو:</span>
+          <div className="flex items-center gap-1.5 p-2 rounded-full bg-[#0a0f1d] border border-slate-800 shadow-xl" dir="ltr">
+            {['C', 'O', 'N', 'T', 'A', 'C', 'T'].map((char, index) => (
+              <Link
+                key={index}
+                href="/contact"
+                className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700/60 flex items-center justify-center text-xs font-mono font-bold text-slate-300 hover:text-white hover:border-[var(--accent-blue)] hover:bg-[var(--accent-blue)] transition-all shadow"
+              >
+                {char}
+              </Link>
+            ))}
+          </div>
+        </div>
+
         {/* کپی‌رایت نهایی */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] pt-4 border-t border-[var(--card-border)]">
           <p>تمامی حقوق مادی و معنوی برای {storeName} محفوظ است © ۲۰۲۶</p>
-          <p className="font-mono text-[11px]">کد رهگیری نماد / پشتیبانی فعال: ۲۷۴۲۴۵۳۴</p>
+          <p className="font-mono text-[11px]">نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)</p>
         </div>
 
       </div>

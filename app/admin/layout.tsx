@@ -1,20 +1,30 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
-import { NotificationProvider } from "@/components/admin/AdminNotificationProvider";
+import AdminNotificationProvider from "@/components/admin/AdminNotificationProvider";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isLoginPage = pathname === "/admin/login";
+
+  if (isLoginPage) {
+    return <main className="min-h-screen bg-slate-950">{children}</main>;
+  }
+
   return (
-    <NotificationProvider>
-      <div className="min-h-screen flex bg-slate-950 text-slate-100 font-sans select-none" dir="rtl">
-        <AdminSidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <AdminHeader />
-          <main className="flex-1 p-6 md:p-8 overflow-y-auto">{children}</main>
+    <AdminNotificationProvider>
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none" dir="rtl">
+        <AdminHeader />
+        <div className="flex">
+          <AdminSidebar />
+          <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+            {children}
+          </main>
         </div>
       </div>
-    </NotificationProvider>
+    </AdminNotificationProvider>
   );
 }

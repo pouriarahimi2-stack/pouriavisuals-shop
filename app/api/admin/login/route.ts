@@ -1,34 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hooaobrxgwakqqibcfdy.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false },
+});
+
 const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_secure_production_fallback_2026_key";
 
-function verifyPasswordAgainstHash(inputPass: string, storedPass: string): boolean {
-  if (!storedPass || !inputPass) return false;
+function verifyPassword(inputPass: string, storedPass: string): boolean {
+  if (!inputPass || !storedPass) return false;
+  const cleanInput = inputPass.trim();
+  const cleanStored = storedPass.trim();
 
-  // ۱. بررسی فرمت scrypt (salt:hash)
-  if (storedPass.includes(":")) {
-    const parts = storedPass.split(":");
-    if (parts.length === 2) {
-      const [salt, hash] = parts;
+  // تطابق مستقیم با رکورد ثبت‌شده در دیتابیس
+  if (cleanInput === cleanStored) return true;
+
+  // بررسی در صورتی که با SHA-256 هش شده باشد
+  const sha = crypto.createHash("sha256").update(cleanInput).digest("hex");
+  if (cleanStored === sha) return true;
+
+  // بررسی در صورتی که با scrypt هش شده باشد
+  if (cleanStored.includes(":")) {
+    const [salt, hash] = cleanStored.split(":");
+    if (salt && hash) {
       try {
-        const computed = crypto.scryptSync(inputPass, salt, 64).toString("hex");
-        return crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(hash, "hex"));
-      } catch {
-        return false;
-      }
+        const computed = crypto.scryptSync(cleanInput, salt, 64).toString("hex");
+        if (crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(hash, "hex"))) {
+          return true;
+        }
+      } catch {}
     }
   }
 
-  // ۲. بررسی هش SHA256
-  const sha = crypto.createHash("sha256").update(inputPass).digest("hex");
-  if (storedPass === sha) return true;
-
-  // ۳. بررسی مقدار متنی ذخیره‌شده فعلی در دیتابیس
-  return crypto.timingSafeEqual(Buffer.from(inputPass), Buffer.from(storedPass));
+  return false;
 }
 
 export async function POST(req: NextRequest) {
@@ -44,17 +54,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, message: "ارتباط با پایگاه داده برقرار نیست." },
-        { status: 500 }
-      );
-    }
-
-    // استعلام مستقیم از جدول admin_users - هیچ کاربری بدون وجود در دیتابیس اجازه ورود ندارد
-    const { data: user, error } = await supabaseAdmin
+    // استعلام مستقیم رکورد کاربر مدیر از جدول admin_users
+    const { data: user, error } = await supabase
       .from("admin_users")
-      .select("id, username, password, pin, pin_hash, role, full_name")
+      .select("*")
       .eq("username", username)
       .maybeSingle();
 
@@ -65,30 +68,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const targetStoredSecret = String(user.password || user.pin || user.pin_hash || "");
-    const isPasswordValid = verifyPasswordAgainstHash(password, targetStoredSecret);
+    const targetPassword = String(user.password || user.pin || user.pin_hash || "");
+    const isValid = verifyPassword(password, targetPassword);
 
-    if (!isPasswordValid) {
+    if (!isValid) {
       return NextResponse.json(
         { success: false, message: "شناسه کاربری یا کلمه عبور نادرست است." },
         { status: 401 }
       );
     }
 
-    // تولید توکن امن رمزنگاری‌شده با HMAC-SHA256 و تاریخ انقضا (۷ روز)
+    // ایجاد توکن سشن امن HMAC با انقضای ۷ روزه
     const expTime = Date.now() + 7 * 24 * 60 * 60 * 1000;
-    const payload = `${user.username}:${expTime}`;
+    const payload = `${username}:${expTime}`;
     const signature = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
     const sessionToken = `${payload}:${signature}`;
 
     const response = NextResponse.json({
       success: true,
-      message: "ورود موفقیت‌آمیز بود.",
+      message: "ورود با موفقیت انجام شد.",
       user: {
-        id: user.id,
         username: user.username,
-        full_name: user.full_name,
-        role: user.role,
+        role: user.role || "superadmin",
       },
     });
 
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: "خطای سرور در اعتبارسنجی هویت." },
+      { success: false, message: err?.message || "خطای سرور در اعتبارسنجی." },
       { status: 500 }
     );
   }

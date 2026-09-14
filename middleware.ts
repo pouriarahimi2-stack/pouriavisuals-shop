@@ -11,7 +11,6 @@ function verifyTokenSecure(token?: string): boolean {
     if (parts.length !== 3) return false;
     const [username, expStr, sig] = parts;
     if (Date.now() > Number(expStr)) return false;
-    
     const payload = `${username}:${expStr}`;
     const expectedSig = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
     return crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expectedSig, "hex"));
@@ -28,22 +27,17 @@ export function middleware(req: NextRequest) {
   if (pathname.startsWith("/api/admin")) {
     const isAuthEndpoint = pathname === "/api/admin/auth" || pathname === "/api/admin/login";
     if (!isAuthEndpoint && !isAuthenticated) {
-      return NextResponse.json(
-        { success: false, message: "دسترسی غیرمجاز. سشن امنیتی معتبر نیست." },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. سشن امنیتی معتبر نیست." }, { status: 401 });
     }
   }
 
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login";
-
     if (!isAuthenticated && !isLoginPage) {
       const loginUrl = new URL("/admin/login", req.url);
       loginUrl.searchParams.set("from", pathname);
       return NextResponse.redirect(loginUrl);
     }
-
     if (isAuthenticated && isLoginPage) {
       return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }
@@ -52,9 +46,6 @@ export function middleware(req: NextRequest) {
   const response = NextResponse.next();
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-
   return response;
 }
 

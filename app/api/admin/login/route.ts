@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "شناسه یا کلمه عبور نادرست است." }, { status: 401 });
     }
 
-    // تولید امضای امنیتی استاندارد
+    // تولید توکن امضاشده
     const expTime = Date.now() + 7 * 24 * 60 * 60 * 1000;
     const payload = `${username}:${expTime}`;
     const signature = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
@@ -58,14 +58,15 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
+      redirectTo: "/admin/dashboard",
       message: "ورود با موفقیت انجام شد.",
       user: { username: user.username, role: user.role || "superadmin" },
     });
 
-    // ست کردن کوکی استاندارد روی کل دامنه با تنظیمات سازگار با Next.js در پروداکشن
+    // تنظیم کوکی سازگار با مرورگر در دامنه و پروکسی
     response.cookies.set("admin_session_token", sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: "lax",
       path: "/",
       maxAge: 7 * 24 * 60 * 60,
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     response.cookies.set("admin_logged_in", "true", {
       httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: "lax",
       path: "/",
       maxAge: 7 * 24 * 60 * 60,

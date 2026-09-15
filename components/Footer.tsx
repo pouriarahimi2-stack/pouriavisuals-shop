@@ -1,147 +1,114 @@
-// File Path: components/Footer.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, SiteInfo } from "@/services/siteInfoService";
 
-interface ContactItem {
-  char: string;
-  label: string;
-  value: string;
-  href: string;
-  icon: string;
-}
-
 export default function Footer() {
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
-  const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
 
   useEffect(() => {
     siteInfoService.getSiteInfo().then((data) => {
       if (data) setSiteInfo(data);
     });
+
     const handleUpdate = (e: any) => {
       if (e.detail) setSiteInfo(e.detail);
     };
+
     window.addEventListener("site_info_updated", handleUpdate);
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
-  const storeName = siteInfo?.siteName || siteInfo?.site_name || "Axon | آکسون";
-  const footerLogo = siteInfo?.footer_logo_url || siteInfo?.footerLogoUrl || siteInfo?.logo_url || siteInfo?.logoUrl;
-  const phone = siteInfo?.phone || "09376110200";
-  const email = siteInfo?.email || "Pouriarahimi@yahoo.com";
-  const address = siteInfo?.address || "شیراز - ستارخان";
-
-  const contactItems: ContactItem[] = [
-    { char: "C", label: "تماس تلفنی", value: phone, href: `tel:${phone}`, icon: "📞" },
-    { char: "O", label: "پیگیری سفارش", value: "سامانه رهگیری مرسولات", href: "/track", icon: "📦" },
-    { char: "N", label: "نشانی تحویل", value: address, href: "/contact", icon: "📍" },
-    { char: "T", label: "تیکت پشتیبانی", value: "مشاوره آنلاین", href: "/contact", icon: "✉️" },
-    { char: "A", label: "درباره ما", value: "تضمین اصالت کالا", href: "/about", icon: "🛡️" },
-    { char: "C", label: "کانال تلگرام", value: "@AxonCore_Support", href: "https://t.me", icon: "✈️" },
-    { char: "T", label: "پست الکترونیک", value: email, href: `mailto:${email}`, icon: "📧" },
-  ];
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
+  const logoUrl = siteInfo?.footer_logo_url || siteInfo?.footerLogoUrl || siteInfo?.logo_url || siteInfo?.logoUrl;
+  const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
+  const email = siteInfo?.email || "info@axoncore.ir";
+  const address = siteInfo?.address || "تهران، خیابان ولیعصر، تقاطع میرداماد";
+  const description =
+    siteInfo?.description ||
+    siteInfo?.footer_text ||
+    "تأمین و عرضه پیشرفته‌ترین تجهیزات دیجیتال، گجت‌ها و سخت‌افزارهای مدرن با تضمین اصالت و ارسال سریع به سراسر کشور.";
 
   return (
-    <footer className="w-full bg-[var(--modal-bg)] text-[var(--text-primary)] font-sans select-none pt-8 pb-6 px-4 sm:px-6 lg:px-8 mt-12" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* ۳ ستون اصلی بدون خط جداکننده و با چیدمان فشرده و مینیمال */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          
-          {/* ستون راست: لوگو داینامیک از ادمین + متن معرفی + کپسول C O N T A C T مستقیم در زیر آن */}
-          <div className="md:col-span-6 space-y-3">
-            {footerLogo ? (
-              <div className="h-10 flex items-center">
-                <img src={footerLogo} alt={storeName} className="h-9 object-contain" />
-              </div>
-            ) : null}
+    <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors duration-300" dir="rtl">
+      {/* بخش ۳ کارت مزایا - موقتاً طبق درخواست مخفی شده است */}
+      <div className="hidden max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
+            <span className="text-3xl block">🛡️</span>
+            <strong className="text-sm font-black block">۱۸ ماه گارانتی اصالت طلایی</strong>
+            <p className="text-xs text-[var(--text-secondary)]">تضمین سلامت سخت‌افزاری پنل بدون پیکسل سوخته</p>
+          </div>
+          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
+            <span className="text-3xl block">⚡</span>
+            <strong className="text-sm font-black block">کالیبراسیون سخت‌افزاری</strong>
+            <p className="text-xs text-[var(--text-secondary)]">پوشش دقیق فضاهای رنگی DCI-P3 و Rec.709</p>
+          </div>
+          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
+            <span className="text-3xl block">📦</span>
+            <strong className="text-sm font-black block">ارسال فوق‌سریع و ایمن</strong>
+            <p className="text-xs text-[var(--text-secondary)]">بسته‌بندی اختصاصی ضدضربه جهت ارسال به سراسر کشور</p>
+          </div>
+        </div>
+      </div>
 
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium max-w-md">
-              تأمین و عرضه پیشرفته‌ترین تجهیزات دیجیتال، گجت‌ها و سخت‌افزارهای مدرن با تضمین اصالت و ارسال سریع به سراسر کشور.
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          
+          {/* ستون اول: معرفی و شبکه‌های ارتباطی */}
+          <div className="md:col-span-2 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-black text-xl shadow-md">
+                {logoUrl ? (
+                  <img src={logoUrl} alt={storeName} className="w-7 h-7 object-contain" />
+                ) : (
+                  "A"
+                )}
+              </div>
+              <span className="text-lg font-black tracking-tight">{storeName}</span>
+            </div>
+
+            <p className="text-xs leading-relaxed text-[var(--text-secondary)] max-w-md font-medium text-justify">
+              {description}
             </p>
 
-            {/* نوار کپسولی مشکی انیمیشنی C O N T A C T در زیر متن ستون راست */}
-            <div className="pt-2">
-              <span className="text-[11px] font-bold text-[var(--text-secondary)] block mb-2">شبکه‌های ارتباطی و اطلاعات تماس:</span>
-              <div className="relative inline-flex items-center gap-1.5 p-1.5 px-3 rounded-full bg-[#0b0f19] border border-slate-800 shadow-xl" dir="ltr">
-                {contactItems.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="relative flex flex-col items-center"
-                    onMouseEnter={() => setActiveTooltip(idx)}
-                    onMouseLeave={() => setActiveTooltip(null)}
-                  >
-                    <Link
-                      href={item.href}
-                      className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-[11px] font-mono font-black text-slate-300 hover:text-white hover:bg-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition-all duration-200 hover:scale-110 shadow"
-                    >
-                      {item.char}
-                    </Link>
-
-                    {activeTooltip === idx && (
-                      <div className="absolute bottom-11 z-50 flex flex-col items-center animate-fadeIn pointer-events-none" dir="rtl">
-                        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 text-white rounded-2xl p-2.5 shadow-2xl whitespace-nowrap text-center space-y-1">
-                          <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-[var(--accent-blue)]">
-                            <span>{item.icon}</span>
-                            <span>{item.label}</span>
-                          </div>
-                          <span className="block font-mono text-xs font-bold text-slate-200" dir="ltr">
-                            {item.value}
-                          </span>
-                        </div>
-                        <div className="w-2 h-2 bg-slate-900 border-r border-b border-slate-700 rotate-45 -mt-1" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+            <div className="space-y-1 text-xs text-[var(--text-secondary)] font-medium pt-2">
+              <p>📍 نشانی: {address}</p>
+              <p>📞 تلفن تماس: <span className="font-mono font-bold" dir="ltr">{phone}</span></p>
+              <p>✉️ ایمیل: <span className="font-mono">{email}</span></p>
             </div>
           </div>
 
-          {/* ستون وسط: دسترسی سریع */}
-          <div className="md:col-span-3 space-y-2.5">
-            <h4 className="font-black text-xs text-[var(--text-primary)] tracking-wide">دسترسی سریع</h4>
-            <ul className="space-y-1.5 text-xs text-[var(--text-secondary)] font-medium">
-              <li><Link href="/products" className="hover:text-[var(--accent-blue)] transition">کاتالوگ کالاها</Link></li>
-              <li><Link href="/track" className="hover:text-[var(--accent-blue)] transition">سامانه رهگیری مرسولات</Link></li>
-              <li><Link href="/news" className="hover:text-[var(--accent-blue)] transition">جدیدترین اخبار تکنولوژی</Link></li>
-              <li><Link href="/contact" className="hover:text-[var(--accent-blue)] transition">مجله مقالات تخصصی</Link></li>
+          {/* ستون دوم: دسترسی سریع */}
+          <div className="space-y-3 text-xs">
+            <h4 className="font-black text-sm text-[var(--text-primary)]">دسترسی سریع</h4>
+            <ul className="space-y-2 text-[var(--text-secondary)] font-medium">
+              <li><Link href="/products" className="hover:text-blue-500 transition">کاتالوگ کالاها</Link></li>
+              <li><Link href="/track-order" className="hover:text-blue-500 transition">سامانه رهگیری مرسولات</Link></li>
+              <li><Link href="/news" className="hover:text-blue-500 transition">جدیدترین اخبار تکنولوژی</Link></li>
+              <li><Link href="/blog" className="hover:text-blue-500 transition">مجله مقالات تخصصی</Link></li>
             </ul>
           </div>
 
-          {/* ستون چپ: خدمات مشتریان */}
-          <div className="md:col-span-3 space-y-2.5">
-            <h4 className="font-black text-xs text-[var(--text-primary)] tracking-wide">خدمات مشتریان</h4>
-            <ul className="space-y-1.5 text-xs text-[var(--text-secondary)] font-medium">
-              <li><Link href="/contact" className="hover:text-[var(--accent-blue)] transition">ثبت تیکت مشاوره</Link></li>
-              <li><Link href="/about" className="hover:text-[var(--accent-blue)] transition">شرایط گارانتی طلایی</Link></li>
-              <li><Link href="/track" className="hover:text-[var(--accent-blue)] transition">ضمانت بازگشت وجه ۷ روزه</Link></li>
-              <li><Link href="/products" className="hover:text-[var(--accent-blue)] transition">راهنمای تخصصی کالاها</Link></li>
+          {/* ستون سوم: خدمات مشتریان و اینماد */}
+          <div className="space-y-3 text-xs">
+            <h4 className="font-black text-sm text-[var(--text-primary)]">خدمات مشتریان</h4>
+            <ul className="space-y-2 text-[var(--text-secondary)] font-medium">
+              <li><Link href="/contact" className="hover:text-blue-500 transition">ثبت تیکت مشاوره</Link></li>
+              <li><Link href="/about" className="hover:text-blue-500 transition">شرایط گارانتی طلایی</Link></li>
+              <li><Link href="/about" className="hover:text-blue-500 transition">ضمانت بازگشت وجه ۷ روزه</Link></li>
+              <li><Link href="/products" className="hover:text-blue-500 transition">راهنمای تخصصی کالاها</Link></li>
             </ul>
-          </div>
 
-        </div>
-
-        {/* نوار پایانی کپی‌رایت مینیمال (بدون حاشیه و خطوط اضافه) */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[var(--text-secondary)] pt-4">
-          <p>تمامی حقوق مادی و معنوی برای {storeName} محفوظ است © ۲۰۲۶</p>
-          <p className="font-mono">نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)</p>
-        </div>
-
-      </div>
-      <div className="hidden">
-
-            {/* لوگوی رسمی اینماد */}
-            <div className="p-3 rounded-2xl bg-white/5 border border-[var(--card-border)] hover:border-emerald-500/40 transition flex items-center justify-center backdrop-blur-md shadow-sm">
+            {/* لوگوی رسمی و فعال اینماد */}
+            <div className="pt-2">
               <a
                 referrerPolicy="origin"
                 target="_blank"
                 rel="noreferrer"
                 href="https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
-                className="inline-block"
+                className="inline-block p-2 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] hover:border-emerald-500 transition shadow-sm"
               >
                 <img
                   referrerPolicy="origin"
@@ -152,7 +119,20 @@ export default function Footer() {
                 />
               </a>
             </div>
-  </div>
-</footer>
+          </div>
+
+        </div>
+
+        {/* کپی‌رایت انتهای صفحه */}
+        <div className="mt-12 pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)]">
+          <p>© ۲۰۲۶ تمامی حقوق مادی و معنوی برای {storeName} محفوظ است.</p>
+          <div className="flex items-center gap-4 text-[11px]">
+            <Link href="/about" className="hover:underline">درباره ما</Link>
+            <Link href="/contact" className="hover:underline">تماس با ما</Link>
+            <Link href="/track-order" className="hover:underline">رهگیری سفارش</Link>
+          </div>
+        </div>
+      </div>
+    </footer>
   );
 }

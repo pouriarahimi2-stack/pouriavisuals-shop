@@ -21,69 +21,57 @@ export default function Footer() {
   }, []);
 
   const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
-  const logoUrl = siteInfo?.footer_logo_url || siteInfo?.footerLogoUrl || siteInfo?.logo_url || siteInfo?.logoUrl;
-  const phone = siteInfo?.phone || "۰۲۱-۸۸۸۸۸۸۸۸";
-  const email = siteInfo?.email || "info@axoncore.ir";
-  const address = siteInfo?.address || "تهران، خیابان ولیعصر، تقاطع میرداماد";
-  const description =
-    siteInfo?.description ||
-    siteInfo?.footer_text ||
-    "تأمین و عرضه پیشرفته‌ترین تجهیزات دیجیتال، گجت‌ها و سخت‌افزارهای مدرن با تضمین اصالت و ارسال سریع به سراسر کشور.";
+  const footerLogo = siteInfo?.footer_logo_url || siteInfo?.footerLogoUrl || siteInfo?.logo_url || siteInfo?.logoUrl;
+  const phone = siteInfo?.phone || "09376110200";
+  const email = siteInfo?.email || "Pouriarahimi@yahoo.com";
+  const address = siteInfo?.address || "شیراز - ستارخان";
 
   return (
     <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors duration-300" dir="rtl">
-      {/* بخش ۳ کارت مزایا - موقتاً طبق درخواست مخفی شده است */}
-      <div className="hidden max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
-            <span className="text-3xl block">🛡️</span>
-            <strong className="text-sm font-black block">۱۸ ماه گارانتی اصالت طلایی</strong>
-            <p className="text-xs text-[var(--text-secondary)]">تضمین سلامت سخت‌افزاری پنل بدون پیکسل سوخته</p>
-          </div>
-          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
-            <span className="text-3xl block">⚡</span>
-            <strong className="text-sm font-black block">کالیبراسیون سخت‌افزاری</strong>
-            <p className="text-xs text-[var(--text-secondary)]">پوشش دقیق فضاهای رنگی DCI-P3 و Rec.709</p>
-          </div>
-          <div className="p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center space-y-2">
-            <span className="text-3xl block">📦</span>
-            <strong className="text-sm font-black block">ارسال فوق‌سریع و ایمن</strong>
-            <p className="text-xs text-[var(--text-secondary)]">بسته‌بندی اختصاصی ضدضربه جهت ارسال به سراسر کشور</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           
-          {/* ستون اول: معرفی و شبکه‌های ارتباطی */}
-          <div className="md:col-span-2 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-black text-xl shadow-md">
-                {logoUrl ? (
-                  <img src={logoUrl} alt={storeName} className="w-7 h-7 object-contain" />
+          {/* ستون اول (سمت راست): برند بزرگ آکسون و اطلاعات تماس بدون متن توضیحات اضافی */}
+          <div className="md:col-span-5 space-y-6 pt-2">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-black text-2xl shadow-xl overflow-hidden shrink-0 border border-[var(--card-border)]">
+                {footerLogo ? (
+                  <img src={footerLogo} alt={storeName} className="w-full h-full object-contain p-2" />
                 ) : (
-                  "A"
+                  <span className="text-xl">⚡</span>
                 )}
               </div>
-              <span className="text-lg font-black tracking-tight">{storeName}</span>
+              <span className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
+                {storeName}
+              </span>
             </div>
 
-            <p className="text-xs leading-relaxed text-[var(--text-secondary)] max-w-md font-medium text-justify">
-              {description}
-            </p>
-
-            <div className="space-y-1 text-xs text-[var(--text-secondary)] font-medium pt-2">
-              <p>📍 نشانی: {address}</p>
-              <p>📞 تلفن تماس: <span className="font-mono font-bold" dir="ltr">{phone}</span></p>
-              <p>✉️ ایمیل: <span className="font-mono">{email}</span></p>
+            <div className="space-y-2 text-xs sm:text-sm text-[var(--text-secondary)] font-medium pt-3">
+              <p className="flex items-center gap-2">
+                <span>📍</span>
+                <span>نشانی: {address}</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <span>📞</span>
+                <span>تلفن تماس:</span>
+                <a href={`tel:${phone}`} className="font-mono font-bold hover:text-blue-500 transition" dir="ltr">
+                  {phone}
+                </a>
+              </p>
+              <p className="flex items-center gap-2">
+                <span>✉️</span>
+                <span>ایمیل:</span>
+                <span className="font-mono">{email}</span>
+              </p>
             </div>
           </div>
 
-          {/* ستون دوم: دسترسی سریع */}
-          <div className="space-y-3 text-xs">
-            <h4 className="font-black text-sm text-[var(--text-primary)]">دسترسی سریع</h4>
-            <ul className="space-y-2 text-[var(--text-secondary)] font-medium">
+          {/* ستون دوم: دسترسی سریع (شیفت شده به سمت راست) */}
+          <div className="md:col-span-2 space-y-3 text-xs pt-3">
+            <h4 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2 w-fit">
+              دسترسی سریع
+            </h4>
+            <ul className="space-y-2.5 text-[var(--text-secondary)] font-medium">
               <li><Link href="/products" className="hover:text-blue-500 transition">کاتالوگ کالاها</Link></li>
               <li><Link href="/track-order" className="hover:text-blue-500 transition">سامانه رهگیری مرسولات</Link></li>
               <li><Link href="/news" className="hover:text-blue-500 transition">جدیدترین اخبار تکنولوژی</Link></li>
@@ -91,39 +79,46 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون سوم: خدمات مشتریان و اینماد */}
-          <div className="space-y-3 text-xs">
-            <h4 className="font-black text-sm text-[var(--text-primary)]">خدمات مشتریان</h4>
-            <ul className="space-y-2 text-[var(--text-secondary)] font-medium">
+          {/* ستون سوم: خدمات مشتریان (شیفت شده به سمت راست) */}
+          <div className="md:col-span-2 space-y-3 text-xs pt-3">
+            <h4 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2 w-fit">
+              خدمات مشتریان
+            </h4>
+            <ul className="space-y-2.5 text-[var(--text-secondary)] font-medium">
               <li><Link href="/contact" className="hover:text-blue-500 transition">ثبت تیکت مشاوره</Link></li>
               <li><Link href="/about" className="hover:text-blue-500 transition">شرایط گارانتی طلایی</Link></li>
               <li><Link href="/about" className="hover:text-blue-500 transition">ضمانت بازگشت وجه ۷ روزه</Link></li>
               <li><Link href="/products" className="hover:text-blue-500 transition">راهنمای تخصصی کالاها</Link></li>
             </ul>
+          </div>
 
-            {/* لوگوی رسمی و فعال اینماد */}
-            <div className="pt-2">
+          {/* ستون چهارم (منتهی‌الیه سمت چپ - کادر سبز): اینماد رسمی */}
+          <div className="md:col-span-3 flex flex-col items-center md:items-end justify-center pt-2">
+            <div className="p-3.5 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-xl hover:border-emerald-500/50 transition">
               <a
                 referrerPolicy="origin"
                 target="_blank"
                 rel="noreferrer"
                 href="https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
-                className="inline-block p-2 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] hover:border-emerald-500 transition shadow-sm"
+                className="inline-block"
               >
                 <img
                   referrerPolicy="origin"
                   src="https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
                   alt="نماد اعتماد الکترونیکی آکسون"
-                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain cursor-pointer transition hover:scale-105"
+                  className="w-24 h-24 sm:w-28 sm:h-28 object-contain cursor-pointer transition hover:scale-105"
                   {...({ code: "RqxtofLwJnKsvqQACWz1mvYVVKykOrtD" } as any)}
                 />
               </a>
             </div>
+            <span className="text-[10px] text-[var(--text-secondary)] font-bold mt-2 text-center md:text-left">
+              نماد اعتماد الکترونیکی رسمی
+            </span>
           </div>
 
         </div>
 
-        {/* کپی‌رایت انتهای صفحه */}
+        {/* خط کپی‌رایت پایین */}
         <div className="mt-12 pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)]">
           <p>© ۲۰۲۶ تمامی حقوق مادی و معنوی برای {storeName} محفوظ است.</p>
           <div className="flex items-center gap-4 text-[11px]">

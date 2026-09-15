@@ -15,7 +15,6 @@ export default function AdminSiteInfo() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [workingHours, setWorkingHours] = useState("");
-  const [description, setDescription] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -37,7 +36,6 @@ export default function AdminSiteInfo() {
       setEmail(data.email || "Pouriarahimi@yahoo.com");
       setAddress(data.address || "شیراز - ستارخان");
       setWorkingHours(data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
-      setDescription(data.description || data.footer_text || "");
     }
   };
 
@@ -60,6 +58,7 @@ export default function AdminSiteInfo() {
     e.preventDefault();
     soundEngine.playClick();
     setSaving(true);
+    setStatusMessage(null);
 
     try {
       const payload: Partial<SiteInfo> = {
@@ -76,16 +75,13 @@ export default function AdminSiteInfo() {
         email: email.trim(),
         address: address.trim(),
         working_hours: workingHours.trim(),
-        description: description.trim(),
-        footer_text: description.trim(),
       };
 
       const updated = await siteInfoService.updateSiteInfo(payload);
       if (updated) {
         soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "✓ تنظیمات عمومی، فاوآیکون و لوگوها با موفقیت در سراسر سایت ذخیره و فعال شدند." });
-        
-        // به‌روزرسانی آنی فاوآیکون در تب جاری مرورگر
+        setStatusMessage({ type: "success", text: "⚡ لوگوها و مشخصات فروشگاه با موفقیت در دیتابیس ذخیره و فعال شدند." });
+
         if (faviconUrl) {
           let link = document.getElementById("axon-dynamic-favicon") as HTMLLinkElement;
           if (!link) {
@@ -96,11 +92,9 @@ export default function AdminSiteInfo() {
           }
           link.href = faviconUrl;
         }
-      } else {
-        throw new Error("خطا در ذخیره دیتابیس");
       }
     } catch (err: any) {
-      setStatusMessage({ type: "error", text: err.message || "خطا در ثبت اطلاعات." });
+      setStatusMessage({ type: "error", text: err.message || "خطا در ثبت اطلاعات در دیتابیس." });
     } finally {
       setSaving(false);
       setTimeout(() => setStatusMessage(null), 3500);
@@ -109,192 +103,200 @@ export default function AdminSiteInfo() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <input type="file" ref={faviconInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setFaviconUrl)} accept=".ico,.png,.svg" className="hidden" />
+      {/* ورودی‌های مخفی فایل */}
+      <input type="file" ref={faviconInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setFaviconUrl)} accept="image/*" className="hidden" />
       <input type="file" ref={logoInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setLogoUrl)} accept="image/*" className="hidden" />
       <input type="file" ref={footerLogoInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setFooterLogoUrl)} accept="image/*" className="hidden" />
 
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex items-center justify-between">
+      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-sky-500 flex items-center gap-2">
-            <span>⚙️</span> تنظیمات عمومی، مدیریت فاوآیکون مرورگر و هویت بصری
+          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>⚙️</span> تنظیمات هویت بصری، لوگوها و مشخصات رسمی
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تعیین آیکون نوار آدرس مرورگر (Favicon)، لوگوی اصلی هدر و فوتر و اطلاعات رسمی شرکت
+            تغییر و آپلود مستقیم لوگوی هدر، لوگوی بزرگ فوتر و فاوآیکون تب مرورگر با ذخیره در دیتابیس
           </p>
         </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
+        >
+          {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار سراسری"}
+        </button>
       </div>
 
       {statusMessage && (
         <div className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${
-          statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30" : "bg-rose-500/15 text-rose-600"
+          statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30" : "bg-rose-500/15 text-rose-600 border border-rose-500/30"
         }`}>
           {statusMessage.text}
         </div>
       )}
 
-      <form onSubmit={handleSave} className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
+      <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
         
-        {/* بخش ویژه فاوآیکون تب مرورگر */}
-        <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
-          <div className="flex justify-between items-center">
-            <div>
-              <h4 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                <span>🌐</span> لوگو و فاوآیکون نوار آدرس مرورگر (Browser Tab Favicon)
-              </h4>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                تصویری که در تب بالای مرورگر و بوک‌مارک‌ها کنار نام سایت نمایش داده می‌شود
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => faviconInputRef.current?.click()}
-              className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs cursor-pointer shadow-md transition"
-            >
-              📁 انتخاب فایل فاوآیکون
-            </button>
-          </div>
+        {/* بخش مدیریت ۳ لوگوی سایت */}
+        <div className="space-y-4 border-b border-[var(--card-border)] pb-6">
+          <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
+            <span>🖼️</span> مدیریت لوگوها و آیکون مرورگر (آپلود مستقیم یا لینک URL)
+          </h3>
 
-          <div className="flex items-center gap-4 pt-2">
-            <div className="w-12 h-12 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center p-2 shrink-0 shadow-inner">
-              {faviconUrl ? (
-                <img src={faviconUrl} alt="Favicon" className="w-full h-full object-contain" />
-              ) : (
-                <span className="text-xl">🌐</span>
-              )}
-            </div>
-            <input
-              type="text"
-              value={faviconUrl}
-              onChange={(e) => setFaviconUrl(e.target.value)}
-              placeholder="آدرس تصویر فاوآیکون (یا بارگذاری با دکمه بالا)"
-              className="flex-1 p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs font-bold text-[var(--text-primary)] outline-none"
-            />
-          </div>
-        </div>
-
-        {/* بخش ویژه لوگوی هدر و لوگوی فوتر */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="font-black text-[var(--text-primary)]">لوگوی اصلی هدر کپسولی:</span>
-              <button
-                type="button"
-                onClick={() => logoInputRef.current?.click()}
-                className="px-3 py-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold cursor-pointer"
-              >
-                بارگذاری عکس
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-1 flex items-center justify-center">
-                {logoUrl ? <img src={logoUrl} alt="" className="w-full h-full object-contain" /> : "▲"}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* ۱. لوگوی هدر بالای سایت */}
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="font-bold text-[var(--text-primary)]">لوگوی بالای سایت (Header):</label>
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-[11px] font-bold cursor-pointer hover:bg-blue-500 transition"
+                >
+                  📁 انتخاب فایل
+                </button>
+              </div>
+              <div className="w-full h-24 rounded-xl border border-[var(--card-border)] bg-black/10 dark:bg-white/5 flex items-center justify-center overflow-hidden p-2">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Header Logo" className="max-h-full object-contain" />
+                ) : (
+                  <span className="text-slate-400 font-bold text-[11px]">لوگو تنظیم نشده</span>
+                )}
               </div>
               <input
                 type="text"
+                placeholder="یا آدرس اینترنتی عکس https://..."
                 value={logoUrl}
                 onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="URL لوگوی هدر"
-                className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs"
+                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
               />
             </div>
-          </div>
 
-          <div className="p-5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="font-black text-[var(--text-primary)]">لوگوی ستون فوتر:</span>
-              <button
-                type="button"
-                onClick={() => footerLogoInputRef.current?.click()}
-                className="px-3 py-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] text-[11px] font-bold cursor-pointer"
-              >
-                بارگذاری عکس
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-1 flex items-center justify-center">
-                {footerLogoUrl ? <img src={footerLogoUrl} alt="" className="w-full h-full object-contain" /> : "▲"}
+            {/* ۲. لوگوی بزرگ فوتر */}
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="font-bold text-[var(--text-primary)]">لوگوی بزرگ فوتر (Footer):</label>
+                <button
+                  type="button"
+                  onClick={() => footerLogoInputRef.current?.click()}
+                  className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-[11px] font-bold cursor-pointer hover:bg-blue-500 transition"
+                >
+                  📁 انتخاب فایل
+                </button>
+              </div>
+              <div className="w-full h-24 rounded-xl border border-[var(--card-border)] bg-black/10 dark:bg-white/5 flex items-center justify-center overflow-hidden p-2">
+                {footerLogoUrl ? (
+                  <img src={footerLogoUrl} alt="Footer Logo" className="max-h-full object-contain" />
+                ) : (
+                  <span className="text-slate-400 font-bold text-[11px]">لوگوی فوتر تنظیم نشده</span>
+                )}
               </div>
               <input
                 type="text"
+                placeholder="یا آدرس اینترنتی عکس https://..."
                 value={footerLogoUrl}
                 onChange={(e) => setFooterLogoUrl(e.target.value)}
-                placeholder="URL لوگوی فوتر"
-                className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs"
+                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
               />
             </div>
+
+            {/* ۳. فاوآیکون تب مرورگر */}
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="font-bold text-[var(--text-primary)]">فاوآیکون مرورگر (Favicon):</label>
+                <button
+                  type="button"
+                  onClick={() => faviconInputRef.current?.click()}
+                  className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-[11px] font-bold cursor-pointer hover:bg-blue-500 transition"
+                >
+                  📁 انتخاب فایل
+                </button>
+              </div>
+              <div className="w-full h-24 rounded-xl border border-[var(--card-border)] bg-black/10 dark:bg-white/5 flex items-center justify-center overflow-hidden p-2">
+                {faviconUrl ? (
+                  <img src={faviconUrl} alt="Favicon" className="w-12 h-12 object-contain" />
+                ) : (
+                  <span className="text-slate-400 font-bold text-[11px]">فاوآیکون تنظیم نشده</span>
+                )}
+              </div>
+              <input
+                type="text"
+                placeholder="یا آدرس اینترنتی آیکون https://..."
+                value={faviconUrl}
+                onChange={(e) => setFaviconUrl(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
+              />
+            </div>
+
           </div>
         </div>
 
-        {/* مشخصات عمومی و متنی */}
+        {/* بخش اطلاعات هویتی و تماس */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام رسمی فروشگاه و برند:</label>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی فروشگاه (Brand Name):</label>
             <input
               type="text"
+              required
               value={siteName}
               onChange={(e) => setSiteName(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
             />
           </div>
 
           <div>
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">شعار تجاری (Tagline):</label>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شعار برند (Tagline):</label>
             <input
               type="text"
               value={tagline}
               onChange={(e) => setTagline(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
             />
           </div>
 
           <div>
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره تماس پشتیبانی:</label>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">شماره تلفن مستقیم:</label>
             <input
               type="text"
+              dir="ltr"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-xs"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
             />
           </div>
 
           <div>
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">پست الکترونیک رسمی:</label>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">پست الکترونیک (Email):</label>
             <input
-              type="text"
+              type="email"
+              dir="ltr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
             />
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">نشانی دفتر و انبار تحویل حضوری:</label>
+            <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نشانی انبار و تحویل حضوری:</label>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
-            />
-          </div>
-
-          <div className="sm:col-span-2">
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن معرفی، گارانتی و استانداردها:</label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-medium outline-none"
             />
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full py-4 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs transition shadow-xl cursor-pointer disabled:opacity-50"
-        >
-          {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و انتشار سراسری تغییرات"}
-        </button>
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
+          >
+            {saving ? "در حال ذخیره در دیتابیس..." : "💾 ذخیره تغییرات لوگوها و هویت سایت"}
+          </button>
+        </div>
       </form>
     </div>
   );

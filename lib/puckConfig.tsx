@@ -9,6 +9,47 @@ import ProductList from "@/components/ProductList";
 import ProductExplodedView from "@/components/ProductExplodedView";
 import { productService, Product } from "@/services/productService";
 
+// کامپوننت انتخابگر رنگ سفارشی بازگردانی‌شده
+const ColorPickerCustomField = ({
+  label,
+  value,
+  onChange,
+}: {
+  label?: string;
+  value: string;
+  onChange: (val: string) => void;
+}) => {
+  const currentColor = value && value.startsWith("#") ? value : "#07090e";
+
+  return (
+    <div className="w-full my-3 space-y-1.5 font-sans" dir="rtl">
+      {label && (
+        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+          {label}
+        </label>
+      )}
+      <div
+        className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+        dir="ltr"
+      >
+        <input
+          type="color"
+          value={currentColor}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-600 cursor-pointer p-0 shrink-0 bg-transparent"
+        />
+        <input
+          type="text"
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#07090e"
+          className="w-full bg-transparent text-xs font-mono font-bold text-slate-900 dark:text-slate-100 outline-none px-2 text-right"
+        />
+      </div>
+    </div>
+  );
+};
+
 export type ComponentProps = {
   GlobalHeaderMount: {};
   GlobalFooterMount: {};
@@ -162,8 +203,18 @@ export const puckConfig: Config<ComponentProps> = {
           label: "آیکون پروفایل",
           options: [{ label: "فعال", value: true }, { label: "غیرفعال", value: false }],
         },
-        capsuleBg: { type: "text", label: "رنگ پس‌زمینه کپسول" },
-        capsuleBorder: { type: "text", label: "رنگ حاشیه کپسول" },
+        capsuleBg: {
+          type: "custom",
+          render: ({ value, onChange }) => (
+            <ColorPickerCustomField label="رنگ پس‌زمینه کپسول" value={value} onChange={onChange} />
+          ),
+        },
+        capsuleBorder: {
+          type: "custom",
+          render: ({ value, onChange }) => (
+            <ColorPickerCustomField label="رنگ خط دور کپسول" value={value} onChange={onChange} />
+          ),
+        },
       },
       defaultProps: {
         brandText: "Axon | آکسون",
@@ -239,7 +290,12 @@ export const puckConfig: Config<ComponentProps> = {
       label: "هیرو ۳D اصلی سایت",
       fields: {
         topBadge: { type: "text", label: "متن برچسب بالا" },
-        badgeColor: { type: "text", label: "رنگ برچسب" },
+        badgeColor: {
+          type: "custom",
+          render: ({ value, onChange }) => (
+            <ColorPickerCustomField label="رنگ برچسب بالا" value={value} onChange={onChange} />
+          ),
+        },
         title: { type: "text", label: "تیتر اصلی هیرو" },
         titleSize: { type: "number", label: "اندازه تیتر اصلی (px)" },
         subtitle: { type: "textarea", label: "متن توضیحات زیرعنوان" },
@@ -404,7 +460,12 @@ export const puckConfig: Config<ComponentProps> = {
         workingHours: { type: "text", label: "ساعات پاسخگویی" },
         enamadCode: { type: "text", label: "کد اینماد" },
         copyrightText: { type: "text", label: "متن کپی‌رایت" },
-        footerBg: { type: "text", label: "رنگ پس‌زمینه فوتر" },
+        footerBg: {
+          type: "custom",
+          render: ({ value, onChange }) => (
+            <ColorPickerCustomField label="رنگ پس‌زمینه فوتر" value={value} onChange={onChange} />
+          ),
+        },
       },
       defaultProps: {
         footerLogoUrl: "",

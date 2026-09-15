@@ -1,55 +1,88 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { requireAdmin } from '@/lib/authSecurityHelper';
+import { authSecurity } from '@/lib/authSecurity';
 
 export const dynamic = 'force-dynamic';
 
-function hashSecret(val: string): string {
-  return crypto.createHash('sha256').update(val).digest('hex');
+export async function GET(req: NextRequest) {
+  try {
+    const auth = await requireAdmin(req);
+    if (!auth.ok) return auth.res;
+
+    const { data: user } = await supabaseAdmin
+      .from('admin_users')
+      .select('id, username, full_name, role')
+      .eq('username', auth.session.username)
+      .maybeSingle();
+
+    return NextResponse.json({ success: true, user: user || auth.session });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { currentPin, newPin, username } = await req.json();
+    const auth = await requireAdmin(req);
+    if (!auth.ok) return auth.res;
 
-    if (!currentPin || !newPin) {
-      return NextResponse.json({ success: false, message: 'پین فعلی و جدید الزامی هستند.' }, { status: 400 });
-    }
+    const body = await req.json();
+    const currentPassword = String(body.currentPassword || body.currentPin || '').trim();
+    const newPassword = String(body.newPassword || body.newPin || '').trim();
+    const newFullName = body.newFullName ? String(body.newFullName).trim() : undefined;
+    const newUsername = body.newUsername ? String(body.newUsername).trim().toLowerCase() : undefined;
 
-    if (String(newPin).length < 4) {
-      return NextResponse.json({ success: false, message: 'پین جدید باید حداقل ۴ رقم باشد.' }, { status: 400 });
-    }
+    // استخراج نام کاربری منحصراً از سشن احراز هویت شده سرور
+    const sessionUsername = auth.session.username;
 
-    const cleanUsername = String(username || 'admin').trim();
     const { data: user } = await supabaseAdmin
       .from('admin_users')
       .select('*')
-      .eq('username', cleanUsername)
+      .eq('username', sessionUsername)
       .maybeSingle();
 
     if (!user) {
       return NextResponse.json({ success: false, message: 'کاربر مدیر یافت نشد.' }, { status: 404 });
     }
 
-    const currentHash = hashSecret(String(currentPin));
-    const isPinCorrect = user.pin_hash ? user.pin_hash === currentHash : (user.pin === currentPin);
+    if (newPassword) {
+      if (newPassword.length < 4) {
+        return NextResponse.json({ success: false, message: 'کلمه عبور یا پین جدید باید حداقل ۴ رقم باشد.' }, { status: 400 });
+      }
 
-    if (!isPinCorrect) {
-      return NextResponse.json({ success: false, message: 'پین فعلی وارد شده اشتباه است.' }, { status: 403 });
+      const storedPass = String(user.password_hash || user.password || user.pin_hash || user.pin || '');
+      let isCurrentCorrect = false;
+
+      if (storedPass.includes(':')) {
+        isCurrentCorrect = authSecurity.verifyPassword(currentPassword, storedPass);
+      } else {
+        isCurrentCorrect = (storedPass === currentPassword);
+      }
+
+      if (!isCurrentCorrect) {
+        return NextResponse.json({ success: false, message: 'کلمه عبور فعلی وارد شده نادرست است.' }, { status: 403 });
+      }
     }
 
-    const newHash = hashSecret(String(newPin));
-    await supabaseAdmin
-      .from('admin_users')
-      .update({
-        pin_hash: newHash,
-        pin: null, // حذف فیلد پلین‌تکست
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id);
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
 
-    return NextResponse.json({ success: true, message: 'پین امنیتی با موفقیت بروزرسانی شد.' });
+    if (newPassword) {
+      updatePayload.password_hash = authSecurity.hashPassword(newPassword);
+      updatePayload.password = null;
+      updatePayload.pin_hash = null;
+      updatePayload.pin = null;
+    }
+
+    if (newFullName) updatePayload.full_name = newFullName;
+    if (newUsername && newUsername !== sessionUsername) updatePayload.username = newUsername;
+
+    await supabaseAdmin.from('admin_users').update(updatePayload).eq('id', user.id);
+
+    return NextResponse.json({ success: true, message: 'مشخصات حساب و کلمه عبور با موفقیت بروزرسانی شد.' });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: 'خطای سرور.' }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message || 'خطای سرور.' }, { status: 500 });
   }
 }

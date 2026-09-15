@@ -26,10 +26,11 @@ const NAV_SECTIONS: NavGroup[] = [
     ],
   },
   {
-    groupTitle: "کاتالوگ و محتوا",
+    groupTitle: "کاتالوگ و چیدمان ویترین",
     items: [
+      { name: "استودیوی ظاهر (هدر و فوتر)", href: "/admin/appearance", icon: "🎨" },
       { name: "کاتالوگ محصولات", href: "/admin/products", icon: "💻" },
-      { name: "صفحه‌ساز ماژولار (Puck)", href: "/admin/pages", icon: "🎨" },
+      { name: "صفحه‌ساز ماژولار (Puck)", href: "/admin/pages", icon: "📐" },
       { name: "بنرها و اسلایدر", href: "/admin/banners", icon: "🖼️" },
       { name: "وبلاگ و مقالات سئو", href: "/admin/blog", icon: "📚" },
       { name: "رادار اخبار فناوری", href: "/admin/news", icon: "📡" },
@@ -41,7 +42,7 @@ const NAV_SECTIONS: NavGroup[] = [
     groupTitle: "هوش مصنوعی و هویت بصری",
     items: [
       { name: "مرکز هوش مصنوعی (AI Suite)", href: "/admin/ai", icon: "🤖" },
-      { name: "هویت بصری و فونت‌ها", href: "/admin/styles", icon: "🎨" },
+      { name: "هویت بصری و فونت‌ها", href: "/admin/styles", icon: "✨" },
     ],
   },
   {
@@ -70,18 +71,16 @@ export default function AdminSidebar() {
 
   return (
     <>
-      {/* دکمه بازکردن منو در موبایل */}
       <div className="lg:hidden fixed bottom-4 right-4 z-50">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-2xl font-bold text-lg"
+          className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-2xl font-bold text-lg cursor-pointer"
           aria-label="منوی مدیریت"
         >
           {mobileOpen ? "✕" : "☰"}
         </button>
       </div>
 
-      {/* پس‌زمینه تیره موبایل */}
       {mobileOpen && (
         <div
           onClick={() => setMobileOpen(false)}
@@ -89,7 +88,6 @@ export default function AdminSidebar() {
         />
       )}
 
-      {/* سایدبار استاندارد دسکتاپ و دراور کشویی موبایل */}
       <aside
         className={`fixed lg:sticky top-0 right-0 z-40 w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-screen overflow-y-auto flex flex-col justify-between p-4 font-sans select-none shadow-xl transition-transform duration-300 ${
           mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
@@ -97,7 +95,6 @@ export default function AdminSidebar() {
         dir="rtl"
       >
         <div className="space-y-5">
-          {/* هدر برند سایدبار */}
           <div className="flex items-center gap-3 px-2 py-2 border-b border-[var(--card-border)] pb-4">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/25">
               ⚡
@@ -108,7 +105,6 @@ export default function AdminSidebar() {
             </div>
           </div>
 
-          {/* گروه‌های منو */}
           <nav className="space-y-4">
             {NAV_SECTIONS.map((sec, sIdx) => (
               <div key={sIdx} className="space-y-1">
@@ -143,7 +139,6 @@ export default function AdminSidebar() {
           </nav>
         </div>
 
-        {/* فوتر سایدبار */}
         <div className="pt-4 border-t border-[var(--card-border)] space-y-2 mt-4">
           <Link
             href="/"

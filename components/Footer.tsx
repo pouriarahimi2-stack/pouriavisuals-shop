@@ -21,7 +21,7 @@ export default function Footer() {
   }, []);
 
   const footerLogo = siteInfo?.footer_logo_url || siteInfo?.footerLogoUrl;
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "";
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName;
   const phone = siteInfo?.phone || "09376110200";
   const email = siteInfo?.email || "Pouriarahimi@yahoo.com";
   const address = siteInfo?.address || "شیراز - ستارخان";
@@ -31,13 +31,13 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           
-          {/* ستون اول: فقط در صورت آپلود بودن لوگو در ادمین نمایش داده می‌شود */}
+          {/* ستون اول: برند و آدرس (فقط در صورت آپلود در ادمین لوگو دیده می‌شود) */}
           <div className="md:col-span-5 space-y-6 pt-2">
             {(footerLogo || storeName) && (
               <div className="flex items-center gap-4">
                 {footerLogo && (
                   <div className="w-16 h-16 rounded-2xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center shadow-xl overflow-hidden shrink-0 border border-[var(--card-border)]">
-                    <img src={footerLogo} alt={storeName || "لوگو"} className="w-full h-full object-contain p-2" />
+                    <img src={footerLogo} alt="" className="w-full h-full object-contain p-2" />
                   </div>
                 )}
                 {storeName && (
@@ -94,14 +94,34 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون چهارم: اینماد رسمی */}
+          {/* ستون چهارم (منتهی‌الیه چپ): باکس استعلام تضمینی اینماد */}
           <div className="md:col-span-3 flex flex-col items-center md:items-end justify-center pt-2">
-            <div
-              className="p-3 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-xl hover:border-emerald-500/50 transition flex items-center justify-center min-w-[130px] min-h-[130px]"
-              dangerouslySetInnerHTML={{
-                __html: `<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD' alt='نماد اعتماد الکترونیکی آکسون' style='cursor:pointer; width:120px; height:120px; object-fit:contain;' code='RqxtofLwJnKsvqQACWz1mvYVVKykOrtD'></a>`
-              }}
-            />
+            <div className="p-3 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-xl hover:border-emerald-500/50 transition flex flex-col items-center justify-center min-w-[140px] min-h-[140px]">
+              <a
+                referrerPolicy="origin"
+                target="_blank"
+                rel="noreferrer"
+                href="https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
+                className="flex flex-col items-center gap-2"
+              >
+                <img
+                  src="https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
+                  alt="نماد اعتماد الکترونیکی آکسون"
+                  className="w-24 h-24 object-contain cursor-pointer"
+                  onError={(e) => {
+                    // Fallback هوشمند در صورت فیلتر بودن سرور اینماد روی IP کاربر
+                    e.currentTarget.style.display = 'none';
+                    const parent = e.currentTarget.parentElement;
+                    if (parent && !parent.querySelector('.enamad-fallback')) {
+                      const fb = document.createElement('div');
+                      fb.className = 'enamad-fallback text-center p-2';
+                      fb.innerHTML = '<span style="font-size:32px;">🛡️</span><span style="display:block; font-size:11px; font-weight:bold; color:#10b981; margin-top:4px;">تاییدیه رسمی اینماد</span>';
+                      parent.appendChild(fb);
+                    }
+                  }}
+                />
+              </a>
+            </div>
             <span className="text-[10px] text-[var(--text-secondary)] font-bold mt-2 text-center md:text-left">
               نماد اعتماد الکترونیکی رسمی
             </span>
@@ -109,7 +129,6 @@ export default function Footer() {
 
         </div>
 
-        {/* کپی‌رایت پایین */}
         <div className="mt-12 pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)]">
           <p>© ۲۰۲۶ تمامی حقوق محفوظ است.</p>
           <div className="flex items-center gap-4 text-[11px]">

@@ -132,6 +132,27 @@ export default function Footer() {
         </div>
 
       </div>
-    </footer>
+      <div className="hidden">
+
+            {/* لوگوی رسمی اینماد */}
+            <div className="p-3 rounded-2xl bg-white/5 border border-[var(--card-border)] hover:border-emerald-500/40 transition flex items-center justify-center backdrop-blur-md shadow-sm">
+              <a
+                referrerPolicy="origin"
+                target="_blank"
+                rel="noreferrer"
+                href="https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
+                className="inline-block"
+              >
+                <img
+                  referrerPolicy="origin"
+                  src="https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
+                  alt="نماد اعتماد الکترونیکی آکسون"
+                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain cursor-pointer transition hover:scale-105"
+                  {...({ code: "RqxtofLwJnKsvqQACWz1mvYVVKykOrtD" } as any)}
+                />
+              </a>
+            </div>
+  </div>
+</footer>
   );
 }

@@ -6,6 +6,7 @@ import { siteInfoService, HomepageLayoutConfig, DEFAULT_HOMEPAGE_LAYOUT_CONFIG }
 
 export default function Footer() {
   const [layout, setLayout] = useState<HomepageLayoutConfig>(DEFAULT_HOMEPAGE_LAYOUT_CONFIG);
+  const [enamadImgError, setEnamadImgError] = useState(false);
 
   useEffect(() => {
     siteInfoService.getSiteInfo().then((info) => {
@@ -36,10 +37,9 @@ export default function Footer() {
   return (
     <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors duration-300 mt-16" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16">
-        {/* گرید متوازن ۱۲ ستونه: ۴ + ۲ + ۲ + ۴ */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           
-          {/* ستون اول (Col-4): برند، لوگوی بدون قاب و اطلاعات تماس */}
+          {/* ستون اول: برند و اطلاعات تماس */}
           <div className="md:col-span-4 space-y-4">
             <div className="flex items-center gap-3">
               {f.logoUrl ? (
@@ -79,7 +79,7 @@ export default function Footer() {
             )}
           </div>
 
-          {/* ستون دوم (Col-2): دسترسی سریع */}
+          {/* ستون دوم: دسترسی سریع */}
           {f.quickLinks.show && (
             <div className="md:col-span-2 space-y-3 text-xs">
               <h4 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2 w-fit">
@@ -97,7 +97,7 @@ export default function Footer() {
             </div>
           )}
 
-          {/* ستون سوم (Col-2): خدمات مشتریان */}
+          {/* ستون سوم: خدمات مشتریان */}
           {f.customerServices.show && (
             <div className="md:col-span-2 space-y-3 text-xs">
               <h4 className="font-black text-sm text-[var(--text-primary)] border-b border-[var(--card-border)] pb-2 w-fit">
@@ -115,9 +115,8 @@ export default function Footer() {
             </div>
           )}
 
-          {/* ستون چهارم (Col-4): تماس، اینماد و مجوزها */}
+          {/* ستون چهارم: تماس و اینماد */}
           <div className="md:col-span-4 space-y-4">
-            {/* اطلاعات تماس */}
             {f.contactInfo.show && (
               <div className="space-y-2 text-xs bg-[var(--input-bg)] p-3.5 rounded-2xl border border-[var(--card-border)]">
                 {f.contactInfo.items.filter((i) => i.show).map((it) => (
@@ -135,25 +134,31 @@ export default function Footer() {
               </div>
             )}
 
-            {/* باکس نماد اعتماد الکترونیکی استاندارد */}
             {f.certificates.show && (
               <div className="flex items-center justify-center md:justify-start gap-3 pt-2">
                 {f.certificates.items.filter((c) => c.show).map((cert) => (
-                  <div key={cert.id} className="p-2 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-md flex items-center justify-center">
+                  <div key={cert.id} className="p-2 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-md flex items-center justify-center min-w-[100px] min-h-[100px]">
                     <a
                       referrerPolicy="origin"
                       target="_blank"
                       rel="noreferrer"
                       href={cert.link || "https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"}
-                      className="block"
+                      className="flex flex-col items-center justify-center gap-1"
                     >
-                      <img
-                        referrerPolicy="origin"
-                        src={cert.imageUrl || "https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"}
-                        alt={cert.title}
-                        className="w-24 h-24 object-contain cursor-pointer"
-                        loading="lazy"
-                      />
+                      {!enamadImgError ? (
+                        <img
+                          referrerPolicy="origin"
+                          src={cert.imageUrl || "https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"}
+                          alt={cert.title}
+                          className="w-20 h-20 object-contain cursor-pointer"
+                          onError={() => setEnamadImgError(true)}
+                        />
+                      ) : (
+                        <div className="w-20 h-20 flex flex-col items-center justify-center text-center p-1">
+                          <span className="text-2xl">🛡️</span>
+                          <span className="text-[9px] font-bold text-slate-500">اینماد تایید شده</span>
+                        </div>
+                      )}
                     </a>
                   </div>
                 ))}
@@ -163,7 +168,6 @@ export default function Footer() {
 
         </div>
 
-        {/* نوار کپی‌رایت پایینی */}
         {f.bottomBar.show && (
           <div className="mt-12 pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)]">
             <p>{f.bottomBar.copyrightText}</p>

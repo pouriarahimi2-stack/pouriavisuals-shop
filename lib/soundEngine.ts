@@ -1,9 +1,3 @@
-// File Path: lib/soundEngine.ts
-/**
- * موتور سنتز صداهای سیستمی و فیدبک لمسی بر پایه Web Audio API
- * رفع کامل ارور AudioContext was not allowed to start با فعال‌سازی تنبل صرفاً در زمان کلیک
- */
-
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;

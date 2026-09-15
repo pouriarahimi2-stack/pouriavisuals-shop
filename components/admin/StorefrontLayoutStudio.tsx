@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import {
   siteInfoService,
+  SiteInfo,
   HomepageLayoutConfig,
   DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
   HeaderMenuItem,
@@ -16,6 +17,7 @@ import MediaUploadModal from "@/components/admin/MediaUploadModal";
 export default function StorefrontLayoutStudio() {
   const [activeTab, setActiveTab] = useState<"header" | "footer" | "sections" | "media" | "preview">("header");
   const [config, setConfig] = useState<HomepageLayoutConfig>(DEFAULT_HOMEPAGE_LAYOUT_CONFIG);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveCounter, setSaveCounter] = useState(0);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -44,14 +46,27 @@ export default function StorefrontLayoutStudio() {
 
   const loadData = async () => {
     const info = await siteInfoService.getSiteInfo();
-    if (info?.homepage_layout_config) {
-      setConfig({
-        ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
-        ...info.homepage_layout_config,
-        header: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header, ...(info.homepage_layout_config.header || {}) },
-        footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(info.homepage_layout_config.footer || {}) },
-        aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(info.homepage_layout_config.aiChat || {}) },
-      });
+    if (info) {
+      setSiteInfo(info);
+      if (info.homepage_layout_config) {
+        const loadedCfg = {
+          ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+          ...info.homepage_layout_config,
+          header: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header, ...(info.homepage_layout_config.header || {}) },
+          footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(info.homepage_layout_config.footer || {}) },
+          aiChat: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.aiChat, ...(info.homepage_layout_config.aiChat || {}) },
+        };
+
+        // تضمین نمایش لوگوها از ستون‌های اصلی در صورت خالی بودن کانفیگ
+        if (!loadedCfg.header.brand.logoUrl && info.logo_url) {
+          loadedCfg.header.brand.logoUrl = info.logo_url;
+        }
+        if (!loadedCfg.footer.logoUrl && info.footer_logo_url) {
+          loadedCfg.footer.logoUrl = info.footer_logo_url;
+        }
+
+        setConfig(loadedCfg);
+      }
     }
   };
 
@@ -69,6 +84,11 @@ export default function StorefrontLayoutStudio() {
     try {
       const updated = await siteInfoService.updateSiteInfo({
         homepage_layout_config: configToSave,
+        logo_url: configToSave.header.brand.logoUrl,
+        footer_logo_url: configToSave.footer.logoUrl,
+        site_name: configToSave.header.brand.name,
+        tagline: configToSave.header.brand.tagline,
+        description: configToSave.footer.description,
       });
 
       if (updated) {
@@ -76,7 +96,7 @@ export default function StorefrontLayoutStudio() {
         setSaveCounter((prev) => prev + 1);
         setStatusMessage({
           type: "success",
-          text: "⚡ تمامی تنظیمات هدر، فوتر، منوها، سکشن‌ها و لوگوها با موفقیت در دیتابیس ذخیره و بلادرنگ منتشر شدند.",
+          text: "⚡ تمامی تنظیمات هدر، فوتر، منوها، سکشن‌ها و لوگوها با موفقیت در دیتابیس ثبت و به صورت دائمی ذخیره شدند.",
         });
       }
     } catch {
@@ -106,13 +126,14 @@ export default function StorefrontLayoutStudio() {
       order: config.header.menu.items.length + 1,
       show: true,
     };
-    setConfig({
+    const updated = {
       ...config,
       header: {
         ...config.header,
         menu: { ...config.header.menu, items: [...config.header.menu.items, newItem] },
       },
-    });
+    };
+    setConfig(updated);
     setNewMenuTitle("");
     setNewMenuUrl("");
     setNewMenuBadge("");
@@ -264,10 +285,9 @@ export default function StorefrontLayoutStudio() {
         ))}
       </div>
 
-      {/* تب ۱: هدر، ابعاد، اکشن‌ها و مدیریت کامل منوها */}
+      {/* تب ۱: هدر */}
       {activeTab === "header" && (
         <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
-          
           <div className="border-b border-[var(--card-border)] pb-4 space-y-4">
             <h3 className="font-black text-sm text-[var(--accent-blue)]">⚙️ ابعاد، استایل و رفتار هدر:</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -349,7 +369,7 @@ export default function StorefrontLayoutStudio() {
             </div>
           </div>
 
-          {/* مدیریت منوهای هدر با قابلیت افزودن، حذف، تغییر ترتیب */}
+          {/* مدیریت منوها */}
           <div className="space-y-4">
             <h3 className="font-black text-sm text-[var(--accent-blue)]">📋 آیتم‌های منوی بالای سایت (Header Navigation):</h3>
             
@@ -367,76 +387,27 @@ export default function StorefrontLayoutStudio() {
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => moveMenuItem(idx, "up")}
-                      disabled={idx === 0}
-                      className="p-1 px-2.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
-                      title="حرکت به بالا"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveMenuItem(idx, "down")}
-                      disabled={idx === config.header.menu.items.length - 1}
-                      className="p-1 px-2.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
-                      title="حرکت به پایین"
-                    >
-                      ▼
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeMenuItem(item.id)}
-                      className="p-1 px-2.5 rounded-lg bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500 hover:text-white transition font-bold cursor-pointer"
-                      title="حذف منو"
-                    >
-                      ✕
-                    </button>
+                    <button type="button" onClick={() => moveMenuItem(idx, "up")} disabled={idx === 0} className="p-1 px-2.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer">▲</button>
+                    <button type="button" onClick={() => moveMenuItem(idx, "down")} disabled={idx === config.header.menu.items.length - 1} className="p-1 px-2.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer">▼</button>
+                    <button type="button" onClick={() => removeMenuItem(item.id)} className="p-1 px-2.5 rounded-lg bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500 hover:text-white transition font-bold cursor-pointer">✕</button>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* فرم افزودن منوی جدید */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                placeholder="عنوان منو (مثال: درباره ما)"
-                value={newMenuTitle}
-                onChange={(e) => setNewMenuTitle(e.target.value)}
-                className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold"
-              />
-              <input
-                type="text"
-                placeholder="آدرس لینک (/about)"
-                value={newMenuUrl}
-                onChange={(e) => setNewMenuUrl(e.target.value)}
-                className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono"
-              />
-              <input
-                type="text"
-                placeholder="برچسب اختیاری"
-                value={newMenuBadge}
-                onChange={(e) => setNewMenuBadge(e.target.value)}
-                className="w-28 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs"
-              />
-              <button
-                type="button"
-                onClick={addMenuItem}
-                className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow"
-              >
-                + افزودن منو
-              </button>
+              <input type="text" placeholder="عنوان منو" value={newMenuTitle} onChange={(e) => setNewMenuTitle(e.target.value)} className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold" />
+              <input type="text" placeholder="آدرس لینک (/about)" value={newMenuUrl} onChange={(e) => setNewMenuUrl(e.target.value)} className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-mono" />
+              <input type="text" placeholder="برچسب اختیاری" value={newMenuBadge} onChange={(e) => setNewMenuBadge(e.target.value)} className="w-28 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" />
+              <button type="button" onClick={addMenuItem} className="px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow">+ افزودن منو</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* تب ۲: فوتر، ستون‌های لینک، اینماد، اطلاعات تماس و aiChat */}
+      {/* تب ۲: فوتر */}
       {activeTab === "footer" && (
         <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
-          
           <div className="border-b border-[var(--card-border)] pb-4 space-y-3">
             <h3 className="font-black text-sm text-[var(--accent-blue)]">⚓ متون ستون اصلی فوتر:</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -470,7 +441,6 @@ export default function StorefrontLayoutStudio() {
             </div>
           </div>
 
-          {/* دو ستون لینک‌های فوتر */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* دسترسی سریع */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
@@ -509,7 +479,7 @@ export default function StorefrontLayoutStudio() {
             </div>
           </div>
 
-          {/* مدیریت نماد اعتماد و اینماد */}
+          {/* مدیریت نماد اعتماد */}
           <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
             <span className="font-black text-[var(--text-primary)] block">📜 نماد اعتماد الکترونیکی (اینماد) و مجوزها:</span>
             <div className="space-y-2">
@@ -530,32 +500,6 @@ export default function StorefrontLayoutStudio() {
               <button type="button" onClick={addCert} className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black">+ ثبت نماد</button>
             </div>
           </div>
-
-          {/* کنترل موقعیت چت هوش مصنوعی */}
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
-            <span className="font-black text-[var(--text-primary)] block">🤖 تنظیمات موقعیت دکمه چت هوش مصنوعی (AIAssistantChat):</span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-slate-400 mb-1">فاصله از پایین دسکتاپ (px):</label>
-                <input
-                  type="number"
-                  value={config.aiChat?.bottomDesktop || 64}
-                  onChange={(e) => setConfig({ ...config, aiChat: { ...(config.aiChat || {}), bottomDesktop: Number(e.target.value) } })}
-                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1">فاصله از پایین موبایل (px):</label>
-                <input
-                  type="number"
-                  value={config.aiChat?.bottomMobile || 96}
-                  onChange={(e) => setConfig({ ...config, aiChat: { ...(config.aiChat || {}), bottomMobile: Number(e.target.value) } })}
-                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold"
-                />
-              </div>
-            </div>
-          </div>
-
         </div>
       )}
 
@@ -566,104 +510,137 @@ export default function StorefrontLayoutStudio() {
           <div className="space-y-3">
             <label className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] cursor-pointer">
               <span className="font-bold">۱. بخش هیرو و بنر اصلی (Hero Banner)</span>
-              <input
-                type="checkbox"
-                checked={config.hero.show}
-                onChange={(e) => setConfig({ ...config, hero: { ...config.hero, show: e.target.checked } })}
-                className="w-4 h-4 rounded"
-              />
+              <input type="checkbox" checked={config.hero.show} onChange={(e) => setConfig({ ...config, hero: { ...config.hero, show: e.target.checked } })} className="w-4 h-4 rounded" />
             </label>
             <label className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] cursor-pointer">
               <span className="font-bold">۲. نوار فیلتر دسته‌بندی بالای کاتالوگ محصولات</span>
-              <input
-                type="checkbox"
-                checked={config.productsSection.showCategoryFilter}
-                onChange={(e) => setConfig({ ...config, productsSection: { ...config.productsSection, showCategoryFilter: e.target.checked } })}
-                className="w-4 h-4 rounded"
-              />
+              <input type="checkbox" checked={config.productsSection.showCategoryFilter} onChange={(e) => setConfig({ ...config, productsSection: { ...config.productsSection, showCategoryFilter: e.target.checked } })} className="w-4 h-4 rounded" />
             </label>
             <label className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] cursor-pointer">
               <span className="font-bold">۳. سه کارت اعتماد (گارانتی / کالیبراسیون / ارسال)</span>
-              <input
-                type="checkbox"
-                checked={config.trustBadges.show}
-                onChange={(e) => setConfig({ ...config, trustBadges: { ...config.trustBadges, show: e.target.checked } })}
-                className="w-4 h-4 rounded"
-              />
+              <input type="checkbox" checked={config.trustBadges.show} onChange={(e) => setConfig({ ...config, trustBadges: { ...config.trustBadges, show: e.target.checked } })} className="w-4 h-4 rounded" />
             </label>
           </div>
         </div>
       )}
 
-      {/* تب ۴: رسانه و لوگوها (لوگوی هدر، لوگوی فوتر، فاوآیکون) */}
+      {/* تب ۴: رسانه و لوگوها (با پیش‌نمایش شفاف و ورودی متن زنده) */}
       {activeTab === "media" && (
         <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             
-            {/* لوگوی هدر */}
+            {/* ۱. لوگوی هدر */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
               <div className="flex justify-between items-center">
-                <span className="font-bold">لوگوی هدر:</span>
+                <span className="font-bold text-[var(--text-primary)]">لوگوی هدر (Header):</span>
                 <button
                   type="button"
                   onClick={() => setMediaModal({ open: true, target: "headerLogo" })}
-                  className="px-3 py-1 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px]"
+                  className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] cursor-pointer shadow"
                 >
                   انتخاب / آپلود
                 </button>
               </div>
-              <div className="h-20 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center p-2">
+
+              <div className="h-28 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center p-2 relative overflow-hidden">
                 {config.header.brand.logoUrl ? (
-                  <img src={config.header.brand.logoUrl} alt="" className="max-h-full object-contain" />
+                  <img src={config.header.brand.logoUrl} alt="Header Logo" className="max-h-full max-w-full object-contain" />
                 ) : (
-                  <span className="text-slate-400">بدون لوگو</span>
+                  <span className="text-slate-400 font-bold">لوگو انتخاب نشده است</span>
                 )}
               </div>
+
+              <input
+                type="text"
+                dir="ltr"
+                placeholder="https://... یا تصویر آپلود شده"
+                value={config.header.brand.logoUrl}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const updated = { ...config, header: { ...config.header, brand: { ...config.header.brand, logoUrl: val } } };
+                  setConfig(updated);
+                  siteInfoService.updateSiteInfo({ logo_url: val, homepage_layout_config: updated });
+                }}
+                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
+              />
             </div>
 
-            {/* لوگوی فوتر */}
+            {/* ۲. لوگوی فوتر */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
               <div className="flex justify-between items-center">
-                <span className="font-bold">لوگوی فوتر:</span>
+                <span className="font-bold text-[var(--text-primary)]">لوگوی فوتر (Footer):</span>
                 <button
                   type="button"
                   onClick={() => setMediaModal({ open: true, target: "footerLogo" })}
-                  className="px-3 py-1 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px]"
+                  className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] cursor-pointer shadow"
                 >
                   انتخاب / آپلود
                 </button>
               </div>
-              <div className="h-20 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center p-2">
+
+              <div className="h-28 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center p-2 relative overflow-hidden">
                 {config.footer.logoUrl ? (
-                  <img src={config.footer.logoUrl} alt="" className="max-h-full object-contain" />
+                  <img src={config.footer.logoUrl} alt="Footer Logo" className="max-h-full max-w-full object-contain" />
                 ) : (
-                  <span className="text-slate-400">بدون لوگو</span>
+                  <span className="text-slate-400 font-bold">لوگو انتخاب نشده است</span>
                 )}
               </div>
+
+              <input
+                type="text"
+                dir="ltr"
+                placeholder="https://... یا تصویر آپلود شده"
+                value={config.footer.logoUrl}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const updated = { ...config, footer: { ...config.footer, logoUrl: val } };
+                  setConfig(updated);
+                  siteInfoService.updateSiteInfo({ footer_logo_url: val, homepage_layout_config: updated });
+                }}
+                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
+              />
             </div>
 
-            {/* فاوآیکون تب مرورگر */}
+            {/* ۳. فاوآیکون */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
               <div className="flex justify-between items-center">
-                <span className="font-bold">فاوآیکون (Favicon):</span>
+                <span className="font-bold text-[var(--text-primary)]">فاوآیکون (Favicon):</span>
                 <button
                   type="button"
                   onClick={() => setMediaModal({ open: true, target: "favicon" })}
-                  className="px-3 py-1 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px]"
+                  className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-[11px] cursor-pointer shadow"
                 >
                   انتخاب / آپلود
                 </button>
               </div>
-              <div className="h-20 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center p-2">
-                <span className="text-xl">🌟</span>
+
+              <div className="h-28 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center p-2 relative overflow-hidden">
+                {siteInfo?.favicon_url ? (
+                  <img src={siteInfo.favicon_url} alt="Favicon" className="w-10 h-10 object-contain" />
+                ) : (
+                  <span className="text-2xl">🌟</span>
+                )}
               </div>
+
+              <input
+                type="text"
+                dir="ltr"
+                placeholder="https://... یا فایل .ico / .png"
+                value={siteInfo?.favicon_url || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSiteInfo((prev) => prev ? { ...prev, favicon_url: val } : null);
+                  siteInfoService.updateSiteInfo({ favicon_url: val });
+                }}
+                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
+              />
             </div>
 
           </div>
         </div>
       )}
 
-      {/* تب ۵: پیش‌نمایش زنده با رفرش فوری پس از ذخیره */}
+      {/* تب ۵: پیش‌نمایش زنده */}
       {activeTab === "preview" && (
         <div className="bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] shadow-xl overflow-hidden space-y-3">
           <div className="flex justify-between items-center px-2">
@@ -685,19 +662,38 @@ export default function StorefrontLayoutStudio() {
         </div>
       )}
 
-      {/* مدال مدیاپیکر ۳ کاره */}
+      {/* مدال انتخاب مدیا با ذخیره آنی */}
       {mediaModal.open && (
         <MediaUploadModal
           isOpen={mediaModal.open}
           onClose={() => setMediaModal({ open: false, target: null })}
+          currentValue={
+            mediaModal.target === "headerLogo"
+              ? config.header.brand.logoUrl
+              : mediaModal.target === "footerLogo"
+              ? config.footer.logoUrl
+              : siteInfo?.favicon_url || ""
+          }
           onUploadSuccess={(url) => {
             if (mediaModal.target === "headerLogo") {
-              setConfig({ ...config, header: { ...config.header, brand: { ...config.header.brand, logoUrl: url } } });
+              const updated = {
+                ...config,
+                header: { ...config.header, brand: { ...config.header.brand, logoUrl: url } },
+              };
+              setConfig(updated);
+              handleSave(updated);
             } else if (mediaModal.target === "footerLogo") {
-              setConfig({ ...config, footer: { ...config.footer, logoUrl: url } });
+              const updated = {
+                ...config,
+                footer: { ...config.footer, logoUrl: url },
+              };
+              setConfig(updated);
+              handleSave(updated);
             } else if (mediaModal.target === "favicon") {
+              setSiteInfo((prev) => (prev ? { ...prev, favicon_url: url } : null));
               siteInfoService.updateSiteInfo({ favicon_url: url });
             }
+            setMediaModal({ open: false, target: null });
           }}
         />
       )}

@@ -236,6 +236,8 @@ export interface SiteInfo {
   updated_at?: string;
 }
 
+const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
+
 export const DEFAULT_AUTH_SECURITY_CONFIG: AuthSecurityConfig = {
   adminDeck: {
     pin: "1234",
@@ -429,11 +431,16 @@ export const DEFAULT_SITE_INFO: SiteInfo = {
   description: "مرجع تخصصی تامین تجهیزات دیجیتال، تصویر و گجت‌های نوین با گارانتی اصالت طلایی در ایران.",
   footer_text: "تمامی حقوق محفوظ است © 2026 آکسون کور",
   homepage_layout_config: DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
-  auth_security_config: DEFAULT_AUTH_SECURITY_CONFIG,
 };
 
 export const siteInfoService = {
   getSiteInfoSync(): SiteInfo {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(LOCAL_STORAGE_SITE_INFO);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
     return DEFAULT_SITE_INFO;
   },
 
@@ -445,6 +452,7 @@ export const siteInfoService = {
         if (json.data) {
           const data = json.data;
           let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+          
           if (data.homepage_layout_config) {
             try {
               const incoming = typeof data.homepage_layout_config === "string"
@@ -461,36 +469,33 @@ export const siteInfoService = {
             }
           }
 
-          let parsedSecurity: AuthSecurityConfig = DEFAULT_AUTH_SECURITY_CONFIG;
-          if (data.auth_security_config) {
-            try {
-              const incomingSec = typeof data.auth_security_config === "string"
-                ? JSON.parse(data.auth_security_config)
-                : data.auth_security_config;
-              parsedSecurity = {
-                adminDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.adminDeck, ...(incomingSec.adminDeck || {}) },
-                userDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.userDeck, ...(incomingSec.userDeck || {}) },
-              };
-            } catch (err) {
-              console.error("[SECURITY_PARSE_ERROR]:", err);
-            }
-          }
+          // پل ارتباطی ستون‌های SQL با ساختار ویترین
+          const finalHeaderLogo = parsedLayout.header.brand.logoUrl || data.logo_url || "";
+          const finalFooterLogo = parsedLayout.footer.logoUrl || data.footer_logo_url || "";
+          const finalSiteName = parsedLayout.header.brand.name || data.site_name || data.store_name || "آکسون کور | Axon";
+          const finalTagline = parsedLayout.header.brand.tagline || data.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر";
+          const finalFavicon = data.favicon_url || "";
+
+          parsedLayout.header.brand.logoUrl = finalHeaderLogo;
+          parsedLayout.footer.logoUrl = finalFooterLogo;
+          parsedLayout.header.brand.name = finalSiteName;
+          parsedLayout.header.brand.tagline = finalTagline;
 
           const mapped: SiteInfo = {
             id: data.id,
-            site_name: data.site_name || data.store_name || "آکسون کور | Axon",
-            siteName: data.site_name || data.store_name || "آکسون کور | Axon",
-            storeName: data.site_name || data.store_name || "آکسون کور | Axon",
-            tagline: data.tagline || "فروشگاه تخصصی تجهیزات و گجت‌های تکنولوژی",
+            site_name: finalSiteName,
+            siteName: finalSiteName,
+            storeName: finalSiteName,
+            tagline: finalTagline,
             phone: data.phone || "09376110200",
             email: data.email || "Pouriarahimi@yahoo.com",
             address: data.address || "شیراز - ستارخان",
             working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-            logo_url: data.logo_url || "",
-            logoUrl: data.logo_url || "",
-            footer_logo_url: data.footer_logo_url || "",
-            footerLogoUrl: data.footer_logo_url || "",
-            favicon_url: data.favicon_url || "",
+            logo_url: finalHeaderLogo,
+            logoUrl: finalHeaderLogo,
+            footer_logo_url: finalFooterLogo,
+            footerLogoUrl: finalFooterLogo,
+            favicon_url: finalFavicon,
             allow_google_index: data.allow_google_index !== false,
             allowGoogleIndex: data.allow_google_index !== false,
             maintenance_mode: (data.maintenance_mode as MaintenanceMode) || "none",
@@ -501,40 +506,64 @@ export const siteInfoService = {
             custom_css: data.custom_css || "",
             active_font_id: data.active_font_id || "Vazirmatn",
             homepage_layout_config: parsedLayout,
-            auth_security_config: parsedSecurity,
             updated_at: data.updated_at,
           };
 
           if (typeof window !== "undefined") {
+            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
             if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
             if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
           }
           return mapped;
         }
       }
-      return DEFAULT_SITE_INFO;
+      return this.getSiteInfoSync();
     } catch {
-      return DEFAULT_SITE_INFO;
+      return this.getSiteInfoSync();
     }
   },
 
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
+      const current = await this.getSiteInfo();
+      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون کور | Axon";
+
+      const mergedPayload: any = {
+        ...current,
+        ...payload,
+        site_name: sName,
+        store_name: sName,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (payload.homepage_layout_config) {
+        if (payload.homepage_layout_config.header?.brand?.logoUrl) {
+          mergedPayload.logo_url = payload.homepage_layout_config.header.brand.logoUrl;
+        }
+        if (payload.homepage_layout_config.footer?.logoUrl) {
+          mergedPayload.footer_logo_url = payload.homepage_layout_config.footer.logoUrl;
+        }
+      }
+
+      // ۱. ذخیره فوری در LocalStorage جهت پیشگیری از هرگونه از دست رفتن داده
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mergedPayload));
+        realtimeEngine.broadcastLocally("site_info_updated", mergedPayload);
+      }
+
+      // ۲. ارسال امن به پایگاه داده
       const res = await fetch("/api/site-info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(mergedPayload),
       });
 
       const json = await res.json();
-      if (res.ok && json.success) {
+      if (json.success) {
         const fresh = await this.getSiteInfo();
-        if (typeof window !== "undefined" && fresh) {
-          realtimeEngine.broadcastLocally("site_info_updated", fresh);
-        }
-        return fresh;
+        return fresh || mergedPayload;
       }
-      return null;
+      return mergedPayload;
     } catch (e) {
       console.error("siteInfoService.updateSiteInfo Error:", e);
       return null;

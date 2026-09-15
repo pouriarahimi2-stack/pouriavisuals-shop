@@ -92,3 +92,10 @@ body {
     font-size: 13px !important;
   }
 }
+
+/* AXON CORE - HIDE 3 TRUST BADGES GLOBALLY */
+div:has(> * > strong:contains("۱۸ ماه گارانتی اصالت طلایی")),
+div:has(> strong:contains("۱۸ ماه گارانتی اصالت طلایی")),
+[data-axon-badges="true"] {
+  display: none !important;
+}

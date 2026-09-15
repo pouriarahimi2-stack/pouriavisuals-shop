@@ -27,7 +27,7 @@ export default function AdminSiteInfo() {
     const data = await siteInfoService.getSiteInfo();
     if (data) {
       setSiteInfo(data);
-      setSiteName(data.site_name || data.siteName || data.storeName || "Axon | آکسون");
+      setSiteName(data.site_name || data.siteName || data.storeName || "");
       setTagline(data.tagline || "");
       setLogoUrl(data.logo_url || data.logoUrl || "");
       setFooterLogoUrl(data.footer_logo_url || data.footerLogoUrl || "");
@@ -80,7 +80,7 @@ export default function AdminSiteInfo() {
       const updated = await siteInfoService.updateSiteInfo(payload);
       if (updated) {
         soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "⚡ لوگوها و مشخصات فروشگاه با موفقیت در دیتابیس ذخیره و فعال شدند." });
+        setStatusMessage({ type: "success", text: "⚡ تنظیمات لوگوها و هویت برند در دیتابیس ثبت و در سایت فعال شد." });
 
         if (faviconUrl) {
           let link = document.getElementById("axon-dynamic-favicon") as HTMLLinkElement;
@@ -94,7 +94,7 @@ export default function AdminSiteInfo() {
         }
       }
     } catch (err: any) {
-      setStatusMessage({ type: "error", text: err.message || "خطا در ثبت اطلاعات در دیتابیس." });
+      setStatusMessage({ type: "error", text: err.message || "خطا در ثبت اطلاعات." });
     } finally {
       setSaving(false);
       setTimeout(() => setStatusMessage(null), 3500);
@@ -103,7 +103,6 @@ export default function AdminSiteInfo() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      {/* ورودی‌های مخفی فایل */}
       <input type="file" ref={faviconInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setFaviconUrl)} accept="image/*" className="hidden" />
       <input type="file" ref={logoInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setLogoUrl)} accept="image/*" className="hidden" />
       <input type="file" ref={footerLogoInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], setFooterLogoUrl)} accept="image/*" className="hidden" />
@@ -111,10 +110,10 @@ export default function AdminSiteInfo() {
       <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>⚙️</span> تنظیمات هویت بصری، لوگوها و مشخصات رسمی
+            <span>⚙️</span> تنظیمات هویت بصری و لوگوهای ۳ گانه
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تغییر و آپلود مستقیم لوگوی هدر، لوگوی بزرگ فوتر و فاوآیکون تب مرورگر با ذخیره در دیتابیس
+            آپلود مستقیم یا لینک لوگوی بالای سایت (Header)، لوگوی بزرگ فوتر (Footer) و فاوآیکون تب مرورگر (Favicon)
           </p>
         </div>
         <button
@@ -137,18 +136,18 @@ export default function AdminSiteInfo() {
 
       <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
         
-        {/* بخش مدیریت ۳ لوگوی سایت */}
+        {/* بخش آپلود ۳ لوگوی اصلی */}
         <div className="space-y-4 border-b border-[var(--card-border)] pb-6">
           <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-            <span>🖼️</span> مدیریت لوگوها و آیکون مرورگر (آپلود مستقیم یا لینک URL)
+            <span>🖼️</span> مدیریت ۳ لوگوی سایت
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            {/* ۱. لوگوی هدر بالای سایت */}
+            {/* ۱. لوگوی بالای سایت */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
               <div className="flex justify-between items-center">
-                <label className="font-bold text-[var(--text-primary)]">لوگوی بالای سایت (Header):</label>
+                <label className="font-bold text-[var(--text-primary)]">لوگوی هدر (Header):</label>
                 <button
                   type="button"
                   onClick={() => logoInputRef.current?.click()}
@@ -161,22 +160,22 @@ export default function AdminSiteInfo() {
                 {logoUrl ? (
                   <img src={logoUrl} alt="Header Logo" className="max-h-full object-contain" />
                 ) : (
-                  <span className="text-slate-400 font-bold text-[11px]">لوگو تنظیم نشده</span>
+                  <span className="text-slate-400 font-bold text-[11px]">بدون لوگو</span>
                 )}
               </div>
               <input
                 type="text"
-                placeholder="یا آدرس اینترنتی عکس https://..."
+                placeholder="https://... یا تصویر آپلود شده"
                 value={logoUrl}
                 onChange={(e) => setLogoUrl(e.target.value)}
                 className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
               />
             </div>
 
-            {/* ۲. لوگوی بزرگ فوتر */}
+            {/* ۲. لوگوی فوتر */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
               <div className="flex justify-between items-center">
-                <label className="font-bold text-[var(--text-primary)]">لوگوی بزرگ فوتر (Footer):</label>
+                <label className="font-bold text-[var(--text-primary)]">لوگوی فوتر (Footer):</label>
                 <button
                   type="button"
                   onClick={() => footerLogoInputRef.current?.click()}
@@ -189,12 +188,12 @@ export default function AdminSiteInfo() {
                 {footerLogoUrl ? (
                   <img src={footerLogoUrl} alt="Footer Logo" className="max-h-full object-contain" />
                 ) : (
-                  <span className="text-slate-400 font-bold text-[11px]">لوگوی فوتر تنظیم نشده</span>
+                  <span className="text-slate-400 font-bold text-[11px]">بدون لوگو</span>
                 )}
               </div>
               <input
                 type="text"
-                placeholder="یا آدرس اینترنتی عکس https://..."
+                placeholder="https://... یا تصویر آپلود شده"
                 value={footerLogoUrl}
                 onChange={(e) => setFooterLogoUrl(e.target.value)}
                 className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
@@ -204,7 +203,7 @@ export default function AdminSiteInfo() {
             {/* ۳. فاوآیکون تب مرورگر */}
             <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
               <div className="flex justify-between items-center">
-                <label className="font-bold text-[var(--text-primary)]">فاوآیکون مرورگر (Favicon):</label>
+                <label className="font-bold text-[var(--text-primary)]">آیکون مرورگر (Favicon):</label>
                 <button
                   type="button"
                   onClick={() => faviconInputRef.current?.click()}
@@ -215,14 +214,14 @@ export default function AdminSiteInfo() {
               </div>
               <div className="w-full h-24 rounded-xl border border-[var(--card-border)] bg-black/10 dark:bg-white/5 flex items-center justify-center overflow-hidden p-2">
                 {faviconUrl ? (
-                  <img src={faviconUrl} alt="Favicon" className="w-12 h-12 object-contain" />
+                  <img src={faviconUrl} alt="Favicon" className="w-10 h-10 object-contain" />
                 ) : (
-                  <span className="text-slate-400 font-bold text-[11px]">فاوآیکون تنظیم نشده</span>
+                  <span className="text-slate-400 font-bold text-[11px]">بدون آیکون</span>
                 )}
               </div>
               <input
                 type="text"
-                placeholder="یا آدرس اینترنتی آیکون https://..."
+                placeholder="https://... یا فایل .ico / .png"
                 value={faviconUrl}
                 onChange={(e) => setFaviconUrl(e.target.value)}
                 className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-[11px] outline-none"
@@ -232,15 +231,15 @@ export default function AdminSiteInfo() {
           </div>
         </div>
 
-        {/* بخش اطلاعات هویتی و تماس */}
+        {/* مشخصات برند و اطلاعات تماس */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نام رسمی فروشگاه (Brand Name):</label>
             <input
               type="text"
-              required
               value={siteName}
               onChange={(e) => setSiteName(e.target.value)}
+              placeholder="اختیاری یا نام برند"
               className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
             />
           </div>
@@ -294,7 +293,7 @@ export default function AdminSiteInfo() {
             disabled={saving}
             className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-xl cursor-pointer disabled:opacity-50"
           >
-            {saving ? "در حال ذخیره در دیتابیس..." : "💾 ذخیره تغییرات لوگوها و هویت سایت"}
+            {saving ? "در حال ثبت در دیتابیس..." : "💾 ذخیره و اعمال آنی لوگوها و مشخصات"}
           </button>
         </div>
       </form>

@@ -20,8 +20,8 @@ export default function Footer() {
     return () => window.removeEventListener("site_info_updated", handleUpdate);
   }, []);
 
-  const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "Axon | آکسون";
-  const footerLogo = siteInfo?.footer_logo_url || siteInfo?.footerLogoUrl || siteInfo?.logo_url || siteInfo?.logoUrl;
+  const footerLogo = siteInfo?.footer_logo_url || siteInfo?.footerLogoUrl;
+  const storeName = siteInfo?.site_name || siteInfo?.siteName || siteInfo?.storeName || "";
   const phone = siteInfo?.phone || "09376110200";
   const email = siteInfo?.email || "Pouriarahimi@yahoo.com";
   const address = siteInfo?.address || "شیراز - ستارخان";
@@ -31,20 +31,22 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           
-          {/* ستون اول: برند بزرگ آکسون و مشخصات */}
+          {/* ستون اول: فقط در صورت آپلود بودن لوگو در ادمین نمایش داده می‌شود */}
           <div className="md:col-span-5 space-y-6 pt-2">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-black text-2xl shadow-xl overflow-hidden shrink-0 border border-[var(--card-border)]">
-                {footerLogo ? (
-                  <img src={footerLogo} alt={storeName} className="w-full h-full object-contain p-2" />
-                ) : (
-                  <span className="text-xl">⚡</span>
+            {(footerLogo || storeName) && (
+              <div className="flex items-center gap-4">
+                {footerLogo && (
+                  <div className="w-16 h-16 rounded-2xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center shadow-xl overflow-hidden shrink-0 border border-[var(--card-border)]">
+                    <img src={footerLogo} alt={storeName || "لوگو"} className="w-full h-full object-contain p-2" />
+                  </div>
+                )}
+                {storeName && (
+                  <span className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
+                    {storeName}
+                  </span>
                 )}
               </div>
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
-                {storeName}
-              </span>
-            </div>
+            )}
 
             <div className="space-y-2 text-xs sm:text-sm text-[var(--text-secondary)] font-medium pt-2">
               <p className="flex items-center gap-2">
@@ -92,12 +94,12 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون چهارم: اینماد رسمی با آی‌فریم و کد مستقیم اینماد جهت لود قطعی */}
+          {/* ستون چهارم: اینماد رسمی */}
           <div className="md:col-span-3 flex flex-col items-center md:items-end justify-center pt-2">
-            <div 
-              className="p-3 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-xl hover:border-emerald-500/50 transition flex items-center justify-center"
+            <div
+              className="p-3 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-xl hover:border-emerald-500/50 transition flex items-center justify-center min-w-[130px] min-h-[130px]"
               dangerouslySetInnerHTML={{
-                __html: `<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD' alt='نماد اعتماد الکترونیکی آکسون' style='cursor:pointer; width:125px; height:125px; object-fit:contain;' code='RqxtofLwJnKsvqQACWz1mvYVVKykOrtD'></a>`
+                __html: `<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD' alt='نماد اعتماد الکترونیکی آکسون' style='cursor:pointer; width:120px; height:120px; object-fit:contain;' code='RqxtofLwJnKsvqQACWz1mvYVVKykOrtD'></a>`
               }}
             />
             <span className="text-[10px] text-[var(--text-secondary)] font-bold mt-2 text-center md:text-left">
@@ -107,8 +109,9 @@ export default function Footer() {
 
         </div>
 
+        {/* کپی‌رایت پایین */}
         <div className="mt-12 pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)]">
-          <p>© ۲۰۲۶ تمامی حقوق مادی و معنوی برای {storeName} محفوظ است.</p>
+          <p>© ۲۰۲۶ تمامی حقوق محفوظ است.</p>
           <div className="flex items-center gap-4 text-[11px]">
             <Link href="/about" className="hover:underline">درباره ما</Link>
             <Link href="/contact" className="hover:underline">تماس با ما</Link>

@@ -31,7 +31,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           
-          {/* ستون اول (سمت راست): برند بزرگ آکسون و مشخصات */}
+          {/* ستون اول: برند بزرگ آکسون و مشخصات */}
           <div className="md:col-span-5 space-y-6 pt-2">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center font-black text-2xl shadow-xl overflow-hidden shrink-0 border border-[var(--card-border)]">
@@ -92,34 +92,21 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* ستون چهارم (منتهی‌الیه سمت چپ): نشان رسمی و تاییدشده اینماد */}
+          {/* ستون چهارم: اینماد رسمی با آی‌فریم و کد مستقیم اینماد جهت لود قطعی */}
           <div className="md:col-span-3 flex flex-col items-center md:items-end justify-center pt-2">
-            <a
-              target="_blank"
-              rel="noreferrer"
-              href="https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
-              className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-xl hover:border-emerald-500/50 transition flex flex-col items-center gap-2 group cursor-pointer"
-            >
-              {/* نشان گرافیکی برداری رسمی اینماد */}
-              <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center relative">
-                <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md group-hover:scale-105 transition duration-300">
-                  <circle cx="50" cy="50" r="46" fill="#0284c7" fillOpacity="0.08" stroke="#0284c7" strokeWidth="2.5" />
-                  <path d="M50 15 L78 30 L78 65 L50 85 L22 65 L22 30 Z" fill="#ffffff" stroke="#0369a1" strokeWidth="2" />
-                  <path d="M40 50 L47 57 L63 41" fill="none" stroke="#16a34a" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
-                  <text x="50" y="74" textAnchor="middle" fill="#0f172a" fontSize="8" fontWeight="bold" fontFamily="sans-serif">ENAMAD</text>
-                  <text x="50" y="27" textAnchor="middle" fill="#0284c7" fontSize="9" fontWeight="black" fontFamily="sans-serif">★ ★</text>
-                </svg>
-              </div>
-              <span className="text-[11px] font-black text-slate-700 dark:text-slate-200 group-hover:text-emerald-500 transition">
-                نماد اعتماد الکترونیکی رسمی
-              </span>
-              <span className="text-[9px] font-mono text-slate-400">کد اختصاصی: 7434404</span>
-            </a>
+            <div 
+              className="p-3 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] shadow-xl hover:border-emerald-500/50 transition flex items-center justify-center"
+              dangerouslySetInnerHTML={{
+                __html: `<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD' alt='نماد اعتماد الکترونیکی آکسون' style='cursor:pointer; width:125px; height:125px; object-fit:contain;' code='RqxtofLwJnKsvqQACWz1mvYVVKykOrtD'></a>`
+              }}
+            />
+            <span className="text-[10px] text-[var(--text-secondary)] font-bold mt-2 text-center md:text-left">
+              نماد اعتماد الکترونیکی رسمی
+            </span>
           </div>
 
         </div>
 
-        {/* کپی‌رایت پایین */}
         <div className="mt-12 pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)]">
           <p>© ۲۰۲۶ تمامی حقوق مادی و معنوی برای {storeName} محفوظ است.</p>
           <div className="flex items-center gap-4 text-[11px]">

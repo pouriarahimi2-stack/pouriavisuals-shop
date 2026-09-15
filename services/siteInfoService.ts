@@ -1,8 +1,73 @@
-// File Path: services/siteInfoService.ts
 import { supabase } from "@/lib/supabase";
 import { realtimeEngine, applyFaviconToDOM, applyTitleToDOM } from "@/lib/realtimeSync";
 
 export type MaintenanceMode = "none" | "timed" | "indefinite";
+
+export interface HeaderMenuItem {
+  id: string;
+  title: string;
+  url: string;
+  order: number;
+  show: boolean;
+  openInNewTab?: boolean;
+  badge?: string;
+}
+
+export interface HeaderActionConfig {
+  show: boolean;
+  label?: string;
+  icon?: string;
+  url?: string;
+  order: number;
+}
+
+export interface HeaderConfig {
+  show: boolean;
+  variant: "capsule" | "full-width" | "bordered";
+  position: "fixed" | "sticky" | "static";
+  maxWidth: number;
+  height: number;
+  paddingX: number;
+  borderRadius: number;
+  backgroundColor?: string;
+  borderColor?: string;
+  blurIntensity: "none" | "sm" | "md" | "xl" | "2xl";
+  shadow: "none" | "sm" | "md" | "xl";
+  shrinkOnScroll: boolean;
+  brand: {
+    showLogo: boolean;
+    logoUrl: string;
+    logoWidth: number;
+    logoHeight: number;
+    logoRadius: number;
+    showName: boolean;
+    name: string;
+    showTagline: boolean;
+    tagline: string;
+    href: string;
+  };
+  menu: {
+    show: boolean;
+    alignment: "start" | "center" | "end";
+    fontSize: number;
+    gap: number;
+    items: HeaderMenuItem[];
+  };
+  actions: {
+    search: HeaderActionConfig;
+    themeToggle: HeaderActionConfig;
+    account: HeaderActionConfig;
+    cart: HeaderActionConfig & { showCount: boolean; style: "pill" | "icon" };
+  };
+  announcement: {
+    show: boolean;
+    text: string;
+    backgroundColor: string;
+    textColor: string;
+    dismissible: boolean;
+    link?: string;
+  };
+}
 
 export interface FooterLinkItem {
   id: string;
@@ -16,30 +81,30 @@ export interface FooterContactItem {
   title: string;
   value: string;
   link?: string;
-  icon?: string;
   show: boolean;
 }
 
 export interface FooterCertificateItem {
   id: string;
   title: string;
-  codeOrHtml?: string;
   imageUrl?: string;
   link?: string;
   show: boolean;
 }
 
-export interface SocialKeyItem {
-  letter: string;
-  name: string;
-  href: string;
-  color: string;
+export interface HomeSectionConfig {
+  id: string;
+  type: "hero" | "banners" | "products" | "trustBadges" | "blog" | "news" | "richText";
+  show: boolean;
+  order: number;
+  title?: string;
+  subtitle?: string;
 }
 
 export interface AuthSecurityConfig {
   adminDeck: {
     pin: string;
-    pinLength: 4 | 5 | 6;
+    pinLength: 4 | 5 | 6 | 8;
     badgeText: string;
     title: string;
     subtitle: string;
@@ -47,7 +112,7 @@ export interface AuthSecurityConfig {
     quickPinLabel: string;
   };
   userDeck: {
-    otpLength: 4 | 5 | 6;
+    otpLength: 4 | 5 | 6 | 8;
     badgeText: string;
     title: string;
     subtitle: string;
@@ -57,23 +122,28 @@ export interface AuthSecurityConfig {
 }
 
 export interface HomepageLayoutConfig {
-  headerLogoConfig?: any;
+  header: HeaderConfig;
   hero: {
     show: boolean;
-    heightMode: "compact" | "standard" | "cinematic";
-    verticalPadding: "compact" | "normal" | "relaxed";
     title: string;
     subtitle: string;
     buttonText: string;
     buttonLink: string;
     show3DCanvas: boolean;
   };
-  showcase3D: {
+  productsSection: {
     show: boolean;
-    cardScale: "compact" | "standard" | "large";
     title: string;
     subtitle: string;
-    limit: number;
+    showCategoryFilter: boolean;
+  };
+  trustBadges: {
+    show: boolean;
+  };
+  showcase3D: {
+    show: boolean;
+    title: string;
+    subtitle: string;
   };
   newsTicker: {
     show: boolean;
@@ -83,21 +153,17 @@ export interface HomepageLayoutConfig {
     title: string;
     subtitle: string;
     count: number;
-    showViewAll: boolean;
-  };
-  contactDock: {
-    show: boolean;
-    title: string;
-    scale: "small" | "medium" | "large";
-    keys: SocialKeyItem[];
   };
   footer: {
     show: boolean;
-    paddingMode: "compact" | "normal" | "relaxed";
     scaleMode: "compact" | "normal" | "large";
-    brandTitle?: string;
-    brandSubtitle?: string;
-    description?: string;
+    paddingMode: "compact" | "normal" | "relaxed";
+    brandTitle: string;
+    brandSubtitle: string;
+    description: string;
+    logoUrl?: string;
+    logoWidth?: number;
+    logoHeight?: number;
     showBadges: boolean;
     badge1Text: string;
     badge2Text: string;
@@ -131,7 +197,6 @@ export interface HomepageLayoutConfig {
   aiChat: {
     bottomDesktop: number;
     bottomMobile: number;
-    sizeMode: "compact" | "standard" | "large";
     autoHideNearFooter: boolean;
   };
 }
@@ -151,7 +216,6 @@ export interface SiteInfo {
   footer_logo_url?: string;
   footerLogoUrl?: string;
   favicon_url?: string;
-  faviconUrl?: string;
   allow_google_index?: boolean;
   allowGoogleIndex?: boolean;
   maintenance_mode?: MaintenanceMode;
@@ -167,13 +231,10 @@ export interface SiteInfo {
   footer_text?: string;
   custom_css?: string;
   active_font_id?: string;
-  gemini_api_key?: string;
-  homepage_layout_config?: Partial<HomepageLayoutConfig> | any;
+  homepage_layout_config?: HomepageLayoutConfig;
   auth_security_config?: AuthSecurityConfig;
   updated_at?: string;
 }
-
-const LOCAL_STORAGE_SITE_INFO = "axon_site_info_cache_permanent_v2026";
 
 export const DEFAULT_AUTH_SECURITY_CONFIG: AuthSecurityConfig = {
   adminDeck: {
@@ -195,23 +256,81 @@ export const DEFAULT_AUTH_SECURITY_CONFIG: AuthSecurityConfig = {
   },
 };
 
+export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
+  show: true,
+  variant: "capsule",
+  position: "fixed",
+  maxWidth: 1280,
+  height: 56,
+  paddingX: 24,
+  borderRadius: 9999,
+  blurIntensity: "xl",
+  shadow: "xl",
+  shrinkOnScroll: true,
+  brand: {
+    showLogo: true,
+    logoUrl: "",
+    logoWidth: 38,
+    logoHeight: 38,
+    logoRadius: 9999,
+    showName: true,
+    name: "آکسون کور | Axon",
+    showTagline: false,
+    tagline: "مرجع تخصصی تجهیزات دیجیتال و تصویر",
+    href: "/",
+  },
+  menu: {
+    show: true,
+    alignment: "center",
+    fontSize: 12,
+    gap: 24,
+    items: [
+      { id: "m1", title: "کاتالوگ کالاها", url: "/products", order: 1, show: true },
+      { id: "m2", title: "رادار اخبار", url: "/news", order: 2, show: true },
+      { id: "m3", title: "مجله سئو", url: "/blog", order: 3, show: true },
+      { id: "m4", title: "پیگیری سفارش", url: "/track-order", order: 4, show: true },
+      { id: "m5", title: "درباره ما", url: "/about", order: 5, show: true },
+      { id: "m6", title: "تماس با ما", url: "/contact", order: 6, show: true },
+    ],
+  },
+  actions: {
+    search: { show: true, label: "جستجو", order: 1 },
+    themeToggle: { show: true, label: "تغییر تم", order: 2 },
+    account: { show: true, label: "حساب کاربری", url: "/login", order: 3 },
+    cart: { show: true, showCount: true, style: "pill", order: 4 },
+  },
+  announcement: {
+    show: false,
+    text: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | گارانتی اصالت طلایی",
+    backgroundColor: "#0284c7",
+    textColor: "#ffffff",
+    dismissible: true,
+  },
+};
+
 export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
+  header: DEFAULT_HEADER_CONFIG,
   hero: {
     show: true,
-    heightMode: "compact",
-    verticalPadding: "compact",
-    title: "مرجع تخصصی خرید جدیدترین گجت‌ها و سخت‌افزار نوین",
-    subtitle: "تامین مستقیم انواع مانیتورهای ۵K رتینا، لپ‌تاپ‌های حرفه‌ای M4 Max، ساعت‌های هوشمند اولترا و ابزارهای استودیو با ۱۸ ماه گارانتی اصالت طلایی و ارسال پیشتاز.",
-    buttonText: "مشاهده کاتالوگ محصولات",
-    buttonLink: "/#products",
+    title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+    subtitle: "تامین مستقیم تجهیزات حرفه‌ای استودیو، کالیبراسیون تخصصی پنل و مانیتورهای مرجع تصویر در ایران.",
+    buttonText: "مشاهده کاتالوگ تجهیزات",
+    buttonLink: "/products",
     show3DCanvas: true,
+  },
+  productsSection: {
+    show: true,
+    title: "محصولات منتخب و پرچمدار",
+    subtitle: "آماده ارسال با بسته‌بندی ضدضربه استودیویی و گارانتی اصالت طلایی",
+    showCategoryFilter: false,
+  },
+  trustBadges: {
+    show: false,
   },
   showcase3D: {
     show: true,
-    cardScale: "standard",
     title: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-    subtitle: "پیمایش با درگ یا کلیدهای کنترل جهت بررسی دقیق مشخصات متالورژی و نوری",
-    limit: 7,
+    subtitle: "پیمایش تعاملی جهت بررسی متالورژی قطعات و استانداردهای نوری",
   },
   newsTicker: {
     show: true,
@@ -219,43 +338,31 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
   blogSection: {
     show: true,
     title: "مجله و مقالات تحلیلی فناوری",
-    subtitle: "جدیدترین بررسی‌های تخصصی سخت‌افزار و راهنمای خرید گجت‌ها",
+    subtitle: "بررسی‌های تخصصی، راهنمای کالیبراسیون و استانداردهای رنگ",
     count: 3,
-    showViewAll: true,
-  },
-  contactDock: {
-    show: true,
-    title: "شبکه‌های ارتباطی و اجتماعی استودیو:",
-    scale: "medium",
-    keys: [
-      { letter: "C", name: "GitHub", href: "https://github.com", color: "#181717" },
-      { letter: "O", name: "LinkedIn", href: "https://linkedin.com", color: "#0A66C2" },
-      { letter: "N", name: "Discord", href: "https://discord.com", color: "#5865F2" },
-      { letter: "T", name: "Instagram", href: "https://instagram.com", color: "#E4405F" },
-      { letter: "A", name: "Telegram", href: "https://t.me", color: "#26A5E4" },
-      { letter: "C", name: "X / Twitter", href: "https://x.com", color: "#000000" },
-      { letter: "T", name: "پشتیبانی تماس", href: "tel:09376110200", color: "#0284C7" },
-    ],
   },
   footer: {
     show: true,
-    paddingMode: "compact",
     scaleMode: "normal",
+    paddingMode: "normal",
     brandTitle: "آکسون | Axon",
-    brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
-    description: "مرجع تخصصی تامین، کالیبراسیون و مشاوره سخت‌افزارهای حرفه‌ای تصویر در ایران با ۱۸ ماه گارانتی اصالت طلایی.",
+    brandSubtitle: "فروشگاه تخصصی تجهیزات تصویر و گجت‌های نوین",
+    description: "مرجع تخصصی تامین، کالیبراسیون و مشاوره تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی.",
+    logoUrl: "",
+    logoWidth: 160,
+    logoHeight: 56,
     showBadges: true,
     badge1Text: "گارانتی اصالت ۱۰۰٪ فیزیکی",
-    badge2Text: "ارسال پیشتاز سراسری",
+    badge2Text: "ارسال سریع پیشتاز سراسری",
     quickLinks: {
       show: true,
       title: "دسترسی سریع",
       links: [
-        { id: "l1", title: "کاتالوگ کالاها", url: "/#products" },
+        { id: "l1", title: "کاتالوگ کالاها", url: "/products" },
         { id: "l2", title: "سامانه رهگیری مرسولات", url: "/track-order" },
         { id: "l3", title: "جدیدترین اخبار تکنولوژی", url: "/news" },
         { id: "l4", title: "مجله مقالات تخصصی", url: "/blog" },
-        { id: "l5", title: "درباره آکسون", url: "/about" },
+        { id: "l5", title: "درباره ما", url: "/about" },
       ],
     },
     customerServices: {
@@ -263,54 +370,53 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
       title: "خدمات مشتریان",
       links: [
         { id: "s1", title: "ثبت تیکت مشاوره", url: "/contact" },
-        { id: "s2", title: "شرایط گارانتی طلایی", url: "/#products" },
-        { id: "s3", title: "ضمانت بازگشت وجه ۷ روزه", url: "/#products" },
-        { id: "s4", title: "راهنمای کالیبراسیون ۵K", url: "/blog" },
-        { id: "s5", title: "روش‌های پرداخت امن شاپرک", url: "/track-order" },
+        { id: "s2", title: "شرایط گارانتی طلایی", url: "/about" },
+        { id: "s3", title: "ضمانت بازگشت وجه ۷ روزه", url: "/about" },
+        { id: "s4", title: "روش‌های پرداخت امن شاپرک", url: "/track-order" },
       ],
     },
     contactInfo: {
       show: true,
       title: "اطلاعات تماس و دفتر",
       items: [
-        { id: "c1", type: "phone", title: "تلفن پشتیبانی:", value: "09376110200", link: "tel:09376110200", show: true },
+        { id: "c1", type: "phone", title: "تلفن تماس:", value: "09376110200", link: "tel:09376110200", show: true },
         { id: "c2", type: "email", title: "پست الکترونیک:", value: "Pouriarahimi@yahoo.com", link: "mailto:Pouriarahimi@yahoo.com", show: true },
-        { id: "c3", type: "address", title: "نشانی تحویل حضوری و انبار:", value: "شیراز - ستارخان", show: true },
+        { id: "c3", type: "address", title: "نشانی:", value: "شیراز - ستارخان", show: true },
         { id: "c4", type: "working_hours", title: "ساعات پاسخگویی:", value: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰", show: true },
       ],
     },
     certificates: {
       show: true,
-      title: "مجوزها و تاییدیه رسمی",
+      title: "نماد اعتماد الکترونیکی رسمی",
       items: [
         {
           id: "cert-enamad",
-          title: "نماد اعتماد الکترونیکی (کد ۲۷۴۲۴۵۳۴)",
-          link: "https://trustseal.enamad.ir/?id=27424534",
+          title: "نماد اعتماد الکترونیکی (کد ۷۴۳۴۴۰۴)",
+          link: "https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD",
+          imageUrl: "https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD",
           show: true,
         },
       ],
     },
     bottomBar: {
       show: true,
-      copyrightText: "تمامی حقوق مادی و معنوی برای آکسون | Axon محفوظ است",
-      designerText: "طراحی و معماری مهندسی پایدار",
-      enamadBadgeText: "نماد اعتماد الکترونیکی فعال (۲۷۴۲۴۵۳۴)",
+      copyrightText: "تمامی حقوق مادی و معنوی برای آکسون | Axon محفوظ است © 2026",
+      designerText: "طراحی مهندسی و پایدار",
+      enamadBadgeText: "نماد اعتماد الکترونیکی فعال",
     },
   },
   aiChat: {
     bottomDesktop: 64,
     bottomMobile: 96,
-    sizeMode: "standard",
     autoHideNearFooter: true,
   },
 };
 
 export const DEFAULT_SITE_INFO: SiteInfo = {
-  site_name: "آکسون | Axon",
-  siteName: "آکسون | Axon",
-  storeName: "آکسون | Axon",
-  tagline: "مرجع تخصصی تجهیزات دیجیتال و تصویر",
+  site_name: "آکسون کور | Axon",
+  siteName: "آکسون کور | Axon",
+  storeName: "آکسون کور | Axon",
+  tagline: "فروشگاه تخصصی تجهیزات و گجت‌های تکنولوژی",
   allow_google_index: true,
   allowGoogleIndex: true,
   maintenance_mode: "none",
@@ -318,10 +424,10 @@ export const DEFAULT_SITE_INFO: SiteInfo = {
   email: "Pouriarahimi@yahoo.com",
   address: "شیراز - ستارخان",
   working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-  header_announcement: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | ۱۸ ماه گارانتی اصالت طلایی",
+  header_announcement: "⚡ ارسال سریع سفارش‌های استودیو با گارانتی اصالت طلایی",
   free_shipping_threshold: 2000000,
-  description: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
-  footer_text: "مرجع تخصصی تجهیزات دیجیتال، مانیتورهای حرفه‌ای و استودیو با گارانتی اصالت طلایی",
+  description: "مرجع تخصصی تامین تجهیزات دیجیتال، تصویر و گجت‌های نوین با گارانتی اصالت طلایی در ایران.",
+  footer_text: "تمامی حقوق محفوظ است © 2026 آکسون کور",
   homepage_layout_config: DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
   auth_security_config: DEFAULT_AUTH_SECURITY_CONFIG,
 };
@@ -338,16 +444,21 @@ export const siteInfoService = {
         const json = await res.json();
         if (json.data) {
           const data = json.data;
-          const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
-
           let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
           if (data.homepage_layout_config) {
             try {
               const incoming = typeof data.homepage_layout_config === "string"
                 ? JSON.parse(data.homepage_layout_config)
                 : data.homepage_layout_config;
-              parsedLayout = { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG, ...incoming };
-            } catch (err) { console.error("[SITE_INFO_SILENT_ERROR]:", err); }
+              parsedLayout = {
+                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
+                ...incoming,
+                header: { ...DEFAULT_HEADER_CONFIG, ...(incoming.header || {}) },
+                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(incoming.footer || {}) },
+              };
+            } catch (err) {
+              console.error("[LAYOUT_PARSE_ERROR]:", err);
+            }
           }
 
           let parsedSecurity: AuthSecurityConfig = DEFAULT_AUTH_SECURITY_CONFIG;
@@ -360,15 +471,17 @@ export const siteInfoService = {
                 adminDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.adminDeck, ...(incomingSec.adminDeck || {}) },
                 userDeck: { ...DEFAULT_AUTH_SECURITY_CONFIG.userDeck, ...(incomingSec.userDeck || {}) },
               };
-            } catch (err) { console.error("[SITE_INFO_SILENT_ERROR]:", err); }
+            } catch (err) {
+              console.error("[SECURITY_PARSE_ERROR]:", err);
+            }
           }
 
           const mapped: SiteInfo = {
             id: data.id,
-            site_name: data.site_name || data.store_name || "آکسون | Axon",
-            siteName: data.site_name || data.store_name || "آکسون | Axon",
-            storeName: data.site_name || data.store_name || "آکسون | Axon",
-            tagline: data.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر",
+            site_name: data.site_name || data.store_name || "آکسون کور | Axon",
+            siteName: data.site_name || data.store_name || "آکسون کور | Axon",
+            storeName: data.site_name || data.store_name || "آکسون کور | Axon",
+            tagline: data.tagline || "فروشگاه تخصصی تجهیزات و گجت‌های تکنولوژی",
             phone: data.phone || "09376110200",
             email: data.email || "Pouriarahimi@yahoo.com",
             address: data.address || "شیراز - ستارخان",
@@ -378,26 +491,21 @@ export const siteInfoService = {
             footer_logo_url: data.footer_logo_url || "",
             footerLogoUrl: data.footer_logo_url || "",
             favicon_url: data.favicon_url || "",
-            faviconUrl: data.favicon_url || "",
-            allow_google_index: isAllowed,
-            allowGoogleIndex: isAllowed,
-            maintenance_mode: (data.maintenance_mode as MaintenanceMode) || (isAllowed ? "none" : "indefinite"),
-            maintenance_until: data.maintenance_until || undefined,
-            maintenance_duration_minutes: data.maintenance_duration_minutes ? Number(data.maintenance_duration_minutes) : undefined,
+            allow_google_index: data.allow_google_index !== false,
+            allowGoogleIndex: data.allow_google_index !== false,
+            maintenance_mode: (data.maintenance_mode as MaintenanceMode) || "none",
             header_announcement: data.header_announcement || "",
             free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
             description: data.description || data.footer_text || "",
             footer_text: data.footer_text || data.description || "",
             custom_css: data.custom_css || "",
             active_font_id: data.active_font_id || "Vazirmatn",
-            gemini_api_key: data.gemini_api_key || "",
             homepage_layout_config: parsedLayout,
             auth_security_config: parsedSecurity,
             updated_at: data.updated_at,
           };
 
           if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
             if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
             if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
           }
@@ -412,72 +520,21 @@ export const siteInfoService = {
 
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      const current = await this.getSiteInfo();
-      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون | Axon";
-
-      const mergedConfig: HomepageLayoutConfig = {
-        ...(current?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG),
-        ...(payload.homepage_layout_config || {}),
-      };
-
-      const mergedSecurity: AuthSecurityConfig = {
-        adminDeck: {
-          ...(current?.auth_security_config?.adminDeck || DEFAULT_AUTH_SECURITY_CONFIG.adminDeck),
-          ...(payload.auth_security_config?.adminDeck || {}),
-        },
-        userDeck: {
-          ...(current?.auth_security_config?.userDeck || DEFAULT_AUTH_SECURITY_CONFIG.userDeck),
-          ...(payload.auth_security_config?.userDeck || {}),
-        },
-      };
-
-      const dbPayload: any = {
-        site_name: sName,
-        store_name: sName,
-        tagline: payload.tagline !== undefined ? payload.tagline : current?.tagline,
-        phone: payload.phone !== undefined ? payload.phone : current?.phone,
-        email: payload.email !== undefined ? payload.email : current?.email,
-        address: payload.address !== undefined ? payload.address : current?.address,
-        working_hours: payload.working_hours !== undefined ? payload.working_hours : current?.working_hours,
-        logo_url: payload.logo_url !== undefined ? payload.logo_url : current?.logo_url,
-        footer_logo_url: payload.footer_logo_url !== undefined ? payload.footer_logo_url : current?.footer_logo_url,
-        favicon_url: payload.favicon_url !== undefined ? payload.favicon_url : current?.favicon_url,
-        allow_google_index: payload.allow_google_index !== undefined ? payload.allow_google_index : current?.allow_google_index,
-        maintenance_mode: payload.maintenance_mode !== undefined ? payload.maintenance_mode : current?.maintenance_mode,
-        maintenance_until: payload.maintenance_until !== undefined ? payload.maintenance_until : current?.maintenance_until,
-        maintenance_duration_minutes: payload.maintenance_duration_minutes !== undefined ? payload.maintenance_duration_minutes : current?.maintenance_duration_minutes,
-        header_announcement: payload.header_announcement !== undefined ? payload.header_announcement : current?.header_announcement,
-        free_shipping_threshold: payload.free_shipping_threshold !== undefined ? payload.free_shipping_threshold : current?.free_shipping_threshold,
-        footer_text: payload.footer_text !== undefined ? payload.footer_text : current?.footer_text,
-        description: payload.description !== undefined ? payload.description : current?.description,
-        custom_css: payload.custom_css !== undefined ? payload.custom_css : current?.custom_css,
-        active_font_id: payload.active_font_id !== undefined ? payload.active_font_id : current?.active_font_id,
-        gemini_api_key: payload.gemini_api_key !== undefined ? payload.gemini_api_key : current?.gemini_api_key,
-        homepage_layout_config: mergedConfig,
-        auth_security_config: mergedSecurity,
-        updated_at: new Date().toISOString(),
-      };
-
       const res = await fetch("/api/site-info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dbPayload),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
-      const finalData: SiteInfo = {
-        ...(current || DEFAULT_SITE_INFO),
-        ...(json.data || dbPayload),
-        homepage_layout_config: mergedConfig,
-        auth_security_config: mergedSecurity,
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(finalData));
-        realtimeEngine.broadcastLocally("site_info_updated", finalData);
+      if (res.ok && json.success) {
+        const fresh = await this.getSiteInfo();
+        if (typeof window !== "undefined" && fresh) {
+          realtimeEngine.broadcastLocally("site_info_updated", fresh);
+        }
+        return fresh;
       }
-
-      return finalData;
+      return null;
     } catch (e) {
       console.error("siteInfoService.updateSiteInfo Error:", e);
       return null;

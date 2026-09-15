@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { requireAdmin } from "@/lib/authSecurityHelper";
+import sanitizeHtml from "sanitize-html";
 
 export const dynamic = "force-dynamic";
 
@@ -10,61 +12,53 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/webp",
   "image/svg+xml",
   "image/gif",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
 ]);
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // حداکثر ۵ مگابایت
 
 export async function POST(req: NextRequest) {
   try {
-    // ۱. بررسی نشست مدیریت
-    const adminToken = req.cookies.get("admin_session_token")?.value;
-    if (!adminToken || adminToken.length < 20) {
-      return NextResponse.json(
-        { success: false, message: "دسترسی غیرمجاز. لطفا ابتدا وارد پنل شوید." },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAdmin(req);
+    if (!auth.ok) return auth.res;
 
-    // ۲. استخراج فایل از FormData
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const bucketName = (formData.get("bucket") as string) || "products";
 
     if (!file || typeof file === "string") {
-      return NextResponse.json(
-        { success: false, message: "هیچ فایلی برای بارگذاری دریافت نشد." },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "فایلی برای آپلود ارسال نشده است." }, { status: 400 });
     }
 
-    // ۳. بررسی اندازه فایل
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { success: false, message: "حجم فایل ارسالی فراتر از حد مجاز (حداکثر ۵ مگابایت) است." },
-        { status: 400 }
-      );
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ success: false, message: "حجم فایل نباید بیش از ۵ مگابایت باشد." }, { status: 400 });
     }
 
-    // ۴. اعتبارسنجی پسوند و نوع داده
     if (!ALLOWED_MIME_TYPES.has(file.type)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "فرمت فایل نامعتبر است. فقط تصاویر (WebP, PNG, JPG, SVG, GIF) مجاز هستند.",
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "فرمت فایل تصویری مجاز نیست." }, { status: 400 });
     }
-
-    // ۵. نام‌گذاری تصادفی و خنثی‌سازی حملات نام فایل
-    const originalExt = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "webp";
-    const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${originalExt}`;
-    const filePath = `uploads/${cleanFileName}`;
 
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    let buffer = Buffer.from(bytes);
 
-    // ۶. ارسال به Supabase Storage با مجوز ادمین
+    // پاکسازی امن فایل‌های SVG برای جلوگیری از حملات XSS
+    if (file.type === "image/svg+xml") {
+      const rawSvg = buffer.toString("utf8");
+      const cleanSvg = sanitizeHtml(rawSvg, {
+        allowedTags: [
+          "svg", "g", "path", "circle", "rect", "line", "polyline", "polygon",
+          "ellipse", "defs", "linearGradient", "radialGradient", "stop", "text", "tspan", "title"
+        ],
+        allowedAttributes: {
+          "*": ["id", "class", "style", "d", "fill", "stroke", "stroke-width", "viewBox", "width", "height", "x", "y", "cx", "cy", "r", "rx", "ry", "x1", "y1", "x2", "y2", "points", "transform", "opacity", "offset", "stop-color"]
+        },
+      });
+      buffer = Buffer.from(cleanSvg, "utf8");
+    }
+
+    const originalExt = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "webp";
+    const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${originalExt}`;
+    const filePath = `uploads/${cleanFileName}`;
+
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
       .from(bucketName)
       .upload(filePath, buffer, {
@@ -73,13 +67,9 @@ export async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      return NextResponse.json(
-        { success: false, message: uploadError.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, message: uploadError.message }, { status: 500 });
     }
 
-    // ۷. دریافت آدرس عمومی فایل
     const { data: publicUrlData } = supabaseAdmin.storage
       .from(bucketName)
       .getPublicUrl(uploadData.path);
@@ -88,14 +78,9 @@ export async function POST(req: NextRequest) {
       success: true,
       url: publicUrlData.publicUrl,
       fileName: cleanFileName,
-      size: file.size,
-      mimeType: file.type,
-      message: "فایل با موفقیت و بررسی‌های امنیتی ذخیره گردید.",
+      message: "فایل با موفقیت و پاکسازی امنیتی ذخیره گردید.",
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, message: err.message || "خطا در پردازش آپلود." },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: err.message || "خطا در آپلود فایل." }, { status: 500 });
   }
 }

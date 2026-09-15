@@ -1,58 +1,55 @@
-// File Path: app/api/sms/send/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { checkRateLimit } from "@/lib/rateLimiter";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
+const ipRequestTracker = new Map<string, { count: number; expires: number }>();
+
 export async function POST(req: NextRequest) {
   try {
-    const { phone, message } = await req.json();
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "127.0.0.1";
+    const session = await verifyAdminSession(req);
 
-    if (!phone || !message) {
-      return NextResponse.json({ success: false, message: "شماره تماس و متن پیام الزامی است." }, { status: 400 });
+    // اگر فراخوانی توسط ادمین نیست، محدودیت ترافیک بر پایه IP اعمال می‌شود
+    if (!session) {
+      const now = Date.now();
+      const tracker = ipRequestTracker.get(clientIp);
+      if (tracker && tracker.expires > now) {
+        if (tracker.count >= 5) {
+          return NextResponse.json({ success: false, message: "سقف تعداد ارسال پیامک پر شده است. لطفاً ۵ دقیقه دیگر تلاش کنید." }, { status: 429 });
+        }
+        tracker.count++;
+      } else {
+        ipRequestTracker.set(clientIp, { count: 1, expires: now + 5 * 60 * 1000 });
+      }
     }
 
-    const cleanPhone = String(phone)
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
-      .replace(/\D/g, "");
-
+    const body = await req.json();
+    const cleanPhone = String(body.phone || "").replace(/\D/g, "");
     if (!/^09\d{9}$/.test(cleanPhone)) {
-      return NextResponse.json({ success: false, message: "شماره موبایل وارد شده باید ۱۱ رقمی و با ۰۹ شروع شود." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شماره موبایل معتبر ۱۱ رقمی الزامی است." }, { status: 400 });
     }
 
-    const isAllowed = await checkRateLimit(cleanPhone, 8, 5);
-    if (!isAllowed) {
-      return NextResponse.json(
-        { success: false, message: "سقف تعداد پیامک‌های ارسالی به این شماره پر شده است. لطفاً ۵ دقیقه دیگر تلاش کنید." },
-        { status: 429 }
-      );
+    const message = String(body.message || "").trim();
+    if (!message) {
+      return NextResponse.json({ success: false, message: "متن پیامک الزامی است." }, { status: 400 });
     }
 
     const kavenegarApiKey = process.env.KAVENEGAR_API_KEY;
     if (kavenegarApiKey) {
       try {
-        const resp = await fetch(`https://api.kavenegar.com/v1/${kavenegarApiKey}/sms/send.json`, {
+        await fetch(`https://api.kavenegar.com/v1/${kavenegarApiKey}/sms/send.json`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            receptor: cleanPhone,
-            message: String(message).trim(),
-          }),
+          body: new URLSearchParams({ receptor: cleanPhone, message }),
         });
-        const resJson = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-          throw new Error(resJson?.return?.message || "خطا در درگاه کاوه‌نگار");
-        }
-      } catch (err: any) {
-        console.error("[GATEWAY_SMS_SEND_ERROR]:", err);
+      } catch (smsErr) {
+        console.error("[KAVENEGAR_SEND_ERROR]:", smsErr);
       }
-    } else {
-      console.log(`[DIRECT_SMS_OUT] To: ${cleanPhone} | Msg: ${message}`);
     }
 
-    return NextResponse.json({ success: true, message: "پیامک با موفقیت ارسال شد." });
+    return NextResponse.json({ success: true, message: "پیامک با موفقیت ارسال گردید." });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || "خطای سرور در ارسال پیامک." }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

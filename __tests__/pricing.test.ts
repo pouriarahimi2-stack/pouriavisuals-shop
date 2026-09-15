@@ -1,9 +1,10 @@
 /**
- * AXON CORE - Pricing & Cart Unit Tests
+ * AXON CORE - Pricing & Real Coupon Validation Logic Tests
  */
+import { calculateOrderDiscount } from "@/lib/couponValidator";
 
 describe("Cart & Pricing Business Logic", () => {
-  test("calculates raw subtotal correctly", () => {
+  test("calculates raw subtotal accurately", () => {
     const items = [
       { price: 1000000, quantity: 2 },
       { price: 500000, quantity: 1 },
@@ -12,18 +13,31 @@ describe("Cart & Pricing Business Logic", () => {
     expect(subtotal).toBe(2500000);
   });
 
-  test("applies percentage discount accurately and respects max discount", () => {
-    const rawTotal = 10000000;
-    const discountPercent = 20;
-    const maxDiscount = 1500000;
+  test("applies percentage discount accurately and enforces max discount limit", () => {
+    const coupon = {
+      code: "VIP20",
+      type: "percent",
+      discount_value: 20,
+      max_discount_amount: 1500000,
+      is_active: true,
+    };
 
-    let discount = Math.round((rawTotal * discountPercent) / 100);
-    if (maxDiscount && discount > maxDiscount) {
-      discount = maxDiscount;
-    }
+    const res = calculateOrderDiscount(coupon, 10000000);
+    expect(res.valid).toBe(true);
+    expect(res.discountAmount).toBe(1500000);
+  });
 
-    const finalPayable = Math.max(0, rawTotal - discount);
-    expect(discount).toBe(1500000);
-    expect(finalPayable).toBe(8500000);
+  test("rejects inactive or below min_order coupons safely", () => {
+    const minOrderCoupon = {
+      code: "MIN5M",
+      type: "fixed",
+      discount_value: 200000,
+      min_order_amount: 5000000,
+      is_active: true,
+    };
+
+    const res = calculateOrderDiscount(minOrderCoupon, 2000000);
+    expect(res.valid).toBe(false);
+    expect(res.discountAmount).toBe(0);
   });
 });

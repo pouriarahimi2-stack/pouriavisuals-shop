@@ -1,37 +1,67 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: string;
+interface NavGroup {
+  groupTitle: string;
+  items: {
+    name: string;
+    href: string;
+    icon: string;
+  }[];
 }
 
-const navItems: NavItem[] = [
-  { name: "داشبورد اصلی", href: "/admin/dashboard", icon: "⚡" },
-  { name: "مدیریت سفارشات", href: "/admin/orders", icon: "📦" },
-  { name: "کاتالوگ محصولات", href: "/admin/products", icon: "💻" },
-  { name: "صفحه‌ساز حرفه‌ای (Puck)", href: "/admin/pages", icon: "🎨" },
-  { name: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
-  { name: "بنرها و اسلایدر", href: "/admin/banners", icon: "🖼️" },
-  { name: "اخبار و مقالات", href: "/admin/news", icon: "📰" },
-  { name: "گزارشات و انبار", href: "/admin/inventory", icon: "📈" },
-  { name: "لاگ‌های امنیتی", href: "/admin/audit-logs", icon: "🛡️" },
-  { name: "پشتیبان‌گیری داده‌ها", href: "/admin/backup", icon: "💾" },
-  { name: "تنظیمات فروشگاه", href: "/admin/settings", icon: "⚙️" },
+const NAV_SECTIONS: NavGroup[] = [
+  {
+    groupTitle: "مدیریت فروش و فاکتورها",
+    items: [
+      { name: "داشبورد تحلیلی", href: "/admin/dashboard", icon: "📊" },
+      { name: "سفارشات و بارنامه", href: "/admin/orders", icon: "📦" },
+      { name: "مشتریان و CRM", href: "/admin/customers", icon: "👥" },
+      { name: "حسابداری و انبار", href: "/admin/inventory", icon: "📈" },
+      { name: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
+    ],
+  },
+  {
+    groupTitle: "کاتالوگ و محتوا",
+    items: [
+      { name: "کاتالوگ محصولات", href: "/admin/products", icon: "💻" },
+      { name: "صفحه‌ساز ماژولار (Puck)", href: "/admin/pages", icon: "🎨" },
+      { name: "بنرها و اسلایدر", href: "/admin/banners", icon: "🖼️" },
+      { name: "وبلاگ و مقالات سئو", href: "/admin/blog", icon: "📚" },
+      { name: "رادار اخبار فناوری", href: "/admin/news", icon: "📡" },
+      { name: "منو و دسته‌بندی‌ها", href: "/admin/menu", icon: "🔗" },
+      { name: "پیام‌ها و تیکت‌ها", href: "/admin/messages", icon: "📩" },
+    ],
+  },
+  {
+    groupTitle: "هوش مصنوعی و هویت بصری",
+    items: [
+      { name: "مرکز هوش مصنوعی (AI Suite)", href: "/admin/ai", icon: "🤖" },
+      { name: "هویت بصری و فونت‌ها", href: "/admin/styles", icon: "🎨" },
+    ],
+  },
+  {
+    groupTitle: "سیستم و امنیت هسته",
+    items: [
+      { name: "ماتریس دسترسی‌ها (RBAC)", href: "/admin/roles", icon: "🛡️" },
+      { name: "لاگ‌های امنیتی (Audit)", href: "/admin/audit-logs", icon: "📝" },
+      { name: "پشتیبان‌گیری دیتابیس", href: "/admin/backup", icon: "💾" },
+      { name: "تنظیمات عمومی فروشگاه", href: "/admin/settings", icon: "⚙️" },
+      { name: "تغییر کلمه عبور و پین", href: "/admin/change-pin", icon: "🔐" },
+    ],
+  },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
     soundEngine.playClick();
-    document.cookie = "admin_session_token=; path=/; max-age=0";
-    document.cookie = "admin_logged_in=; path=/; max-age=0";
     try {
       await fetch("/api/admin/logout", { method: "POST" });
     } catch {}
@@ -39,62 +69,101 @@ export default function AdminSidebar() {
   };
 
   return (
-    <aside className="w-64 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] min-h-[calc(100vh-65px)] flex flex-col justify-between p-4 font-sans select-none shadow-sm" dir="rtl">
-      <div className="space-y-6">
-        {/* برند بالای سایدبار */}
-        <div className="flex items-center gap-3 px-2 py-1">
-          <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/20">
-            A
-          </div>
-          <div>
-            <span className="font-black text-xs text-[var(--text-primary)] block tracking-tight">آکسون کور</span>
-            <span className="text-[10px] font-mono text-blue-500 font-bold tracking-wider block">CONTROL PANEL V1.0</span>
-          </div>
-        </div>
-
-        {/* لیست منوها */}
-        <nav className="space-y-1.5">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => soundEngine.playClick()}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
-                    : "text-[var(--text-primary)] hover:bg-[var(--input-bg)] hover:text-blue-600 dark:hover:text-blue-400"
-                }`}
-              >
-                <span className="truncate">{item.name}</span>
-                <span className="text-base shrink-0 opacity-90">{item.icon}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* بخش پایینی: مشاهده سایت و خروج */}
-      <div className="pt-4 border-t border-[var(--card-border)] space-y-2">
-        <Link
-          href="/"
-          target="_blank"
-          onClick={() => soundEngine.playClick()}
-          className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:text-blue-600 hover:bg-[var(--input-bg)] transition cursor-pointer"
-        >
-          <span>مشاهده فروشگاه</span>
-          <span className="text-sm">↗</span>
-        </Link>
+    <>
+      {/* دکمه بازکردن منو در موبایل */}
+      <div className="lg:hidden fixed bottom-4 right-4 z-50">
         <button
-          type="button"
-          onClick={handleLogout}
-          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-2xl font-bold text-lg"
+          aria-label="منوی مدیریت"
         >
-          <span>خروج از مدیریت</span>
-          <span>🚪</span>
+          {mobileOpen ? "✕" : "☰"}
         </button>
       </div>
-    </aside>
+
+      {/* پس‌زمینه تیره موبایل */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        />
+      )}
+
+      {/* سایدبار استاندارد دسکتاپ و دراور کشویی موبایل */}
+      <aside
+        className={`fixed lg:sticky top-0 right-0 z-40 w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-screen overflow-y-auto flex flex-col justify-between p-4 font-sans select-none shadow-xl transition-transform duration-300 ${
+          mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+        }`}
+        dir="rtl"
+      >
+        <div className="space-y-5">
+          {/* هدر برند سایدبار */}
+          <div className="flex items-center gap-3 px-2 py-2 border-b border-[var(--card-border)] pb-4">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/25">
+              ⚡
+            </div>
+            <div>
+              <span className="font-black text-xs text-[var(--text-primary)] block tracking-tight">آکسون کور | Axon</span>
+              <span className="text-[10px] font-mono text-blue-500 font-bold tracking-wider block">ENTERPRISE PANEL</span>
+            </div>
+          </div>
+
+          {/* گروه‌های منو */}
+          <nav className="space-y-4">
+            {NAV_SECTIONS.map((sec, sIdx) => (
+              <div key={sIdx} className="space-y-1">
+                <span className="text-[10px] font-black text-slate-400 px-3 block uppercase tracking-wider">
+                  {sec.groupTitle}
+                </span>
+                <div className="space-y-0.5">
+                  {sec.items.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setMobileOpen(false);
+                        }}
+                        className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                          isActive
+                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--input-bg)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        <span className="truncate">{item.name}</span>
+                        <span className="text-sm shrink-0 opacity-90">{item.icon}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        {/* فوتر سایدبار */}
+        <div className="pt-4 border-t border-[var(--card-border)] space-y-2 mt-4">
+          <Link
+            href="/"
+            target="_blank"
+            onClick={() => soundEngine.playClick()}
+            className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold bg-[var(--input-bg)] text-[var(--text-primary)] hover:border-blue-500 border border-[var(--card-border)] transition cursor-pointer"
+          >
+            <span>مشاهده ویترین فروشگاه</span>
+            <span className="text-sm">↗</span>
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+          >
+            <span>خروج از پنل مدیریت</span>
+            <span>🚪</span>
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

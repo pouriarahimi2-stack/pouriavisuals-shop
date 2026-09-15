@@ -1,39 +1,32 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import crypto from "crypto";
+import { verifyPayload, COOKIE_NAME } from "@/lib/session";
 
-const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || "axon_core_fixed_session_secret_2026";
-
-function isTokenValid(token?: string): boolean {
-  if (!token || typeof token !== "string" || !token.includes(":")) return false;
-  try {
-    const parts = token.split(":");
-    if (parts.length !== 3) return false;
-    const [user, expStr, sig] = parts;
-    if (Date.now() > Number(expStr)) return false;
-    const payload = `${user}:${expStr}`;
-    const expectedSig = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
-    return crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expectedSig, "hex"));
-  } catch {
-    return false;
-  }
-}
-
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const token = req.cookies.get("admin_session_token")?.value;
-  const loggedInFlag = req.cookies.get("admin_logged_in")?.value;
-  const isAuthenticated = isTokenValid(token) || loggedInFlag === "true";
-
-  // دسترسی به API های مدیریت و حسابداری
-  if (pathname.startsWith("/api/admin") || pathname === "/api/accounting") {
-    const isPublic = pathname === "/api/admin/login" || pathname === "/api/admin/session" || pathname === "/api/admin/auth";
-    if (!isPublic && !isAuthenticated) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
+  const token = req.cookies.get(COOKIE_NAME)?.value;
+  
+  let isAuthenticated = false;
+  if (token) {
+    const payload = await verifyPayload(token);
+    if (payload && payload.username) {
+      isAuthenticated = true;
     }
   }
 
-  // مدیریت صفحات ادمین
+  // محافظت از روت‌های حساس مدیریت و حسابداری
+  if (pathname.startsWith("/api/admin") || pathname === "/api/accounting") {
+    const isPublic = 
+      pathname === "/api/admin/login" || 
+      pathname === "/api/admin/session" || 
+      pathname === "/api/admin/auth";
+      
+    if (!isPublic && !isAuthenticated) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. احراز هویت الزامی است." }, { status: 401 });
+    }
+  }
+
+  // محافظت از صفحات پیشخوان ادمین
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login";
 
@@ -54,5 +47,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|icons|placeholder.png|robots.txt|sitemap.xml).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|icons|placeholder.png|robots.txt|sitemap.xml|27424534.txt).*)"],
 };

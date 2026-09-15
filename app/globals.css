@@ -31,29 +31,25 @@
 }
 
 html, body {
-  overflow-x: hidden !important;
   width: 100%;
   max-width: 100vw;
   scroll-behavior: smooth;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
 }
 
 body {
   font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
-  -webkit-overflow-scrolling: touch;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* شتاب‌دهی سخت‌افزاری برای کارت‌ها و المان‌های تعاملی موبایل */
-.glass-morphism, [class*="rounded-"], button, input, select, textarea {
+/* شتاب‌دهی سخت‌افزاری تنها روی المان‌های نیازمند انیمیشن (حذف سربار GPU در موبایل) */
+.gpu-accelerated {
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
 }
 
 .glass-morphism {
@@ -85,17 +81,9 @@ body {
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* تاچ تارگت‌های ارگونومیک برای موبایل و تبلت */
+/* تاچ‌تارگت‌های ارگونومیک ۴۴ پیکسلی ویژه موبایل و تبلت */
 @media (max-width: 768px) {
   button, input, select, textarea {
     min-height: 44px;
-    font-size: 13px !important;
   }
-}
-
-/* AXON CORE - HIDE 3 TRUST BADGES GLOBALLY */
-div:has(> * > strong:contains("۱۸ ماه گارانتی اصالت طلایی")),
-div:has(> strong:contains("۱۸ ماه گارانتی اصالت طلایی")),
-[data-axon-badges="true"] {
-  display: none !important;
 }

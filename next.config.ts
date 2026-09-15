@@ -1,8 +1,9 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: false,
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
   images: {
-    unoptimized: true, // رفع قطعی خطای 400 Bad Request برای تصاویر محلی و ریموت در ورسل
+    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "**" },
     ],
@@ -13,16 +14,20 @@ const nextConfig = {
         source: "/(.*)",
         headers: [
           {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://rsms.me",
-              "font-src 'self' data: https://fonts.gstatic.com https://rsms.me",
-              "img-src 'self' data: blob: https: http:",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
-              "connect-src 'self' https: wss:",
-              "frame-src 'self' https:",
-            ].join("; "),
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "SAMEORIGIN",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains; preload",
           },
         ],
       },
@@ -35,10 +40,15 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "(?!axoncore\\.ir$|localhost).*$",
+            value: "(?!axoncore\\.ir$|localhost(:\\d+)?).*$",
           },
         ],
         destination: "https://axoncore.ir/:path*",
+        permanent: true,
+      },
+      {
+        source: "/track",
+        destination: "/track-order",
         permanent: true,
       },
     ];

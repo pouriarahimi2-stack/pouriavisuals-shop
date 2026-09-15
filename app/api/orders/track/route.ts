@@ -18,7 +18,7 @@ function maskAddress(addr?: string): string {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get("q")?.trim();
+    const query = searchParams.get("q")?.trim() || searchParams.get("query")?.trim();
     const phone = searchParams.get("phone")?.trim();
 
     if (!query && !phone) {
@@ -31,20 +31,17 @@ export async function GET(req: NextRequest) {
     let dbQuery = supabaseAdmin.from("orders").select("*");
 
     if (query) {
-      // جستجو هم بر اساس آیدی سفارش و هم کد رهگیری پستی
-      if (query.includes("-") || query.length >= 20) {
-        dbQuery = dbQuery.eq("id", query);
-      } else {
-        dbQuery = dbQuery.or(`id.ilike.%${query}%,tracking_code.eq.${query}`);
-      }
+      // پاکسازی ورودی برای جلوگیری از PostgREST Filter Injection
+      const sanitized = query.replace(/[^a-zA-Z0-9_-]/g, "");
+      dbQuery = dbQuery.or(`id.eq.${sanitized},order_number.eq.${sanitized},tracking_code.eq.${sanitized}`);
     }
 
     if (phone) {
-      const cleanPhone = phone.replace("+98", "0");
-      dbQuery = dbQuery.eq("customer_phone", cleanPhone);
+      const cleanPhone = phone.replace(/\D/g, "");
+      dbQuery = dbQuery.or(`customer_phone.eq.${cleanPhone},phone.eq.${cleanPhone}`);
     }
 
-    const { data: orders, error } = await dbQuery.order("created_at", { ascending: false }).limit(5);
+    const { data: orders, error } = await dbQuery.order("created_at", { ascending: false }).limit(10);
 
     if (error) throw error;
 
@@ -55,34 +52,71 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // پالایش اطلاعات شخصی (PII Masking)
     const sanitizedOrders = orders.map((o) => ({
       id: o.id,
+      order_number: o.order_number || o.id,
       customer_name: o.customer_name ? o.customer_name[0] + "***" : "مشتری گرامی",
-      customer_phone: maskPhoneNumber(o.customer_phone),
-      customer_address: maskAddress(o.customer_address),
+      customer_phone: maskPhoneNumber(o.customer_phone || o.phone),
+      customer_address: maskAddress(o.customer_address || o.address),
       status: o.status,
       tracking_code: o.tracking_code || null,
       total_amount: o.final_amount || o.total_amount,
-      items: Array.isArray(o.items)
-        ? o.items.map((i: any) => ({
-            title: i.title,
-            quantity: i.quantity,
-            selected_color: i.selected_color,
-            selected_storage: i.selected_storage,
-          }))
-        : [],
+      final_amount: o.final_amount || o.total_amount,
+      items: Array.isArray(o.items) ? o.items : [],
       created_at: o.created_at,
     }));
 
     return NextResponse.json({
       success: true,
       orders: sanitizedOrders,
+      order: sanitizedOrders[0],
     });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, message: err.message || "خطا در پیگیری وضعیت مرسوله." },
       { status: 500 }
     );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const orderId = body.orderId ? String(body.orderId).trim().replace(/[^a-zA-Z0-9_-]/g, "") : null;
+    const phone = body.phone ? String(body.phone).trim().replace(/\D/g, "") : null;
+
+    if (!orderId && !phone) {
+      return NextResponse.json({ success: false, message: "شناسه سفارش یا تلفن الزامی است." }, { status: 400 });
+    }
+
+    let dbQuery = supabaseAdmin.from("orders").select("*");
+    if (orderId) {
+      dbQuery = dbQuery.or(`id.eq.${orderId},order_number.eq.${orderId},tracking_code.eq.${orderId}`);
+    }
+    if (phone) {
+      dbQuery = dbQuery.or(`customer_phone.eq.${phone},phone.eq.${phone}`);
+    }
+
+    const { data: order, error } = await dbQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (error || !order) {
+      return NextResponse.json({ success: false, message: "سفارش مورد نظر یافت نشد." }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      order: {
+        id: order.id,
+        order_number: order.order_number || order.id,
+        customer_name: order.customer_name ? order.customer_name[0] + "***" : "مشتری گرامی",
+        status: order.status,
+        tracking_code: order.tracking_code || null,
+        final_amount: order.final_amount || order.total_amount,
+        total_amount: order.total_amount,
+        items: Array.isArray(order.items) ? order.items : [],
+        created_at: order.created_at,
+      }
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

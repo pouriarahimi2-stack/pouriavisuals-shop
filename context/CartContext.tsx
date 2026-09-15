@@ -1,4 +1,3 @@
-// File Path: context/CartContext.tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
@@ -50,6 +49,7 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 const CART_STORAGE_KEY = "axon_cart_store_v2026";
 const COUPON_STORAGE_KEY = "axon_active_coupon_v2026";
+const ORDERS_HISTORY_STORAGE_KEY = "axon_orders_history_v2026";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -57,7 +57,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [freeShippingThreshold] = useState<number>(2000000);
 
-  // بارگذاری داده‌ها از LocalStorage در مرحله کلاینت
   useEffect(() => {
     try {
       const localCart = localStorage.getItem(CART_STORAGE_KEY);
@@ -76,7 +75,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // همگام‌سازی بلادرنگ سبد خرید بین تمام تب‌های باز مرورگر (Cross-Tab Sync)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === CART_STORAGE_KEY && e.newValue) {
@@ -255,6 +253,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeCoupon = () => persistCoupon(null);
 
+  // رفع باگ آلودگی کلید CART_STORAGE_KEY: ذخیره در کلید مستقل سوابق
   const submitOrder = (orderData: any) => {
     const orderId = `ORD-${Date.now().toString().slice(-6)}`;
     const fullOrder = {
@@ -267,8 +266,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     try {
-      const existing = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([fullOrder, ...existing]));
+      const existing = JSON.parse(localStorage.getItem(ORDERS_HISTORY_STORAGE_KEY) || "[]");
+      localStorage.setItem(ORDERS_HISTORY_STORAGE_KEY, JSON.stringify([fullOrder, ...existing]));
     } catch {}
     return fullOrder;
   };

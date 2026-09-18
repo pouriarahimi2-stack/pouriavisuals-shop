@@ -1,3 +1,7 @@
+function safeJsonLd(obj: any): string {
+  return JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+}
+
 import React from "react";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import BlogArchiveClient, { BlogPostItem } from "@/components/BlogArchiveClient";
@@ -83,7 +87,7 @@ export default async function BlogPage() {
     <div className="max-w-7xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(blogJsonLd) }}
       />
 
       <div className="text-center space-y-2">

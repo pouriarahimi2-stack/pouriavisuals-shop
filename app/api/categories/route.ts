@@ -6,13 +6,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data: categories, error } = await supabaseAdmin
       .from("categories")
       .select("*")
-      .order("id", { ascending: true });
+      .order("created_at", { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json({ success: true, data: data || [] });
+    return NextResponse.json({ success: true, categories: categories || [], data: categories || [] });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -20,69 +20,54 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!(await verifyAdminSession(req))) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
     }
 
-    const { name, id } = await req.json();
-    const cleanName = String(name || "").trim();
+    const body = await req.json();
+    const name = String(body.name || body.title || "").trim();
 
-    if (!cleanName) {
+    if (!name) {
       return NextResponse.json({ success: false, message: "نام دسته‌بندی الزامی است." }, { status: 400 });
     }
 
-    const categoryId = String(id || ("cat_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6)));
+    const slug = String(body.slug || name)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+      .replace(/^-+|-+$/g, "");
 
-    const { data, error } = await supabaseAdmin
-      .from("categories")
-      .insert([{ id: categoryId, name: cleanName }])
-      .select()
-      .single();
+    const payload = {
+      name,
+      title: name,
+      slug,
+      description: body.description ? String(body.description).trim() : null,
+      icon: body.icon || "📁",
+      is_active: body.is_active !== false,
+      updated_at: new Date().toISOString(),
+    };
 
-    if (error) throw error;
+    if (body.id) {
+      const { data: updated, error } = await supabaseAdmin
+        .from("categories")
+        .update(payload)
+        .eq("id", body.id)
+        .select()
+        .single();
 
-    return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
+      if (error) throw error;
+      return NextResponse.json({ success: true, message: "دسته‌بندی با موفقیت به‌روزرسانی شد.", category: updated });
+    } else {
+      const { data: inserted, error } = await supabaseAdmin
+        .from("categories")
+        .insert([{ ...payload, created_at: new Date().toISOString() }])
+        .select()
+        .single();
 
-export async function PUT(req: NextRequest) {
-  try {
-    if (!(await verifyAdminSession(req))) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+      if (error) throw error;
+      return NextResponse.json({ success: true, message: "دسته‌بندی جدید با موفقیت ایجاد شد.", category: inserted });
     }
-
-    const { id, name } = await req.json();
-    const cleanName = String(name || "").trim();
-
-    if (!id || !cleanName) {
-      return NextResponse.json({ success: false, message: "شناسه و نام جدید الزامی است." }, { status: 400 });
-    }
-
-    const { data: oldCat } = await supabaseAdmin
-      .from("categories")
-      .select("name")
-      .eq("id", id)
-      .maybeSingle();
-
-    const { data, error } = await supabaseAdmin
-      .from("categories")
-      .update({ name: cleanName })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    if (oldCat?.name) {
-      await supabaseAdmin
-        .from("products")
-        .update({ category: cleanName })
-        .eq("category", oldCat.name);
-    }
-
-    return NextResponse.json({ success: true, data });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -90,23 +75,19 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    if (!(await verifyAdminSession(req))) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
+    }
+    if (session.role !== "superadmin") {
+      return NextResponse.json({ success: false, message: "تنها مدیر ارشد مجاز به حذف دسته‌بندی است." }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    const name = searchParams.get("name");
 
     if (!id) {
       return NextResponse.json({ success: false, message: "شناسه دسته‌بندی الزامی است." }, { status: 400 });
-    }
-
-    if (name) {
-      await supabaseAdmin
-        .from("products")
-        .update({ category: "تجهیزات عمومی" })
-        .eq("category", name);
     }
 
     const { error } = await supabaseAdmin.from("categories").delete().eq("id", id);

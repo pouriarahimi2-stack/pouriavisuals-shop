@@ -519,15 +519,18 @@ export default function AdminProducts() {
                   <div>
                     <label className="block font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی کالا در فروشگاه</label>
                     <div className="flex gap-1.5 items-center">
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-[var(--text-primary)] cursor-pointer outline-none"
-                      >
-                        {categories.map((c) => (
-                          <option key={c.id || c.name} value={c.name}>{c.name}</option>
-                        ))}
-                      </select>
+                      
+      <div className="flex gap-2">
+        <input
+          type="text"
+          required
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="دسته‌بندی (مثلاً: اتوبخار و لوازم خانگی)"
+          className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+        />
+      </div>
+    
 
                       <button
                         type="button"

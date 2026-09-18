@@ -1,0 +1,31 @@
+[
+  {
+    "title": "مانیتور ۵K استودیو دیسپلی اپل مدل نانوتکستچر",
+    "price": 135000000,
+    "discount_price": 129000000,
+    "stock": 8,
+    "category": "مانیتور استودیویی",
+    "short_description": "پنل ۲۷ اینچ ۵K رتینا با تفکیک ۱ میلیارد رنگ و پایه با قابلیت تنظیم شیب و ارتفاع",
+    "image_url": "/placeholder.png",
+    "specs": {
+      "رزولوشن": "5120x2880 (5K)",
+      "تراکم پیکسلی": "218 PPI",
+      "گاموت رنگی": "P3 Wide Color",
+      "درگاه": "Thunderbolt 3"
+    }
+  },
+  {
+    "title": "کارت کپچر اکسترنال بلک‌مجیک UltraStudio 4K Mini",
+    "price": 68000000,
+    "discount_price": null,
+    "stock": 5,
+    "category": "کارت کپچر و تصویر",
+    "short_description": "کپچر و پخش زنده پیشرفته تاندربولت ۳ با ورودی 12G-SDI و HDMI",
+    "image_url": "/placeholder.png",
+    "specs": {
+      "اتصال": "Thunderbolt 3",
+      "ورودی/خروجی": "12G-SDI, HDMI",
+      "کدک": "ProRes, DNxHD"
+    }
+  }
+]

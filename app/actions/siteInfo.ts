@@ -12,7 +12,7 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
 
     const { data, error } = await supabaseAdmin
       .from("site_info")
-      .select("*")
+      .select('id, site_name, store_name, tagline, logo_url, footer_logo_url, favicon_url, active_font_id, phone, email, address, working_hours, instagram, telegram, whatsapp, youtube, header_announcement, free_shipping_threshold, allow_google_index, maintenance_mode, maintenance_until, maintenance_duration_minutes')
       .order("id", { ascending: true })
       .limit(1)
       .maybeSingle();

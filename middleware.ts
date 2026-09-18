@@ -5,7 +5,7 @@ import { verifyPayload, COOKIE_NAME } from "@/lib/session";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get(COOKIE_NAME)?.value;
-  
+
   let isAuthenticated = false;
   if (token) {
     const payload = await verifyPayload(token);
@@ -14,15 +14,24 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // محافظت از روت‌های حساس مدیریت و حسابداری
-  if (pathname.startsWith("/api/admin") || pathname === "/api/accounting") {
+  // محافظت از روت‌های حساس مدیریت، پیامک، تست هوش مصنوعی و حسابداری
+  const isProtectedApi = 
+    pathname.startsWith("/api/admin") || 
+    pathname === "/api/accounting" ||
+    pathname === "/api/sms/send" ||
+    pathname === "/api/test-ai";
+
+  if (isProtectedApi) {
+    // تنها مسیرهای عمومی مجاز: لاگین ادمین و وضعیت سشن
     const isPublic = 
       pathname === "/api/admin/login" || 
-      pathname === "/api/admin/session" || 
-      pathname === "/api/admin/auth";
-      
+      pathname === "/api/admin/session";
+
     if (!isPublic && !isAuthenticated) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. احراز هویت الزامی است." }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز. احراز هویت الزامی است." },
+        { status: 401 }
+      );
     }
   }
 
@@ -47,5 +56,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|icons|placeholder.png|robots.txt|sitemap.xml|27424534.txt).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|images|icons|placeholder.png|robots.txt|sitemap.xml|27424534.txt).*)",
+  ],
 };

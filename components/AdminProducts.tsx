@@ -8,6 +8,36 @@ import ProductExplodedView from "@/components/ProductExplodedView";
 import { formatPrice } from "@/lib/formatters";
 
 export default function AdminProducts() {
+  const fileImportInputRef = React.useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = React.useState(false);
+
+  const handleImportJsonFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const res = await fetch("/api/admin/import-products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert("✓ " + (data.message || "محصولات با موفقیت وارد شدند."));
+        window.location.reload();
+      } else {
+        alert("خطا در ایمپورت: " + (data.message || data.error));
+      }
+    } catch (err: any) {
+      alert("فایل نامعتبر است: " + err.message);
+    } finally {
+      setImporting(false);
+      if (fileImportInputRef.current) fileImportInputRef.current.value = "";
+    }
+  };
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);

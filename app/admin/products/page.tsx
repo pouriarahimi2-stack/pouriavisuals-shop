@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, CheckCircle2, ArrowRight } from "lucide-react";
+import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 interface SpecItem {
@@ -23,14 +23,16 @@ export default function AdminProductsPage() {
   const [discountToman, setDiscountToman] = useState<string>("");
   const [stock, setStock] = useState<number>(10);
   const [description, setDescription] = useState("");
-  const [images, setImages] = useState<string[]>([]);
-  const [imageUrlInput, setImageUrlInput] = useState("");
   
+  // مدیریت چند عکس
+  const [images, setImages] = useState<string[]>([]);
+  const [imgInput, setImgInput] = useState("");
+
   // رنگ‌بندی
   const [colors, setColors] = useState<string[]>([]);
   const [colorInput, setColorInput] = useState("");
 
-  // ویژگی‌های فنی پویا (Key-Value)
+  // مشخصات فنی پویا
   const [specsList, setSpecsList] = useState<SpecItem[]>([
     { key: "توان مصرفی", value: "" },
     { key: "ظرفیت مخزن", value: "" },
@@ -55,9 +57,8 @@ export default function AdminProductsPage() {
     fetchProducts();
   }, []);
 
-  // توابع فرمت‌بندی ۳ رقمی
   const formatNumber = (val: string) => {
-    const raw = val.replace(/\D/g, "");
+    const raw = String(val || "").replace(/\D/g, "");
     return raw.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
@@ -66,7 +67,35 @@ export default function AdminProductsPage() {
   };
 
   const parseRawNumber = (formatted: string) => {
-    return Number(formatted.replace(/,/g, "")) || 0;
+    return Number(String(formatted || "").replace(/,/g, "")) || 0;
+  };
+
+  // مدیریت تصاویر
+  const addImage = () => {
+    const url = imgInput.trim();
+    if (url && !images.includes(url)) {
+      setImages([...images, url]);
+      setImgInput("");
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+  };
+
+  // تبدیل فایل آپلودی به Base64
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result && typeof reader.result === "string") {
+          setImages((prev) => [...prev, reader.result as string]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   // مدیریت رنگ‌ها
@@ -82,7 +111,7 @@ export default function AdminProductsPage() {
     setColors(colors.filter((c) => c !== col));
   };
 
-  // مدیریت ویژگی‌های پویا
+  // مدیریت مشخصات
   const addSpecField = () => {
     setSpecsList([...specsList, { key: "", value: "" }]);
   };
@@ -97,7 +126,34 @@ export default function AdminProductsPage() {
     setSpecsList(specsList.filter((_, i) => i !== index));
   };
 
-  // ذخیره فرم با اعتبارسنجی
+  // باز کردن مدال در حالت ویرایش
+  const handleEditClick = (p: any) => {
+    setEditingId(p.id);
+    setTitle(p.title || p.name || "");
+    setCategory(p.category || "");
+    setPriceToman(formatNumber(String(p.price || "")));
+    setDiscountToman(p.discount_price ? formatNumber(String(p.discount_price)) : "");
+    setStock(p.stock !== undefined ? p.stock : 10);
+    setDescription(p.description || "");
+
+    const loadedImgs = Array.isArray(p.images) && p.images.length > 0 
+      ? p.images 
+      : (p.image_url ? [p.image_url] : []);
+    setImages(loadedImgs);
+
+    setColors(Array.isArray(p.colors) ? p.colors : []);
+
+    if (p.specs && typeof p.specs === "object") {
+      const sp = Object.entries(p.specs).map(([key, value]) => ({ key, value: String(value) }));
+      setSpecsList(sp.length > 0 ? sp : [{ key: "توان مصرفی", value: "" }, { key: "ظرفیت مخزن", value: "" }]);
+    } else {
+      setSpecsList([{ key: "توان مصرفی", value: "" }, { key: "ظرفیت مخزن", value: "" }]);
+    }
+
+    setIsModalOpen(true);
+  };
+
+  // ذخیره فرم
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
@@ -105,7 +161,6 @@ export default function AdminProductsPage() {
       return;
     }
 
-    // تبدیل ویژگی‌ها به آبجکت ساخت‌یافته
     const specsObject: Record<string, string> = {};
     specsList.forEach((item) => {
       if (item.key.trim() && item.value.trim()) {
@@ -122,6 +177,7 @@ export default function AdminProductsPage() {
       stock: Number(stock),
       description,
       images,
+      image_url: images[0] || "/placeholder.png",
       colors,
       specs: specsObject,
     };
@@ -136,7 +192,7 @@ export default function AdminProductsPage() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.message || "خطا در برقراری ارتباط با سرور");
+        throw new Error(data.message || "خطا در ارتباط با سرور");
       }
 
       alert("کالا با موفقیت ذخیره گردید!");
@@ -159,6 +215,7 @@ export default function AdminProductsPage() {
     setStock(10);
     setDescription("");
     setImages([]);
+    setImgInput("");
     setColors([]);
     setSpecsList([
       { key: "توان مصرفی", value: "" },
@@ -166,17 +223,11 @@ export default function AdminProductsPage() {
     ]);
   };
 
-  const openCreateModal = () => {
-    resetForm();
-    setIsModalOpen(true);
-  };
-
   const rawPrice = parseRawNumber(priceToman);
   const rawDiscount = parseRawNumber(discountToman);
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-6 lg:p-10 dir-rtl">
-      {/* هدر صفحه */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 border-b border-[var(--card-border)]">
         <div>
           <div className="flex items-center gap-3">
@@ -187,12 +238,12 @@ export default function AdminProductsPage() {
             <h1 className="text-2xl font-black">مدیریت کاتالوگ و انبار کالاها</h1>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-2">
-            تعریف و ویرایش مشخصات فنی، رنگ‌بندی و قیمت‌گذاری به تومان و ریال
+            تعریف و ویرایش مشخصات فنی، چند تصویر، رنگ‌بندی و قیمت‌گذاری به تومان و ریال
           </p>
         </div>
 
         <button
-          onClick={openCreateModal}
+          onClick={() => { resetForm(); setIsModalOpen(true); }}
           className="px-6 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2"
         >
           <Plus size={18} />
@@ -200,7 +251,7 @@ export default function AdminProductsPage() {
         </button>
       </div>
 
-      {/* جدول نمایش محصولات */}
+      {/* لیست کارت‌های محصولات */}
       <div className="mt-8">
         {loading ? (
           <div className="text-center py-20 text-sm font-bold text-[var(--text-secondary)]">
@@ -209,62 +260,79 @@ export default function AdminProductsPage() {
         ) : products.length === 0 ? (
           <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-16 text-center">
             <p className="text-sm font-bold text-[var(--text-secondary)]">
-              هنوز کالایی ثبت نشده است. با زدن دکمه «افزودن محصول جدید» اولین محصول را وارد نمایید.
+              هنوز کالایی ثبت نشده است.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((p) => (
-              <div key={p.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-5 flex flex-col justify-between">
-                <div>
-                  <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-400">
-                    {p.category || "بدون دسته"}
-                  </span>
-                  <h3 className="font-bold text-sm mt-3 line-clamp-2">{p.title || p.name}</h3>
-                  
-                  <div className="mt-4 pt-3 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
-                    <span className="text-[var(--text-secondary)]">قیمت:</span>
-                    <div className="text-left font-bold">
-                      <div>{Number(p.price || 0).toLocaleString("fa-IR")} تومان</div>
-                      <div className="text-[10px] text-[var(--text-secondary)]">
-                        {(Number(p.price || 0) * 10).toLocaleString("fa-IR")} ریال
+            {products.map((p) => {
+              const displayImg = (Array.isArray(p.images) && p.images[0]) || p.image_url || "/placeholder.png";
+              return (
+                <div key={p.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-5 flex flex-col justify-between shadow-sm">
+                  <div>
+                    <div className="w-full h-44 rounded-2xl bg-zinc-900/50 overflow-hidden mb-4 relative flex items-center justify-center border border-[var(--card-border)]">
+                      <img src={displayImg} alt={p.title || p.name} className="w-full h-full object-contain p-2" />
+                      <span className="absolute top-3 right-3 text-[10px] font-bold px-3 py-1 rounded-full bg-blue-500/80 text-white backdrop-blur-md">
+                        {p.category || "عمومی"}
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-sm line-clamp-2 leading-relaxed">{p.title || p.name}</h3>
+                    
+                    <div className="mt-4 pt-3 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
+                      <span className="text-[var(--text-secondary)]">قیمت:</span>
+                      <div className="text-left font-bold">
+                        <div>{Number(p.price || 0).toLocaleString("fa-IR")} تومان</div>
+                        <div className="text-[10px] text-[var(--text-secondary)]">
+                          {(Number(p.price || 0) * 10).toLocaleString("fa-IR")} ریال
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="mt-2 flex justify-between items-center text-xs">
+                      <span className="text-[var(--text-secondary)]">موجودی انبار:</span>
+                      <span className="font-bold">{p.stock} عدد</span>
                     </div>
                   </div>
 
-                  <div className="mt-2 flex justify-between items-center text-xs">
-                    <span className="text-[var(--text-secondary)]">موجودی انبار:</span>
-                    <span className="font-bold">{p.stock} عدد</span>
+                  {/* دکمه‌های ویرایش و حذف */}
+                  <div className="mt-6 pt-3 border-t border-[var(--card-border)] flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => handleEditClick(p)}
+                      className="p-2.5 text-blue-400 hover:bg-blue-500/10 rounded-xl transition flex items-center gap-1.5 text-xs font-bold"
+                      title="ویرایش کالا"
+                    >
+                      <Edit size={16} />
+                      ویرایش
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (confirm("آیا از حذف این کالا از دیتابیس مطمئن هستید؟")) {
+                          await fetch(`/api/admin/products?id=${p.id}`, { method: "DELETE" });
+                          fetchProducts();
+                        }
+                      }}
+                      className="p-2.5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition"
+                      title="حذف کالا"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
-
-                <div className="mt-6 pt-3 border-t border-[var(--card-border)] flex items-center justify-end gap-2">
-                  <button
-                    onClick={async () => {
-                      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
-                        await fetch(`/api/admin/products?id=${p.id}`, { method: "DELETE" });
-                        fetchProducts();
-                      }
-                    }}
-                    className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-xl"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* مدال مهندسی ثبت/ویرایش کالا */}
+      {/* مدال ایجاد و ویرایش */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#121214] border border-[#27272a] rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl text-right">
             <div className="flex items-center justify-between pb-4 border-b border-[#27272a]">
               <h2 className="text-lg font-black flex items-center gap-2 text-white">
-                <Plus size={20} className="text-[#0071e3]" />
-                {editingId ? "ویرایش کالا" : "ایجاد کالای جدید"}
+                {editingId ? <Edit size={20} className="text-[#0071e3]" /> : <Plus size={20} className="text-[#0071e3]" />}
+                {editingId ? "ویرایش مشخصات کالا" : "ایجاد کالای جدید"}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 text-zinc-400 hover:text-white">
                 <X size={20} />
@@ -298,7 +366,7 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* قیمت‌گذاری دوسطحی (تومان و ریال هوشمند) */}
+              {/* قیمت‌گذاری */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-300 mb-2">قیمت اصلی (تومان) *</label>
@@ -312,7 +380,7 @@ export default function AdminProductsPage() {
                   />
                   {rawPrice > 0 && (
                     <div className="text-[11px] text-zinc-400 mt-1.5 flex justify-between">
-                      <span>معادل رسمی به ریال:</span>
+                      <span>معادل به ریال:</span>
                       <span className="font-bold text-emerald-400">{(rawPrice * 10).toLocaleString("fa-IR")} ریال</span>
                     </div>
                   )}
@@ -329,7 +397,7 @@ export default function AdminProductsPage() {
                   />
                   {rawDiscount > 0 && (
                     <div className="text-[11px] text-zinc-400 mt-1.5 flex justify-between">
-                      <span>معادل رسمی تخفیف:</span>
+                      <span>معادل تخفیف ریال:</span>
                       <span className="font-bold text-emerald-400">{(rawDiscount * 10).toLocaleString("fa-IR")} ریال</span>
                     </div>
                   )}
@@ -346,6 +414,49 @@ export default function AdminProductsPage() {
                     className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
                   />
                 </div>
+              </div>
+
+              {/* مدیریت گالری تصاویر چندگانه */}
+              <div className="p-4 rounded-2xl bg-[#161618] border border-[#27272a]">
+                <label className="block text-xs font-black text-white mb-2">گالری تصاویر کالا (افزودن چند تصویر)</label>
+                <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={imgInput}
+                    onChange={(e) => setImgInput(e.target.value)}
+                    placeholder="آدرس اینترنتی تصویر (URL)"
+                    className="flex-1 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs text-white outline-none focus:border-[#0071e3]"
+                  />
+                  <button
+                    type="button"
+                    onClick={addImage}
+                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white"
+                  >
+                    افزودن لینک
+                  </button>
+                  <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ED] text-xs font-bold text-white flex items-center justify-center gap-2">
+                    <ImageIcon size={14} />
+                    آپلود از دستگاه
+                    <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
+                  </label>
+                </div>
+
+                {images.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mt-3">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-zinc-700 group bg-black">
+                        <img src={img} alt="preview" className="w-full h-full object-contain" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-1 opacity-90 hover:opacity-100"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* رنگ‌بندی‌های مجاز */}
@@ -387,7 +498,7 @@ export default function AdminProductsPage() {
                 )}
               </div>
 
-              {/* مشخصات فنی تفکیک‌شده (Dynamic Specs) */}
+              {/* مشخصات فنی تفکیک‌شده */}
               <div className="p-4 rounded-2xl bg-[#161618] border border-[#27272a]">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-xs font-black text-white">مشخصات فنی و ویژگی‌های تفکیک‌شده</label>
@@ -430,7 +541,7 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* توضیحات کلی */}
+              {/* توضیحات */}
               <div>
                 <label className="block text-xs font-bold text-zinc-300 mb-2">توضیحات کلی محصول</label>
                 <textarea
@@ -442,7 +553,7 @@ export default function AdminProductsPage() {
                 />
               </div>
 
-              {/* دکمه‌های اقدام */}
+              {/* دکمه‌ها */}
               <div className="pt-4 border-t border-[#27272a] flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -457,7 +568,7 @@ export default function AdminProductsPage() {
                   className="px-8 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white text-xs font-bold shadow-lg flex items-center gap-2 disabled:opacity-50"
                 >
                   <Save size={16} />
-                  {saving ? "در حال ذخیره‌سازی..." : "ذخیره کالا"}
+                  {saving ? "در حال ذخیره‌سازی..." : (editingId ? "ذخیره تغییرات" : "ثبت نهایی کالا")}
                 </button>
               </div>
             </form>

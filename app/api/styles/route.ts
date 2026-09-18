@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
-import { enforceRbac } from "@/lib/rbacGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +27,6 @@ export async function POST(req: NextRequest) {
     const session: any = await verifyAdminSession(req);
     if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-    }
-
-    if (!enforceRbac(session.role, "styles.manage") && session.role !== "superadmin") {
-      return NextResponse.json(
-        { success: false, message: "نقش کاربری شما اجازه تغییر هویت بصری و استایل‌های سایت را ندارد." },
-        { status: 403 }
-      );
     }
 
     const body = await req.json();

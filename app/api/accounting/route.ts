@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز. لطفا مجددا وارد شوید." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const [prodsRes, ordersRes] = await Promise.all([
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
         });
       });
 
-      const sellingPrice = Number(p.discountPrice || p.discount_price || p.price || 0);
+      const sellingPrice = Number(p.discount_price || p.discountPrice || p.price || 0);
       const purchasePrice = Number(p.purchase_price || p.purchasePrice || Math.round(sellingPrice * 0.7));
       const vatPerUnit = Math.round(sellingPrice * 0.1);
       const netSellingRevenuePerUnit = sellingPrice - vatPerUnit;
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       return {
         id: String(p.id),
         title: p.title || p.name || "کالای بدون عنوان",
-        category: p.category || "تجهیزات تخصصی",
+        category: p.category || p.category_name || "تجهیزات تخصصی",
         stock: p.stock !== undefined && p.stock !== null ? Number(p.stock) : 0,
         isAvailable: p.is_available !== false,
         sellingPrice,

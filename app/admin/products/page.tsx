@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, ArrowRight, ShieldCheck, Truck } from "lucide-react";
+import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, ArrowRight, Video, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 interface SpecItem {
@@ -22,12 +22,10 @@ export default function AdminProductsPage() {
   const [discountToman, setDiscountToman] = useState<string>("");
   const [stock, setStock] = useState<number>(10);
   const [warranty, setWarranty] = useState<string>("");
-  const [shippingStatus, setShippingStatus] = useState<string>("");
+  const [videoUrl, setVideoUrl] = useState<string>("");
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [imgInput, setImgInput] = useState("");
-  const [colors, setColors] = useState<string[]>([]);
-  const [colorInput, setColorInput] = useState("");
   const [specsList, setSpecsList] = useState<SpecItem[]>([]);
 
   const fetchProducts = async () => {
@@ -58,7 +56,7 @@ export default function AdminProductsPage() {
     return Number(String(formatted || "").replace(/,/g, "")) || 0;
   };
 
-  // فشرده‌سازی پیشرفته به WebP برای جلوگیری از سنگین شدن دیتابیس
+  // تبدیل و بهینه‌سازی کلاینتی به WebP
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -74,7 +72,7 @@ export default function AdminProductsPage() {
         canvas.height = img.height * scale;
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/webp", 0.82));
+        resolve(canvas.toDataURL("image/webp", 0.8));
       };
       img.onerror = reject;
       reader.readAsDataURL(file);
@@ -102,6 +100,7 @@ export default function AdminProductsPage() {
     }
   };
 
+  // باز کردن فرم ویرایش با استخراج خودکار تصاویر چندگانه و متادیتا
   const handleEditClick = (p: any) => {
     setEditingId(p.id);
     setTitle(p.title || p.name || "");
@@ -109,22 +108,37 @@ export default function AdminProductsPage() {
     setPriceToman(formatNumber(String(p.price || "")));
     setDiscountToman(p.discount_price ? formatNumber(String(p.discount_price)) : "");
     setStock(p.stock !== undefined ? p.stock : 10);
-    setWarranty(p.warranty || "");
-    setShippingStatus(p.shipping_status || "");
-    setDescription(p.description || "");
 
-    const loadedImgs = Array.isArray(p.images) && p.images.length > 0 
-      ? p.images 
-      : (p.image_url ? [p.image_url] : []);
-    setImages(loadedImgs);
-    setColors(Array.isArray(p.colors) ? p.colors : []);
+    // استخراج متادیتا از داخل description
+    let rawDesc = p.description || "";
+    let extractedImages: string[] = [];
+    let extractedWarranty = p.warranty || "";
+    let extractedVideo = "";
+    let extractedSpecs: Record<string, string> = {};
 
-    if (p.specs && typeof p.specs === "object") {
-      const sp = Object.entries(p.specs).map(([key, value]) => ({ key, value: String(value) }));
-      setSpecsList(sp.length > 0 ? sp : []);
-    } else {
-      setSpecsList([]);
+    const metaMatch = rawDesc.match(/<!--MEDIA_METADATA:([\s\S]*?)-->/);
+    if (metaMatch) {
+      try {
+        const meta = JSON.parse(metaMatch[1]);
+        if (Array.isArray(meta.images)) extractedImages = meta.images;
+        if (meta.warranty) extractedWarranty = meta.warranty;
+        if (meta.video_url) extractedVideo = meta.video_url;
+        if (meta.specs) extractedSpecs = meta.specs;
+        rawDesc = rawDesc.replace(metaMatch[0], "").trim();
+      } catch (err) {}
     }
+
+    if (extractedImages.length === 0 && p.image_url) {
+      extractedImages = [p.image_url];
+    }
+
+    setImages(extractedImages);
+    setWarranty(extractedWarranty);
+    setVideoUrl(extractedVideo);
+    setDescription(rawDesc);
+
+    const sp = Object.entries(extractedSpecs).map(([key, value]) => ({ key, value: String(value) }));
+    setSpecsList(sp);
 
     setIsModalOpen(true);
   };
@@ -151,11 +165,9 @@ export default function AdminProductsPage() {
       discount_price: discountToman ? parseRawNumber(discountToman) : null,
       stock: Number(stock),
       warranty: warranty.trim() || null,
-      shipping_status: shippingStatus.trim() || null,
+      video_url: videoUrl.trim() || null,
       description,
       images,
-      image_url: images[0] || "/placeholder.png",
-      colors,
       specs: specsObject,
     };
 
@@ -176,7 +188,7 @@ export default function AdminProductsPage() {
       setIsModalOpen(false);
       fetchProducts();
     } catch (err: any) {
-      alert("خطا: " + err.message);
+      alert("خطا در ذخیره کالا: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -190,11 +202,10 @@ export default function AdminProductsPage() {
     setDiscountToman("");
     setStock(10);
     setWarranty("");
-    setShippingStatus("");
+    setVideoUrl("");
     setDescription("");
     setImages([]);
     setImgInput("");
-    setColors([]);
     setSpecsList([]);
   };
 
@@ -210,7 +221,7 @@ export default function AdminProductsPage() {
             <h1 className="text-2xl font-black">مدیریت کاتالوگ و انبار کالاها</h1>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-2">
-            تنظیم مشخصات تفکیک‌شده، تصاویر بهینه، وضعیت ارسال و گارانتی اختصاصی
+            تنظیم تصاویر چندگانه نامحدود، گارانتی اختصاصی و ویژگی‌های تفکیک‌شده
           </p>
         </div>
 
@@ -233,7 +244,7 @@ export default function AdminProductsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {products.map((p) => {
-              const displayImg = (Array.isArray(p.images) && p.images[0]) || p.image_url || "/placeholder.png";
+              const displayImg = p.image_url || "/placeholder.png";
               return (
                 <div key={p.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-5 flex flex-col justify-between shadow-sm">
                   <div>
@@ -268,7 +279,7 @@ export default function AdminProductsPage() {
                       className="p-2.5 text-blue-400 hover:bg-blue-500/10 rounded-xl transition flex items-center gap-1.5 text-xs font-bold"
                     >
                       <Edit size={16} />
-                      ویرایش
+                      ویرایش کالا
                     </button>
                     <button
                       onClick={async () => {
@@ -295,7 +306,7 @@ export default function AdminProductsPage() {
             <div className="flex items-center justify-between pb-4 border-b border-[#27272a]">
               <h2 className="text-lg font-black text-white flex items-center gap-2">
                 {editingId ? <Edit size={20} className="text-[#0071e3]" /> : <Plus size={20} className="text-[#0071e3]" />}
-                {editingId ? "ویرایش کالا" : "ایجاد کالای جدید"}
+                {editingId ? "ویرایش مشخصات کالا" : "ایجاد کالای جدید"}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 text-zinc-400 hover:text-white">
                 <X size={20} />
@@ -345,7 +356,7 @@ export default function AdminProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">قیمت تخفیف‌خورده (تومان)</label>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">قیمت با تخفیف (تومان)</label>
                   <input
                     type="text"
                     value={discountToman}
@@ -367,39 +378,39 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* گارانتی و وضعیت ارسال (کاملاً اختیاری و داینامیک) */}
+              {/* گارانتی و ویدیو */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">گارانتی محصول (اختیاری)</label>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">مدت گارانتی محصول (اختیاری)</label>
                   <input
                     type="text"
                     value={warranty}
                     onChange={(e) => setWarranty(e.target.value)}
-                    placeholder="مثلاً: ۱۲ ماه گارانتی تعویض و سلامت فیزیکی"
+                    placeholder="مثلاً: ۱۲ ماه گارانتی تعویض شرکتی"
                     className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">وضعیت ارسال (اختیاری)</label>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">لینک ویدیوی محصول (اختیاری)</label>
                   <input
                     type="text"
-                    value={shippingStatus}
-                    onChange={(e) => setShippingStatus(e.target.value)}
-                    placeholder="مثلاً: آماده ارسال فوری با پست پیشتاز"
-                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    placeholder="لینک یوتیوب، آپارات یا ویدیو MP4"
+                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
                   />
                 </div>
               </div>
 
-              {/* گالری چند تصویری به همراه فشرده‌ساز وب‌پی */}
+              {/* گالری چند تصویری نامحدود با فشرده‌ساز */}
               <div className="p-4 rounded-2xl bg-[#161618] border border-[#27272a]">
-                <label className="block text-xs font-black text-white mb-2">گالری تصاویر کالا (چند عکس با فشرده‌سازی خودکار)</label>
+                <label className="block text-xs font-black text-white mb-2">تصاویر محصول (افزودن نامحدود با پیش‌نمایش)</label>
                 <div className="flex flex-col sm:flex-row gap-2 mb-3">
                   <input
                     type="text"
                     value={imgInput}
                     onChange={(e) => setImgInput(e.target.value)}
-                    placeholder="آدرس اینترنتی تصویر (URL)"
+                    placeholder="آدرس تصویر (URL)"
                     className="flex-1 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs text-white outline-none focus:border-[#0071e3]"
                   />
                   <button type="button" onClick={addImageByUrl} className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white">
@@ -407,7 +418,7 @@ export default function AdminProductsPage() {
                   </button>
                   <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ED] text-xs font-bold text-white flex items-center justify-center gap-2">
                     <ImageIcon size={14} />
-                    آپلود عکس‌ها (WebP بهینه)
+                    انتخاب عکس‌ها از سیستم
                     <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
                   </label>
                 </div>
@@ -424,6 +435,11 @@ export default function AdminProductsPage() {
                         >
                           <X size={12} />
                         </button>
+                        {idx === 0 && (
+                          <span className="absolute bottom-0 left-0 right-0 bg-blue-600 text-[9px] text-center text-white py-0.5 font-bold">
+                            شاخص
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -455,7 +471,7 @@ export default function AdminProductsPage() {
                           updated[idx].key = e.target.value;
                           setSpecsList(updated);
                         }}
-                        placeholder="عنوان ویژگی (مثلاً توان مصرفی)"
+                        placeholder="عنوان (مثلاً توان مصرفی)"
                         className="w-1/3 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
                       />
                       <input
@@ -466,7 +482,7 @@ export default function AdminProductsPage() {
                           updated[idx].value = e.target.value;
                           setSpecsList(updated);
                         }}
-                        placeholder="مقدار ویژگی (مثلاً ۱۲۰۰ وات)"
+                        placeholder="مقدار (مثلاً ۱۲۰۰ وات)"
                         className="flex-1 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
                       />
                       <button
@@ -481,7 +497,6 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* توضیحات کالا */}
               <div>
                 <label className="block text-xs font-bold text-zinc-300 mb-2">توضیحات کالا</label>
                 <textarea

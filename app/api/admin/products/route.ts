@@ -37,17 +37,22 @@ export async function POST(req: NextRequest) {
     const price = Number(body.price || 0);
     const discountPrice = body.discount_price ? Number(body.discount_price) : null;
     const stock = body.stock !== undefined ? Number(body.stock) : 10;
-    const category = body.category || "تجهیزات هوشمند";
+    const category = body.category || "عمومی";
 
-    let formattedDescription = body.description || "";
-    if (body.colors && Array.isArray(body.colors) && body.colors.length > 0) {
-      formattedDescription += "\n\nرنگ‌بندی مجاز: " + body.colors.join("، ");
-    }
-    if (body.specs && typeof body.specs === "object" && Object.keys(body.specs).length > 0) {
-      formattedDescription += "\n\nمشخصات فنی:\n" + Object.entries(body.specs).map(([k, v]) => `• ${k}: ${v}`).join("\n");
-    }
+    // ذخیره امن تصاویر چندگانه و ویدیو و مشخصات در قالب متادیتای ساختاریافته درون description
+    const mediaMeta = {
+      images: Array.isArray(body.images) && body.images.length > 0 ? body.images : (body.image_url ? [body.image_url] : []),
+      video_url: body.video_url || null,
+      specs: typeof body.specs === "object" ? body.specs : {},
+      warranty: body.warranty || null,
+    };
 
-    const basePayload: Record<string, any> = {
+    let baseDescription = String(body.description || "").replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "").trim();
+    const packagedDescription = baseDescription + "\n\n<!--MEDIA_METADATA:" + JSON.stringify(mediaMeta) + "-->";
+
+    const primaryImage = mediaMeta.images[0] || body.image_url || "/placeholder.png";
+
+    const payload: Record<string, any> = {
       id: productId,
       title,
       name: title,
@@ -56,47 +61,38 @@ export async function POST(req: NextRequest) {
       discount_price: discountPrice,
       stock,
       is_available: stock > 0,
-      description: formattedDescription,
-      warranty: body.warranty || null,
-      shipping_status: body.shipping_status || null,
-      image_url: body.image_url || (Array.isArray(body.images) && body.images[0]) || "/placeholder.png",
+      description: packagedDescription,
+      image_url: primaryImage,
       updated_at: new Date().toISOString(),
-    };
-
-    const fullPayload: Record<string, any> = {
-      ...basePayload,
-      colors: Array.isArray(body.colors) ? body.colors : [],
-      specs: typeof body.specs === "object" && body.specs !== null ? body.specs : {},
     };
 
     let resultData = null;
 
     if (body.id) {
-      const res = await supabaseAdmin.from("products").update(fullPayload).eq("id", body.id).select().maybeSingle();
-      if (res.error) {
-        const fallbackRes = await supabaseAdmin.from("products").update(basePayload).eq("id", body.id).select().maybeSingle();
-        if (fallbackRes.error) throw fallbackRes.error;
-        resultData = fallbackRes.data;
-      } else {
-        resultData = res.data;
-      }
-    } else {
-      fullPayload.created_at = new Date().toISOString();
-      basePayload.created_at = new Date().toISOString();
+      const { data: updated, error } = await supabaseAdmin
+        .from("products")
+        .update(payload)
+        .eq("id", body.id)
+        .select()
+        .single();
 
-      const res = await supabaseAdmin.from("products").insert([fullPayload]).select().maybeSingle();
-      if (res.error) {
-        const fallbackRes = await supabaseAdmin.from("products").insert([basePayload]).select().maybeSingle();
-        if (fallbackRes.error) throw fallbackRes.error;
-        resultData = fallbackRes.data;
-      } else {
-        resultData = res.data;
-      }
+      if (error) throw error;
+      resultData = updated;
+    } else {
+      payload.created_at = new Date().toISOString();
+      const { data: inserted, error } = await supabaseAdmin
+        .from("products")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) throw error;
+      resultData = inserted;
     }
 
     return NextResponse.json({
       success: true,
-      message: "کالا با موفقیت در پایگاه داده ثبت شد.",
+      message: "کالا و رسانه‌ها با موفقیت در پایگاه داده ثبت شدند.",
       product: resultData,
     });
   } catch (err: any) {

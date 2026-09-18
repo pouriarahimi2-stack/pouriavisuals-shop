@@ -15,6 +15,8 @@ export default function robots(): MetadataRoute.Robots {
           "/products/*",
           "/blog",
           "/blog/*",
+          "/news",
+          "/news/*",
           "/about",
           "/contact",
           "/api/torob",

@@ -1,126 +1,108 @@
-// File Path: app/api/pages/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-export interface PageSummaryItem {
-  id: string;
-  slug: string;
-  title: string;
-  is_published: boolean;
-  updated_at: string;
-}
-
-const FALLBACK_PAGES: PageSummaryItem[] = [
-  { id: "sys-home", slug: "home", title: "صفحه اصلی (خانه)", is_published: true, updated_at: new Date().toISOString() },
-  { id: "sys-products", slug: "products", title: "کاتالوگ محصولات و تجهیزات", is_published: true, updated_at: new Date().toISOString() },
-  { id: "sys-news", slug: "news", title: "اخبار تکنولوژی", is_published: true, updated_at: new Date().toISOString() },
-  { id: "sys-blog", slug: "blog", title: "مجله سئو", is_published: true, updated_at: new Date().toISOString() },
-  { id: "sys-about", slug: "about", title: "درباره ما", is_published: true, updated_at: new Date().toISOString() },
-  { id: "sys-contact", slug: "contact", title: "تماس با ما", is_published: true, updated_at: new Date().toISOString() },
-  { id: "sys-track", slug: "track-order", title: "پیگیری سفارش", is_published: true, updated_at: new Date().toISOString() },
-];
-
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
+    const id = searchParams.get("id");
 
-    if (slug) {
-      const cleanSlug = String(slug).trim().toLowerCase();
+    if (slug || id) {
+      let query = supabaseAdmin.from("modular_pages").select("*");
+      if (id) query = query.eq("id", id);
+      else if (slug) query = query.eq("slug", slug.trim().toLowerCase());
 
-      try {
-        const { data, error } = await supabaseAdmin
-          .from("modular_pages")
-          .select("*")
-          .eq("slug", cleanSlug)
-          .maybeSingle();
-
-        if (!error && data) {
-          return NextResponse.json({ success: true, page: data });
-        }
-      } catch (dbErr) {
-        console.warn("DB select fallback warning:", dbErr);
-      }
-
-      const defaultTitle = cleanSlug === "home" ? "صفحه اصلی" : cleanSlug;
-      return NextResponse.json({
-        success: true,
-        page: { slug: cleanSlug, title: defaultTitle, puck_data: null }
-      });
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
+      return NextResponse.json({ success: true, page: data, data });
     }
 
-    try {
-      const { data: dbPages, error } = await supabaseAdmin
-        .from("modular_pages")
-        .select("id, slug, title, is_published, updated_at")
-        .order("updated_at", { ascending: false });
+    const { data: pages, error } = await supabaseAdmin
+      .from("modular_pages")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-      if (!error && Array.isArray(dbPages)) {
-        const merged: PageSummaryItem[] = [...(dbPages as PageSummaryItem[])];
-        FALLBACK_PAGES.forEach((fp) => {
-          if (!merged.some((p) => p.slug === fp.slug)) {
-            merged.push(fp);
-          }
-        });
-        return NextResponse.json({ success: true, pages: merged });
-      }
-    } catch (e) {
-      console.warn("Error fetching all pages:", e);
-    }
-
-    return NextResponse.json({ success: true, pages: FALLBACK_PAGES });
+    if (error) throw error;
+    return NextResponse.json({ success: true, pages: pages || [], data: pages || [] });
   } catch (err: any) {
-    return NextResponse.json({ success: true, pages: FALLBACK_PAGES, warning: err.message });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    if (!(await verifyAdminSession(req))) {
+    const session = await verifyAdminSession(req);
+    if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const body = await req.json();
-    const { slug, title, puck_data, is_published } = body;
-    const cleanSlug = String(slug || "home").trim().toLowerCase();
+    const title = String(body.title || "").trim();
+    const rawSlug = String(body.slug || title).trim();
 
-    const payload: Record<string, any> = {
+    if (!title || !rawSlug) {
+      return NextResponse.json({ success: false, message: "عنوان و نامک صفحه الزامی هستند." }, { status: 400 });
+    }
+
+    const cleanSlug = rawSlug
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    const payload = {
+      title,
       slug: cleanSlug,
-      title: String(title || cleanSlug).trim(),
-      puck_data: puck_data || {},
-      is_published: is_published !== false,
+      puck_data: body.puck_data || body.data || { content: [], root: {} },
+      is_published: body.is_published !== false,
       updated_at: new Date().toISOString(),
     };
 
-    try {
-      const { data: existing } = await supabaseAdmin
+    if (body.id) {
+      const { data: updated, error } = await supabaseAdmin
         .from("modular_pages")
-        .select("id")
-        .eq("slug", cleanSlug)
-        .maybeSingle();
+        .update(payload)
+        .eq("id", body.id)
+        .select()
+        .single();
 
-      if (existing) {
-        await supabaseAdmin
-          .from("modular_pages")
-          .update(payload)
-          .eq("id", existing.id);
-      } else {
-        payload.id = "page_" + cleanSlug + "_" + Date.now();
-        payload.created_at = new Date().toISOString();
-        await supabaseAdmin.from("modular_pages").insert([payload]);
-      }
-    } catch (dbErr: any) {
-      console.error("Database upsert error in /api/pages:", dbErr);
-      return NextResponse.json({
-        success: false,
-        message: "خطا در ثبت پایگاه‌داده: " + (dbErr.message || "خطای سرور")
-      }, { status: 200 });
+      if (error) throw error;
+      return NextResponse.json({ success: true, message: "صفحه با موفقیت به‌روزرسانی شد.", page: updated });
+    } else {
+      const { data: inserted, error } = await supabaseAdmin
+        .from("modular_pages")
+        .insert([{ ...payload, created_at: new Date().toISOString() }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return NextResponse.json({ success: true, message: "صفحه جدید با موفقیت ایجاد شد.", page: inserted });
+    }
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
-    return NextResponse.json({ success: true, message: "صفحه با موفقیت ذخیره شد." });
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه صفحه الزامی است." }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin.from("modular_pages").delete().eq("id", id);
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, message: "صفحه با موفقیت حذف شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

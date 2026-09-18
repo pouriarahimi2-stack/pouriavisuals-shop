@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
       // تولید کد امن و عدم ارسال کد به پاسخ کلاینت (ارسال از طریق درگاه واقعی یا لاگ سرور)
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
-      console.log(`[SECURE_RECOVERY] Admin recovery code for ${cleanEmail}: ${generatedPin}`);
+      /* Sensitive recovery code logging eliminated */
 
       return NextResponse.json({
         success: true,

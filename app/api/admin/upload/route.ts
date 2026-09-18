@@ -1,3 +1,4 @@
+const ALLOWED_BUCKETS = ['products', 'blog', 'site-assets', 'banners'];
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/authSecurityHelper";

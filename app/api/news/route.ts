@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
-import { ensureFreshAutonomousNews } from "@/lib/techNewsHarvester";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    await ensureFreshAutonomousNews();
+    const { searchParams } = new URL(req.url);
+    const slug = searchParams.get("slug");
+
+    if (slug) {
+      const { data: newsItem, error } = await supabaseAdmin
+        .from("tech_news")
+        .select("*")
+        .eq("slug", slug)
+        .maybeSingle();
+
+      if (error) throw error;
+      return NextResponse.json({ success: true, data: newsItem });
+    }
 
     const { data, error } = await supabaseAdmin
       .from("tech_news")
@@ -16,10 +27,7 @@ export async function GET(req: NextRequest) {
       .eq("is_published", true)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-    }
-
+    if (error) throw error;
     return NextResponse.json({ success: true, data: data || [] });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
@@ -55,21 +63,32 @@ export async function POST(req: NextRequest) {
       content: body.content ? String(body.content).trim() : "",
       category: body.category || "hardware",
       source_name: body.source_name ? String(body.source_name).trim() : "آکسون تک",
-      image_url: body.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
+      image_url: body.image_url || "/placeholder.png",
       tags: Array.isArray(body.tags) ? body.tags : ["تکنولوژی", "سخت افزار"],
-      is_published: true,
+      is_published: body.is_published !== undefined ? Boolean(body.is_published) : true,
       trending_score: body.trending_score ? Number(body.trending_score) : 95,
       updated_at: new Date().toISOString(),
     };
 
     if (body.id) {
-      const { data, error } = await supabaseAdmin.from("tech_news").update(payload).eq("id", body.id).select().single();
+      const { data, error } = await supabaseAdmin
+        .from("tech_news")
+        .update(payload)
+        .eq("id", body.id)
+        .select()
+        .single();
+
       if (error) throw error;
       return NextResponse.json({ success: true, message: "خبر با موفقیت به‌روزرسانی شد.", data });
     } else {
       payload.published_at = new Date().toISOString();
       payload.created_at = new Date().toISOString();
-      const { data, error } = await supabaseAdmin.from("tech_news").insert([payload]).select().single();
+      const { data, error } = await supabaseAdmin
+        .from("tech_news")
+        .insert([payload])
+        .select()
+        .single();
+
       if (error) throw error;
       return NextResponse.json({ success: true, message: "خبر با موفقیت منتشر گردید.", data });
     }

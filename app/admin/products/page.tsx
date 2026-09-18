@@ -1,70 +1,51 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-import MediaUploadModal from "@/components/admin/MediaUploadModal";
+import React, { useState, useEffect } from "react";
+import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, CheckCircle2, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
-interface Product {
-  id: string;
-  title: string;
-  category: string;
-  price: number;
-  discount_price?: number | null;
-  stock: number;
-  images: string[];
-  description?: string;
-  colors?: string[];
-  storage_options?: string[];
+interface SpecItem {
+  key: string;
+  value: string;
 }
 
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [colorInput, setColorInput] = useState("");
-  const [storageInput, setStorageInput] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState<{
-    id?: string;
-    title: string;
-    category: string;
-    price: number | "";
-    discount_price: number | "";
-    stock: number | "";
-    images: string[];
-    description: string;
-    colors: string[];
-    storage_options: string[];
-  }>({
-    title: "",
-    category: "smartphones",
-    price: "",
-    discount_price: "",
-    stock: "",
-    images: [],
-    description: "",
-    colors: [],
-    storage_options: [],
-  });
+  // استیت‌های فرم
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [priceToman, setPriceToman] = useState<string>("");
+  const [discountToman, setDiscountToman] = useState<string>("");
+  const [stock, setStock] = useState<number>(10);
+  const [description, setDescription] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [imageUrlInput, setImageUrlInput] = useState("");
+  
+  // رنگ‌بندی
+  const [colors, setColors] = useState<string[]>([]);
+  const [colorInput, setColorInput] = useState("");
+
+  // ویژگی‌های فنی پویا (Key-Value)
+  const [specsList, setSpecsList] = useState<SpecItem[]>([
+    { key: "توان مصرفی", value: "" },
+    { key: "ظرفیت مخزن", value: "" },
+  ]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/reports");
-      const prodRes = await fetch("/api/products?limit=100").catch(() => null);
-      if (prodRes && prodRes.ok) {
-        const json = await prodRes.json();
-        setProducts(json.products || []);
-      } else {
-        const repJson = await res.json();
-        if (repJson.report?.low_stock_items) {
-          setProducts(repJson.report.low_stock_items);
-        }
+      const res = await fetch("/api/admin/products");
+      const data = await res.json();
+      if (data.success) {
+        setProducts(data.products || []);
       }
-    } catch {
-      console.error("خطا در واکشی کاتالوگ محصولات.");
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -74,380 +55,415 @@ export default function AdminProductsPage() {
     fetchProducts();
   }, []);
 
-  const handleOpenCreate = () => {
-    soundEngine.playClick();
-    setEditingProduct(null);
-    setForm({
-      title: "",
-      category: "smartphones",
-      price: "",
-      discount_price: "",
-      stock: 10,
-      images: [],
-      description: "",
-      colors: ["مشکی", "تیتانیوم"],
-      storage_options: ["256GB", "512GB"],
-    });
-    setIsModalOpen(true);
+  // توابع فرمت‌بندی ۳ رقمی
+  const formatNumber = (val: string) => {
+    const raw = val.replace(/\D/g, "");
+    return raw.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
-  const handleOpenEdit = (p: Product) => {
-    soundEngine.playClick();
-    setEditingProduct(p);
-    setForm({
-      id: p.id,
-      title: p.title,
-      category: p.category || "smartphones",
-      price: p.price,
-      discount_price: p.discount_price ?? "",
-      stock: p.stock,
-      images: Array.isArray(p.images) ? p.images : [],
-      description: p.description || "",
-      colors: Array.isArray(p.colors) ? p.colors : [],
-      storage_options: Array.isArray(p.storage_options) ? p.storage_options : [],
-    });
-    setIsModalOpen(true);
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (v: string) => void) => {
+    setter(formatNumber(e.target.value));
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این محصول از کاتالوگ اطمینان دارید؟")) return;
-    soundEngine.playClick();
-    try {
-      const res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        fetchProducts();
-      } else {
-        alert(json.message || "خطا در حذف محصول.");
-      }
-    } catch {
-      alert("ارتباط با سرور برقرار نشد.");
+  const parseRawNumber = (formatted: string) => {
+    return Number(formatted.replace(/,/g, "")) || 0;
+  };
+
+  // مدیریت رنگ‌ها
+  const addColor = () => {
+    const trimmed = colorInput.trim();
+    if (trimmed && !colors.includes(trimmed)) {
+      setColors([...colors, trimmed]);
+      setColorInput("");
     }
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  const removeColor = (col: string) => {
+    setColors(colors.filter((c) => c !== col));
+  };
+
+  // مدیریت ویژگی‌های پویا
+  const addSpecField = () => {
+    setSpecsList([...specsList, { key: "", value: "" }]);
+  };
+
+  const updateSpecField = (index: number, field: "key" | "value", val: string) => {
+    const updated = [...specsList];
+    updated[index][field] = val;
+    setSpecsList(updated);
+  };
+
+  const removeSpecField = (index: number) => {
+    setSpecsList(specsList.filter((_, i) => i !== index));
+  };
+
+  // ذخیره فرم با اعتبارسنجی
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    soundEngine.playClick();
-
-    if (Number(form.price) < 0 || Number(form.stock) < 0) {
-      alert("قیمت یا موجودی نمی‌تواند منفی باشد.");
+    if (!title.trim()) {
+      alert("نام محصول الزامی است.");
       return;
     }
 
-    if (form.discount_price && Number(form.discount_price) > Number(form.price)) {
-      alert("قیمت با تخفیف نمی‌تواند بیشتر از قیمت اصلی باشد.");
-      return;
-    }
+    // تبدیل ویژگی‌ها به آبجکت ساخت‌یافته
+    const specsObject: Record<string, string> = {};
+    specsList.forEach((item) => {
+      if (item.key.trim() && item.value.trim()) {
+        specsObject[item.key.trim()] = item.value.trim();
+      }
+    });
 
     const payload = {
-      ...form,
-      price: Number(form.price),
-      discount_price: form.discount_price ? Number(form.discount_price) : null,
-      stock: Number(form.stock),
+      id: editingId || undefined,
+      title: title.trim(),
+      category: category.trim() || "تجهیزات هوشمند",
+      price: parseRawNumber(priceToman),
+      discount_price: discountToman ? parseRawNumber(discountToman) : null,
+      stock: Number(stock),
+      description,
+      images,
+      colors,
+      specs: specsObject,
     };
 
+    setSaving(true);
     try {
-      const method = editingProduct ? "PUT" : "POST";
       const res = await fetch("/api/admin/products", {
-        method,
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        setIsModalOpen(false);
-        fetchProducts();
-      } else {
-        alert(json.message || "خطا در ذخیره‌سازی مشخصات محصول.");
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "خطا در برقراری ارتباط با سرور");
       }
-    } catch {
-      alert("خطا در ارسال اطلاعات به سرور.");
+
+      alert("کالا با موفقیت ذخیره گردید!");
+      setIsModalOpen(false);
+      resetForm();
+      fetchProducts();
+    } catch (err: any) {
+      alert("خطا در ذخیره کالا: " + err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
+  const resetForm = () => {
+    setEditingId(null);
+    setTitle("");
+    setCategory("");
+    setPriceToman("");
+    setDiscountToman("");
+    setStock(10);
+    setDescription("");
+    setImages([]);
+    setColors([]);
+    setSpecsList([
+      { key: "توان مصرفی", value: "" },
+      { key: "ظرفیت مخزن", value: "" },
+    ]);
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  const rawPrice = parseRawNumber(priceToman);
+  const rawDiscount = parseRawNumber(discountToman);
+
   return (
-    <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-6 lg:p-10 dir-rtl">
+      {/* هدر صفحه */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 border-b border-[var(--card-border)]">
         <div>
-          <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>💻</span> مدیریت کاتالوگ و انبار کالاها
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تعریف محصولات، مدیریت گالری تصاویر، قیمت‌گذاری و متغیرهای رنگ و حافظه
+          <div className="flex items-center gap-3">
+            <Link href="/admin" className="p-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--card-hover)] text-sm font-bold flex items-center gap-2">
+              <ArrowRight size={18} />
+              پیشخوان
+            </Link>
+            <h1 className="text-2xl font-black">مدیریت کاتالوگ و انبار کالاها</h1>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] mt-2">
+            تعریف و ویرایش مشخصات فنی، رنگ‌بندی و قیمت‌گذاری به تومان و ریال
           </p>
         </div>
 
         <button
-          onClick={handleOpenCreate}
-          className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md flex items-center gap-2 cursor-pointer"
+          onClick={openCreateModal}
+          className="px-6 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2"
         >
-          <span>➕</span> افزودن محصول جدید
+          <Plus size={18} />
+          افزودن محصول جدید
         </button>
       </div>
 
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+      {/* جدول نمایش محصولات */}
+      <div className="mt-8">
         {loading ? (
-          <div className="p-12 text-center text-xs text-slate-400">در حال دریافت محصولات...</div>
+          <div className="text-center py-20 text-sm font-bold text-[var(--text-secondary)]">
+            در حال بارگذاری اطلاعات از دیتابیس...
+          </div>
         ) : products.length === 0 ? (
-          <div className="p-12 text-center text-xs text-slate-400">محصولی در کاتالوگ یافت نشد.</div>
+          <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-16 text-center">
+            <p className="text-sm font-bold text-[var(--text-secondary)]">
+              هنوز کالایی ثبت نشده است. با زدن دکمه «افزودن محصول جدید» اولین محصول را وارد نمایید.
+            </p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
-                  <th className="pb-3 px-3">تصویر</th>
-                  <th className="pb-3 px-3">عنوان محصول</th>
-                  <th className="pb-3 px-3">قیمت اصلی</th>
-                  <th className="pb-3 px-3">قیمت تخفیف</th>
-                  <th className="pb-3 px-3">موجودی انبار</th>
-                  <th className="pb-3 px-3 text-left">عملیات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--card-border)]">
-                {products.map((p) => (
-                  <tr key={p.id} className="hover:bg-[var(--input-bg)]/40 transition">
-                    <td className="py-3 px-3">
-                      {p.images && p.images[0] ? (
-                        <img
-                          src={p.images[0]}
-                          alt={p.title}
-                          className="w-10 h-10 object-cover rounded-xl border border-[var(--card-border)]"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs">
-                          📦
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-3 font-bold text-[var(--text-primary)]">{p.title}</td>
-                    <td className="py-3 px-3 font-mono">
-                      {Number(p.price).toLocaleString("fa-IR")} تومان
-                    </td>
-                    <td className="py-3 px-3 font-mono text-emerald-400">
-                      {p.discount_price ? `${Number(p.discount_price).toLocaleString("fa-IR")} تومان` : "—"}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`px-2.5 py-1 rounded-xl font-mono text-xs font-bold ${
-                          p.stock < 5
-                            ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                            : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                        }`}
-                      >
-                        {p.stock} عدد
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-left space-x-2 space-x-reverse">
-                      <button
-                        onClick={() => handleOpenEdit(p)}
-                        className="px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:bg-[var(--card-border)] transition"
-                      >
-                        ویرایش
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        className="px-3 py-1 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 transition"
-                      >
-                        حذف
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products.map((p) => (
+              <div key={p.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-5 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-400">
+                    {p.category || "بدون دسته"}
+                  </span>
+                  <h3 className="font-bold text-sm mt-3 line-clamp-2">{p.title || p.name}</h3>
+                  
+                  <div className="mt-4 pt-3 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
+                    <span className="text-[var(--text-secondary)]">قیمت:</span>
+                    <div className="text-left font-bold">
+                      <div>{Number(p.price || 0).toLocaleString("fa-IR")} تومان</div>
+                      <div className="text-[10px] text-[var(--text-secondary)]">
+                        {(Number(p.price || 0) * 10).toLocaleString("fa-IR")} ریال
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex justify-between items-center text-xs">
+                    <span className="text-[var(--text-secondary)]">موجودی انبار:</span>
+                    <span className="font-bold">{p.stock} عدد</span>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-3 border-t border-[var(--card-border)] flex items-center justify-end gap-2">
+                  <button
+                    onClick={async () => {
+                      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
+                        await fetch(`/api/admin/products?id=${p.id}`, { method: "DELETE" });
+                        fetchProducts();
+                      }
+                    }}
+                    className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-xl"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
+      {/* مدال مهندسی ثبت/ویرایش کالا */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto space-y-5">
-            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black text-[var(--text-primary)]">
-                {editingProduct ? "✏️ ویرایش مشخصات کالا" : "➕ ایجاد کالای جدید"}
-              </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white transition font-mono"
-              >
-                ✕
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#121214] border border-[#27272a] rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl text-right">
+            <div className="flex items-center justify-between pb-4 border-b border-[#27272a]">
+              <h2 className="text-lg font-black flex items-center gap-2 text-white">
+                <Plus size={20} className="text-[#0071e3]" />
+                {editingId ? "ویرایش کالا" : "ایجاد کالای جدید"}
+              </h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 text-zinc-400 hover:text-white">
+                <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+              {/* نام و دسته‌بندی */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">نام و مدل کالا:</label>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">نام و مدل کالا *</label>
                   <input
                     type="text"
                     required
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="مثلاً: اتوبخار پرتابل هوشمند با چرخش ۱۸۰ درجه"
+                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی:</label>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">دسته‌بندی کالا *</label>
                   <input
-              type="text"
-              required
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-                placeholder="دسته‌بندی (مثلاً: اتوبخار و لوازم خانگی)"
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-            />
+                    type="text"
+                    required
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    placeholder="مثلاً: اتوبخار و مراقبت از لباس"
+                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
+                  />
                 </div>
               </div>
 
+              {/* قیمت‌گذاری دوسطحی (تومان و ریال هوشمند) */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">قیمت اصلی (تومان):</label>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">قیمت اصلی (تومان) *</label>
                   <input
-                    type="number"
+                    type="text"
                     required
-                    min={0}
-                    value={form.price}
-                    onChange={(e) => setForm({ ...form, price: e.target.value === "" ? "" : Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
+                    value={priceToman}
+                    onChange={(e) => handlePriceChange(e, setPriceToman)}
+                    placeholder="مثلاً: 4,000,000"
+                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">قیمت با تخفیف (اختیاری):</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.discount_price}
-                    onChange={(e) => setForm({ ...form, discount_price: e.target.value === "" ? "" : Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">موجودی انبار:</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value === "" ? "" : Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[var(--text-secondary)]">گالری تصاویر کالا:</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsUploadOpen(true)}
-                    className="px-3 py-1 rounded-xl bg-[var(--accent-blue)] text-white text-[11px] font-bold hover:opacity-90 transition"
-                  >
-                    ☁️ بارگذاری تصویر جدید
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap min-h-[60px] p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-                  {form.images.map((img, idx) => (
-                    <div key={idx} className="relative group">
-                      <img
-                        src={img}
-                        alt="Product visual"
-                        className="w-14 h-14 object-cover rounded-xl border border-[var(--card-border)]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setForm({ ...form, images: form.images.filter((_, i) => i !== idx) })}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center shadow"
-                      >
-                        ✕
-                      </button>
+                  {rawPrice > 0 && (
+                    <div className="text-[11px] text-zinc-400 mt-1.5 flex justify-between">
+                      <span>معادل رسمی به ریال:</span>
+                      <span className="font-bold text-emerald-400">{(rawPrice * 10).toLocaleString("fa-IR")} ریال</span>
                     </div>
-                  ))}
-                  {form.images.length === 0 && (
-                    <span className="text-slate-400 text-xs">هنوز تصویری اضافه نشده است.</span>
                   )}
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">قیمت با تخفیف (تومان)</label>
+                  <input
+                    type="text"
+                    value={discountToman}
+                    onChange={(e) => handlePriceChange(e, setDiscountToman)}
+                    placeholder="مثلاً: 3,900,000"
+                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
+                  />
+                  {rawDiscount > 0 && (
+                    <div className="text-[11px] text-zinc-400 mt-1.5 flex justify-between">
+                      <span>معادل رسمی تخفیف:</span>
+                      <span className="font-bold text-emerald-400">{(rawDiscount * 10).toLocaleString("fa-IR")} ریال</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">موجودی انبار *</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={stock}
+                    onChange={(e) => setStock(Number(e.target.value))}
+                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-[var(--text-secondary)]">رنگ‌بندی‌های مجاز:</label>
+              {/* رنگ‌بندی‌های مجاز */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 mb-2">رنگ‌بندی‌های مجاز</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={colorInput}
                     onChange={(e) => setColorInput(e.target.value)}
-                    placeholder="مثال: نقره‌ای"
-                    className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)]"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addColor();
+                      }
+                    }}
+                    placeholder="مثلاً: بژ متالیک، سفید صدفی، مشکی..."
+                    className="flex-1 p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      if (colorInput.trim()) {
-                        setForm({ ...form, colors: [...form.colors, colorInput.trim()] });
-                        setColorInput("");
-                      }
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--card-border)] text-xs font-bold"
+                    onClick={addColor}
+                    className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white"
                   >
                     افزودن رنگ
                   </button>
                 </div>
-                <div className="flex gap-1.5 flex-wrap pt-1">
-                  {form.colors.map((c, i) => (
-                    <span key={i} className="px-2.5 py-0.5 rounded-lg bg-[var(--card-border)] text-xs flex items-center gap-1">
-                      {c}
+                {colors.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {colors.map((c) => (
+                      <span key={c} className="px-3 py-1.5 rounded-xl bg-zinc-800 text-xs font-bold text-zinc-200 flex items-center gap-2">
+                        {c}
+                        <button type="button" onClick={() => removeColor(c)} className="text-zinc-400 hover:text-rose-400">
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* مشخصات فنی تفکیک‌شده (Dynamic Specs) */}
+              <div className="p-4 rounded-2xl bg-[#161618] border border-[#27272a]">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-black text-white">مشخصات فنی و ویژگی‌های تفکیک‌شده</label>
+                  <button
+                    type="button"
+                    onClick={addSpecField}
+                    className="text-xs font-bold text-[#0071e3] hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} />
+                    افزودن ویژگی جدید
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {specsList.map((spec, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        value={spec.key}
+                        onChange={(e) => updateSpecField(index, "key", e.target.value)}
+                        placeholder="عنوان ویژگی (مثلاً توان مصرفی)"
+                        className="w-1/3 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
+                      />
+                      <input
+                        type="text"
+                        value={spec.value}
+                        onChange={(e) => updateSpecField(index, "value", e.target.value)}
+                        placeholder="مقدار ویژگی (مثلاً 1200W)"
+                        className="flex-1 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
+                      />
                       <button
                         type="button"
-                        onClick={() => setForm({ ...form, colors: form.colors.filter((_, idx) => idx !== i) })}
-                        className="text-rose-400 text-[10px]"
+                        onClick={() => removeSpecField(index)}
+                        className="p-2 text-zinc-500 hover:text-rose-400"
                       >
-                        ✕
+                        <Trash2 size={16} />
                       </button>
-                    </span>
+                    </div>
                   ))}
                 </div>
               </div>
 
+              {/* توضیحات کلی */}
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">توضیحات و مشخصات فنی:</label>
+                <label className="block text-xs font-bold text-zinc-300 mb-2">توضیحات کلی محصول</label>
                 <textarea
-                  rows={3}
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
+                  rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="توضیحات معرفی دستگاه، موارد استفاده و نکات کلیدی..."
+                  className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
+              {/* دکمه‌های اقدام */}
+              <div className="pt-4 border-t border-[#27272a] flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+                  className="px-6 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-300"
                 >
                   انصراف
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md hover:opacity-90 transition"
+                  disabled={saving}
+                  className="px-8 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white text-xs font-bold shadow-lg flex items-center gap-2 disabled:opacity-50"
                 >
-                  ذخیره کالا 💾
+                  <Save size={16} />
+                  {saving ? "در حال ذخیره‌سازی..." : "ذخیره کالا"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      <MediaUploadModal
-        isOpen={isUploadOpen}
-        bucket="products"
-        onClose={() => setIsUploadOpen(false)}
-        onUploadSuccess={(url) => {
-          setForm((prev) => ({ ...prev, images: [...prev.images, url] }));
-        }}
-      />
     </div>
   );
 }

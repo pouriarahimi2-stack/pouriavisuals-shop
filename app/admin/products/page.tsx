@@ -291,16 +291,14 @@ export default function AdminProductsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی:</label>
-                  <select
-                    value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none"
-                  >
-                    <option value="smartphones">گوشی‌های هوشمند</option>
-                    <option value="laptops">لپ‌تاپ و اولترابوک</option>
-                    <option value="audio">هدفون و سیستم صوتی</option>
-                    <option value="accessories">لوازم جانبی</option>
-                  </select>
+                  <input
+              type="text"
+              required
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+                placeholder="دسته‌بندی (مثلاً: اتوبخار و لوازم خانگی)"
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+            />
                 </div>
               </div>
 

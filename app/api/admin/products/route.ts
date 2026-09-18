@@ -57,6 +57,8 @@ export async function POST(req: NextRequest) {
       stock,
       is_available: stock > 0,
       description: formattedDescription,
+      warranty: body.warranty || null,
+      shipping_status: body.shipping_status || null,
       image_url: body.image_url || (Array.isArray(body.images) && body.images[0]) || "/placeholder.png",
       updated_at: new Date().toISOString(),
     };

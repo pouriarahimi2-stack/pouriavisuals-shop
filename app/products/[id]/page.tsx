@@ -1,220 +1,281 @@
-// File Path: app/products/[id]/page.tsx
-import React from "react";
-import { notFound } from "next/navigation";
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { ShieldCheck, Truck, ChevronRight, ChevronLeft, Star, ShoppingCart, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
-import AddToCartButton from "@/components/AddToCartButton";
-import ProductReviews from "@/components/ProductReviews";
-import ColorGamutSimulator from "@/components/ColorGamutSimulator";
-import LiveMarketArbitrage from "@/components/LiveMarketArbitrage";
-import { formatPrice } from "@/lib/formatters";
-import type { Metadata } from "next";
 
-export const revalidate = 60; // بازسازی خودکار هر ۱ دقیقه (ISR)
+export default function ProductDetailPage() {
+  const params = useParams();
+  const id = params?.id as string;
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+  const [product, setProduct] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-async function getProduct(id: string) {
-  try {
-    if (supabaseAdmin) {
-      const { data } = await supabaseAdmin
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+  // فرم نظرات
+  const [authorName, setAuthorName] = useState("");
+  const [rating, setRating] = useState(5);
+  const [commentText, setCommentText] = useState("");
+  const [commentStatus, setCommentStatus] = useState<string | null>(null);
 
-      if (data) return data;
-    }
-  } catch {}
+  useEffect(() => {
+    if (!id) return;
+    const fetchDetail = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/admin/products?id=${id}`);
+        const data = await res.json();
+        if (data.product) {
+          setProduct(data.product);
+        } else if (data.products) {
+          const found = data.products.find((p: any) => p.id === id);
+          if (found) setProduct(found);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDetail();
+  }, [id]);
 
-  return FLAGSHIP_7_PRODUCTS.find((p) => String(p.id) === String(id)) || null;
-}
-
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { id } = await params;
-  const product = await getProduct(id);
-
-  if (!product) {
-    return { title: "کالای مورد نظر یافت نشد | آکسون" };
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center dir-rtl text-sm font-bold">در حال بارگذاری اطلاعات کالا...</div>;
   }
 
-  const title = product.title || product.name || "محصول استودیویی آکسون";
-  const desc = product.meta_description || product.description?.slice(0, 150) || "مشخصات فنی، قیمت و خرید مانیتور و تجهیزات استودیویی در آکسون کور.";
+  if (!product) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl gap-4">
+        <p className="text-base font-bold">کالای مورد نظر یافت نشد.</p>
+        <Link href="/products" className="px-5 py-2.5 rounded-2xl bg-[#0071e3] text-white font-bold text-xs">
+          بازگشت به کاتالوگ
+        </Link>
+      </div>
+    );
+  }
 
-  return {
-    title: `${title} | نقد و بررسی و خرید با گارانتی اصالت طلایی`,
-    description: desc,
-    alternates: {
-      canonical: `https://axoncore.ir/products/${id}`,
-    },
-    openGraph: {
-      title,
-      description: desc,
-      url: `https://axoncore.ir/products/${id}`,
-      images: [product.image_url || product.image || "https://axoncore.ir/placeholder.png"],
-    },
+  const gallery = Array.isArray(product.images) && product.images.length > 0 
+    ? product.images 
+    : (product.image_url ? [product.image_url] : ["/placeholder.png"]);
+
+  const handleNextImage = () => {
+    setActiveImageIndex((prev) => (prev + 1) % gallery.length);
   };
-}
 
-export default async function ProductDetailPage({ params }: PageProps) {
-  const { id } = await params;
-  const product = await getProduct(id);
+  const handlePrevImage = () => {
+    setActiveImageIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+  };
 
-  if (!product) notFound();
-
-  const title = product.title || product.name || "کالای تخصصی";
-  const finalPrice = Number(product.discount_price || product.discountPrice || product.price || 0);
-  const basePrice = Number(product.price || 0);
-  const hasDiscount = Boolean(finalPrice > 0 && finalPrice < basePrice);
-  const imageUrl = product.image_url || product.image || (product.images && product.images[0]) || "https://axoncore.ir/placeholder.png";
-
-  const productSchemaJsonLd = {
-    "@context": "https://schema.org/",
-    "@type": "Product",
-    "name": title,
-    "image": [imageUrl],
-    "description": product.description || "تجهیزات تخصصی و مانیتور تدوین استودیو با گارانتی اصالت طلایی",
-    "sku": product.sku || `AXN-${product.id}`,
-    "brand": {
-      "@type": "Brand",
-      "name": product.brand || "Apple",
-    },
-    "offers": {
-      "@type": "Offer",
-      "url": `https://axoncore.ir/products/${product.id}`,
-      "priceCurrency": "IRR",
-      "price": finalPrice * 10,
-      "availability": product.is_available !== false ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-      "itemCondition": "https://schema.org/NewCondition",
-    },
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authorName.trim() || !commentText.trim()) return;
+    try {
+      setCommentStatus("submitting");
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: product.id,
+          author_name: authorName,
+          rating,
+          comment: commentText,
+        }),
+      });
+      if (res.ok) {
+        setCommentStatus("success");
+        setAuthorName("");
+        setCommentText("");
+      } else {
+        setCommentStatus("error");
+      }
+    } catch (e) {
+      setCommentStatus("error");
+    }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-none text-[var(--text-primary)] space-y-12" dir="rtl">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchemaJsonLd) }}
-      />
-
-      <nav className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
-        <Link href="/" className="hover:text-[var(--accent-blue)]">خانه</Link>
+    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-6 lg:p-12 dir-rtl">
+      {/* بردکرامب بدون هاردکد */}
+      <div className="max-w-6xl mx-auto flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-8">
+        <Link href="/" className="hover:underline">خانه</Link>
         <span>/</span>
-        <Link href="/products" className="hover:text-[var(--accent-blue)]">کاتالوگ تجهیزات</Link>
+        <Link href="/products" className="hover:underline">کاتالوگ</Link>
         <span>/</span>
-        <span className="text-[var(--text-primary)] truncate max-w-xs">{title}</span>
-      </nav>
+        <span className="text-[var(--text-primary)] font-bold">{product.title || product.name}</span>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
-        {/* گالری تصویر کالا */}
-        <div className="rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 shadow-xl flex items-center justify-center aspect-square overflow-hidden">
-          <img
-            src={imageUrl}
-            alt={title}
-            width={520}
-            height={520}
-            className="w-full h-full object-contain max-h-[420px] transition-transform duration-500 hover:scale-105"
-          />
-        </div>
-
-        {/* مشخصات و جعبه خرید */}
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-xs font-black font-mono">
-              {product.category || "تجهیزات تخصصی تصویر"}
-            </span>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black leading-snug">
-              {title}
-            </h1>
-            {product.title_fa && (
-              <p className="text-xs text-[var(--text-secondary)] font-bold">{product.title_fa}</p>
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+        {/* اسلایدر تصاویر کالا */}
+        <div className="flex flex-col items-center bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 relative">
+          <div className="w-full h-80 sm:h-96 relative flex items-center justify-center overflow-hidden rounded-2xl">
+            <img
+              src={gallery[activeImageIndex]}
+              alt={product.title}
+              className="w-full h-full object-contain transition-all duration-300"
+            />
+            {gallery.length > 1 && (
+              <>
+                <button
+                  onClick={handlePrevImage}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 text-white hover:bg-black transition"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={handleNextImage}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 text-white hover:bg-black transition"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
             )}
           </div>
 
-          {/* تنوع و رنگ‌ها در صورت تعریف */}
-          {Array.isArray(product.variants) && product.variants.length > 0 && (
-            <div className="space-y-2 p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)]">
-              <span className="text-xs font-bold text-[var(--text-secondary)] block">انتخاب رنگ و مدل:</span>
-              <div className="flex flex-wrap gap-2">
-                {product.variants.map((v: any, idx: number) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    className="px-3.5 py-1.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold flex items-center gap-2 hover:border-[var(--accent-blue)] transition"
-                  >
-                    {v.colorHex && (
-                      <span className="w-3.5 h-3.5 rounded-full border border-black/20" style={{ backgroundColor: v.colorHex }} />
-                    )}
-                    <span>{v.name}</span>
-                  </button>
+          {/* تصاویر بندانگشتی */}
+          {gallery.length > 1 && (
+            <div className="flex gap-3 mt-5 overflow-x-auto p-1 max-w-full">
+              {gallery.map((img: string, idx: number) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition ${
+                    activeImageIndex === idx ? "border-[#0071e3]" : "border-transparent opacity-60"
+                  }`}
+                >
+                  <img src={img} alt="thumb" className="w-full h-full object-contain bg-black/20" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* مشخصات و قیمت */}
+        <div className="flex flex-col space-y-6">
+          <div>
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-400">
+              {product.category || "عمومی"}
+            </span>
+            <h1 className="text-2xl lg:text-3xl font-black mt-3 leading-snug">{product.title || product.name}</h1>
+          </div>
+
+          {/* نشان وضعیت ارسال و گارانتی (صرفاً در صورت وجود) */}
+          {(product.warranty || product.shipping_status) && (
+            <div className="flex flex-wrap gap-4 pt-2">
+              {product.warranty && (
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] text-xs font-bold text-blue-400">
+                  <ShieldCheck size={18} />
+                  <span>{product.warranty}</span>
+                </div>
+              )}
+              {product.shipping_status && (
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] text-xs font-bold text-emerald-400">
+                  <Truck size={18} />
+                  <span>{product.shipping_status}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* باکس قیمت بدون متن‌های هاردکد اضافه */}
+          <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] flex items-center justify-between">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت نهایی:</span>
+            <div className="text-left font-black">
+              <div className="text-2xl text-emerald-400">{Number(product.price || 0).toLocaleString("fa-IR")} تومان</div>
+              <div className="text-xs text-[var(--text-secondary)] mt-1">
+                {(Number(product.price || 0) * 10).toLocaleString("fa-IR")} ریال
+              </div>
+            </div>
+          </div>
+
+          {/* توضیحات کالا */}
+          {product.description && (
+            <div>
+              <h2 className="text-sm font-black mb-3">توضیحات کالا</h2>
+              <p className="text-xs leading-relaxed text-[var(--text-secondary)] whitespace-pre-line bg-[var(--card-bg)] border border-[var(--card-border)] p-5 rounded-3xl">
+                {product.description}
+              </p>
+            </div>
+          )}
+
+          {/* مشخصات تفکیک‌شده فنی */}
+          {product.specs && Object.keys(product.specs).length > 0 && (
+            <div>
+              <h2 className="text-sm font-black mb-3">مشخصات فنی</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Object.entries(product.specs).map(([k, v]: any) => (
+                  <div key={k} className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex justify-between text-xs">
+                    <span className="text-[var(--text-secondary)]">{k}:</span>
+                    <span className="font-bold text-[var(--text-primary)]">{v}</span>
+                  </div>
                 ))}
               </div>
             </div>
           )}
-
-          {/* کارت گارانتی و اصالت */}
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-[var(--text-secondary)] block font-bold">🛡️ گارانتی محصول:</span>
-              <strong className="text-xs font-bold text-[var(--text-primary)]">{product.warranty || "۱۸ ماه گارانتی اصالت طلایی"}</strong>
-            </div>
-            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
-              <span className="text-[var(--text-secondary)] block font-bold">🚀 وضعیت ارسال:</span>
-              <strong className="text-xs font-bold text-emerald-600 dark:text-emerald-400">آماده تحویل به پست پیشتاز</strong>
-            </div>
-          </div>
-
-          {/* قیمت */}
-          <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت نهایی استودیو:</span>
-            <div className="flex flex-col items-end">
-              {hasDiscount && (
-                <span className="text-xs font-mono line-through text-slate-400" suppressHydrationWarning>
-                  {formatPrice(basePrice)} تومان
-                </span>
-              )}
-              <span className="text-xl sm:text-2xl font-mono font-black text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
-                {formatPrice(finalPrice)} تومان
-              </span>
-            </div>
-          </div>
-
-          <AddToCartButton
-            product={{
-              id: product.id,
-              title,
-              price: finalPrice,
-              image: imageUrl,
-              images: [imageUrl],
-              stock: product.stock,
-              category: product.category,
-            }}
-          />
-
-          {/* توضیحات */}
-          <div className="space-y-3 pt-4 border-t border-[var(--card-border)]">
-            <h3 className="font-black text-sm">توضیحات و استانداردهای مهندسی</h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium whitespace-pre-line text-justify">
-              {product.description || "این کالا منطبق با استانداردهای رتینا، پوشش رنگ DCI-P3 و کالیبراسیون سخت‌افزاری استودیوهای تدوین رنگ ارائه می‌گردد."}
-            </p>
-          </div>
         </div>
       </div>
 
-      {/* شبیه‌ساز گاموت رنگی */}
-      <ColorGamutSimulator productTitle={title} />
+      {/* بخش ثبت دیدگاه و نظرات */}
+      <div className="max-w-4xl mx-auto mt-16 pt-10 border-t border-[var(--card-border)]">
+        <h2 className="text-lg font-black mb-6 flex items-center gap-2">
+          <Star size={20} className="text-amber-400" />
+          ثبت نظر و تجربه استفاده
+        </h2>
 
-      {/* پایش زنده قیمت در ۵ پلتفرم */}
-      <LiveMarketArbitrage
-        productTitle={title}
-        ourPrice={finalPrice}
-        marketBenchmarks={product.market_comparison}
-      />
+        <form onSubmit={handleCommentSubmit} className="space-y-4 bg-[var(--card-bg)] border border-[var(--card-border)] p-6 rounded-3xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold mb-2">نام و نام خانوادگی *</label>
+              <input
+                type="text"
+                required
+                value={authorName}
+                onChange={(e) => setAuthorName(e.target.value)}
+                placeholder="مثال: علی محمدی"
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[#0071e3]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-2">امتیاز کیفی</label>
+              <select
+                value={rating}
+                onChange={(e) => setRating(Number(e.target.value))}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[#0071e3]"
+              >
+                <option value={5}>عالی (۵ از ۵)</option>
+                <option value={4}>خیلی خوب (۴ از ۵)</option>
+                <option value={3}>متوسط (۳ از ۵)</option>
+                <option value={2}>ضعیف (۲ از ۵)</option>
+                <option value={1}>بسیار ضعیف (۱ از ۵)</option>
+              </select>
+            </div>
+          </div>
 
-      {/* دیدگاه‌های خریداران */}
-      <ProductReviews productId={String(product.id)} />
+          <div>
+            <label className="block text-xs font-bold mb-2">متن دیدگاه یا نقد شما *</label>
+            <textarea
+              required
+              rows={4}
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="دیدگاه خود را درباره کیفیت، کارایی و تجربه کار با این محصول بنویسید..."
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[#0071e3]"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="px-6 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white font-bold text-xs"
+          >
+            {commentStatus === "submitting" ? "در حال ثبت..." : "ثبت و ارسال دیدگاه"}
+          </button>
+
+          {commentStatus === "success" && (
+            <p className="text-xs font-bold text-emerald-400 mt-2">دیدگاه شما با موفقیت دریافت گردید و پس از بازبینی منتشر خواهد شد.</p>
+          )}
+        </form>
+      </div>
     </div>
   );
 }

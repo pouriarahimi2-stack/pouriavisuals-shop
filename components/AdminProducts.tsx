@@ -8,6 +8,20 @@ import ProductExplodedView from "@/components/ProductExplodedView";
 import { formatPrice } from "@/lib/formatters";
 
 export default function AdminProducts() {
+  const [liveCategories, setLiveCategories] = React.useState<string[]>([]);
+  const loadLiveCategories = async () => {
+    try {
+      const res = await fetch("/api/categories");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.categories)) {
+        const names = json.categories.map((c: any) => c.name || c.title).filter(Boolean);
+        if (names.length > 0) setLiveCategories(names);
+      }
+    } catch (e) {
+      console.warn("Categories fetch fallback:", e);
+    }
+  };
+
   const fileImportInputRef = React.useRef<HTMLInputElement>(null);
   const [importing, setImporting] = React.useState(false);
 

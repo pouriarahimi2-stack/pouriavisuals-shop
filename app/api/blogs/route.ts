@@ -4,15 +4,29 @@ import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const { data, error } = await supabaseAdmin
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    const slug = searchParams.get("slug");
+
+    if (id || slug) {
+      let query = supabaseAdmin.from("posts").select("*");
+      if (id) query = query.eq("id", id);
+      else if (slug) query = query.eq("slug", slug);
+
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
+      return NextResponse.json({ success: true, post: data, data });
+    }
+
+    const { data: posts, error } = await supabaseAdmin
       .from("posts")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json({ success: true, data: data || [], posts: data || [] });
+    return NextResponse.json({ success: true, posts: posts || [], data: posts || [] });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -20,47 +34,58 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!(await verifyAdminSession(req))) {
+    const session = await verifyAdminSession(req);
+    if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const body = await req.json();
-    const cleanTitle = String(body.title || "").trim();
+    const title = String(body.title || "").trim();
+    const content = String(body.content || "").trim();
 
-    if (!cleanTitle) {
-      return NextResponse.json({ success: false, message: "عنوان مقاله الزامی است." }, { status: 400 });
+    if (!title || !content) {
+      return NextResponse.json({ success: false, message: "عنوان و محتوای مقاله الزامی هستند." }, { status: 400 });
     }
 
-    const postId = String(body.id || ("post_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6)));
-    const cleanSlug = String(body.slug || cleanTitle)
+    const cleanSlug = String(body.slug || title)
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
       .replace(/^-+|-+$/g, "");
 
-    const payload: Record<string, any> = {
-      id: postId,
-      title: cleanTitle,
+    const img = body.imageUrl || body.image_url || "/placeholder.png";
+    const metaDesc = body.metaDescription || body.meta_description || title;
+
+    const payload = {
+      title,
       slug: cleanSlug,
-      content: body.content || "",
-      category: body.category || "مقاله تخصصی",
-      image_url: body.image_url || body.imageUrl || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-      meta_description: body.meta_description || body.metaDescription || cleanTitle,
-      is_published: body.is_published !== false && body.isPublished !== false,
+      content,
+      category: body.category || "راهنمای خرید و بررسی",
+      image_url: img,
+      meta_description: metaDesc,
+      is_published: body.isPublished !== undefined ? Boolean(body.isPublished) : (body.is_published !== undefined ? Boolean(body.is_published) : true),
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabaseAdmin.from("posts").select("id").eq("id", postId).maybeSingle();
+    if (body.id) {
+      const { data: updated, error } = await supabaseAdmin
+        .from("posts")
+        .update(payload)
+        .eq("id", body.id)
+        .select()
+        .single();
 
-    if (existing) {
-      const { data, error } = await supabaseAdmin.from("posts").update(payload).eq("id", postId).select().single();
       if (error) throw error;
-      return NextResponse.json({ success: true, message: "مقاله با موفقیت به‌روزرسانی شد.", data, post: data });
+      return NextResponse.json({ success: true, message: "مقاله با موفقیت به‌روزرسانی شد.", data: updated, post: updated });
     } else {
-      payload.created_at = new Date().toISOString();
-      const { data, error } = await supabaseAdmin.from("posts").insert([payload]).select().single();
+      const { data: inserted, error } = await supabaseAdmin
+        .from("posts")
+        .insert([{ ...payload, created_at: new Date().toISOString() }])
+        .select()
+        .single();
+
       if (error) throw error;
-      return NextResponse.json({ success: true, message: "مقاله جدید با موفقیت منتشر گردید.", data, post: data });
+      return NextResponse.json({ success: true, message: "مقاله با موفقیت منتشر گردید.", data: inserted, post: inserted });
     }
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
@@ -69,7 +94,8 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    if (!(await verifyAdminSession(req))) {
+    const session = await verifyAdminSession(req);
+    if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
@@ -83,7 +109,7 @@ export async function DELETE(req: NextRequest) {
     const { error } = await supabaseAdmin.from("posts").delete().eq("id", id);
     if (error) throw error;
 
-    return NextResponse.json({ success: true, message: "مقاله با موفقیت از پایگاه داده حذف شد." });
+    return NextResponse.json({ success: true, message: "مقاله با موفقیت حذف شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

@@ -21,7 +21,7 @@ export async function getSiteInfoServer(): Promise<SiteInfo> {
       return getDefaultSiteInfo();
     }
 
-    const isAllowed = data.allow_google_index !== false && data.allowGoogleIndex !== false;
+    const isAllowed = (data as any).allow_google_index !== false && (data as any).allowGoogleIndex !== false;
 
     return {
       id: data.id,

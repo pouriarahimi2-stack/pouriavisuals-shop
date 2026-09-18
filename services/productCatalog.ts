@@ -62,6 +62,27 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
     category: "اتوبخار و لوازم خانگی",
     price: 2450000,
     discountPrice: 1980000,
+    stock: 25,
+    isAvailable: true,
+    warranty: "۱۲ ماه گارانتی اصالت و تعویض",
+    image: "/placeholder.png",
+    images: ["/placeholder.png"],
+    short_description: "اتوبخار دستی دوکاره با توان ۱۲۰۰ وات، مخزن ۱۲۰ میلی‌لیتر و ۶ حالت تنظیم هوشمند بخار.",
+    description: "اتوبخار هوشمند با چرخش ۱۸۰ درجه، کنترل دقیق دما و تنظیم بخار برای انواع پارچه‌های ابریشم، نخ و کتان.",
+    specs: {
+      "توان مصرفی": "1200W",
+      "ظرفیت مخزن آب": "120 ml",
+      "زاویه چرخش دسته": "۱۸۰ درجه",
+      "حالت عملکرد": "دوکاره (افقی + عمودی)"
+    }
+  },
+  {
+    id: "steamer-180-pro",
+    title: "اتوبخار پرتابل هوشمند با چرخش ۱۸۰ درجه",
+    title_fa: "اتوبخار مسافرتی و خانگی ۱۲۰۰ وات ۶ حالته",
+    category: "اتوبخار و لوازم خانگی",
+    price: 2450000,
+    discountPrice: 1980000,
     discount_price: 1980000,
     stock: 25,
     isAvailable: true,

@@ -1,3 +1,4 @@
+import AnnouncementBar from "@/components/AnnouncementBar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import CartDrawer from "@/components/CartDrawer";
 import type { Metadata, Viewport } from "next";
@@ -70,6 +71,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
+        <AnnouncementBar />
         <CartProvider>
           <LayoutShell><div className="pb-16 lg:pb-0">{children}</div>
         <MobileBottomNav />

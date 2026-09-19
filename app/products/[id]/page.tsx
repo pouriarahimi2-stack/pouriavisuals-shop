@@ -18,6 +18,21 @@ export default function ProductDetailPage() {
   const [rating, setRating] = useState(5);
   const [commentText, setCommentText] = useState("");
   const [commentStatus, setCommentStatus] = useState<string | null>(null);
+  const [existingReviews, setExistingReviews] = useState<any[]>([]);
+
+  const fetchApprovedReviews = async () => {
+    try {
+      const r = await fetch(`/api/reviews?product_id=${id}`);
+      const d = await r.json();
+      if (d.success && Array.isArray(d.reviews)) {
+        setExistingReviews(d.reviews.filter((item: any) => item.is_approved !== false));
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (id) fetchApprovedReviews();
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -340,6 +355,27 @@ export default function ProductDetailPage() {
             <p className="text-xs font-bold text-emerald-400 mt-2">دیدگاه شما ثبت گردید.</p>
           )}
         </form>
+
+        {/* لیست نظرات ثبت و تایید شده */}
+        {existingReviews.length > 0 && (
+          <div className="mt-8 space-y-4">
+            <h3 className="text-sm font-black text-white">نظرات خریداران ({existingReviews.length})</h3>
+            <div className="space-y-3">
+              {existingReviews.map((rev) => (
+                <div key={rev.id} className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">{rev.author_name}</span>
+                    <div className="flex items-center gap-1 text-amber-400 text-xs">
+                      <span>★</span>
+                      <span>{rev.rating}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{rev.comment}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

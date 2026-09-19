@@ -1,3 +1,4 @@
+import MobileBottomNav from "@/components/MobileBottomNav";
 import CartDrawer from "@/components/CartDrawer";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
@@ -70,7 +71,8 @@ export default function RootLayout({
       </head>
       <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
         <CartProvider>
-          <LayoutShell>{children}
+          <LayoutShell><div className="pb-16 lg:pb-0">{children}</div>
+        <MobileBottomNav />
         <CartDrawer /></LayoutShell>
         </CartProvider>
       </body>

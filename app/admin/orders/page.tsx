@@ -68,7 +68,7 @@ export default function AdminOrdersPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 border-b border-[var(--card-border)]">
         <div>
           <div className="flex items-center gap-3">
-            <Link href="/admin" className="p-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--card-hover)] text-sm font-bold flex items-center gap-2">
+            <Link href="/admin/orders" className="p-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--card-hover)] text-sm font-bold flex items-center gap-2">
               <ArrowRight size={18} />
               پیشخوان
             </Link>

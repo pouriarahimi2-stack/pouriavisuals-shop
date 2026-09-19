@@ -188,7 +188,7 @@ export default function CheckoutPage() {
           </h2>
 
           <form onSubmit={handleSubmitOrder} id="checkout-form" className="space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-300 mb-2">نام و نام خانوادگی *</label>
                 <input
@@ -257,7 +257,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-300 mb-2">استان</label>
                 <input

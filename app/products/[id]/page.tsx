@@ -229,7 +229,7 @@ export default function ProductDetailPage() {
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
         {/* اسلایدر تصاویر با دکمه پخش ویدیو */}
         <div className="flex flex-col items-center bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 relative shadow-sm">
-          <div className="w-full h-80 sm:h-96 relative flex items-center justify-center overflow-hidden rounded-2xl bg-zinc-950/40">
+          <div className="w-full h-64 sm:h-80 md:h-96 relative flex items-center justify-center overflow-hidden rounded-2xl bg-zinc-950/40">
             <img
               src={gallery[activeImageIndex]}
               alt={product.title}

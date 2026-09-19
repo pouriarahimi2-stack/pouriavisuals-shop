@@ -65,7 +65,7 @@ export default function CartDrawer() {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-start dir-rtl">
-      <div className="w-full max-w-md bg-[#121214] border-l border-[#27272a] h-full flex flex-col justify-between p-6 shadow-2xl animate-in slide-in-from-right duration-200">
+      <div className="w-full sm:max-w-md max-w-full bg-[#121214] border-l border-[#27272a] h-full flex flex-col justify-between p-6 shadow-2xl animate-in slide-in-from-right duration-200">
         <div>
           <div className="flex items-center justify-between pb-4 border-b border-[#27272a]">
             <div className="flex items-center gap-2">
@@ -78,7 +78,7 @@ export default function CartDrawer() {
             </button>
           </div>
 
-          <div className="mt-4 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="mt-4 space-y-3 max-h-[55vh] sm:max-h-[60vh] overflow-y-auto pr-1">
             {cartItems.length === 0 ? (
               <div className="py-20 text-center text-xs text-zinc-500 font-bold">
                 سبد خرید شما در حال حاضر خالی است.

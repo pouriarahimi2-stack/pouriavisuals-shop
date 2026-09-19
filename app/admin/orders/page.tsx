@@ -275,7 +275,7 @@ export default function AdminOrdersPage() {
                       onChange={(e) =>
                         setTrackingInputs((prev) => ({ ...prev, [ord.id]: e.target.value }))
                       }
-                      className="flex-1 sm:w-64 px-3 py-1.5 rounded-xl bg-[#121214] border border-[#27272a] text-xs font-mono text-white outline-none focus:border-[#0071e3]"
+                      className="w-full sm:w-64 px-3 py-2 rounded-xl bg-[#121214] border border-[#27272a] text-xs font-mono text-white outline-none focus:border-[#0071e3]"
                     />
                     <button
                       type="button"

@@ -1,5 +1,6 @@
 "use client";
 
+import EnamadBadge from "@/components/EnamadBadge";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, HomepageLayoutConfig, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
@@ -179,6 +180,9 @@ export default function Footer() {
           </div>
         )}
       </div>
-    </footer>
+      <div className="max-w-7xl mx-auto px-6 pt-6 flex justify-center pb-4">
+            <EnamadBadge />
+          </div>
+        </footer>
   );
 }

@@ -8,10 +8,9 @@ import { formatPrice } from "@/lib/formatters";
 
 interface ProductCardProps {
   product: any;
-  onOpenQuickView?: (product: any) => void;
 }
 
-export default function ProductCard({ product, onOpenQuickView }: ProductCardProps) {
+export default function ProductCard({ product }: ProductCardProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -19,20 +18,13 @@ export default function ProductCard({ product, onOpenQuickView }: ProductCardPro
   }, []);
 
   const title = product?.title || product?.name || "محصول استودیو";
-  const mainImage =
-    (product?.images && product.images[0]) ||
-    product?.image ||
-    "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800";
-
+  const mainImage = (product?.images && product.images[0]) || product?.image || "/placeholder.png";
   const price = Number(product?.price || 0);
-  const discountPrice = product?.discount_price ? Number(product.discount_price) : null;
+  const discountPrice = product?.discount_price || product?.discountPrice ? Number(product.discount_price || product.discountPrice) : null;
   const isAvailable = product?.is_available !== false && (product?.stock === undefined || Number(product.stock) > 0);
 
   return (
-    <div
-      className="group relative rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] p-4 transition-all duration-300 shadow-md flex flex-col justify-between font-sans select-none"
-      dir="rtl"
-    >
+    <div className="group relative rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] p-4 sm:p-5 transition-all duration-300 shadow-md flex flex-col justify-between font-sans select-none" dir="rtl">
       <div>
         <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
           <Link href={"/products/" + product.id} className="w-full h-full relative block">
@@ -40,13 +32,12 @@ export default function ProductCard({ product, onOpenQuickView }: ProductCardPro
               src={mainImage}
               alt={title}
               fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               loading="lazy"
               className="object-contain transition-transform duration-500 group-hover:scale-105"
             />
           </Link>
-
-          <span className="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-md text-white text-[10px] px-3 py-1 rounded-full font-bold border border-white/10">
+          <span className="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-md text-white text-[10px] px-3 py-1 rounded-full font-bold border border-white/10 z-10">
             {product?.category || "تخصصی"}
           </span>
         </div>

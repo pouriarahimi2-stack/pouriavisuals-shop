@@ -1,7 +1,3 @@
-/**
- * AXON CORE - ISR Cache Tags & Revalidation Helpers
- */
-
 export const CACHE_TAGS = {
   PRODUCTS: "products-cache",
   BLOGS: "blogs-cache",
@@ -10,7 +6,7 @@ export const CACHE_TAGS = {
 };
 
 export const REVALIDATE_TIMES = {
-  PRODUCTS: 60, // هر ۶۰ ثانیه
-  BLOGS: 300,   // هر ۵ دقیقه
-  SETTINGS: 3600, // هر ۱ ساعت
+  PRODUCTS: 30,
+  BLOGS: 120,
+  SETTINGS: 3600,
 };

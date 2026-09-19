@@ -1,3 +1,6 @@
+"use client";
+
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import React from "react";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
@@ -6,19 +9,7 @@ import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "کاتالوگ و خرید مانیتورهای ۵K و تجهیزات استودیویی | آکسون",
-  description: "مرجع تخصصی مانیتورهای تدوین رنگ ۵K و ۴K، استودیو دیسپلی، پردازنده‌های گرافیکی و کابل‌های تاندربولت با گارانتی اصالت طلایی در آکسون کور.",
-  openGraph: {
-    title: "کاتالوگ تخصصی تجهیزات استودیو و تصویر | آکسون",
-    description: "تامین رسمی مانیتورهای کالیبره استودیویی و تجهیزات حرفه‌ای تدوین در ایران.",
-    url: "https://axoncore.ir/products",
-    type: "website",
-  },
-  alternates: {
-    canonical: "https://axoncore.ir/products",
-  },
-};
+
 
 export default async function ProductsArchivePage() {
   let products: any[] = [];

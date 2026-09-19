@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { ShieldCheck, ChevronRight, ChevronLeft, Star, Play, X } from "lucide-react";
 import Link from "next/link";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -14,13 +15,63 @@ export default function ProductDetailPage() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
+  // دیدگاه‌ها
+  const [existingReviews, setExistingReviews] = useState<any[]>([]);
   const [authorName, setAuthorName] = useState("");
   const [rating, setRating] = useState(5);
   const [commentText, setCommentText] = useState("");
   const [commentStatus, setCommentStatus] = useState<string | null>(null);
-  const [existingReviews, setExistingReviews] = useState<any[]>([]);
 
-  const fetchApprovedReviews = async () => {
+  const fetchDetail = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/admin/products?id=${id}`);
+      const data = await res.json();
+      let found = null;
+      if (data.product) found = data.product;
+      else if (data.products) found = data.products.find((p: any) => p.id === id);
+
+      if (found) {
+        let rawDesc = found.description || "";
+        let extractedImages: string[] = [];
+        let extractedWarranty = found.warranty || "";
+        let extractedVideo = found.video_url || "";
+        let extractedSpecs = found.specs || {};
+
+        const metaMatch = rawDesc.match(/<!--MEDIA_METADATA:([\s\S]*?)-->/);
+        if (metaMatch) {
+          try {
+            const meta = JSON.parse(metaMatch[1]);
+            if (Array.isArray(meta.images) && meta.images.length > 0) extractedImages = meta.images;
+            if (meta.warranty) extractedWarranty = meta.warranty;
+            if (meta.video_url) extractedVideo = meta.video_url;
+            if (meta.specs) extractedSpecs = meta.specs;
+            rawDesc = rawDesc.replace(metaMatch[0], "").trim();
+          } catch (e) {}
+        }
+
+        if (extractedImages.length === 0 && found.image_url) {
+          extractedImages = [found.image_url];
+        }
+
+        found.parsedImages = extractedImages;
+        found.parsedWarranty = extractedWarranty;
+        found.parsedVideo = extractedVideo;
+        found.parsedSpecs = extractedSpecs;
+        found.cleanDescription = rawDesc;
+
+        setProduct(found);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  const fetchApprovedReviews = useCallback(async () => {
+    if (!id) return;
     try {
       const r = await fetch(`/api/reviews?product_id=${id}`);
       const d = await r.json();
@@ -28,65 +79,46 @@ export default function ProductDetailPage() {
         setExistingReviews(d.reviews.filter((item: any) => item.is_approved !== false));
       }
     } catch (e) {}
-  };
-
-  useEffect(() => {
-    if (id) fetchApprovedReviews();
   }, [id]);
 
   useEffect(() => {
     if (!id) return;
-    const fetchDetail = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/admin/products?id=${id}`);
-        const data = await res.json();
-        let found = null;
-        if (data.product) found = data.product;
-        else if (data.products) found = data.products.find((p: any) => p.id === id);
-
-        if (found) {
-          let rawDesc = found.description || "";
-          let extractedImages: string[] = [];
-          let extractedWarranty = found.warranty || "";
-          let extractedVideo = found.video_url || "";
-          let extractedSpecs = found.specs || {};
-
-          const metaMatch = rawDesc.match(/<!--MEDIA_METADATA:([\s\S]*?)-->/);
-          if (metaMatch) {
-            try {
-              const meta = JSON.parse(metaMatch[1]);
-              if (Array.isArray(meta.images) && meta.images.length > 0) extractedImages = meta.images;
-              if (meta.warranty) extractedWarranty = meta.warranty;
-              if (meta.video_url) extractedVideo = meta.video_url;
-              if (meta.specs) extractedSpecs = meta.specs;
-              rawDesc = rawDesc.replace(metaMatch[0], "").trim();
-            } catch (e) {}
-          }
-
-          if (extractedImages.length === 0 && found.image_url) {
-            extractedImages = [found.image_url];
-          }
-
-          found.parsedImages = extractedImages;
-          found.parsedWarranty = extractedWarranty;
-          found.parsedVideo = extractedVideo;
-          found.parsedSpecs = extractedSpecs;
-          found.cleanDescription = rawDesc;
-
-          setProduct(found);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDetail();
-  }, [id]);
+    fetchApprovedReviews();
+
+    // همگام‌سازی بلادرنگ با وب‌سوکت Supabase
+    if (supabaseBrowser && typeof supabaseBrowser.channel === "function") {
+      const client = supabaseBrowser;
+      const channel = client
+        .channel(`product-${id}-realtime`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "products", filter: `id=eq.${id}` },
+          () => {
+            fetchDetail();
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "reviews", filter: `product_id=eq.${id}` },
+          () => {
+            fetchApprovedReviews();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        client.removeChannel(channel);
+      };
+    }
+  }, [id, fetchDetail, fetchApprovedReviews]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center dir-rtl text-sm font-bold">در حال بارگذاری اطلاعات کالا...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center dir-rtl text-sm font-bold">
+        در حال بارگذاری اطلاعات کالا...
+      </div>
+    );
   }
 
   if (!product) {
@@ -107,7 +139,6 @@ export default function ProductDetailPage() {
   const handleNext = () => setActiveImageIndex((prev) => (prev + 1) % gallery.length);
   const handlePrev = () => setActiveImageIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
 
-  // تبدیل آدرس‌های استاندارد آپارات و یوتیوب به لینک Embed قابل پخش بدون خطای اتصال
   const getEmbedUrl = (raw: string) => {
     if (!raw) return "";
     let url = raw.trim();
@@ -116,12 +147,12 @@ export default function ProductDetailPage() {
       return `https://www.aparat.com/video/video/embed/videohash/${hash}/vt/frame`;
     }
     if (url.includes("youtu.be/")) {
-      const id = url.split("youtu.be/")[1]?.split("?")[0];
-      return `https://www.youtube.com/embed/${id}`;
+      const videoId = url.split("youtu.be/")[1]?.split("?")[0];
+      return `https://www.youtube.com/embed/${videoId}`;
     }
     if (url.includes("youtube.com/watch?v=")) {
-      const id = url.split("watch?v=")[1]?.split("&")[0];
-      return `https://www.youtube.com/embed/${id}`;
+      const videoId = url.split("watch?v=")[1]?.split("&")[0];
+      return `https://www.youtube.com/embed/${videoId}`;
     }
     return url;
   };
@@ -147,6 +178,7 @@ export default function ProductDetailPage() {
         setCommentStatus("success");
         setAuthorName("");
         setCommentText("");
+        fetchApprovedReviews();
       } else {
         setCommentStatus("error");
       }
@@ -166,7 +198,7 @@ export default function ProductDetailPage() {
       </div>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-        {/* تصویر کالا، اسلایدر و دکمه شیک پخش ویدیو */}
+        {/* اسلایدر تصاویر با دکمه پخش ویدیو */}
         <div className="flex flex-col items-center bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 relative shadow-sm">
           <div className="w-full h-80 sm:h-96 relative flex items-center justify-center overflow-hidden rounded-2xl bg-zinc-950/40">
             <img
@@ -175,7 +207,6 @@ export default function ProductDetailPage() {
               className="w-full h-full object-contain transition-all duration-300 select-none"
             />
 
-            {/* دکمه پخش ویدیو در صورت وجود لینک */}
             {embedVideo && (
               <button
                 type="button"
@@ -250,7 +281,6 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* توضیحات کالا با اندازه فونت خوانا و مناسب */}
           {product.cleanDescription && (
             <div>
               <h2 className="text-sm font-black mb-3">توضیحات کالا</h2>
@@ -260,7 +290,6 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {/* مشخصات فنی تفکیک شده */}
           {product.parsedSpecs && Object.keys(product.parsedSpecs).length > 0 && (
             <div>
               <h2 className="text-sm font-black mb-3">مشخصات فنی</h2>
@@ -277,7 +306,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* مدال تماشای ویدیوی معرفی */}
+      {/* مدال ویدیوی معرفی */}
       {isVideoModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#121214] border border-[#27272a] rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl">
@@ -356,7 +385,6 @@ export default function ProductDetailPage() {
           )}
         </form>
 
-        {/* لیست نظرات ثبت و تایید شده */}
         {existingReviews.length > 0 && (
           <div className="mt-8 space-y-4">
             <h3 className="text-sm font-black text-white">نظرات خریداران ({existingReviews.length})</h3>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowRight, ShoppingBag, CheckCircle2, UserCheck } from "lucide-react";
+import { ArrowRight, ShoppingBag, CheckCircle2, UserCheck, ShieldCheck, Send } from "lucide-react";
 
 export default function CheckoutPage() {
   const [cartItems, setCartItems] = useState<any[]>([]);
@@ -18,6 +18,13 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
 
+  // وضعیت‌های OTP
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [timer, setTimer] = useState(0);
+  const [otpLoading, setOtpLoading] = useState(false);
+
   useEffect(() => {
     try {
       const items = JSON.parse(localStorage.getItem("axon_cart") || "[]");
@@ -27,10 +34,69 @@ export default function CheckoutPage() {
     }
   }, []);
 
+  useEffect(() => {
+    let interval: any;
+    if (timer > 0) {
+      interval = setInterval(() => setTimer((t) => t - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timer]);
+
   const totalPrice = cartItems.reduce((acc, item) => {
     const p = item.discount_price ? Number(item.discount_price) : Number(item.price || 0);
     return acc + p * (item.quantity || 1);
   }, 0);
+
+  const handleSendOtp = async () => {
+    if (!phone || phone.trim().length < 10) {
+      alert("لطفاً شماره موبایل معتبر ۱۱ رقمی وارد نمایید.");
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      const res = await fetch("/api/auth/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOtpSent(true);
+        setTimer(120);
+      } else {
+        alert(data.message || "خطا در ارسال پیامک");
+      }
+    } catch (e) {
+      alert("خطا در برقراری ارتباط با سامانه پیامکی");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.trim().length < 4) {
+      alert("لطفاً کد تایید پیامک‌شده را وارد نمایید.");
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      const res = await fetch("/api/auth/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone.trim(), code: otpCode.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsPhoneVerified(true);
+      } else {
+        alert(data.message || "کد تایید وارد شده اشتباه است.");
+      }
+    } catch (e) {
+      alert("خطا در تایید کد");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +106,7 @@ export default function CheckoutPage() {
     }
 
     if (!fullName.trim() || !phone.trim() || !address.trim()) {
-      alert("لطفاً نام، شماره تماس و آدرس دقیق را وارد نمایید.");
+      alert("لطفاً نام، شماره تماس و نشانی دقیق را وارد نمایید.");
       return;
     }
 
@@ -58,6 +124,7 @@ export default function CheckoutPage() {
             postal_code: postalCode.trim(),
             address: address.trim(),
             notes: notes.trim(),
+            phone_verified: isPhoneVerified,
           },
           items: cartItems,
           total_price: totalPrice,
@@ -69,12 +136,11 @@ export default function CheckoutPage() {
         throw new Error(data.message || "خطا در ثبت اطلاعات");
       }
 
-      // خالی کردن سبد خرید بدون هدایت به درگاه یا صفحه کد رهگیری
       localStorage.removeItem("axon_cart");
       window.dispatchEvent(new Event("cart_updated"));
       setIsSubmitted(true);
     } catch (err: any) {
-      alert("خطا در ثبت: " + err.message);
+      alert("خطا: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -89,7 +155,7 @@ export default function CheckoutPage() {
           </div>
           <h2 className="text-lg font-black text-white">اطلاعات شما با موفقیت ثبت شد</h2>
           <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
-            درخواست خرید شما در سیستم ثبت گردید. پس از بررسی اقلام و هماهنگی ارسال، کارشناسان ما با شما تماس خواهند گرفت.
+            درخواست سفارش شما با موفقیت دریافت گردید. کارشناسان آکسون جهت هماهنگی و ارسال با شما تماس خواهند گرفت.
           </p>
           <div className="mt-8">
             <Link
@@ -110,18 +176,18 @@ export default function CheckoutPage() {
       <div className="max-w-5xl mx-auto flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-8">
         <Link href="/" className="hover:underline">خانه</Link>
         <span>/</span>
-        <span className="text-[var(--text-primary)] font-bold">ثبت اطلاعات سفارش</span>
+        <span className="text-[var(--text-primary)] font-bold">ثبت سفارش و اطلاعات گیرنده</span>
       </div>
 
       <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* فرم ثبت مشخصات خریدار */}
+        {/* فرم ثبت مشخصات */}
         <div className="lg:col-span-2 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 md:p-8">
           <h2 className="text-base font-black text-white pb-4 border-b border-[var(--card-border)] mb-6 flex items-center gap-2">
             <UserCheck size={18} className="text-[#0071e3]" />
             مشخصات گیرنده و آدرس تحویل
           </h2>
 
-          <form onSubmit={handleSubmitOrder} id="checkout-form" className="space-y-4">
+          <form onSubmit={handleSubmitOrder} id="checkout-form" className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-300 mb-2">نام و نام خانوادگی *</label>
@@ -134,16 +200,60 @@ export default function CheckoutPage() {
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
                 />
               </div>
+
+              {/* بخش شماره موبایل و تایید پیامکی OTP */}
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-2">شماره تماس همراه *</label>
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="09123456789"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
-                />
+                <label className="block text-xs font-bold text-zinc-300 mb-2">
+                  شماره موبایل همراه *
+                  {isPhoneVerified && (
+                    <span className="text-emerald-400 text-[11px] mr-2 inline-flex items-center gap-1">
+                      <ShieldCheck size={13} /> تایید شده
+                    </span>
+                  )}
+                </label>
+
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    required
+                    disabled={isPhoneVerified}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="09123456789"
+                    className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left disabled:opacity-60"
+                  />
+                  {!isPhoneVerified && (
+                    <button
+                      type="button"
+                      disabled={otpLoading || timer > 0}
+                      onClick={handleSendOtp}
+                      className="px-3.5 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white text-xs font-bold whitespace-nowrap transition disabled:opacity-50"
+                    >
+                      {timer > 0 ? `${timer} ثانیه` : otpSent ? "ارسال مجدد" : "ارسال کد"}
+                    </button>
+                  )}
+                </div>
+
+                {/* فیلد ورود کد دریافتی */}
+                {otpSent && !isPhoneVerified && (
+                  <div className="flex gap-2 mt-3 animate-in fade-in duration-200">
+                    <input
+                      type="text"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      placeholder="کد ۵ رقمی پیامک‌شده"
+                      className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[#0071e3] text-xs font-bold text-white outline-none text-center font-mono"
+                    />
+                    <button
+                      type="button"
+                      disabled={otpLoading}
+                      onClick={handleVerifyOtp}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold whitespace-nowrap"
+                    >
+                      تایید کد
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -174,7 +284,7 @@ export default function CheckoutPage() {
                   type="text"
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="۱۰ رقمی (اختیاری)"
+                  placeholder="۱۰ رقمی"
                   className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
                 />
               </div>
@@ -198,14 +308,14 @@ export default function CheckoutPage() {
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="نکات تحویل یا زمان پاسخگویی..."
+                placeholder="یادداشت هماهنگی ارسال..."
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
               />
             </div>
           </form>
         </div>
 
-        {/* خلاصه سفارش */}
+        {/* خلاصه اقلام سفارش */}
         <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 h-fit space-y-6">
           <div className="flex items-center gap-2 pb-4 border-b border-[var(--card-border)]">
             <ShoppingBag size={18} className="text-[#0071e3]" />
@@ -242,7 +352,7 @@ export default function CheckoutPage() {
             disabled={loading || cartItems.length === 0}
             className="w-full py-4 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white text-xs font-black shadow-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
-            {loading ? "در حال ثبت سفارش..." : "ثبت نهایی اطلاعات سفارش"}
+            {loading ? "در حال پردازش و ثبت..." : "ثبت نهایی اطلاعات سفارش"}
           </button>
         </div>
       </div>

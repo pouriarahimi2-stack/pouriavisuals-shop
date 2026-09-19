@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowRight, Package, Truck, CheckCircle2, Clock, MapPin, Phone, Hash } from "lucide-react";
+import { ArrowRight, Package, Truck, CheckCircle2, Clock, MapPin, Phone, Hash, ShieldCheck } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function AdminOrdersPage() {
@@ -107,6 +107,16 @@ export default function AdminOrdersPage() {
                       <Phone size={13} />
                       {ord.customer_phone}
                     </span>
+                    {ord.phone_verified ? (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                        <ShieldCheck size={11} />
+                        موبایل تأیید شده
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-[10px] font-bold">
+                        ثبت عادی
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">

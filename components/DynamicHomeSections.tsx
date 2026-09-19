@@ -63,15 +63,16 @@ export default function DynamicHomeSections({
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  const heroTitle = siteInfo?.hero_title || siteInfo?.home_title || "جهان پیشرفته فناوری و گجت‌های نوآورانه";
-  const heroSubtitle =
-    siteInfo?.hero_subtitle ||
-    siteInfo?.home_subtitle ||
-    siteInfo?.description ||
-    "مرجع تخصصی خرید آنلاین جدیدترین ابزارها، تجهیزات دیجیتال و گجت‌های هوشمند با تضمین اصالت فیزیکی و ارسال سریع پیشتاز.";
+  const heroTitle = siteInfo?.hero_title || siteInfo?.home_title || "جهان پیشرفته فناوری و گجت‌های هوشمند";
+  
+  let rawSubtitle = siteInfo?.hero_subtitle || siteInfo?.home_subtitle || siteInfo?.description || "";
+  if (rawSubtitle.includes("استودیو") || rawSubtitle.includes("کالیبراسیون") || !rawSubtitle) {
+    rawSubtitle = "مرجع تخصصی خرید آنلاین جدیدترین ابزارها، تجهیزات دیجیتال و گجت‌های هوشمند بازار با تضمین اصالت فیزیکی و ارسال سریع پیشتاز.";
+  }
 
   return (
     <div className="space-y-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+      {/* اسلایدر بنرهای پویا یا هیرو اصلی هماهنگ با پنل ادمین */}
       {banners.length > 0 ? (
         <div className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl aspect-[16/8] sm:aspect-[21/9] max-h-[480px]">
           {banners.map((b, idx) => (
@@ -125,7 +126,7 @@ export default function DynamicHomeSections({
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed max-w-2xl mx-auto">
-              {heroSubtitle}
+              {rawSubtitle}
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
@@ -134,7 +135,7 @@ export default function DynamicHomeSections({
                 onClick={() => soundEngine.playClick()}
                 className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-xl shadow-blue-600/25"
               >
-                کاتالوگ تمام محصولات ←
+                مشاهده کاتالوگ محصولات ←
               </Link>
               <Link
                 href="/news"
@@ -148,6 +149,7 @@ export default function DynamicHomeSections({
         </div>
       )}
 
+      {/* ویترین محصولات */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
           <div className="space-y-1">
@@ -194,24 +196,6 @@ export default function DynamicHomeSections({
           </div>
         )}
       </section>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
-        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 text-center shadow-md">
-          <span className="text-3xl block">🛡️</span>
-          <h3 className="text-xs font-black text-[var(--text-primary)]">ضمانت اصالت و سلامت کالا</h3>
-          <p className="text-[11px] text-[var(--text-secondary)]">تضمین ۱۰۰٪ فیزیکی و بازگشت وجه تا ۷ روز</p>
-        </div>
-        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 text-center shadow-md">
-          <span className="text-3xl block">🚀</span>
-          <h3 className="text-xs font-black text-[var(--text-primary)]">ارسال سریع پیشتاز به سراسر کشور</h3>
-          <p className="text-[11px] text-[var(--text-secondary)]">بسته‌بندی مقاوم و صدور فوری بارنامه آنلاین</p>
-        </div>
-        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 text-center shadow-md">
-          <span className="text-3xl block">💳</span>
-          <h3 className="text-xs font-black text-[var(--text-primary)]">پرداخت امن شاپرک</h3>
-          <p className="text-[11px] text-[var(--text-secondary)]">اتصال امن به درگاه رسمی و صدور پیش‌فاکتور آنی</p>
-        </div>
-      </div>
     </div>
   );
 }

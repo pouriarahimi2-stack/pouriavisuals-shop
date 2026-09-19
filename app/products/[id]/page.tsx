@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { ShieldCheck, ChevronRight, ChevronLeft, Star, Play, X } from "lucide-react";
+import { ShieldCheck, ChevronRight, ChevronLeft, Star, Play, X, ShoppingCart, Check } from "lucide-react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
@@ -21,6 +21,35 @@ export default function ProductDetailPage() {
   const [rating, setRating] = useState(5);
   const [commentText, setCommentText] = useState("");
   const [commentStatus, setCommentStatus] = useState<string | null>(null);
+  const [addedToCart, setAddedToCart] = useState(false);
+
+  const handleAddToCart = () => {
+    if (!product) return;
+    try {
+      const currentCart = JSON.parse(localStorage.getItem("axon_cart") || "[]");
+      const existingIndex = currentCart.findIndex((item: any) => item.id === product.id);
+
+      if (existingIndex > -1) {
+        currentCart[existingIndex].quantity = (currentCart[existingIndex].quantity || 1) + 1;
+      } else {
+        currentCart.push({
+          id: product.id,
+          title: product.title || product.name,
+          price: product.price,
+          discount_price: product.discount_price,
+          image: (Array.isArray(product.parsedImages) && product.parsedImages[0]) || product.image_url || "/placeholder.png",
+          quantity: 1,
+        });
+      }
+
+      localStorage.setItem("axon_cart", JSON.stringify(currentCart));
+      window.dispatchEvent(new Event("cart_updated"));
+      setAddedToCart(true);
+      setTimeout(() => setAddedToCart(false), 2500);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -280,6 +309,29 @@ export default function ProductDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* دکمه افزودن به سبد خرید */}
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            className={`w-full py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+              addedToCart 
+                ? "bg-emerald-600 text-white" 
+                : "bg-[#0071e3] hover:bg-[#0077ED] text-white"
+            }`}
+          >
+            {addedToCart ? (
+              <>
+                <Check size={20} />
+                به سبد خرید اضافه شد
+              </>
+            ) : (
+              <>
+                <ShoppingCart size={20} />
+                افزودن به سبد خرید
+              </>
+            )}
+          </button>
 
           {product.cleanDescription && (
             <div>

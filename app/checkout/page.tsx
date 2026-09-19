@@ -26,6 +26,18 @@ export default function CheckoutPage() {
   const [otpLoading, setOtpLoading] = useState(false);
 
   useEffect(() => {
+    // بازخوانی نشست کاربر در صورت لاگین بودن قبلی
+    try {
+      const match = document.cookie.match(/(^|;)\s*axon_user_session=([^;]+)/);
+      if (match) {
+        const currentUser = JSON.parse(decodeURIComponent(match[2]));
+        if (currentUser.name) setFullName(currentUser.name);
+        if (currentUser.phone) {
+          setPhone(currentUser.phone);
+          setIsPhoneVerified(true);
+        }
+      }
+    } catch (e) {}
     try {
       const items = JSON.parse(localStorage.getItem("axon_cart") || "[]");
       setCartItems(items);
@@ -137,6 +149,10 @@ export default function CheckoutPage() {
       }
 
       localStorage.removeItem("axon_cart");
+      if (data.user) {
+        localStorage.setItem("axon_user", JSON.stringify(data.user));
+        window.dispatchEvent(new Event("user_session_updated"));
+      }
       window.dispatchEvent(new Event("cart_updated"));
       setIsSubmitted(true);
     } catch (err: any) {

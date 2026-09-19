@@ -1,208 +1,166 @@
-// File Path: components/ProductReviews.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { soundEngine } from "@/lib/soundEngine";
-
-interface Review {
-  id: string;
-  product_id: string;
-  user_name: string;
-  rating: number;
-  comment: string;
-  created_at: string;
-}
+import { Star, MessageSquare, Send, CheckCircle2 } from "lucide-react";
 
 export default function ProductReviews({ productId }: { productId: string }) {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [userName, setUserName] = useState("");
-  const [comment, setComment] = useState("");
   const [rating, setRating] = useState(5);
-  const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  const loadReviews = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("product_reviews")
-        .select("*")
-        .eq("product_id", productId)
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        setReviews(data);
-        return;
-      }
-
-      if (typeof window !== "undefined") {
-        const local = localStorage.getItem(`reviews_${productId}`);
-        if (local) setReviews(JSON.parse(local));
-      }
-    } catch (e) {
-      console.warn("Reviews load warning:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [comment, setComment] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    loadReviews();
+    // خواندن نام کاربر در صورت لاگین بودن
+    try {
+      const match = document.cookie.match(/(^|;)\s*axon_user_session=([^;]+)/);
+      if (match) {
+        const u = JSON.parse(decodeURIComponent(match[2]));
+        if (u.name) setUserName(u.name);
+      }
+    } catch (e) {}
 
-    const channel = supabase
-      .channel(`realtime-reviews-${productId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "product_reviews", filter: `product_id=eq.${productId}` }, () => {
-        loadReviews();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    fetchReviews();
   }, [productId]);
+
+  const fetchReviews = async () => {
+    try {
+      const res = await fetch(`/api/products/${productId}/reviews`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.reviews)) {
+        setReviews(data.reviews);
+      }
+    } catch (err) {}
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userName.trim() || !comment.trim()) return;
 
-    soundEngine.playClick();
-    setSubmitting(true);
-    const newRev: Review = {
-      id: `rev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      product_id: productId,
-      user_name: userName.trim(),
-      rating,
-      comment: comment.trim(),
-      created_at: new Date().toISOString(),
-    };
-
+    setLoading(true);
     try {
-      const { error } = await supabase.from("product_reviews").insert([newRev]);
-      if (error) throw error;
-
-      soundEngine.playSuccess();
-      showToast("دیدگاه شما با موفقیت ثبت شد و بلادرنگ منتشر گردید.");
-      setUserName("");
-      setComment("");
-      setRating(5);
-      loadReviews();
-    } catch {
-      // فال‌بک ذخیره محلی
-      const updated = [newRev, ...reviews];
-      setReviews(updated);
-      if (typeof window !== "undefined") {
-        localStorage.setItem(`reviews_${productId}`, JSON.stringify(updated));
+      const res = await fetch(`/api/products/${productId}/reviews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_name: userName, rating, comment }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSubmitted(true);
+        setComment("");
+        fetchReviews();
       }
-      showToast("دیدگاه با موفقیت ثبت گردید.", "success");
+    } catch (err) {
+      alert("خطا در ثبت نظر");
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      {toast && (
-        <div
-          className={`p-4 rounded-2xl text-xs font-black shadow-xl flex items-center gap-2 animate-fadeIn ${
-            toast.type === "success"
-              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-              : "bg-rose-500/15 border border-rose-500/30 text-rose-600"
-          }`}
-        >
-          <span>{toast.type === "success" ? "✓" : "⚠️"}</span>
-          <span>{toast.message}</span>
-        </div>
-      )}
+    <div className="mt-12 pt-8 border-t border-[var(--card-border)] dir-rtl">
+      <div className="flex items-center gap-2 mb-6">
+        <MessageSquare size={20} className="text-[#0071e3]" />
+        <h3 className="text-base font-black text-white">نظرات و امتیاز خریداران</h3>
+        <span className="text-xs text-zinc-500 font-bold">({reviews.length})</span>
+      </div>
 
-      <form onSubmit={handleSubmit} className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 text-xs shadow-xl">
-        <h4 className="font-black text-sm text-[var(--accent-blue)] flex items-center gap-2">
-          <span>✍️</span>
-          <span>ثبت نظر و نقد تخصصی برای این محصول</span>
-        </h4>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی شما *</label>
-            <input
-              type="text"
-              required
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              placeholder="مثال: علی محمدی"
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-            />
-          </div>
-
-          <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">امتیاز کیفی به عملکرد محصول</label>
-            <select
-              value={rating}
-              onChange={(e) => setRating(Number(e.target.value))}
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] cursor-pointer text-[var(--text-primary)]"
-            >
-              <option value={5}>⭐⭐⭐⭐⭐ (عالی - ۵ از ۵)</option>
-              <option value={4}>⭐⭐⭐⭐ (خوب - ۴ از ۵)</option>
-              <option value={3}>⭐⭐⭐ (متوسط - ۳ از ۵)</option>
-              <option value={2}>⭐⭐ (ضعیف - ۲ از ۵)</option>
-              <option value={1}>⭐ (خیلی ضعیف - ۱ از ۵)</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن دیدگاه یا بررسی کارشناسی شما *</label>
-          <textarea
-            rows={3}
-            required
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="تجربه خود را از کالیبراسیون رنگ، کیفیت پنل، درگاه‌ها یا ساختار فیزیکی بنویسید..."
-            className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium leading-relaxed focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          <span>{submitting ? "در حال ثبت..." : "ثبت و انتشار بلادرنگ دیدگاه 🚀"}</span>
-        </button>
-      </form>
-
-      <div className="space-y-3">
-        <h4 className="font-black text-xs text-[var(--text-secondary)]">دیدگاه‌های ثبت‌شده متخصصان ({reviews.length})</h4>
-
-        {loading ? (
-          <div className="py-8 text-center text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری نظرات...</div>
-        ) : reviews.length === 0 ? (
-          <div className="p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center text-xs font-bold text-[var(--text-secondary)]">
-            هنوز دیدگاهی برای این محصول ثبت نشده است. اولین نفری باشید که نظر می‌دهد!
-          </div>
-        ) : (
-          reviews.map((rev) => (
-            <div
-              key={rev.id}
-              className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 text-xs shadow-sm"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-black text-[var(--text-primary)]">{rev.user_name}</span>
-                <span className="text-amber-500 font-mono text-sm">{"⭐".repeat(rev.rating)}</span>
-              </div>
-              <p className="text-[var(--text-secondary)] font-medium leading-relaxed text-justify">{rev.comment}</p>
-              <span className="text-[10px] text-slate-400 font-mono block pt-1">
-                {new Date(rev.created_at).toLocaleDateString("fa-IR")}
-              </span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* فرم ثبت دیدگاه */}
+        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-5 sm:p-6 h-fit">
+          <h4 className="text-xs font-bold text-white mb-4">ثبت تجربه خرید شما</h4>
+          {submitted ? (
+            <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-400 text-xs text-center flex items-center justify-center gap-2">
+              <CheckCircle2 size={16} />
+              نظر شما با موفقیت ثبت گردید.
             </div>
-          ))
-        )}
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-zinc-400 mb-1.5 font-bold">نام شما</label>
+                <input
+                  type="text"
+                  required
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="مثال: پوریا"
+                  className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-white outline-none focus:border-[#0071e3]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 mb-1.5 font-bold">امتیاز شما</label>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setRating(s)}
+                      className="p-1 text-zinc-500 hover:text-amber-400 transition"
+                    >
+                      <Star
+                        size={20}
+                        className={s <= rating ? "fill-amber-400 text-amber-400" : "text-zinc-600"}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 mb-1.5 font-bold">متن دیدگاه</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="کیفیت ساخت، عملکرد و نظر کلی درباره این کالا..."
+                  className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-white outline-none focus:border-[#0071e3]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl bg-[#0071e3] hover:bg-[#0077ED] text-white font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"
+              >
+                <Send size={14} />
+                {loading ? "در حال ثبت..." : "ارسال دیدگاه"}
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* لیست نظرات ثبت‌شده */}
+        <div className="lg:col-span-2 space-y-3">
+          {reviews.length === 0 ? (
+            <div className="p-8 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] text-center text-xs text-zinc-500 font-bold">
+              هنوز نظری برای این کالا ثبت نشده است. اولین نفری باشید که دیدگاه خود را مطرح می‌کند!
+            </div>
+          ) : (
+            reviews.map((rev) => (
+              <div key={rev.id} className="p-4 sm:p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-white">{rev.user_name}</span>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        size={12}
+                        className={s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-zinc-700"}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed">{rev.comment}</p>
+                <div className="text-[10px] text-zinc-500 text-left">
+                  {new Date(rev.created_at).toLocaleDateString("fa-IR")}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

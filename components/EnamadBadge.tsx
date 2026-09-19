@@ -4,7 +4,7 @@ import React from "react";
 
 export default function EnamadBadge() {
   return (
-    <div className="flex items-center justify-center p-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition shadow-sm">
+    <div className="flex items-center justify-center p-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-sm hover:border-[var(--accent-blue)] transition">
       <a
         referrerPolicy="origin"
         target="_blank"
@@ -15,7 +15,8 @@ export default function EnamadBadge() {
           referrerPolicy="origin"
           src="https://trustseal.enamad.ir/logo.aspx?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
           alt="نماد اعتماد الکترونیکی آکسون"
-          style={{ cursor: "pointer", width: "120px", height: "auto" }}
+          style={{ cursor: "pointer", width: "125px", height: "auto" }}
+          id="RqxtofLwJnKsvqQACWz1mvYVVKykOrtD"
         />
       </a>
     </div>

@@ -25,15 +25,7 @@ function PaymentGatewayContent() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    let payable = 0;
-    try {
-      const savedAmount = sessionStorage.getItem("pending_payment_amount");
-      if (savedAmount && Number(savedAmount) > 0) {
-        payable = Number(savedAmount);
-        setAmount(payable);
-      }
-    } catch {}
-
+    // استعلام مستقیم مبلغ معتبر فاکتور از دیتابیس
     if (orderId) {
       orderService.getById(orderId).then((found) => {
         if (found) {
@@ -90,7 +82,7 @@ function PaymentGatewayContent() {
 
       setTrackingRef(resJson.trackingRef || Date.now().toString().slice(-8));
 
-      // پاکسازی تضمینی کش سبد خرید
+      // پاکسازی تضمینی کش سبد خرید پس از پرداخت موفق
       if (typeof window !== "undefined") {
         localStorage.removeItem("axon_cart_store_v2026");
         localStorage.removeItem("axon_active_coupon_v2026");
@@ -158,7 +150,7 @@ function PaymentGatewayContent() {
 
   return (
     <div className="min-h-[85vh] py-10 px-4 max-w-lg mx-auto font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
+      <div className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
         <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
           <div className="flex items-center gap-2.5">
             <span className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-lg">

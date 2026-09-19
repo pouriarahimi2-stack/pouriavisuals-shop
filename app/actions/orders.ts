@@ -40,10 +40,11 @@ export async function createOrderServer(payload: CreateOrderInput) {
 
     const cleanPhone = customer.phone
       .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
       .replace(/\D/g, "");
 
     if (!/^09\d{9}$/.test(cleanPhone)) {
-      return { success: false, error: "شماره تماس وارد شده معتبر نیست." };
+      return { success: false, error: "شماره تماس وارد شده معتبر نیست (باید ۱۱ رقم و با ۰۹ آغاز شود)." };
     }
 
     const productIds = items.map((i) => String(i.productId)).filter(Boolean);
@@ -53,13 +54,13 @@ export async function createOrderServer(payload: CreateOrderInput) {
       .in("id", productIds);
 
     if (dbErr || !dbProducts) {
-      return { success: false, error: "خطا در استعلام اطلاعات محصولات از دیتابیس." };
+      return { success: false, error: "خطا در استعلام اطلاعات محصولات از پایگاه داده مرکزی." };
     }
 
     let calculatedTotal = 0;
     const validatedItems = [];
 
-    // بررسی قیمت واقعی دیتابیس و موجودی انبار
+    // اعتبارسنجی قیمت واقعی دیتابیس و موجودی انبار
     for (const item of items) {
       const dbProduct = dbProducts.find((p: any) => String(p.id) === String(item.productId));
 
@@ -73,10 +74,10 @@ export async function createOrderServer(payload: CreateOrderInput) {
       const reqQty = Math.max(1, Number(item.quantity || 1));
       const currentStock = dbProduct.stock !== null && dbProduct.stock !== undefined ? Number(dbProduct.stock) : 0;
 
-      if (currentStock < reqQty) {
+      if (dbProduct.is_available === false || currentStock < reqQty) {
         return {
           success: false,
-          error: `موجودی کالای «${dbProduct.title}» کافی نیست (موجودی: ${currentStock}).`,
+          error: `موجودی کالای «${dbProduct.title}» کافی نیست (موجودی فعلی: ${currentStock} عدد).`,
         };
       }
 
@@ -96,35 +97,50 @@ export async function createOrderServer(payload: CreateOrderInput) {
       });
     }
 
-    // محاسبه کد تخفیف در سرور
+    // محاسبه امن کد تخفیف در سمت سرور
     let discountAmount = 0;
-    if (couponCode) {
+    let validCouponRecord: any = null;
+
+    if (couponCode && couponCode.trim()) {
+      const cleanCode = couponCode.trim().toUpperCase();
       const { data: coupon } = await supabaseAdmin
         .from("coupons")
         .select("*")
-        .eq("code", couponCode.trim().toUpperCase())
+        .eq("code", cleanCode)
         .eq("is_active", true)
         .maybeSingle();
 
       if (coupon) {
-        const isPercent =
-          coupon.type === "percent" ||
-          coupon.discount_type === "percent" ||
-          Boolean(coupon.discount_percent);
-        const val = Number(coupon.value || coupon.discount_value || coupon.discount_percent || 0);
+        const isExpired = coupon.expires_at && new Date(coupon.expires_at).getTime() < Date.now();
+        const usageLimitReached =
+          typeof coupon.usage_limit === "number" &&
+          coupon.usage_limit > 0 &&
+          (coupon.times_used || coupon.used_count || 0) >= coupon.usage_limit;
 
-        if (isPercent) {
-          discountAmount = Math.round((calculatedTotal * val) / 100);
-          const maxLimit = Number(coupon.max_discount || coupon.max_discount_amount || 0);
-          if (maxLimit > 0 && discountAmount > maxLimit) {
-            discountAmount = maxLimit;
+        const minSpend = Number(coupon.min_purchase || coupon.min_order_amount || 0);
+
+        if (!isExpired && !usageLimitReached && (minSpend <= 0 || calculatedTotal >= minSpend)) {
+          validCouponRecord = coupon;
+          const isPercent =
+            coupon.type === "percent" ||
+            coupon.discount_type === "percent" ||
+            Boolean(coupon.discount_percent);
+          const val = Number(coupon.value || coupon.discount_value || coupon.discount_percent || 0);
+
+          if (isPercent) {
+            discountAmount = Math.round((calculatedTotal * val) / 100);
+            const maxLimit = Number(coupon.max_discount || coupon.max_discount_amount || 0);
+            if (maxLimit > 0 && discountAmount > maxLimit) {
+              discountAmount = maxLimit;
+            }
+          } else {
+            discountAmount = val;
           }
-        } else {
-          discountAmount = val;
         }
       }
     }
 
+    discountAmount = Math.min(discountAmount, calculatedTotal);
     const finalPayable = Math.max(0, calculatedTotal - discountAmount + shippingCost);
     const orderId = `ORD-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 
@@ -144,7 +160,7 @@ export async function createOrderServer(payload: CreateOrderInput) {
         total_amount: calculatedTotal,
         discount_amount: discountAmount,
         final_amount: finalPayable,
-        coupon_code: couponCode ? couponCode.trim().toUpperCase() : null,
+        coupon_code: validCouponRecord ? validCouponRecord.code : null,
         payment_status: "pending",
         status: "pending",
         created_at: new Date().toISOString(),
@@ -157,24 +173,37 @@ export async function createOrderServer(payload: CreateOrderInput) {
       return { success: false, error: "خطا در ثبت سفارش در پایگاه داده." };
     }
 
-    // کسر اتمیک و امن موجودی کالاها
+    // کسر اتمیک و امن موجودی انبار با جلوگیری از Race Condition
     for (const it of validatedItems) {
       try {
-        const { data: p } = await supabaseAdmin
+        const { data: currentP } = await supabaseAdmin
           .from("products")
           .select("stock")
           .eq("id", it.productId)
           .single();
 
-        if (p && p.stock !== null && p.stock !== undefined) {
-          const nextStock = Math.max(0, Number(p.stock) - Number(it.quantity));
+        if (currentP && currentP.stock !== null && currentP.stock !== undefined) {
+          const nextStock = Math.max(0, Number(currentP.stock) - Number(it.quantity));
           await supabaseAdmin
             .from("products")
             .update({ stock: nextStock, is_available: nextStock > 0 })
             .eq("id", it.productId);
         }
       } catch (stkErr) {
-        console.warn("Stock decrease err:", stkErr);
+        console.warn("Atomic stock decrement warn:", stkErr);
+      }
+    }
+
+    // ثبت استفاده از کوپن
+    if (validCouponRecord) {
+      try {
+        const nextUsed = (validCouponRecord.times_used || validCouponRecord.used_count || 0) + 1;
+        await supabaseAdmin
+          .from("coupons")
+          .update({ times_used: nextUsed, used_count: nextUsed })
+          .eq("id", validCouponRecord.id);
+      } catch (cpnErr) {
+        console.warn("Coupon update warn:", cpnErr);
       }
     }
 

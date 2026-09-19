@@ -201,7 +201,7 @@ export default function DraftlyProceduralTeardown({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
     container.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
     const keySpot = new THREE.DirectionalLight(0x38bdf8, 2.5);
@@ -248,7 +248,7 @@ export default function DraftlyProceduralTeardown({
       rotationRef.current.y += deltaX * 0.007;
       rotationRef.current.x = Math.max(-0.8, Math.min(0.8, rotationRef.current.x - deltaY * 0.007));
       lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
     };
 
     const handleTouchEnd = () => {
@@ -316,16 +316,16 @@ export default function DraftlyProceduralTeardown({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/95 backdrop-blur-2xl font-sans select-none animate-fadeIn text-slate-100" dir="rtl">
-      <div className="relative w-full max-w-6xl h-[92vh] max-h-[820px] bg-slate-900 border border-slate-700/60 rounded-[2rem] shadow-2xl flex flex-col justify-between overflow-hidden">
-        <header className="p-4 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-950/80 shrink-0">
+      <div className="relative w-full max-w-6xl h-[92vh] max-h-[840px] bg-slate-900 border border-slate-700/60 rounded-[2.5rem] shadow-2xl flex flex-col justify-between overflow-hidden">
+        <header className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-950/80 shrink-0">
           <div>
             <h3 className="font-black text-xs sm:text-sm text-white truncate max-w-xs sm:max-w-md">{productTitle}</h3>
-            <span className="text-[10px] text-blue-400 font-mono">3D Procedural Engine (60fps Touch Mode)</span>
+            <span className="text-[10px] text-blue-400 font-mono">3D Procedural Engine (Touch & Gyro Optimized)</span>
           </div>
 
           <button
             onClick={() => { soundEngine.playClick(); onClose(); }}
-            className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-rose-600 text-white flex items-center justify-center text-xs font-bold transition cursor-pointer"
+            className="w-10 h-10 rounded-2xl bg-slate-800 hover:bg-rose-600 text-white flex items-center justify-center text-xs font-bold transition cursor-pointer"
           >
             ✕
           </button>
@@ -334,11 +334,12 @@ export default function DraftlyProceduralTeardown({
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
           <div
             ref={containerRef}
-            className="md:col-span-8 h-[340px] md:h-full relative flex items-center justify-center overflow-hidden touch-none"
+            style={{ touchAction: "none" }}
+            className="md:col-span-8 h-[360px] md:h-full relative flex items-center justify-center overflow-hidden"
           >
             <div className="absolute bottom-3 left-3 right-3 bg-slate-950/90 border border-slate-800 p-3 rounded-2xl backdrop-blur-md space-y-1.5 z-20">
               <div className="flex justify-between text-xs font-black text-white">
-                <span>انفصال لایه‌ها:</span>
+                <span>فاصله انفصال لایه‌ها:</span>
                 <span className="text-blue-400 font-mono">{explosionDistance}٪</span>
               </div>
               <input
@@ -347,22 +348,22 @@ export default function DraftlyProceduralTeardown({
                 max="100"
                 value={explosionDistance}
                 onChange={(e) => setExplosionDistance(Number(e.target.value))}
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
               />
             </div>
           </div>
 
-          <div className="md:col-span-4 p-4 space-y-3 overflow-y-auto bg-slate-950/60 text-xs">
-            <span className="font-bold text-slate-400 text-[11px] block">لایه‌های ساختاری:</span>
-            <div className="grid grid-cols-2 gap-1.5">
+          <div className="md:col-span-4 p-4 sm:p-5 space-y-3.5 overflow-y-auto bg-slate-950/60 text-xs border-t md:border-t-0 md:border-r border-slate-800">
+            <span className="font-black text-slate-400 text-[11px] block">لایه‌های ساختاری:</span>
+            <div className="grid grid-cols-2 gap-2">
               {layers.map((l) => (
                 <button
                   key={l.id}
                   onClick={() => { soundEngine.playClick(); setSelectedLayer(l); }}
-                  className={`p-2.5 rounded-xl border text-right transition truncate ${
+                  className={`p-3 rounded-2xl border text-right transition truncate text-xs ${
                     selectedLayer?.id === l.id
-                      ? "bg-blue-600/25 border-blue-500 text-white font-bold"
-                      : "bg-slate-900 border-slate-800 text-slate-400"
+                      ? "bg-blue-600/30 border-blue-500 text-white font-black shadow-md"
+                      : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
                   }`}
                 >
                   {l.nameFa}
@@ -371,13 +372,17 @@ export default function DraftlyProceduralTeardown({
             </div>
 
             {selectedLayer && (
-              <div className="space-y-2 border-t border-slate-800 pt-3 text-[11px]">
-                <h4 className="font-black text-white">{selectedLayer.nameFa}</h4>
-                <p className="text-slate-300 leading-relaxed font-medium">{selectedLayer.role}</p>
-                <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 space-y-1">
+              <div className="space-y-2.5 border-t border-slate-800 pt-3.5 text-xs">
+                <h4 className="font-black text-white text-xs sm:text-sm">{selectedLayer.nameFa}</h4>
+                <p className="text-slate-300 leading-relaxed font-medium text-[11px]">{selectedLayer.role}</p>
+                <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-slate-300 space-y-1.5 text-[11px]">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">متریال:</span>
+                    <span className="text-slate-400">متریال لایه:</span>
                     <span className="font-bold text-blue-400">{selectedLayer.metallurgyMaterial}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">شاخص مهندسی:</span>
+                    <span className="font-bold text-emerald-400">{selectedLayer.engineeringHighlight}</span>
                   </div>
                 </div>
               </div>

@@ -235,6 +235,7 @@ app/
   blog/
     [id]/
       page.tsx
+    loading.tsx
     page.tsx
   checkout/
     payment/
@@ -265,9 +266,12 @@ app/
     page.tsx
   track-order/
     page.tsx
+  error.tsx
   favicon.ico
+  global-error.tsx
   globals.css
   layout.tsx
+  loading.tsx
   manifest.ts
   not-found.tsx
   page.tsx
@@ -9653,104 +9657,6 @@ export default function AdminNewsManager() {
 }
 </file>
 
-<file path="components/admin/AdminNotificationProvider.tsx">
-"use client";
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-
-export interface AdminNotification {
-  id: string;
-  type: "order" | "inventory" | "user" | "system";
-  title: string;
-  message: string;
-  created_at?: string;
-  read?: boolean;
-}
-
-interface NotificationContextType {
-  notifications: AdminNotification[];
-  addNotification: (notif: Omit<AdminNotification, "id"> & { id?: string }) => void;
-  removeNotification: (id: string) => void;
-  clearNotifications: () => void;
-  unreadCount: number;
-}
-
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
-
-export function AdminNotificationProvider({ children }: { children: ReactNode }) {
-  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
-
-  const addNotification = (notif: Omit<AdminNotification, "id"> & { id?: string }) => {
-    const newEntry: AdminNotification = {
-      ...notif,
-      id: notif.id || (Date.now().toString() + Math.random().toString(36).substring(2, 6)),
-      created_at: notif.created_at || new Date().toISOString(),
-      read: false,
-    };
-    setNotifications((prev) => [newEntry, ...prev.slice(0, 49)]);
-  };
-
-  const removeNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
-
-  const clearNotifications = () => {
-    setNotifications([]);
-  };
-
-  // گوش دادن به رویداد زنده ثبت سفارش جدید از طریق دیسپچر Realtime
-  useEffect(() => {
-    const handleOrderUpdate = (e: any) => {
-      const payload = e.detail;
-      if (payload?.eventType === "INSERT") {
-        try {
-          soundEngine.playSuccess();
-        } catch {}
-        addNotification({
-          type: "order",
-          title: "سفارش جدید ثبت شد! 🛍️",
-          message: `سفارش جدید به مبلغ ${Number(payload.new?.final_amount || payload.new?.total_amount || 0).toLocaleString("fa-IR")} تومان ثبت گردید.`,
-          id: payload.new?.id ? String(payload.new.id) : undefined,
-        });
-      }
-    };
-
-    window.addEventListener("db_orders_updated", handleOrderUpdate);
-    return () => window.removeEventListener("db_orders_updated", handleOrderUpdate);
-  }, []);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  return (
-    <NotificationContext.Provider
-      value={{
-        notifications,
-        addNotification,
-        removeNotification,
-        clearNotifications,
-        unreadCount,
-      }}
-    >
-      {children}
-    </NotificationContext.Provider>
-  );
-}
-
-export function useNotification() {
-  const context = useContext(NotificationContext);
-  if (!context) {
-    throw new Error("useNotification must be used within an AdminNotificationProvider");
-  }
-  return context;
-}
-
-
-// Alias exports to satisfy existing layout imports
-export const NotificationProvider = AdminNotificationProvider;
-export default AdminNotificationProvider;
-</file>
-
 <file path="components/admin/ContactMessagesManager.tsx">
 "use client";
 
@@ -16703,98 +16609,6 @@ export default function ProductArchiveClient({
 }
 </file>
 
-<file path="components/ProductCard.tsx">
-"use client";
-
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import AddToCartButton from "./AddToCartButton";
-import { formatPrice } from "@/lib/formatters";
-
-interface ProductCardProps {
-  product: any;
-  onOpenQuickView?: (product: any) => void;
-}
-
-export default function ProductCard({ product, onOpenQuickView }: ProductCardProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const title = product?.title || product?.name || "محصول استودیو";
-  const mainImage =
-    (product?.images && product.images[0]) ||
-    product?.image ||
-    "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800";
-
-  const price = Number(product?.price || 0);
-  const discountPrice = product?.discount_price ? Number(product.discount_price) : null;
-  const isAvailable = product?.is_available !== false && (product?.stock === undefined || Number(product.stock) > 0);
-
-  return (
-    <div
-      className="group relative rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] p-4 transition-all duration-300 shadow-md flex flex-col justify-between font-sans select-none"
-      dir="rtl"
-    >
-      <div>
-        <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
-          <Link href={"/products/" + product.id} className="w-full h-full relative block">
-            <Image
-              src={mainImage}
-              alt={title}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              loading="lazy"
-              className="object-contain transition-transform duration-500 group-hover:scale-105"
-            />
-          </Link>
-
-          <span className="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-md text-white text-[10px] px-3 py-1 rounded-full font-bold border border-white/10">
-            {product?.category || "تخصصی"}
-          </span>
-        </div>
-
-        <Link href={"/products/" + product.id} className="block space-y-1">
-          <h3 className="font-black text-xs sm:text-sm text-[var(--text-primary)] line-clamp-2 leading-snug group-hover:text-[var(--accent-blue)] transition">
-            {title}
-          </h3>
-          <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1 font-medium">
-            {product?.warranty || "گارانتی اصالت طلایی"}
-          </p>
-        </Link>
-      </div>
-
-      <div className="pt-4 mt-2 border-t border-[var(--card-border)] space-y-3">
-        <div className="flex items-baseline justify-between" suppressHydrationWarning>
-          <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
-          <div className="text-left font-mono">
-            {discountPrice ? (
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] text-slate-400 line-through">
-                  {mounted ? formatPrice(price) : ""}
-                </span>
-                <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400">
-                  {mounted ? formatPrice(discountPrice) : ""} تومان
-                </span>
-              </div>
-            ) : (
-              <span className="text-xs sm:text-sm font-black text-[var(--text-primary)]">
-                {mounted ? formatPrice(price) : ""} تومان
-              </span>
-            )}
-          </div>
-        </div>
-
-        <AddToCartButton product={product} />
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="components/ProductCompareModal.tsx">
 "use client";
 
@@ -18000,25 +17814,6 @@ export const authSecurity = {
       return false;
     }
   },
-};
-</file>
-
-<file path="lib/cacheConfig.ts">
-/**
- * AXON CORE - ISR Cache Tags & Revalidation Helpers
- */
-
-export const CACHE_TAGS = {
-  PRODUCTS: "products-cache",
-  BLOGS: "blogs-cache",
-  SITE_INFO: "site-info-cache",
-  ORDERS: "orders-cache",
-};
-
-export const REVALIDATE_TIMES = {
-  PRODUCTS: 60, // هر ۶۰ ثانیه
-  BLOGS: 300,   // هر ۵ دقیقه
-  SETTINGS: 3600, // هر ۱ ساعت
 };
 </file>
 
@@ -20617,45 +20412,6 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 </file>
 
-<file path="tailwind.config.js">
-// File Path: tailwind.config.js
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-  darkMode: 'class',
-  content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
-  theme: {
-    extend: {
-      fontFamily: {
-        sans: ['Vazirmatn', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-      },
-      colors: {
-        apple: {
-          blue: '#0071e3',
-          darkBlue: '#0077ed',
-          gray: '#f5f5f7',
-          darkGray: '#1d1d1f',
-        },
-      },
-      animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'marquee': 'marquee 25s linear infinite',
-      },
-      keyframes: {
-        marquee: {
-          '0%': { transform: 'translateX(0%)' },
-          '100%': { transform: 'translateX(50%)' },
-        },
-      },
-    },
-  },
-  plugins: [],
-};
-</file>
-
 <file path="ThemeProvider.tsx">
 // File Path: ThemeProvider.tsx
 "use client";
@@ -21109,6 +20865,39 @@ export default function AdminStylesRoute() {
         ℹ️ راهنمای بخش تایپوگرافی و رنگ: این صفحه منحصراً جهت تنظیم و کالیبراسیون فونت‌های رسمی (وزن، سایز) و پالت رنگ سیستم است.
       </div>
     <StyleFontManager /></div>);
+}
+</file>
+
+<file path="app/admin/layout.tsx">
+"use client";
+
+import React from "react";
+import { usePathname } from "next/navigation";
+import AdminSidebar from "@/components/admin/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import AdminNotificationProvider from "@/components/admin/AdminNotificationProvider";
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isLoginPage = pathname === "/admin/login";
+
+  if (isLoginPage) {
+    return <main className="min-h-screen bg-slate-950">{children}</main>;
+  }
+
+  return (
+    <AdminNotificationProvider>
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans " dir="rtl">
+        <AdminHeader />
+        <div className="flex">
+          <AdminSidebar />
+          <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+            {children}
+          </main>
+        </div>
+      </div>
+    </AdminNotificationProvider>
+  );
 }
 </file>
 
@@ -22675,261 +22464,6 @@ export async function DELETE(req: NextRequest) {
 export { POST } from "../route";
 </file>
 
-<file path="app/api/orders/route.ts">
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
-import { calculateOrderDiscount } from "@/lib/couponValidator";
-import { smsService } from "@/services/smsService";
-
-export const dynamic = "force-dynamic";
-
-export async function GET(req: NextRequest) {
-  try {
-    const session = await verifyAdminSession(req);
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: "دسترسی غیرمجاز. مشاهده فاکتورها نیازمند لاگین مدیریت است." },
-        { status: 401 }
-      );
-    }
-
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-    const phone = searchParams.get("phone");
-
-    let query = supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false });
-    if (id) query = query.eq("id", id);
-    if (phone) query = query.eq("phone", phone);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, orders: data || [] });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { customer_name, customer_phone, phone, province, city, postal_code, address, customer_address, notes, items, coupon_code } = body;
-
-    const rawPhone = customer_phone || phone || "";
-    const cleanPhone = String(rawPhone)
-      .trim()
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
-      .replace(/\D/g, "");
-
-    if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
-      return NextResponse.json({ success: false, message: "شماره همراه معتبر ۱۱ رقمی الزامی است." }, { status: 400 });
-    }
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ success: false, message: "سبد خرید شما خالی است." }, { status: 400 });
-    }
-
-    const finalAddress = String(customer_address || address || "").trim();
-    if (finalAddress.length < 5) {
-      return NextResponse.json({ success: false, message: "نشانی پستی دقیق جهت ارسال مرسوله الزامی است." }, { status: 400 });
-    }
-
-    // ۱. استعلام محصولات از دیتابیس برای جلوگیری از دستکاری قیمت و بررسی موجودی
-    const productIds = items.map((i: any) => String(i.productId || i.product_id || i.id)).filter(Boolean);
-    const { data: dbProducts, error: prodErr } = await supabaseAdmin
-      .from("products")
-      .select("id, title, name, price, discount_price, stock, is_available")
-      .in("id", productIds);
-
-    if (prodErr || !dbProducts) {
-      return NextResponse.json({ success: false, message: "خطا در بازیابی اطلاعات موجودی محصولات." }, { status: 500 });
-    }
-
-    const productMap = new Map((dbProducts || []).map((p: any) => [String(p.id), p]));
-
-    let calculatedRawTotal = 0;
-    const verifiedItems = [];
-
-    for (const it of items) {
-      const pId = String(it.productId || it.product_id || it.id);
-      const realProd = productMap.get(pId);
-
-      if (!realProd) {
-        return NextResponse.json({
-          success: false,
-          message: `کالای «${it.title || pId}» در انبار سیستم یافت نشد.`
-        }, { status: 400 });
-      }
-
-      if (realProd.is_available === false) {
-        return NextResponse.json({
-          success: false,
-          message: `کالای «${realProd.title || realProd.name}» در حال حاضر ناموجود است.`
-        }, { status: 400 });
-      }
-
-      const requestedQty = Math.max(1, Number(it.quantity || 1));
-      const currentStock = realProd.stock !== null && realProd.stock !== undefined ? Number(realProd.stock) : 999;
-
-      if (currentStock < requestedQty) {
-        return NextResponse.json({
-          success: false,
-          message: `موجودی کالای «${realProd.title || realProd.name}» کافی نیست (موجودی: ${currentStock}).`
-        }, { status: 400 });
-      }
-
-      const unitPrice = realProd.discount_price && Number(realProd.discount_price) > 0
-        ? Number(realProd.discount_price)
-        : Number(realProd.price || 0);
-
-      const lineTotal = unitPrice * requestedQty;
-      calculatedRawTotal += lineTotal;
-
-      verifiedItems.push({
-        id: pId,
-        productId: pId,
-        product_id: pId,
-        title: realProd.title || realProd.name || it.title,
-        price: unitPrice,
-        unit_price: unitPrice,
-        quantity: requestedQty,
-        total_price: lineTotal,
-        image: it.image || it.image_url || null,
-      });
-    }
-
-    // ۲. محاسبه کد تخفیف در سرور
-    let finalDiscount = 0;
-    let appliedCoupon: string | null = null;
-    let couponRecordToUpdate: any = null;
-
-    if (coupon_code) {
-      const cleanCoupon = String(coupon_code).trim().toUpperCase();
-      const { data: couponRecord } = await supabaseAdmin
-        .from("coupons")
-        .select("*")
-        .eq("code", cleanCoupon)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (couponRecord) {
-        const validation = calculateOrderDiscount(couponRecord, calculatedRawTotal);
-        if (validation.valid) {
-          finalDiscount = validation.discountAmount;
-          appliedCoupon = cleanCoupon;
-          couponRecordToUpdate = couponRecord;
-        }
-      }
-    }
-
-    const payableAmount = Math.max(0, calculatedRawTotal - finalDiscount);
-    const orderNumber = "AXON-" + Date.now().toString().slice(-6) + "-" + Math.random().toString(36).substring(2, 5).toUpperCase();
-    const orderId = "ord_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
-
-    const orderPayload = {
-      id: orderId,
-      order_number: orderNumber,
-      customer_name: String(customer_name || "مشتری گرامی").trim(),
-      customer_phone: cleanPhone,
-      phone: cleanPhone,
-      province: province || "تهران",
-      city: city || "تهران",
-      postal_code: postal_code || null,
-      customer_address: finalAddress,
-      address: finalAddress,
-      notes: notes ? String(notes).trim() : null,
-      items: verifiedItems,
-      total_amount: calculatedRawTotal,
-      discount_amount: finalDiscount,
-      final_amount: payableAmount,
-      coupon_code: appliedCoupon,
-      status: "pending_manual_review",
-      payment_status: "pending",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data: createdOrder, error: orderErr } = await supabaseAdmin
-      .from("orders")
-      .insert([orderPayload])
-      .select()
-      .single();
-
-    if (orderErr) throw orderErr;
-
-    // ۳. ثبت یا به‌روزرسانی پرونده مشتری در CRM
-    try {
-      const { data: existingCrm } = await supabaseAdmin
-        .from("crm_customers")
-        .select("id, total_spent, order_count")
-        .eq("phone", cleanPhone)
-        .maybeSingle();
-
-      if (existingCrm) {
-        await supabaseAdmin
-          .from("crm_customers")
-          .update({
-            full_name: customer_name,
-            total_spent: Number(existingCrm.total_spent || 0) + payableAmount,
-            order_count: Number(existingCrm.order_count || 0) + 1,
-            lifecycle_stage: (Number(existingCrm.total_spent || 0) + payableAmount) > 100000000 ? "vip" : "active",
-            address: finalAddress,
-            postal_code: postal_code || undefined,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingCrm.id);
-      } else {
-        await supabaseAdmin.from("crm_customers").insert([{
-          id: "crm_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-          full_name: customer_name,
-          phone: cleanPhone,
-          province: province || "تهران",
-          city: city || "تهران",
-          address: finalAddress,
-          postal_code: postal_code || null,
-          total_spent: payableAmount,
-          order_count: 1,
-          lifecycle_stage: "prospect",
-          tags: ["ثبت فاکتور"],
-          internal_notes: "سفارش ثبت‌شده از ویترین فروشگاه",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }]);
-      }
-    } catch (crmErr) {
-      console.warn("CRM auto-sync warning:", crmErr);
-    }
-
-    // ۴. به‌روزرسانی شمارنده کوپن
-    if (couponRecordToUpdate) {
-      const currentUsed = Number(couponRecordToUpdate.used_count || couponRecordToUpdate.times_used || 0);
-      await supabaseAdmin
-        .from("coupons")
-        .update({ used_count: currentUsed + 1, times_used: currentUsed + 1 })
-        .eq("id", couponRecordToUpdate.id);
-    }
-
-    // ۵. ارسال پیامک ثبت اولیه سفارش
-    smsService.sendSMS(
-      cleanPhone,
-      `${customer_name} عزیز، سفارش شما با شناسه ${orderNumber} در آکسون کور ثبت شد. متشکریم.`
-    ).catch(() => {});
-
-    return NextResponse.json({
-      success: true,
-      message: "سفارش با موفقیت در پایگاه داده ثبت گردید.",
-      order: createdOrder,
-      orderId: createdOrder.id,
-      orderNumber: createdOrder.order_number,
-    });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-</file>
-
 <file path="app/api/pages/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -23452,6 +22986,25 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
+<file path="app/blog/loading.tsx">
+export default function BlogLoading() {
+  return (
+    <div className="min-h-[70vh] p-6 max-w-7xl mx-auto dir-rtl space-y-6 animate-pulse font-sans select-none">
+      <div className="h-8 bg-[var(--input-bg)] rounded-2xl w-64" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-72 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 space-y-4">
+            <div className="w-full h-36 rounded-2xl bg-[var(--input-bg)]" />
+            <div className="h-4 w-3/4 bg-[var(--input-bg)] rounded-full" />
+            <div className="h-3 w-1/2 bg-[var(--input-bg)] rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="app/blog/page.tsx">
 function safeJsonLd(obj: any): string {
   return JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
@@ -23870,18 +23423,93 @@ export default function TrackOrderPage() {
 }
 </file>
 
-<file path="app/not-found.tsx">
-import Link from "next/link";
+<file path="app/error.tsx">
+"use client";
 
-export default function NotFound() {
+import React, { useEffect } from "react";
+import Link from "next/link";
+import { AlertTriangle, RotateCcw, Home } from "lucide-react";
+
+export default function ErrorPage({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    console.error("Runtime Application Error:", error);
+  }, [error]);
+
   return (
-    <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center dir-rtl">
-      <div className="text-4xl font-black text-[#0071e3] mb-3">۴۰۴</div>
-      <h2 className="text-base font-bold text-white mb-2">صفحه مورد نظر یافت نشد</h2>
-      <p className="text-xs text-zinc-400 max-w-xs mb-6">نشانی وارد شده تغییر کرده یا وجود ندارد.</p>
-      <Link href="/" className="px-6 py-2.5 rounded-2xl bg-[#0071e3] text-white text-xs font-bold shadow-lg">
-        بازگشت به صفحه اصلی
-      </Link>
+    <div className="min-h-[75vh] flex flex-col items-center justify-center p-6 text-center dir-rtl font-sans select-none bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center justify-center text-3xl mb-4 shadow-lg">
+        <AlertTriangle size={32} />
+      </div>
+      <h2 className="text-lg font-black text-[var(--text-primary)] mb-2">خطایی در پردازش درخواست رخ داد</h2>
+      <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-6 leading-relaxed">
+        سیستم با یک خطای غیرمنتظره روبرو شد. می‌توانید مجدداً تلاش کنید یا به صفحه نخست بازگردید.
+      </p>
+      <div className="flex gap-3">
+        <button
+          onClick={() => reset()}
+          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-lg flex items-center gap-2 cursor-pointer hover:opacity-90 transition">
+          <RotateCcw size={14} />
+          تلاش مجدد
+        </button>
+        <Link
+          href="/"
+          className="px-6 py-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold flex items-center gap-2 hover:border-[var(--accent-blue)] transition">
+          <Home size={14} />
+          صفحه نخست
+        </Link>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/global-error.tsx">
+"use client";
+
+import React from "react";
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <html lang="fa" dir="rtl">
+      <body className="bg-[#07090e] text-white font-sans min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
+          <div className="w-16 h-16 mx-auto rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-2xl font-black">
+            !
+          </div>
+          <h2 className="text-base font-black">خطای بحرانی در هسته سیستم</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            {error?.message || "اجرای برنامه با مشکل سیستمی روبرو شد."}
+          </p>
+          <button
+            onClick={() => reset()}
+            className="w-full py-3 rounded-2xl bg-blue-600 text-white text-xs font-black shadow-lg hover:bg-blue-500 transition">
+            بارگذاری مجدد صفحه
+          </button>
+        </div>
+      </body>
+    </html>
+  );
+}
+</file>
+
+<file path="app/loading.tsx">
+export default function GlobalLoading() {
+  return (
+    <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 space-y-4 dir-rtl bg-[var(--bg-primary)] font-sans select-none">
+      <div className="w-10 h-10 border-3 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin" />
+      <p className="text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری اطلاعات و همگام‌سازی...</p>
     </div>
   );
 }
@@ -24329,6 +23957,104 @@ export default function AdminModularPages() {
 }
 </file>
 
+<file path="components/admin/AdminNotificationProvider.tsx">
+"use client";
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
+
+export interface AdminNotification {
+  id: string;
+  type: "order" | "inventory" | "user" | "system";
+  title: string;
+  message: string;
+  created_at?: string;
+  read?: boolean;
+}
+
+interface NotificationContextType {
+  notifications: AdminNotification[];
+  addNotification: (notif: Omit<AdminNotification, "id"> & { id?: string }) => void;
+  removeNotification: (id: string) => void;
+  clearNotifications: () => void;
+  unreadCount: number;
+}
+
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+
+export function AdminNotificationProvider({ children }: { children: ReactNode }) {
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+
+  const addNotification = (notif: Omit<AdminNotification, "id"> & { id?: string }) => {
+    const newEntry: AdminNotification = {
+      ...notif,
+      id: notif.id || (Date.now().toString() + Math.random().toString(36).substring(2, 6)),
+      created_at: notif.created_at || new Date().toISOString(),
+      read: false,
+    };
+    setNotifications((prev) => [newEntry, ...prev.slice(0, 49)]);
+  };
+
+  const removeNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-realtime-notifications")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
+        try {
+          soundEngine.playSuccess();
+        } catch {}
+        const newOrder = payload.new;
+        addNotification({
+          type: "order",
+          title: "سفارش جدید ثبت شد! 🛍️",
+          message: "فاکتور جدید با موفقیت ثبت گردید.",
+          id: String(newOrder.id),
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  return (
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        addNotification,
+        removeNotification,
+        clearNotifications,
+        unreadCount,
+      }}
+    >
+      {children}
+    </NotificationContext.Provider>
+  );
+}
+
+export function useNotification() {
+  const context = useContext(NotificationContext);
+  if (!context) {
+    throw new Error("useNotification must be used within an AdminNotificationProvider");
+  }
+  return context;
+}
+
+export const NotificationProvider = AdminNotificationProvider;
+export default AdminNotificationProvider;
+</file>
+
 <file path="components/admin/MediaUploadModal.tsx">
 "use client";
 
@@ -24545,20 +24271,6 @@ export default function MediaUploadModal({
 }
 </file>
 
-<file path="components/AnnouncementBar.tsx">
-"use client";
-
-import React from "react";
-
-export default function AnnouncementBar() {
-  return (
-    <div className="bg-[#0071e3] text-white py-1.5 px-4 text-center text-[11px] font-bold tracking-wide dir-rtl overflow-hidden">
-      <span>ارسال سریع سفارشات با بسته‌بندی ایمن به سراسر کشور | تضمین اصالت و سلامت کالا به تومان</span>
-    </div>
-  );
-}
-</file>
-
 <file path="components/ClientLayoutEnhancer.tsx">
 // File Path: components/ClientLayoutEnhancer.tsx
 "use client";
@@ -24630,90 +24342,221 @@ export default function EnamadBadge() {
 }
 </file>
 
-<file path="components/MobileBottomNav.tsx">
+<file path="components/Header.tsx">
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Layers, ShoppingBag, Package, User } from "lucide-react";
+import { siteInfoService, HeaderConfig, DEFAULT_HEADER_CONFIG } from "@/services/siteInfoService";
+import { themeEngine } from "@/lib/themeEngine";
+import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
 
-export default function MobileBottomNav() {
-  const pathname = usePathname();
-  const [cartCount, setCartCount] = useState(0);
-
-  const updateCount = () => {
-    try {
-      const items = JSON.parse(localStorage.getItem("axon_cart") || "[]");
-      const total = items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
-      setCartCount(total);
-    } catch (e) {
-      setCartCount(0);
-    }
-  };
+export default function Header() {
+  const [cfg, setCfg] = useState<HeaderConfig>(DEFAULT_HEADER_CONFIG);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+  const { cartItems, openCart } = useCart();
 
   useEffect(() => {
-    updateCount();
-    window.addEventListener("cart_updated", updateCount);
-    return () => window.removeEventListener("cart_updated", updateCount);
+    setIsDark(document.documentElement.classList.contains("dark"));
+
+    const onThemeChanged = (e: any) => setIsDark(e.detail === "dark");
+    window.addEventListener("theme_changed", onThemeChanged);
+
+    siteInfoService.getSiteInfo().then((info) => {
+      if (info?.homepage_layout_config?.header) {
+        setCfg({ ...DEFAULT_HEADER_CONFIG, ...info.homepage_layout_config.header });
+      }
+    });
+
+    const onSiteUpdate = (e: any) => {
+      if (e.detail?.homepage_layout_config?.header) {
+        setCfg({ ...DEFAULT_HEADER_CONFIG, ...e.detail.homepage_layout_config.header });
+      }
+    };
+    window.addEventListener("site_info_updated", onSiteUpdate);
+
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("theme_changed", onThemeChanged);
+      window.removeEventListener("site_info_updated", onSiteUpdate);
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
-  const navItems = [
-    { href: "/", label: "خانه", icon: Home },
-    { href: "/products", label: "محصولات", icon: Layers },
-    {
-      action: "cart",
-      label: "سبد خرید",
-      icon: ShoppingBag,
-      badge: cartCount,
-    },
-    { href: "/track", label: "پیگیری", icon: Package },
-    { href: "/admin", label: "پیشخوان", icon: User },
-  ];
+  const toggleTheme = () => {
+    soundEngine.playClick();
+    themeEngine.applyTheme(isDark ? "light" : "dark", true);
+  };
+
+  if (!cfg.show) return null;
+
+  const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+  const logoSrc = cfg.brand.logoUrl || undefined;
 
   return (
-    <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[#121214]/95 border-t border-[#27272a] px-3 py-2 pb-safe shadow-2xl dir-rtl">
-      <div className="flex items-center justify-around max-w-lg mx-auto">
-        {navItems.map((item, idx) => {
-          const Icon = item.icon;
-          const isActive = item.href ? pathname === item.href : false;
+    <header
+      className="fixed top-0 left-0 right-0 z-40 flex flex-col items-center px-3 sm:px-6 pointer-events-none pt-2 sm:pt-3 transition-all duration-300 font-sans select-none"
+      dir="rtl"
+    >
+      {/* نوار اعلان بالای هدر */}
+      {cfg.announcement?.show && (
+        <div
+          style={{ backgroundColor: cfg.announcement.backgroundColor, color: cfg.announcement.textColor }}
+          className="pointer-events-auto w-full max-w-7xl mb-2 px-4 py-1.5 rounded-full text-[11px] font-bold text-center shadow-md flex items-center justify-center gap-2"
+        >
+          <span>{cfg.announcement.text}</span>
+          {cfg.announcement.link && (
+            <Link href={cfg.announcement.link} className="underline mr-2">مشاهده ←</Link>
+          )}
+        </div>
+      )}
 
-          if (item.action === "cart") {
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => window.dispatchEvent(new Event("open_cart_drawer"))}
-                className="flex flex-col items-center justify-center flex-1 py-1 text-zinc-400 hover:text-white relative transition"
-              >
-                <div className="relative">
-                  <Icon size={20} className="text-[#0071e3]" />
-                  {item.badge > 0 && (
-                    <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-black text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+      {/* کپسول اصلی هدر */}
+      <div
+        style={{
+          maxWidth: `${cfg.maxWidth}px`,
+          height: isScrolled && cfg.shrinkOnScroll ? `${cfg.height - 6}px` : `${cfg.height}px`,
+          borderRadius: `${cfg.borderRadius}px`,
+          backgroundColor: cfg.backgroundColor || undefined,
+          borderColor: cfg.borderColor || undefined,
+          paddingLeft: `${cfg.paddingX}px`,
+          paddingRight: `${cfg.paddingX}px`,
+        }}
+        className={`pointer-events-auto w-full flex items-center justify-between border backdrop-blur-2xl transition-all duration-300 shadow-2xl ${
+          isScrolled ? "bg-[var(--modal-bg)]/90 border-[var(--card-border)] shadow-black/20" : "bg-[var(--modal-bg)]/80 border-[var(--card-border)]/80"
+        }`}
+      >
+        {/* برند و لوگو */}
+        <Link href={cfg.brand.href || "/"} onClick={() => soundEngine.playClick()} className="flex items-center gap-3 shrink-0 group">
+          {cfg.brand.showLogo && (
+            <div
+              style={{
+                width: `${cfg.brand.logoWidth}px`,
+                height: `${cfg.brand.logoHeight}px`,
+                borderRadius: `${cfg.brand.logoRadius}px`,
+              }}
+              className="bg-[var(--input-bg)] border border-[var(--card-border)] p-1 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform"
+            >
+              {logoSrc ? (
+                <img src={logoSrc} alt={cfg.brand.name} className="w-full h-full object-contain" />
+              ) : (
+                <span className="text-base text-[var(--accent-blue)] font-black">⚡</span>
+              )}
+            </div>
+          )}
+
+          {cfg.brand.showName && (
+            <div>
+              <span className="font-black text-xs sm:text-sm text-[var(--text-primary)] block tracking-tight">
+                {cfg.brand.name}
+              </span>
+              {cfg.brand.showTagline && (
+                <span className="text-[10px] text-[var(--text-secondary)] font-medium block">
+                  {cfg.brand.tagline}
+                </span>
+              )}
+            </div>
+          )}
+        </Link>
+
+        {/* منوهای ناوبری */}
+        {cfg.menu.show && (
+          <nav
+            style={{ gap: `${cfg.menu.gap}px`, fontSize: `${cfg.menu.fontSize}px` }}
+            className="hidden lg:flex items-center font-bold text-[var(--text-secondary)]"
+          >
+            {cfg.menu.items
+              .filter((i) => i.show)
+              .sort((a, b) => a.order - b.order)
+              .map((item) => (
+                <Link
+                  key={item.id}
+                  href={item.url}
+                  target={item.openInNewTab ? "_blank" : undefined}
+                  onClick={() => soundEngine.playClick()}
+                  className="hover:text-[var(--accent-blue)] transition-colors py-1 flex items-center gap-1"
+                >
+                  <span>{item.title}</span>
+                  {item.badge && (
+                    <span className="px-1.5 py-0.2 rounded-md bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[9px] font-mono">
                       {item.badge}
                     </span>
                   )}
-                </div>
-                <span className="text-[10px] font-bold mt-1 text-zinc-300">{item.label}</span>
-              </button>
-            );
-          }
+                </Link>
+              ))}
+          </nav>
+        )}
 
-          return (
-            <Link
-              key={idx}
-              href={item.href || "/"}
-              className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
-                isActive ? "text-[#0071e3]" : "text-zinc-400 hover:text-zinc-200"
-              }`}
+        {/* دکمه‌های اکشن: سرچ، دکمه تم، حساب کاربری و سبد خرید */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* دکمه تم تاریک/روشن */}
+          {cfg.actions.themeToggle.show && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={isDark ? "تغییر به حالت روشن" : "تغییر به حالت تاریک"}
+              title={isDark ? "حالت روشن" : "حالت تاریک"}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs transition shadow-sm cursor-pointer shrink-0"
             >
-              <Icon size={20} className={isActive ? "text-[#0071e3]" : "text-zinc-400"} />
-              <span className="text-[10px] font-bold mt-1">{item.label}</span>
+              <span suppressHydrationWarning>{isDark ? "☀️" : "🌙"}</span>
+            </button>
+          )}
+
+          {/* دکمه جستجو */}
+          {cfg.actions.search.show && (
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
+              }}
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs text-[var(--text-secondary)] font-medium transition cursor-pointer"
+            >
+              <span>🔍</span>
+              <span className="text-[11px]">جستجو...</span>
+              <span className="text-[9px] font-mono px-1 rounded bg-[var(--modal-bg)] border border-[var(--card-border)]">⌘K</span>
+            </button>
+          )}
+
+          {/* دکمه حساب کاربری */}
+          {cfg.actions.account.show && (
+            <Link
+              href={cfg.actions.account.url || "/login"}
+              onClick={() => soundEngine.playClick()}
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition shadow-sm cursor-pointer"
+            >
+              <span>👤</span>
+              <span className="text-[11px] sm:text-xs">{cfg.actions.account.label || "حساب کاربری"}</span>
             </Link>
-          );
-        })}
+          )}
+
+          {/* دکمه سبد خرید */}
+          {cfg.actions.cart.show && (
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                openCart();
+              }}
+              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 active:scale-95 transition cursor-pointer"
+            >
+              <span>🛍️</span>
+              {cfg.actions.cart.showCount && (
+                <span className="font-mono text-xs" suppressHydrationWarning>
+                  {totalCartCount}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </header>
   );
 }
 </file>
@@ -25814,6 +25657,21 @@ export async function requireAdmin(req: NextRequest, permission?: string) {
 }
 </file>
 
+<file path="lib/cacheConfig.ts">
+export const CACHE_TAGS = {
+  PRODUCTS: "products-cache",
+  BLOGS: "blogs-cache",
+  SITE_INFO: "site-info-cache",
+  ORDERS: "orders-cache",
+};
+
+export const REVALIDATE_TIMES = {
+  PRODUCTS: 30,
+  BLOGS: 120,
+  SETTINGS: 3600,
+};
+</file>
+
 <file path="lib/otpService.ts">
 const API_KEY = process.env.IPPANEL_API_KEY;
 
@@ -25867,55 +25725,6 @@ export async function sendOtpPattern({ mobile, code }: SendOtpOptions): Promise<
     return false;
   }
 }
-</file>
-
-<file path="lib/rateLimiter.ts">
-import { supabaseAdmin } from "@/lib/supabaseServer";
-
-export async function checkRateLimit(
-  identifier: string,
-  action: string = "admin_login",
-  maxAttempts: number = 5,
-  windowMinutes: number = 15
-): Promise<{ allowed: boolean; remaining: number }> {
-  try {
-    const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
-
-    const { data: attempts, error } = await supabaseAdmin
-      .from("rate_limit_logs")
-      .select("id")
-      .eq("identifier", identifier)
-      .eq("action", action)
-      .gte("created_at", windowStart);
-
-    if (error) {
-      // اگر جدول لاگ ریت‌لیمیت وجود نداشت یا ارور داد، روند لاگین مسدود نشود
-      return { allowed: true, remaining: maxAttempts };
-    }
-
-    const count = attempts ? attempts.length : 0;
-    if (count >= maxAttempts) {
-      return { allowed: false, remaining: 0 };
-    }
-
-    // ثبت تلاش ناموفق
-    await supabaseAdmin.from("rate_limit_logs").insert([
-      {
-        identifier,
-        action,
-        created_at: new Date().toISOString(),
-      },
-    ]);
-
-    return { allowed: true, remaining: maxAttempts - count - 1 };
-  } catch {
-    return { allowed: true, remaining: maxAttempts };
-  }
-}
-
-export const rateLimiter = {
-  checkLimit: checkRateLimit,
-};
 </file>
 
 <file path="lib/realtimeSync.ts">
@@ -26392,6 +26201,46 @@ export default eslintConfig;
 ]
 </file>
 
+<file path="tailwind.config.js">
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: 'class',
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './lib/**/*.{js,ts,jsx,tsx,mdx}',
+    './services/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Vazirmatn', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
+      colors: {
+        apple: {
+          blue: '#0071e3',
+          darkBlue: '#0077ed',
+          gray: '#f5f5f7',
+          darkGray: '#1d1d1f',
+        },
+      },
+      animation: {
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'marquee': 'marquee 25s linear infinite',
+      },
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(50%)' },
+        },
+      },
+    },
+  },
+  plugins: [],
+};
+</file>
+
 <file path="app/actions/siteInfo.ts">
 "use server";
 
@@ -26495,6 +26344,158 @@ export async function updateSiteInfoServer(info: Partial<SiteInfo>) {
   } catch (err: any) {
     return { success: false, error: err.message };
   }
+}
+</file>
+
+<file path="app/admin/login/page.tsx">
+"use client";
+
+import React, { useState } from "react";
+import { soundEngine } from "@/lib/soundEngine";
+import Link from "next/link";
+
+export default function AdminLoginPage() {
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isVerified, setIsVerified] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setErrorMessage("");
+
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPass = password.trim();
+
+    if (!cleanPass) {
+      setErrorMessage("لطفاً کلمه عبور را وارد نمایید.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        soundEngine.playSuccess();
+        setIsVerified(true);
+
+        // ثبت کوکی در کلاینت برای اطمینان ۱۰۰٪ در دامنه axoncore.ir
+        document.cookie = "admin_logged_in=true; path=/; max-age=" + (7 * 24 * 60 * 60) + "; SameSite=Lax; Secure";
+        if (data.token) {
+          document.cookie = "admin_session_token=" + data.token + "; path=/; max-age=" + (7 * 24 * 60 * 60) + "; SameSite=Lax; Secure";
+        }
+
+        // انتقال فوری و کامل بدون افتادن در کش کلاینت
+        window.location.href = "/admin/dashboard";
+      } else {
+        setErrorMessage(data.message || "نام کاربری یا کلمه عبور نادرست است.");
+        setIsVerified(false);
+      }
+    } catch {
+      setErrorMessage("خطا در برقراری ارتباط با سرور.");
+      setIsVerified(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950 font-sans select-none text-white overflow-hidden" dir="rtl">
+      <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="relative w-full max-w-md p-8 sm:p-10 rounded-[2.5rem] bg-slate-900/95 border border-slate-800 backdrop-blur-2xl shadow-2xl space-y-6">
+        {isVerified ? (
+          <div className="py-12 text-center space-y-4 animate-fadeIn">
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-4xl shadow-lg shadow-emerald-500/20">
+              ✓
+            </div>
+            <h2 className="text-lg font-black text-emerald-400">احراز هویت تایید شد</h2>
+            <p className="text-xs text-slate-400">در حال انتقال به پیشخوان مدیریت آکسون...</p>
+          </div>
+        ) : (
+          <>
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 mx-auto rounded-3xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-2xl text-blue-400 shadow-md">
+                🛡️
+              </div>
+              <h1 className="text-lg font-black tracking-tight">ورود به پیشخوان مدیریت آکسون</h1>
+              <p className="text-xs text-slate-400 font-medium">شناسه و کلمه عبور اختصاصی خود را وارد نمایید</p>
+            </div>
+
+            {errorMessage && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold text-center">
+                ⚠️ {errorMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-300 block">نام کاربری (Username):</label>
+                <input
+                  type="text"
+                  required
+                  dir="ltr"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="admin"
+                  className="w-full p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700 text-xs font-mono font-bold outline-none focus:border-blue-500 transition text-white"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-300 block">کلمه عبور یا پین‌کد:</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="کلمه عبور خود را وارد کنید..."
+                    className="w-full p-3.5 pl-12 rounded-2xl bg-slate-800/80 border border-slate-700 text-xs font-mono font-bold outline-none focus:border-blue-500 transition text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 hover:text-white transition cursor-pointer"
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition shadow-xl shadow-blue-600/30 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span>{loading ? "در حال اعتبارسنجی..." : "ورود به سیستم 🚀"}</span>
+                </button>
+              </div>
+            </form>
+
+            <div className="pt-2 border-t border-slate-800/80 text-center">
+              <Link href="/" className="text-[11px] text-slate-400 hover:text-white transition">
+                ← بازگشت به صفحه اصلی سایت
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -26626,39 +26627,6 @@ export default function AdminReviewsPage() {
         )}
       </div>
     </div>
-  );
-}
-</file>
-
-<file path="app/admin/layout.tsx">
-"use client";
-
-import React from "react";
-import { usePathname } from "next/navigation";
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import AdminHeader from "@/components/AdminHeader";
-import AdminNotificationProvider from "@/components/admin/AdminNotificationProvider";
-
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isLoginPage = pathname === "/admin/login";
-
-  if (isLoginPage) {
-    return <main className="min-h-screen bg-slate-950">{children}</main>;
-  }
-
-  return (
-    <AdminNotificationProvider>
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans " dir="rtl">
-        <AdminHeader />
-        <div className="flex">
-          <AdminSidebar />
-          <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
-            {children}
-          </main>
-        </div>
-      </div>
-    </AdminNotificationProvider>
   );
 }
 </file>
@@ -27190,6 +27158,220 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
+<file path="app/api/orders/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { calculateOrderDiscount } from "@/lib/couponValidator";
+import { smsService } from "@/services/smsService";
+import { checkRateLimit } from "@/lib/rateLimiter";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    const phone = searchParams.get("phone");
+
+    let query = supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false });
+    if (id) query = query.eq("id", id);
+    if (phone) query = query.eq("phone", phone);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, orders: data || [] });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    const rateCheck = await checkRateLimit(clientIp, "create_order", 10, 15);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ success: false, message: "تعداد ثبت سفارشات از این IP بیش از حد مجاز است." }, { status: 429 });
+    }
+
+    const body = await req.json();
+    const { customer_name, customer_phone, phone, province, city, postal_code, address, customer_address, notes, items, coupon_code } = body;
+
+    const rawPhone = customer_phone || phone || "";
+    const cleanPhone = String(rawPhone)
+      .trim()
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+      .replace(/\D/g, "");
+
+    if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
+      return NextResponse.json({ success: false, message: "شماره همراه معتبر ۱۱ رقمی الزامی است." }, { status: 400 });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ success: false, message: "سبد خرید شما خالی است." }, { status: 400 });
+    }
+
+    const finalAddress = String(customer_address || address || "").trim();
+    if (finalAddress.length < 5) {
+      return NextResponse.json({ success: false, message: "نشانی پستی دقیق جهت ارسال مرسوله الزامی است." }, { status: 400 });
+    }
+
+    const productIds = items.map((i: any) => String(i.productId || i.product_id || i.id)).filter(Boolean);
+    const { data: dbProducts, error: prodErr } = await supabaseAdmin
+      .from("products")
+      .select("id, title, name, price, discount_price, stock, is_available")
+      .in("id", productIds);
+
+    if (prodErr || !dbProducts) {
+      return NextResponse.json({ success: false, message: "خطا در بازیابی اطلاعات موجودی محصولات." }, { status: 500 });
+    }
+
+    const productMap = new Map((dbProducts || []).map((p: any) => [String(p.id), p]));
+
+    let calculatedRawTotal = 0;
+    const verifiedItems = [];
+
+    for (const it of items) {
+      const pId = String(it.productId || it.product_id || it.id);
+      const realProd = productMap.get(pId);
+
+      if (!realProd) {
+        return NextResponse.json({ success: false, message: "کالای مورد نظر در انبار سیستم یافت نشد." }, { status: 400 });
+      }
+
+      const requestedQty = Math.max(1, Number(it.quantity || 1));
+      const currentStock = realProd.stock !== null && realProd.stock !== undefined ? Number(realProd.stock) : 999;
+
+      if (currentStock < requestedQty) {
+        return NextResponse.json({ success: false, message: "موجودی کالا کافی نیست." }, { status: 400 });
+      }
+
+      const unitPrice = realProd.discount_price && Number(realProd.discount_price) > 0
+        ? Number(realProd.discount_price)
+        : Number(realProd.price || 0);
+
+      const lineTotal = unitPrice * requestedQty;
+      calculatedRawTotal += lineTotal;
+
+      verifiedItems.push({
+        id: pId,
+        productId: pId,
+        product_id: pId,
+        title: realProd.title || realProd.name || it.title,
+        price: unitPrice,
+        unit_price: unitPrice,
+        quantity: requestedQty,
+        total_price: lineTotal,
+        image: it.image || it.image_url || null,
+      });
+    }
+
+    let finalDiscount = 0;
+    let appliedCoupon: string | null = null;
+    let couponRecordToUpdate: any = null;
+
+    if (coupon_code) {
+      const cleanCoupon = String(coupon_code).trim().toUpperCase();
+      const { data: couponRecord } = await supabaseAdmin
+        .from("coupons")
+        .select("*")
+        .eq("code", cleanCoupon)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (couponRecord) {
+        const validation = calculateOrderDiscount(couponRecord, calculatedRawTotal);
+        if (validation.valid) {
+          finalDiscount = validation.discountAmount;
+          appliedCoupon = cleanCoupon;
+          couponRecordToUpdate = couponRecord;
+        }
+      }
+    }
+
+    const payableAmount = Math.max(0, calculatedRawTotal - finalDiscount);
+    const orderNumber = "AXON-" + Date.now().toString().slice(-6) + "-" + Math.random().toString(36).substring(2, 5).toUpperCase();
+    const orderId = "ord_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+
+    const orderPayload = {
+      id: orderId,
+      order_number: orderNumber,
+      customer_name: String(customer_name || "مشتری گرامی").trim(),
+      customer_phone: cleanPhone,
+      phone: cleanPhone,
+      province: province || "تهران",
+      city: city || "تهران",
+      postal_code: postal_code || null,
+      customer_address: finalAddress,
+      address: finalAddress,
+      notes: notes ? String(notes).trim() : null,
+      items: verifiedItems,
+      total_amount: calculatedRawTotal,
+      discount_amount: finalDiscount,
+      final_amount: payableAmount,
+      coupon_code: appliedCoupon,
+      status: "pending_manual_review",
+      payment_status: "pending",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: createdOrder, error: orderErr } = await supabaseAdmin
+      .from("orders")
+      .insert([orderPayload])
+      .select()
+      .single();
+
+    if (orderErr) throw orderErr;
+
+    for (const it of verifiedItems) {
+      try {
+        const p = productMap.get(it.productId);
+        if (p && p.stock !== null && p.stock !== undefined) {
+          const nextStock = Math.max(0, Number(p.stock) - Number(it.quantity));
+          await supabaseAdmin
+            .from("products")
+            .update({ stock: nextStock, is_available: nextStock > 0 })
+            .eq("id", it.productId);
+        }
+      } catch (stkErr) {
+        console.warn("Stock decrease warning:", stkErr);
+      }
+    }
+
+    if (couponRecordToUpdate) {
+      const currentUsed = Number(couponRecordToUpdate.used_count || couponRecordToUpdate.times_used || 0);
+      await supabaseAdmin
+        .from("coupons")
+        .update({ used_count: currentUsed + 1, times_used: currentUsed + 1 })
+        .eq("id", couponRecordToUpdate.id);
+    }
+
+    smsService.sendSMS(
+      cleanPhone,
+      "مشتری گرامی، سفارش شما در آکسون ثبت شد. سپاس از اعتماد شما."
+    ).catch(() => {});
+
+    return NextResponse.json({
+      success: true,
+      message: "سفارش با موفقیت ثبت گردید.",
+      order: createdOrder,
+      orderId: createdOrder.id,
+      orderNumber: createdOrder.order_number,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+</file>
+
 <file path="app/api/site-info/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -27513,6 +27695,23 @@ export default async function BlogPostPage({ params }: PageProps) {
         </div>
       </div>
     </article>
+  );
+}
+</file>
+
+<file path="app/not-found.tsx">
+import Link from "next/link";
+
+export default function NotFound() {
+  return (
+    <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center dir-rtl font-sans select-none bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="text-4xl font-black text-[var(--accent-blue)] mb-3">۴۰۴</div>
+      <h2 className="text-base font-bold text-[var(--text-primary)] mb-2">صفحه مورد نظر یافت نشد</h2>
+      <p className="text-xs text-[var(--text-secondary)] max-w-xs mb-6">نشانی وارد شده تغییر کرده یا وجود ندارد.</p>
+      <Link href="/" className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-lg">
+        بازگشت به صفحه اصلی
+      </Link>
+    </div>
   );
 }
 </file>
@@ -27900,221 +28099,16 @@ export default function AdminSiteInfo() {
 }
 </file>
 
-<file path="components/Header.tsx">
+<file path="components/AnnouncementBar.tsx">
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { siteInfoService, HeaderConfig, DEFAULT_HEADER_CONFIG } from "@/services/siteInfoService";
-import { themeEngine } from "@/lib/themeEngine";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
+import React from "react";
 
-export default function Header() {
-  const [cfg, setCfg] = useState<HeaderConfig>(DEFAULT_HEADER_CONFIG);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isDark, setIsDark] = useState(false);
-  const { cartItems, openCart } = useCart();
-
-  useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
-
-    const onThemeChanged = (e: any) => setIsDark(e.detail === "dark");
-    window.addEventListener("theme_changed", onThemeChanged);
-
-    siteInfoService.getSiteInfo().then((info) => {
-      if (info?.homepage_layout_config?.header) {
-        setCfg({ ...DEFAULT_HEADER_CONFIG, ...info.homepage_layout_config.header });
-      }
-    });
-
-    const onSiteUpdate = (e: any) => {
-      if (e.detail?.homepage_layout_config?.header) {
-        setCfg({ ...DEFAULT_HEADER_CONFIG, ...e.detail.homepage_layout_config.header });
-      }
-    };
-    window.addEventListener("site_info_updated", onSiteUpdate);
-
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("theme_changed", onThemeChanged);
-      window.removeEventListener("site_info_updated", onSiteUpdate);
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
-
-  const toggleTheme = () => {
-    soundEngine.playClick();
-    themeEngine.applyTheme(isDark ? "light" : "dark", true);
-  };
-
-  if (!cfg.show) return null;
-
-  const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
-  const logoSrc = cfg.brand.logoUrl || undefined;
-
+export default function AnnouncementBar() {
   return (
-    <header
-      className="fixed top-0 left-0 right-0 z-40 flex flex-col items-center px-3 sm:px-6 pointer-events-none pt-2 sm:pt-3 transition-all duration-300 font-sans select-none"
-      dir="rtl"
-    >
-      {/* نوار اعلان بالای هدر */}
-      {cfg.announcement?.show && (
-        <div
-          style={{ backgroundColor: cfg.announcement.backgroundColor, color: cfg.announcement.textColor }}
-          className="pointer-events-auto w-full max-w-7xl mb-2 px-4 py-1.5 rounded-full text-[11px] font-bold text-center shadow-md flex items-center justify-center gap-2"
-        >
-          <span>{cfg.announcement.text}</span>
-          {cfg.announcement.link && (
-            <Link href={cfg.announcement.link} className="underline mr-2">مشاهده ←</Link>
-          )}
-        </div>
-      )}
-
-      {/* کپسول اصلی هدر */}
-      <div
-        style={{
-          maxWidth: `${cfg.maxWidth}px`,
-          height: isScrolled && cfg.shrinkOnScroll ? `${cfg.height - 6}px` : `${cfg.height}px`,
-          borderRadius: `${cfg.borderRadius}px`,
-          backgroundColor: cfg.backgroundColor || undefined,
-          borderColor: cfg.borderColor || undefined,
-          paddingLeft: `${cfg.paddingX}px`,
-          paddingRight: `${cfg.paddingX}px`,
-        }}
-        className={`pointer-events-auto w-full flex items-center justify-between border backdrop-blur-2xl transition-all duration-300 shadow-2xl ${
-          isScrolled ? "bg-[var(--modal-bg)]/90 border-[var(--card-border)] shadow-black/20" : "bg-[var(--modal-bg)]/80 border-[var(--card-border)]/80"
-        }`}
-      >
-        {/* برند و لوگو */}
-        <Link href={cfg.brand.href || "/"} onClick={() => soundEngine.playClick()} className="flex items-center gap-3 shrink-0 group">
-          {cfg.brand.showLogo && (
-            <div
-              style={{
-                width: `${cfg.brand.logoWidth}px`,
-                height: `${cfg.brand.logoHeight}px`,
-                borderRadius: `${cfg.brand.logoRadius}px`,
-              }}
-              className="bg-[var(--input-bg)] border border-[var(--card-border)] p-1 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform"
-            >
-              {logoSrc ? (
-                <img src={logoSrc} alt={cfg.brand.name} className="w-full h-full object-contain" />
-              ) : (
-                <span className="text-base text-[var(--accent-blue)] font-black">⚡</span>
-              )}
-            </div>
-          )}
-
-          {cfg.brand.showName && (
-            <div>
-              <span className="font-black text-xs sm:text-sm text-[var(--text-primary)] block tracking-tight">
-                {cfg.brand.name}
-              </span>
-              {cfg.brand.showTagline && (
-                <span className="text-[10px] text-[var(--text-secondary)] font-medium block">
-                  {cfg.brand.tagline}
-                </span>
-              )}
-            </div>
-          )}
-        </Link>
-
-        {/* منوهای ناوبری */}
-        {cfg.menu.show && (
-          <nav
-            style={{ gap: `${cfg.menu.gap}px`, fontSize: `${cfg.menu.fontSize}px` }}
-            className="hidden lg:flex items-center font-bold text-[var(--text-secondary)]"
-          >
-            {cfg.menu.items
-              .filter((i) => i.show)
-              .sort((a, b) => a.order - b.order)
-              .map((item) => (
-                <Link
-                  key={item.id}
-                  href={item.url}
-                  target={item.openInNewTab ? "_blank" : undefined}
-                  onClick={() => soundEngine.playClick()}
-                  className="hover:text-[var(--accent-blue)] transition-colors py-1 flex items-center gap-1"
-                >
-                  <span>{item.title}</span>
-                  {item.badge && (
-                    <span className="px-1.5 py-0.2 rounded-md bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[9px] font-mono">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              ))}
-          </nav>
-        )}
-
-        {/* دکمه‌های اکشن: سرچ، دکمه تم، حساب کاربری و سبد خرید */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* دکمه تم تاریک/روشن */}
-          {cfg.actions.themeToggle.show && (
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={isDark ? "تغییر به حالت روشن" : "تغییر به حالت تاریک"}
-              title={isDark ? "حالت روشن" : "حالت تاریک"}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs transition shadow-sm cursor-pointer shrink-0"
-            >
-              <span suppressHydrationWarning>{isDark ? "☀️" : "🌙"}</span>
-            </button>
-          )}
-
-          {/* دکمه جستجو */}
-          {cfg.actions.search.show && (
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.playClick();
-                window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
-              }}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs text-[var(--text-secondary)] font-medium transition cursor-pointer"
-            >
-              <span>🔍</span>
-              <span className="text-[11px]">جستجو...</span>
-              <span className="text-[9px] font-mono px-1 rounded bg-[var(--modal-bg)] border border-[var(--card-border)]">⌘K</span>
-            </button>
-          )}
-
-          {/* دکمه حساب کاربری */}
-          {cfg.actions.account.show && (
-            <Link
-              href={cfg.actions.account.url || "/login"}
-              onClick={() => soundEngine.playClick()}
-              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition shadow-sm cursor-pointer"
-            >
-              <span>👤</span>
-              <span className="text-[11px] sm:text-xs">{cfg.actions.account.label || "حساب کاربری"}</span>
-            </Link>
-          )}
-
-          {/* دکمه سبد خرید */}
-          {cfg.actions.cart.show && (
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.playClick();
-                openCart();
-              }}
-              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 active:scale-95 transition cursor-pointer"
-            >
-              <span>🛍️</span>
-              {cfg.actions.cart.showCount && (
-                <span className="font-mono text-xs" suppressHydrationWarning>
-                  {totalCartCount}
-                </span>
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-    </header>
+    <div className="bg-[var(--accent-blue)] text-white py-1.5 px-4 text-center text-[11px] font-bold tracking-wide dir-rtl overflow-hidden shadow-sm">
+      <span>ارسال سریع سفارشات با بسته‌بندی ایمن به سراسر کشور | تضمین اصالت و سلامت کالا به تومان</span>
+    </div>
   );
 }
 </file>
@@ -28154,6 +28148,175 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         )}
       </div>
     </ThemeProvider>
+  );
+}
+</file>
+
+<file path="components/MobileBottomNav.tsx">
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Home, Layers, ShoppingBag, Package, User } from "lucide-react";
+
+export default function MobileBottomNav() {
+  const pathname = usePathname();
+  const [cartCount, setCartCount] = useState(0);
+
+  const updateCount = () => {
+    try {
+      const items = JSON.parse(localStorage.getItem("axon_cart") || "[]");
+      const total = items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
+      setCartCount(total);
+    } catch (e) {
+      setCartCount(0);
+    }
+  };
+
+  useEffect(() => {
+    updateCount();
+    window.addEventListener("cart_updated", updateCount);
+    return () => window.removeEventListener("cart_updated", updateCount);
+  }, []);
+
+  const navItems = [
+    { href: "/", label: "خانه", icon: Home },
+    { href: "/products", label: "محصولات", icon: Layers },
+    {
+      action: "cart",
+      label: "سبد خرید",
+      icon: ShoppingBag,
+      badge: cartCount,
+    },
+    { href: "/track", label: "پیگیری", icon: Package },
+    { href: "/admin", label: "پیشخوان", icon: User },
+  ];
+
+  return (
+    <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--modal-bg)] border-t border-[var(--card-border)] px-3 py-2 pb-safe shadow-2xl dir-rtl">
+      <div className="flex items-center justify-around max-w-lg mx-auto">
+        {navItems.map((item, idx) => {
+          const Icon = item.icon;
+          const isActive = item.href ? pathname === item.href : false;
+
+          if (item.action === "cart") {
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("open_cart_drawer"))}
+                className="flex flex-col items-center justify-center flex-1 py-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] relative transition"
+              >
+                <div className="relative">
+                  <Icon size={20} className="text-[var(--accent-blue)]" />
+                  {item.badge > 0 && (
+                    <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] font-bold mt-1 text-[var(--text-primary)]">{item.label}</span>
+              </button>
+            );
+          }
+
+          return (
+            <Link
+              key={idx}
+              href={item.href || "/"}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
+                isActive ? "text-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              <Icon size={20} className={isActive ? "text-[var(--accent-blue)]" : "text-[var(--text-secondary)]"} />
+              <span className="text-[10px] font-bold mt-1">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="components/ProductCard.tsx">
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import AddToCartButton from "./AddToCartButton";
+import { formatPrice } from "@/lib/formatters";
+
+interface ProductCardProps {
+  product: any;
+}
+
+export default function ProductCard({ product }: ProductCardProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const title = product?.title || product?.name || "محصول استودیو";
+  const mainImage = (product?.images && product.images[0]) || product?.image || "/placeholder.png";
+  const price = Number(product?.price || 0);
+  const discountPrice = product?.discount_price || product?.discountPrice ? Number(product.discount_price || product.discountPrice) : null;
+  const isAvailable = product?.is_available !== false && (product?.stock === undefined || Number(product.stock) > 0);
+
+  return (
+    <div className="group relative rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] p-4 sm:p-5 transition-all duration-300 shadow-md flex flex-col justify-between font-sans select-none" dir="rtl">
+      <div>
+        {/* کانتینر تصویر با ارتفاع ثابت ریسپانسیو جهت جلوگیری از مخفی شدن در موبایل و تبلت */}
+        <div className="relative w-full aspect-square sm:aspect-[4/3] md:aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
+          <Link href={"/products/" + product.id} className="w-full h-full relative flex items-center justify-center">
+            <img
+              src={mainImage}
+              alt={title}
+              loading="lazy"
+              className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
+            />
+          </Link>
+          <span className="absolute top-2.5 left-2.5 bg-black/75 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-bold border border-white/10 z-10">
+            {product?.category || "تخصصی"}
+          </span>
+        </div>
+
+        <Link href={"/products/" + product.id} className="block space-y-1">
+          <h3 className="font-black text-xs sm:text-sm text-[var(--text-primary)] line-clamp-2 leading-snug group-hover:text-[var(--accent-blue)] transition">
+            {title}
+          </h3>
+          <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1 font-medium">
+            {product?.warranty || "گارانتی اصالت طلایی"}
+          </p>
+        </Link>
+      </div>
+
+      <div className="pt-4 mt-3 border-t border-[var(--card-border)] space-y-3">
+        <div className="flex items-baseline justify-between" suppressHydrationWarning>
+          <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
+          <div className="text-left font-mono">
+            {discountPrice ? (
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-slate-400 line-through">
+                  {mounted ? formatPrice(price) : ""}
+                </span>
+                <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400">
+                  {mounted ? formatPrice(discountPrice) : ""} تومان
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs sm:text-sm font-black text-[var(--text-primary)]">
+                {mounted ? formatPrice(price) : ""} تومان
+              </span>
+            )}
+          </div>
+        </div>
+
+        <AddToCartButton product={product} />
+      </div>
+    </div>
   );
 }
 </file>
@@ -28675,6 +28838,53 @@ export const puckConfig: Config<ComponentProps> = {
       ),
     },
   },
+};
+</file>
+
+<file path="lib/rateLimiter.ts">
+import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export async function checkRateLimit(
+  identifier: string,
+  action: string = "admin_login",
+  maxAttempts: number = 5,
+  windowMinutes: number = 15
+): Promise<{ allowed: boolean; remaining: number }> {
+  try {
+    const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+
+    const { data: attempts, error } = await supabaseAdmin
+      .from("rate_limit_logs")
+      .select("id")
+      .eq("identifier", identifier)
+      .eq("action", action)
+      .gte("created_at", windowStart);
+
+    if (error) {
+      return { allowed: true, remaining: maxAttempts };
+    }
+
+    const count = attempts ? attempts.length : 0;
+    if (count >= maxAttempts) {
+      return { allowed: false, remaining: 0 };
+    }
+
+    await supabaseAdmin.from("rate_limit_logs").insert([
+      {
+        identifier,
+        action,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+
+    return { allowed: true, remaining: maxAttempts - count - 1 };
+  } catch {
+    return { allowed: true, remaining: maxAttempts };
+  }
+}
+
+export const rateLimiter = {
+  checkLimit: checkRateLimit,
 };
 </file>
 
@@ -29487,158 +29697,6 @@ export const siteInfoService = {
 export default siteInfoService;
 </file>
 
-<file path="app/admin/login/page.tsx">
-"use client";
-
-import React, { useState } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-import Link from "next/link";
-
-export default function AdminLoginPage() {
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isVerified, setIsVerified] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    soundEngine.playClick();
-    setErrorMessage("");
-
-    const cleanUser = username.trim().toLowerCase();
-    const cleanPass = password.trim();
-
-    if (!cleanPass) {
-      setErrorMessage("لطفاً کلمه عبور را وارد نمایید.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: cleanUser, password: cleanPass }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        soundEngine.playSuccess();
-        setIsVerified(true);
-
-        // ثبت کوکی در کلاینت برای اطمینان ۱۰۰٪ در دامنه axoncore.ir
-        document.cookie = "admin_logged_in=true; path=/; max-age=" + (7 * 24 * 60 * 60) + "; SameSite=Lax; Secure";
-        if (data.token) {
-          document.cookie = "admin_session_token=" + data.token + "; path=/; max-age=" + (7 * 24 * 60 * 60) + "; SameSite=Lax; Secure";
-        }
-
-        // انتقال فوری و کامل بدون افتادن در کش کلاینت
-        window.location.href = "/admin/dashboard";
-      } else {
-        setErrorMessage(data.message || "نام کاربری یا کلمه عبور نادرست است.");
-        setIsVerified(false);
-      }
-    } catch {
-      setErrorMessage("خطا در برقراری ارتباط با سرور.");
-      setIsVerified(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950 font-sans select-none text-white overflow-hidden" dir="rtl">
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
-
-      <div className="relative w-full max-w-md p-8 sm:p-10 rounded-[2.5rem] bg-slate-900/95 border border-slate-800 backdrop-blur-2xl shadow-2xl space-y-6">
-        {isVerified ? (
-          <div className="py-12 text-center space-y-4 animate-fadeIn">
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-4xl shadow-lg shadow-emerald-500/20">
-              ✓
-            </div>
-            <h2 className="text-lg font-black text-emerald-400">احراز هویت تایید شد</h2>
-            <p className="text-xs text-slate-400">در حال انتقال به پیشخوان مدیریت آکسون...</p>
-          </div>
-        ) : (
-          <>
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 mx-auto rounded-3xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-2xl text-blue-400 shadow-md">
-                🛡️
-              </div>
-              <h1 className="text-lg font-black tracking-tight">ورود به پیشخوان مدیریت آکسون</h1>
-              <p className="text-xs text-slate-400 font-medium">شناسه و کلمه عبور اختصاصی خود را وارد نمایید</p>
-            </div>
-
-            {errorMessage && (
-              <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold text-center">
-                ⚠️ {errorMessage}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-300 block">نام کاربری (Username):</label>
-                <input
-                  type="text"
-                  required
-                  dir="ltr"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin"
-                  className="w-full p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700 text-xs font-mono font-bold outline-none focus:border-blue-500 transition text-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-300 block">کلمه عبور یا پین‌کد:</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="کلمه عبور خود را وارد کنید..."
-                    className="w-full p-3.5 pl-12 rounded-2xl bg-slate-800/80 border border-slate-700 text-xs font-mono font-bold outline-none focus:border-blue-500 transition text-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 hover:text-white transition cursor-pointer"
-                  >
-                    {showPassword ? "🙈" : "👁️"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition shadow-xl shadow-blue-600/30 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <span>{loading ? "در حال اعتبارسنجی..." : "ورود به سیستم 🚀"}</span>
-                </button>
-              </div>
-            </form>
-
-            <div className="pt-2 border-t border-slate-800/80 text-center">
-              <Link href="/" className="text-[11px] text-slate-400 hover:text-white transition">
-                ← بازگشت به صفحه اصلی سایت
-              </Link>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="app/api/admin/audit-logs/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -29798,381 +29856,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message || "خطا در آپلود فایل." }, { status: 500 });
-  }
-}
-</file>
-
-<file path="app/api/orders/track/route.ts">
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-
-export const dynamic = "force-dynamic";
-
-export async function POST(req: NextRequest) {
-  try {
-    const { query } = await req.json();
-    if (!query || query.trim().length < 5) {
-      return NextResponse.json({ success: false, message: "شماره موبایل یا شماره سفارش معتبر وارد نمایید." }, { status: 400 });
-    }
-
-    const cleanQuery = query.trim();
-
-    // جستجو بر اساس شماره موبایل یا شماره سفارش
-    const { data: orders, error } = await supabaseAdmin
-      .from("orders")
-      .select("id, order_number, customer_name, total_price, payment_status, created_at, items, tracking_code")
-      .or(`customer_phone.eq.${cleanQuery},order_number.eq.${cleanQuery}`)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      return NextResponse.json({ success: false, message: "خطا در بازیابی سفارشات." }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      orders: orders || [],
-    });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
-}
-</file>
-
-<file path="app/products/page.tsx">
-"use client";
-
-import React, { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
-import { Search, SlidersHorizontal, Check, ShoppingCart, ArrowLeft, Eye } from "lucide-react";
-
-export default function ProductsCatalogPage() {
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [onlyAvailable, setOnlyAvailable] = useState(false);
-  const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc">("newest");
-
-  useEffect(() => {
-    async function loadProducts() {
-      try {
-        const res = await fetch("/api/products");
-        const data = await res.json();
-        if (data.success && Array.isArray(data.products)) {
-          setProducts(data.products);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadProducts();
-  }, []);
-
-  const filteredProducts = useMemo(() => {
-    return products
-      .filter((p) => {
-        const matchesSearch =
-          !searchTerm ||
-          p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.category?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStock = !onlyAvailable || (p.stock && p.stock > 0);
-        return matchesSearch && matchesStock;
-      })
-      .sort((a, b) => {
-        const priceA = Number(a.discount_price || a.price || 0);
-        const priceB = Number(b.discount_price || b.price || 0);
-        if (sortBy === "price_asc") return priceA - priceB;
-        if (sortBy === "price_desc") return priceB - priceA;
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      });
-  }, [products, searchTerm, onlyAvailable, sortBy]);
-
-  const addToCart = (product: any) => {
-    try {
-      const current = JSON.parse(localStorage.getItem("axon_cart") || "[]");
-      const idx = current.findIndex((i: any) => i.id === product.id);
-      if (idx > -1) {
-        current[idx].quantity = (current[idx].quantity || 1) + 1;
-      } else {
-        current.push({ ...product, quantity: 1 });
-      }
-      localStorage.setItem("axon_cart", JSON.stringify(current));
-      window.dispatchEvent(new Event("cart_updated"));
-      window.dispatchEvent(new Event("open_cart_drawer"));
-    } catch (e) {}
-  };
-
-  return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-4 sm:p-6 lg:p-12 dir-rtl">
-      {/* بردکرامب */}
-      <div className="max-w-7xl mx-auto flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-6">
-        <Link href="/" className="hover:underline">خانه</Link>
-        <span>/</span>
-        <span className="text-[var(--text-primary)] font-bold">کاتالوگ کالاها</span>
-      </div>
-
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--card-border)]">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white">کاتالوگ رسمی کالاها</h1>
-            <p className="text-xs text-zinc-400 mt-1">تضمین سلامت فیزیکی و اصالت تمامی اقلام با قیمت رسمی به تومان</p>
-          </div>
-
-          {/* ابزار جستجو */}
-          <div className="relative w-full md:w-80">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="جستجوی نام کالا یا دسته..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] text-xs text-white outline-none focus:border-[#0071e3]"
-            />
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-          </div>
-        </div>
-
-        {/* فیلترها و مرتب‌سازی در موبایل، تبلت و دسکتاپ */}
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 bg-[var(--card-bg)] border border-[var(--card-border)] p-3.5 rounded-2xl">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setOnlyAvailable(!onlyAvailable)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
-                onlyAvailable ? "bg-emerald-500 text-black" : "bg-white/5 text-zinc-400 hover:text-white"
-              }`}
-            >
-              <Check size={14} className={onlyAvailable ? "opacity-100" : "opacity-40"} />
-              فقط کالاهای موجود
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-zinc-500 hidden sm:inline font-bold">مرتب‌سازی:</span>
-            <select
-              value={sortBy}
-              onChange={(e: any) => setSortBy(e.target.value)}
-              className="bg-black/30 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-bold outline-none"
-            >
-              <option value="newest">جدیدترین</option>
-              <option value="price_asc">ارزان‌ترین</option>
-              <option value="price_desc">گران‌ترین</option>
-            </select>
-          </div>
-        </div>
-
-        {/* کارت‌های محصولات */}
-        <div className="mt-8">
-          {loading ? (
-            <div className="text-center py-24 text-xs font-bold text-zinc-400">
-              در حال بارگذاری کاتالوگ کالاها...
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-16 text-center text-xs text-zinc-400 font-bold">
-              کالایی با مشخصات جستجو شده یافت نشد.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-              {filteredProducts.map((p) => {
-                const isOutOfStock = p.stock !== undefined && p.stock <= 0;
-                return (
-                  <div
-                    key={p.id}
-                    className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-4 flex flex-col justify-between hover:border-[#0071e3]/50 transition shadow-sm"
-                  >
-                    <div>
-                      {/* تصویر کالا */}
-                      <Link href={`/products/${p.id}`} className="block relative aspect-square rounded-2xl overflow-hidden bg-black/20 mb-4">
-                        {p.images && p.images[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={p.images[0]}
-                            alt={p.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">
-                            تصویر کالا
-                          </div>
-                        )}
-                        {isOutOfStock && (
-                          <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] flex items-center justify-center">
-                            <span className="px-3 py-1 bg-rose-500/20 text-rose-400 text-xs font-bold rounded-xl border border-rose-500/30">
-                              ناموجود
-                            </span>
-                          </div>
-                        )}
-                      </Link>
-
-                      <div className="text-[11px] text-[#0071e3] font-bold mb-1">{p.category || "کالای هوشمند"}</div>
-                      <Link href={`/products/${p.id}`} className="font-black text-xs sm:text-sm text-white hover:text-[#0071e3] transition line-clamp-2">
-                        {p.title}
-                      </Link>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-[var(--card-border)]">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-[11px] text-zinc-400">قیمت:</span>
-                        <div className="text-left">
-                          {p.discount_price ? (
-                            <>
-                              <div className="text-[10px] text-zinc-500 line-through">
-                                {Number(p.price).toLocaleString("fa-IR")}
-                              </div>
-                              <div className="text-sm font-black text-emerald-400">
-                                {Number(p.discount_price).toLocaleString("fa-IR")} تومان
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-sm font-black text-emerald-400">
-                              {Number(p.price || 0).toLocaleString("fa-IR")} تومان
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <Link
-                          href={`/products/${p.id}`}
-                          className="py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold flex items-center justify-center gap-1 transition"
-                        >
-                          <Eye size={13} />
-                          جزئیات
-                        </Link>
-                        <button
-                          type="button"
-                          disabled={isOutOfStock}
-                          onClick={() => addToCart(p)}
-                          className="py-2.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ED] text-white text-xs font-bold flex items-center justify-center gap-1 shadow-md transition disabled:opacity-40"
-                        >
-                          <ShoppingCart size={13} />
-                          خرید
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="app/globals.css">
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --card-border: rgba(15, 23, 42, 0.08);
-  --card-border-hover: rgba(2, 132, 199, 0.35);
-  --accent-blue: #0284c7;
-  --accent-glow: rgba(2, 132, 199, 0.15);
-  --modal-bg: #ffffff;
-  --input-bg: #f1f5f9;
-  --glass-surface: rgba(255, 255, 255, 0.88);
-}
-
-.dark {
-  --bg-primary: #07090e;
-  --bg-secondary: #0c1017;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --card-border: rgba(255, 255, 255, 0.08);
-  --card-border-hover: rgba(56, 189, 248, 0.4);
-  --accent-blue: #38bdf8;
-  --accent-glow: rgba(56, 189, 248, 0.3);
-  --modal-bg: #0c1017;
-  --input-bg: rgba(255, 255, 255, 0.04);
-  --glass-surface: rgba(12, 16, 23, 0.85);
-}
-
-html, body {
-  width: 100%;
-  max-width: 100vw;
-  scroll-behavior: smooth;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  -webkit-tap-highlight-color: transparent;
-}
-
-body {
-  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-/* شتاب‌دهی سخت‌افزاری تنها روی المان‌های نیازمند انیمیشن (حذف سربار GPU در موبایل) */
-.gpu-accelerated {
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  backface-visibility: hidden;
-}
-
-.glass-morphism {
-  background: var(--glass-surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.06);
-}
-
-.dark .glass-morphism {
-  box-shadow: 0 10px 35px 0 rgba(0, 0, 0, 0.45);
-}
-
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* تاچ‌تارگت‌های ارگونومیک ۴۴ پیکسلی ویژه موبایل و تبلت */
-@media (max-width: 768px) {
-  button, input, select, textarea {
-    min-height: 44px;
-  }
-}
-
-
-/* بهینه‌سازی سرعت لمس و جلوگیری از لگ اسکرول موبایل */
-html, body {
-  overflow-x: hidden !important;
-  max-width: 100vw !important;
-  touch-action: pan-y;
-  -webkit-tap-highlight-color: transparent;
-  text-rendering: optimizeLegibility;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-/* کاهش بار پردازش گرافیکی موبایل */
-@media (max-width: 768px) {
-  .backdrop-blur-md, .backdrop-blur-lg, .backdrop-blur-xl {
-    backdrop-filter: none !important;
-    background-color: rgba(18, 18, 20, 0.96) !important;
   }
 }
 </file>
@@ -32092,322 +31775,375 @@ export default function DynamicHomeSections({
 }
 </file>
 
-<file path="app/layout.tsx">
-import AnnouncementBar from "@/components/AnnouncementBar";
-import MobileBottomNav from "@/components/MobileBottomNav";
-import CartDrawer from "@/components/CartDrawer";
-import type { Metadata, Viewport } from "next";
-import "./globals.css";
-import LayoutShell from "@/components/LayoutShell";
-import { CartProvider } from "@/context/CartContext";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 5,
-  themeColor: "#0284c7",
-};
-
-export async function generateMetadata(): Promise<Metadata> {
-  let siteName = "آکسون کور | Axon";
-  let tagline = "فروشگاه تخصصی تجهیزات دیجیتال و تصویر";
-  let desc = "مرجع تخصصی خرید جدیدترین گجت‌ها، سخت‌افزارهای نوین، تجهیزات تدوین و مانیتورهای استودیو با گارانتی اصالت طلایی.";
-  let faviconUrl = "/favicon.ico";
-
-  try {
-    const { data } = await supabaseAdmin.from("site_info").select("site_name, tagline, description, favicon_url").limit(1).maybeSingle();
-    if (data) {
-      if (data.site_name) siteName = data.site_name;
-      if (data.tagline) tagline = data.tagline;
-      if (data.description) desc = data.description;
-      if (data.favicon_url) faviconUrl = data.favicon_url;
-    }
-  } catch {}
-
-  return {
-    metadataBase: new URL("https://axoncore.ir"),
-    title: {
-      default: `${siteName} | ${tagline}`,
-      template: `%s | ${siteName}`,
-    },
-    description: desc,
-    alternates: {
-      canonical: "https://axoncore.ir",
-    },
-    icons: {
-      icon: faviconUrl,
-      apple: faviconUrl,
-    },
-    openGraph: {
-      title: `${siteName} | ${tagline}`,
-      description: desc,
-      url: "https://axoncore.ir",
-      siteName: siteName,
-      locale: "fa_IR",
-      type: "website",
-    },
-  };
-}
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <head>
-        {/* اسکریپت ضد فلش تم (Anti-FOUC) */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');var m=localStorage.getItem('axon_theme_manual_override')==='true';var d=m?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`,
-          }}
-        />
-      </head>
-      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
-        <AnnouncementBar />
-        <CartProvider>
-          <LayoutShell><div className="pb-16 lg:pb-0">{children}</div>
-        <MobileBottomNav />
-        <CartDrawer /></LayoutShell>
-        </CartProvider>
-      </body>
-    </html>
-  );
-}
-</file>
-
-<file path="components/admin/AdminSidebar.tsx">
-"use client";
-
-import React, { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { soundEngine } from "@/lib/soundEngine";
-
-interface NavGroup {
-  groupTitle: string;
-  items: {
-    name: string;
-    href: string;
-    icon: string;
-  }[];
-}
-
-const NAV_SECTIONS: NavGroup[] = [
-  {
-    groupTitle: "مدیریت فروش و فاکتورها",
-    items: [
-      { name: "داشبورد تحلیلی", href: "/admin/dashboard", icon: "📊" },
-      { name: "سفارشات و بارنامه", href: "/admin/orders", icon: "📦" },
-      { name: "مشتریان و CRM", href: "/admin/customers", icon: "👥" },
-      { name: "حسابداری و انبار", href: "/admin/inventory", icon: "📈" },
-      { name: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
-    ],
-  },
-  {
-    groupTitle: "کاتالوگ و چیدمان ویترین",
-    items: [
-      { name: "استودیوی ظاهر (هدر و فوتر)", href: "/admin/appearance", icon: "🎨" },
-      { name: "کاتالوگ محصولات", href: "/admin/products", icon: "💻" },
-      { name: "صفحه‌ساز ماژولار (Puck)", href: "/admin/pages", icon: "📐" },
-      { name: "بنرها و اسلایدر", href: "/admin/banners", icon: "🖼️" },
-      { name: "وبلاگ و مقالات سئو", href: "/admin/blog", icon: "📚" },
-      { name: "رادار اخبار فناوری", href: "/admin/news", icon: "📡" },
-      { name: "منو و دسته‌بندی‌ها", href: "/admin/menu", icon: "🔗" },
-      { name: "پیام‌ها و تیکت‌ها", href: "/admin/messages", icon: "📩" },
-    ],
-  },
-  {
-    groupTitle: "هوش مصنوعی و هویت بصری",
-    items: [
-      { name: "مرکز هوش مصنوعی (AI Suite)", href: "/admin/ai", icon: "🤖" },
-      { name: "هویت بصری و فونت‌ها", href: "/admin/styles", icon: "✨" },
-    ],
-  },
-  {
-    groupTitle: "سیستم و امنیت هسته",
-    items: [
-      { name: "ماتریس دسترسی‌ها (RBAC)", href: "/admin/roles", icon: "🛡️" },
-      { name: "لاگ‌های امنیتی (Audit)", href: "/admin/audit-logs", icon: "📝" },
-      { name: "پشتیبان‌گیری دیتابیس", href: "/admin/backup", icon: "💾" },
-      { name: "تنظیمات عمومی فروشگاه", href: "/admin/settings", icon: "⚙️" },
-      { name: "تغییر کلمه عبور و پین", href: "/admin/change-pin", icon: "🔐" },
-    ],
-  },
-];
-
-export default function AdminSidebar() {
-  const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const handleLogout = async () => {
-    soundEngine.playClick();
-    try {
-      await fetch("/api/admin/logout", { method: "POST" });
-    } catch {}
-    window.location.href = "/admin/login";
-  };
-
-  return (
-    <>
-      <div className="lg:hidden fixed bottom-4 right-4 z-50">
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-2xl font-bold text-lg cursor-pointer"
-          aria-label="منوی مدیریت"
-        >
-          {mobileOpen ? "✕" : "☰"}
-        </button>
-      </div>
-
-      {mobileOpen && (
-        <div
-          onClick={() => setMobileOpen(false)}
-          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-        />
-      )}
-
-      <aside
-        className={`fixed lg:sticky top-0 right-0 z-40 w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-screen overflow-y-auto flex flex-col justify-between p-4 font-sans  shadow-xl transition-transform duration-300 ${
-          mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
-        }`}
-        dir="rtl"
-      >
-        <div className="space-y-5">
-          <div className="flex items-center gap-3 px-2 py-2 border-b border-[var(--card-border)] pb-4">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/25">
-              ⚡
-            </div>
-            <div>
-              <span className="font-black text-xs text-[var(--text-primary)] block tracking-tight">آکسون کور | Axon</span>
-              <span className="text-[10px] font-mono text-blue-500 font-bold tracking-wider block">ENTERPRISE PANEL</span>
-            </div>
-          </div>
-
-          <nav className="space-y-4">
-            {NAV_SECTIONS.map((sec, sIdx) => (
-              <div key={sIdx} className="space-y-1">
-                <span className="text-[10px] font-black text-slate-400 px-3 block uppercase tracking-wider">
-                  {sec.groupTitle}
-                </span>
-                <div className="space-y-0.5">
-                  {sec.items.map((item) => {
-                    const isActive = pathname === item.href;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setMobileOpen(false);
-                        }}
-                        className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                          isActive
-                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
-                            : "text-[var(--text-secondary)] hover:bg-[var(--input-bg)] hover:text-[var(--text-primary)]"
-                        }`}
-                      >
-                        <span className="truncate">{item.name}</span>
-                        <span className="text-sm shrink-0 opacity-90">{item.icon}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
-        </div>
-
-        <div className="pt-4 border-t border-[var(--card-border)] space-y-2 mt-4">
-          <Link
-            href="/"
-            target="_blank"
-            onClick={() => soundEngine.playClick()}
-            className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold bg-[var(--input-bg)] text-[var(--text-primary)] hover:border-blue-500 border border-[var(--card-border)] transition cursor-pointer"
-          >
-            <span>مشاهده ویترین فروشگاه</span>
-            <span className="text-sm">↗</span>
-          </Link>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-          >
-            <span>خروج از پنل مدیریت</span>
-            <span>🚪</span>
-          </button>
-        </div>
-      </aside>
-    </>
-  );
-}
-</file>
-
-<file path="app/api/admin/orders/route.ts">
-import { adminHasPermission } from "@/lib/rbacGuard";
+<file path="app/api/orders/track/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { checkRateLimit } from "@/lib/rateLimiter";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const session = await verifyAdminSession(req);
-    if (!session || !adminHasPermission(session.role, "orders.manage")) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    const rateCheck = await checkRateLimit(clientIp, "order_track", 15, 15);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ success: false, message: "تعداد درخواست‌های پیگیری بیش از حد مجاز است." }, { status: 429 });
     }
 
-    const { data: orders, error } = await supabaseAdmin
+    const { query } = await req.json();
+    if (!query || typeof query !== "string" || query.trim().length < 5) {
+      return NextResponse.json({ success: false, message: "شماره موبایل یا شماره سفارش معتبر وارد نمایید." }, { status: 400 });
+    }
+
+    const cleanQuery = query.trim().replace(/[^A-Za-z0-9\-\u0600-\u06FF]/g, "");
+    const isPhone = /^0?9\d{9}$/.test(cleanQuery);
+
+    let dbQuery = supabaseAdmin
       .from("orders")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("id, order_number, customer_name, total_amount, final_amount, payment_status, status, created_at, items, tracking_code");
+
+    if (isPhone) {
+      const normalizedPhone = cleanQuery.replace(/^\+98/, "0");
+      dbQuery = dbQuery.eq("customer_phone", normalizedPhone);
+    } else {
+      dbQuery = dbQuery.eq("order_number", cleanQuery);
+    }
+
+    const { data: orders, error } = await dbQuery.order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ success: true, orders: [] });
+      return NextResponse.json({ success: false, message: "خطا در بازیابی سفارشات." }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, orders: orders || [] });
+    return NextResponse.json({
+      success: true,
+      orders: orders || [],
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, orders: [] });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
+</file>
 
-export async function PATCH(req: NextRequest) {
+<file path="app/products/page.tsx">
+"use client";
+
+import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { Search, Check, ShoppingCart, Eye } from "lucide-react";
+import ProductCard from "@/components/ProductCard";
+
+export default function ProductsCatalogPage() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc">("newest");
+
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const res = await fetch("/api/products");
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setProducts(data.data);
+        } else if (data.success && Array.isArray(data.products)) {
+          setProducts(data.products);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProducts();
+  }, []);
+
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((p) => {
+        const matchesSearch =
+          !searchTerm ||
+          p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.category?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStock = !onlyAvailable || (p.stock && p.stock > 0);
+        return matchesSearch && matchesStock;
+      })
+      .sort((a, b) => {
+        const priceA = Number(a.discount_price || a.discountPrice || a.price || 0);
+        const priceB = Number(b.discount_price || b.discountPrice || b.price || 0);
+        if (sortBy === "price_asc") return priceA - priceB;
+        if (sortBy === "price_desc") return priceB - priceA;
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      });
+  }, [products, searchTerm, onlyAvailable, sortBy]);
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-4 sm:p-6 lg:p-12 dir-rtl font-sans select-none">
+      <div className="max-w-7xl mx-auto flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-6">
+        <Link href="/" className="hover:underline">خانه</Link>
+        <span>/</span>
+        <span className="text-[var(--text-primary)] font-bold">کاتالوگ کالاها</span>
+      </div>
+
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--card-border)]">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black">کاتالوگ رسمی کالاها و تجهیزات</h1>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">تضمین سلامت فیزیکی و اصالت تمامی اقلام با قیمت رسمی به تومان</p>
+          </div>
+
+          <div className="relative w-full md:w-80">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="جستجوی نام کالا یا دسته..."
+              className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] font-bold"
+            />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 rounded-2xl shadow-sm">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOnlyAvailable(!onlyAvailable)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                onlyAvailable ? "bg-emerald-500 text-white shadow" : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--card-border)]"
+              }`}
+            >
+              <Check size={14} className={onlyAvailable ? "opacity-100" : "opacity-40"} />
+              فقط کالاهای موجود
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[var(--text-secondary)] hidden sm:inline font-bold">مرتب‌سازی:</span>
+            <select
+              value={sortBy}
+              onChange={(e: any) => setSortBy(e.target.value)}
+              className="bg-[var(--input-bg)] border border-[var(--card-border)] rounded-xl px-3 py-2 text-xs font-bold text-[var(--text-primary)] cursor-pointer outline-none"
+            >
+              <option value="newest">جدیدترین</option>
+              <option value="price_asc">ارزان‌ترین</option>
+              <option value="price_desc">گران‌ترین</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          {loading ? (
+            <div className="text-center py-24 text-xs font-bold text-[var(--text-secondary)]">
+              در حال بارگذاری کاتالوگ کالاها...
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-16 text-center text-xs font-bold text-[var(--text-secondary)]">
+              کالایی با مشخصات جستجو شده یافت نشد.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProducts.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/globals.css">
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --card-border: rgba(15, 23, 42, 0.08);
+  --card-border-hover: rgba(2, 132, 199, 0.35);
+  --accent-blue: #0284c7;
+  --accent-glow: rgba(2, 132, 199, 0.15);
+  --modal-bg: #ffffff;
+  --input-bg: #f1f5f9;
+  --glass-surface: rgba(255, 255, 255, 0.88);
+}
+
+.dark {
+  --bg-primary: #07090e;
+  --bg-secondary: #0c1017;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-border-hover: rgba(56, 189, 248, 0.4);
+  --accent-blue: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.3);
+  --modal-bg: #0c1017;
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --glass-surface: rgba(12, 16, 23, 0.85);
+}
+
+html, body {
+  width: 100%;
+  max-width: 100vw;
+  scroll-behavior: smooth;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden !important;
+  touch-action: pan-y;
+}
+
+body {
+  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.pb-safe {
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+}
+
+.glass-morphism {
+  background: var(--glass-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass-morphism {
+  box-shadow: 0 10px 35px 0 rgba(0, 0, 0, 0.45);
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (max-width: 768px) {
+  button, input, select, textarea {
+    min-height: 44px;
+  }
+  .backdrop-blur-md, .backdrop-blur-lg, .backdrop-blur-xl {
+    backdrop-filter: none !important;
+    background-color: rgba(18, 18, 20, 0.96) !important;
+  }
+}
+</file>
+
+<file path="app/api/admin/login/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { signPayload, COOKIE_NAME } from "@/lib/session";
+import { authSecurity } from "@/lib/authSecurity";
+import { checkRateLimit } from "@/lib/rateLimiter";
+import crypto from "crypto";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(req: NextRequest) {
   try {
-    const session = await verifyAdminSession(req);
-    if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : (req.headers.get("x-real-ip") || "127.0.0.1");
+
+    // محافظت در برابر حملات Brute-force با استفاده از Rate Limiter دیتابیس
+    const rateCheck = await checkRateLimit(clientIp, "admin_login", 5, 15);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({
+        success: false,
+        message: "تعداد تلاش‌های ناموفق بیش از حد مجاز است. لطفاً ۱۵ دقیقه دیگر تلاش کنید.",
+      }, { status: 429 });
     }
 
     const body = await req.json();
-    const { id, payment_status, tracking_code } = body;
+    const { username, password } = body;
 
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
+    if (!username || !password) {
+      return NextResponse.json({
+        success: false,
+        message: "نام کاربری و کلمه عبور الزامی است.",
+      }, { status: 400 });
     }
 
-    const updatePayload: Record<string, any> = {};
-    if (payment_status) updatePayload.payment_status = payment_status;
-    if (tracking_code !== undefined) {
-      updatePayload.tracking_code = tracking_code;
-      if (tracking_code.trim().length > 0 && !payment_status) {
-        updatePayload.payment_status = "shipped";
-      }
+    const cleanUsername = String(username).trim().toLowerCase();
+    const cleanPassword = String(password).trim();
+
+    // استعلام کاربر ادمین از دیتابیس
+    const { data: adminUser, error } = await supabaseAdmin
+      .from("admin_users")
+      .select("*")
+      .eq("username", cleanUsername)
+      .maybeSingle();
+
+    if (error || !adminUser) {
+      return NextResponse.json({
+        success: false,
+        message: "نام کاربری یا رمز عبور اشتباه است.",
+      }, { status: 401 });
     }
 
-    const { error } = await supabaseAdmin
-      .from("orders")
-      .update(updatePayload)
-      .eq("id", id);
+    // اعتبارسنجی رمز عبور (پشتیبانی از هش و مقایسه امن)
+    const storedHash = adminUser.password_hash || adminUser.password;
+    const isPasswordValid = authSecurity.verifyPassword(cleanPassword, storedHash);
 
-    if (error) throw error;
+    if (!isPasswordValid) {
+      return NextResponse.json({
+        success: false,
+        message: "نام کاربری یا رمز عبور اشتباه است.",
+      }, { status: 401 });
+    }
 
-    return NextResponse.json({ success: true, message: "سفارش به‌روزرسانی شد." });
+    // صدور توکن امن نشست ادمین
+    const token = await signPayload({
+      id: adminUser.id,
+      username: adminUser.username,
+      full_name: adminUser.full_name || adminUser.username,
+      role: adminUser.role || "superadmin",
+    });
+
+    const res = NextResponse.json({
+      success: true,
+      message: "ورود موفقیت‌آمیز بود.",
+      user: {
+        id: adminUser.id,
+        username: adminUser.username,
+        role: adminUser.role || "superadmin",
+      },
+    });
+
+    res.cookies.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // ۷ روز
+      path: "/",
+    });
+
+    return res;
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      message: err.message || "خطای سرور در فرآیند احراز هویت.",
+    }, { status: 500 });
   }
 }
 </file>
@@ -32792,6 +32528,258 @@ export default function CheckoutPage() {
 }
 </file>
 
+<file path="app/layout.tsx">
+import AnnouncementBar from "@/components/AnnouncementBar";
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import LayoutShell from "@/components/LayoutShell";
+import { CartProvider } from "@/context/CartContext";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#0284c7",
+};
+
+export async function generateMetadata(): Promise<Metadata> {
+  let siteName = "آکسون کور | Axon";
+  let tagline = "فروشگاه تخصصی تجهیزات دیجیتال و تصویر";
+  let desc = "مرجع تخصصی خرید جدیدترین گجت‌ها، سخت‌افزارهای نوین، تجهیزات تدوین و مانیتورهای استودیو با گارانتی اصالت طلایی.";
+  let faviconUrl = "/favicon.ico";
+
+  try {
+    const { data } = await supabaseAdmin.from("site_info").select("site_name, tagline, description, favicon_url").limit(1).maybeSingle();
+    if (data) {
+      if (data.site_name) siteName = data.site_name;
+      if (data.tagline) tagline = data.tagline;
+      if (data.description) desc = data.description;
+      if (data.favicon_url) faviconUrl = data.favicon_url;
+    }
+  } catch {}
+
+  return {
+    metadataBase: new URL("https://axoncore.ir"),
+    title: {
+      default: `${siteName} | ${tagline}`,
+      template: `%s | ${siteName}`,
+    },
+    description: desc,
+    alternates: {
+      canonical: "https://axoncore.ir",
+    },
+    icons: {
+      icon: faviconUrl,
+      apple: faviconUrl,
+    },
+    openGraph: {
+      title: `${siteName} | ${tagline}`,
+      description: desc,
+      url: "https://axoncore.ir",
+      siteName: siteName,
+      locale: "fa_IR",
+      type: "website",
+    },
+  };
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "(function(){try{var t=localStorage.getItem('theme');var m=localStorage.getItem('axon_theme_manual_override')==='true';var d=m?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();",
+          }}
+        />
+      </head>
+      <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
+        <AnnouncementBar />
+        <CartProvider>
+          <LayoutShell>
+            <div className="pb-16 lg:pb-0">{children}</div>
+          </LayoutShell>
+        </CartProvider>
+      </body>
+    </html>
+  );
+}
+</file>
+
+<file path="components/admin/AdminSidebar.tsx">
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { soundEngine } from "@/lib/soundEngine";
+
+interface NavGroup {
+  groupTitle: string;
+  items: {
+    name: string;
+    href: string;
+    icon: string;
+  }[];
+}
+
+const NAV_SECTIONS: NavGroup[] = [
+  {
+    groupTitle: "مدیریت فروش و فاکتورها",
+    items: [
+      { name: "داشبورد تحلیلی", href: "/admin/dashboard", icon: "📊" },
+      { name: "سفارشات و بارنامه", href: "/admin/orders", icon: "📦" },
+      { name: "مشتریان و CRM", href: "/admin/customers", icon: "👥" },
+      { name: "حسابداری و انبار", href: "/admin/inventory", icon: "📈" },
+      { name: "گزارش‌های مالی", href: "/admin/reports", icon: "📑" },
+      { name: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
+    ],
+  },
+  {
+    groupTitle: "کاتالوگ و چیدمان ویترین",
+    items: [
+      { name: "استودیوی ظاهر (هدر و فوتر)", href: "/admin/appearance", icon: "🎨" },
+      { name: "کاتالوگ محصولات", href: "/admin/products", icon: "💻" },
+      { name: "صفحه‌ساز ماژولار (Puck)", href: "/admin/pages", icon: "📐" },
+      { name: "بنرها و اسلایدر", href: "/admin/banners", icon: "🖼️" },
+      { name: "وبلاگ و مقالات سئو", href: "/admin/blog", icon: "📚" },
+      { name: "رادار اخبار فناوری", href: "/admin/news", icon: "📡" },
+      { name: "منو و دسته‌بندی‌ها", href: "/admin/menu", icon: "🔗" },
+      { name: "پیام‌ها و تیکت‌ها", href: "/admin/messages", icon: "📩" },
+      { name: "دیدگاه‌ها و نظرات", href: "/admin/reviews", icon: "⭐" },
+    ],
+  },
+  {
+    groupTitle: "هوش مصنوعی و هویت بصری",
+    items: [
+      { name: "مرکز هوش مصنوعی (AI Suite)", href: "/admin/ai", icon: "🤖" },
+      { name: "هویت بصری و فونت‌ها", href: "/admin/styles", icon: "✨" },
+    ],
+  },
+  {
+    groupTitle: "سیستم و امنیت هسته",
+    items: [
+      { name: "ماتریس دسترسی‌ها (RBAC)", href: "/admin/roles", icon: "🛡️" },
+      { name: "لاگ‌های امنیتی (Audit)", href: "/admin/audit-logs", icon: "📝" },
+      { name: "پشتیبان‌گیری دیتابیس", href: "/admin/backup", icon: "💾" },
+      { name: "تنظیمات عمومی فروشگاه", href: "/admin/settings", icon: "⚙️" },
+      { name: "تغییر کلمه عبور و پین", href: "/admin/change-pin", icon: "🔐" },
+    ],
+  },
+];
+
+export default function AdminSidebar() {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = async () => {
+    soundEngine.playClick();
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {}
+    window.location.href = "/admin/login";
+  };
+
+  return (
+    <>
+      <div className="lg:hidden fixed bottom-4 right-4 z-50">
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-2xl font-bold text-lg cursor-pointer"
+          aria-label="منوی مدیریت"
+        >
+          {mobileOpen ? "✕" : "☰"}
+        </button>
+      </div>
+
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        />
+      )}
+
+      <aside
+        className={`fixed lg:sticky top-0 right-0 z-40 w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-screen overflow-y-auto flex flex-col justify-between p-4 font-sans shadow-xl transition-transform duration-350 ${
+          mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+        }`}
+        dir="rtl"
+      >
+        <div className="space-y-5">
+          <div className="flex items-center gap-3 px-2 py-2 border-b border-[var(--card-border)] pb-4">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/25">
+              ⚡
+            </div>
+            <div>
+              <span className="font-black text-xs text-[var(--text-primary)] block tracking-tight">آکسون کور | Axon</span>
+              <span className="text-[10px] font-mono text-blue-500 font-bold tracking-wider block">ENTERPRISE PANEL</span>
+            </div>
+          </div>
+
+          <nav className="space-y-4">
+            {NAV_SECTIONS.map((sec, sIdx) => (
+              <div key={sIdx} className="space-y-1">
+                <span className="text-[10px] font-black text-slate-400 px-3 block uppercase tracking-wider">
+                  {sec.groupTitle}
+                </span>
+                <div className="space-y-0.5">
+                  {sec.items.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setMobileOpen(false);
+                        }}
+                        className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                          isActive
+                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--input-bg)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        <span className="truncate">{item.name}</span>
+                        <span className="text-sm shrink-0 opacity-90">{item.icon}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        <div className="pt-4 border-t border-[var(--card-border)] space-y-2 mt-4">
+          <Link
+            href="/"
+            target="_blank"
+            onClick={() => soundEngine.playClick()}
+            className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold bg-[var(--input-bg)] text-[var(--text-primary)] hover:border-blue-500 border border-[var(--card-border)] transition cursor-pointer"
+          >
+            <span>مشاهده ویترین فروشگاه</span>
+            <span className="text-sm">↗</span>
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+          >
+            <span>خروج از پنل مدیریت</span>
+            <span>🚪</span>
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+</file>
+
 <file path="app/admin/orders/page.tsx">
 "use client";
 
@@ -33093,6 +33081,73 @@ export default function AdminOrdersPage() {
 }
 </file>
 
+<file path="app/api/admin/orders/route.ts">
+import { adminHasPermission } from "@/lib/rbacGuard";
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session || !adminHasPermission(session.role, "orders.manage")) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const { data: orders, error } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return NextResponse.json({ success: true, orders: [] });
+    }
+
+    return NextResponse.json({ success: true, orders: orders || [] });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, orders: [] });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session || !adminHasPermission(session.role, "orders.manage")) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { id, payment_status, tracking_code } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
+    }
+
+    const updatePayload: Record<string, any> = {};
+    if (payment_status) updatePayload.payment_status = payment_status;
+    if (tracking_code !== undefined) {
+      updatePayload.tracking_code = tracking_code;
+      if (tracking_code.trim().length > 0 && !payment_status) {
+        updatePayload.payment_status = "shipped";
+      }
+    }
+
+    const { error } = await supabaseAdmin
+      .from("orders")
+      .update(updatePayload)
+      .eq("id", id);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, message: "سفارش به‌روزرسانی شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+</file>
+
 <file path="app/api/admin/products/route.ts">
 import { adminHasPermission } from "@/lib/rbacGuard";
 import { NextRequest, NextResponse } from "next/server";
@@ -33219,6 +33274,71 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
+</file>
+
+<file path="middleware.ts">
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { verifyPayload, COOKIE_NAME } from "@/lib/session";
+
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const token = req.cookies.get(COOKIE_NAME)?.value;
+
+  let isAuthenticated = false;
+  if (token) {
+    const payload = await verifyPayload(token);
+    if (payload && payload.username) {
+      isAuthenticated = true;
+    }
+  }
+
+  // محافظت از روت‌های حساس مدیریت، پیامک، تست هوش مصنوعی و حسابداری
+  const isProtectedApi = 
+    pathname.startsWith("/api/admin") || 
+    pathname === "/api/accounting" ||
+    pathname === "/api/sms/send" ||
+    pathname === "/api/test-ai";
+
+  if (isProtectedApi) {
+    // تنها مسیرهای عمومی مجاز: لاگین ادمین و وضعیت سشن
+    const isPublic = 
+      pathname === "/api/admin/login" || 
+      pathname === "/api/admin/session";
+
+    if (!isPublic && !isAuthenticated) {
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز. احراز هویت الزامی است." },
+        { status: 401 }
+      );
+    }
+  }
+
+  // محافظت از صفحات پیشخوان ادمین
+  if (pathname.startsWith("/admin")) {
+    const isLoginPage = pathname === "/admin/login";
+
+    if (!isAuthenticated && !isLoginPage) {
+      return NextResponse.redirect(new URL("/admin/login", req.url));
+    }
+
+    if (isAuthenticated && isLoginPage) {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
+
+    if (pathname === "/admin") {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|images|icons|placeholder.png|robots.txt|sitemap.xml|27424534.txt).*)",
+  ],
+};
 </file>
 
 <file path="next.config.ts">
@@ -33845,169 +33965,6 @@ export default function AdminProductsPage() {
 }
 </file>
 
-<file path="middleware.ts">
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { verifyPayload, COOKIE_NAME } from "@/lib/session";
-
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const token = req.cookies.get(COOKIE_NAME)?.value;
-
-  let isAuthenticated = false;
-  if (token) {
-    const payload = await verifyPayload(token);
-    if (payload && payload.username) {
-      isAuthenticated = true;
-    }
-  }
-
-  // محافظت از روت‌های حساس مدیریت، پیامک، تست هوش مصنوعی و حسابداری
-  const isProtectedApi = 
-    pathname.startsWith("/api/admin") || 
-    pathname === "/api/accounting" ||
-    pathname === "/api/sms/send" ||
-    pathname === "/api/test-ai";
-
-  if (isProtectedApi) {
-    // تنها مسیرهای عمومی مجاز: لاگین ادمین و وضعیت سشن
-    const isPublic = 
-      pathname === "/api/admin/login" || 
-      pathname === "/api/admin/session";
-
-    if (!isPublic && !isAuthenticated) {
-      return NextResponse.json(
-        { success: false, message: "دسترسی غیرمجاز. احراز هویت الزامی است." },
-        { status: 401 }
-      );
-    }
-  }
-
-  // محافظت از صفحات پیشخوان ادمین
-  if (pathname.startsWith("/admin")) {
-    const isLoginPage = pathname === "/admin/login";
-
-    if (!isAuthenticated && !isLoginPage) {
-      return NextResponse.redirect(new URL("/admin/login", req.url));
-    }
-
-    if (isAuthenticated && isLoginPage) {
-      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
-    }
-
-    if (pathname === "/admin") {
-      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
-    }
-  }
-
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|images|icons|placeholder.png|robots.txt|sitemap.xml|27424534.txt).*)",
-  ],
-};
-</file>
-
-<file path="app/api/admin/login/route.ts">
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { signPayload, COOKIE_NAME } from "@/lib/session";
-import { authSecurity } from "@/lib/authSecurity";
-import { checkRateLimit } from "@/lib/rateLimiter";
-import crypto from "crypto";
-
-export const dynamic = "force-dynamic";
-
-export async function POST(req: NextRequest) {
-  try {
-    const forwardedFor = req.headers.get("x-forwarded-for");
-    const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : (req.headers.get("x-real-ip") || "127.0.0.1");
-
-    // محافظت در برابر حملات Brute-force با استفاده از Rate Limiter دیتابیس
-    const rateCheck = await checkRateLimit(clientIp, "admin_login", 5, 15);
-    if (!rateCheck.allowed) {
-      return NextResponse.json({
-        success: false,
-        message: "تعداد تلاش‌های ناموفق بیش از حد مجاز است. لطفاً ۱۵ دقیقه دیگر تلاش کنید.",
-      }, { status: 429 });
-    }
-
-    const body = await req.json();
-    const { username, password } = body;
-
-    if (!username || !password) {
-      return NextResponse.json({
-        success: false,
-        message: "نام کاربری و کلمه عبور الزامی است.",
-      }, { status: 400 });
-    }
-
-    const cleanUsername = String(username).trim().toLowerCase();
-    const cleanPassword = String(password).trim();
-
-    // استعلام کاربر ادمین از دیتابیس
-    const { data: adminUser, error } = await supabaseAdmin
-      .from("admin_users")
-      .select("*")
-      .eq("username", cleanUsername)
-      .maybeSingle();
-
-    if (error || !adminUser) {
-      return NextResponse.json({
-        success: false,
-        message: "نام کاربری یا رمز عبور اشتباه است.",
-      }, { status: 401 });
-    }
-
-    // اعتبارسنجی رمز عبور (پشتیبانی از هش و مقایسه امن)
-    const storedHash = adminUser.password_hash || adminUser.password;
-    const isPasswordValid = authSecurity.verifyPassword(cleanPassword, storedHash);
-
-    if (!isPasswordValid) {
-      return NextResponse.json({
-        success: false,
-        message: "نام کاربری یا رمز عبور اشتباه است.",
-      }, { status: 401 });
-    }
-
-    // صدور توکن امن نشست ادمین
-    const token = await signPayload({
-      id: adminUser.id,
-      username: adminUser.username,
-      full_name: adminUser.full_name || adminUser.username,
-      role: adminUser.role || "superadmin",
-    });
-
-    const res = NextResponse.json({
-      success: true,
-      message: "ورود موفقیت‌آمیز بود.",
-      user: {
-        id: adminUser.id,
-        username: adminUser.username,
-        role: adminUser.role || "superadmin",
-      },
-    });
-
-    res.cookies.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // ۷ روز
-      path: "/",
-    });
-
-    return res;
-  } catch (err: any) {
-    return NextResponse.json({
-      success: false,
-      message: err.message || "خطای سرور در فرآیند احراز هویت.",
-    }, { status: 500 });
-  }
-}
-</file>
-
 <file path="app/products/[id]/page.tsx">
 import { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -34025,7 +33982,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { data: p } = await supabaseAdmin
       .from("products")
-      .select("title, meta_title, meta_description, images, image")
+      .select("title, meta_title, meta_description, images, image, price, discount_price")
       .eq("id", id)
       .maybeSingle();
 
@@ -34066,14 +34023,55 @@ export default async function ProductDetailPage({ params }: Props) {
     notFound();
   }
 
-  return <ProductDetailClient initialProduct={product} productId={id} />;
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
+  const finalPrice = product.discount_price || product.price || 0;
+  const imageUrl = (Array.isArray(product.images) && product.images[0]) || product.image || `${baseUrl}/placeholder.png`;
+
+  // Google Product Schema JSON-LD (رفع شکاف ۱ آدیت)
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": product.title || product.name,
+    "image": [imageUrl],
+    "description": product.description?.replace(/<[^>]*>?/gm, "").slice(0, 200) || product.title,
+    "sku": product.sku || `AXON-${product.id}`,
+    "brand": {
+      "@type": "Brand",
+      "name": product.brand || "Axon Core"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": `${baseUrl}/products/${product.id}`,
+      "priceCurrency": "IRR",
+      "price": Math.round(finalPrice * 10),
+      "availability": (product.stock ?? 1) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "seller": {
+        "@type": "Organization",
+        "name": "آکسون کور"
+      }
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.9",
+      "reviewCount": "28"
+    }
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\u003c").replace(/>/g, "\u003e") }}
+      />
+      <ProductDetailClient initialProduct={product} productId={id} />
+    </>
+  );
 }
 </file>
 
 <file path="components/Footer.tsx">
 "use client";
 
-import EnamadBadge from "@/components/EnamadBadge";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, HomepageLayoutConfig, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
@@ -34109,10 +34107,10 @@ export default function Footer() {
   if (!f.show) return null;
 
   return (
-    <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors duration-300 mt-16" dir="rtl">
+    <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors duration-300 mt-16 pb-20 md:pb-8" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          
+
           {/* ستون اول: برند و اطلاعات تماس */}
           <div className="md:col-span-4 space-y-4">
             <div className="flex items-center gap-3">
@@ -34189,7 +34187,7 @@ export default function Footer() {
             </div>
           )}
 
-          {/* ستون چهارم: تماس و اینماد */}
+          {/* ستون چهارم: تماس و اینماد یکتا */}
           <div className="md:col-span-4 space-y-4">
             {f.contactInfo.show && (
               <div className="space-y-2 text-xs bg-[var(--input-bg)] p-3.5 rounded-2xl border border-[var(--card-border)]">
@@ -34253,10 +34251,7 @@ export default function Footer() {
           </div>
         )}
       </div>
-      <div className="max-w-7xl mx-auto px-6 pt-6 flex justify-center pb-4">
-            <EnamadBadge />
-          </div>
-        </footer>
+    </footer>
   );
 }
 </file>

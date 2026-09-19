@@ -24,9 +24,7 @@ export default function Navbar() {
     siteInfoService.getSiteInfo().then((info) => {
       if (info) {
         const resolvedName = String(info.storeName || info.site_name || (info as any).siteName || "").trim();
-        if (resolvedName) {
-          setSiteName(resolvedName);
-        }
+        if (resolvedName) setSiteName(resolvedName);
       }
     });
 

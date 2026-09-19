@@ -31,13 +31,9 @@ export default function Header() {
     siteInfoService.getSiteInfo().then((info) => {
       if (info) {
         const resolvedName = String(info.storeName || info.site_name || (info as any).siteName || "").trim();
-        if (resolvedName) {
-          setSiteName(resolvedName);
-        }
+        if (resolvedName) setSiteName(resolvedName);
         const resolvedAnnouncement = String((info as any).announcement_text || "").trim();
-        if (resolvedAnnouncement) {
-          setAnnouncementText(resolvedAnnouncement);
-        }
+        if (resolvedAnnouncement) setAnnouncementText(resolvedAnnouncement);
       }
     });
 

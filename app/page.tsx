@@ -32,15 +32,9 @@ export default async function HomePage() {
         supabaseAdmin.from("site_info").select("*").limit(1).maybeSingle(),
       ]);
 
-      if (prodRes.data && prodRes.data.length > 0) {
-        products = prodRes.data;
-      }
-      if (bannerRes.data) {
-        banners = bannerRes.data;
-      }
-      if (siteInfoRes.data) {
-        siteSettings = siteInfoRes.data;
-      }
+      if (prodRes.data && prodRes.data.length > 0) products = prodRes.data;
+      if (bannerRes.data) banners = bannerRes.data;
+      if (siteInfoRes.data) siteSettings = siteInfoRes.data;
     }
   } catch (err) {
     console.warn("Home page data fetch warning:", err);

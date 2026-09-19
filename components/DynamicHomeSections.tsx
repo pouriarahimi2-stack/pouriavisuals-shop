@@ -30,15 +30,11 @@ export default function DynamicHomeSections({
         fetch("/api/site-info", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
       ]);
 
-      if (prodRes?.success && Array.isArray(prodRes.data)) {
-        setProducts(prodRes.data);
-      }
+      if (prodRes?.success && Array.isArray(prodRes.data)) setProducts(prodRes.data);
       if (bannerRes?.success && Array.isArray(bannerRes.banners)) {
         setBanners(bannerRes.banners.filter((b: any) => b.is_active));
       }
-      if (siteRes?.siteInfo) {
-        setSiteInfo(siteRes.siteInfo);
-      }
+      if (siteRes?.siteInfo) setSiteInfo(siteRes.siteInfo);
     } catch {}
   };
 

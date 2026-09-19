@@ -88,7 +88,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         <div className="space-y-1.5">
           <span className="text-[10px] font-bold text-[var(--accent-blue)] block truncate">
-            {product.category || "گجت و لوازم دیجیتال"}
+            {product.category || "تکنولوژی و لوازم دیجیتال"}
           </span>
           <h3 className="text-xs font-black text-[var(--text-primary)] line-clamp-2 leading-relaxed min-h-[36px] group-hover:text-[var(--accent-blue)] transition">
             {title}

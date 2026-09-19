@@ -16,7 +16,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AdminNotificationProvider>
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none" dir="rtl">
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans " dir="rtl">
         <AdminHeader />
         <div className="flex">
           <AdminSidebar />

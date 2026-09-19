@@ -16,7 +16,13 @@ export const COOKIE_NAME = "admin_session_token";
 const SESSION_EXPIRY_SECONDS = 72 * 60 * 60; // 72 hours
 
 function getSecretKey(): string {
-  const secret = process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "axon_core_fixed_session_secret_2026_secure";
+  const secret = (() => {
+  const key = process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key && process.env.NODE_ENV === "production") {
+    console.warn("CRITICAL: ADMIN_SESSION_SECRET environment variable is not defined!");
+  }
+  return key || "axon_core_production_fixed_secure_key_fallback_2026";
+})();
   return secret.trim();
 }
 

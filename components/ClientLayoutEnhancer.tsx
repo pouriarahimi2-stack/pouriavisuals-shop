@@ -3,9 +3,16 @@
 
 import { useEffect } from "react";
 import { siteInfoService } from "@/services/siteInfoService";
+import { realtimeEngine } from "@/lib/realtimeSync";
 
 export default function ClientLayoutEnhancer() {
   useEffect(() => {
+    let cleanup: (() => void) | void;
+    try {
+      cleanup = realtimeEngine.init();
+    } catch (e) {
+      console.warn("Realtime init warning:", e);
+    }
     const applyTitle = (info: any) => {
       if (!info) return;
       const sName = info.storeName || info.site_name || info.siteName || "آکسون";
@@ -23,6 +30,7 @@ export default function ClientLayoutEnhancer() {
     window.addEventListener("site_info_updated", handleUpdate);
 
     return () => {
+      if (typeof cleanup === "function") cleanup();
       window.removeEventListener("site_info_updated", handleUpdate);
     };
   }, []);

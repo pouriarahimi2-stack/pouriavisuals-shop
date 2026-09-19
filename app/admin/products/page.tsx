@@ -266,7 +266,7 @@ export default function AdminProductsPage() {
                       <div className="text-left font-bold">
                         <div>{Number(p.price || 0).toLocaleString("fa-IR")} تومان</div>
                         <div className="text-[10px] text-[var(--text-secondary)]">
-                          {(Number(p.price || 0) * 10).toLocaleString("fa-IR")} ریال
+                          {(Number(p.price || 0) * 10).toLocaleString("fa-IR")} تومان
                         </div>
                       </div>
                     </div>
@@ -353,8 +353,8 @@ export default function AdminProductsPage() {
                   />
                   {parseRawNumber(priceToman) > 0 && (
                     <div className="text-[11px] text-zinc-400 mt-1.5 flex justify-between">
-                      <span>ریال:</span>
-                      <span className="text-emerald-400 font-bold">{(parseRawNumber(priceToman) * 10).toLocaleString("fa-IR")} ریال</span>
+                      <span>تومان:</span>
+                      <span className="text-emerald-400 font-bold">{(parseRawNumber(priceToman) * 10).toLocaleString("fa-IR")} تومان</span>
                     </div>
                   )}
                 </div>

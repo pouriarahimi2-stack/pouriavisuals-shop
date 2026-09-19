@@ -1,157 +1,136 @@
-// File Path: components/CartDrawer.tsx
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { useCart } from "@/context/CartContext";
-import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
 
 export default function CartDrawer() {
-  const { cartItems, isCartOpen, closeCart, updateQuantity, removeFromCart, finalPayable, totalAmount } = useCart();
-  const drawerRef = useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [cartItems, setCartItems] = useState<any[]>([]);
+
+  const loadCart = () => {
+    try {
+      const items = JSON.parse(localStorage.getItem("axon_cart") || "[]");
+      setCartItems(items);
+    } catch (e) {
+      setCartItems([]);
+    }
+  };
 
   useEffect(() => {
-    if (isCartOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isCartOpen]);
+    loadCart();
 
-  if (!isCartOpen) return null;
+    const handleUpdate = () => loadCart();
+    const handleOpen = () => {
+      loadCart();
+      setIsOpen(true);
+    };
+
+    window.addEventListener("cart_updated", handleUpdate);
+    window.addEventListener("open_cart_drawer", handleOpen);
+
+    return () => {
+      window.removeEventListener("cart_updated", handleUpdate);
+      window.removeEventListener("open_cart_drawer", handleOpen);
+    };
+  }, []);
+
+  const updateQuantity = (index: number, delta: number) => {
+    const updated = [...cartItems];
+    const newQty = (updated[index].quantity || 1) + delta;
+    if (newQty <= 0) {
+      updated.splice(index, 1);
+    } else {
+      updated[index].quantity = newQty;
+    }
+    setCartItems(updated);
+    localStorage.setItem("axon_cart", JSON.stringify(updated));
+    window.dispatchEvent(new Event("cart_updated"));
+  };
+
+  const removeItem = (index: number) => {
+    const updated = [...cartItems];
+    updated.splice(index, 1);
+    setCartItems(updated);
+    localStorage.setItem("axon_cart", JSON.stringify(updated));
+    window.dispatchEvent(new Event("cart_updated"));
+  };
+
+  const totalPrice = cartItems.reduce((acc, item) => {
+    const p = item.discount_price ? Number(item.discount_price) : Number(item.price || 0);
+    return acc + p * (item.quantity || 1);
+  }, 0);
+
+  if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-start bg-black/60 backdrop-blur-md transition-opacity duration-300"
-      onClick={closeCart}
-      dir="rtl"
-    >
-      <div
-        ref={drawerRef}
-        onClick={(e) => e.stopPropagation()}
-        style={{ transform: "translateZ(0)" }}
-        className="w-full max-w-md h-full bg-[var(--modal-bg)] border-l border-[var(--card-border)] shadow-2xl flex flex-col justify-between p-5 sm:p-6 text-[var(--text-primary)] select-none animate-fadeIn"
-      >
-        {/* هدر کشو */}
-        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-2xl bg-[var(--accent-blue)] text-white flex items-center justify-center text-lg font-black shadow-md">
-              🛒
-            </span>
-            <div>
-              <h2 className="text-sm sm:text-base font-black">سبد خرید شما</h2>
-              <span className="text-[10px] text-[var(--text-secondary)] font-bold">
-                {cartItems.length} قلم کالا انتخاب شده
-              </span>
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-start dir-rtl">
+      <div className="w-full max-w-md bg-[#121214] border-l border-[#27272a] h-full flex flex-col justify-between p-6 shadow-2xl animate-in slide-in-from-right duration-200">
+        <div>
+          <div className="flex items-center justify-between pb-4 border-b border-[#27272a]">
+            <div className="flex items-center gap-2">
+              <ShoppingBag size={20} className="text-[#0071e3]" />
+              <h2 className="text-base font-black text-white">سبد خرید شما</h2>
+              <span className="text-xs text-zinc-400 font-bold">({cartItems.length} قلم کالا)</span>
             </div>
+            <button onClick={() => setIsOpen(false)} className="p-2 text-zinc-400 hover:text-white">
+              <X size={20} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              closeCart();
-            }}
-            className="w-10 h-10 rounded-2xl bg-[var(--input-bg)] hover:bg-rose-500 hover:text-white border border-[var(--card-border)] flex items-center justify-center text-sm font-black transition cursor-pointer"
-            aria-label="بستن سبد خرید"
-          >
-            ✕
-          </button>
-        </div>
 
-        {/* لیست اقلام سبد */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-3 scrollbar-none">
-          {cartItems.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
-              <span className="text-5xl block">🛍️</span>
-              <p className="text-xs font-bold text-[var(--text-secondary)]">سبد خرید شما خالی است.</p>
-              <button
-                type="button"
-                onClick={closeCart}
-                className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg cursor-pointer"
-              >
-                مشاهده کاتالوگ مانیتورها
-              </button>
-            </div>
-          ) : (
-            cartItems.map((item) => (
-              <div
-                key={item.id}
-                className="p-3.5 sm:p-4 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 shadow-sm"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <img
-                    src={item.image || "/placeholder.png"}
-                    alt={item.title || item.name || "کالا"}
-                    className="w-14 h-14 object-contain rounded-2xl bg-[var(--modal-bg)] p-1 border border-[var(--card-border)] shrink-0"
-                  />
-                  <div className="overflow-hidden space-y-1">
-                    <h3 className="text-xs font-black truncate max-w-[150px] sm:max-w-[180px]">
-                      {item.title || item.name}
-                    </h3>
-                    <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 block" suppressHydrationWarning>
-                      {formatPrice(item.price)} تومان
-                    </span>
-                  </div>
-                </div>
-
-                {/* دکمه‌های کنترل تعداد ارگونومیک */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick();
-                      updateQuantity(item.id, 1);
-                    }}
-                    className="w-9 h-9 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center font-black text-sm transition cursor-pointer"
-                  >
-                    +
-                  </button>
-                  <span className="w-5 text-center font-mono font-bold text-xs">
-                    {item.quantity || 1}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick();
-                      if ((item.quantity || 1) > 1) {
-                        updateQuantity(item.id, -1);
-                      } else {
-                        removeFromCart(item.id);
-                      }
-                    }}
-                    className="w-9 h-9 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-rose-500 hover:text-rose-500 flex items-center justify-center font-black text-sm transition cursor-pointer"
-                  >
-                    -
-                  </button>
-                </div>
+          <div className="mt-4 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {cartItems.length === 0 ? (
+              <div className="py-20 text-center text-xs text-zinc-500 font-bold">
+                سبد خرید شما در حال حاضر خالی است.
               </div>
-            ))
-          )}
+            ) : (
+              cartItems.map((item, idx) => (
+                <div key={idx} className="p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] flex items-center justify-between gap-3">
+                  <img src={item.image || "/placeholder.png"} alt={item.title} className="w-14 h-14 object-contain rounded-xl bg-black/40 p-1" />
+                  
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs font-bold text-white truncate">{item.title}</h4>
+                    <div className="text-[11px] text-emerald-400 font-bold mt-1">
+                      {Number(item.discount_price || item.price || 0).toLocaleString("fa-IR")} تومان
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-[#121214] px-2 py-1 rounded-xl border border-[#27272a]">
+                    <button onClick={() => updateQuantity(idx, 1)} className="text-zinc-400 hover:text-white">
+                      <Plus size={13} />
+                    </button>
+                    <span className="text-xs font-bold text-white px-1">{item.quantity}</span>
+                    <button onClick={() => updateQuantity(idx, -1)} className="text-zinc-400 hover:text-white">
+                      <Minus size={13} />
+                    </button>
+                  </div>
+
+                  <button onClick={() => removeItem(idx)} className="p-1.5 text-zinc-500 hover:text-rose-400">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        {/* فوتر تسویه حساب */}
         {cartItems.length > 0 && (
-          <div className="border-t border-[var(--card-border)] pt-4 space-y-3 shrink-0">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-bold text-[var(--text-secondary)]">مبلغ کل قابل پرداخت:</span>
-              <span className="font-mono font-black text-base text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
-                {formatPrice(finalPayable || totalAmount)} تومان
-              </span>
+          <div className="pt-4 border-t border-[#27272a] space-y-4">
+            <div className="flex justify-between items-center text-xs font-bold">
+              <span className="text-zinc-400">مبلغ قابل پرداخت:</span>
+              <div className="text-left">
+                <div className="text-base text-emerald-400 font-black">{totalPrice.toLocaleString("fa-IR")} تومان</div>
+                <div className="text-[10px] text-zinc-500">{(totalPrice * 10).toLocaleString("fa-IR")} ریال</div>
+              </div>
             </div>
 
             <Link
               href="/checkout"
-              onClick={() => {
-                soundEngine.playClick();
-                closeCart();
-              }}
-              className="w-full min-h-[48px] py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-95 transition shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              onClick={() => setIsOpen(false)}
+              className="w-full py-3.5 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg"
             >
-              <span>تکمیل سفارش و صدور فاکتور 💳</span>
+              ثبت سفارش و ادامه خرید
+              <ArrowLeft size={16} />
             </Link>
           </div>
         )}

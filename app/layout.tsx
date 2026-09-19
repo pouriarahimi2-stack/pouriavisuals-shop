@@ -1,3 +1,4 @@
+import CartDrawer from "@/components/CartDrawer";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import LayoutShell from "@/components/LayoutShell";
@@ -69,7 +70,8 @@ export default function RootLayout({
       </head>
       <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
         <CartProvider>
-          <LayoutShell>{children}</LayoutShell>
+          <LayoutShell>{children}
+        <CartDrawer /></LayoutShell>
         </CartProvider>
       </body>
     </html>

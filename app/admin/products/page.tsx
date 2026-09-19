@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, ArrowRight, Video, ShieldCheck } from "lucide-react";
+import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, ArrowRight, Video, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
 interface SpecItem {
@@ -56,14 +56,11 @@ export default function AdminProductsPage() {
     return Number(String(formatted || "").replace(/,/g, "")) || 0;
   };
 
-  // تبدیل و بهینه‌سازی کلاینتی به WebP
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const reader = new FileReader();
-      reader.onload = (e) => {
-        img.src = e.target?.result as string;
-      };
+      reader.onload = (e) => { img.src = e.target?.result as string; };
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const MAX_WIDTH = 1200;
@@ -72,7 +69,7 @@ export default function AdminProductsPage() {
         canvas.height = img.height * scale;
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/webp", 0.8));
+        resolve(canvas.toDataURL("image/webp", 0.82));
       };
       img.onerror = reject;
       reader.readAsDataURL(file);
@@ -87,7 +84,7 @@ export default function AdminProductsPage() {
         const compressed = await compressImage(file);
         setImages((prev) => [...prev, compressed]);
       } catch (err) {
-        console.error("خطا در فشرده‌سازی تصویر:", err);
+        console.error(err);
       }
     }
   };
@@ -100,7 +97,15 @@ export default function AdminProductsPage() {
     }
   };
 
-  // باز کردن فرم ویرایش با استخراج خودکار تصاویر چندگانه و متادیتا
+  // قرار دادن تصویر انتخابی به عنوان تصویر اول (شاخص)
+  const setAsPrimaryImage = (index: number) => {
+    if (index === 0) return;
+    const reordered = [...images];
+    const [selected] = reordered.splice(index, 1);
+    reordered.unshift(selected);
+    setImages(reordered);
+  };
+
   const handleEditClick = (p: any) => {
     setEditingId(p.id);
     setTitle(p.title || p.name || "");
@@ -109,7 +114,6 @@ export default function AdminProductsPage() {
     setDiscountToman(p.discount_price ? formatNumber(String(p.discount_price)) : "");
     setStock(p.stock !== undefined ? p.stock : 10);
 
-    // استخراج متادیتا از داخل description
     let rawDesc = p.description || "";
     let extractedImages: string[] = [];
     let extractedWarranty = p.warranty || "";
@@ -138,7 +142,7 @@ export default function AdminProductsPage() {
     setDescription(rawDesc);
 
     const sp = Object.entries(extractedSpecs).map(([key, value]) => ({ key, value: String(value) }));
-    setSpecsList(sp);
+    setSpecsList(sp.length > 0 ? sp : [{ key: "توان مصرفی", value: "" }, { key: "ظرفیت مخزن", value: "" }]);
 
     setIsModalOpen(true);
   };
@@ -181,14 +185,14 @@ export default function AdminProductsPage() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.message || "خطا در ارتباط با دیتابیس");
+        throw new Error(data.message || "خطا در ارتباط با سرور");
       }
 
       alert("کالا با موفقیت ذخیره گردید!");
       setIsModalOpen(false);
       fetchProducts();
     } catch (err: any) {
-      alert("خطا در ذخیره کالا: " + err.message);
+      alert("خطا: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -206,7 +210,7 @@ export default function AdminProductsPage() {
     setDescription("");
     setImages([]);
     setImgInput("");
-    setSpecsList([]);
+    setSpecsList([{ key: "توان مصرفی", value: "" }, { key: "ظرفیت مخزن", value: "" }]);
   };
 
   return (
@@ -221,7 +225,7 @@ export default function AdminProductsPage() {
             <h1 className="text-2xl font-black">مدیریت کاتالوگ و انبار کالاها</h1>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-2">
-            تنظیم تصاویر چندگانه نامحدود، گارانتی اختصاصی و ویژگی‌های تفکیک‌شده
+            تنظیم تصویر شاخص، امبد ویدیو و مدیریت ویژگی‌های فنی کالا
           </p>
         </div>
 
@@ -268,7 +272,7 @@ export default function AdminProductsPage() {
                     </div>
 
                     <div className="mt-2 flex justify-between items-center text-xs">
-                      <span className="text-[var(--text-secondary)]">موجودی انبار:</span>
+                      <span className="text-[var(--text-secondary)]">موجودی:</span>
                       <span className="font-bold">{p.stock} عدد</span>
                     </div>
                   </div>
@@ -279,7 +283,7 @@ export default function AdminProductsPage() {
                       className="p-2.5 text-blue-400 hover:bg-blue-500/10 rounded-xl transition flex items-center gap-1.5 text-xs font-bold"
                     >
                       <Edit size={16} />
-                      ویرایش کالا
+                      ویرایش
                     </button>
                     <button
                       onClick={async () => {
@@ -378,7 +382,6 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* گارانتی و ویدیو */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-300 mb-2">مدت گارانتی محصول (اختیاری)</label>
@@ -391,26 +394,29 @@ export default function AdminProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">لینک ویدیوی محصول (اختیاری)</label>
+                  <label className="block text-xs font-bold text-zinc-300 mb-2">لینک ویدیوی محصول (آپارات یا یوتیوب)</label>
                   <input
                     type="text"
                     value={videoUrl}
                     onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="لینک یوتیوب، آپارات یا ویدیو MP4"
+                    placeholder="https://www.aparat.com/v/... یا https://youtu.be/..."
                     className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
                   />
                 </div>
               </div>
 
-              {/* گالری چند تصویری نامحدود با فشرده‌ساز */}
+              {/* گالری با قابلیت تعیین تصویر شاخص */}
               <div className="p-4 rounded-2xl bg-[#161618] border border-[#27272a]">
-                <label className="block text-xs font-black text-white mb-2">تصاویر محصول (افزودن نامحدود با پیش‌نمایش)</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-black text-white">تصاویر محصول (انتخاب تصویر شاخص با یک کلیک)</label>
+                  <span className="text-[11px] text-zinc-400">عکس اول به عنوان تصویر شاخص نمایش داده می‌شود.</span>
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2 mb-3">
                   <input
                     type="text"
                     value={imgInput}
                     onChange={(e) => setImgInput(e.target.value)}
-                    placeholder="آدرس تصویر (URL)"
+                    placeholder="آدرس تصویر اینترنتی (URL)"
                     className="flex-1 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs text-white outline-none focus:border-[#0071e3]"
                   />
                   <button type="button" onClick={addImageByUrl} className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white">
@@ -418,35 +424,47 @@ export default function AdminProductsPage() {
                   </button>
                   <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ED] text-xs font-bold text-white flex items-center justify-center gap-2">
                     <ImageIcon size={14} />
-                    انتخاب عکس‌ها از سیستم
+                    انتخاب از سیستم
                     <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
                   </label>
                 </div>
 
                 {images.length > 0 && (
-                  <div className="flex flex-wrap gap-3 mt-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-3">
                     {images.map((img, idx) => (
-                      <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-zinc-700 bg-black">
-                        <img src={img} alt="preview" className="w-full h-full object-contain" />
-                        <button
-                          type="button"
-                          onClick={() => setImages(images.filter((_, i) => i !== idx))}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-1 opacity-90 hover:opacity-100"
-                        >
-                          <X size={12} />
-                        </button>
-                        {idx === 0 && (
-                          <span className="absolute bottom-0 left-0 right-0 bg-blue-600 text-[9px] text-center text-white py-0.5 font-bold">
-                            شاخص
-                          </span>
-                        )}
+                      <div key={idx} className="relative rounded-xl overflow-hidden border border-zinc-700 bg-black flex flex-col items-center">
+                        <div className="w-full h-20 p-1">
+                          <img src={img} alt="preview" className="w-full h-full object-contain" />
+                        </div>
+                        <div className="w-full p-1 bg-zinc-900 flex justify-between items-center border-t border-zinc-800">
+                          {idx === 0 ? (
+                            <span className="text-[10px] text-emerald-400 font-bold px-2 py-0.5 bg-emerald-500/10 rounded-md">
+                              شاخص
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setAsPrimaryImage(idx)}
+                              className="text-[10px] text-blue-400 hover:underline font-bold"
+                            >
+                              انتخاب شاخص
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setImages(images.filter((_, i) => i !== idx))}
+                            className="text-rose-400 hover:text-rose-500 p-0.5"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* ویژگی‌های فنی تفکیک شده */}
+              {/* ویژگی‌های فنی */}
               <div className="p-4 rounded-2xl bg-[#161618] border border-[#27272a]">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-xs font-black text-white">ویژگی‌ها و مشخصات فنی تفکیک‌شده</label>

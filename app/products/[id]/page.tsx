@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { ShieldCheck, ChevronRight, ChevronLeft, Star, ShoppingCart, Video } from "lucide-react";
+import { ShieldCheck, ChevronRight, ChevronLeft, Star, Play, X } from "lucide-react";
 import Link from "next/link";
 
 export default function ProductDetailPage() {
@@ -12,6 +12,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   const [authorName, setAuthorName] = useState("");
   const [rating, setRating] = useState(5);
@@ -91,6 +92,27 @@ export default function ProductDetailPage() {
   const handleNext = () => setActiveImageIndex((prev) => (prev + 1) % gallery.length);
   const handlePrev = () => setActiveImageIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
 
+  // تبدیل آدرس‌های استاندارد آپارات و یوتیوب به لینک Embed قابل پخش بدون خطای اتصال
+  const getEmbedUrl = (raw: string) => {
+    if (!raw) return "";
+    let url = raw.trim();
+    if (url.includes("aparat.com/v/")) {
+      const hash = url.split("aparat.com/v/")[1]?.split("/")[0]?.split("?")[0];
+      return `https://www.aparat.com/video/video/embed/videohash/${hash}/vt/frame`;
+    }
+    if (url.includes("youtu.be/")) {
+      const id = url.split("youtu.be/")[1]?.split("?")[0];
+      return `https://www.youtube.com/embed/${id}`;
+    }
+    if (url.includes("youtube.com/watch?v=")) {
+      const id = url.split("watch?v=")[1]?.split("&")[0];
+      return `https://www.youtube.com/embed/${id}`;
+    }
+    return url;
+  };
+
+  const embedVideo = getEmbedUrl(product.parsedVideo);
+
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authorName.trim() || !commentText.trim()) return;
@@ -129,7 +151,7 @@ export default function ProductDetailPage() {
       </div>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-        {/* اسلایدر با قابلیت ورق زدن تصاویر متعدد */}
+        {/* تصویر کالا، اسلایدر و دکمه شیک پخش ویدیو */}
         <div className="flex flex-col items-center bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 relative shadow-sm">
           <div className="w-full h-80 sm:h-96 relative flex items-center justify-center overflow-hidden rounded-2xl bg-zinc-950/40">
             <img
@@ -137,6 +159,19 @@ export default function ProductDetailPage() {
               alt={product.title}
               className="w-full h-full object-contain transition-all duration-300 select-none"
             />
+
+            {/* دکمه پخش ویدیو در صورت وجود لینک */}
+            {embedVideo && (
+              <button
+                type="button"
+                onClick={() => setIsVideoModalOpen(true)}
+                className="absolute bottom-3 left-3 px-4 py-2 rounded-2xl bg-black/75 hover:bg-black text-white text-xs font-bold flex items-center gap-2 backdrop-blur-md shadow-lg border border-white/10 transition"
+              >
+                <Play size={14} className="text-rose-500 fill-rose-500" />
+                ویدیوی معرفی دستگاه
+              </button>
+            )}
+
             {gallery.length > 1 && (
               <>
                 <button
@@ -157,7 +192,6 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {/* تصاویر بندانگشتی جهت ورق‌زدن مستقیم */}
           {gallery.length > 1 && (
             <div className="flex gap-3 mt-4 overflow-x-auto p-2 max-w-full">
               {gallery.map((img: string, idx: number) => (
@@ -175,7 +209,7 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        {/* مشخصات و قیمت */}
+        {/* مشخصات، قیمت و توضیحات کالا */}
         <div className="flex flex-col space-y-6">
           <div>
             <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-400">
@@ -184,7 +218,6 @@ export default function ProductDetailPage() {
             <h1 className="text-2xl lg:text-3xl font-black mt-3 leading-snug">{product.title || product.name}</h1>
           </div>
 
-          {/* مدت گارانتی در صورت تعریف شدن */}
           {product.parsedWarranty && (
             <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] text-xs font-bold text-blue-400 w-fit">
               <ShieldCheck size={18} />
@@ -192,7 +225,6 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {/* باکس قیمت بدون کلمات هاردکد اضافه */}
           <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] flex items-center justify-between">
             <span className="text-xs font-bold text-[var(--text-secondary)]">قیمت:</span>
             <div className="text-left font-black">
@@ -203,17 +235,17 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* توضیحات کالا */}
+          {/* توضیحات کالا با اندازه فونت خوانا و مناسب */}
           {product.cleanDescription && (
             <div>
               <h2 className="text-sm font-black mb-3">توضیحات کالا</h2>
-              <p className="text-xs leading-relaxed text-[var(--text-secondary)] whitespace-pre-line bg-[var(--card-bg)] border border-[var(--card-border)] p-5 rounded-3xl">
+              <div className="text-sm leading-loose text-[var(--text-primary)] font-medium whitespace-pre-line bg-[var(--card-bg)] border border-[var(--card-border)] p-6 rounded-3xl">
                 {product.cleanDescription}
-              </p>
+              </div>
             </div>
           )}
 
-          {/* مشخصات تفکیک شده */}
+          {/* مشخصات فنی تفکیک شده */}
           {product.parsedSpecs && Object.keys(product.parsedSpecs).length > 0 && (
             <div>
               <h2 className="text-sm font-black mb-3">مشخصات فنی</h2>
@@ -227,21 +259,30 @@ export default function ProductDetailPage() {
               </div>
             </div>
           )}
-
-          {/* ویدیو محصول در صورت وجود */}
-          {product.parsedVideo && (
-            <div className="pt-2">
-              <h2 className="text-sm font-black mb-3 flex items-center gap-2">
-                <Video size={18} className="text-rose-500" />
-                ویدیوی معرفی دستگاه
-              </h2>
-              <div className="rounded-2xl overflow-hidden border border-[var(--card-border)] aspect-video bg-black flex items-center justify-center">
-                <iframe src={product.parsedVideo} className="w-full h-full" allowFullScreen />
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* مدال تماشای ویدیوی معرفی */}
+      {isVideoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#121214] border border-[#27272a] rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-[#27272a] flex justify-between items-center">
+              <h3 className="text-sm font-black text-white">ویدیوی معرفی دستگاه</h3>
+              <button onClick={() => setIsVideoModalOpen(false)} className="text-zinc-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="aspect-video w-full bg-black">
+              <iframe
+                src={embedVideo}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* بخش ثبت دیدگاه */}
       <div className="max-w-4xl mx-auto mt-16 pt-10 border-t border-[var(--card-border)]">

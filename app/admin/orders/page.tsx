@@ -1,280 +1,164 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-
-interface OrderItem {
-  title: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  selected_color?: string;
-  selected_storage?: string;
-}
-
-interface Order {
-  id: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_address: string;
-  postal_code?: string;
-  status: string;
-  total_amount: number;
-  discount_amount?: number;
-  final_amount?: number;
-  coupon_code?: string;
-  tracking_code?: string;
-  created_at: string;
-  items: OrderItem[];
-}
-
-const STATUS_OPTIONS = [
-  { value: "all", label: "همه سفارشات" },
-  { value: "pending_manual_review", label: "در انتظار بررسی واریز" },
-  { value: "paid", label: "پرداخت تایید شد (کسر موجودی)" },
-  { value: "processing", label: "در حال پردازش در انبار" },
-  { value: "shipped", label: "ارسال شد" },
-  { value: "delivered", label: "تحویل گردید" },
-  { value: "cancelled", label: "لغو شده" },
-];
+import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { ArrowRight, Package, Truck, CheckCircle2, Clock, MapPin, Phone, Hash } from "lucide-react";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [filter, setFilter] = useState("all");
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [trackingInputs, setTrackingInputs] = useState<Record<string, string>>({});
-  const [sendSmsMap, setSendSmsMap] = useState<Record<string, boolean>>({});
 
-  const fetchOrders = async (status = filter) => {
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const url = status === "all" ? "/api/admin/orders" : `/api/admin/orders?status=${status}`;
-      const res = await fetch(url);
+      const res = await fetch("/api/admin/orders");
       const data = await res.json();
-      if (res.ok && data.success) {
-        setOrders(data.orders || []);
+      if (data.success && Array.isArray(data.orders)) {
+        setOrders(data.orders);
       }
-    } catch {
-      console.error("خطا در واکشی سفارشات.");
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchOrders(filter);
-  }, [filter]);
+    fetchOrders();
 
-  const handleStatusChange = async (order: Order, newStatus: string) => {
-    soundEngine.playClick();
-    setUpdatingId(order.id);
-    const tracking = trackingInputs[order.id] || order.tracking_code;
-    const shouldSendSms = sendSmsMap[order.id] !== false; // پیش‌فرض فعال
-
-    try {
-      // ۱. به‌روزرسانی وضعیت سفارش در دیتابیس
-      const res = await fetch("/api/admin/orders", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: order.id,
-          status: newStatus,
-          tracking_code: tracking,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        // ۲. ارسال پیامک به خریدار در صورت تایید و انتخاب وضعیت‌های مهم
-        if (shouldSendSms && ["paid", "shipped", "delivered"].includes(newStatus)) {
-          try {
-            await fetch("/api/admin/sms/order-status", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                orderId: order.id,
-                phone: order.customer_phone,
-                status: newStatus,
-                customerName: order.customer_name,
-                trackingCode: tracking,
-              }),
-            });
-          } catch (smsErr) {
-            console.error("خطا در ارسال پیامک خودکار:", smsErr);
+    if (supabaseBrowser && typeof supabaseBrowser.channel === "function") {
+      const client = supabaseBrowser;
+      const channel = client
+        .channel("admin-orders-realtime")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "orders" },
+          () => {
+            fetchOrders();
           }
-        }
+        )
+        .subscribe();
 
-        soundEngine.playSuccess();
-        fetchOrders(filter);
-      } else {
-        alert(data.message || "خطا در تغییر وضعیت سفارش.");
-      }
-    } catch {
-      alert("ارتباط با سرور برقرار نشد.");
-    } finally {
-      setUpdatingId(null);
+      return () => {
+        client.removeChannel(channel);
+      };
     }
-  };
+  }, [fetchOrders]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending_manual_review":
-        return "bg-amber-500/15 border-amber-500/30 text-amber-400";
-      case "paid":
-      case "delivered":
-        return "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
-      case "processing":
-      case "shipped":
-        return "bg-blue-500/15 border-blue-500/30 text-blue-400";
-      case "cancelled":
-        return "bg-rose-500/15 border-rose-500/30 text-rose-400";
-      default:
-        return "bg-slate-500/15 border-slate-500/30 text-slate-400";
+  const updateStatus = async (id: string, newStatus: string) => {
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, payment_status: newStatus }),
+      });
+      if (res.ok) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === id ? { ...o, payment_status: newStatus } : o))
+        );
+      }
+    } catch (err) {
+      alert("خطا در تغییر وضعیت سفارش");
     }
   };
 
   return (
-    <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
-      {/* هدر صفحه و فیلترها */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-6 lg:p-10 dir-rtl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 border-b border-[var(--card-border)]">
         <div>
-          <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📦</span> مدیریت جامع سفارشات و انبار
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1">
-            بررسی پرداخت‌ها، تغییر وضعیت پردازش، ثبت بارنامه‌های پستی و دیسپچ پیامک‌های مشتری
+          <div className="flex items-center gap-3">
+            <Link href="/admin" className="p-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--card-hover)] text-sm font-bold flex items-center gap-2">
+              <ArrowRight size={18} />
+              پیشخوان
+            </Link>
+            <h1 className="text-2xl font-black">مدیریت سفارشات و بارنامه‌ها</h1>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] mt-2">
+            مشاهده سفارشات خریداران، بررسی آدرس‌ها و صدور بارنامه به صورت بلادرنگ
           </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => {
-                soundEngine.playClick();
-                setFilter(opt.value);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border ${
-                filter === opt.value
-                  ? "bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white"
-                  : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)] hover:text-white"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
         </div>
       </div>
 
-      {/* لیست سفارشات */}
-      {loading ? (
-        <div className="p-12 text-center text-xs text-slate-400">در حال دریافت سفارشات...</div>
-      ) : orders.length === 0 ? (
-        <div className="p-12 text-center text-xs text-slate-400 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl">
-          هیچ سفارشی در این وضعیت یافت نشد.
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {orders.map((ord) => (
-            <div
-              key={ord.id}
-              className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-4"
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-slate-400">#{ord.id.slice(0, 8)}</span>
-                  <span className="font-black text-sm text-[var(--text-primary)]">{ord.customer_name}</span>
-                  <span className="font-mono text-xs text-slate-400">{ord.customer_phone}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-xl border text-xs font-bold ${getStatusBadge(ord.status)}`}>
-                    {STATUS_OPTIONS.find((s) => s.value === ord.status)?.label || ord.status}
-                  </span>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    {new Date(ord.created_at).toLocaleDateString("fa-IR")}
-                  </span>
-                </div>
-              </div>
+      <div className="mt-8">
+        {loading ? (
+          <div className="text-center py-20 text-sm font-bold text-[var(--text-secondary)]">
+            در حال بارگذاری لیست سفارشات...
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-16 text-center">
+            <Package size={40} className="mx-auto text-zinc-600 mb-3" />
+            <p className="text-sm font-bold text-[var(--text-secondary)]">
+              هنوز سفارشی به ثبت نرسیده است.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {orders.map((ord) => (
+              <div key={ord.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 shadow-sm">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-[var(--card-border)]">
+                  <div className="flex items-center gap-3">
+                    <span className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-400 font-black text-xs flex items-center gap-1">
+                      <Hash size={14} />
+                      {ord.order_number}
+                    </span>
+                    <span className="font-bold text-sm text-white">{ord.customer_name}</span>
+                    <span className="text-xs text-zinc-400 flex items-center gap-1">
+                      <Phone size={13} />
+                      {ord.customer_phone}
+                    </span>
+                  </div>
 
-              {/* آدرس و اقلام */}
-              <div className="text-xs text-[var(--text-secondary)]">
-                <span className="font-bold text-[var(--text-primary)]">آدرس تحویل: </span>
-                {ord.customer_address} {ord.postal_code && `(کد پستی: ${ord.postal_code})`}
-              </div>
-
-              <div className="space-y-1.5">
-                {Array.isArray(ord.items) &&
-                  ord.items.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]"
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-400">وضعیت:</span>
+                    <select
+                      value={ord.payment_status || "pending"}
+                      onChange={(e) => updateStatus(ord.id, e.target.value)}
+                      className="bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white px-3 py-1.5 rounded-xl outline-none"
                     >
-                      <span className="font-bold text-[var(--text-primary)]">
-                        {item.title} × {item.quantity}
-                        {item.selected_color && <span className="mr-2 text-slate-400">({item.selected_color})</span>}
-                        {item.selected_storage && <span className="mr-1 text-slate-400">[{item.selected_storage}]</span>}
-                      </span>
-                      <span className="font-mono text-slate-300">
-                        {Number(item.total_price || item.unit_price * item.quantity).toLocaleString("fa-IR")} تومان
-                      </span>
+                      <option value="pending">در انتظار بررسی / پرداخت</option>
+                      <option value="paid">پرداخت شده و تایید</option>
+                      <option value="shipped">ارسال شده به پست</option>
+                      <option value="delivered">تحویل داده شده</option>
+                      <option value="cancelled">لغو شده</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <div className="text-zinc-400 mb-1 flex items-center gap-1">
+                      <MapPin size={13} />
+                      نشانی تحویل:
                     </div>
-                  ))}
-              </div>
+                    <div className="text-white font-medium">{ord.shipping_address}</div>
+                  </div>
 
-              {/* مبلغ نهایی، گزینه‌ها و تغییر وضعیت */}
-              <div className="border-t border-[var(--card-border)] pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                  <span className="text-xs text-slate-400">مبلغ نهایی: </span>
-                  <span className="text-sm font-black text-emerald-400 font-mono">
-                    {Number(ord.final_amount || ord.total_amount).toLocaleString("fa-IR")} تومان
-                  </span>
-                  {ord.coupon_code && (
-                    <span className="mr-2 text-[11px] text-amber-400 font-mono">(کوپن: {ord.coupon_code})</span>
-                  )}
+                  <div className="text-left md:text-left flex flex-col justify-end">
+                    <div className="text-zinc-400">مجموع پرداختی:</div>
+                    <div className="text-lg font-black text-emerald-400 mt-0.5">
+                      {Number(ord.total_price || 0).toLocaleString("fa-IR")} تومان
+                    </div>
+                    <div className="text-[10px] text-zinc-500">
+                      {(Number(ord.total_price || 0) * 10).toLocaleString("fa-IR")} ریال
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
-                  <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={sendSmsMap[ord.id] !== false}
-                      onChange={(e) =>
-                        setSendSmsMap((prev) => ({ ...prev, [ord.id]: e.target.checked }))
-                      }
-                      className="rounded accent-[var(--accent-blue)]"
-                    />
-                    ارسال پیامک تغییر وضعیت
-                  </label>
-
-                  <input
-                    type="text"
-                    placeholder="کد پیگیری پستی..."
-                    defaultValue={ord.tracking_code || ""}
-                    onChange={(e) =>
-                      setTrackingInputs((prev) => ({ ...prev, [ord.id]: e.target.value }))
-                    }
-                    className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-
-                  <select
-                    disabled={updatingId === ord.id}
-                    value={ord.status}
-                    onChange={(e) => handleStatusChange(ord, e.target.value)}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-bold focus:outline-none cursor-pointer disabled:opacity-50"
-                  >
-                    {STATUS_OPTIONS.filter((s) => s.value !== "all").map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
+                {Array.isArray(ord.items) && ord.items.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-white/5 flex flex-wrap gap-2">
+                    {ord.items.map((it: any, idx: number) => (
+                      <span key={idx} className="px-3 py-1 bg-black/30 rounded-xl text-[11px] text-zinc-300 border border-white/5">
+                        {it.title} × {it.quantity}
+                      </span>
                     ))}
-                  </select>
-                </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

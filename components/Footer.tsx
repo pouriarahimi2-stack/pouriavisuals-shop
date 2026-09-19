@@ -1,6 +1,5 @@
 "use client";
 
-import EnamadBadge from "@/components/EnamadBadge";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { siteInfoService, HomepageLayoutConfig, DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
@@ -36,10 +35,10 @@ export default function Footer() {
   if (!f.show) return null;
 
   return (
-    <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors duration-300 mt-16" dir="rtl">
+    <footer className="w-full bg-[var(--modal-bg)] border-t border-[var(--card-border)] text-[var(--text-primary)] font-sans select-none transition-colors duration-300 mt-16 pb-20 md:pb-8" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          
+
           {/* ستون اول: برند و اطلاعات تماس */}
           <div className="md:col-span-4 space-y-4">
             <div className="flex items-center gap-3">
@@ -116,7 +115,7 @@ export default function Footer() {
             </div>
           )}
 
-          {/* ستون چهارم: تماس و اینماد */}
+          {/* ستون چهارم: تماس و اینماد یکتا */}
           <div className="md:col-span-4 space-y-4">
             {f.contactInfo.show && (
               <div className="space-y-2 text-xs bg-[var(--input-bg)] p-3.5 rounded-2xl border border-[var(--card-border)]">
@@ -180,9 +179,6 @@ export default function Footer() {
           </div>
         )}
       </div>
-      <div className="max-w-7xl mx-auto px-6 pt-6 flex justify-center pb-4">
-            <EnamadBadge />
-          </div>
-        </footer>
+    </footer>
   );
 }

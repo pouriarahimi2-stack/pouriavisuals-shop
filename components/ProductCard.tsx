@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import AddToCartButton from "./AddToCartButton";
 import { formatPrice } from "@/lib/formatters";
@@ -26,18 +25,17 @@ export default function ProductCard({ product }: ProductCardProps) {
   return (
     <div className="group relative rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] p-4 sm:p-5 transition-all duration-300 shadow-md flex flex-col justify-between font-sans select-none" dir="rtl">
       <div>
-        <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
-          <Link href={"/products/" + product.id} className="w-full h-full relative block">
-            <Image
+        {/* کانتینر تصویر با ارتفاع ثابت ریسپانسیو جهت جلوگیری از مخفی شدن در موبایل و تبلت */}
+        <div className="relative w-full aspect-square sm:aspect-[4/3] md:aspect-square rounded-2xl overflow-hidden bg-[var(--input-bg)] mb-4 flex items-center justify-center p-3 border border-[var(--card-border)]">
+          <Link href={"/products/" + product.id} className="w-full h-full relative flex items-center justify-center">
+            <img
               src={mainImage}
               alt={title}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               loading="lazy"
-              className="object-contain transition-transform duration-500 group-hover:scale-105"
+              className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-105"
             />
           </Link>
-          <span className="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-md text-white text-[10px] px-3 py-1 rounded-full font-bold border border-white/10 z-10">
+          <span className="absolute top-2.5 left-2.5 bg-black/75 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-bold border border-white/10 z-10">
             {product?.category || "تخصصی"}
           </span>
         </div>
@@ -52,7 +50,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Link>
       </div>
 
-      <div className="pt-4 mt-2 border-t border-[var(--card-border)] space-y-3">
+      <div className="pt-4 mt-3 border-t border-[var(--card-border)] space-y-3">
         <div className="flex items-baseline justify-between" suppressHydrationWarning>
           <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت نهایی:</span>
           <div className="text-left font-mono">

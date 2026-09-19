@@ -39,7 +39,7 @@ export default function MobileBottomNav() {
   ];
 
   return (
-    <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[#121214]/95 border-t border-[#27272a] px-3 py-2 pb-safe shadow-2xl dir-rtl">
+    <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--modal-bg)] border-t border-[var(--card-border)] px-3 py-2 pb-safe shadow-2xl dir-rtl">
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {navItems.map((item, idx) => {
           const Icon = item.icon;
@@ -51,17 +51,17 @@ export default function MobileBottomNav() {
                 key={idx}
                 type="button"
                 onClick={() => window.dispatchEvent(new Event("open_cart_drawer"))}
-                className="flex flex-col items-center justify-center flex-1 py-1 text-zinc-400 hover:text-white relative transition"
+                className="flex flex-col items-center justify-center flex-1 py-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] relative transition"
               >
                 <div className="relative">
-                  <Icon size={20} className="text-[#0071e3]" />
+                  <Icon size={20} className="text-[var(--accent-blue)]" />
                   {item.badge > 0 && (
-                    <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-black text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
                       {item.badge}
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] font-bold mt-1 text-zinc-300">{item.label}</span>
+                <span className="text-[10px] font-bold mt-1 text-[var(--text-primary)]">{item.label}</span>
               </button>
             );
           }
@@ -71,10 +71,10 @@ export default function MobileBottomNav() {
               key={idx}
               href={item.href || "/"}
               className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
-                isActive ? "text-[#0071e3]" : "text-zinc-400 hover:text-zinc-200"
+                isActive ? "text-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
             >
-              <Icon size={20} className={isActive ? "text-[#0071e3]" : "text-zinc-400"} />
+              <Icon size={20} className={isActive ? "text-[var(--accent-blue)]" : "text-[var(--text-secondary)]"} />
               <span className="text-[10px] font-bold mt-1">{item.label}</span>
             </Link>
           );

@@ -42,7 +42,12 @@ export async function PATCH(req: NextRequest) {
 
     const updatePayload: Record<string, any> = {};
     if (payment_status) updatePayload.payment_status = payment_status;
-    if (tracking_code !== undefined) updatePayload.tracking_code = tracking_code;
+    if (tracking_code !== undefined) {
+      updatePayload.tracking_code = tracking_code;
+      if (tracking_code.trim().length > 0 && !payment_status) {
+        updatePayload.payment_status = "shipped";
+      }
+    }
 
     const { error } = await supabaseAdmin
       .from("orders")

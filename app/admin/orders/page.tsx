@@ -2,7 +2,20 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowRight, Package, Truck, CheckCircle2, Clock, MapPin, Phone, Hash, ShieldCheck, Save } from "lucide-react";
+import { 
+  ArrowRight, 
+  Package, 
+  Truck, 
+  CheckCircle2, 
+  Clock, 
+  MapPin, 
+  Phone, 
+  Hash, 
+  ShieldCheck, 
+  Save, 
+  Search,
+  Filter
+} from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function AdminOrdersPage() {
@@ -10,6 +23,8 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [trackingInputs, setTrackingInputs] = useState<Record<string, string>>({});
   const [savingTracking, setSavingTracking] = useState<Record<string, boolean>>({});
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -18,7 +33,6 @@ export default function AdminOrdersPage() {
       const data = await res.json();
       if (data.success && Array.isArray(data.orders)) {
         setOrders(data.orders);
-        // مقداردهی اولیه اینپوت‌های کد مرسوله
         const initialTracking: Record<string, string> = {};
         data.orders.forEach((o: any) => {
           initialTracking[o.id] = o.tracking_code || "";
@@ -72,19 +86,23 @@ export default function AdminOrdersPage() {
   };
 
   const handleSaveTracking = async (id: string) => {
-    const code = trackingInputs[id] || "";
+    const code = (trackingInputs[id] || "").trim();
     setSavingTracking((prev) => ({ ...prev, [id]: true }));
     try {
       const res = await fetch("/api/admin/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, tracking_code: code.trim() }),
+        body: JSON.stringify({ id, tracking_code: code }),
       });
       if (res.ok) {
         setOrders((prev) =>
-          prev.map((o) => (o.id === id ? { ...o, tracking_code: code.trim() } : o))
+          prev.map((o) => 
+            o.id === id 
+              ? { ...o, tracking_code: code, payment_status: code ? "shipped" : o.payment_status } 
+              : o
+          )
         );
-        alert("کد مرسوله پستی با موفقیت ذخیره شد.");
+        alert("کد مرسوله ذخیره گردید و وضعیت سفارش به ارسال پستی تغییر یافت.");
       } else {
         alert("خطا در ذخیره کد مرسوله");
       }
@@ -95,8 +113,20 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const filteredOrders = orders.filter((ord) => {
+    const matchesFilter = filterStatus === "all" || ord.payment_status === filterStatus;
+    const matchesSearch = 
+      !searchTerm ||
+      (ord.customer_name && ord.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (ord.customer_phone && ord.customer_phone.includes(searchTerm)) ||
+      (ord.order_number && ord.order_number.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    return matchesFilter && matchesSearch;
+  });
+
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-6 lg:p-10 dir-rtl">
+      {/* هدر پیشخوان سفارشات */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 border-b border-[var(--card-border)]">
         <div>
           <div className="flex items-center gap-3">
@@ -107,26 +137,62 @@ export default function AdminOrdersPage() {
             <h1 className="text-2xl font-black">مدیریت سفارشات و بارنامه‌ها</h1>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-2">
-            مشاهده سفارشات، بررسی شماره‌های تأییدشده پیامکی و ثبت کدهای رهگیری پست
+            محاسبه خالص به تومان | تفکیک شماره‌های تأییدشده پیامکی | صدور بارنامه
           </p>
         </div>
       </div>
 
-      <div className="mt-8">
+      {/* نوار جستجو و فیلترهای وضعیت */}
+      <div className="mt-8 flex flex-col md:flex-row gap-4 justify-between items-center bg-[var(--card-bg)] border border-[var(--card-border)] p-4 rounded-3xl">
+        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
+          {[
+            { id: "all", label: "همه سفارشات" },
+            { id: "pending", label: "در انتظار بررسی" },
+            { id: "paid", label: "تایید شده" },
+            { id: "shipped", label: "ارسال شده به پست" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterStatus(tab.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                filterStatus === tab.id
+                  ? "bg-[#0071e3] text-white shadow-md"
+                  : "bg-black/20 text-zinc-400 hover:text-white"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full md:w-72">
+          <input
+            type="text"
+            placeholder="جستجوی شماره، نام یا موبایل..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl bg-black/20 border border-[var(--card-border)] text-xs text-white outline-none focus:border-[#0071e3]"
+          />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+        </div>
+      </div>
+
+      {/* لیست سفارشات */}
+      <div className="mt-6">
         {loading ? (
           <div className="text-center py-20 text-sm font-bold text-[var(--text-secondary)]">
             در حال بارگذاری لیست سفارشات...
           </div>
-        ) : orders.length === 0 ? (
+        ) : filteredOrders.length === 0 ? (
           <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-16 text-center">
             <Package size={40} className="mx-auto text-zinc-600 mb-3" />
             <p className="text-sm font-bold text-[var(--text-secondary)]">
-              هنوز سفارشی به ثبت نرسیده است.
+              سفارشی مطابق با فیلتر انتخابی یافت نشد.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((ord) => (
+            {filteredOrders.map((ord) => (
               <div key={ord.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 shadow-sm">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-[var(--card-border)]">
                   <div className="flex flex-wrap items-center gap-3">
@@ -177,14 +243,14 @@ export default function AdminOrdersPage() {
                   </div>
 
                   <div className="text-left flex flex-col justify-end">
-                    <div className="text-zinc-400">مجموع پرداختی:</div>
+                    <div className="text-zinc-400">مجموع سفارش:</div>
                     <div className="text-lg font-black text-emerald-400 mt-0.5">
                       {Number(ord.total_price || 0).toLocaleString("fa-IR")} تومان
                     </div>
                   </div>
                 </div>
 
-                {/* بخش اقلام ثبت‌شده */}
+                {/* لیست کالاها */}
                 {Array.isArray(ord.items) && ord.items.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-white/5 flex flex-wrap gap-2">
                     {ord.items.map((it: any, idx: number) => (
@@ -195,16 +261,16 @@ export default function AdminOrdersPage() {
                   </div>
                 )}
 
-                {/* فرم ثبت کد رهگیری پستی */}
+                {/* ثبت و ذخیره کد رهگیری پستی */}
                 <div className="mt-4 pt-4 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-black/20 p-3.5 rounded-2xl">
                   <div className="flex items-center gap-2 text-xs text-zinc-300">
                     <Truck size={16} className="text-blue-400" />
-                    <span>کد رهگیری پستی مرسوله:</span>
+                    <span>کد مرسوله پستی:</span>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <input
                       type="text"
-                      placeholder="مثال: ۲۴ رقم کد رهگیری پست"
+                      placeholder="۲۴ رقم کد رهگیری پست"
                       value={trackingInputs[ord.id] || ""}
                       onChange={(e) =>
                         setTrackingInputs((prev) => ({ ...prev, [ord.id]: e.target.value }))
@@ -218,7 +284,7 @@ export default function AdminOrdersPage() {
                       className="px-3 py-1.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ED] text-white text-xs font-bold flex items-center gap-1 transition disabled:opacity-50"
                     >
                       <Save size={13} />
-                      {savingTracking[ord.id] ? "در حال ثبت..." : "ذخیره"}
+                      {savingTracking[ord.id] ? "در حال ثبت..." : "ثبت و ارسال به پست"}
                     </button>
                   </div>
                 </div>

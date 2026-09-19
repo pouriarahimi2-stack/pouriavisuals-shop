@@ -64,8 +64,8 @@ export default function CartDrawer() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-start dir-rtl">
-      <div className="w-full sm:max-w-md max-w-full bg-[#121214] border-l border-[#27272a] h-full flex flex-col justify-between p-6 shadow-2xl animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-0 z-50 bg-black/70 bg-black/60 flex justify-start dir-rtl">
+      <div className="w-full sm:max-w-md w-full max-w-full sm:max-w-md bg-[#121214] will-change-transform border-l border-[#27272a] h-full flex flex-col justify-between p-6 shadow-2xl animate-in slide-in-from-right duration-200">
         <div>
           <div className="flex items-center justify-between pb-4 border-b border-[#27272a]">
             <div className="flex items-center gap-2">

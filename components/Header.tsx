@@ -2,215 +2,143 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { siteInfoService, HeaderConfig, DEFAULT_HEADER_CONFIG } from "@/services/siteInfoService";
-import { themeEngine } from "@/lib/themeEngine";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
+import { themeEngine } from "@/lib/themeEngine";
+import { siteInfoService } from "@/services/siteInfoService";
 
 export default function Header() {
-  const [cfg, setCfg] = useState<HeaderConfig>(DEFAULT_HEADER_CONFIG);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isDark, setIsDark] = useState(false);
-  const { cartItems, openCart } = useCart();
+  const cart = useCart() as any;
+  const [siteName, setSiteName] = useState<string>("آکسون کور | Axon");
+  const [announcementText, setAnnouncementText] = useState<string>("⚡ ارسال سریع سفارشات با بسته‌بندی ایمن به سراسر کشور | ضمانت اصالت فیزیکی تمامی کالاها");
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [userPhone, setUserPhone] = useState<string | null>(null);
+
+  const cartItems: any[] = Array.isArray(cart?.cartItems)
+    ? cart.cartItems
+    : (Array.isArray(cart?.items) ? cart.items : []);
+
+  const cartCount = cartItems.reduce(
+    (acc: number, item: any) => acc + (Number(item?.quantity) || 1),
+    0
+  );
 
   useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
-
-    const onThemeChanged = (e: any) => setIsDark(e.detail === "dark");
-    window.addEventListener("theme_changed", onThemeChanged);
+    if (typeof document !== "undefined") {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    }
 
     siteInfoService.getSiteInfo().then((info) => {
-      if (info?.homepage_layout_config?.header) {
-        setCfg({ ...DEFAULT_HEADER_CONFIG, ...info.homepage_layout_config.header });
+      if (info) {
+        const resolvedName = String(info.storeName || info.site_name || (info as any).siteName || "").trim();
+        if (resolvedName) {
+          setSiteName(resolvedName);
+        }
+        const resolvedAnnouncement = String((info as any).announcement_text || "").trim();
+        if (resolvedAnnouncement) {
+          setAnnouncementText(resolvedAnnouncement);
+        }
       }
     });
 
-    const onSiteUpdate = (e: any) => {
-      if (e.detail?.homepage_layout_config?.header) {
-        setCfg({ ...DEFAULT_HEADER_CONFIG, ...e.detail.homepage_layout_config.header });
+    try {
+      const user = localStorage.getItem("axon_user_session");
+      if (user) {
+        const parsed = JSON.parse(user);
+        if (parsed.phone) setUserPhone(String(parsed.phone));
       }
-    };
-    window.addEventListener("site_info_updated", onSiteUpdate);
+    } catch {}
 
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+    const handleAuthChange = (e: any) => {
+      if (e.detail?.phone) setUserPhone(String(e.detail.phone));
+      else setUserPhone(null);
     };
-    window.addEventListener("scroll", handleScroll, { passive: true });
 
-    return () => {
-      window.removeEventListener("theme_changed", onThemeChanged);
-      window.removeEventListener("site_info_updated", onSiteUpdate);
-      window.removeEventListener("scroll", handleScroll);
-    };
+    window.addEventListener("user_auth_changed", handleAuthChange);
+    return () => window.removeEventListener("user_auth_changed", handleAuthChange);
   }, []);
 
   const toggleTheme = () => {
     soundEngine.playClick();
-    themeEngine.applyTheme(isDark ? "light" : "dark", true);
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    if (themeEngine && typeof (themeEngine as any).applyTheme === "function") {
+      (themeEngine as any).applyTheme(next ? "dark" : "light", true);
+    }
   };
 
-  if (!cfg.show) return null;
-
-  const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
-  const logoSrc = cfg.brand.logoUrl || undefined;
-
   return (
-    <header
-      className="fixed top-0 left-0 right-0 z-40 flex flex-col items-center px-3 sm:px-6 pointer-events-none pt-2 sm:pt-3 transition-all duration-300 font-sans select-none"
-      dir="rtl"
-    >
-      {/* نوار اعلان بالای هدر */}
-      {cfg.announcement?.show && (
-        <div
-          style={{ backgroundColor: cfg.announcement.backgroundColor, color: cfg.announcement.textColor }}
-          className="pointer-events-auto w-full max-w-7xl mb-2 px-4 py-1.5 rounded-full text-[11px] font-bold text-center shadow-md flex items-center justify-center gap-2"
-        >
-          <span>{cfg.announcement.text}</span>
-          {cfg.announcement.link && (
-            <Link href={cfg.announcement.link} className="underline mr-2">مشاهده ←</Link>
-          )}
+    <>
+      <header className="fixed top-0 inset-x-0 z-40 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--card-border)] transition-colors duration-300">
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white text-[11px] font-bold py-1.5 px-4 text-center select-none overflow-hidden truncate">
+          <span>{announcementText}</span>
         </div>
-      )}
 
-      {/* کپسول اصلی هدر */}
-      <div
-        style={{
-          maxWidth: `${cfg.maxWidth}px`,
-          height: isScrolled && cfg.shrinkOnScroll ? `${cfg.height - 6}px` : `${cfg.height}px`,
-          borderRadius: `${cfg.borderRadius}px`,
-          backgroundColor: cfg.backgroundColor || undefined,
-          borderColor: cfg.borderColor || undefined,
-          paddingLeft: `${cfg.paddingX}px`,
-          paddingRight: `${cfg.paddingX}px`,
-        }}
-        className={`pointer-events-auto w-full flex items-center justify-between border backdrop-blur-2xl transition-all duration-300 shadow-2xl ${
-          isScrolled ? "bg-[var(--modal-bg)]/90 border-[var(--card-border)] shadow-black/20" : "bg-[var(--modal-bg)]/80 border-[var(--card-border)]/80"
-        }`}
-      >
-        {/* برند و لوگو */}
-        <Link href={cfg.brand.href || "/"} onClick={() => soundEngine.playClick()} className="flex items-center gap-3 shrink-0 group">
-          {cfg.brand.showLogo && (
-            <div
-              style={{
-                width: `${cfg.brand.logoWidth}px`,
-                height: `${cfg.brand.logoHeight}px`,
-                borderRadius: `${cfg.brand.logoRadius}px`,
-              }}
-              className="bg-[var(--input-bg)] border border-[var(--card-border)] p-1 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform"
-            >
-              {logoSrc ? (
-                <img src={logoSrc} alt={cfg.brand.name} className="w-full h-full object-contain" />
-              ) : (
-                <span className="text-base text-[var(--accent-blue)] font-black">⚡</span>
-              )}
-            </div>
-          )}
-
-          {cfg.brand.showName && (
-            <div>
-              <span className="font-black text-xs sm:text-sm text-[var(--text-primary)] block tracking-tight">
-                {cfg.brand.name}
-              </span>
-              {cfg.brand.showTagline && (
-                <span className="text-[10px] text-[var(--text-secondary)] font-medium block">
-                  {cfg.brand.tagline}
-                </span>
-              )}
-            </div>
-          )}
-        </Link>
-
-        {/* منوهای ناوبری */}
-        {cfg.menu.show && (
-          <nav
-            style={{ gap: `${cfg.menu.gap}px`, fontSize: `${cfg.menu.fontSize}px` }}
-            className="hidden lg:flex items-center font-bold text-[var(--text-secondary)]"
-          >
-            {cfg.menu.items
-              .filter((i) => i.show)
-              .sort((a, b) => a.order - b.order)
-              .map((item) => (
-                <Link
-                  key={item.id}
-                  href={item.url}
-                  target={item.openInNewTab ? "_blank" : undefined}
-                  onClick={() => soundEngine.playClick()}
-                  className="hover:text-[var(--accent-blue)] transition-colors py-1 flex items-center gap-1"
-                >
-                  <span>{item.title}</span>
-                  {item.badge && (
-                    <span className="px-1.5 py-0.2 rounded-md bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[9px] font-mono">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              ))}
-          </nav>
-        )}
-
-        {/* دکمه‌های اکشن: سرچ، دکمه تم، حساب کاربری و سبد خرید */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* دکمه تم تاریک/روشن */}
-          {cfg.actions.themeToggle.show && (
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={isDark ? "تغییر به حالت روشن" : "تغییر به حالت تاریک"}
-              title={isDark ? "حالت روشن" : "حالت تاریک"}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs transition shadow-sm cursor-pointer shrink-0"
-            >
-              <span suppressHydrationWarning>{isDark ? "☀️" : "🌙"}</span>
-            </button>
-          )}
-
-          {/* دکمه جستجو */}
-          {cfg.actions.search.show && (
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.playClick();
-                window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
-              }}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs text-[var(--text-secondary)] font-medium transition cursor-pointer"
-            >
-              <span>🔍</span>
-              <span className="text-[11px]">جستجو...</span>
-              <span className="text-[9px] font-mono px-1 rounded bg-[var(--modal-bg)] border border-[var(--card-border)]">⌘K</span>
-            </button>
-          )}
-
-          {/* دکمه حساب کاربری */}
-          {cfg.actions.account.show && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-6">
             <Link
-              href={cfg.actions.account.url || "/login"}
+              href="/"
               onClick={() => soundEngine.playClick()}
-              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition shadow-sm cursor-pointer"
+              className="flex items-center gap-2 text-base sm:text-lg font-black tracking-tight text-[var(--text-primary)] hover:opacity-90 transition"
+            >
+              <span className="w-9 h-9 rounded-xl bg-[var(--accent-blue)] text-white flex items-center justify-center font-black text-sm shadow-md">
+                A
+              </span>
+              <span className="font-extrabold">{siteName}</span>
+            </Link>
+
+            <nav className="hidden md:flex items-center gap-5 text-xs font-bold text-[var(--text-secondary)]">
+              <Link href="/products" className="hover:text-[var(--text-primary)] transition">
+                کاتالوگ کالاها
+              </Link>
+              <Link href="/news" className="hover:text-[var(--text-primary)] transition">
+                رادار اخبار
+              </Link>
+              <Link href="/track-order" className="hover:text-[var(--text-primary)] transition">
+                پیگیری سفارش
+              </Link>
+              <Link href="/about" className="hover:text-[var(--text-primary)] transition">
+                درباره ما
+              </Link>
+              <Link href="/contact" className="hover:text-[var(--text-primary)] transition">
+                تماس با ما
+              </Link>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={toggleTheme}
+              className="w-9 h-9 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs transition cursor-pointer"
+              title="تغییر تم"
+            >
+              {isDarkMode ? "🌙" : "☀️"}
+            </button>
+
+            <Link
+              href={userPhone ? "/my-orders" : "/login"}
+              onClick={() => soundEngine.playClick()}
+              className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition flex items-center gap-1.5"
             >
               <span>👤</span>
-              <span className="text-[11px] sm:text-xs">{cfg.actions.account.label || "حساب کاربری"}</span>
+              <span className="hidden sm:inline">{userPhone ? "سفارش‌های من" : "حساب کاربری"}</span>
             </Link>
-          )}
 
-          {/* دکمه سبد خرید */}
-          {cfg.actions.cart.show && (
             <button
-              type="button"
               onClick={() => {
                 soundEngine.playClick();
-                openCart();
+                if (typeof cart?.openCart === "function") cart.openCart();
               }}
-              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 active:scale-95 transition cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 transition flex items-center gap-2 cursor-pointer"
             >
-              <span>🛍️</span>
-              {cfg.actions.cart.showCount && (
-                <span className="font-mono text-xs" suppressHydrationWarning>
-                  {totalCartCount}
-                </span>
-              )}
+              <span>🛒</span>
+              <span className="bg-white/20 px-2 py-0.5 rounded-full font-mono text-[11px]">{cartCount}</span>
             </button>
-          )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      <div className="h-24 sm:h-26" />
+    </>
   );
 }

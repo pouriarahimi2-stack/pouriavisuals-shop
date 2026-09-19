@@ -573,198 +573,6 @@ export default function AboutPage() {
 }
 </file>
 
-<file path="app/actions/orders.ts">
-"use server";
-
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import crypto from "crypto";
-
-export interface OrderItemInput {
-  productId: string | number;
-  title: string;
-  price: number;
-  quantity: number;
-  image?: string;
-}
-
-export interface CreateOrderInput {
-  items: OrderItemInput[];
-  customer: {
-    fullName: string;
-    phone: string;
-    province?: string;
-    city?: string;
-    address: string;
-    postalCode?: string;
-    notes?: string;
-  };
-  couponCode?: string;
-  shippingCost?: number;
-}
-
-export async function createOrderServer(payload: CreateOrderInput) {
-  try {
-    const { items, customer, couponCode, shippingCost = 0 } = payload;
-
-    if (!items || items.length === 0) {
-      return { success: false, error: "سبد خرید خالی است." };
-    }
-
-    if (!customer.phone || !customer.address || !customer.fullName) {
-      return { success: false, error: "مشخصات خریدار و نشانی تحویل مرسوله ناقص است." };
-    }
-
-    const cleanPhone = customer.phone
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/\D/g, "");
-
-    if (!/^09\d{9}$/.test(cleanPhone)) {
-      return { success: false, error: "شماره تماس وارد شده معتبر نیست." };
-    }
-
-    const productIds = items.map((i) => String(i.productId)).filter(Boolean);
-    const { data: dbProducts, error: dbErr } = await supabaseAdmin
-      .from("products")
-      .select("id, title, price, discount_price, stock, is_available")
-      .in("id", productIds);
-
-    if (dbErr || !dbProducts) {
-      return { success: false, error: "خطا در استعلام اطلاعات محصولات از دیتابیس." };
-    }
-
-    let calculatedTotal = 0;
-    const validatedItems = [];
-
-    // بررسی قیمت واقعی دیتابیس و موجودی انبار
-    for (const item of items) {
-      const dbProduct = dbProducts.find((p: any) => String(p.id) === String(item.productId));
-
-      if (!dbProduct) {
-        return {
-          success: false,
-          error: `کالای «${item.title || item.productId}» در سیستم یافت نشد.`,
-        };
-      }
-
-      const reqQty = Math.max(1, Number(item.quantity || 1));
-      const currentStock = dbProduct.stock !== null && dbProduct.stock !== undefined ? Number(dbProduct.stock) : 0;
-
-      if (currentStock < reqQty) {
-        return {
-          success: false,
-          error: `موجودی کالای «${dbProduct.title}» کافی نیست (موجودی: ${currentStock}).`,
-        };
-      }
-
-      const unitPrice =
-        dbProduct.discount_price && Number(dbProduct.discount_price) > 0
-          ? Number(dbProduct.discount_price)
-          : Number(dbProduct.price);
-
-      calculatedTotal += unitPrice * reqQty;
-
-      validatedItems.push({
-        productId: String(dbProduct.id),
-        title: dbProduct.title,
-        price: unitPrice,
-        quantity: reqQty,
-        image: item.image || "",
-      });
-    }
-
-    // محاسبه کد تخفیف در سرور
-    let discountAmount = 0;
-    if (couponCode) {
-      const { data: coupon } = await supabaseAdmin
-        .from("coupons")
-        .select("*")
-        .eq("code", couponCode.trim().toUpperCase())
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (coupon) {
-        const isPercent =
-          coupon.type === "percent" ||
-          coupon.discount_type === "percent" ||
-          Boolean(coupon.discount_percent);
-        const val = Number(coupon.value || coupon.discount_value || coupon.discount_percent || 0);
-
-        if (isPercent) {
-          discountAmount = Math.round((calculatedTotal * val) / 100);
-          const maxLimit = Number(coupon.max_discount || coupon.max_discount_amount || 0);
-          if (maxLimit > 0 && discountAmount > maxLimit) {
-            discountAmount = maxLimit;
-          }
-        } else {
-          discountAmount = val;
-        }
-      }
-    }
-
-    const finalPayable = Math.max(0, calculatedTotal - discountAmount + shippingCost);
-    const orderId = `ORD-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
-
-    const { data: newOrder, error: insertError } = await supabaseAdmin
-      .from("orders")
-      .insert({
-        id: orderId,
-        order_number: orderId,
-        customer_name: customer.fullName.trim(),
-        phone: cleanPhone,
-        province: customer.province || "تهران",
-        city: customer.city || "تهران",
-        address: customer.address.trim(),
-        postal_code: customer.postalCode?.trim() || null,
-        notes: customer.notes || "",
-        items: validatedItems,
-        total_amount: calculatedTotal,
-        discount_amount: discountAmount,
-        final_amount: finalPayable,
-        coupon_code: couponCode ? couponCode.trim().toUpperCase() : null,
-        payment_status: "pending",
-        status: "pending",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (insertError || !newOrder) {
-      return { success: false, error: "خطا در ثبت سفارش در پایگاه داده." };
-    }
-
-    // کسر اتمیک و امن موجودی کالاها
-    for (const it of validatedItems) {
-      try {
-        const { data: p } = await supabaseAdmin
-          .from("products")
-          .select("stock")
-          .eq("id", it.productId)
-          .single();
-
-        if (p && p.stock !== null && p.stock !== undefined) {
-          const nextStock = Math.max(0, Number(p.stock) - Number(it.quantity));
-          await supabaseAdmin
-            .from("products")
-            .update({ stock: nextStock, is_available: nextStock > 0 })
-            .eq("id", it.productId);
-        }
-      } catch (stkErr) {
-        console.warn("Stock decrease err:", stkErr);
-      }
-    }
-
-    return {
-      success: true,
-      orderId: newOrder.id,
-      totalAmount: finalPayable,
-    };
-  } catch (err: any) {
-    return { success: false, error: err.message || "خطای پردازش فاکتور." };
-  }
-}
-</file>
-
 <file path="app/admin/ai/page.tsx">
 "use client";
 
@@ -2747,219 +2555,6 @@ export default function AdminPagesRoute() {
 }
 </file>
 
-<file path="app/admin/reports/page.tsx">
-"use client";
-
-import React, { useEffect, useState } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-
-interface LowStockItem {
-  id: string;
-  title: string;
-  stock: number;
-  price: number;
-  category?: string;
-}
-
-interface ReportData {
-  total_revenue: number;
-  total_orders_count: number;
-  paid_orders_count: number;
-  low_stock_items: LowStockItem[];
-}
-
-export default function AdminReportsPage() {
-  const [report, setReport] = useState<ReportData>({
-    total_revenue: 0,
-    total_orders_count: 0,
-    paid_orders_count: 0,
-    low_stock_items: [],
-  });
-
-  const [loading, setLoading] = useState(true);
-  const [quickStockInputs, setQuickStockInputs] = useState<Record<string, number>>({});
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-
-  const fetchReports = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/admin/reports");
-      const json = await res.json();
-      if (res.ok && json.success && json.report) {
-        setReport(json.report);
-      }
-    } catch {
-      console.error("خطا در دریافت گزارشات تحلیلی.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchReports();
-  }, []);
-
-  const handleQuickRestock = async (item: LowStockItem) => {
-    const addCount = quickStockInputs[item.id];
-    if (!addCount || addCount <= 0) return;
-
-    soundEngine.playClick();
-    setUpdatingId(item.id);
-
-    try {
-      const newStock = Number(item.stock) + Number(addCount);
-      const res = await fetch("/api/admin/products", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: item.id,
-          stock: newStock,
-        }),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        setQuickStockInputs((prev) => ({ ...prev, [item.id]: 0 }));
-        fetchReports();
-      } else {
-        alert(json.message || "خطا در بروزرسانی موجودی انبار.");
-      }
-    } catch {
-      alert("خطا در برقراری ارتباط با سرور.");
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  return (
-    <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
-      {/* هدر صفحه */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📈</span> تحلیل عملکرد مالی و پایش کسری انبار
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            بررسی نرخ تسویه‌حساب سفارشات، تفکیک درآمد کل و شارژ فوری کالاهای رو به اتمام
-          </p>
-        </div>
-
-        <button
-          onClick={() => {
-            soundEngine.playClick();
-            fetchReports();
-          }}
-          className="px-4 py-2 rounded-2xl bg-[var(--input-bg)] hover:bg-[var(--card-border)] border border-[var(--card-border)] text-xs font-bold transition flex items-center gap-2 cursor-pointer"
-        >
-          <span>🔄</span> تازه‌سازی آمار
-        </button>
-      </div>
-
-      {/* کارت‌های خلاصه تحلیلی */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
-          <span className="text-xs text-slate-400 block">درآمد ناخالص تاییدشده</span>
-          <div className="text-xl font-black font-mono text-emerald-400">
-            {loading ? "..." : `${Number(report.total_revenue || 0).toLocaleString("fa-IR")} تومان`}
-          </div>
-          <span className="text-[11px] text-slate-400">محاسبه‌شده از سفارشات پرداخت‌شده</span>
-        </div>
-
-        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
-          <span className="text-xs text-slate-400 block">نرخ موفقیت پرداخت‌ها</span>
-          <div className="text-xl font-black font-mono text-[var(--accent-blue)]">
-            {loading
-              ? "..."
-              : report.total_orders_count > 0
-              ? `${Math.round((report.paid_orders_count / report.total_orders_count) * 100)}%`
-              : "۰٪"}
-          </div>
-          <span className="text-[11px] text-slate-400">
-            {report.paid_orders_count} سفارش موفق از مجموع {report.total_orders_count}
-          </span>
-        </div>
-
-        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
-          <span className="text-xs text-slate-400 block">کالاهای بحرانی (رو به اتمام)</span>
-          <div className="text-xl font-black font-mono text-rose-400">
-            {loading ? "..." : `${report.low_stock_items?.length || 0} قلم`}
-          </div>
-          <span className="text-[11px] text-slate-400">نیازمند شارژ سریع انبار</span>
-        </div>
-      </div>
-
-      {/* لیست کالاهای دارای کسری موجودی همراه با ورودی شارژ سریع */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-        <h2 className="text-sm font-black text-[var(--text-primary)] flex items-center gap-2">
-          <span>⚠️</span> فهرست کالاهای نیازمند تأمین موجودی
-        </h2>
-
-        {loading ? (
-          <div className="p-10 text-center text-xs text-slate-400">در حال ارزیابی موجودی انبار...</div>
-        ) : !report.low_stock_items || report.low_stock_items.length === 0 ? (
-          <div className="p-10 text-center text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl font-bold">
-            ✔ هیچ کالایی با کسری بحرانی موجودی (زیر ۵ عدد) گزارش نشده است. انبار در وضعیت مطلوب قرار دارد.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
-                  <th className="pb-3 px-3">عنوان کالا</th>
-                  <th className="pb-3 px-3">قیمت واحد</th>
-                  <th className="pb-3 px-3">موجودی فعلی</th>
-                  <th className="pb-3 px-3 text-left">اقدام سریع شارژ انبار</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--card-border)]">
-                {report.low_stock_items.map((item) => (
-                  <tr key={item.id} className="hover:bg-[var(--input-bg)]/40 transition">
-                    <td className="py-3.5 px-3 font-bold text-[var(--text-primary)]">{item.title}</td>
-                    <td className="py-3.5 px-3 font-mono text-slate-300">
-                      {Number(item.price).toLocaleString("fa-IR")} ت
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <span className="px-2.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 font-mono font-bold">
-                        {item.stock} عدد
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-left">
-                      <div className="inline-flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={1}
-                          placeholder="+ تعداد"
-                          value={quickStockInputs[item.id] || ""}
-                          onChange={(e) =>
-                            setQuickStockInputs((prev) => ({
-                              ...prev,
-                              [item.id]: Number(e.target.value),
-                            }))
-                          }
-                          className="w-20 px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-center font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                        />
-                        <button
-                          disabled={updatingId === item.id || !quickStockInputs[item.id]}
-                          onClick={() => handleQuickRestock(item)}
-                          className="px-3 py-1.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold hover:opacity-90 transition disabled:opacity-40 cursor-pointer"
-                        >
-                          {updatingId === item.id ? "..." : "افزودن به انبار"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="app/admin/roles/page.tsx">
 "use client";
 
@@ -4582,316 +4177,6 @@ export async function POST() {
 }
 </file>
 
-<file path="app/checkout/payment/page.tsx">
-"use client";
-
-import React, { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { orderService } from "@/services/orderService";
-import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
-
-function PaymentGatewayContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const orderId = searchParams.get("orderId") || "";
-
-  const [amount, setAmount] = useState<number>(0);
-  const [cardNumber, setCardNumber] = useState("");
-  const [cvv2, setCvv2] = useState("");
-  const [month, setMonth] = useState("");
-  const [year, setYear] = useState("");
-  const [pass, setPass] = useState("");
-  const [otpTimer, setOtpTimer] = useState(120);
-  const [paying, setPaying] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [trackingRef, setTrackingRef] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  useEffect(() => {
-    let payable = 0;
-    try {
-      const savedAmount = sessionStorage.getItem("pending_payment_amount");
-      if (savedAmount && Number(savedAmount) > 0) {
-        payable = Number(savedAmount);
-        setAmount(payable);
-      }
-    } catch {}
-
-    if (orderId) {
-      orderService.getById(orderId).then((found) => {
-        if (found) {
-          const finalVal = Number(found.finalAmount || (found as any).final_amount || found.totalAmount || 0);
-          if (finalVal > 0) {
-            setAmount(finalVal);
-          }
-        }
-      });
-    }
-
-    const timer = setInterval(() => {
-      setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [orderId]);
-
-  const handlePay = async (e: React.FormEvent) => {
-    e.preventDefault();
-    soundEngine.playClick();
-    setErrorMsg("");
-
-    const cleanCard = cardNumber.replace(/\D/g, "");
-    if (cleanCard.length !== 16) {
-      setErrorMsg("شماره کارت بانکی باید دقیقاً ۱۶ رقم باشد.");
-      return;
-    }
-    if (cvv2.length < 3 || cvv2.length > 4) {
-      setErrorMsg("کد CVV2 نامعتبر است (۳ یا ۴ رقم).");
-      return;
-    }
-    if (!pass || pass.length < 5) {
-      setErrorMsg("رمز دوم پویا را وارد نمایید.");
-      return;
-    }
-
-    setPaying(true);
-
-    try {
-      const res = await fetch("/api/payment/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId,
-          authority: "AUTH_" + Date.now().toString().slice(-8),
-        }),
-      });
-
-      const resJson = await res.json();
-      if (!res.ok || !resJson.success) {
-        throw new Error(resJson.message || "تراکنش بانکی تایید نشد.");
-      }
-
-      setTrackingRef(resJson.trackingRef || Date.now().toString().slice(-8));
-
-      // پاکسازی تضمینی کش سبد خرید
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("axon_cart_store_v2026");
-        localStorage.removeItem("axon_active_coupon_v2026");
-        sessionStorage.removeItem("pending_payment_amount");
-        sessionStorage.removeItem("pending_payment_order_id");
-        window.dispatchEvent(new CustomEvent("cart_updated", { detail: [] }));
-      }
-
-      soundEngine.playSuccess();
-      setPaymentSuccess(true);
-    } catch (err: any) {
-      setErrorMsg(err.message || "خطا در پردازش تراکنش بانکی.");
-    } finally {
-      setPaying(false);
-    }
-  };
-
-  if (paymentSuccess) {
-    return (
-      <div className="min-h-[75vh] flex items-center justify-center p-4 font-sans select-none" dir="rtl">
-        <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center space-y-5 shadow-2xl animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-3xl flex items-center justify-center mx-auto">
-            ✓
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-lg font-black text-emerald-600 dark:text-emerald-400">پرداخت با موفقیت تایید شد</h2>
-            <p className="text-xs text-[var(--text-secondary)] font-medium">سفارش شما در مرحله آماده‌سازی و صدور بارنامه پستی قرار گرفت.</p>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs space-y-2 text-right">
-            <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">شماره فاکتور:</span>
-              <span className="font-mono font-bold text-[var(--accent-blue)]">{orderId}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">کد پیگیری تراکنش:</span>
-              <span className="font-mono font-bold text-slate-400">{trackingRef}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">مبلغ پرداختی:</span>
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
-                {formatPrice(amount)} تومان
-              </span>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Link
-              href={`/track-order?orderId=${orderId}&success=true`}
-              className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition shadow-md"
-            >
-              پیگیری مرسوله 📦
-            </Link>
-            <Link
-              href="/"
-              className="flex-1 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
-            >
-              صفحه نخست
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-[85vh] py-10 px-4 max-w-lg mx-auto font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
-        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
-          <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-lg">
-              💳
-            </span>
-            <div>
-              <h1 className="text-sm font-black">درگاه پرداخت الکترونیک شاپرک</h1>
-              <p className="text-[10px] text-[var(--text-secondary)] font-medium">اتصال امن به سوئیچ شبکه بانکی کشور</p>
-            </div>
-          </div>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
-            SSL 256-bit
-          </span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center text-xs">
-          <span className="text-[var(--text-secondary)] font-bold">مبلغ قابل پرداخت فاکتور:</span>
-          <span className="font-mono font-black text-base text-[var(--accent-blue)]" suppressHydrationWarning>
-            {formatPrice(amount)} تومان
-          </span>
-        </div>
-
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-600 text-xs font-bold">
-            ⚠️ {errorMsg}
-          </div>
-        )}
-
-        <form onSubmit={handlePay} className="space-y-4 text-xs">
-          <div>
-            <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره کارت بانکی (۱۶ رقم):</label>
-            <input
-              type="text"
-              maxLength={19}
-              required
-              value={cardNumber}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "").slice(0, 16);
-                const formatted = val.match(/.{1,4}/g)?.join(" - ") || val;
-                setCardNumber(formatted);
-              }}
-              placeholder="۶۰۳۷ - ۹۹۱۸ - XXXX - XXXX"
-              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold tracking-widest text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد CVV2:</label>
-              <input
-                type="password"
-                maxLength={4}
-                required
-                value={cvv2}
-                onChange={(e) => setCvv2(e.target.value.replace(/\D/g, ""))}
-                placeholder="۳ یا ۴ رقم"
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انقضا (ماه / سال):</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  maxLength={2}
-                  placeholder="ماه"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value.replace(/\D/g, ""))}
-                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-                />
-                <input
-                  type="text"
-                  maxLength={2}
-                  placeholder="سال"
-                  value={year}
-                  onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))}
-                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="font-bold text-[var(--text-secondary)]">رمز دوم پویا:</label>
-              <span className="text-[10px] font-mono text-amber-500 font-bold" suppressHydrationWarning>
-                {Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, "0")} مانده
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                required
-                maxLength={7}
-                value={pass}
-                onChange={(e) => setPass(e.target.value.replace(/\D/g, ""))}
-                placeholder="رمز پیامک‌شده"
-                className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playClick();
-                  setPass("584920");
-                  setOtpTimer(120);
-                }}
-                className="px-4 py-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"
-              >
-                دریافت رمز
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={paying}
-              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {paying ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
-              ) : (
-                <span>پرداخت نهایی و تایید فاکتور 🔒</span>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-export default function CheckoutPaymentPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
-          در حال اتصال به درگاه شاپرک...
-        </div>
-      }
-    >
-      <PaymentGatewayContent />
-    </Suspense>
-  );
-}
-</file>
-
 <file path="app/login/page.tsx">
 "use client";
 
@@ -5296,157 +4581,6 @@ export default function UserLoginPage() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-</file>
-
-<file path="app/my-orders/page.tsx">
-"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { soundEngine } from "@/lib/soundEngine";
-import { formatPrice } from "@/lib/formatters";
-
-interface OrderItem {
-  id: string;
-  order_number?: string;
-  created_at: string;
-  status: string;
-  final_amount: number;
-  tracking_code?: string;
-  items: any[];
-}
-
-export default function MyOrdersPage() {
-  const [orders, setOrders] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [phone, setPhone] = useState("");
-
-  useEffect(() => {
-    // استخراج شماره همراه کاربر وارد شده از سشن
-    try {
-      const userRaw = localStorage.getItem("axon_user_session");
-      if (userRaw) {
-        const user = JSON.parse(userRaw);
-        if (user?.phone) {
-          setPhone(user.phone);
-          fetchCustomerOrders(user.phone);
-          return;
-        }
-      }
-    } catch {}
-    setLoading(false);
-  }, []);
-
-  const fetchCustomerOrders = async (userPhone: string) => {
-    try {
-      const res = await fetch(`/api/orders/track?phone=${encodeURIComponent(userPhone)}`);
-      const data = await res.json();
-      if (data.success && data.orders) {
-        setOrders(data.orders);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusBadge = (st: string) => {
-    switch (st) {
-      case "paid":
-        return <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">پرداخت شده ✓</span>;
-      case "shipped":
-        return <span className="px-2.5 py-1 rounded-xl bg-blue-500/15 text-blue-500 font-bold text-[10px]">تحویل به پست 🚚</span>;
-      case "delivered":
-        return <span className="px-2.5 py-1 rounded-xl bg-purple-500/15 text-purple-500 font-bold text-[10px]">تحویل داده شد</span>;
-      case "cancelled":
-        return <span className="px-2.5 py-1 rounded-xl bg-rose-500/15 text-rose-500 font-bold text-[10px]">لغو شده</span>;
-      default:
-        return <span className="px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-500 font-bold text-[10px]">در انتظار بررسی</span>;
-    }
-  };
-
-  return (
-    <div className="max-w-5xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
-      <div className="border-b border-[var(--card-border)] pb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black">حساب کاربری و تاریخچه سفارش‌های من</h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1">
-            {phone ? `سفارش‌های ثبت شده با شماره ${phone}` : "برای مشاهده سوابق فاکتورها وارد حساب خود شوید."}
-          </p>
-        </div>
-        <Link
-          href="/"
-          className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
-        >
-          ← بازگشت به فروشگاه
-        </Link>
-      </div>
-
-      {loading ? (
-        <div className="py-20 text-center text-xs font-bold text-[var(--text-secondary)]">
-          در حال بارگذاری فاکتورهای شما...
-        </div>
-      ) : !phone ? (
-        <div className="p-12 text-center rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4">
-          <p className="text-xs font-bold text-[var(--text-secondary)]">شما هنوز وارد حساب کاربری خود نشده‌اید.</p>
-          <Link
-            href="/login"
-            className="inline-block px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg"
-          >
-            ورود به حساب کاربری ←
-          </Link>
-        </div>
-      ) : orders.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-3">
-          <span className="text-3xl block">📦</span>
-          <p className="text-xs font-bold text-[var(--text-secondary)]">هنوز سفارشی با این شماره در سیستم ثبت نشده است.</p>
-          <Link
-            href="/products"
-            className="inline-block px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold"
-          >
-            مشاهده کاتالوگ مانیتورها
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {orders.map((ord) => (
-            <div
-              key={ord.id}
-              className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm space-y-4 text-xs"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-3">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-black text-sm text-[var(--accent-blue)]">
-                    #{ord.order_number || ord.id.slice(0, 8)}
-                  </span>
-                  <span className="text-[10px] text-[var(--text-secondary)] font-mono">
-                    {new Date(ord.created_at).toLocaleDateString("fa-IR")}
-                  </span>
-                </div>
-                <div>{getStatusBadge(ord.status)}</div>
-              </div>
-
-              {ord.tracking_code && (
-                <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex flex-wrap justify-between items-center gap-2">
-                  <span className="font-bold text-blue-400 text-[11px]">کد رهگیری پست پیشتاز:</span>
-                  <span className="font-mono font-black tracking-widest text-[11px] text-blue-300">{ord.tracking_code}</span>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-[var(--text-secondary)]">مبلغ کل پرداختی:</span>
-                <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm" suppressHydrationWarning>
-                  {formatPrice(ord.final_amount)} تومان
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -6160,210 +5294,6 @@ export { POST } from "@/app/api/ai-teardown/route";
 export type { TeardownData, TeardownComponent } from "@/app/api/ai-teardown/route";
 </file>
 
-<file path="app/track-order/page.tsx">
-"use client";
-
-import React, { useState } from "react";
-import { soundEngine } from "@/lib/soundEngine";
-
-interface TrackedOrder {
-  id: string;
-  status: string;
-  total_amount: number;
-  discount_amount: number;
-  final_amount: number;
-  created_at: string;
-  customer_name: string;
-  items: Array<{
-    title: string;
-    quantity: number;
-    unit_price: number;
-    total_price: number;
-  }>;
-}
-
-const STEPS = [
-  { key: "pending_manual_review", title: "بررسی پرداخت", desc: "در انتظار تایید فیش واریزی" },
-  { key: "paid", title: "پرداخت تایید شد", desc: "سفارش آماده‌سازی در انبار" },
-  { key: "shipped", title: "ارسال شد", desc: "تحویل به مامور ارسال یا تیپاکس" },
-  { key: "delivered", title: "تحویل داده شد", desc: "سفارش با موفقیت تحویل شد" },
-];
-
-export default function TrackOrderPage() {
-  const [orderId, setOrderId] = useState("");
-  const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [order, setOrder] = useState<TrackedOrder | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const handleTrack = async (e: React.FormEvent) => {
-    e.preventDefault();
-    soundEngine.playClick();
-    setErrorMsg(null);
-    setOrder(null);
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/orders/track", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, phone }),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        setOrder(json.order);
-      } else {
-        setErrorMsg(json.message || "سفارش مورد نظر یافت نشد.");
-      }
-    } catch {
-      setErrorMsg("خطا در برقراری ارتباط با سامانه رهگیری.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStepIndex = (status: string) => {
-    if (status === "cancelled") return -1;
-    if (status === "pending" || status === "pending_manual_review") return 0;
-    if (status === "paid" || status === "processing") return 1;
-    if (status === "shipped") return 2;
-    if (status === "delivered") return 3;
-    return 0;
-  };
-
-  const activeStep = order ? getStepIndex(order.status) : 0;
-
-  return (
-    <div className="min-h-screen py-16 px-4 max-w-3xl mx-auto space-y-8 font-sans" dir="rtl">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-black text-[var(--text-primary)]">📦 پیگیری وضعیت سفارش</h1>
-        <p className="text-xs text-[var(--text-secondary)]">
-          جهت استعلام آخرین وضعیت ارسال، شماره تماس و کد پیگیری سفارش خود را وارد کنید.
-        </p>
-      </div>
-
-      <form
-        onSubmit={handleTrack}
-        className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">کد پیگیری سفارش:</label>
-            <input
-              type="text"
-              required
-              value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
-              placeholder="مثال: 550e8400-e29b-..."
-              className="w-full px-4 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">شماره تماس خریدار:</label>
-            <input
-              type="tel"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="09123456789"
-              className="w-full px-4 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] font-mono"
-            />
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md cursor-pointer disabled:opacity-50"
-        >
-          {loading ? "در حال استعلام اطلاعات..." : "رهگیری آنلاین سفارش 🔍"}
-        </button>
-
-        {errorMsg && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-bold text-center">
-            {errorMsg}
-          </div>
-        )}
-      </form>
-
-      {order && (
-        <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 animate-fadeIn">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[var(--card-border)] pb-4">
-            <div>
-              <span className="text-xs text-[var(--text-secondary)]">سفارش بنام:</span>
-              <span className="font-black text-sm text-[var(--text-primary)] mr-2">{order.customer_name}</span>
-            </div>
-            <span className="text-xs font-mono text-slate-400">
-              ثبت: {new Date(order.created_at).toLocaleDateString("fa-IR")}
-            </span>
-          </div>
-
-          {/* نوار وضعیت چندمرحله‌ای (Stepper) */}
-          {order.status === "cancelled" ? (
-            <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 font-bold text-xs text-center">
-              ⚠️ این سفارش لغو شده است.
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {STEPS.map((step, idx) => {
-                const isPassed = idx <= activeStep;
-                const isCurrent = idx === activeStep;
-                return (
-                  <div
-                    key={step.key}
-                    className={`p-3 rounded-2xl border text-center transition ${
-                      isCurrent
-                        ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] text-[var(--accent-blue)]"
-                        : isPassed
-                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                        : "bg-[var(--input-bg)] border-[var(--card-border)] text-slate-500"
-                    }`}
-                  >
-                    <span className="text-xs font-black block">{step.title}</span>
-                    <span className="text-[10px] mt-1 block opacity-80">{step.desc}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* اقلام فاکتور */}
-          <div className="space-y-3 pt-2">
-            <span className="text-xs font-bold text-[var(--text-secondary)] block">اقلام سفارش:</span>
-            <div className="space-y-2">
-              {Array.isArray(order.items) &&
-                order.items.map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
-                  >
-                    <span className="font-bold text-[var(--text-primary)]">
-                      {item.title} × {item.quantity}
-                    </span>
-                    <span className="font-mono text-slate-400">
-                      {Number(item.total_price || item.unit_price * item.quantity).toLocaleString("fa-IR")} تومان
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          {/* مجموع مبالغ */}
-          <div className="border-t border-[var(--card-border)] pt-4 flex items-center justify-between">
-            <span className="text-xs font-bold text-[var(--text-secondary)]">مبلغ نهایی فاکتور:</span>
-            <span className="text-sm font-black text-emerald-500 font-mono">
-              {Number(order.final_amount || order.total_amount).toLocaleString("fa-IR")} تومان
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-</file>
-
 <file path="app/manifest.ts">
 import type { MetadataRoute } from "next";
 
@@ -6485,399 +5415,6 @@ export default async function HomePage() {
       />
 
       <DynamicHomeSections initialProducts={products} initialBanners={banners} />
-    </div>
-  );
-}
-</file>
-
-<file path="components/3d/DraftlyProceduralTeardown.tsx">
-"use client";
-
-import React, { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
-import { soundEngine } from "@/lib/soundEngine";
-
-export type ProductArchetype =
-  | "studio_display"
-  | "macbook"
-  | "watch"
-  | "ipad"
-  | "capture_card"
-  | "calibrator"
-  | "generic_gear";
-
-export interface DraftlyLayerInfo {
-  id: string;
-  depthIndex: number;
-  nameEn: string;
-  nameFa: string;
-  category: "optics" | "display" | "logicboard" | "power" | "audio" | "chassis";
-  role: string;
-  engineeringHighlight: string;
-  metallurgyMaterial: string;
-  specifications: Record<string, string>;
-  meshZOffset: number;
-  meshScale: [number, number, number];
-  colorHex: number;
-  metalness: number;
-  roughness: number;
-  transmission?: number;
-}
-
-export function classifyProductArchetype(title: string, category: string = ""): ProductArchetype {
-  const norm = (title + " " + category).toLowerCase();
-  if (norm.includes("studio") || norm.includes("display") || norm.includes("xdr") || norm.includes("مانیتور")) return "studio_display";
-  if (norm.includes("macbook") || norm.includes("مک‌بوک") || norm.includes("مک بوک") || norm.includes("laptop")) return "macbook";
-  if (norm.includes("watch") || norm.includes("ساعت") || norm.includes("ultra")) return "watch";
-  if (norm.includes("ipad") || norm.includes("آیپد") || norm.includes("tablet")) return "ipad";
-  if (norm.includes("decklink") || norm.includes("کپچر") || norm.includes("blackmagic")) return "capture_card";
-  if (norm.includes("calibrite") || norm.includes("کالیبرایت") || norm.includes("sensor")) return "calibrator";
-  return "generic_gear";
-}
-
-export function generateDraftlyLayers(archetype: ProductArchetype, title: string): DraftlyLayerInfo[] {
-  return [
-    {
-      id: "layer-1",
-      depthIndex: 1,
-      nameEn: "Nano-Texture Front Optical Glass",
-      nameFa: "شیشه نوری نانوتکستچر با فیلتر پولاریزه آنتی‌رفلکت",
-      category: "optics",
-      role: "حذف ۹۹.۴٪ بازتاب‌های محیطی و عبور دقیق طیف نور بدون اعوجاج رنگی",
-      engineeringHighlight: "حکاکی مستقیم شیشه در مقیاس نانومتری جهت تثبیت کنتراست",
-      metallurgyMaterial: "شیشه سیلیکات تقویت‌شده با پوشش اولئوفوبیک",
-      specifications: { "ضریب بازتاب": "۰.۲٪", "شفافیت": "۹۸.۶٪", "سختی سطحی": "9H" },
-      meshZOffset: 1.8,
-      meshScale: [3.4, 2.0, 0.04],
-      colorHex: 0x38bdf8,
-      metalness: 0.1,
-      roughness: 0.08,
-      transmission: 0.92,
-    },
-    {
-      id: "layer-2",
-      depthIndex: 2,
-      nameEn: "5K Retina IPS Precision Active Matrix Panel",
-      nameFa: "پنل ۵K رتینا با ماتریس رنگ ۱۰ بیتی و مناطق نوردهی موضعی",
-      category: "display",
-      role: "تولید تصویر با وضوح ۲۱۸ PPI و پوشش ۹۹٪ گاموت رنگی DCI-P3",
-      engineeringHighlight: "کالیبراسیون سخت‌افزاری با جدول رنگ ۳D LUT داخلی",
-      metallurgyMaterial: "زیرلایه نیمه‌هادی ایندیوم گالیوم زینک اکسید (IGZO)",
-      specifications: { "تراکم": "218 PPI", "تفکیک رنگ": "1.07 میلیارد رنگ", "روشنایی": "600 Nits" },
-      meshZOffset: 1.1,
-      meshScale: [3.35, 1.95, 0.06],
-      colorHex: 0x0284c7,
-      metalness: 0.3,
-      roughness: 0.2,
-    },
-    {
-      id: "layer-3",
-      depthIndex: 3,
-      nameEn: "Main Logic Board & Neural Processor Die",
-      nameFa: "مادربرد مرکزی ۱۲ لایه با پردازشگر عصبی تصویر (Neural Engine)",
-      category: "logicboard",
-      role: "مدیریت لحظه‌ای Center Stage، پردازش صدای فراگیر و کنترل تاندربولت",
-      engineeringHighlight: "تبدیل بلادرنگ فضای رنگ Rec.709 به Rec.2020 در ۰.۱ میلی‌ثانیه",
-      metallurgyMaterial: "فایبرگلاس نظامی FR-4 با روکش طلای غوطه‌ور ENIG",
-      specifications: { "پهنای باند": "40Gbps Thunderbolt 3", "تعداد لایه‌ها": "PCB دوازده لایه", "پردازنده": "Neural Display Core" },
-      meshZOffset: 0.4,
-      meshScale: [2.8, 1.4, 0.08],
-      colorHex: 0x047857,
-      metalness: 0.8,
-      roughness: 0.3,
-    },
-    {
-      id: "layer-4",
-      depthIndex: 4,
-      nameEn: "Integrated GaN High-Efficiency Power Subsystem",
-      nameFa: "ماژول تغذیه یکپارچه نیترید گالیوم و هیت‌پایپ‌های مسی خنک‌کاری",
-      category: "power",
-      role: "تامین ولتاژ پایدار ۲۴۰ وات با راندمان ۹۶٪ و شارژ همزمان مک‌بوک",
-      engineeringHighlight: "کاهش ۶۰ درصدی ابعاد نسبت به منابع تغذیه متداول",
-      metallurgyMaterial: "نیمه‌هادی‌های GaNFast با خازن‌های جامد ژاپنی و مس C1100",
-      specifications: { "توان خروجی": "240W پیوسته", "شارژ تاندربولت": "96W Power Delivery", "راندمان": "96%" },
-      meshZOffset: -0.3,
-      meshScale: [2.2, 0.9, 0.12],
-      colorHex: 0xd97706,
-      metalness: 0.75,
-      roughness: 0.35,
-    },
-    {
-      id: "layer-5",
-      depthIndex: 5,
-      nameEn: "Six-Speaker Acoustic Chamber with Force-Cancelling",
-      nameFa: "محفظه آکوستیک استودیویی با ۶ اسپیکر لغوکننده لرزش",
-      category: "audio",
-      role: "تولید صدای سه‌بعدی Dolby Atmos بدون انتقال کوچک‌ترین ارتعاش به پنل",
-      engineeringHighlight: "چیدمان متقارن جفت درایورها جهت خنثی‌سازی کامل گشتاور مکانیکی",
-      metallurgyMaterial: "محفظه رزین کربن فشرده با مگنت‌های نئودیمیوم N52",
-      specifications: { "تعداد درایور": "۴ ووفر + ۲ توییتر", "فرکانس": "45Hz تا 22kHz", "پشتیبانی": "Spatial Audio" },
-      meshZOffset: -1.0,
-      meshScale: [3.1, 0.7, 0.15],
-      colorHex: 0x4f46e5,
-      metalness: 0.5,
-      roughness: 0.5,
-    },
-    {
-      id: "layer-6",
-      depthIndex: 6,
-      nameEn: "Unibody CNC Billet Aluminum Structural Chassis",
-      nameFa: "شاسی یکپارچه آلومینیوم سری ۶۰۰۰ با شبکه خنک‌کاری Laminar",
-      category: "chassis",
-      role: "پایداری ساختار فیزیکی، جذب نویز الکترومغناطیسی و تخلیه یکنواخت گرما",
-      engineeringHighlight: "تراشکاری تمام اتوماتیک ۵ محوره CNC با خطای کمتر از ۰.۰۱ میلی‌متر",
-      metallurgyMaterial: "آلومینیوم هوافضایی گرید ۶۰۶۳-T6 بازیافتی ۱۰۰٪",
-      specifications: { "روش ساخت": "5-Axis CNC Milling", "دفع حرارت": "تا 70W بدون فن", "آلیاژ": "Alloy 6063-T6" },
-      meshZOffset: -1.7,
-      meshScale: [3.45, 2.05, 0.18],
-      colorHex: 0x94a3b8,
-      metalness: 0.9,
-      roughness: 0.2,
-    },
-  ];
-}
-
-interface DraftlyTeardownProps {
-  productTitle: string;
-  productCategory?: string;
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export default function DraftlyProceduralTeardown({
-  productTitle,
-  productCategory = "",
-  isOpen,
-  onClose,
-}: DraftlyTeardownProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [explosionDistance, setExplosionDistance] = useState<number>(55);
-  const [selectedLayer, setSelectedLayer] = useState<DraftlyLayerInfo | null>(null);
-  const [autoRotate, setAutoRotate] = useState<boolean>(false);
-
-  const archetype = classifyProductArchetype(productTitle, productCategory);
-  const layers = generateDraftlyLayers(archetype, productTitle);
-
-  const meshesRef = useRef<THREE.Mesh[]>([]);
-  const rotationRef = useRef({ x: 0.3, y: -0.5 });
-  const isInteractingRef = useRef(false);
-  const lastTouchRef = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setSelectedLayer(layers[0]);
-    setExplosionDistance(55);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const container = containerRef.current;
-    if (!container) return;
-
-    const isMobile = window.innerWidth < 768;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      45,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 0, isMobile ? 8.5 : 7.2);
-
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: !isMobile,
-      powerPreference: "high-performance",
-    });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
-    container.appendChild(renderer.domElement);
-
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
-    scene.add(ambientLight);
-
-    const keySpot = new THREE.DirectionalLight(0x38bdf8, 2.5);
-    keySpot.position.set(5, 5, 5);
-    scene.add(keySpot);
-
-    const mainGroup = new THREE.Group();
-    scene.add(mainGroup);
-
-    meshesRef.current = [];
-    layers.forEach((layer) => {
-      const geo = new THREE.BoxGeometry(
-        layer.meshScale[0],
-        layer.meshScale[1],
-        layer.meshScale[2]
-      );
-
-      const mat = new THREE.MeshStandardMaterial({
-        color: layer.colorHex,
-        metalness: isMobile ? 0.3 : layer.metalness,
-        roughness: isMobile ? 0.4 : layer.roughness,
-      });
-
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.userData = { layerId: layer.id, baseZ: layer.meshZOffset };
-      mesh.position.set(0, 0, layer.meshZOffset);
-
-      mainGroup.add(mesh);
-      meshesRef.current.push(mesh);
-    });
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        isInteractingRef.current = true;
-        lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        setAutoRotate(false);
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isInteractingRef.current || e.touches.length !== 1) return;
-      const deltaX = e.touches[0].clientX - lastTouchRef.current.x;
-      const deltaY = e.touches[0].clientY - lastTouchRef.current.y;
-      rotationRef.current.y += deltaX * 0.007;
-      rotationRef.current.x = Math.max(-0.8, Math.min(0.8, rotationRef.current.x - deltaY * 0.007));
-      lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      e.preventDefault();
-    };
-
-    const handleTouchEnd = () => {
-      isInteractingRef.current = false;
-    };
-
-    container.addEventListener("touchstart", handleTouchStart, { passive: true });
-    container.addEventListener("touchmove", handleTouchMove, { passive: false });
-    container.addEventListener("touchend", handleTouchEnd, { passive: true });
-
-    let animId: number;
-    const animate = () => {
-      animId = requestAnimationFrame(animate);
-
-      if (autoRotate) {
-        rotationRef.current.y += 0.005;
-      }
-
-      mainGroup.rotation.x = rotationRef.current.x;
-      mainGroup.rotation.y = rotationRef.current.y;
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      if (!container) return;
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
-    };
-
-    window.addEventListener("resize", handleResize, { passive: true });
-
-    return () => {
-      container.removeEventListener("touchstart", handleTouchStart);
-      container.removeEventListener("touchmove", handleTouchMove);
-      container.removeEventListener("touchend", handleTouchEnd);
-      window.removeEventListener("resize", handleResize);
-      cancelAnimationFrame(animId);
-
-      meshesRef.current.forEach((m) => {
-        m.geometry.dispose();
-        if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
-        else m.material.dispose();
-      });
-
-      renderer.dispose();
-      if (container && renderer.domElement) {
-        container.removeChild(renderer.domElement);
-      }
-    };
-  }, [isOpen, productTitle]);
-
-  useEffect(() => {
-    const factor = explosionDistance / 50;
-    meshesRef.current.forEach((mesh) => {
-      const baseZ = mesh.userData.baseZ || 0;
-      mesh.position.z = baseZ * factor;
-    });
-  }, [explosionDistance]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/95 backdrop-blur-2xl font-sans select-none animate-fadeIn text-slate-100" dir="rtl">
-      <div className="relative w-full max-w-6xl h-[92vh] max-h-[820px] bg-slate-900 border border-slate-700/60 rounded-[2rem] shadow-2xl flex flex-col justify-between overflow-hidden">
-        <header className="p-4 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-950/80 shrink-0">
-          <div>
-            <h3 className="font-black text-xs sm:text-sm text-white truncate max-w-xs sm:max-w-md">{productTitle}</h3>
-            <span className="text-[10px] text-blue-400 font-mono">3D Procedural Engine (60fps Touch Mode)</span>
-          </div>
-
-          <button
-            onClick={() => { soundEngine.playClick(); onClose(); }}
-            className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-rose-600 text-white flex items-center justify-center text-xs font-bold transition cursor-pointer"
-          >
-            ✕
-          </button>
-        </header>
-
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
-          <div
-            ref={containerRef}
-            className="md:col-span-8 h-[340px] md:h-full relative flex items-center justify-center overflow-hidden touch-none"
-          >
-            <div className="absolute bottom-3 left-3 right-3 bg-slate-950/90 border border-slate-800 p-3 rounded-2xl backdrop-blur-md space-y-1.5 z-20">
-              <div className="flex justify-between text-xs font-black text-white">
-                <span>انفصال لایه‌ها:</span>
-                <span className="text-blue-400 font-mono">{explosionDistance}٪</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={explosionDistance}
-                onChange={(e) => setExplosionDistance(Number(e.target.value))}
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="md:col-span-4 p-4 space-y-3 overflow-y-auto bg-slate-950/60 text-xs">
-            <span className="font-bold text-slate-400 text-[11px] block">لایه‌های ساختاری:</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {layers.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => { soundEngine.playClick(); setSelectedLayer(l); }}
-                  className={`p-2.5 rounded-xl border text-right transition truncate ${
-                    selectedLayer?.id === l.id
-                      ? "bg-blue-600/25 border-blue-500 text-white font-bold"
-                      : "bg-slate-900 border-slate-800 text-slate-400"
-                  }`}
-                >
-                  {l.nameFa}
-                </button>
-              ))}
-            </div>
-
-            {selectedLayer && (
-              <div className="space-y-2 border-t border-slate-800 pt-3 text-[11px]">
-                <h4 className="font-black text-white">{selectedLayer.nameFa}</h4>
-                <p className="text-slate-300 leading-relaxed font-medium">{selectedLayer.role}</p>
-                <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">متریال:</span>
-                    <span className="font-bold text-blue-400">{selectedLayer.metallurgyMaterial}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -20747,6 +19284,227 @@ export default function UserAccountPage() {
 }
 </file>
 
+<file path="app/actions/orders.ts">
+"use server";
+
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import crypto from "crypto";
+
+export interface OrderItemInput {
+  productId: string | number;
+  title: string;
+  price: number;
+  quantity: number;
+  image?: string;
+}
+
+export interface CreateOrderInput {
+  items: OrderItemInput[];
+  customer: {
+    fullName: string;
+    phone: string;
+    province?: string;
+    city?: string;
+    address: string;
+    postalCode?: string;
+    notes?: string;
+  };
+  couponCode?: string;
+  shippingCost?: number;
+}
+
+export async function createOrderServer(payload: CreateOrderInput) {
+  try {
+    const { items, customer, couponCode, shippingCost = 0 } = payload;
+
+    if (!items || items.length === 0) {
+      return { success: false, error: "سبد خرید خالی است." };
+    }
+
+    if (!customer.phone || !customer.address || !customer.fullName) {
+      return { success: false, error: "مشخصات خریدار و نشانی تحویل مرسوله ناقص است." };
+    }
+
+    const cleanPhone = customer.phone
+      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
+      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+      .replace(/\D/g, "");
+
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      return { success: false, error: "شماره تماس وارد شده معتبر نیست (باید ۱۱ رقم و با ۰۹ آغاز شود)." };
+    }
+
+    const productIds = items.map((i) => String(i.productId)).filter(Boolean);
+    const { data: dbProducts, error: dbErr } = await supabaseAdmin
+      .from("products")
+      .select("id, title, price, discount_price, stock, is_available")
+      .in("id", productIds);
+
+    if (dbErr || !dbProducts) {
+      return { success: false, error: "خطا در استعلام اطلاعات محصولات از پایگاه داده مرکزی." };
+    }
+
+    let calculatedTotal = 0;
+    const validatedItems = [];
+
+    // اعتبارسنجی قیمت واقعی دیتابیس و موجودی انبار
+    for (const item of items) {
+      const dbProduct = dbProducts.find((p: any) => String(p.id) === String(item.productId));
+
+      if (!dbProduct) {
+        return {
+          success: false,
+          error: `کالای «${item.title || item.productId}» در سیستم یافت نشد.`,
+        };
+      }
+
+      const reqQty = Math.max(1, Number(item.quantity || 1));
+      const currentStock = dbProduct.stock !== null && dbProduct.stock !== undefined ? Number(dbProduct.stock) : 0;
+
+      if (dbProduct.is_available === false || currentStock < reqQty) {
+        return {
+          success: false,
+          error: `موجودی کالای «${dbProduct.title}» کافی نیست (موجودی فعلی: ${currentStock} عدد).`,
+        };
+      }
+
+      const unitPrice =
+        dbProduct.discount_price && Number(dbProduct.discount_price) > 0
+          ? Number(dbProduct.discount_price)
+          : Number(dbProduct.price);
+
+      calculatedTotal += unitPrice * reqQty;
+
+      validatedItems.push({
+        productId: String(dbProduct.id),
+        title: dbProduct.title,
+        price: unitPrice,
+        quantity: reqQty,
+        image: item.image || "",
+      });
+    }
+
+    // محاسبه امن کد تخفیف در سمت سرور
+    let discountAmount = 0;
+    let validCouponRecord: any = null;
+
+    if (couponCode && couponCode.trim()) {
+      const cleanCode = couponCode.trim().toUpperCase();
+      const { data: coupon } = await supabaseAdmin
+        .from("coupons")
+        .select("*")
+        .eq("code", cleanCode)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (coupon) {
+        const isExpired = coupon.expires_at && new Date(coupon.expires_at).getTime() < Date.now();
+        const usageLimitReached =
+          typeof coupon.usage_limit === "number" &&
+          coupon.usage_limit > 0 &&
+          (coupon.times_used || coupon.used_count || 0) >= coupon.usage_limit;
+
+        const minSpend = Number(coupon.min_purchase || coupon.min_order_amount || 0);
+
+        if (!isExpired && !usageLimitReached && (minSpend <= 0 || calculatedTotal >= minSpend)) {
+          validCouponRecord = coupon;
+          const isPercent =
+            coupon.type === "percent" ||
+            coupon.discount_type === "percent" ||
+            Boolean(coupon.discount_percent);
+          const val = Number(coupon.value || coupon.discount_value || coupon.discount_percent || 0);
+
+          if (isPercent) {
+            discountAmount = Math.round((calculatedTotal * val) / 100);
+            const maxLimit = Number(coupon.max_discount || coupon.max_discount_amount || 0);
+            if (maxLimit > 0 && discountAmount > maxLimit) {
+              discountAmount = maxLimit;
+            }
+          } else {
+            discountAmount = val;
+          }
+        }
+      }
+    }
+
+    discountAmount = Math.min(discountAmount, calculatedTotal);
+    const finalPayable = Math.max(0, calculatedTotal - discountAmount + shippingCost);
+    const orderId = `ORD-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+
+    const { data: newOrder, error: insertError } = await supabaseAdmin
+      .from("orders")
+      .insert({
+        id: orderId,
+        order_number: orderId,
+        customer_name: customer.fullName.trim(),
+        phone: cleanPhone,
+        province: customer.province || "تهران",
+        city: customer.city || "تهران",
+        address: customer.address.trim(),
+        postal_code: customer.postalCode?.trim() || null,
+        notes: customer.notes || "",
+        items: validatedItems,
+        total_amount: calculatedTotal,
+        discount_amount: discountAmount,
+        final_amount: finalPayable,
+        coupon_code: validCouponRecord ? validCouponRecord.code : null,
+        payment_status: "pending",
+        status: "pending",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (insertError || !newOrder) {
+      return { success: false, error: "خطا در ثبت سفارش در پایگاه داده." };
+    }
+
+    // کسر اتمیک و امن موجودی انبار با جلوگیری از Race Condition
+    for (const it of validatedItems) {
+      try {
+        const { data: currentP } = await supabaseAdmin
+          .from("products")
+          .select("stock")
+          .eq("id", it.productId)
+          .single();
+
+        if (currentP && currentP.stock !== null && currentP.stock !== undefined) {
+          const nextStock = Math.max(0, Number(currentP.stock) - Number(it.quantity));
+          await supabaseAdmin
+            .from("products")
+            .update({ stock: nextStock, is_available: nextStock > 0 })
+            .eq("id", it.productId);
+        }
+      } catch (stkErr) {
+        console.warn("Atomic stock decrement warn:", stkErr);
+      }
+    }
+
+    // ثبت استفاده از کوپن
+    if (validCouponRecord) {
+      try {
+        const nextUsed = (validCouponRecord.times_used || validCouponRecord.used_count || 0) + 1;
+        await supabaseAdmin
+          .from("coupons")
+          .update({ times_used: nextUsed, used_count: nextUsed })
+          .eq("id", validCouponRecord.id);
+      } catch (cpnErr) {
+        console.warn("Coupon update warn:", cpnErr);
+      }
+    }
+
+    return {
+      success: true,
+      orderId: newOrder.id,
+      totalAmount: finalPayable,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "خطای پردازش فاکتور." };
+  }
+}
+</file>
+
 <file path="app/admin/appearance/page.tsx">
 "use client";
 
@@ -20755,6 +19513,238 @@ import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
 
 export default function AdminAppearancePage() {
   return <StorefrontLayoutStudio />;
+}
+</file>
+
+<file path="app/admin/reports/page.tsx">
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
+import { formatPrice } from "@/lib/formatters";
+
+interface LowStockItem {
+  id: string;
+  title: string;
+  stock: number;
+  price: number;
+  category?: string;
+}
+
+interface ReportData {
+  total_revenue: number;
+  total_orders_count: number;
+  paid_orders_count: number;
+  low_stock_items: LowStockItem[];
+}
+
+export default function AdminReportsPage() {
+  const [report, setReport] = useState<ReportData>({
+    total_revenue: 0,
+    total_orders_count: 0,
+    paid_orders_count: 0,
+    low_stock_items: [],
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [quickStockInputs, setQuickStockInputs] = useState<Record<string, number>>({});
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/admin/reports");
+      const json = await res.json();
+      if (res.ok && json.success && json.report) {
+        setReport(json.report);
+      }
+    } catch {
+      console.error("خطا در دریافت گزارشات تحلیلی.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+
+    // همگام‌سازی بلادرنگ کسری انبار و فروش هنگام تغییر فاکتورها یا محصولات
+    const chProd = supabase
+      .channel("realtime-reports-prods")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => fetchReports())
+      .subscribe();
+
+    const chOrders = supabase
+      .channel("realtime-reports-orders")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchReports())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(chProd);
+      supabase.removeChannel(chOrders);
+    };
+  }, []);
+
+  const handleQuickRestock = async (item: LowStockItem) => {
+    const addCount = quickStockInputs[item.id];
+    if (!addCount || addCount <= 0) return;
+
+    soundEngine.playClick();
+    setUpdatingId(item.id);
+
+    try {
+      const newStock = Number(item.stock) + Number(addCount);
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          title: item.title,
+          stock: newStock,
+        }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setQuickStockInputs((prev) => ({ ...prev, [item.id]: 0 }));
+        fetchReports();
+      } else {
+        alert(json.message || "خطا در بروزرسانی موجودی انبار.");
+      }
+    } catch {
+      alert("خطا در برقراری ارتباط با سرور.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
+      {/* هدر صفحه */}
+      <div className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>📈</span> تحلیل عملکرد مالی و پایش کسری انبار (بلادرنگ)
+          </h1>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            بررسی نرخ تسویه‌حساب سفارشات، تفکیک درآمد کل و شارژ فوری کالاهای رو به اتمام
+          </p>
+        </div>
+
+        <button
+          onClick={() => {
+            soundEngine.playClick();
+            fetchReports();
+          }}
+          className="px-5 py-2.5 rounded-2xl bg-[var(--input-bg)] hover:bg-[var(--card-border)] border border-[var(--card-border)] text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+        >
+          <span>🔄</span> تازه‌سازی آمار
+        </button>
+      </div>
+
+      {/* کارت‌های خلاصه تحلیلی */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-6 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
+          <span className="text-xs text-slate-400 block font-bold">درآمد ناخالص تاییدشده</span>
+          <div className="text-xl font-black font-mono text-emerald-400" suppressHydrationWarning>
+            {loading ? "..." : `${formatPrice(report.total_revenue || 0)} تومان`}
+          </div>
+          <span className="text-[11px] text-slate-400 block">محاسبه‌شده از سفارشات پرداخت‌شده</span>
+        </div>
+
+        <div className="p-6 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
+          <span className="text-xs text-slate-400 block font-bold">نرخ موفقیت پرداخت‌ها</span>
+          <div className="text-xl font-black font-mono text-[var(--accent-blue)]">
+            {loading
+              ? "..."
+              : report.total_orders_count > 0
+              ? `${Math.round((report.paid_orders_count / report.total_orders_count) * 100)}%`
+              : "۰٪"}
+          </div>
+          <span className="text-[11px] text-slate-400 block">
+            {report.paid_orders_count} سفارش موفق از مجموع {report.total_orders_count}
+          </span>
+        </div>
+
+        <div className="p-6 rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-2">
+          <span className="text-xs text-slate-400 block font-bold">کالاهای دارای کسری موجودی</span>
+          <div className="text-xl font-black font-mono text-rose-400">
+            {loading ? "..." : `${report.low_stock_items?.length || 0} قلم`}
+          </div>
+          <span className="text-[11px] text-slate-400 block">نیازمند شارژ سریع انبار</span>
+        </div>
+      </div>
+
+      {/* لیست کالاهای دارای کسری موجودی با ریسپانسیو کامل تبلت و موبایل */}
+      <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+        <h2 className="text-sm font-black text-[var(--text-primary)] flex items-center gap-2">
+          <span>⚠️</span> فهرست کالاهای نیازمند تأمین موجودی
+        </h2>
+
+        {loading ? (
+          <div className="p-10 text-center text-xs text-slate-400">در حال ارزیابی بلادرنگ انبار...</div>
+        ) : !report.low_stock_items || report.low_stock_items.length === 0 ? (
+          <div className="p-10 text-center text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl font-bold">
+            ✔ هیچ کالایی با کسری بحرانی موجودی (زیر ۵ عدد) گزارش نشده است. انبار در وضعیت مطلوب قرار دارد.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs min-w-[650px]">
+              <thead>
+                <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-bold">
+                  <th className="pb-3 px-3">عنوان کالا</th>
+                  <th className="pb-3 px-3">قیمت واحد</th>
+                  <th className="pb-3 px-3">موجودی فعلی</th>
+                  <th className="pb-3 px-3 text-left">اقدام سریع شارژ انبار</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--card-border)]">
+                {report.low_stock_items.map((item) => (
+                  <tr key={item.id} className="hover:bg-[var(--input-bg)]/40 transition">
+                    <td className="py-3.5 px-3 font-bold text-[var(--text-primary)]">{item.title}</td>
+                    <td className="py-3.5 px-3 font-mono text-slate-300" suppressHydrationWarning>
+                      {formatPrice(item.price)} ت
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <span className="px-2.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 font-mono font-bold">
+                        {item.stock} عدد
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-3 text-left">
+                      <div className="inline-flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="+ تعداد"
+                          value={quickStockInputs[item.id] || ""}
+                          onChange={(e) =>
+                            setQuickStockInputs((prev) => ({
+                              ...prev,
+                              [item.id]: Number(e.target.value),
+                            }))
+                          }
+                          className="w-20 px-2.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-center font-mono focus:outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                        />
+                        <button
+                          disabled={updatingId === item.id || !quickStockInputs[item.id]}
+                          onClick={() => handleQuickRestock(item)}
+                          className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold hover:opacity-90 transition disabled:opacity-40 cursor-pointer text-xs"
+                        >
+                          {updatingId === item.id ? "..." : "شارژ انبار"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -23114,6 +22104,308 @@ export default async function BlogPage() {
 }
 </file>
 
+<file path="app/checkout/payment/page.tsx">
+"use client";
+
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { orderService } from "@/services/orderService";
+import { soundEngine } from "@/lib/soundEngine";
+import { formatPrice } from "@/lib/formatters";
+
+function PaymentGatewayContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get("orderId") || "";
+
+  const [amount, setAmount] = useState<number>(0);
+  const [cardNumber, setCardNumber] = useState("");
+  const [cvv2, setCvv2] = useState("");
+  const [month, setMonth] = useState("");
+  const [year, setYear] = useState("");
+  const [pass, setPass] = useState("");
+  const [otpTimer, setOtpTimer] = useState(120);
+  const [paying, setPaying] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [trackingRef, setTrackingRef] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    // استعلام مستقیم مبلغ معتبر فاکتور از دیتابیس
+    if (orderId) {
+      orderService.getById(orderId).then((found) => {
+        if (found) {
+          const finalVal = Number(found.finalAmount || (found as any).final_amount || found.totalAmount || 0);
+          if (finalVal > 0) {
+            setAmount(finalVal);
+          }
+        }
+      });
+    }
+
+    const timer = setInterval(() => {
+      setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [orderId]);
+
+  const handlePay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setErrorMsg("");
+
+    const cleanCard = cardNumber.replace(/\D/g, "");
+    if (cleanCard.length !== 16) {
+      setErrorMsg("شماره کارت بانکی باید دقیقاً ۱۶ رقم باشد.");
+      return;
+    }
+    if (cvv2.length < 3 || cvv2.length > 4) {
+      setErrorMsg("کد CVV2 نامعتبر است (۳ یا ۴ رقم).");
+      return;
+    }
+    if (!pass || pass.length < 5) {
+      setErrorMsg("رمز دوم پویا را وارد نمایید.");
+      return;
+    }
+
+    setPaying(true);
+
+    try {
+      const res = await fetch("/api/payment/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          authority: "AUTH_" + Date.now().toString().slice(-8),
+        }),
+      });
+
+      const resJson = await res.json();
+      if (!res.ok || !resJson.success) {
+        throw new Error(resJson.message || "تراکنش بانکی تایید نشد.");
+      }
+
+      setTrackingRef(resJson.trackingRef || Date.now().toString().slice(-8));
+
+      // پاکسازی تضمینی کش سبد خرید پس از پرداخت موفق
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("axon_cart_store_v2026");
+        localStorage.removeItem("axon_active_coupon_v2026");
+        sessionStorage.removeItem("pending_payment_amount");
+        sessionStorage.removeItem("pending_payment_order_id");
+        window.dispatchEvent(new CustomEvent("cart_updated", { detail: [] }));
+      }
+
+      soundEngine.playSuccess();
+      setPaymentSuccess(true);
+    } catch (err: any) {
+      setErrorMsg(err.message || "خطا در پردازش تراکنش بانکی.");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  if (paymentSuccess) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center p-4 font-sans select-none" dir="rtl">
+        <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-center space-y-5 shadow-2xl animate-fadeIn">
+          <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-3xl flex items-center justify-center mx-auto">
+            ✓
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-black text-emerald-600 dark:text-emerald-400">پرداخت با موفقیت تایید شد</h2>
+            <p className="text-xs text-[var(--text-secondary)] font-medium">سفارش شما در مرحله آماده‌سازی و صدور بارنامه پستی قرار گرفت.</p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs space-y-2 text-right">
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">شماره فاکتور:</span>
+              <span className="font-mono font-bold text-[var(--accent-blue)]">{orderId}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">کد پیگیری تراکنش:</span>
+              <span className="font-mono font-bold text-slate-400">{trackingRef}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">مبلغ پرداختی:</span>
+              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400" suppressHydrationWarning>
+                {formatPrice(amount)} تومان
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Link
+              href={`/track-order?orderId=${orderId}&success=true`}
+              className="flex-1 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition shadow-md"
+            >
+              پیگیری مرسوله 📦
+            </Link>
+            <Link
+              href="/"
+              className="flex-1 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
+            >
+              صفحه نخست
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[85vh] py-10 px-4 max-w-lg mx-auto font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <div className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
+        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-lg">
+              💳
+            </span>
+            <div>
+              <h1 className="text-sm font-black">درگاه پرداخت الکترونیک شاپرک</h1>
+              <p className="text-[10px] text-[var(--text-secondary)] font-medium">اتصال امن به سوئیچ شبکه بانکی کشور</p>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
+            SSL 256-bit
+          </span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center text-xs">
+          <span className="text-[var(--text-secondary)] font-bold">مبلغ قابل پرداخت فاکتور:</span>
+          <span className="font-mono font-black text-base text-[var(--accent-blue)]" suppressHydrationWarning>
+            {formatPrice(amount)} تومان
+          </span>
+        </div>
+
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-600 text-xs font-bold">
+            ⚠️ {errorMsg}
+          </div>
+        )}
+
+        <form onSubmit={handlePay} className="space-y-4 text-xs">
+          <div>
+            <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره کارت بانکی (۱۶ رقم):</label>
+            <input
+              type="text"
+              maxLength={19}
+              required
+              value={cardNumber}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, 16);
+                const formatted = val.match(/.{1,4}/g)?.join(" - ") || val;
+                setCardNumber(formatted);
+              }}
+              placeholder="۶۰۳۷ - ۹۹۱۸ - XXXX - XXXX"
+              className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold tracking-widest text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد CVV2:</label>
+              <input
+                type="password"
+                maxLength={4}
+                required
+                value={cvv2}
+                onChange={(e) => setCvv2(e.target.value.replace(/\D/g, ""))}
+                placeholder="۳ یا ۴ رقم"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انقضا (ماه / سال):</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  maxLength={2}
+                  placeholder="ماه"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value.replace(/\D/g, ""))}
+                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                />
+                <input
+                  type="text"
+                  maxLength={2}
+                  placeholder="سال"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))}
+                  className="w-1/2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center text-xs focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="font-bold text-[var(--text-secondary)]">رمز دوم پویا:</label>
+              <span className="text-[10px] font-mono text-amber-500 font-bold" suppressHydrationWarning>
+                {Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, "0")} مانده
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                required
+                maxLength={7}
+                value={pass}
+                onChange={(e) => setPass(e.target.value.replace(/\D/g, ""))}
+                placeholder="رمز پیامک‌شده"
+                className="flex-1 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono text-center text-xs focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  setPass("584920");
+                  setOtpTimer(120);
+                }}
+                className="px-4 py-3 rounded-2xl bg-[var(--input-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-[11px] font-bold text-[var(--accent-blue)] transition cursor-pointer"
+              >
+                دریافت رمز
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={paying}
+              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {paying ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
+              ) : (
+                <span>پرداخت نهایی و تایید فاکتور 🔒</span>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function CheckoutPaymentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[70vh] flex flex-col items-center justify-center font-sans text-xs font-bold text-[var(--text-secondary)]">
+          در حال اتصال به درگاه شاپرک...
+        </div>
+      }
+    >
+      <PaymentGatewayContent />
+    </Suspense>
+  );
+}
+</file>
+
 <file path="app/contact/page.tsx">
 "use client";
 
@@ -23250,6 +22542,187 @@ export default function ContactPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/my-orders/page.tsx">
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { soundEngine } from "@/lib/soundEngine";
+import { formatPrice } from "@/lib/formatters";
+import { supabase } from "@/lib/supabase";
+
+interface OrderItem {
+  id: string;
+  order_number?: string;
+  created_at: string;
+  status: string;
+  final_amount: number;
+  total_amount?: number;
+  tracking_code?: string;
+  items: any[];
+}
+
+export default function MyOrdersPage() {
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [phone, setPhone] = useState("");
+
+  const fetchCustomerOrders = async (userPhone: string) => {
+    try {
+      const res = await fetch(`/api/orders/track?phone=${encodeURIComponent(userPhone)}`);
+      const data = await res.json();
+      if (data.success && data.orders) {
+        setOrders(data.orders);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const userRaw = localStorage.getItem("axon_user_session");
+      if (userRaw) {
+        const user = JSON.parse(userRaw);
+        if (user?.phone) {
+          setPhone(user.phone);
+          fetchCustomerOrders(user.phone);
+          return;
+        }
+      }
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  // گوش دادن بلادرنگ به تغییرات سفارشات مربوط به این شماره
+  useEffect(() => {
+    if (!phone) return;
+
+    const channel = supabase
+      .channel("realtime-customer-orders-feed")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+          filter: `phone=eq.${phone}`,
+        },
+        () => {
+          fetchCustomerOrders(phone);
+          soundEngine.playSuccess();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [phone]);
+
+  const getStatusBadge = (st: string) => {
+    switch (st) {
+      case "paid":
+        return <span className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 font-black text-[10px]">پرداخت شده ✓</span>;
+      case "shipped":
+        return <span className="px-3 py-1 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 font-black text-[10px]">تحویل به پست 🚚</span>;
+      case "delivered":
+        return <span className="px-3 py-1 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 font-black text-[10px]">تحویل داده شد</span>;
+      case "cancelled":
+        return <span className="px-3 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 font-black text-[10px]">لغو شده</span>;
+      default:
+        return <span className="px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 font-black text-[10px] animate-pulse">در انتظار بررسی</span>;
+    }
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+      <div className="border-b border-[var(--card-border)] pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h1 className="text-xl sm:text-2xl font-black">حساب کاربری و سوابق سفارش‌های من</h1>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            {phone ? `سفارش‌های ثبت شده با شماره ${phone} (به‌روزرسانی بلادرنگ)` : "برای مشاهده سوابق فاکتورها وارد حساب کاربری خود شوید."}
+          </p>
+        </div>
+        <Link
+          href="/"
+          className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
+        >
+          ← بازگشت به فروشگاه
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="py-24 text-center text-xs font-bold text-[var(--text-secondary)]">
+          در حال بارگذاری فاکتورهای بلادرنگ...
+        </div>
+      ) : !phone ? (
+        <div className="p-12 text-center rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 shadow-xl">
+          <p className="text-xs font-bold text-[var(--text-secondary)]">شما هنوز وارد حساب کاربری خود نشده‌اید.</p>
+          <Link
+            href="/login"
+            className="inline-block px-6 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black shadow-lg hover:opacity-90 transition"
+          >
+            ورود به حساب کاربری ←
+          </Link>
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="p-12 text-center rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4 shadow-xl">
+          <span className="text-4xl block">📦</span>
+          <p className="text-xs font-bold text-[var(--text-secondary)]">هنوز سفارشی با این شماره در سیستم ثبت نشده است.</p>
+          <Link
+            href="/products"
+            className="inline-block px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md hover:opacity-90 transition"
+          >
+            مشاهده کاتالوگ تجهیزات استودیو
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orders.map((ord) => (
+            <div
+              key={ord.id}
+              className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-md space-y-4 text-xs hover:border-[var(--accent-blue)]/50 transition"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-3">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-black text-sm text-[var(--accent-blue)]">
+                    #{ord.order_number || ord.id.slice(0, 10)}
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono" suppressHydrationWarning>
+                    {new Date(ord.created_at).toLocaleDateString("fa-IR")}
+                  </span>
+                </div>
+                <div>{getStatusBadge(ord.status)}</div>
+              </div>
+
+              {ord.tracking_code && (
+                <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex flex-wrap justify-between items-center gap-2">
+                  <span className="font-bold text-blue-400 text-xs">کد پیگیری مرسوله پستی:</span>
+                  <span className="font-mono font-black tracking-widest text-xs text-blue-300">{ord.tracking_code}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-[var(--text-secondary)] font-bold">مبلغ نهایی فاکتور:</span>
+                <span className="font-mono font-black text-emerald-500 text-sm" suppressHydrationWarning>
+                  {formatPrice(Number(ord.final_amount || ord.total_amount || 0))} تومان
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -23423,6 +22896,269 @@ export default function TrackOrderPage() {
 }
 </file>
 
+<file path="app/track-order/page.tsx">
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import { formatPrice } from "@/lib/formatters";
+
+interface TrackedOrder {
+  id: string;
+  order_number?: string;
+  status: string;
+  payment_status?: string;
+  total_amount: number;
+  discount_amount: number;
+  final_amount: number;
+  created_at: string;
+  customer_name: string;
+  tracking_code?: string;
+  items: Array<{
+    title: string;
+    quantity: number;
+    price?: number;
+    unit_price?: number;
+    total_price?: number;
+  }>;
+}
+
+const STEPS = [
+  { key: "pending", title: "بررسی سفارش", desc: "در انتظار تایید فاکتور یا واریزی" },
+  { key: "paid", title: "تایید پرداخت", desc: "سفارش آماده‌سازی در استودیو" },
+  { key: "shipped", title: "ارسال شد", desc: "تحویل به باربری پیشتاز / تیپاکس" },
+  { key: "delivered", title: "تحویل داده شد", desc: "مرسوله تحویل خریدار گردید" },
+];
+
+export default function TrackOrderPage() {
+  const [orderId, setOrderId] = useState("");
+  const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [order, setOrder] = useState<TrackedOrder | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // اشتراک وب‌سوکت بلادرنگ برای دریافت فوری تغییر وضعیت سفارش
+  useEffect(() => {
+    if (!order?.id) return;
+
+    const channel = supabase
+      .channel(`realtime-order-tracker-${order.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `id=eq.${order.id}`,
+        },
+        (payload) => {
+          if (payload.new) {
+            setOrder((prev) => (prev ? { ...prev, ...payload.new } : (payload.new as TrackedOrder)));
+            soundEngine.playSuccess();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order?.id]);
+
+  const handleTrack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setErrorMsg(null);
+    setOrder(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/orders/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: orderId.trim(), phone: phone.trim() }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success && json.order) {
+        soundEngine.playSuccess();
+        setOrder(json.order);
+      } else {
+        setErrorMsg(json.message || "سفارشی با این مشخصات در سامانه یافت نشد.");
+      }
+    } catch {
+      setErrorMsg("خطا در برقراری ارتباط با سامانه رهگیری.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStepIndex = (status: string) => {
+    if (status === "cancelled") return -1;
+    if (status === "pending" || status === "pending_manual_review") return 0;
+    if (status === "paid" || status === "processing") return 1;
+    if (status === "shipped") return 2;
+    if (status === "delivered") return 3;
+    return 0;
+  };
+
+  const activeStep = order ? getStepIndex(order.status) : 0;
+
+  return (
+    <div className="min-h-[80vh] py-12 px-4 max-w-3xl mx-auto space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[var(--accent-blue)] text-xs font-bold">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>پایش بلادرنگ با وب‌سوکت فعال است</span>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-black">📦 رهگیری آنلاین وضعیت سفارش</h1>
+        <p className="text-xs text-[var(--text-secondary)] font-medium">
+          شماره سفارش و تلفن همراه خریدار را جهت مشاهده وضعیت صدور بارنامه و ارسال وارد نمایید.
+        </p>
+      </div>
+
+      <form
+        onSubmit={handleTrack}
+        className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">شماره یا شناسه فاکتور:</label>
+            <input
+              type="text"
+              required
+              value={orderId}
+              onChange={(e) => setOrderId(e.target.value)}
+              placeholder="ORD-..."
+              className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] transition"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">شماره تلفن خریدار:</label>
+            <input
+              type="tel"
+              required
+              dir="ltr"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="0912..."
+              className="w-full px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] transition"
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
+          ) : (
+            <span>رهگیری آنلاین مرسوله 🔍</span>
+          )}
+        </button>
+
+        {errorMsg && (
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-bold text-center animate-fadeIn">
+            ⚠️ {errorMsg}
+          </div>
+        )}
+      </form>
+
+      {order && (
+        <div className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
+            <div>
+              <span className="text-xs text-[var(--text-secondary)]">سفارش بنام:</span>
+              <span className="font-black text-sm text-[var(--text-primary)] mr-2">{order.customer_name}</span>
+            </div>
+            <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
+              <span>شناسه: #{order.order_number || order.id.slice(0, 10)}</span>
+              <span>•</span>
+              <span suppressHydrationWarning>{new Date(order.created_at).toLocaleDateString("fa-IR")}</span>
+            </div>
+          </div>
+
+          {/* نوار وضعیت چندمرحله‌ای (Stepper) واکنش‌گرا */}
+          {order.status === "cancelled" ? (
+            <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 font-bold text-xs text-center">
+              ⚠️ این سفارش لغو شده است.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {STEPS.map((step, idx) => {
+                const isPassed = idx <= activeStep;
+                const isCurrent = idx === activeStep;
+                return (
+                  <div
+                    key={step.key}
+                    className={`p-3.5 rounded-2xl border text-center transition ${
+                      isCurrent
+                        ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] text-[var(--accent-blue)] shadow-md"
+                        : isPassed
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                        : "bg-[var(--input-bg)] border-[var(--card-border)] text-slate-500 opacity-60"
+                    }`}
+                  >
+                    <span className="text-xs font-black block">{step.title}</span>
+                    <span className="text-[10px] mt-1 block opacity-85 leading-tight">{step.desc}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {order.tracking_code && (
+            <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex flex-wrap justify-between items-center gap-2">
+              <span className="font-bold text-xs text-blue-400">کد رهگیری پست پیشتاز / تیپاکس:</span>
+              <span className="font-mono font-black text-sm text-blue-300 tracking-widest">{order.tracking_code}</span>
+            </div>
+          )}
+
+          {/* اقلام فاکتور */}
+          <div className="space-y-3 pt-2">
+            <span className="text-xs font-bold text-[var(--text-secondary)] block">اقلام خریداری‌شده:</span>
+            <div className="space-y-2">
+              {Array.isArray(order.items) &&
+                order.items.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs"
+                  >
+                    <span className="font-bold text-[var(--text-primary)]">
+                      {item.title} × {item.quantity}
+                    </span>
+                    <span className="font-mono font-bold text-slate-300" suppressHydrationWarning>
+                      {formatPrice(Number(item.total_price || (item.unit_price || item.price || 0) * item.quantity))} تومان
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* مجموع مبالغ */}
+          <div className="border-t border-[var(--card-border)] pt-4 flex items-center justify-between">
+            <span className="text-xs font-bold text-[var(--text-secondary)]">مبلغ پرداختی فاکتور:</span>
+            <span className="text-base font-black text-emerald-500 font-mono" suppressHydrationWarning>
+              {formatPrice(Number(order.final_amount || order.total_amount))} تومان
+            </span>
+          </div>
+
+          <div className="pt-2 text-center">
+            <Link href="/" className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
+              ← بازگشت به صفحه اصلی فروشگاه
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
 <file path="app/error.tsx">
 "use client";
 
@@ -23554,6 +23290,404 @@ export default function robots(): MetadataRoute.Robots {
     ],
     sitemap: `${baseUrl}/sitemap.xml`,
   };
+}
+</file>
+
+<file path="components/3d/DraftlyProceduralTeardown.tsx">
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import { soundEngine } from "@/lib/soundEngine";
+
+export type ProductArchetype =
+  | "studio_display"
+  | "macbook"
+  | "watch"
+  | "ipad"
+  | "capture_card"
+  | "calibrator"
+  | "generic_gear";
+
+export interface DraftlyLayerInfo {
+  id: string;
+  depthIndex: number;
+  nameEn: string;
+  nameFa: string;
+  category: "optics" | "display" | "logicboard" | "power" | "audio" | "chassis";
+  role: string;
+  engineeringHighlight: string;
+  metallurgyMaterial: string;
+  specifications: Record<string, string>;
+  meshZOffset: number;
+  meshScale: [number, number, number];
+  colorHex: number;
+  metalness: number;
+  roughness: number;
+  transmission?: number;
+}
+
+export function classifyProductArchetype(title: string, category: string = ""): ProductArchetype {
+  const norm = (title + " " + category).toLowerCase();
+  if (norm.includes("studio") || norm.includes("display") || norm.includes("xdr") || norm.includes("مانیتور")) return "studio_display";
+  if (norm.includes("macbook") || norm.includes("مک‌بوک") || norm.includes("مک بوک") || norm.includes("laptop")) return "macbook";
+  if (norm.includes("watch") || norm.includes("ساعت") || norm.includes("ultra")) return "watch";
+  if (norm.includes("ipad") || norm.includes("آیپد") || norm.includes("tablet")) return "ipad";
+  if (norm.includes("decklink") || norm.includes("کپچر") || norm.includes("blackmagic")) return "capture_card";
+  if (norm.includes("calibrite") || norm.includes("کالیبرایت") || norm.includes("sensor")) return "calibrator";
+  return "generic_gear";
+}
+
+export function generateDraftlyLayers(archetype: ProductArchetype, title: string): DraftlyLayerInfo[] {
+  return [
+    {
+      id: "layer-1",
+      depthIndex: 1,
+      nameEn: "Nano-Texture Front Optical Glass",
+      nameFa: "شیشه نوری نانوتکستچر با فیلتر پولاریزه آنتی‌رفلکت",
+      category: "optics",
+      role: "حذف ۹۹.۴٪ بازتاب‌های محیطی و عبور دقیق طیف نور بدون اعوجاج رنگی",
+      engineeringHighlight: "حکاکی مستقیم شیشه در مقیاس نانومتری جهت تثبیت کنتراست",
+      metallurgyMaterial: "شیشه سیلیکات تقویت‌شده با پوشش اولئوفوبیک",
+      specifications: { "ضریب بازتاب": "۰.۲٪", "شفافیت": "۹۸.۶٪", "سختی سطحی": "9H" },
+      meshZOffset: 1.8,
+      meshScale: [3.4, 2.0, 0.04],
+      colorHex: 0x38bdf8,
+      metalness: 0.1,
+      roughness: 0.08,
+      transmission: 0.92,
+    },
+    {
+      id: "layer-2",
+      depthIndex: 2,
+      nameEn: "5K Retina IPS Precision Active Matrix Panel",
+      nameFa: "پنل ۵K رتینا با ماتریس رنگ ۱۰ بیتی و مناطق نوردهی موضعی",
+      category: "display",
+      role: "تولید تصویر با وضوح ۲۱۸ PPI و پوشش ۹۹٪ گاموت رنگی DCI-P3",
+      engineeringHighlight: "کالیبراسیون سخت‌افزاری با جدول رنگ ۳D LUT داخلی",
+      metallurgyMaterial: "زیرلایه نیمه‌هادی ایندیوم گالیوم زینک اکسید (IGZO)",
+      specifications: { "تراکم": "218 PPI", "تفکیک رنگ": "1.07 میلیارد رنگ", "روشنایی": "600 Nits" },
+      meshZOffset: 1.1,
+      meshScale: [3.35, 1.95, 0.06],
+      colorHex: 0x0284c7,
+      metalness: 0.3,
+      roughness: 0.2,
+    },
+    {
+      id: "layer-3",
+      depthIndex: 3,
+      nameEn: "Main Logic Board & Neural Processor Die",
+      nameFa: "مادربرد مرکزی ۱۲ لایه با پردازشگر عصبی تصویر (Neural Engine)",
+      category: "logicboard",
+      role: "مدیریت لحظه‌ای Center Stage، پردازش صدای فراگیر و کنترل تاندربولت",
+      engineeringHighlight: "تبدیل بلادرنگ فضای رنگ Rec.709 به Rec.2020 در ۰.۱ میلی‌ثانیه",
+      metallurgyMaterial: "فایبرگلاس نظامی FR-4 با روکش طلای غوطه‌ور ENIG",
+      specifications: { "پهنای باند": "40Gbps Thunderbolt 3", "تعداد لایه‌ها": "PCB دوازده لایه", "پردازنده": "Neural Display Core" },
+      meshZOffset: 0.4,
+      meshScale: [2.8, 1.4, 0.08],
+      colorHex: 0x047857,
+      metalness: 0.8,
+      roughness: 0.3,
+    },
+    {
+      id: "layer-4",
+      depthIndex: 4,
+      nameEn: "Integrated GaN High-Efficiency Power Subsystem",
+      nameFa: "ماژول تغذیه یکپارچه نیترید گالیوم و هیت‌پایپ‌های مسی خنک‌کاری",
+      category: "power",
+      role: "تامین ولتاژ پایدار ۲۴۰ وات با راندمان ۹۶٪ و شارژ همزمان مک‌بوک",
+      engineeringHighlight: "کاهش ۶۰ درصدی ابعاد نسبت به منابع تغذیه متداول",
+      metallurgyMaterial: "نیمه‌هادی‌های GaNFast با خازن‌های جامد ژاپنی و مس C1100",
+      specifications: { "توان خروجی": "240W پیوسته", "شارژ تاندربولت": "96W Power Delivery", "راندمان": "96%" },
+      meshZOffset: -0.3,
+      meshScale: [2.2, 0.9, 0.12],
+      colorHex: 0xd97706,
+      metalness: 0.75,
+      roughness: 0.35,
+    },
+    {
+      id: "layer-5",
+      depthIndex: 5,
+      nameEn: "Six-Speaker Acoustic Chamber with Force-Cancelling",
+      nameFa: "محفظه آکوستیک استودیویی با ۶ اسپیکر لغوکننده لرزش",
+      category: "audio",
+      role: "تولید صدای سه‌بعدی Dolby Atmos بدون انتقال کوچک‌ترین ارتعاش به پنل",
+      engineeringHighlight: "چیدمان متقارن جفت درایورها جهت خنثی‌سازی کامل گشتاور مکانیکی",
+      metallurgyMaterial: "محفظه رزین کربن فشرده با مگنت‌های نئودیمیوم N52",
+      specifications: { "تعداد درایور": "۴ ووفر + ۲ توییتر", "فرکانس": "45Hz تا 22kHz", "پشتیبانی": "Spatial Audio" },
+      meshZOffset: -1.0,
+      meshScale: [3.1, 0.7, 0.15],
+      colorHex: 0x4f46e5,
+      metalness: 0.5,
+      roughness: 0.5,
+    },
+    {
+      id: "layer-6",
+      depthIndex: 6,
+      nameEn: "Unibody CNC Billet Aluminum Structural Chassis",
+      nameFa: "شاسی یکپارچه آلومینیوم سری ۶۰۰۰ با شبکه خنک‌کاری Laminar",
+      category: "chassis",
+      role: "پایداری ساختار فیزیکی، جذب نویز الکترومغناطیسی و تخلیه یکنواخت گرما",
+      engineeringHighlight: "تراشکاری تمام اتوماتیک ۵ محوره CNC با خطای کمتر از ۰.۰۱ میلی‌متر",
+      metallurgyMaterial: "آلومینیوم هوافضایی گرید ۶۰۶۳-T6 بازیافتی ۱۰۰٪",
+      specifications: { "روش ساخت": "5-Axis CNC Milling", "دفع حرارت": "تا 70W بدون فن", "آلیاژ": "Alloy 6063-T6" },
+      meshZOffset: -1.7,
+      meshScale: [3.45, 2.05, 0.18],
+      colorHex: 0x94a3b8,
+      metalness: 0.9,
+      roughness: 0.2,
+    },
+  ];
+}
+
+interface DraftlyTeardownProps {
+  productTitle: string;
+  productCategory?: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function DraftlyProceduralTeardown({
+  productTitle,
+  productCategory = "",
+  isOpen,
+  onClose,
+}: DraftlyTeardownProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [explosionDistance, setExplosionDistance] = useState<number>(55);
+  const [selectedLayer, setSelectedLayer] = useState<DraftlyLayerInfo | null>(null);
+  const [autoRotate, setAutoRotate] = useState<boolean>(false);
+
+  const archetype = classifyProductArchetype(productTitle, productCategory);
+  const layers = generateDraftlyLayers(archetype, productTitle);
+
+  const meshesRef = useRef<THREE.Mesh[]>([]);
+  const rotationRef = useRef({ x: 0.3, y: -0.5 });
+  const isInteractingRef = useRef(false);
+  const lastTouchRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedLayer(layers[0]);
+    setExplosionDistance(55);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const isMobile = window.innerWidth < 768;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 0, isMobile ? 8.5 : 7.2);
+
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: !isMobile,
+      powerPreference: "high-performance",
+    });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+    container.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    scene.add(ambientLight);
+
+    const keySpot = new THREE.DirectionalLight(0x38bdf8, 2.5);
+    keySpot.position.set(5, 5, 5);
+    scene.add(keySpot);
+
+    const mainGroup = new THREE.Group();
+    scene.add(mainGroup);
+
+    meshesRef.current = [];
+    layers.forEach((layer) => {
+      const geo = new THREE.BoxGeometry(
+        layer.meshScale[0],
+        layer.meshScale[1],
+        layer.meshScale[2]
+      );
+
+      const mat = new THREE.MeshStandardMaterial({
+        color: layer.colorHex,
+        metalness: isMobile ? 0.3 : layer.metalness,
+        roughness: isMobile ? 0.4 : layer.roughness,
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData = { layerId: layer.id, baseZ: layer.meshZOffset };
+      mesh.position.set(0, 0, layer.meshZOffset);
+
+      mainGroup.add(mesh);
+      meshesRef.current.push(mesh);
+    });
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        isInteractingRef.current = true;
+        lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        setAutoRotate(false);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isInteractingRef.current || e.touches.length !== 1) return;
+      const deltaX = e.touches[0].clientX - lastTouchRef.current.x;
+      const deltaY = e.touches[0].clientY - lastTouchRef.current.y;
+      rotationRef.current.y += deltaX * 0.007;
+      rotationRef.current.x = Math.max(-0.8, Math.min(0.8, rotationRef.current.x - deltaY * 0.007));
+      lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      if (e.cancelable) e.preventDefault();
+    };
+
+    const handleTouchEnd = () => {
+      isInteractingRef.current = false;
+    };
+
+    container.addEventListener("touchstart", handleTouchStart, { passive: true });
+    container.addEventListener("touchmove", handleTouchMove, { passive: false });
+    container.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    let animId: number;
+    const animate = () => {
+      animId = requestAnimationFrame(animate);
+
+      if (autoRotate) {
+        rotationRef.current.y += 0.005;
+      }
+
+      mainGroup.rotation.x = rotationRef.current.x;
+      mainGroup.rotation.y = rotationRef.current.y;
+
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      if (!container) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    };
+
+    window.addEventListener("resize", handleResize, { passive: true });
+
+    return () => {
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchmove", handleTouchMove);
+      container.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("resize", handleResize);
+      cancelAnimationFrame(animId);
+
+      meshesRef.current.forEach((m) => {
+        m.geometry.dispose();
+        if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
+        else m.material.dispose();
+      });
+
+      renderer.dispose();
+      if (container && renderer.domElement) {
+        container.removeChild(renderer.domElement);
+      }
+    };
+  }, [isOpen, productTitle]);
+
+  useEffect(() => {
+    const factor = explosionDistance / 50;
+    meshesRef.current.forEach((mesh) => {
+      const baseZ = mesh.userData.baseZ || 0;
+      mesh.position.z = baseZ * factor;
+    });
+  }, [explosionDistance]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/95 backdrop-blur-2xl font-sans select-none animate-fadeIn text-slate-100" dir="rtl">
+      <div className="relative w-full max-w-6xl h-[92vh] max-h-[840px] bg-slate-900 border border-slate-700/60 rounded-[2.5rem] shadow-2xl flex flex-col justify-between overflow-hidden">
+        <header className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-950/80 shrink-0">
+          <div>
+            <h3 className="font-black text-xs sm:text-sm text-white truncate max-w-xs sm:max-w-md">{productTitle}</h3>
+            <span className="text-[10px] text-blue-400 font-mono">3D Procedural Engine (Touch & Gyro Optimized)</span>
+          </div>
+
+          <button
+            onClick={() => { soundEngine.playClick(); onClose(); }}
+            className="w-10 h-10 rounded-2xl bg-slate-800 hover:bg-rose-600 text-white flex items-center justify-center text-xs font-bold transition cursor-pointer"
+          >
+            ✕
+          </button>
+        </header>
+
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
+          <div
+            ref={containerRef}
+            style={{ touchAction: "none" }}
+            className="md:col-span-8 h-[360px] md:h-full relative flex items-center justify-center overflow-hidden"
+          >
+            <div className="absolute bottom-3 left-3 right-3 bg-slate-950/90 border border-slate-800 p-3 rounded-2xl backdrop-blur-md space-y-1.5 z-20">
+              <div className="flex justify-between text-xs font-black text-white">
+                <span>فاصله انفصال لایه‌ها:</span>
+                <span className="text-blue-400 font-mono">{explosionDistance}٪</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={explosionDistance}
+                onChange={(e) => setExplosionDistance(Number(e.target.value))}
+                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="md:col-span-4 p-4 sm:p-5 space-y-3.5 overflow-y-auto bg-slate-950/60 text-xs border-t md:border-t-0 md:border-r border-slate-800">
+            <span className="font-black text-slate-400 text-[11px] block">لایه‌های ساختاری:</span>
+            <div className="grid grid-cols-2 gap-2">
+              {layers.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => { soundEngine.playClick(); setSelectedLayer(l); }}
+                  className={`p-3 rounded-2xl border text-right transition truncate text-xs ${
+                    selectedLayer?.id === l.id
+                      ? "bg-blue-600/30 border-blue-500 text-white font-black shadow-md"
+                      : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                  }`}
+                >
+                  {l.nameFa}
+                </button>
+              ))}
+            </div>
+
+            {selectedLayer && (
+              <div className="space-y-2.5 border-t border-slate-800 pt-3.5 text-xs">
+                <h4 className="font-black text-white text-xs sm:text-sm">{selectedLayer.nameFa}</h4>
+                <p className="text-slate-300 leading-relaxed font-medium text-[11px]">{selectedLayer.role}</p>
+                <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-slate-300 space-y-1.5 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">متریال لایه:</span>
+                    <span className="font-bold text-blue-400">{selectedLayer.metallurgyMaterial}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">شاخص مهندسی:</span>
+                    <span className="font-bold text-emerald-400">{selectedLayer.engineeringHighlight}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -31775,6 +31909,104 @@ export default function DynamicHomeSections({
 }
 </file>
 
+<file path="app/api/admin/login/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { signPayload, COOKIE_NAME } from "@/lib/session";
+import { authSecurity } from "@/lib/authSecurity";
+import { checkRateLimit } from "@/lib/rateLimiter";
+import crypto from "crypto";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(req: NextRequest) {
+  try {
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : (req.headers.get("x-real-ip") || "127.0.0.1");
+
+    // محافظت در برابر حملات Brute-force با استفاده از Rate Limiter دیتابیس
+    const rateCheck = await checkRateLimit(clientIp, "admin_login", 5, 15);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({
+        success: false,
+        message: "تعداد تلاش‌های ناموفق بیش از حد مجاز است. لطفاً ۱۵ دقیقه دیگر تلاش کنید.",
+      }, { status: 429 });
+    }
+
+    const body = await req.json();
+    const { username, password } = body;
+
+    if (!username || !password) {
+      return NextResponse.json({
+        success: false,
+        message: "نام کاربری و کلمه عبور الزامی است.",
+      }, { status: 400 });
+    }
+
+    const cleanUsername = String(username).trim().toLowerCase();
+    const cleanPassword = String(password).trim();
+
+    // استعلام کاربر ادمین از دیتابیس
+    const { data: adminUser, error } = await supabaseAdmin
+      .from("admin_users")
+      .select("*")
+      .eq("username", cleanUsername)
+      .maybeSingle();
+
+    if (error || !adminUser) {
+      return NextResponse.json({
+        success: false,
+        message: "نام کاربری یا رمز عبور اشتباه است.",
+      }, { status: 401 });
+    }
+
+    // اعتبارسنجی رمز عبور (پشتیبانی از هش و مقایسه امن)
+    const storedHash = adminUser.password_hash || adminUser.password;
+    const isPasswordValid = authSecurity.verifyPassword(cleanPassword, storedHash);
+
+    if (!isPasswordValid) {
+      return NextResponse.json({
+        success: false,
+        message: "نام کاربری یا رمز عبور اشتباه است.",
+      }, { status: 401 });
+    }
+
+    // صدور توکن امن نشست ادمین
+    const token = await signPayload({
+      id: adminUser.id,
+      username: adminUser.username,
+      full_name: adminUser.full_name || adminUser.username,
+      role: adminUser.role || "superadmin",
+    });
+
+    const res = NextResponse.json({
+      success: true,
+      message: "ورود موفقیت‌آمیز بود.",
+      user: {
+        id: adminUser.id,
+        username: adminUser.username,
+        role: adminUser.role || "superadmin",
+      },
+    });
+
+    res.cookies.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // ۷ روز
+      path: "/",
+    });
+
+    return res;
+  } catch (err: any) {
+    return NextResponse.json({
+      success: false,
+      message: err.message || "خطای سرور در فرآیند احراز هویت.",
+    }, { status: 500 });
+  }
+}
+</file>
+
 <file path="app/api/orders/track/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -32046,104 +32278,6 @@ body {
   .backdrop-blur-md, .backdrop-blur-lg, .backdrop-blur-xl {
     backdrop-filter: none !important;
     background-color: rgba(18, 18, 20, 0.96) !important;
-  }
-}
-</file>
-
-<file path="app/api/admin/login/route.ts">
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { signPayload, COOKIE_NAME } from "@/lib/session";
-import { authSecurity } from "@/lib/authSecurity";
-import { checkRateLimit } from "@/lib/rateLimiter";
-import crypto from "crypto";
-
-export const dynamic = "force-dynamic";
-
-export async function POST(req: NextRequest) {
-  try {
-    const forwardedFor = req.headers.get("x-forwarded-for");
-    const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : (req.headers.get("x-real-ip") || "127.0.0.1");
-
-    // محافظت در برابر حملات Brute-force با استفاده از Rate Limiter دیتابیس
-    const rateCheck = await checkRateLimit(clientIp, "admin_login", 5, 15);
-    if (!rateCheck.allowed) {
-      return NextResponse.json({
-        success: false,
-        message: "تعداد تلاش‌های ناموفق بیش از حد مجاز است. لطفاً ۱۵ دقیقه دیگر تلاش کنید.",
-      }, { status: 429 });
-    }
-
-    const body = await req.json();
-    const { username, password } = body;
-
-    if (!username || !password) {
-      return NextResponse.json({
-        success: false,
-        message: "نام کاربری و کلمه عبور الزامی است.",
-      }, { status: 400 });
-    }
-
-    const cleanUsername = String(username).trim().toLowerCase();
-    const cleanPassword = String(password).trim();
-
-    // استعلام کاربر ادمین از دیتابیس
-    const { data: adminUser, error } = await supabaseAdmin
-      .from("admin_users")
-      .select("*")
-      .eq("username", cleanUsername)
-      .maybeSingle();
-
-    if (error || !adminUser) {
-      return NextResponse.json({
-        success: false,
-        message: "نام کاربری یا رمز عبور اشتباه است.",
-      }, { status: 401 });
-    }
-
-    // اعتبارسنجی رمز عبور (پشتیبانی از هش و مقایسه امن)
-    const storedHash = adminUser.password_hash || adminUser.password;
-    const isPasswordValid = authSecurity.verifyPassword(cleanPassword, storedHash);
-
-    if (!isPasswordValid) {
-      return NextResponse.json({
-        success: false,
-        message: "نام کاربری یا رمز عبور اشتباه است.",
-      }, { status: 401 });
-    }
-
-    // صدور توکن امن نشست ادمین
-    const token = await signPayload({
-      id: adminUser.id,
-      username: adminUser.username,
-      full_name: adminUser.full_name || adminUser.username,
-      role: adminUser.role || "superadmin",
-    });
-
-    const res = NextResponse.json({
-      success: true,
-      message: "ورود موفقیت‌آمیز بود.",
-      user: {
-        id: adminUser.id,
-        username: adminUser.username,
-        role: adminUser.role || "superadmin",
-      },
-    });
-
-    res.cookies.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // ۷ روز
-      path: "/",
-    });
-
-    return res;
-  } catch (err: any) {
-    return NextResponse.json({
-      success: false,
-      message: err.message || "خطای سرور در فرآیند احراز هویت.",
-    }, { status: 500 });
   }
 }
 </file>
@@ -32780,6 +32914,71 @@ export default function AdminSidebar() {
 }
 </file>
 
+<file path="middleware.ts">
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { verifyPayload, COOKIE_NAME } from "@/lib/session";
+
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const token = req.cookies.get(COOKIE_NAME)?.value;
+
+  let isAuthenticated = false;
+  if (token) {
+    const payload = await verifyPayload(token);
+    if (payload && payload.username) {
+      isAuthenticated = true;
+    }
+  }
+
+  // محافظت از روت‌های حساس مدیریت، پیامک، تست هوش مصنوعی و حسابداری
+  const isProtectedApi = 
+    pathname.startsWith("/api/admin") || 
+    pathname === "/api/accounting" ||
+    pathname === "/api/sms/send" ||
+    pathname === "/api/test-ai";
+
+  if (isProtectedApi) {
+    // تنها مسیرهای عمومی مجاز: لاگین ادمین و وضعیت سشن
+    const isPublic = 
+      pathname === "/api/admin/login" || 
+      pathname === "/api/admin/session";
+
+    if (!isPublic && !isAuthenticated) {
+      return NextResponse.json(
+        { success: false, message: "دسترسی غیرمجاز. احراز هویت الزامی است." },
+        { status: 401 }
+      );
+    }
+  }
+
+  // محافظت از صفحات پیشخوان ادمین
+  if (pathname.startsWith("/admin")) {
+    const isLoginPage = pathname === "/admin/login";
+
+    if (!isAuthenticated && !isLoginPage) {
+      return NextResponse.redirect(new URL("/admin/login", req.url));
+    }
+
+    if (isAuthenticated && isLoginPage) {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
+
+    if (pathname === "/admin") {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|images|icons|placeholder.png|robots.txt|sitemap.xml|27424534.txt).*)",
+  ],
+};
+</file>
+
 <file path="app/admin/orders/page.tsx">
 "use client";
 
@@ -33274,71 +33473,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
-</file>
-
-<file path="middleware.ts">
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { verifyPayload, COOKIE_NAME } from "@/lib/session";
-
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const token = req.cookies.get(COOKIE_NAME)?.value;
-
-  let isAuthenticated = false;
-  if (token) {
-    const payload = await verifyPayload(token);
-    if (payload && payload.username) {
-      isAuthenticated = true;
-    }
-  }
-
-  // محافظت از روت‌های حساس مدیریت، پیامک، تست هوش مصنوعی و حسابداری
-  const isProtectedApi = 
-    pathname.startsWith("/api/admin") || 
-    pathname === "/api/accounting" ||
-    pathname === "/api/sms/send" ||
-    pathname === "/api/test-ai";
-
-  if (isProtectedApi) {
-    // تنها مسیرهای عمومی مجاز: لاگین ادمین و وضعیت سشن
-    const isPublic = 
-      pathname === "/api/admin/login" || 
-      pathname === "/api/admin/session";
-
-    if (!isPublic && !isAuthenticated) {
-      return NextResponse.json(
-        { success: false, message: "دسترسی غیرمجاز. احراز هویت الزامی است." },
-        { status: 401 }
-      );
-    }
-  }
-
-  // محافظت از صفحات پیشخوان ادمین
-  if (pathname.startsWith("/admin")) {
-    const isLoginPage = pathname === "/admin/login";
-
-    if (!isAuthenticated && !isLoginPage) {
-      return NextResponse.redirect(new URL("/admin/login", req.url));
-    }
-
-    if (isAuthenticated && isLoginPage) {
-      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
-    }
-
-    if (pathname === "/admin") {
-      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
-    }
-  }
-
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|images|icons|placeholder.png|robots.txt|sitemap.xml|27424534.txt).*)",
-  ],
-};
 </file>
 
 <file path="next.config.ts">

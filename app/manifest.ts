@@ -4,9 +4,9 @@ export const dynamic = "force-dynamic";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "آکسون کور | مرجع مانیتورهای تدوین و تجهیزات استودیو",
+    name: "آکسون کور | فروشگاه تخصصی تکنولوژی و گجت‌های هوشمند",
     short_name: "آکسون",
-    description: "فروشگاه تخصصی مانیتورهای ۵K، تجهیزات رنگ، تصویر و استودیوهای دیجیتال در ایران",
+    description: "فروشگاه آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و تجهیزات دیجیتال در ایران",
     start_url: "/",
     display: "standalone",
     background_color: "#07090e",

@@ -64,9 +64,9 @@ export default async function ProductsArchivePage() {
         <span className="px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] font-mono text-[11px] font-bold">
           STUDIO GEAR CATALOG • 2026
         </span>
-        <h1 className="text-2xl md:text-4xl font-black">تجهیزات تخصصی تدوین، تصویر و مانیتورهای استودیو</h1>
+        <h1 className="text-2xl md:text-4xl font-black">کاتالوگ رسمی کالاها و تجهیزات هوشمند</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium max-w-xl mx-auto leading-relaxed">
-          کلیه کالاها با تست سلامت پنل، گارانتی اصالت طلایی و ارسال پیشتاز استودیویی عرضه می‌شوند.
+          ضمانت اصالت و سلامت فیزیکی تمامی کالاها همراه با بررسی فنی پیش از تحویل.
         </p>
       </div>
 

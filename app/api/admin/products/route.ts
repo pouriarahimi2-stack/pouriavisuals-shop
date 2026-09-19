@@ -1,3 +1,4 @@
+import { adminHasPermission } from "@/lib/rbacGuard";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";

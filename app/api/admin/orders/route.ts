@@ -1,3 +1,4 @@
+import { adminHasPermission } from "@/lib/rbacGuard";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
-    if (!session) {
+    if (!session || !adminHasPermission(session.role, "orders.manage")) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 

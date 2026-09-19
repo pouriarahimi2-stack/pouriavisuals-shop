@@ -1,27 +1,46 @@
-/**
- * AXON CORE - Database-Backed Rate Limiting Guard
- */
-
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
-export async function checkRateLimit(identifier: string, maxAttempts: number = 5, windowMinutes: number = 10): Promise<boolean> {
+export async function checkRateLimit(
+  identifier: string,
+  action: string = "admin_login",
+  maxAttempts: number = 5,
+  windowMinutes: number = 15
+): Promise<{ allowed: boolean; remaining: number }> {
   try {
-    const now = new Date();
-    const windowAgo = new Date(now.getTime() - windowMinutes * 60 * 1000).toISOString();
+    const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
 
-    // بررسی تعداد درخواست‌ها در بازه زمانی مشخص
-    const { count, error } = await supabaseAdmin
-      .from("contact_messages") // یا جدول لاگ عمومی درخواست‌ها
-      .select("*", { count: "exact", head: true })
-      .eq("phone", identifier)
-      .gte("created_at", windowAgo);
+    const { data: attempts, error } = await supabaseAdmin
+      .from("rate_limit_logs")
+      .select("id")
+      .eq("identifier", identifier)
+      .eq("action", action)
+      .gte("created_at", windowStart);
 
     if (error) {
-      return true; // در صورت خطای دیتابیس به صورت پیش‌فرض اجازه دسترسی می‌دهیم تا اختلالی ایجاد نشود
+      // اگر جدول لاگ ریت‌لیمیت وجود نداشت یا ارور داد، روند لاگین مسدود نشود
+      return { allowed: true, remaining: maxAttempts };
     }
 
-    return (count || 0) < maxAttempts;
+    const count = attempts ? attempts.length : 0;
+    if (count >= maxAttempts) {
+      return { allowed: false, remaining: 0 };
+    }
+
+    // ثبت تلاش ناموفق
+    await supabaseAdmin.from("rate_limit_logs").insert([
+      {
+        identifier,
+        action,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+
+    return { allowed: true, remaining: maxAttempts - count - 1 };
   } catch {
-    return true;
+    return { allowed: true, remaining: maxAttempts };
   }
 }
+
+export const rateLimiter = {
+  checkLimit: checkRateLimit,
+};

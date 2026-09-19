@@ -3,36 +3,30 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const orderId = searchParams.get("orderId") || searchParams.get("id");
-    const phone = searchParams.get("phone");
-
-    if (!orderId || !phone) {
-      return NextResponse.json(
-        { success: false, message: "ارائه همزمان شماره سفارش و شماره موبایل خریدار الزامی است." },
-        { status: 400 }
-      );
+    const { query } = await req.json();
+    if (!query || query.trim().length < 5) {
+      return NextResponse.json({ success: false, message: "شماره موبایل یا شماره سفارش معتبر وارد نمایید." }, { status: 400 });
     }
 
-    const cleanPhone = phone.replace(/\D/g, "");
+    const cleanQuery = query.trim();
 
-    const { data: order, error } = await supabaseAdmin
+    // جستجو بر اساس شماره موبایل یا شماره سفارش
+    const { data: orders, error } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number, customer_name, status, payment_status, total_amount, final_amount, created_at, items")
-      .eq("id", orderId.trim())
-      .eq("phone", cleanPhone)
-      .maybeSingle();
+      .select("id, order_number, customer_name, total_price, payment_status, created_at, items, tracking_code")
+      .or(`customer_phone.eq.${cleanQuery},order_number.eq.${cleanQuery}`)
+      .order("created_at", { ascending: false });
 
-    if (error || !order) {
-      return NextResponse.json(
-        { success: false, message: "سفارشی با این مشخصات یافت نشد." },
-        { status: 404 }
-      );
+    if (error) {
+      return NextResponse.json({ success: false, message: "خطا در بازیابی سفارشات." }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, order });
+    return NextResponse.json({
+      success: true,
+      orders: orders || [],
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

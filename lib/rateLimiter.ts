@@ -17,7 +17,6 @@ export async function checkRateLimit(
       .gte("created_at", windowStart);
 
     if (error) {
-      // اگر جدول لاگ ریت‌لیمیت وجود نداشت یا ارور داد، روند لاگین مسدود نشود
       return { allowed: true, remaining: maxAttempts };
     }
 
@@ -26,7 +25,6 @@ export async function checkRateLimit(
       return { allowed: false, remaining: 0 };
     }
 
-    // ثبت تلاش ناموفق
     await supabaseAdmin.from("rate_limit_logs").insert([
       {
         identifier,

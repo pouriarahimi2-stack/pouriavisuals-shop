@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
 
 export interface AdminNotification {
   id: string;
@@ -43,25 +44,26 @@ export function AdminNotificationProvider({ children }: { children: ReactNode })
     setNotifications([]);
   };
 
-  // گوش دادن به رویداد زنده ثبت سفارش جدید از طریق دیسپچر Realtime
   useEffect(() => {
-    const handleOrderUpdate = (e: any) => {
-      const payload = e.detail;
-      if (payload?.eventType === "INSERT") {
+    const channel = supabase
+      .channel("admin-realtime-notifications")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
         try {
           soundEngine.playSuccess();
         } catch {}
+        const newOrder = payload.new;
         addNotification({
           type: "order",
           title: "سفارش جدید ثبت شد! 🛍️",
-          message: `سفارش جدید به مبلغ ${Number(payload.new?.final_amount || payload.new?.total_amount || 0).toLocaleString("fa-IR")} تومان ثبت گردید.`,
-          id: payload.new?.id ? String(payload.new.id) : undefined,
+          message: "فاکتور جدید با موفقیت ثبت گردید.",
+          id: String(newOrder.id),
         });
-      }
-    };
+      })
+      .subscribe();
 
-    window.addEventListener("db_orders_updated", handleOrderUpdate);
-    return () => window.removeEventListener("db_orders_updated", handleOrderUpdate);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -89,7 +91,5 @@ export function useNotification() {
   return context;
 }
 
-
-// Alias exports to satisfy existing layout imports
 export const NotificationProvider = AdminNotificationProvider;
 export default AdminNotificationProvider;

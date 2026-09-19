@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { calculateOrderDiscount } from "@/lib/couponValidator";
 import { smsService } from "@/services/smsService";
+import { checkRateLimit } from "@/lib/rateLimiter";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +11,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: "دسترسی غیرمجاز. مشاهده فاکتورها نیازمند لاگین مدیریت است." },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -35,14 +33,20 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    const rateCheck = await checkRateLimit(clientIp, "create_order", 10, 15);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ success: false, message: "تعداد ثبت سفارشات از این IP بیش از حد مجاز است." }, { status: 429 });
+    }
+
     const body = await req.json();
     const { customer_name, customer_phone, phone, province, city, postal_code, address, customer_address, notes, items, coupon_code } = body;
 
     const rawPhone = customer_phone || phone || "";
     const cleanPhone = String(rawPhone)
       .trim()
-      .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-      .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
       .replace(/\D/g, "");
 
     if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
@@ -58,7 +62,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "نشانی پستی دقیق جهت ارسال مرسوله الزامی است." }, { status: 400 });
     }
 
-    // ۱. استعلام محصولات از دیتابیس برای جلوگیری از دستکاری قیمت و بررسی موجودی
     const productIds = items.map((i: any) => String(i.productId || i.product_id || i.id)).filter(Boolean);
     const { data: dbProducts, error: prodErr } = await supabaseAdmin
       .from("products")
@@ -79,27 +82,14 @@ export async function POST(req: NextRequest) {
       const realProd = productMap.get(pId);
 
       if (!realProd) {
-        return NextResponse.json({
-          success: false,
-          message: `کالای «${it.title || pId}» در انبار سیستم یافت نشد.`
-        }, { status: 400 });
-      }
-
-      if (realProd.is_available === false) {
-        return NextResponse.json({
-          success: false,
-          message: `کالای «${realProd.title || realProd.name}» در حال حاضر ناموجود است.`
-        }, { status: 400 });
+        return NextResponse.json({ success: false, message: "کالای مورد نظر در انبار سیستم یافت نشد." }, { status: 400 });
       }
 
       const requestedQty = Math.max(1, Number(it.quantity || 1));
       const currentStock = realProd.stock !== null && realProd.stock !== undefined ? Number(realProd.stock) : 999;
 
       if (currentStock < requestedQty) {
-        return NextResponse.json({
-          success: false,
-          message: `موجودی کالای «${realProd.title || realProd.name}» کافی نیست (موجودی: ${currentStock}).`
-        }, { status: 400 });
+        return NextResponse.json({ success: false, message: "موجودی کالا کافی نیست." }, { status: 400 });
       }
 
       const unitPrice = realProd.discount_price && Number(realProd.discount_price) > 0
@@ -122,7 +112,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ۲. محاسبه کد تخفیف در سرور
     let finalDiscount = 0;
     let appliedCoupon: string | null = null;
     let couponRecordToUpdate: any = null;
@@ -181,50 +170,21 @@ export async function POST(req: NextRequest) {
 
     if (orderErr) throw orderErr;
 
-    // ۳. ثبت یا به‌روزرسانی پرونده مشتری در CRM
-    try {
-      const { data: existingCrm } = await supabaseAdmin
-        .from("crm_customers")
-        .select("id, total_spent, order_count")
-        .eq("phone", cleanPhone)
-        .maybeSingle();
-
-      if (existingCrm) {
-        await supabaseAdmin
-          .from("crm_customers")
-          .update({
-            full_name: customer_name,
-            total_spent: Number(existingCrm.total_spent || 0) + payableAmount,
-            order_count: Number(existingCrm.order_count || 0) + 1,
-            lifecycle_stage: (Number(existingCrm.total_spent || 0) + payableAmount) > 100000000 ? "vip" : "active",
-            address: finalAddress,
-            postal_code: postal_code || undefined,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingCrm.id);
-      } else {
-        await supabaseAdmin.from("crm_customers").insert([{
-          id: "crm_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-          full_name: customer_name,
-          phone: cleanPhone,
-          province: province || "تهران",
-          city: city || "تهران",
-          address: finalAddress,
-          postal_code: postal_code || null,
-          total_spent: payableAmount,
-          order_count: 1,
-          lifecycle_stage: "prospect",
-          tags: ["ثبت فاکتور"],
-          internal_notes: "سفارش ثبت‌شده از ویترین فروشگاه",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }]);
+    for (const it of verifiedItems) {
+      try {
+        const p = productMap.get(it.productId);
+        if (p && p.stock !== null && p.stock !== undefined) {
+          const nextStock = Math.max(0, Number(p.stock) - Number(it.quantity));
+          await supabaseAdmin
+            .from("products")
+            .update({ stock: nextStock, is_available: nextStock > 0 })
+            .eq("id", it.productId);
+        }
+      } catch (stkErr) {
+        console.warn("Stock decrease warning:", stkErr);
       }
-    } catch (crmErr) {
-      console.warn("CRM auto-sync warning:", crmErr);
     }
 
-    // ۴. به‌روزرسانی شمارنده کوپن
     if (couponRecordToUpdate) {
       const currentUsed = Number(couponRecordToUpdate.used_count || couponRecordToUpdate.times_used || 0);
       await supabaseAdmin
@@ -233,15 +193,14 @@ export async function POST(req: NextRequest) {
         .eq("id", couponRecordToUpdate.id);
     }
 
-    // ۵. ارسال پیامک ثبت اولیه سفارش
     smsService.sendSMS(
       cleanPhone,
-      `${customer_name} عزیز، سفارش شما با شناسه ${orderNumber} در آکسون کور ثبت شد. متشکریم.`
+      "مشتری گرامی، سفارش شما در آکسون ثبت شد. سپاس از اعتماد شما."
     ).catch(() => {});
 
     return NextResponse.json({
       success: true,
-      message: "سفارش با موفقیت در پایگاه داده ثبت گردید.",
+      message: "سفارش با موفقیت ثبت گردید.",
       order: createdOrder,
       orderId: createdOrder.id,
       orderNumber: createdOrder.order_number,

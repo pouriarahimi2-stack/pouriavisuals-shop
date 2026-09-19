@@ -22,6 +22,7 @@ const NAV_SECTIONS: NavGroup[] = [
       { name: "سفارشات و بارنامه", href: "/admin/orders", icon: "📦" },
       { name: "مشتریان و CRM", href: "/admin/customers", icon: "👥" },
       { name: "حسابداری و انبار", href: "/admin/inventory", icon: "📈" },
+      { name: "گزارش‌های مالی", href: "/admin/reports", icon: "📑" },
       { name: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
     ],
   },
@@ -36,6 +37,7 @@ const NAV_SECTIONS: NavGroup[] = [
       { name: "رادار اخبار فناوری", href: "/admin/news", icon: "📡" },
       { name: "منو و دسته‌بندی‌ها", href: "/admin/menu", icon: "🔗" },
       { name: "پیام‌ها و تیکت‌ها", href: "/admin/messages", icon: "📩" },
+      { name: "دیدگاه‌ها و نظرات", href: "/admin/reviews", icon: "⭐" },
     ],
   },
   {
@@ -89,7 +91,7 @@ export default function AdminSidebar() {
       )}
 
       <aside
-        className={`fixed lg:sticky top-0 right-0 z-40 w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-screen overflow-y-auto flex flex-col justify-between p-4 font-sans  shadow-xl transition-transform duration-300 ${
+        className={`fixed lg:sticky top-0 right-0 z-40 w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-screen overflow-y-auto flex flex-col justify-between p-4 font-sans shadow-xl transition-transform duration-350 ${
           mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
         }`}
         dir="rtl"

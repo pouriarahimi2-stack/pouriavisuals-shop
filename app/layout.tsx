@@ -1,6 +1,4 @@
 import AnnouncementBar from "@/components/AnnouncementBar";
-import MobileBottomNav from "@/components/MobileBottomNav";
-import CartDrawer from "@/components/CartDrawer";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import LayoutShell from "@/components/LayoutShell";
@@ -63,19 +61,18 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
-        {/* اسکریپت ضد فلش تم (Anti-FOUC) */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');var m=localStorage.getItem('axon_theme_manual_override')==='true';var d=m?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`,
+            __html: "(function(){try{var t=localStorage.getItem('theme');var m=localStorage.getItem('axon_theme_manual_override')==='true';var d=m?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();",
           }}
         />
       </head>
       <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
         <AnnouncementBar />
         <CartProvider>
-          <LayoutShell><div className="pb-16 lg:pb-0">{children}</div>
-        <MobileBottomNav />
-        <CartDrawer /></LayoutShell>
+          <LayoutShell>
+            <div className="pb-16 lg:pb-0">{children}</div>
+          </LayoutShell>
         </CartProvider>
       </body>
     </html>

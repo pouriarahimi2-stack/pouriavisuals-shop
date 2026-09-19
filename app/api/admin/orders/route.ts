@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const session = await verifyAdminSession(req);
-    if (!session) {
+    if (!session || !adminHasPermission(session.role, "orders.manage")) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 

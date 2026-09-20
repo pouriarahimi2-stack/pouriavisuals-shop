@@ -14,21 +14,12 @@ export default function AboutPage() {
 
   useEffect(() => {
     fetchAboutData();
-
-    const handleUpdate = (e: any) => {
-      if (e.detail) setSiteInfo(e.detail);
-    };
-
-    window.addEventListener("site_info_updated", handleUpdate);
-    return () => {
-      window.removeEventListener("site_info_updated", handleUpdate);
-    };
+    window.addEventListener("site_info_updated", fetchAboutData);
+    return () => window.removeEventListener("site_info_updated", fetchAboutData);
   }, []);
 
-  const storeName = siteInfo?.storeName || siteInfo?.site_name || siteInfo?.siteName || "آکسون | Axon";
+  const storeName = siteInfo?.storeName || siteInfo?.site_name || "آکسون کور | Axon Core";
   const aboutText =
-    siteInfo?.description ||
-    siteInfo?.footer_text ||
     `مجموعه ${storeName} مرجع تخصصی تامین و عرضه جدیدترین محصولات فناوری، گجت‌های هوشمند و ابزارهای نوین دیجیتال در ایران است.\n\nتعهد ما ارائه کالاهای ۱۰۰٪ اورجینال با تضمین سلامت و اصالت فیزیکی، بهترین قیمت بازار و ارسال سریع پیشتاز به سراسر کشور با بسته‌بندی ایمن و استاندارد است.`;
 
   return (

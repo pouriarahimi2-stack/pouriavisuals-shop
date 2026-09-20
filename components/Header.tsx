@@ -2,18 +2,20 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { themeEngine } from "@/lib/themeEngine";
-import { siteInfoService } from "@/services/siteInfoService";
+import { siteInfoService, HeaderConfig, DEFAULT_HEADER_CONFIG } from "@/services/siteInfoService";
 import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Header() {
+  const pathname = usePathname();
   const cart = useCart() as any;
-  const [siteName, setSiteName] = useState<string>("آکسون کور | Axon");
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [headerCfg, setHeaderCfg] = useState<HeaderConfig>(DEFAULT_HEADER_CONFIG);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [isScrolled, setIsScrolled] = useState<boolean>(false);
 
   const cartItems: any[] = Array.isArray(cart?.cartItems)
     ? cart.cartItems
@@ -24,18 +26,19 @@ export default function Header() {
     0
   );
 
+  const syncHeader = () => {
+    siteInfoService.getSiteInfo().then((info) => {
+      if (info?.homepage_layout_config?.header) {
+        setHeaderCfg(info.homepage_layout_config.header);
+      }
+    });
+  };
+
   useEffect(() => {
     if (typeof document !== "undefined") {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
     }
-
-    siteInfoService.getSiteInfo().then((info) => {
-      if (info) {
-        const resolvedName = String(info.storeName || info.site_name || (info as any).siteName || "").trim();
-        if (resolvedName) setSiteName(resolvedName);
-        if (info.logo_url) setLogoUrl(info.logo_url);
-      }
-    });
+    syncHeader();
 
     try {
       const user = localStorage.getItem("axon_user_session");
@@ -45,13 +48,21 @@ export default function Header() {
       }
     } catch {}
 
-    const handleAuthChange = (e: any) => {
-      if (e.detail?.phone) setUserPhone(String(e.detail.phone));
-      else setUserPhone(null);
+    const handleScroll = () => {
+      if (window.scrollY > 20) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
     };
 
-    window.addEventListener("user_auth_changed", handleAuthChange);
-    return () => window.removeEventListener("user_auth_changed", handleAuthChange);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("site_info_updated", syncHeader);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("site_info_updated", syncHeader);
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -63,73 +74,113 @@ export default function Header() {
     }
   };
 
+  if (!headerCfg.show) return null;
+
+  const isCapsule = headerCfg.variant === "capsule";
+  const positionClass =
+    headerCfg.position === "fixed"
+      ? "fixed top-3 inset-x-0 z-40"
+      : headerCfg.position === "sticky"
+      ? "sticky top-3 z-40"
+      : "relative z-40";
+
+  const brandName = headerCfg.brand.name || "آکسون کور | Axon Core";
+  const logoSrc = headerCfg.brand.logoUrl;
+
   return (
-    <header className="sticky top-4 z-40 max-w-7xl mx-auto px-4 transition-all duration-300">
-      <div className="p-2 sm:px-6 sm:py-2.5 rounded-full bg-[var(--modal-bg)]/85 border border-[var(--card-border)] backdrop-blur-2xl shadow-xl flex items-center justify-between gap-3">
-        
-        {/* راست: لوگو و نام فروشگاه */}
-        <div className="flex items-center gap-5">
+    <header className={`w-full transition-all duration-300 ${positionClass} px-3 sm:px-6`} dir="rtl">
+      <div
+        style={{
+          maxWidth: `${headerCfg.maxWidth || 1280}px`,
+          height: isScrolled && headerCfg.shrinkOnScroll ? `${Math.max(48, headerCfg.height - 8)}px` : `${headerCfg.height || 60}px`,
+        }}
+        className={`mx-auto w-full px-4 sm:px-8 transition-all duration-300 flex items-center justify-between gap-4 border shadow-xl backdrop-blur-2xl ${
+          isCapsule ? "rounded-full" : "rounded-2xl"
+        } bg-[var(--modal-bg)]/90 border-[var(--card-border)]`}
+      >
+        {/* راست: لوگو و لینک‌ها */}
+        <div className="flex items-center gap-6 sm:gap-8">
           <Link
             href="/"
             onClick={() => soundEngine.playClick()}
-            className="flex items-center gap-2.5 text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)] hover:opacity-90 transition"
+            className="flex items-center gap-2.5 text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)] hover:opacity-90 transition shrink-0"
           >
-            {logoUrl ? (
-              <img src={logoUrl} alt={siteName} className="h-8 w-auto max-w-[110px] object-contain rounded-lg" />
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt={brandName}
+                style={{
+                  width: `${headerCfg.brand.logoWidth || 38}px`,
+                  height: `${headerCfg.brand.logoHeight || 38}px`,
+                }}
+                className="object-contain rounded-lg"
+              />
             ) : (
-              <AnimatedLogo />
+              <AnimatedLogo size={36} />
             )}
-            <span className="font-black">{siteName}</span>
+            {headerCfg.brand.showName && <span className="font-black whitespace-nowrap">{brandName}</span>}
           </Link>
 
-          <nav className="hidden md:flex items-center gap-4 text-xs font-bold text-[var(--text-secondary)]">
-            <Link href="/products" className="hover:text-[var(--text-primary)] transition">
-              کاتالوگ کالاها
-            </Link>
-            <Link href="/news" className="hover:text-[var(--text-primary)] transition">
-              رادار اخبار
-            </Link>
-            <Link href="/track-order" className="hover:text-[var(--text-primary)] transition">
-              پیگیری سفارش
-            </Link>
-            <Link href="/about" className="hover:text-[var(--text-primary)] transition">
-              درباره ما
-            </Link>
-            <Link href="/contact" className="hover:text-[var(--text-primary)] transition">
-              تماس با ما
-            </Link>
-          </nav>
+          {headerCfg.menu.show && (
+            <nav className="hidden md:flex items-center gap-5 lg:gap-6 text-xs font-bold text-[var(--text-secondary)]">
+              {headerCfg.menu.items.filter((m) => m.show !== false).map((item) => {
+                const isActive = pathname === item.url;
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.url}
+                    className={`hover:text-[var(--text-primary)] transition whitespace-nowrap flex items-center gap-1.5 ${
+                      isActive ? "text-[var(--accent-blue)] font-black" : ""
+                    }`}
+                  >
+                    <span>{item.title}</span>
+                    {item.badge && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-[var(--accent-blue)] text-white text-[9px] font-mono">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          )}
         </div>
 
         {/* چپ: ابزارها و سبد خرید */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleTheme}
-            className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs transition cursor-pointer"
-            title="تغییر تم"
-          >
-            {isDarkMode ? "🌙" : "☀️"}
-          </button>
+        <div className="flex items-center gap-2.5 shrink-0">
+          {headerCfg.actions.themeToggle.show && (
+            <button
+              onClick={toggleTheme}
+              className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs transition cursor-pointer"
+              title="تغییر تم"
+            >
+              {isDarkMode ? "🌙" : "☀️"}
+            </button>
+          )}
 
-          <Link
-            href={userPhone ? "/my-orders" : "/login"}
-            onClick={() => soundEngine.playClick()}
-            className="px-3.5 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition flex items-center gap-1.5"
-          >
-            <span>👤</span>
-            <span className="hidden sm:inline">{userPhone ? "سفارش‌ها" : "حساب کاربری"}</span>
-          </Link>
+          {headerCfg.actions.account.show && (
+            <Link
+              href={userPhone ? "/my-orders" : "/login"}
+              onClick={() => soundEngine.playClick()}
+              className="px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition flex items-center gap-1.5"
+            >
+              <span>👤</span>
+              <span className="hidden sm:inline">{userPhone ? "سفارش‌های من" : "حساب کاربری"}</span>
+            </Link>
+          )}
 
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              if (typeof cart?.openCart === "function") cart.openCart();
-            }}
-            className="px-4 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 transition flex items-center gap-2 cursor-pointer"
-          >
-            <span>🛒</span>
-            <span className="bg-white/20 px-2 py-0.5 rounded-full font-mono text-[11px]">{cartCount}</span>
-          </button>
+          {headerCfg.actions.cart.show && (
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                if (typeof cart?.openCart === "function") cart.openCart();
+              }}
+              className="px-4 sm:px-5 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 transition flex items-center gap-2 cursor-pointer"
+            >
+              <span>🛒</span>
+              <span className="bg-white/20 px-2 py-0.5 rounded-full font-mono text-[11px]">{cartCount}</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

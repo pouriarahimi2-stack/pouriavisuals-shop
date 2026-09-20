@@ -47,7 +47,7 @@ export default function AIAssistantChat() {
 
   return (
     <>
-      <div className="fixed bottom-20 sm:bottom-6 left-4 z-30 font-sans select-none" dir="rtl">
+      <div className="fixed bottom-20 md:bottom-6 left-4 md:left-6 z-40 font-sans select-none" dir="rtl">
         {!isOpen && (
           <button
             onClick={() => {
@@ -63,7 +63,7 @@ export default function AIAssistantChat() {
       </div>
 
       {isOpen && (
-        <div className="fixed bottom-20 sm:bottom-6 left-4 z-50 w-[92vw] sm:w-96 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden font-sans text-xs flex flex-col justify-between h-[480px] animate-fadeIn" dir="rtl">
+        <div className="fixed bottom-20 md:bottom-6 left-4 md:left-6 z-50 w-[92vw] sm:w-96 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden font-sans text-xs flex flex-col justify-between h-[480px] animate-fadeIn" dir="rtl">
           <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-lg">🤖</span>

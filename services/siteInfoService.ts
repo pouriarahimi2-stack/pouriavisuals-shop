@@ -92,15 +92,6 @@ export interface FooterCertificateItem {
   show: boolean;
 }
 
-export interface HomeSectionConfig {
-  id: string;
-  type: "hero" | "banners" | "products" | "trustBadges" | "blog" | "news" | "richText";
-  show: boolean;
-  order: number;
-  title?: string;
-  subtitle?: string;
-}
-
 export interface AuthSecurityConfig {
   adminDeck: {
     pin: string;
@@ -263,7 +254,7 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   variant: "capsule",
   position: "fixed",
   maxWidth: 1280,
-  height: 56,
+  height: 60,
   paddingX: 24,
   borderRadius: 9999,
   blurIntensity: "xl",
@@ -276,9 +267,9 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
     logoHeight: 38,
     logoRadius: 9999,
     showName: true,
-    name: "آکسون کور | Axon",
+    name: "آکسون کور | Axon Core",
     showTagline: false,
-    tagline: "مرجع تخصصی تجهیزات دیجیتال و تصویر",
+    tagline: "فروشگاه تخصصی محصولات تکنولوژی و گجت‌های هوشمند",
     href: "/",
   },
   menu: {
@@ -288,8 +279,8 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
     gap: 24,
     items: [
       { id: "m1", title: "کاتالوگ کالاها", url: "/products", order: 1, show: true },
-      { id: "m2", title: "رادار اخبار", url: "/news", order: 2, show: true },
-      { id: "m3", title: "مجله سئو", url: "/blog", order: 3, show: true },
+      { id: "m2", title: "رادار اخبار تکنولوژی", url: "/news", order: 2, show: true },
+      { id: "m3", title: "مجله تخصصی دیجیتال", url: "/blog", order: 3, show: true },
       { id: "m4", title: "پیگیری سفارش", url: "/track-order", order: 4, show: true },
       { id: "m5", title: "درباره ما", url: "/about", order: 5, show: true },
       { id: "m6", title: "تماس با ما", url: "/contact", order: 6, show: true },
@@ -303,7 +294,7 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   },
   announcement: {
     show: false,
-    text: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | گارانتی اصالت طلایی",
+    text: "⚡ ارسال رایگان سفارش‌های بالای ۲ میلیون تومان | گارانتی اصالت طلایی و سلامت فیزیکی",
     backgroundColor: "#0284c7",
     textColor: "#ffffff",
     dismissible: true,
@@ -314,42 +305,42 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
   header: DEFAULT_HEADER_CONFIG,
   hero: {
     show: true,
-    title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
-    subtitle: "تامین مستقیم تجهیزات حرفه‌ای استودیو، کالیبراسیون تخصصی پنل و مانیتورهای مرجع تصویر در ایران.",
-    buttonText: "مشاهده کاتالوگ تجهیزات",
+    title: "دنیای نوآوری، تکنولوژی مدرن و ابزارهای هوشمند",
+    subtitle: "مرجع تخصصی خرید جدیدترین گجت‌های هوشمند، لوازم الکترونیک، گجت‌های کاربردی و ابزارهای دیجیتال با تضمین اصالت و ارسال سریع به سراسر ایران.",
+    buttonText: "مشاهده کاتالوگ محصولات",
     buttonLink: "/products",
     show3DCanvas: true,
   },
   productsSection: {
     show: true,
-    title: "محصولات منتخب و پرچمدار",
-    subtitle: "آماده ارسال با بسته‌بندی ضدضربه استودیویی و گارانتی اصالت طلایی",
-    showCategoryFilter: false,
+    title: "جدیدترین محصولات و گجت‌های دیجیتال",
+    subtitle: "تضمین ۱۰۰٪ سلامت فیزیکی، بهترین قیمت بازار و ارسال سریع پیشتاز",
+    showCategoryFilter: true,
   },
   trustBadges: {
     show: false,
   },
   showcase3D: {
     show: true,
-    title: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-    subtitle: "پیمایش تعاملی جهت بررسی متالورژی قطعات و استانداردهای نوری",
+    title: "نمایشگاه تعاملی سه‌بعدی محصولات پرچمدار",
+    subtitle: "بررسی لایه‌به‌لایه و ساختار مهندسی قطعات با کنترل لمسی",
   },
   newsTicker: {
     show: true,
   },
   blogSection: {
     show: true,
-    title: "مجله و مقالات تحلیلی فناوری",
-    subtitle: "بررسی‌های تخصصی، راهنمای کالیبراسیون و استانداردهای رنگ",
+    title: "مجله نقد و بررسی تخصصی گجت‌ها",
+    subtitle: "بررسی‌های کاربردی، راهنمای خرید هوشمندانه و تازه‌های دنیای فناوری",
     count: 3,
   },
   footer: {
     show: true,
     scaleMode: "normal",
     paddingMode: "normal",
-    brandTitle: "آکسون | Axon",
-    brandSubtitle: "فروشگاه تخصصی تجهیزات تصویر و گجت‌های نوین",
-    description: "مرجع تخصصی تامین، کالیبراسیون و مشاوره تجهیزات پیشرفته استودیو با گارانتی اصالت طلایی.",
+    brandTitle: "آکسون کور | Axon Core",
+    brandSubtitle: "فروشگاه تخصصی تکنولوژی، گجت‌های هوشمند و کالای دیجیتال",
+    description: "مجموعه آکسون کور مرجع عرضه مستقیم جدیدترین تجهیزات الکترونیک، ابزارهای هوشمند و گجت‌های کاربردی دیجیتال با ضمانت اصالت ۱۰۰٪ فیزیکی و پشتیبانی تخصصی در ایران.",
     logoUrl: "",
     logoWidth: 160,
     logoHeight: 56,
@@ -372,7 +363,7 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
       title: "خدمات مشتریان",
       links: [
         { id: "s1", title: "ثبت تیکت مشاوره", url: "/contact" },
-        { id: "s2", title: "شرایط گارانتی طلایی", url: "/about" },
+        { id: "s2", title: "شرایط گارانتی و اصالت", url: "/about" },
         { id: "s3", title: "ضمانت بازگشت وجه ۷ روزه", url: "/about" },
         { id: "s4", title: "روش‌های پرداخت امن شاپرک", url: "/track-order" },
       ],
@@ -402,7 +393,7 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
     },
     bottomBar: {
       show: true,
-      copyrightText: "تمامی حقوق مادی و معنوی برای آکسون | Axon محفوظ است © 2026",
+      copyrightText: "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
       designerText: "طراحی مهندسی و پایدار",
       enamadBadgeText: "نماد اعتماد الکترونیکی فعال",
     },
@@ -415,10 +406,10 @@ export const DEFAULT_HOMEPAGE_LAYOUT_CONFIG: HomepageLayoutConfig = {
 };
 
 export const DEFAULT_SITE_INFO: SiteInfo = {
-  site_name: "آکسون کور | Axon",
-  siteName: "آکسون کور | Axon",
-  storeName: "آکسون کور | Axon",
-  tagline: "فروشگاه تخصصی تجهیزات و گجت‌های تکنولوژی",
+  site_name: "آکسون کور | Axon Core",
+  siteName: "آکسون کور | Axon Core",
+  storeName: "آکسون کور | Axon Core",
+  tagline: "فروشگاه تخصصی محصولات تکنولوژی و گجت‌های هوشمند",
   allow_google_index: true,
   allowGoogleIndex: true,
   maintenance_mode: "none",
@@ -426,9 +417,9 @@ export const DEFAULT_SITE_INFO: SiteInfo = {
   email: "Pouriarahimi@yahoo.com",
   address: "شیراز - ستارخان",
   working_hours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-  header_announcement: "⚡ ارسال سریع سفارش‌های استودیو با گارانتی اصالت طلایی",
+  header_announcement: "⚡ ارسال سریع سفارش‌ها با گارانتی اصالت طلایی و سلامت فیزیکی",
   free_shipping_threshold: 2000000,
-  description: "مرجع تخصصی تامین تجهیزات دیجیتال، تصویر و گجت‌های نوین با گارانتی اصالت طلایی در ایران.",
+  description: "مرجع تخصصی خرید آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و لوازم دیجیتال با تضمین اصالت فیزیکی و ارسال سریع به سراسر کشور.",
   footer_text: "تمامی حقوق محفوظ است © 2026 آکسون کور",
   homepage_layout_config: DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
 };
@@ -452,7 +443,7 @@ export const siteInfoService = {
         if (json.data) {
           const data = json.data;
           let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
-          
+
           if (data.homepage_layout_config) {
             try {
               const incoming = typeof data.homepage_layout_config === "string"
@@ -469,11 +460,10 @@ export const siteInfoService = {
             }
           }
 
-          // پل ارتباطی ستون‌های SQL با ساختار ویترین
           const finalHeaderLogo = parsedLayout.header.brand.logoUrl || data.logo_url || "";
           const finalFooterLogo = parsedLayout.footer.logoUrl || data.footer_logo_url || "";
-          const finalSiteName = parsedLayout.header.brand.name || data.site_name || data.store_name || "آکسون کور | Axon";
-          const finalTagline = parsedLayout.header.brand.tagline || data.tagline || "مرجع تخصصی تجهیزات دیجیتال و تصویر";
+          const finalSiteName = parsedLayout.header.brand.name || data.site_name || data.store_name || "آکسون کور | Axon Core";
+          const finalTagline = parsedLayout.header.brand.tagline || data.tagline || "فروشگاه تخصصی محصولات تکنولوژی و دیجیتال";
           const finalFavicon = data.favicon_url || "";
 
           parsedLayout.header.brand.logoUrl = finalHeaderLogo;
@@ -526,7 +516,7 @@ export const siteInfoService = {
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
       const current = await this.getSiteInfo();
-      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون کور | Axon";
+      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون کور | Axon Core";
 
       const mergedPayload: any = {
         ...current,
@@ -545,13 +535,11 @@ export const siteInfoService = {
         }
       }
 
-      // ۱. ذخیره فوری در LocalStorage جهت پیشگیری از هرگونه از دست رفتن داده
       if (typeof window !== "undefined") {
         localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mergedPayload));
         realtimeEngine.broadcastLocally("site_info_updated", mergedPayload);
       }
 
-      // ۲. ارسال امن به پایگاه داده
       const res = await fetch("/api/site-info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

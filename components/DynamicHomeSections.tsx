@@ -5,6 +5,8 @@ import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
+import TechRadarFeed from "@/components/TechRadarFeed";
 
 interface DynamicHomeSectionsProps {
   initialProducts: any[];
@@ -34,7 +36,7 @@ export default function DynamicHomeSections({
       if (bannerRes?.success && Array.isArray(bannerRes.banners)) {
         setBanners(bannerRes.banners.filter((b: any) => b.is_active));
       }
-      if (siteRes?.siteInfo) setSiteInfo(siteRes.siteInfo);
+      if (siteRes?.data) setSiteInfo(siteRes.data);
     } catch {}
   };
 
@@ -63,15 +65,14 @@ export default function DynamicHomeSections({
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  const heroTitle = siteInfo?.hero_title || siteInfo?.home_title || "جهان پیشرفته فناوری و گجت‌های هوشمند";
-  
-  let rawSubtitle = siteInfo?.hero_subtitle || siteInfo?.home_subtitle || siteInfo?.description || "";
-  if (rawSubtitle.includes("استودیو") || rawSubtitle.includes("کالیبراسیون") || !rawSubtitle) {
-    rawSubtitle = "مرجع تخصصی خرید آنلاین جدیدترین ابزارها، تجهیزات دیجیتال و گجت‌های هوشمند بازار با تضمین اصالت فیزیکی و ارسال سریع پیشتاز.";
-  }
+  const layoutCfg = siteInfo?.homepage_layout_config;
+  const heroTitle = layoutCfg?.hero?.title || "دنیای نوآوری، تکنولوژی مدرن و ابزارهای هوشمند";
+  const heroSubtitle = layoutCfg?.hero?.subtitle || "مرجع تخصصی خرید آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و لوازم دیجیتال با تضمین اصالت فیزیکی و ارسال سریع به سراسر کشور.";
 
   return (
     <div className="space-y-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      
+      {/* اسلایدر یا هیرو اصلی */}
       {banners.length > 0 ? (
         <div className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl aspect-[16/8] sm:aspect-[21/9] max-h-[480px]">
           {banners.map((b, idx) => (
@@ -82,7 +83,7 @@ export default function DynamicHomeSections({
               <img src={b.image_url} alt={b.title || "Banner"} className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-12 text-white space-y-3">
                 <span className="px-3 py-1 rounded-full bg-blue-600/80 text-white text-[11px] font-bold w-fit backdrop-blur-md">
-                  ویژه ویترین آکسون کور
+                  پیشنهاد ویژه آکسون کور
                 </span>
                 <h2 className="text-xl sm:text-3xl lg:text-4xl font-black leading-tight max-w-2xl">{b.title}</h2>
                 {b.link_url && (
@@ -125,7 +126,7 @@ export default function DynamicHomeSections({
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed max-w-2xl mx-auto">
-              {rawSubtitle}
+              {heroSubtitle}
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
@@ -148,6 +149,18 @@ export default function DynamicHomeSections({
         </div>
       )}
 
+      {/* نوار اخبار تکنولوژی */}
+      <TechRadarFeed />
+
+      {/* نمایشگاه سه‌بعدی پرسپکتیو */}
+      {products.length > 0 && (
+        <ProductPerspectiveSlider
+          products={products}
+          customTitle="نمایشگاه تعاملی سه‌بعدی محصولات"
+          customSubtitle="پیمایش با سوایپ لمسی جهت بررسی مشخصات کالاها"
+        />
+      )}
+
       {/* ویترین محصولات */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
@@ -159,7 +172,7 @@ export default function DynamicHomeSections({
               </h2>
             </div>
             <p className="text-xs text-[var(--text-secondary)] font-medium">
-              محصولات فعال، آماده ارسال فوری با تضمین ۱۰۰٪ اصالت فیزیکی کالا
+              محصولات آماده ارسال فوری با تضمین ۱۰۰٪ اصالت فیزیکی کالا
             </p>
           </div>
 

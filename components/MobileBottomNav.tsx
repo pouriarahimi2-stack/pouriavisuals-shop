@@ -3,83 +3,91 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Layers, ShoppingBag, Package, User } from "lucide-react";
+import { useCart } from "@/context/CartContext";
+import { soundEngine } from "@/lib/soundEngine";
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
-  const [cartCount, setCartCount] = useState(0);
+  const cart = useCart() as any;
+  const [userPhone, setUserPhone] = useState<string | null>(null);
 
-  const updateCount = () => {
-    try {
-      const items = JSON.parse(localStorage.getItem("axon_cart") || "[]");
-      const total = items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
-      setCartCount(total);
-    } catch (e) {
-      setCartCount(0);
-    }
-  };
+  const cartItems: any[] = Array.isArray(cart?.cartItems)
+    ? cart.cartItems
+    : (Array.isArray(cart?.items) ? cart.items : []);
+
+  const cartCount = cartItems.reduce(
+    (acc: number, item: any) => acc + (Number(item?.quantity) || 1),
+    0
+  );
 
   useEffect(() => {
-    updateCount();
-    window.addEventListener("cart_updated", updateCount);
-    return () => window.removeEventListener("cart_updated", updateCount);
+    try {
+      const user = localStorage.getItem("axon_user_session");
+      if (user) {
+        const parsed = JSON.parse(user);
+        if (parsed.phone) setUserPhone(String(parsed.phone));
+      }
+    } catch {}
+
+    const handleAuthChange = (e: any) => {
+      if (e.detail?.phone) setUserPhone(String(e.detail.phone));
+      else setUserPhone(null);
+    };
+
+    window.addEventListener("user_auth_changed", handleAuthChange);
+    return () => window.removeEventListener("user_auth_changed", handleAuthChange);
   }, []);
 
   const navItems = [
-    { href: "/", label: "خانه", icon: Home },
-    { href: "/products", label: "محصولات", icon: Layers },
-    {
-      action: "cart",
-      label: "سبد خرید",
-      icon: ShoppingBag,
-      badge: cartCount,
-    },
-    { href: "/track", label: "پیگیری", icon: Package },
-    { href: "/admin", label: "پیشخوان", icon: User },
+    { label: "خانه", href: "/", icon: "🏠" },
+    { label: "محصولات", href: "/products", icon: "📦" },
+    { label: "سبد خرید", href: "#cart", isCart: true, icon: "🛒", badge: cartCount },
+    { label: "پیگیری", href: "/track-order", icon: "🚚" },
+    { label: userPhone ? "حساب من" : "ورود", href: userPhone ? "/my-orders" : "/login", icon: "👤" },
   ];
 
   return (
-    <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--modal-bg)] border-t border-[var(--card-border)] px-3 py-2 pb-safe shadow-2xl dir-rtl">
-      <div className="flex items-center justify-around max-w-lg mx-auto">
-        {navItems.map((item, idx) => {
-          const Icon = item.icon;
-          const isActive = item.href ? pathname === item.href : false;
+    <nav className="fixed bottom-0 inset-x-0 z-30 md:hidden bg-[var(--modal-bg)]/95 backdrop-blur-xl border-t border-[var(--card-border)] h-16 px-2 flex items-center justify-around font-sans select-none">
+      {navItems.map((item) => {
+        const isActive = pathname === item.href;
 
-          if (item.action === "cart") {
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => window.dispatchEvent(new Event("open_cart_drawer"))}
-                className="flex flex-col items-center justify-center flex-1 py-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] relative transition"
-              >
-                <div className="relative">
-                  <Icon size={20} className="text-[var(--accent-blue)]" />
-                  {item.badge > 0 && (
-                    <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] font-bold mt-1 text-[var(--text-primary)]">{item.label}</span>
-              </button>
-            );
-          }
-
+        if (item.isCart) {
           return (
-            <Link
-              key={idx}
-              href={item.href || "/"}
-              className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
-                isActive ? "text-[var(--accent-blue)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
+            <button
+              key={item.label}
+              onClick={() => {
+                soundEngine.playClick();
+                if (typeof cart?.openCart === "function") cart.openCart();
+              }}
+              className="relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition"
             >
-              <Icon size={20} className={isActive ? "text-[var(--accent-blue)]" : "text-[var(--text-secondary)]"} />
-              <span className="text-[10px] font-bold mt-1">{item.label}</span>
-            </Link>
+              <span className="text-lg relative">
+                {item.icon}
+                {item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-2 w-4 h-4 rounded-full bg-[var(--accent-blue)] text-white text-[9px] font-mono flex items-center justify-center font-bold">
+                    {item.badge}
+                  </span>
+                )}
+              </span>
+              <span>{item.label}</span>
+            </button>
           );
-        })}
-      </div>
-    </div>
+        }
+
+        return (
+          <Link
+            key={item.label}
+            href={item.href}
+            onClick={() => soundEngine.playClick()}
+            className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition ${
+              isActive ? "text-[var(--accent-blue)]" : "text-[var(--text-secondary)]"
+            }`}
+          >
+            <span className="text-lg">{item.icon}</span>
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

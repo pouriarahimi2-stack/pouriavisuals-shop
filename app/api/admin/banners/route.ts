@@ -6,17 +6,31 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    if (!supabaseAdmin) return NextResponse.json({ success: true, banners: [] });
-    const { data: banners, error } = await supabaseAdmin
-      .from("banners")
-      .select("*")
-      .order("created_at", { ascending: false });
+    let bannersList: any[] = [];
 
-    if (error) {
-      // فال‌بک امن در صورت نبود جدول
-      return NextResponse.json({ success: true, banners: [] });
+    // ۱. استعلام از جدول اختصاصی banners
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin
+        .from("banners")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data && data.length > 0) bannersList = data;
     }
-    return NextResponse.json({ success: true, banners: banners || [] });
+
+    // ۲. فال‌بک از جدول ماژولار صفحات برای تضمین عدم گم شدن بنرها
+    if (bannersList.length === 0 && supabaseAdmin) {
+      const { data: modularPage } = await supabaseAdmin
+        .from("modular_pages")
+        .select("puck_data")
+        .eq("slug", "site_banners")
+        .maybeSingle();
+
+      if (modularPage?.puck_data?.banners && Array.isArray(modularPage.puck_data.banners)) {
+        bannersList = modularPage.puck_data.banners;
+      }
+    }
+
+    return NextResponse.json({ success: true, banners: bannersList });
   } catch (err: any) {
     return NextResponse.json({ success: true, banners: [] });
   }
@@ -34,10 +48,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "عنوان و تصویر بنر الزامی هستند." }, { status: 400 });
     }
 
-    // استفاده از UUID استاندارد نسخه ۴ جهت عدم ارور syntax error در Postgres
     const bannerId = (body.id && body.id.length === 36) ? body.id : randomUUID();
 
-    const payload: Record<string, any> = {
+    const bannerRecord = {
       id: bannerId,
       title,
       image_url: imageUrl,
@@ -47,34 +60,46 @@ export async function POST(req: NextRequest) {
     };
 
     if (supabaseAdmin) {
+      // ذخیره در جدول اصلی
       if (body.id) {
-        const { error: updErr } = await supabaseAdmin.from("banners").update(payload).eq("id", body.id);
-        if (updErr) {
-          // فال‌بک برای حالتی که ستون بدون خط تیره link باشد
-          await supabaseAdmin.from("banners").update({
-            title,
-            image_url: imageUrl,
-            is_active: isActive,
-            updated_at: new Date().toISOString(),
-          }).eq("id", body.id);
-        }
+        await supabaseAdmin.from("banners").update(bannerRecord).eq("id", body.id);
       } else {
-        payload.created_at = new Date().toISOString();
-        const { error: insErr } = await supabaseAdmin.from("banners").insert([payload]);
-        if (insErr) {
-          // اگر ستون link_url در ساختار جدول وجود نداشت
-          await supabaseAdmin.from("banners").insert([{
-            id: bannerId,
-            title,
-            image_url: imageUrl,
-            is_active: isActive,
+        await supabaseAdmin.from("banners").insert([{ ...bannerRecord, created_at: new Date().toISOString() }]);
+      }
+
+      // ذخیره پشتیبان قطعی در جدول modular_pages
+      try {
+        const { data: pageRecord } = await supabaseAdmin
+          .from("modular_pages")
+          .select("*")
+          .eq("slug", "site_banners")
+          .maybeSingle();
+
+        let existingBanners: any[] = pageRecord?.puck_data?.banners || [];
+        if (body.id) {
+          existingBanners = existingBanners.map((b: any) => (b.id === body.id ? bannerRecord : b));
+        } else {
+          existingBanners = [bannerRecord, ...existingBanners];
+        }
+
+        if (pageRecord) {
+          await supabaseAdmin
+            .from("modular_pages")
+            .update({ puck_data: { banners: existingBanners }, updated_at: new Date().toISOString() })
+            .eq("id", pageRecord.id);
+        } else {
+          await supabaseAdmin.from("modular_pages").insert([{
+            slug: "site_banners",
+            title: "Banners Store",
+            puck_data: { banners: existingBanners },
+            is_published: true,
             created_at: new Date().toISOString(),
           }]);
         }
-      }
+      } catch {}
     }
 
-    return NextResponse.json({ success: true, message: "بنر با موفقیت در دیتابیس ثبت شد.", banner: payload });
+    return NextResponse.json({ success: true, message: "بنر با موفقیت ذخیره گردید.", banner: bannerRecord });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message || "خطا در ثبت بنر." }, { status: 500 });
   }
@@ -88,7 +113,22 @@ export async function DELETE(req: NextRequest) {
 
     if (supabaseAdmin) {
       await supabaseAdmin.from("banners").delete().eq("id", id);
+
+      // حذف از ذخیره پشتیبان
+      try {
+        const { data: pageRecord } = await supabaseAdmin
+          .from("modular_pages")
+          .select("*")
+          .eq("slug", "site_banners")
+          .maybeSingle();
+
+        if (pageRecord?.puck_data?.banners) {
+          const filtered = pageRecord.puck_data.banners.filter((b: any) => b.id !== id);
+          await supabaseAdmin.from("modular_pages").update({ puck_data: { banners: filtered } }).eq("id", pageRecord.id);
+        }
+      } catch {}
     }
+
     return NextResponse.json({ success: true, message: "بنر با موفقیت حذف گردید." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });

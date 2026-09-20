@@ -60,7 +60,7 @@ export default function AdminLoginPage() {
             🛡️
           </div>
           <h1 className="text-lg font-black tracking-tight">ورود به پیشخوان مدیریت آکسون</h1>
-          <p className="text-xs text-slate-400 font-medium">شناسه و رمز عبور اختصاصی مدیر را وارد فرمایید</p>
+          <p className="text-xs text-slate-400 font-medium">شناسه و کلمه عبور اختصاصی خود را وارد نمایید</p>
         </div>
 
         {errorMessage && (
@@ -98,7 +98,7 @@ export default function AdminLoginPage() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 hover:text-white transition cursor-pointer"
-                title={showPassword ? "مخفی‌سازی رمز" : "نمایش رمز"}
+                title={showPassword ? "مخفی کردن رمز" : "نمایش رمز"}
               >
                 {showPassword ? "🙈" : "👁️"}
               </button>
@@ -111,7 +111,7 @@ export default function AdminLoginPage() {
               disabled={loading}
               className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition shadow-xl shadow-blue-600/30 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              <span>{loading ? "در حال بررسی..." : "ورود امن به پیشخوان 🚀"}</span>
+              <span>{loading ? "در حال اعتبارسنجی..." : "ورود به پیشخوان 🚀"}</span>
             </button>
           </div>
         </form>

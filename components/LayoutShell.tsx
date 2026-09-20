@@ -18,7 +18,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       <div className="min-h-screen flex flex-col justify-between bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300">
         {!isAdminRoute && <Header />}
 
-        <main className={`flex-1 w-full ${!isAdminRoute ? "pt-20 sm:pt-24 pb-20 md:pb-6" : ""}`}>
+        <main className={`flex-1 w-full ${!isAdminRoute ? "pt-24 sm:pt-28 pb-20 md:pb-6" : ""}`}>
           {children}
         </main>
 

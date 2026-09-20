@@ -15,6 +15,7 @@ interface ProductCardProps {
     discount_price?: number | null;
     discountPrice?: number | null;
     image?: string | null;
+    image_url?: string | null;
     images?: string[];
     category?: string;
     stock?: number;
@@ -28,11 +29,12 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discountVal = product.discount_price || product.discountPrice;
   const finalPrice = discountVal && Number(discountVal) > 0 ? Number(discountVal) : displayPrice;
 
-  // حل ریشه‌ای: اگر عکس placeholder سیاه بود، عکس باکیفیت و واقعی لود می‌شود
-  let imageSrc = (Array.isArray(product.images) && product.images[0]) || product.image || "";
-  if (!imageSrc || imageSrc.includes("placeholder.png")) {
-    imageSrc = "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80";
-  }
+  // خواندن تصویر واقعی و شاخص خود محصول از دیتابیس بدون هیچ عکس هاردکد شده
+  const imageSrc =
+    (Array.isArray(product.images) && product.images.length > 0 && product.images[0]) ||
+    product.image_url ||
+    product.image ||
+    "/placeholder.png";
 
   return (
     <div className="group rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-xl">
@@ -52,7 +54,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         <div className="space-y-1.5">
           <span className="text-[10px] font-bold text-[var(--accent-blue)] block truncate">
-            {product.category || "لوازم هوشمند و دیجیتال"}
+            {product.category || "لوازم دیجیتال و تکنولوژی"}
           </span>
           <h3 className="text-xs font-black text-[var(--text-primary)] line-clamp-2 leading-relaxed min-h-[36px] group-hover:text-[var(--accent-blue)] transition">
             {title}
@@ -81,7 +83,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         </div>
 
-        {/* دکمه اختصاصی با انیمیشن دقیق چرخ‌دستی و باز شدن به‌موقع پس از ۱.۲۵ ثانیه */}
+        {/* دکمه افزودن با انیمیشن روان که دقیقاً پس از اتمام ۱.۲۵ ثانیه کشوی سبد را باز می‌کند */}
         <AddToCartButton product={{ ...product, image: imageSrc }} showCounter={false} />
       </div>
     </div>

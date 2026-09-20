@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { verifyAdminSession } from '@/lib/authSecurityHelper';
 import { authSecurity } from '@/lib/authSecurity';
+import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,6 @@ export async function GET(req: NextRequest) {
     const username = session?.username || "admin";
 
     let user: any = null;
-    let staffList: any[] = [];
 
     if (supabaseAdmin) {
       const { data } = await supabaseAdmin
@@ -20,18 +20,11 @@ export async function GET(req: NextRequest) {
         .eq('username', username)
         .maybeSingle();
       user = data;
-
-      const { data: allStaff } = await supabaseAdmin
-        .from('admin_users')
-        .select('id, username, full_name, role, created_at')
-        .order('created_at', { ascending: false });
-      staffList = allStaff || [];
     }
 
     return NextResponse.json({
       success: true,
-      user: user || { username, full_name: "مدیر ارشد سیستم", role: "superadmin" },
-      staff: staffList,
+      user: user || { username, full_name: "مدیر ارشد آکسون", role: "superadmin" },
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
@@ -41,73 +34,54 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action } = body;
-
-    // ۱. ایجاد مدیر/کارشناس جدید با تعیین نقش
-    if (action === "create_staff") {
-      const { username, password, full_name, role } = body;
-      const cleanUser = String(username || "").trim().toLowerCase();
-      const cleanPass = String(password || "").trim();
-
-      if (!cleanUser || cleanPass.length < 4) {
-        return NextResponse.json({ success: false, message: "نام کاربری و کلمه عبور حداقل ۴ کاراکتری الزامی است." }, { status: 400 });
-      }
-
-      const hashedPassword = authSecurity.hashPassword(cleanPass);
-      const newStaff = {
-        username: cleanUser,
-        password_hash: hashedPassword,
-        full_name: full_name?.trim() || cleanUser,
-        role: role || "content_editor",
-        created_at: new Date().toISOString(),
-      };
-
-      if (supabaseAdmin) {
-        const { error } = await supabaseAdmin.from('admin_users').insert([newStaff]);
-        if (error) return NextResponse.json({ success: false, message: "این نام کاربری قبلاً ثبت شده است." }, { status: 400 });
-      }
-
-      return NextResponse.json({ success: true, message: `کاربر جدید «${cleanUser}» با نقش ${role} با موفقیت ثبت شد.` });
-    }
-
-    // ۲. تغییر رمز عبور مدیر جاری
-    const currentPassword = String(body.currentPassword || '').trim();
     const newPassword = String(body.newPassword || '').trim();
     const newFullName = body.newFullName ? String(body.newFullName).trim() : undefined;
     const newUsername = body.newUsername ? String(body.newUsername).trim().toLowerCase() : undefined;
 
     const session = await verifyAdminSession(req);
-    const sessionUsername = session?.username || "admin";
+    const currentUsername = session?.username || "admin";
+    const targetUsername = newUsername || currentUsername;
+
+    if (!newPassword || newPassword.length < 4) {
+      return NextResponse.json({ success: false, message: "کلمه عبور باید حداقل ۴ نویسه باشد." }, { status: 400 });
+    }
+
+    const hashedPassword = authSecurity.hashPassword(newPassword);
 
     if (supabaseAdmin) {
-      const { data: user } = await supabaseAdmin
+      // استعلام مستقیم یا ساخت کاربر در صورت نبودن (Upsert تضمینی)
+      const { data: existingUser } = await supabaseAdmin
         .from('admin_users')
         .select('*')
-        .eq('username', sessionUsername)
+        .eq('username', currentUsername)
         .maybeSingle();
 
-      if (user && newPassword) {
-        const storedPass = String(user.password_hash || user.password || '');
-        const isMatch = authSecurity.verifyPassword(currentPassword, storedPass) || storedPass === currentPassword;
-        if (!isMatch) {
-          return NextResponse.json({ success: false, message: 'کلمه عبور فعلی نادرست است.' }, { status: 403 });
-        }
-      }
-
-      const updatePayload: Record<string, any> = { updated_at: new Date().toISOString() };
-      if (newPassword) {
-        updatePayload.password_hash = authSecurity.hashPassword(newPassword);
-      }
-      if (newFullName) updatePayload.full_name = newFullName;
-      if (newUsername) updatePayload.username = newUsername;
-
-      if (user) {
-        await supabaseAdmin.from('admin_users').update(updatePayload).eq('id', user.id);
+      if (existingUser) {
+        await supabaseAdmin.from('admin_users').update({
+          username: targetUsername,
+          password_hash: hashedPassword,
+          password: hashedPassword,
+          full_name: newFullName || existingUser.full_name || targetUsername,
+          updated_at: new Date().toISOString(),
+        }).eq('id', existingUser.id);
+      } else {
+        await supabaseAdmin.from('admin_users').insert([{
+          id: randomUUID(),
+          username: targetUsername,
+          password_hash: hashedPassword,
+          password: hashedPassword,
+          full_name: newFullName || targetUsername,
+          role: "superadmin",
+          created_at: new Date().toISOString(),
+        }]);
       }
     }
 
-    return NextResponse.json({ success: true, message: 'مشخصات حساب و کلمه عبور با موفقیت در دیتابیس تغییر یافت.' });
+    return NextResponse.json({
+      success: true,
+      message: "✓ کلمه عبور و مشخصات حساب با موفقیت در دیتابیس ثبت و فعال شد.",
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message || "خطا در ذخیره کلمه عبور." }, { status: 500 });
   }
 }

@@ -81,7 +81,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadStoredCart();
-
     const handleOpenDrawerEvent = () => setIsCartOpen(true);
     const handleCartUpdatedEvent = () => loadStoredCart();
 
@@ -103,7 +102,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
-  const addToCart = useCallback((item: any, openDrawer: boolean = true) => {
+  // مقدار پیش‌فرض openDrawer برابر false است تا انیمیشن چرخ‌دستی به آرامی و بدون قطع شدن اجرا شود
+  const addToCart = useCallback((item: any, openDrawer: boolean = false) => {
     const itemId = String(item.id);
     const itemTitle = item.title || item.name || "کالای دیجیتال";
     const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);

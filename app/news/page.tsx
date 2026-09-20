@@ -36,7 +36,6 @@ export default function TechNewsHubPage() {
 
   useEffect(() => {
     fetchNews();
-
     const channel = supabase
       .channel("realtime-public-news-feed")
       .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => fetchNews())
@@ -55,14 +54,14 @@ export default function TechNewsHubPage() {
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-6" dir="rtl">
       
-      {/* سربرگ تمیز بدون هیچ متن زائد استودیو و بدون منوی دسته‌بندی اضافه */}
+      {/* سربرگ بدون متن پایش دو ساعت و بدون منوی دسته‌بندی */}
       <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-black tracking-tight">
             رادار جدیدترین رویدادها و اخبار فناوری
           </h1>
           <p className="text-xs text-[var(--text-secondary)] font-medium">
-            پوشش زنده تازه‌ترین دستاوردهای تکنولوژی، سخت‌افزارها و گجت‌های هوشمند
+            پوشش زنده تازه‌ترین اخبار سخت‌افزارها و گجت‌های هوشمند
           </p>
         </div>
 

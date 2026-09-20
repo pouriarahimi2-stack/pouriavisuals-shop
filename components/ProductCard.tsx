@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/formatters";
 import { soundEngine } from "@/lib/soundEngine";
-import { useCart } from "@/context/CartContext";
+import AddToCartButton from "@/components/AddToCartButton";
 
 interface ProductCardProps {
   product: {
@@ -23,52 +23,15 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const cart = useCart() as any;
-
   const title = product.title || product.name || "کالای دیجیتال";
   const displayPrice = Number(product.price || 0);
   const discountVal = product.discount_price || product.discountPrice;
   const finalPrice = discountVal && Number(discountVal) > 0 ? Number(discountVal) : displayPrice;
 
   const imageSrc =
-    product.image ||
     (Array.isArray(product.images) && product.images[0]) ||
+    product.image ||
     "/placeholder.png";
-
-  const cartItems: any[] = Array.isArray(cart?.cartItems)
-    ? cart.cartItems
-    : (Array.isArray(cart?.items) ? cart.items : []);
-
-  const cartItem = cartItems.find(
-    (i: any) => String(i?.productId || i?.id) === String(product.id)
-  );
-  const qtyInCart = Number(cartItem?.quantity || 0);
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    soundEngine.playSuccess();
-
-    const itemPayload = {
-      ...product,
-      id: String(product.id),
-      productId: String(product.id),
-      title,
-      price: finalPrice,
-      image: imageSrc,
-      quantity: 1,
-    };
-
-    if (typeof cart?.addToCart === "function") {
-      cart.addToCart(itemPayload, 1);
-    } else if (typeof cart?.addItem === "function") {
-      cart.addItem(itemPayload);
-    }
-
-    if (typeof cart?.openCart === "function") {
-      cart.openCart();
-    }
-  };
 
   return (
     <div className="group rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-xl">
@@ -117,13 +80,8 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         </div>
 
-        <button
-          onClick={handleAddToCart}
-          className="w-full py-3 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-        >
-          <span>🛒</span>
-          <span>{qtyInCart > 0 ? `افزودن مجدد (${qtyInCart} در سبد)` : "افزودن به سبد خرید"}</span>
-        </button>
+        {/* استفاده از کامپوننت با انیمیشن دقیق چرخ‌دستی و باز شدن به‌موقع کشو */}
+        <AddToCartButton product={product} showCounter={false} />
       </div>
     </div>
   );

@@ -42,8 +42,7 @@ export default function AdminBannersPage() {
       if (json.success) {
         setBanners(json.banners || []);
       }
-    } catch {
-    } finally {
+    } catch {} finally {
       setLoading(false);
     }
   };
@@ -93,7 +92,7 @@ export default function AdminBannersPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim() || !form.image_url.trim()) {
-      setStatusMsg({ type: "error", text: "عنوان بنر و تصویر الزامی هستند." });
+      setStatusMsg({ type: "error", text: "لطفاً عنوان بنر و تصویر را مشخص نمایید." });
       return;
     }
 
@@ -111,13 +110,16 @@ export default function AdminBannersPage() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setIsModalOpen(false);
-        fetchBanners();
+        setStatusMsg({ type: "success", text: "بنر با موفقیت ثبت شد." });
+        setTimeout(() => {
+          setIsModalOpen(false);
+          fetchBanners();
+        }, 800);
       } else {
-        setStatusMsg({ type: "error", text: json.message || "خطا در ثبت بنر." });
+        setStatusMsg({ type: "error", text: json.message || "خطا در ثبت بنر در سرور." });
       }
     } catch {
-      setStatusMsg({ type: "error", text: "خطا در برقراری ارتباط با سرور." });
+      setStatusMsg({ type: "error", text: "ارتباط با سرور برقرار نشد." });
     } finally {
       setSubmitting(false);
     }
@@ -143,12 +145,11 @@ export default function AdminBannersPage() {
         </button>
       </div>
 
-      {/* لیست بنرها */}
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         {loading ? (
           <div className="p-12 text-center text-xs text-slate-400 font-bold">در حال دریافت بنرها...</div>
         ) : banners.length === 0 ? (
-          <div className="p-12 text-center text-xs text-slate-400 font-bold">هیچ بنری در دیتابیس ثبت نشده است.</div>
+          <div className="p-12 text-center text-xs text-slate-400 font-bold">هیچ بنری ثبت نشده است. بنر جدید اضافه کنید.</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {banners.map((b) => (
@@ -196,12 +197,11 @@ export default function AdminBannersPage() {
         )}
       </div>
 
-      {/* مودال ایجاد و ویرایش */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 text-xs">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black">{form.id ? "✏️ ویرایش بنر" : "➕ ثبت بنر تبلیغاتی جدید"}</h3>
+              <h3 className="text-sm font-black">{form.id ? "✏️ ویرایش بنر" : "➕ ثبت بنر جدید"}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white font-mono">✕</button>
             </div>
 
@@ -219,7 +219,7 @@ export default function AdminBannersPage() {
                   required
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="مثال: جشنواره ویژه محصولات دیجیتال"
+                  placeholder="مثال: جشنواره نوروزی تکنولوژی"
                   className="w-full px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
@@ -241,7 +241,7 @@ export default function AdminBannersPage() {
                   <button
                     type="button"
                     onClick={() => setIsUploadOpen(true)}
-                    className="w-full py-6 rounded-2xl border-2 border-dashed border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition flex flex-col items-center justify-center gap-1"
+                    className="w-full py-6 rounded-2xl border-2 border-dashed border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition flex flex-col items-center justify-center gap-1 cursor-pointer"
                   >
                     <span>☁️</span>
                     انتخاب یا آپلود تصویر بنر

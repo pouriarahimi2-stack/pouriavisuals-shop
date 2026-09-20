@@ -7,9 +7,10 @@ import { useCart } from "@/context/CartContext";
 interface AddToCartButtonProps {
   product: {
     id: string | number;
-    title: string;
+    title?: string;
+    name?: string;
     price: number;
-    image?: string;
+    image?: string | null;
     images?: string[];
     stock?: number;
     category?: string;
@@ -39,7 +40,7 @@ export default function AddToCartButton({
   const isMaxReached = currentCount >= stockLimit;
 
   const guaranteedImage =
-    product.images?.[0] ||
+    (Array.isArray(product.images) && product.images[0]) ||
     product.image ||
     "/placeholder.png";
 
@@ -52,12 +53,12 @@ export default function AddToCartButton({
     soundEngine.playAddToCart();
     setAnimState("adding");
 
-    // افزودن کالا بدون باز شدن زودهنگام
+    // افزودن کالا بدون باز کردن زودهنگام کشو
     addToCart(
       {
         id: product.id,
-        title: product.title,
-        name: product.title,
+        title: product.title || product.name,
+        name: product.title || product.name,
         price: product.price,
         image: guaranteedImage,
         images: [guaranteedImage],
@@ -73,7 +74,7 @@ export default function AddToCartButton({
       setTimeout(() => setBumpCounter(false), 500);
     }, 550);
 
-    // کشوی سبد خرید دقیقاً با اتمام کامل انیمیشن چرخ‌دستی (۱.۲۵ ثانیه) باز می‌شود
+    // کشوی سبد خرید دقیقاً با اتمام کامل ۱.۲۵ ثانیه انیمیشن چرخ‌دستی باز می‌شود
     setTimeout(() => {
       setAnimState("idle");
       openCart();

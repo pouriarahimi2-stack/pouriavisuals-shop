@@ -7,12 +7,13 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "مجله تخصصی فناوری و دیجیتال | آکسون کور",
-  description: "مقالات، نقد و بررسی و راهنمای جامع ابزارهای هوشمند در آکسون کور.",
+  description: "مقالات، نقد و بررسی و راهنمای ابزارهای هوشمند در آکسون کور.",
 };
 
 export default async function BlogPage() {
   let posts: BlogPostItem[] = [];
 
+  // خواندن ۱۰۰٪ از دیتابیس بدون هیچ مقاله فیک یا هاردکد
   try {
     if (supabaseAdmin) {
       const { data } = await supabaseAdmin

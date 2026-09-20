@@ -73,7 +73,6 @@ export default function ProductsCatalogPage() {
       </div>
 
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* هدر تمیز و شیک بدون متن اضافه زیر عنوان */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
           <h1 className="text-xl sm:text-2xl font-black">کاتالوگ محصولات و گجت‌های هوشمند</h1>
 
@@ -89,7 +88,7 @@ export default function ProductsCatalogPage() {
           </div>
         </div>
 
-        {/* فیلترهای چندبعدی و پیشرفته */}
+        {/* فیلترهای پیشرفته و دقیق */}
         <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm space-y-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -151,7 +150,6 @@ export default function ProductsCatalogPage() {
           </div>
         </div>
 
-        {/* لیست کالاها */}
         <div>
           {loading ? (
             <div className="text-center py-24 text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری کاتالوگ...</div>

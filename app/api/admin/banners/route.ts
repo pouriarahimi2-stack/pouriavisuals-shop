@@ -54,7 +54,7 @@ export async function GET() {
     }
 
     return NextResponse.json({ success: true, banners: list });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ success: true, banners: readLocalBanners() });
   }
 }

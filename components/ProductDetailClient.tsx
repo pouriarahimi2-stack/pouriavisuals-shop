@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ShieldCheck, ChevronRight, ChevronLeft, Star, Play, X, ShoppingCart, Check } from "lucide-react";
+import { ShieldCheck, ChevronRight, ChevronLeft, Star, Play, X, ShoppingCart, Check, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { useCart } from "@/context/CartContext";
@@ -17,7 +17,7 @@ interface ProductDetailClientProps {
 export default function ProductDetailClient({ initialProduct, productId }: ProductDetailClientProps) {
   const params = useParams();
   const router = useRouter();
-  const id = (params?.id as string) || productId || "";
+  const id = ((params?.id as string) || productId || "") as string;
 
   const { addToCart } = useCart();
 
@@ -26,7 +26,6 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
-  // دیدگاه‌ها
   const [existingReviews, setExistingReviews] = useState<any[]>([]);
   const [authorName, setAuthorName] = useState("");
   const [rating, setRating] = useState(5);
@@ -86,23 +85,33 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
       }
 
       if (found) {
-        let rawDesc = found.description || "";
+        let rawDesc = String(found.description || "");
         let extractedImages: string[] = [];
         let extractedWarranty = found.warranty || "";
         let extractedVideo = found.video_url || "";
-        let extractedSpecs = found.specs || {};
+        let extractedSpecs: Record<string, string> = found.specs || {};
 
-        const metaMatch = rawDesc.match(/<!--MEDIA_METADATA:([sS]*?)-->/);
-        if (metaMatch) {
+        // استخراج و تمیزکاری ضدگلوله متادیتا به طوری که هرگز متن‌های زشت روی صفحه نمایش داده نشوند
+        const metaRegex = /(?:<!--)?MEDIA_METADATA:s*({[sS]*?})(?:-->)?/i;
+        const metaMatch = rawDesc.match(metaRegex);
+
+        if (metaMatch && metaMatch[1]) {
           try {
             const meta = JSON.parse(metaMatch[1]);
             if (Array.isArray(meta.images) && meta.images.length > 0) extractedImages = meta.images;
-            if (meta.warranty) extractedWarranty = meta.warranty;
             if (meta.video_url) extractedVideo = meta.video_url;
-            if (meta.specs) extractedSpecs = meta.specs;
-            rawDesc = rawDesc.replace(metaMatch[0], "").trim();
-          } catch (e) {}
+            if (meta.specs && typeof meta.specs === "object") extractedSpecs = meta.specs;
+            if (meta.warranty) extractedWarranty = meta.warranty;
+          } catch (e) {
+            console.warn("Metadata JSON parse error:", e);
+          }
         }
+
+        // پاکسازی کامل متن متادیتا از متن توضیحات
+        rawDesc = rawDesc
+          .replace(/(?:<!--)?MEDIA_METADATA:[sS]*?(?:-->)?/gi, "")
+          .replace(/MEDIA_METADATA:[sS]*$/gi, "")
+          .trim();
 
         if (extractedImages.length === 0) {
           if (Array.isArray(found.images) && found.images.length > 0) {
@@ -135,7 +144,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
       if (d.success && Array.isArray(d.reviews)) {
         setExistingReviews(d.reviews.filter((item: any) => item.is_approved !== false));
       }
-    } catch (e) {}
+    } catch {}
   }, [id]);
 
   useEffect(() => {
@@ -229,7 +238,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
       } else {
         setCommentStatus("error");
       }
-    } catch (e) {
+    } catch {
       setCommentStatus("error");
     }
   };
@@ -247,7 +256,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
       </div>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-        {/* گالری تصاویر */}
+        {/* گالری تصاویر همراه با دکمه‌های بعدی/قبلی و ویدیوی دستگاه */}
         <div className="flex flex-col items-center bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 relative shadow-md">
           <div className="w-full h-64 sm:h-80 md:h-96 relative flex items-center justify-center overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5">
             <img
@@ -260,7 +269,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
               <button
                 type="button"
                 onClick={() => setIsVideoModalOpen(true)}
-                className="absolute bottom-3 left-3 px-4 py-2 rounded-2xl bg-black/75 hover:bg-black text-white text-xs font-bold flex items-center gap-2 backdrop-blur-md shadow-lg border border-white/10 transition cursor-pointer"
+                className="absolute bottom-3 left-3 px-4 py-2 rounded-2xl bg-black/75 hover:bg-black text-white text-xs font-bold flex items-center gap-2 backdrop-blur-md shadow-lg border border-white/10 transition cursor-pointer z-20"
               >
                 <Play size={14} className="text-rose-500 fill-rose-500" />
                 ویدیوی معرفی دستگاه
@@ -272,14 +281,16 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
                 <button
                   type="button"
                   onClick={handlePrev}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 hover:bg-black text-white transition z-10 cursor-pointer"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 hover:bg-black text-white transition z-10 cursor-pointer shadow-lg"
+                  title="تصویر قبلی"
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 hover:bg-black text-white transition z-10 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 hover:bg-black text-white transition z-10 cursor-pointer shadow-lg"
+                  title="تصویر بعدی"
                 >
                   <ChevronRight size={20} />
                 </button>
@@ -293,7 +304,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
                 <button
                   key={idx}
                   onClick={() => setActiveImageIndex(idx)}
-                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all p-1 bg-black/5 dark:bg-white/5 ${
+                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all p-1 bg-black/5 dark:bg-white/5 cursor-pointer ${
                     activeImageIndex === idx ? "border-[var(--accent-blue)] scale-105" : "border-transparent opacity-60 hover:opacity-100"
                   }`}
                 >
@@ -304,7 +315,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
           )}
         </div>
 
-        {/* اطلاعات کالا و دکمه خرید و انتقال مستقیم به چک‌اوت */}
+        {/* مشخصات و دکمه خرید با هدایت مستقیم به چک‌اوت */}
         <div className="flex flex-col space-y-6">
           <div>
             <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-500/15 text-[var(--accent-blue)]">
@@ -329,7 +340,6 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
             </div>
           </div>
 
-          {/* افزودن به سبد و هدایت مستقیم به صفحه تسویه حساب */}
           <button
             type="button"
             onClick={handleAddToCartAndCheckout}
@@ -352,6 +362,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
             )}
           </button>
 
+          {/* توضیحات کاملاً تمیز و بدون هیچ نشت متنی از متادیتا */}
           {product.cleanDescription && (
             <div>
               <h2 className="text-sm font-black mb-3">توضیحات و مشخصات کالا</h2>
@@ -361,6 +372,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
             </div>
           )}
 
+          {/* جدول مشخصات فنی تفکیک‌شده */}
           {product.parsedSpecs && Object.keys(product.parsedSpecs).length > 0 && (
             <div>
               <h2 className="text-sm font-black mb-3">مشخصات فنی دستگاه</h2>
@@ -368,7 +380,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
                 {Object.entries(product.parsedSpecs).map(([k, v]: any) => (
                   <div key={k} className="p-3.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex justify-between text-xs shadow-sm">
                     <span className="text-[var(--text-secondary)] font-bold">{k}:</span>
-                    <span className="font-bold text-[var(--text-primary)]">{v}</span>
+                    <span className="font-bold text-[var(--text-primary)]">{String(v)}</span>
                   </div>
                 ))}
               </div>
@@ -376,6 +388,28 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
           )}
         </div>
       </div>
+
+      {/* مدال ویدیو */}
+      {isVideoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#121214] border border-[#27272a] rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-[#27272a] flex justify-between items-center">
+              <h3 className="text-sm font-black text-white">ویدیوی معرفی محصول</h3>
+              <button onClick={() => setIsVideoModalOpen(false)} className="text-zinc-400 hover:text-white cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="aspect-video w-full bg-black">
+              <iframe
+                src={embedVideo}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

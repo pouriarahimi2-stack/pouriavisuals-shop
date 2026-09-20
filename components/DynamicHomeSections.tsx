@@ -40,6 +40,8 @@ export default function DynamicHomeSections({
   };
 
   useEffect(() => {
+    fetchLiveData();
+
     const prodChannel = supabase
       .channel("realtime-home-products")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => fetchLiveData())
@@ -71,7 +73,7 @@ export default function DynamicHomeSections({
   return (
     <div className="space-y-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
       
-      {/* هیرو یا بنر اصلی */}
+      {/* هیرو اسلایدر بنرهای پویا */}
       {banners.length > 0 ? (
         <div className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl aspect-[16/8] sm:aspect-[21/9] max-h-[460px]">
           {banners.map((b, idx) => (
@@ -88,7 +90,7 @@ export default function DynamicHomeSections({
                 {b.link_url && (
                   <Link
                     href={b.link_url}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-white text-slate-950 font-black text-xs hover:bg-slate-200 transition w-fit shadow-lg"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-white text-slate-950 font-black text-xs hover:bg-slate-200 transition w-fit shadow-lg cursor-pointer"
                   >
                     <span>مشاهده محصولات</span>
                     <span>←</span>
@@ -104,7 +106,7 @@ export default function DynamicHomeSections({
                 <button
                   key={i}
                   onClick={() => setActiveBannerIdx(i)}
-                  className={`h-2 rounded-full transition-all ${i === activeBannerIdx ? "w-8 bg-blue-500" : "w-2 bg-white/50"}`}
+                  className={`h-2 rounded-full transition-all cursor-pointer ${i === activeBannerIdx ? "w-8 bg-blue-500" : "w-2 bg-white/50"}`}
                 />
               ))}
             </div>
@@ -146,7 +148,7 @@ export default function DynamicHomeSections({
         </div>
       )}
 
-      {/* اسلایدر ۳D پرسپکتیو: منحصراً برای موبایل و تبلت (در دسکتاپ مخفی است) */}
+      {/* اسلایدر ۳D پرسپکتیو: منحصراً برای موبایل و تبلت */}
       {products.length > 0 && (
         <div className="block lg:hidden">
           <ProductPerspectiveSlider

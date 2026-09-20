@@ -13,18 +13,20 @@ export const viewport: Viewport = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
-  let siteName = "آکسون کور | Axon";
-  let tagline = "فروشگاه تخصصی تجهیزات دیجیتال و تصویر";
-  let desc = "مرجع تخصصی خرید جدیدترین گجت‌ها، سخت‌افزارهای نوین، تجهیزات تدوین و مانیتورهای استودیو با گارانتی اصالت طلایی.";
-  let faviconUrl = "/favicon.ico";
+  let siteName = "آکسون کور | Axon Core";
+  let tagline = "فروشگاه تخصصی محصولات تکنولوژی و گجت‌های هوشمند";
+  let desc = "مرجع تخصصی خرید آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و لوازم دیجیتال با تضمین اصالت فیزیکی و ارسال سریع به سراسر کشور.";
+  let allowIndex = true;
 
   try {
-    const { data } = await supabaseAdmin.from("site_info").select("site_name, tagline, description, favicon_url").limit(1).maybeSingle();
-    if (data) {
-      if (data.site_name) siteName = data.site_name;
-      if (data.tagline) tagline = data.tagline;
-      if (data.description) desc = data.description;
-      if (data.favicon_url) faviconUrl = data.favicon_url;
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin.from("site_info").select("site_name, tagline, description, allow_google_index").limit(1).maybeSingle();
+      if (data) {
+        if (data.site_name) siteName = data.site_name;
+        if (data.tagline) tagline = data.tagline;
+        if (data.description) desc = data.description;
+        if (data.allow_google_index !== undefined) allowIndex = Boolean(data.allow_google_index);
+      }
     }
   } catch {}
 
@@ -35,20 +37,16 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s | ${siteName}`,
     },
     description: desc,
+    robots: {
+      index: allowIndex,
+      follow: allowIndex,
+      googleBot: {
+        index: allowIndex,
+        follow: allowIndex,
+      },
+    },
     alternates: {
       canonical: "https://axoncore.ir",
-    },
-    icons: {
-      icon: faviconUrl,
-      apple: faviconUrl,
-    },
-    openGraph: {
-      title: `${siteName} | ${tagline}`,
-      description: desc,
-      url: "https://axoncore.ir",
-      siteName: siteName,
-      locale: "fa_IR",
-      type: "website",
     },
   };
 }

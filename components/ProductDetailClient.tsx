@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ShieldCheck, ChevronRight, ChevronLeft, Star, Play, X, ShoppingCart, Check, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +14,66 @@ interface ProductDetailClientProps {
   productId?: string;
 }
 
+// تابع اختصاصی و تضمینی استخراج متادیتا و تمیزکاری توضیحات
+function cleanAndExtractProduct(raw: any) {
+  if (!raw) return null;
+
+  let rawDesc = String(raw.description || "");
+  let extractedImages: string[] = [];
+  let extractedWarranty = raw.warranty || "";
+  let extractedVideo = raw.video_url || "";
+  let extractedSpecs: Record<string, string> = raw.specs || {};
+
+  // ۱. جداسازی کامل بخش JSON متادیتا
+  if (rawDesc.includes("MEDIA_METADATA")) {
+    const parts = rawDesc.split(/<!--MEDIA_METADATA:|MEDIA_METADATA:/i);
+    rawDesc = parts[0] ? parts[0].trim() : "";
+    if (parts[1]) {
+      const cleanJsonStr = parts[1].replace(/-->[sS]*$/g, "").trim();
+      const firstBrace = cleanJsonStr.indexOf("{");
+      const lastBrace = cleanJsonStr.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        try {
+          const meta = JSON.parse(cleanJsonStr.slice(firstBrace, lastBrace + 1));
+          if (Array.isArray(meta.images) && meta.images.length > 0) extractedImages = meta.images;
+          if (meta.video_url) extractedVideo = meta.video_url;
+          if (meta.specs && typeof meta.specs === "object") extractedSpecs = meta.specs;
+          if (meta.warranty) extractedWarranty = meta.warranty;
+        } catch (e) {
+          console.warn("Metadata JSON parse warning:", e);
+        }
+      }
+    }
+  }
+
+  // ۲. حذف هرگونه تگ نشت‌کرده دیگر
+  rawDesc = rawDesc
+    .replace(/<!--[sS]*?-->/g, "")
+    .replace(/MEDIA_METADATA:[sS]*$/g, "")
+    .replace(/images":[[sS]*$/g, "")
+    .trim();
+
+  // ۳. تضمین وجود عکس‌ها
+  if (extractedImages.length === 0) {
+    if (Array.isArray(raw.images) && raw.images.length > 0) {
+      extractedImages = raw.images;
+    } else if (raw.image_url || raw.image) {
+      extractedImages = [raw.image_url || raw.image];
+    } else {
+      extractedImages = ["/placeholder.png"];
+    }
+  }
+
+  return {
+    ...raw,
+    cleanDescription: rawDesc,
+    parsedImages: extractedImages,
+    parsedWarranty: extractedWarranty,
+    parsedVideo: extractedVideo,
+    parsedSpecs: extractedSpecs,
+  };
+}
+
 export default function ProductDetailClient({ initialProduct, productId }: ProductDetailClientProps) {
   const params = useParams();
   const router = useRouter();
@@ -21,8 +81,9 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
 
   const { addToCart } = useCart();
 
-  const [product, setProduct] = useState<any>(initialProduct || null);
-  const [loading, setLoading] = useState(true);
+  // از همان ابتدا محصول را تمیزکاری و پارس شده مقداردهی می‌کنیم تا در رندر اول هم متن خراب دیده نشود
+  const [product, setProduct] = useState<any>(() => cleanAndExtractProduct(initialProduct));
+  const [loading, setLoading] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
@@ -43,7 +104,6 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
     const itemImage = (Array.isArray(product.parsedImages) && product.parsedImages.length > 0 && product.parsedImages[0]) ||
       product.image_url ||
       product.image ||
-      (Array.isArray(product.images) && product.images[0]) ||
       "/placeholder.png";
 
     addToCart({
@@ -61,13 +121,12 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
 
     setTimeout(() => {
       router.push("/checkout");
-    }, 450);
+    }, 400);
   };
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
     try {
-      setLoading(true);
       const res = await fetch(`/api/products?id=${id}`);
       const data = await res.json();
       let found = null;
@@ -77,63 +136,10 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
         else found = data.data;
       }
 
-      if (!found) {
-        const adminRes = await fetch(`/api/admin/products?id=${id}`);
-        const adminData = await adminRes.json();
-        if (adminData.product) found = adminData.product;
-        else if (adminData.products) found = adminData.products.find((p: any) => String(p.id) === String(id));
-      }
-
       if (found) {
-        let rawDesc = String(found.description || "");
-        let extractedImages: string[] = [];
-        let extractedWarranty = found.warranty || "";
-        let extractedVideo = found.video_url || "";
-        let extractedSpecs: Record<string, string> = found.specs || {};
-
-        // استخراج و تمیزکاری ضدگلوله متادیتا به طوری که هرگز متن‌های زشت روی صفحه نمایش داده نشوند
-        const metaRegex = /(?:<!--)?MEDIA_METADATA:s*({[sS]*?})(?:-->)?/i;
-        const metaMatch = rawDesc.match(metaRegex);
-
-        if (metaMatch && metaMatch[1]) {
-          try {
-            const meta = JSON.parse(metaMatch[1]);
-            if (Array.isArray(meta.images) && meta.images.length > 0) extractedImages = meta.images;
-            if (meta.video_url) extractedVideo = meta.video_url;
-            if (meta.specs && typeof meta.specs === "object") extractedSpecs = meta.specs;
-            if (meta.warranty) extractedWarranty = meta.warranty;
-          } catch (e) {
-            console.warn("Metadata JSON parse error:", e);
-          }
-        }
-
-        // پاکسازی کامل متن متادیتا از متن توضیحات
-        rawDesc = rawDesc
-          .replace(/(?:<!--)?MEDIA_METADATA:[sS]*?(?:-->)?/gi, "")
-          .replace(/MEDIA_METADATA:[sS]*$/gi, "")
-          .trim();
-
-        if (extractedImages.length === 0) {
-          if (Array.isArray(found.images) && found.images.length > 0) {
-            extractedImages = found.images;
-          } else if (found.image_url || found.image) {
-            extractedImages = [found.image_url || found.image];
-          }
-        }
-
-        found.parsedImages = extractedImages;
-        found.parsedWarranty = extractedWarranty;
-        found.parsedVideo = extractedVideo;
-        found.parsedSpecs = extractedSpecs;
-        found.cleanDescription = rawDesc;
-
-        setProduct(found);
+        setProduct(cleanAndExtractProduct(found));
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
   }, [id]);
 
   const fetchApprovedReviews = useCallback(async () => {
@@ -169,7 +175,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
     }
   }, [id, fetchDetail, fetchApprovedReviews]);
 
-  if (loading) {
+  if (!product && loading) {
     return (
       <div className="min-h-screen flex items-center justify-center dir-rtl text-xs font-bold text-[var(--text-secondary)]">
         در حال بارگذاری اطلاعات کالا...
@@ -190,7 +196,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
 
   const gallery: string[] = product.parsedImages && product.parsedImages.length > 0
     ? product.parsedImages 
-    : [product.image_url || product.image || "/placeholder.png"];
+    : ["/placeholder.png"];
 
   const handleNext = () => setActiveImageIndex((prev) => (prev + 1) % gallery.length);
   const handlePrev = () => setActiveImageIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
@@ -256,7 +262,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
       </div>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-        {/* گالری تصاویر همراه با دکمه‌های بعدی/قبلی و ویدیوی دستگاه */}
+        {/* گالری تصاویر همراه با دکمه‌های اسلاید و ویدیوی دستگاه */}
         <div className="flex flex-col items-center bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 relative shadow-md">
           <div className="w-full h-64 sm:h-80 md:h-96 relative flex items-center justify-center overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5">
             <img
@@ -362,7 +368,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
             )}
           </button>
 
-          {/* توضیحات کاملاً تمیز و بدون هیچ نشت متنی از متادیتا */}
+          {/* توضیحات تمیز بدون هیچ‌گونه متن نشت‌کرده */}
           {product.cleanDescription && (
             <div>
               <h2 className="text-sm font-black mb-3">توضیحات و مشخصات کالا</h2>
@@ -372,7 +378,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
             </div>
           )}
 
-          {/* جدول مشخصات فنی تفکیک‌شده */}
+          {/* مشخصات فنی تفکیک‌شده */}
           {product.parsedSpecs && Object.keys(product.parsedSpecs).length > 0 && (
             <div>
               <h2 className="text-sm font-black mb-3">مشخصات فنی دستگاه</h2>

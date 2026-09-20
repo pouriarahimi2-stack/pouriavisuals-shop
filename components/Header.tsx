@@ -26,6 +26,14 @@ export default function Header() {
   };
 
   useEffect(() => {
+    // گارد حذف هرگونه هدر تکراری در صفحه
+    const duplicateHeaders = document.querySelectorAll('header[data-axon-header="main"]');
+    if (duplicateHeaders.length > 1) {
+      for (let i = 1; i < duplicateHeaders.length; i++) {
+        (duplicateHeaders[i] as HTMLElement).style.display = "none";
+      }
+    }
+
     if (typeof document !== "undefined") {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
     }
@@ -40,11 +48,8 @@ export default function Header() {
     } catch {}
 
     const handleScroll = () => {
-      if (window.scrollY > 20) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
+      if (window.scrollY > 20) setIsScrolled(true);
+      else setIsScrolled(false);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -79,7 +84,7 @@ export default function Header() {
   const logoSrc = headerCfg.brand.logoUrl;
 
   return (
-    <header className={`w-full transition-all duration-300 ${positionClass} px-3 sm:px-6`} dir="rtl">
+    <header data-axon-header="main" className={`w-full transition-all duration-300 ${positionClass} px-3 sm:px-6`} dir="rtl">
       <div
         style={{
           maxWidth: `${headerCfg.maxWidth || 1280}px`,
@@ -89,7 +94,6 @@ export default function Header() {
           isCapsule ? "rounded-full" : "rounded-2xl"
         } bg-[var(--modal-bg)]/90 border-[var(--card-border)]`}
       >
-        {/* راست: لوگو و لینک‌ها */}
         <div className="flex items-center gap-6 sm:gap-8">
           <Link
             href="/"
@@ -137,7 +141,6 @@ export default function Header() {
           )}
         </div>
 
-        {/* چپ: ابزارها و سبد خرید */}
         <div className="flex items-center gap-2.5 shrink-0">
           {headerCfg.actions.themeToggle.show && (
             <button

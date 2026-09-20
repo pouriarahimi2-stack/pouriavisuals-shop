@@ -44,9 +44,10 @@ export async function GET() {
 
       if (list.length === 0) {
         try {
-          const { data: siteRow } = await supabaseAdmin.from("site_info").select("homepage_layout_config").limit(1).maybeSingle();
-          if (siteRow && (siteRow as any).homepage_layout_config && Array.isArray((siteRow as any).homepage_layout_config.banners)) {
-            list = (siteRow as any).homepage_layout_config.banners;
+          const res = await supabaseAdmin.from("site_info").select("homepage_layout_config").limit(1).maybeSingle();
+          const siteRow: any = res?.data;
+          if (siteRow && siteRow.homepage_layout_config && Array.isArray(siteRow.homepage_layout_config.banners)) {
+            list = siteRow.homepage_layout_config.banners;
             writeLocalBanners(list);
           }
         } catch {}
@@ -101,9 +102,10 @@ export async function POST(req: NextRequest) {
       } catch {}
 
       try {
-        const { data: siteRow } = await supabaseAdmin.from("site_info").select("id, homepage_layout_config").limit(1).maybeSingle();
+        const res = await supabaseAdmin.from("site_info").select("id, homepage_layout_config").limit(1).maybeSingle();
+        const siteRow: any = res?.data;
         if (siteRow) {
-          const cfg = (siteRow as any).homepage_layout_config || {};
+          const cfg = siteRow.homepage_layout_config || {};
           cfg.banners = currentBanners;
           await supabaseAdmin.from("site_info").update({ homepage_layout_config: cfg }).eq("id", siteRow.id);
         }
@@ -133,11 +135,11 @@ export async function DELETE(req: NextRequest) {
     if (supabaseAdmin) {
       try { await supabaseAdmin.from("banners").delete().eq("id", id); } catch {}
       try {
-        const { data: siteRow } = await supabaseAdmin.from("site_info").select("id, homepage_layout_config").limit(1).maybeSingle();
-        if (siteRow && (siteRow as any).homepage_layout_config) {
-          const cfg = (siteRow as any).homepage_layout_config;
-          cfg.banners = current;
-          await supabaseAdmin.from("site_info").update({ homepage_layout_config: cfg }).eq("id", siteRow.id);
+        const res = await supabaseAdmin.from("site_info").select("id, homepage_layout_config").limit(1).maybeSingle();
+        const siteRow: any = res?.data;
+        if (siteRow && siteRow.homepage_layout_config) {
+          siteRow.homepage_layout_config.banners = current;
+          await supabaseAdmin.from("site_info").update({ homepage_layout_config: siteRow.homepage_layout_config }).eq("id", siteRow.id);
         }
       } catch {}
     }

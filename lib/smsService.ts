@@ -7,7 +7,6 @@ export async function sendVerificationSMS(phone: string, code: string) {
 
   if (!phone || !code) return { success: false, message: "شماره یا کد خالی است." };
 
-  // استانداردسازی شماره همراه خریدار (تبدیل به 09...)
   let recipient = phone.trim().replace(/^\+98/, "0");
   if (!recipient.startsWith("0")) recipient = "0" + recipient;
 
@@ -17,6 +16,7 @@ export async function sendVerificationSMS(phone: string, code: string) {
       sender: originator,
       recipient: recipient,
       variable: {
+        "code": String(code),
         "vefification-code": String(code),
       },
     };
@@ -30,17 +30,13 @@ export async function sendVerificationSMS(phone: string, code: string) {
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
-    console.log("✅ نتیجه پاسخ وب‌سرویس IPPanel:", data);
+    const data = await res.json().catch(() => ({}));
     return { success: res.ok, data };
   } catch (err: any) {
-    console.error("❌ خطا در اتصال به IPPanel:", err);
     return { success: false, error: err.message };
   }
 }
 
-// برای اطلاع‌رسانی ثبت سفارش بدون شکستن پترن
 export async function sendOrderNotificationSMS(customerPhone: string, customerName: string, orderNumber: string) {
-  // اگر پترن اختصاصی دیگری در پنل تعریف نشده، از ارسال امن لاگ استفاده می‌کنیم
-  console.log(`[Order SMS Log] سفارش ${orderNumber} برای ${customerPhone} ثبت گردید.`);
+  console.log(`[Order SMS Log] سفارش ${orderNumber} برای ${customerPhone} با موفقیت ثبت شد.`);
 }

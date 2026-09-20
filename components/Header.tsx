@@ -14,7 +14,7 @@ export default function Header() {
   const { openCart, totalItems } = useCart();
   const [headerCfg, setHeaderCfg] = useState<HeaderConfig>(DEFAULT_HEADER_CONFIG);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
-  const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
 
   const syncHeader = () => {
@@ -25,8 +25,25 @@ export default function Header() {
     });
   };
 
+  const syncUserSession = () => {
+    try {
+      const match = document.cookie.match(/(^|;)\s*axon_user_session=([^;]+)/);
+      if (match) {
+        const parsed = JSON.parse(decodeURIComponent(match[2]));
+        if (parsed?.name) setUserName(parsed.name);
+        else if (parsed?.phone) setUserName(parsed.phone);
+      } else {
+        const local = localStorage.getItem("axon_user_session");
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed?.name) setUserName(parsed.name);
+          else if (parsed?.phone) setUserName(parsed.phone);
+        }
+      }
+    } catch {}
+  };
+
   useEffect(() => {
-    // گارد حذف هرگونه هدر تکراری در صفحه
     const duplicateHeaders = document.querySelectorAll('header[data-axon-header="main"]');
     if (duplicateHeaders.length > 1) {
       for (let i = 1; i < duplicateHeaders.length; i++) {
@@ -38,14 +55,7 @@ export default function Header() {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
     }
     syncHeader();
-
-    try {
-      const user = localStorage.getItem("axon_user_session");
-      if (user) {
-        const parsed = JSON.parse(user);
-        if (parsed.phone) setUserPhone(String(parsed.phone));
-      }
-    } catch {}
+    syncUserSession();
 
     const handleScroll = () => {
       if (window.scrollY > 20) setIsScrolled(true);
@@ -54,10 +64,12 @@ export default function Header() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("site_info_updated", syncHeader);
+    window.addEventListener("user_auth_changed", syncUserSession);
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("site_info_updated", syncHeader);
+      window.removeEventListener("user_auth_changed", syncUserSession);
     };
   }, []);
 
@@ -94,6 +106,7 @@ export default function Header() {
           isCapsule ? "rounded-full" : "rounded-2xl"
         } bg-[var(--modal-bg)]/90 border-[var(--card-border)]`}
       >
+        {/* راست: لوگو و لینک‌ها */}
         <div className="flex items-center gap-6 sm:gap-8">
           <Link
             href="/"
@@ -141,6 +154,7 @@ export default function Header() {
           )}
         </div>
 
+        {/* چپ: دکمه کاربر با نام واقعی خریدار و سبد خرید */}
         <div className="flex items-center gap-2.5 shrink-0">
           {headerCfg.actions.themeToggle.show && (
             <button
@@ -154,12 +168,12 @@ export default function Header() {
 
           {headerCfg.actions.account.show && (
             <Link
-              href={userPhone ? "/my-orders" : "/login"}
+              href={userName ? "/my-orders" : "/login"}
               onClick={() => soundEngine.playClick()}
-              className="px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition flex items-center gap-1.5"
+              className="px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition flex items-center gap-1.5 max-w-[160px] truncate"
             >
               <span>👤</span>
-              <span className="hidden sm:inline">{userPhone ? "سفارش‌های من" : "حساب کاربری"}</span>
+              <span className="truncate">{userName ? `سلام، ${userName}` : "حساب کاربری"}</span>
             </Link>
           )}
 

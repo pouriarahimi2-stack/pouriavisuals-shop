@@ -1,240 +1,185 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
-import Link from "next/link";
 
 export default function AdminChangePinPage() {
-  const [currentUsername, setCurrentUsername] = useState("");
+  const [currentUsername, setCurrentUsername] = useState("admin");
   const [fullName, setFullName] = useState("");
-  const [newUsername, setNewUsername] = useState("");
+  const [newUsername, setNewUsername] = useState("admin");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [newStaffUser, setNewStaffUser] = useState("");
+  const [newStaffPass, setNewStaffPass] = useState("");
+  const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffRole, setNewStaffRole] = useState("content_editor");
 
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    async function loadAdminInfo() {
-      try {
-        const res = await fetch("/api/admin/change-pin");
-        const json = await res.json();
-        if (json.success && json.user) {
-          setCurrentUsername(json.user.username || "admin");
-          setNewUsername(json.user.username || "admin");
-          setFullName(json.user.full_name || "مدیر ارشد آکسون");
-        }
-      } catch (err) {
-        console.warn("Error loading account profile:", err);
-      } finally {
-        setFetching(false);
+  const loadAdminInfo = async () => {
+    try {
+      const res = await fetch("/api/admin/change-pin");
+      const json = await res.json();
+      if (json.success && json.user) {
+        setCurrentUsername(json.user.username || "admin");
+        setNewUsername(json.user.username || "admin");
+        setFullName(json.user.full_name || "مدیر ارشد آکسون");
       }
-    }
+    } catch {}
+  };
+
+  useEffect(() => {
     loadAdminInfo();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newPassword && newPassword !== confirmPassword) {
+      setStatus({ type: "error", text: "تکرار کلمه عبور با مقدار جدید مطابقت ندارد." });
+      return;
+    }
+
     soundEngine.playClick();
+    setLoading(true);
     setStatus(null);
 
-    if (newPassword && newPassword.length < 4) {
-      setStatus({ type: "error", text: "کلمه عبور / پین جدید باید حداقل ۴ رقم یا کاراکتر باشد." });
-      return;
-    }
-
-    if (newPassword && newPassword !== confirmPassword) {
-      setStatus({ type: "error", text: "تکرار کلمه عبور جدید با مقدار وارد شده تطابق ندارد." });
-      return;
-    }
-
-    setLoading(true);
     try {
       const res = await fetch("/api/admin/change-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currentPassword,
+          newPassword,
           newUsername: newUsername.trim(),
           newFullName: fullName.trim(),
-          newPassword: newPassword.trim(),
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
         soundEngine.playSuccess();
-        setStatus({
-          type: "success",
-          text: "✓ اطلاعات با موفقیت ثبت شد. نام کاربری و کلمه عبور شما در دیتابیس به‌روزرسانی گردید.",
-        });
-        setCurrentUsername(newUsername.trim());
+        setStatus({ type: "success", text: "✓ کلمه عبور با موفقیت تغییر کرد و در دیتابیس ثبت شد." });
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
+        loadAdminInfo();
       } else {
-        setStatus({ type: "error", text: data.message || "خطا در به‌روزرسانی مشخصات حساب." });
+        setStatus({ type: "error", text: data.message || "خطا در تغییر کلمه عبور." });
       }
     } catch {
-      setStatus({ type: "error", text: "خطا در برقراری ارتباط با سرور." });
+      setStatus({ type: "error", text: "خطا در اتصال به سرور." });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleCreateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    soundEngine.playClick();
+    setStatus(null);
+
+    try {
+      const res = await fetch("/api/admin/change-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_staff",
+          username: newStaffUser,
+          password: newStaffPass,
+          full_name: newStaffName,
+          role: newStaffRole,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        soundEngine.playSuccess();
+        setStatus({ type: "success", text: data.message });
+        setNewStaffUser("");
+        setNewStaffPass("");
+        setNewStaffName("");
+        loadAdminInfo();
+      } else {
+        setStatus({ type: "error", text: data.message || "خطا در ایجاد کاربر." });
+      }
+    } catch {
+      setStatus({ type: "error", text: "خطا در برقراری ارتباط." });
+    }
+  };
+
   return (
-    <div className="max-w-2xl mx-auto py-8 space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="p-6 sm:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
-        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-5">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center text-2xl shadow-lg">
-              🔐
-            </div>
+    <div className="max-w-4xl mx-auto py-6 space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+      <div className="p-6 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
+        <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
+          <div className="flex items-center gap-3">
+            <span className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-2xl shadow">🔐</span>
             <div>
-              <h1 className="text-base sm:text-lg font-black">مدیریت حساب و امنیت پیشخوان</h1>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
-                ویرایش نام کاربری (Username)، نام نمایشی، کلمه عبور و پین ورود
-              </p>
+              <h1 className="text-base font-black">مدیریت حساب مدیران و سطوح دسترسی پرسنل</h1>
+              <p className="text-xs text-[var(--text-secondary)] font-medium">تعریف مدیر جدید با نقش اختصاصی یا تغییر کلمه عبور</p>
             </div>
           </div>
-          <span className="px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs font-bold text-[var(--accent-blue)]">
-            کاربر: {currentUsername}
+          <span className="px-3 py-1 rounded-xl bg-[var(--input-bg)] border font-mono text-xs font-bold text-[var(--accent-blue)]">
+            کاربر جاری: {currentUsername}
           </span>
         </div>
 
         {status && (
-          <div
-            className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (
-              status.type === "success"
-                ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
-            )}
-          >
+          <div className={`p-4 rounded-2xl text-xs font-bold ${status.type === "success" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"}`}>
             {status.text}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5 text-xs">
+        <form onSubmit={handleChangePassword} className="space-y-4 text-xs">
+          <h3 className="font-black text-xs text-[var(--accent-blue)]">🔑 ویرایش مشخصات و رمز عبور حساب شما:</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="font-bold text-[var(--text-secondary)]">نام و نام خانوادگی مدیر:</label>
-              <input
-                type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="مثلاً: پوریا رحیمی"
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-              />
+            <div>
+              <label className="font-bold text-[var(--text-secondary)] mb-1 block">نام و نام خانوادگی:</label>
+              <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs" />
             </div>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-[var(--text-secondary)]">نام کاربری اختصاصی (Username):</label>
-              <input
-                type="text"
-                required
-                dir="ltr"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value.toLowerCase())}
-                placeholder="admin"
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold outline-none focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-              />
+            <div>
+              <label className="font-bold text-[var(--text-secondary)] mb-1 block">نام کاربری (Username):</label>
+              <input type="text" dir="ltr" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-xs" />
+            </div>
+            <div>
+              <label className="font-bold text-[var(--text-secondary)] mb-1 block">کلمه عبور فعلی:</label>
+              <input type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="رمز فعلی..." className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs" />
+            </div>
+            <div>
+              <label className="font-bold text-[var(--text-secondary)] mb-1 block">کلمه عبور جدید:</label>
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="رمز جدید..." className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="font-bold text-[var(--text-secondary)] mb-1 block">تکرار کلمه عبور جدید:</label>
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="تکرار رمز جدید..." className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs" />
             </div>
           </div>
 
-          <div className="border-t border-[var(--card-border)] pt-4 space-y-4">
-            <h3 className="font-black text-xs text-[var(--accent-blue)]">🔑 تغییر کلمه عبور یا پین‌کد ورود</h3>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-[var(--text-secondary)]">کلمه عبور یا پین‌کد فعلی (پیش‌فرض: 1234):</label>
-              <div className="relative">
-                <input
-                  type={showCurrent ? "text" : "password"}
-                  required
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="رمز عبور فعلی..."
-                  className="w-full p-3.5 pl-12 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold outline-none focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrent(!showCurrent)}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-60 hover:opacity-100 transition cursor-pointer"
-                  title="نمایش / مخفی‌سازی"
-                >
-                  {showCurrent ? "🙈" : "👁️"}
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="font-bold text-[var(--text-secondary)]">کلمه عبور / پین جدید (حداقل ۴ نویسه):</label>
-                <div className="relative">
-                  <input
-                    type={showNew ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="کلمه عبور جدید..."
-                    className="w-full p-3.5 pl-12 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold outline-none focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNew(!showNew)}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-60 hover:opacity-100 transition cursor-pointer"
-                    title="نمایش / مخفی‌سازی"
-                  >
-                    {showNew ? "🙈" : "👁️"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-[var(--text-secondary)]">تکرار کلمه عبور / پین جدید:</label>
-                <div className="relative">
-                  <input
-                    type={showConfirm ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="تکرار کلمه عبور جدید..."
-                    className="w-full p-3.5 pl-12 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold outline-none focus:border-[var(--accent-blue)] transition text-[var(--text-primary)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-60 hover:opacity-100 transition cursor-pointer"
-                    title="نمایش / مخفی‌سازی"
-                  >
-                    {showConfirm ? "🙈" : "👁️"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={loading || fetching}
-              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              <span>{loading ? "در حال ذخیره‌سازی در دیتابیس..." : "ذخیره تغییرات حساب و کلمه عبور 🔒"}</span>
-            </button>
-          </div>
+          <button type="submit" disabled={loading} className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 shadow">
+            {loading ? "در حال ثبت..." : "ذخیره تغییرات رمز عبور 🔒"}
+          </button>
         </form>
 
-        <div className="pt-3 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
-          <Link
-            href="/admin"
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold transition"
-          >
-            ← بازگشت به پیشخوان ادمین
-          </Link>
+        <div className="border-t border-[var(--card-border)] pt-6 space-y-4 text-xs">
+          <h3 className="font-black text-xs text-emerald-500">➕ ثبت مدیر یا پرسنل جدید با سطح دسترسی مشخص:</h3>
+          <form onSubmit={handleCreateStaff} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <input type="text" required placeholder="نام و نام خانوادگی" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold" />
+            <input type="text" required dir="ltr" placeholder="نام کاربری (انگلیسی)" value={newStaffUser} onChange={(e) => setNewStaffUser(e.target.value)} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs" />
+            <input type="password" required placeholder="کلمه عبور" value={newStaffPass} onChange={(e) => setNewStaffPass(e.target.value)} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs" />
+            <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold">
+              <option value="superadmin">مدیر ارشد (Super Admin)</option>
+              <option value="content_editor">کارشناس محتوا و سئو (Editor)</option>
+              <option value="support">پشتیبانی سفارشات (Support)</option>
+              <option value="viewer">بیننده گزارش‌ها (Viewer)</option>
+            </select>
+            <div className="sm:col-span-4">
+              <button type="submit" className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow">
+                + ایجاد حساب کارمند / مدیر
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

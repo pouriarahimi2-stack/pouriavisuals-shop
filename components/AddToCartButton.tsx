@@ -1,4 +1,3 @@
-// File Path: components/AddToCartButton.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -39,11 +38,10 @@ export default function AddToCartButton({
   const isAvailable = stockLimit > 0;
   const isMaxReached = currentCount >= stockLimit;
 
-  // استخراج تصویر مطمئن برای جلوگیری از باگ لود نشدن تصویر در کشوی سبد خرید
   const guaranteedImage =
     product.images?.[0] ||
     product.image ||
-    "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800";
+    "/placeholder.png";
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -54,7 +52,7 @@ export default function AddToCartButton({
     soundEngine.playAddToCart();
     setAnimState("adding");
 
-    // ۱. افزودن فوری به استیت بدون باز شدن زودهنگام کشو
+    // افزودن کالا بدون باز شدن زودهنگام
     addToCart(
       {
         id: product.id,
@@ -70,13 +68,12 @@ export default function AddToCartButton({
       false
     );
 
-    // ۲. جهش فنری شمارنده
     setTimeout(() => {
       setBumpCounter(true);
       setTimeout(() => setBumpCounter(false), 500);
     }, 550);
 
-    // ۳. پس از پایان دقیق ۱۲۵۰ میلی‌ثانیه انیمیشن چرخ‌دستی: باز شدن کشوی سبد خرید
+    // کشوی سبد خرید دقیقاً با اتمام کامل انیمیشن چرخ‌دستی (۱.۲۵ ثانیه) باز می‌شود
     setTimeout(() => {
       setAnimState("idle");
       openCart();
@@ -87,21 +84,17 @@ export default function AddToCartButton({
 
   return (
     <div className={`flex flex-col items-center gap-1.5 w-full select-none ${className}`} dir="rtl" suppressHydrationWarning>
-      
-      {/* دکمه کپسولی: در تم روشن کاملاً مشکی مات با آیکون سفید، در تم تاریک کاملاً سفید با آیکون مشکی */}
       <button
         type="button"
         disabled={!isAvailable || isMaxReached}
         onClick={handleAddToCart}
-        className={`relative w-full h-[52px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer shadow-xl active:scale-[0.98] border ${
+        className={`relative w-full h-[50px] rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer shadow-xl active:scale-[0.98] border ${
           !isAvailable || isMaxReached
             ? "bg-slate-800/40 opacity-40 cursor-not-allowed text-slate-400 border-transparent"
-            : "bg-[#000000] text-white border-black/10 hover:bg-[#111111] shadow-black/15 dark:bg-[#ffffff] dark:text-[#000000] dark:border-white/20 dark:hover:bg-[#f0f0f0] dark:shadow-white/10"
+            : "bg-[#000000] text-white border-black/10 hover:bg-[#111111] dark:bg-[#ffffff] dark:text-[#000000] dark:border-white/20 dark:hover:bg-[#f0f0f0]"
         }`}
       >
         <div className="relative w-full h-full flex items-center justify-center px-4 overflow-hidden">
-          
-          {/* کانتینر سبد خرید متحرک و بسته در حال پرتاب */}
           <div
             className={`flex items-center justify-center transition-all duration-300 ${
               isAnimating
@@ -109,7 +102,6 @@ export default function AddToCartButton({
                 : "translate-x-0"
             }`}
           >
-            {/* بسته سفید با روبان آبی که با پرتاب الاستیک وارد سبد می‌شود */}
             {isAnimating && (
               <div className="absolute -top-3.5 left-[8px] z-30 pointer-events-none animate-kinetic-item-drop">
                 <div className="w-3.5 h-3.5 rounded-[3px] bg-white dark:bg-slate-900 shadow-md border border-slate-300 dark:border-slate-600 flex items-center justify-center relative">
@@ -119,7 +111,6 @@ export default function AddToCartButton({
               </div>
             )}
 
-            {/* آیکون چرخ‌دستی که به سمت چپ می‌راند */}
             <svg
               className="w-5 h-5 shrink-0 drop-shadow-sm"
               viewBox="0 0 24 24"
@@ -133,48 +124,24 @@ export default function AddToCartButton({
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              <circle
-                cx="9.5"
-                cy="19.5"
-                r="1.8"
-                fill="currentColor"
-                className={isAnimating ? "animate-kinetic-wheel-left origin-[9.5px_19.5px]" : ""}
-              />
-              <circle
-                cx="17.5"
-                cy="19.5"
-                r="1.8"
-                fill="currentColor"
-                className={isAnimating ? "animate-kinetic-wheel-left origin-[17.5px_19.5px]" : ""}
-              />
+              <circle cx="9.5" cy="19.5" r="1.8" fill="currentColor" />
+              <circle cx="17.5" cy="19.5" r="1.8" fill="currentColor" />
             </svg>
           </div>
 
-          {/* متن دکمه که با انیمیشن در زمان کلیک محو می‌شود */}
           <span
             className={`font-black text-xs tracking-wider uppercase mr-2.5 transition-all duration-300 whitespace-nowrap ${
-              isAnimating
-                ? "opacity-0 scale-75 -translate-x-6 pointer-events-none w-0 overflow-hidden"
-                : "opacity-100 scale-100 translate-x-0"
+              isAnimating ? "opacity-0 scale-75 -translate-x-6 pointer-events-none w-0 overflow-hidden" : "opacity-100 scale-100 translate-x-0"
             }`}
           >
-            {isMaxReached
-              ? "حداکثر موجودی انبار"
-              : !isAvailable
-              ? "ناموجود در انبار"
-              : "افزودن به سبد خرید"}
+            {isMaxReached ? "حداکثر موجودی" : !isAvailable ? "ناموجود" : "افزودن به سبد خرید"}
           </span>
         </div>
       </button>
 
-      {/* شمارنده با جهش فنری */}
       {showCounter && (
         <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] font-sans" suppressHydrationWarning>
-          <span
-            className={`font-mono font-black transition-all duration-300 ${
-              bumpCounter ? "animate-kinetic-counter-bump text-emerald-500 font-extrabold" : "text-[var(--text-primary)]"
-            }`}
-          >
+          <span className={`font-mono font-black transition-all ${bumpCounter ? "animate-kinetic-counter-bump text-emerald-500" : "text-[var(--text-primary)]"}`}>
             {mounted ? currentCount : 0}
           </span>
           <span>عدد در سبد شما</span>

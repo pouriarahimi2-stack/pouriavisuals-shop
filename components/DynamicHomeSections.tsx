@@ -18,17 +18,19 @@ export default function DynamicHomeSections({
   initialBanners,
   initialSiteInfo,
 }: DynamicHomeSectionsProps) {
+  // رندر آنی بدون تاخیر از داده‌های سرور
   const [products, setProducts] = useState<any[]>(initialProducts || []);
   const [banners, setBanners] = useState<any[]>(initialBanners || []);
   const [siteInfo, setSiteInfo] = useState<any>(initialSiteInfo || null);
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
 
-  const fetchLiveData = async () => {
+  // به‌روزرسانی کاملاً بی‌صدا و در پس‌زمینه بدون ایجاد لودینگ روی صفحه
+  const silentSync = async () => {
     try {
       const [prodRes, bannerRes, siteRes] = await Promise.all([
-        fetch("/api/products", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
-        fetch("/api/admin/banners", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
-        fetch("/api/site-info", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
+        fetch("/api/products").then((r) => r.json()).catch(() => null),
+        fetch("/api/admin/banners").then((r) => r.json()).catch(() => null),
+        fetch("/api/site-info").then((r) => r.json()).catch(() => null),
       ]);
 
       if (prodRes?.success && Array.isArray(prodRes.data)) setProducts(prodRes.data);
@@ -40,21 +42,16 @@ export default function DynamicHomeSections({
   };
 
   useEffect(() => {
-    fetchLiveData();
-
-    const prodChannel = supabase
-      .channel("realtime-home-products")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => fetchLiveData())
-      .subscribe();
-
-    const bannerChannel = supabase
-      .channel("realtime-home-banners")
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => fetchLiveData())
+    // کانال سبک و اشتراکی وب‌سوکت سوپابیس
+    const channel = supabase
+      .channel("realtime-storefront-silent-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => silentSync())
+      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => silentSync())
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => silentSync())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(prodChannel);
-      supabase.removeChannel(bannerChannel);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -73,7 +70,7 @@ export default function DynamicHomeSections({
   return (
     <div className="space-y-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
       
-      {/* هیرو یا بنر اصلی */}
+      {/* هیرو اسلایدر بنرها */}
       {banners.length > 0 ? (
         <div className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl aspect-[16/8] sm:aspect-[21/9] max-h-[460px]">
           {banners.map((b, idx) => (
@@ -159,7 +156,7 @@ export default function DynamicHomeSections({
         </div>
       )}
 
-      {/* ویترین اصلی محصولات */}
+      {/* ویترین اصلی محصولات با بارگذاری آنی */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
           <div className="space-y-1">

@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { soundEngine } from "@/lib/soundEngine";
-import MediaUploadModal from "@/components/admin/MediaUploadModal";
 
 interface Banner {
   id: string;
@@ -17,9 +16,10 @@ export default function AdminBannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<{
     id?: string;
@@ -37,10 +37,10 @@ export default function AdminBannersPage() {
   const fetchBanners = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/banners");
+      const res = await fetch("/api/admin/banners", { cache: "no-store" });
       const json = await res.json();
-      if (json.success) {
-        setBanners(json.banners || []);
+      if (json.success && Array.isArray(json.banners)) {
+        setBanners(json.banners);
       }
     } catch {} finally {
       setLoading(false);
@@ -77,22 +77,49 @@ export default function AdminBannersPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این بنر از اسلایدر مطمئن هستید؟")) return;
+    if (!confirm("آیا از حذف این بنر اطمینان دارید؟")) return;
     soundEngine.playClick();
     try {
       const res = await fetch(`/api/admin/banners?id=${id}`, { method: "DELETE" });
       const json = await res.json();
       if (json.success) {
         soundEngine.playSuccess();
-        fetchBanners();
+        if (Array.isArray(json.banners)) setBanners(json.banners);
+        else fetchBanners();
       }
     } catch {}
+  };
+
+  // آپلود مستقیم عکس و فشرده‌سازی خودکار در کلاینت بدون نیاز به باکت ابری
+  const handleDirectImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    soundEngine.playClick();
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1280;
+        const scale = Math.min(1, MAX_WIDTH / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const webpDataUrl = canvas.toDataURL("image/webp", 0.85);
+        setForm((prev) => ({ ...prev, image_url: webpDataUrl }));
+        soundEngine.playSuccess();
+      };
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim() || !form.image_url.trim()) {
-      setStatusMsg({ type: "error", text: "لطفاً عنوان بنر و تصویر را مشخص نمایید." });
+      setStatusMsg({ type: "error", text: "عنوان و تصویر بنر الزامی هستند." });
       return;
     }
 
@@ -110,16 +137,19 @@ export default function AdminBannersPage() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setStatusMsg({ type: "success", text: "بنر با موفقیت ثبت شد." });
+        setStatusMsg({ type: "success", text: "✓ بنر با موفقیت ذخیره شد." });
+        if (Array.isArray(json.banners)) {
+          setBanners(json.banners);
+        }
         setTimeout(() => {
           setIsModalOpen(false);
           fetchBanners();
-        }, 800);
+        }, 600);
       } else {
-        setStatusMsg({ type: "error", text: json.message || "خطا در ثبت بنر در سرور." });
+        setStatusMsg({ type: "error", text: json.message || "خطا در ثبت بنر." });
       }
     } catch {
-      setStatusMsg({ type: "error", text: "ارتباط با سرور برقرار نشد." });
+      setStatusMsg({ type: "error", text: "خطا در اتصال به سرور." });
     } finally {
       setSubmitting(false);
     }
@@ -127,13 +157,15 @@ export default function AdminBannersPage() {
 
   return (
     <div className="space-y-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
+      <input type="file" ref={fileInputRef} onChange={handleDirectImageUpload} accept="image/*" className="hidden" />
+
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🖼️</span> مدیریت بنرها و اسلایدرهای صفحه اصلی
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ایجاد، ویرایش، حذف و تنظیم لینک‌های تبلیغاتی در ویترین فروشگاه
+            ایجاد، ویرایش، حذف و تنظیم بنرهای تصویری ویترین فروشگاه
           </p>
         </div>
 
@@ -147,9 +179,9 @@ export default function AdminBannersPage() {
 
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         {loading ? (
-          <div className="p-12 text-center text-xs text-slate-400 font-bold">در حال دریافت بنرها...</div>
+          <div className="p-12 text-center text-xs text-slate-400 font-bold">در حال بارگذاری بنرها...</div>
         ) : banners.length === 0 ? (
-          <div className="p-12 text-center text-xs text-slate-400 font-bold">هیچ بنری ثبت نشده است. بنر جدید اضافه کنید.</div>
+          <div className="p-12 text-center text-xs text-slate-400 font-bold">هیچ بنری ثبت نشده است. با دکمه بالا بنر اضافه کنید.</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {banners.map((b) => (
@@ -179,13 +211,13 @@ export default function AdminBannersPage() {
                   <div className="pt-2 flex justify-between items-center border-t border-[var(--card-border)]">
                     <button
                       onClick={() => handleOpenEdit(b)}
-                      className="px-3 py-1 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer"
                     >
                       ویرایش ✏️
                     </button>
                     <button
                       onClick={() => handleDelete(b.id)}
-                      className="px-3 py-1 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition cursor-pointer"
                     >
                       حذف 🗑️
                     </button>
@@ -197,6 +229,7 @@ export default function AdminBannersPage() {
         )}
       </div>
 
+      {/* فرم ایجاد / ویرایش بنر */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 text-xs">
@@ -213,13 +246,13 @@ export default function AdminBannersPage() {
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان یا توضیح بنر *</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان بنر *</label>
                 <input
                   type="text"
                   required
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="مثال: جشنواره نوروزی تکنولوژی"
+                  placeholder="مثال: جشنواره عیدانه آکسون کور"
                   className="w-full px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
                 />
               </div>
@@ -234,23 +267,32 @@ export default function AdminBannersPage() {
                       onClick={() => setForm({ ...form, image_url: "" })}
                       className="absolute top-2 left-2 px-2.5 py-1 rounded-xl bg-rose-600 text-white text-[10px] font-bold"
                     >
-                      تغییر تصویر
+                      تغییر عکس
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsUploadOpen(true)}
-                    className="w-full py-6 rounded-2xl border-2 border-dashed border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition flex flex-col items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <span>☁️</span>
-                    انتخاب یا آپلود تصویر بنر
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full py-5 rounded-2xl border-2 border-dashed border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span>📁</span>
+                      <span>انتخاب عکس از سیستم یا گوشی</span>
+                    </button>
+                    <input
+                      type="text"
+                      placeholder="یا وارد کردن آدرس مستقیم اینترنتی عکس (URL)"
+                      value={form.image_url}
+                      onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs outline-none"
+                    />
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">لینک مقصد (اختیاری):</label>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">لینک کلیک روی بنر:</label>
                 <input
                   type="text"
                   value={form.link_url}
@@ -276,7 +318,7 @@ export default function AdminBannersPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold shadow hover:opacity-90 disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold shadow hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
                   {submitting ? "در حال ذخیره..." : "ذخیره بنر 💾"}
                 </button>
@@ -285,13 +327,6 @@ export default function AdminBannersPage() {
           </div>
         </div>
       )}
-
-      <MediaUploadModal
-        isOpen={isUploadOpen}
-        bucket="banners"
-        onClose={() => setIsUploadOpen(false)}
-        onUploadSuccess={(url) => setForm((prev) => ({ ...prev, image_url: url }))}
-      />
     </div>
   );
 }

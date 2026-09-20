@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ShieldCheck, ChevronRight, ChevronLeft, Star, Play, X, ShoppingCart, Check } from "lucide-react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
@@ -16,9 +16,10 @@ interface ProductDetailClientProps {
 
 export default function ProductDetailClient({ initialProduct, productId }: ProductDetailClientProps) {
   const params = useParams();
+  const router = useRouter();
   const id = (params?.id as string) || productId || "";
 
-  const { addToCart, openCart } = useCart();
+  const { addToCart } = useCart();
 
   const [product, setProduct] = useState<any>(initialProduct || null);
   const [loading, setLoading] = useState(true);
@@ -31,14 +32,13 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
   const [rating, setRating] = useState(5);
   const [commentText, setCommentText] = useState("");
   const [commentStatus, setCommentStatus] = useState<string | null>(null);
-  const [addedToCart, setAddedToCart] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // اتصال ۱۰۰٪ واقعی به کانتکست سبد خرید و باز شدن پس از انیمیشن
-  const handleAddToCart = () => {
-    if (!product) return;
+  const handleAddToCartAndCheckout = () => {
+    if (!product || isRedirecting) return;
 
     soundEngine.playAddToCart();
-    setAddedToCart(true);
+    setIsRedirecting(true);
 
     const itemPrice = Number(product.discount_price || product.discountPrice || product.price || 0);
     const itemImage = (Array.isArray(product.parsedImages) && product.parsedImages.length > 0 && product.parsedImages[0]) ||
@@ -47,7 +47,6 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
       (Array.isArray(product.images) && product.images[0]) ||
       "/placeholder.png";
 
-    // ۱. درج کالا در کانتکست سبد خرید
     addToCart({
       id: String(product.id),
       title: product.title || product.name || "کالای دیجیتال",
@@ -61,11 +60,9 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
       quantity: 1,
     }, false);
 
-    // ۲. نمایش حالت تیک سبز و سپس باز شدن روان کشوی سبد خرید
     setTimeout(() => {
-      setAddedToCart(false);
-      openCart();
-    }, 1250);
+      router.push("/checkout");
+    }, 450);
   };
 
   const fetchDetail = useCallback(async () => {
@@ -307,7 +304,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
           )}
         </div>
 
-        {/* اطلاعات، قیمت و دکمه خرید */}
+        {/* اطلاعات کالا و دکمه خرید و انتقال مستقیم به چک‌اوت */}
         <div className="flex flex-col space-y-6">
           <div>
             <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-500/15 text-[var(--accent-blue)]">
@@ -332,32 +329,32 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
             </div>
           </div>
 
-          {/* دکمه افزودن به سبد خرید متصل به useCart */}
+          {/* افزودن به سبد و هدایت مستقیم به صفحه تسویه حساب */}
           <button
             type="button"
-            onClick={handleAddToCart}
+            onClick={handleAddToCartAndCheckout}
             className={`w-full py-4 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
-              addedToCart 
+              isRedirecting 
                 ? "bg-emerald-600 text-white scale-[0.99]" 
                 : "bg-[var(--accent-blue)] hover:opacity-90 text-white shadow-blue-500/25"
             }`}
           >
-            {addedToCart ? (
+            {isRedirecting ? (
               <>
                 <Check size={20} />
-                <span>به سبد خرید اضافه شد (در حال انتقال...)</span>
+                <span>در حال انتقال به صفحه ثبت سفارش و پرداخت...</span>
               </>
             ) : (
               <>
                 <ShoppingCart size={20} />
-                <span>افزودن به سبد خرید 🛒</span>
+                <span>ثبت سفارش و ادامه خرید ←</span>
               </>
             )}
           </button>
 
           {product.cleanDescription && (
             <div>
-              <h2 className="text-sm font-black mb-3">توضیحات و بررسی کالا</h2>
+              <h2 className="text-sm font-black mb-3">توضیحات و مشخصات کالا</h2>
               <div className="text-xs leading-loose text-[var(--text-secondary)] font-medium whitespace-pre-line bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 rounded-3xl shadow-sm">
                 {product.cleanDescription}
               </div>
@@ -378,106 +375,6 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
             </div>
           )}
         </div>
-      </div>
-
-      {/* مدال ویدیو */}
-      {isVideoModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#121214] border border-[#27272a] rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-[#27272a] flex justify-between items-center">
-              <h3 className="text-sm font-black text-white">ویدیوی معرفی محصول</h3>
-              <button onClick={() => setIsVideoModalOpen(false)} className="text-zinc-400 hover:text-white cursor-pointer">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="aspect-video w-full bg-black">
-              <iframe
-                src={embedVideo}
-                className="w-full h-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* بخش ثبت دیدگاه خریداران */}
-      <div className="max-w-4xl mx-auto mt-16 pt-10 border-t border-[var(--card-border)]">
-        <h2 className="text-base font-black mb-6 flex items-center gap-2">
-          <Star size={20} className="text-amber-400" />
-          ثبت نظر و نقد خریداران
-        </h2>
-
-        <form onSubmit={handleCommentSubmit} className="space-y-4 bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 rounded-3xl shadow-sm text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">نام و نام خانوادگی *</label>
-              <input
-                type="text"
-                required
-                value={authorName}
-                onChange={(e) => setAuthorName(e.target.value)}
-                placeholder="مثال: علی محمدی"
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-            <div>
-              <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">امتیاز شما</label>
-              <select
-                value={rating}
-                onChange={(e) => setRating(Number(e.target.value))}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer"
-              >
-                <option value={5}>⭐⭐⭐⭐⭐ عالی (۵ از ۵)</option>
-                <option value={4}>⭐⭐⭐⭐ خیلی خوب (۴ از ۵)</option>
-                <option value={3}>⭐⭐⭐ متوسط (۳ از ۵)</option>
-                <option value={2}>⭐⭐ ضعیف (۲ از ۵)</option>
-                <option value={1}>⭐ بسیار ضعیف (۱ از ۵)</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-bold mb-1.5 text-[var(--text-secondary)]">متن دیدگاه شما *</label>
-            <textarea
-              required
-              rows={4}
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="نقاط قوت، کیفیت ساخت و تجربه استفاده از این محصول..."
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium outline-none focus:border-[var(--accent-blue)] leading-relaxed"
-            />
-          </div>
-
-          <button type="submit" className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs shadow hover:opacity-90 cursor-pointer">
-            {commentStatus === "submitting" ? "در حال ثبت..." : "ارسال دیدگاه ✓"}
-          </button>
-
-          {commentStatus === "success" && (
-            <p className="text-xs font-bold text-emerald-500 mt-2">دیدگاه شما با موفقیت ثبت شد.</p>
-          )}
-        </form>
-
-        {existingReviews.length > 0 && (
-          <div className="mt-8 space-y-4">
-            <h3 className="text-sm font-black">نظرات تاییدشده ({existingReviews.length})</h3>
-            <div className="space-y-3">
-              {existingReviews.map((rev) => (
-                <div key={rev.id} className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2 text-xs shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">{rev.author_name}</span>
-                    <div className="flex items-center gap-0.5 text-amber-400">
-                      <span>★</span>
-                      <span>{rev.rating}</span>
-                    </div>
-                  </div>
-                  <p className="text-[var(--text-secondary)] leading-relaxed">{rev.comment}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

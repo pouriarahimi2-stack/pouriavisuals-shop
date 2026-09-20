@@ -54,28 +54,10 @@ export interface Product {
   updated_at?: string;
 }
 
+// عکس واقعی، شفاف و باکیفیت اتوبخار به جای صفحه سیاه placeholder
+export const STEAMER_REAL_IMAGE = "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80";
+
 export const FLAGSHIP_7_PRODUCTS: Product[] = [
-  {
-    id: "steamer-180-pro",
-    title: "اتوبخار پرتابل هوشمند با چرخش ۱۸۰ درجه",
-    title_fa: "اتوبخار مسافرتی و خانگی ۱۲۰۰ وات ۶ حالته",
-    category: "اتوبخار و لوازم خانگی",
-    price: 2450000,
-    discountPrice: 1980000,
-    stock: 25,
-    isAvailable: true,
-    warranty: "۱۲ ماه گارانتی اصالت و تعویض",
-    image: "/placeholder.png",
-    images: ["/placeholder.png"],
-    short_description: "اتوبخار دستی دوکاره با توان ۱۲۰۰ وات، مخزن ۱۲۰ میلی‌لیتر و ۶ حالت تنظیم هوشمند بخار.",
-    description: "اتوبخار هوشمند با چرخش ۱۸۰ درجه، کنترل دقیق دما و تنظیم بخار برای انواع پارچه‌های ابریشم، نخ و کتان.",
-    specs: {
-      "توان مصرفی": "1200W",
-      "ظرفیت مخزن آب": "120 ml",
-      "زاویه چرخش دسته": "۱۸۰ درجه",
-      "حالت عملکرد": "دوکاره (افقی + عمودی)"
-    }
-  },
   {
     id: "steamer-180-pro",
     title: "اتوبخار پرتابل هوشمند با چرخش ۱۸۰ درجه",
@@ -87,18 +69,18 @@ export const FLAGSHIP_7_PRODUCTS: Product[] = [
     stock: 25,
     isAvailable: true,
     is_available: true,
-    warranty: "۱۲ ماه گارانتی سلامت فیزیکی و اصالت",
-    image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800",
-    image_url: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800",
-    images: ["https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800"],
-    short_description: "اتوبخار دستی دوکاره با توان ۱۲۰۰ وات، مخزن ۱۲۰ میلی‌لیتر و ۶ حالت تنظیم هوشمند بخار.",
-    description: "اتوبخار هوشمند با چرخش ۱۸۰ درجه، کنترل دقیق دما و تنظیم بخار برای انواع پارچه‌های ابریشم، نخ و کتان بدون آسیب‌دیدگی.",
+    warranty: "۱۲ ماه گارانتی اصالت و سلامت فیزیکی",
+    image: STEAMER_REAL_IMAGE,
+    image_url: STEAMER_REAL_IMAGE,
+    images: [STEAMER_REAL_IMAGE],
+    short_description: "اتوبخار پرتابل دوکاره با توان ۱۲۰۰ وات، مخزن ۱۲۰ میلی‌لیتر و ۶ حالت تنظیم هوشمند بخار.",
+    description: "اتوبخار هوشمند با قابلیت چرخش ۱۸۰ درجه، کنترل دقیق دما و تنظیم بخار چندحالته برای انواع پارچه‌های لطیف تا ضخیم بدون آسیب و لک آب.",
     specs: {
       "توان مصرفی": "1200W",
       "ظرفیت مخزن آب": "120 میلی‌لیتر",
       "زاویه چرخش دسته": "۱۸۰ درجه انعطاف‌پذیر",
-      "نحوه عملکرد": "دوکاره (اتوکشی افقی + بخاردهی عمودی)",
+      "حالت عملکرد": "دوکاره (اتوکشی افقی + بخاردهی عمودی)",
       "تعداد حالات بخار": "۶ حالت هوشمند دیجیتال",
-      "ابعاد دستگاه": "184 × 70 × 98 میلی‌متر"
     }
-  },];
+  },
+];

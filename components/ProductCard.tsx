@@ -28,19 +28,20 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discountVal = product.discount_price || product.discountPrice;
   const finalPrice = discountVal && Number(discountVal) > 0 ? Number(discountVal) : displayPrice;
 
-  const imageSrc =
-    (Array.isArray(product.images) && product.images[0]) ||
-    product.image ||
-    "/placeholder.png";
+  // حل ریشه‌ای: اگر عکس placeholder سیاه بود، عکس باکیفیت و واقعی لود می‌شود
+  let imageSrc = (Array.isArray(product.images) && product.images[0]) || product.image || "";
+  if (!imageSrc || imageSrc.includes("placeholder.png")) {
+    imageSrc = "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80";
+  }
 
   return (
     <div className="group rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-xl">
       <Link href={`/products/${product.id}`} onClick={() => soundEngine.playClick()} className="space-y-3 block p-4">
-        <div className="relative aspect-square rounded-2xl bg-black/5 dark:bg-white/5 overflow-hidden flex items-center justify-center">
+        <div className="relative aspect-square rounded-2xl bg-slate-100 dark:bg-white/5 overflow-hidden flex items-center justify-center p-2">
           <img
             src={imageSrc}
             alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+            className="w-full h-full object-contain group-hover:scale-105 transition duration-500"
           />
           {discountVal && Number(discountVal) > 0 && (
             <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-lg bg-rose-600 text-white text-[10px] font-black shadow-md">
@@ -51,7 +52,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         <div className="space-y-1.5">
           <span className="text-[10px] font-bold text-[var(--accent-blue)] block truncate">
-            {product.category || "تکنولوژی و لوازم دیجیتال"}
+            {product.category || "لوازم هوشمند و دیجیتال"}
           </span>
           <h3 className="text-xs font-black text-[var(--text-primary)] line-clamp-2 leading-relaxed min-h-[36px] group-hover:text-[var(--accent-blue)] transition">
             {title}
@@ -80,8 +81,8 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         </div>
 
-        {/* استفاده از کامپوننت با انیمیشن دقیق چرخ‌دستی و باز شدن به‌موقع کشو */}
-        <AddToCartButton product={product} showCounter={false} />
+        {/* دکمه اختصاصی با انیمیشن دقیق چرخ‌دستی و باز شدن به‌موقع پس از ۱.۲۵ ثانیه */}
+        <AddToCartButton product={{ ...product, image: imageSrc }} showCounter={false} />
       </div>
     </div>
   );

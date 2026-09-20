@@ -71,8 +71,7 @@ export default function DynamicHomeSections({
   }
 
   return (
-    <div className="space-y-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-      {/* اسلایدر بنرهای پویا یا هیرو اصلی هماهنگ با پنل ادمین */}
+    <div className="space-y-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
       {banners.length > 0 ? (
         <div className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl aspect-[16/8] sm:aspect-[21/9] max-h-[480px]">
           {banners.map((b, idx) => (

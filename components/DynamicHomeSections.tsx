@@ -6,7 +6,6 @@ import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
-import TechRadarFeed from "@/components/TechRadarFeed";
 
 interface DynamicHomeSectionsProps {
   initialProducts: any[];
@@ -66,37 +65,32 @@ export default function DynamicHomeSections({
   }, [banners.length]);
 
   const layoutCfg = siteInfo?.homepage_layout_config;
-  const heroCfg = layoutCfg?.hero;
-  const showHero = heroCfg?.show !== false;
-  const heroTitle = heroCfg?.title || "دنیای نوآوری، تکنولوژی مدرن و ابزارهای هوشمند";
-  const heroSubtitle = heroCfg?.subtitle || "مرجع تخصصی خرید آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و لوازم دیجیتال با تضمین اصالت فیزیکی و ارسال سریع به سراسر کشور.";
-
-  // اسلایدر ۳D پرسپکتیو: تنظیم ویژه منحصراً برای تبلت و موبایل طبق درخواست صریح در عکس
-  const show3DSlider = layoutCfg?.showcase3D?.show !== false;
+  const heroTitle = layoutCfg?.hero?.title || "دنیای نوآوری، تکنولوژی مدرن و ابزارهای هوشمند";
+  const heroSubtitle = layoutCfg?.hero?.subtitle || "مرجع تخصصی خرید آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و ابزارهای دیجیتال با تضمین اصالت فیزیکی و ارسال سریع.";
 
   return (
-    <div className="space-y-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
+    <div className="space-y-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
       
-      {/* ۱. هیرو یا اسلایدر اصلی بنرها */}
+      {/* هیرو یا بنر اصلی */}
       {banners.length > 0 ? (
-        <div className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl aspect-[16/8] sm:aspect-[21/9] max-h-[480px]">
+        <div className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl aspect-[16/8] sm:aspect-[21/9] max-h-[460px]">
           {banners.map((b, idx) => (
             <div
               key={b.id || idx}
               className={`absolute inset-0 transition-opacity duration-1000 ${idx === activeBannerIdx ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
             >
               <img src={b.image_url} alt={b.title || "Banner"} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-12 text-white space-y-3">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent flex flex-col justify-end p-6 sm:p-12 text-white space-y-3">
                 <span className="px-3 py-1 rounded-full bg-blue-600/80 text-white text-[11px] font-bold w-fit backdrop-blur-md">
                   پیشنهاد ویژه آکسون کور
                 </span>
-                <h2 className="text-xl sm:text-3xl lg:text-4xl font-black leading-tight max-w-2xl">{b.title}</h2>
+                <h2 className="text-xl sm:text-3xl font-black leading-tight max-w-2xl">{b.title}</h2>
                 {b.link_url && (
                   <Link
                     href={b.link_url}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-slate-950 font-black text-xs hover:bg-slate-200 transition w-fit shadow-lg"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-white text-slate-950 font-black text-xs hover:bg-slate-200 transition w-fit shadow-lg"
                   >
-                    <span>مشاهده و سفارش کالا</span>
+                    <span>مشاهده محصولات</span>
                     <span>←</span>
                   </Link>
                 )}
@@ -116,17 +110,15 @@ export default function DynamicHomeSections({
             </div>
           )}
         </div>
-      ) : showHero && (
+      ) : (
         <div className="relative w-full rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#070b14] to-slate-950 border border-[var(--card-border)] p-8 sm:p-14 text-center space-y-6 shadow-2xl overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-600/15 via-transparent to-transparent pointer-events-none" />
-
           <div className="relative z-10 space-y-4 max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[var(--accent-blue)] text-xs font-bold">
               <span>⚡</span>
               <span>تامین جدیدترین ابزارها و گجت‌های هوشمند بازار</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight">
+            <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight">
               {heroTitle}
             </h1>
 
@@ -138,14 +130,14 @@ export default function DynamicHomeSections({
               <Link
                 href="/products"
                 onClick={() => soundEngine.playClick()}
-                className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-xl shadow-blue-600/25"
+                className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-xl"
               >
                 مشاهده کاتالوگ محصولات ←
               </Link>
               <Link
                 href="/news"
                 onClick={() => soundEngine.playClick()}
-                className="px-8 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition backdrop-blur-md"
+                className="px-8 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition"
               >
                 رادار اخبار تکنولوژی 📡
               </Link>
@@ -154,11 +146,8 @@ export default function DynamicHomeSections({
         </div>
       )}
 
-      {/* ۲. نوار رادار اخبار تکنولوژی */}
-      {layoutCfg?.newsTicker?.show !== false && <TechRadarFeed />}
-
-      {/* ۳. اسلایدر ۳D پرسپکتیو: اختصاصی برای موبایل و تبلت طبق درخواست در کروکی (در دسکتاپ مخفی است) */}
-      {show3DSlider && products.length > 0 && (
+      {/* اسلایدر ۳D پرسپکتیو: منحصراً برای موبایل و تبلت (در دسکتاپ مخفی است) */}
+      {products.length > 0 && (
         <div className="block lg:hidden">
           <ProductPerspectiveSlider
             products={products}
@@ -168,49 +157,47 @@ export default function DynamicHomeSections({
         </div>
       )}
 
-      {/* ۴. ویترین کاتالوگ محصولات */}
-      {layoutCfg?.productsSection?.show !== false && (
-        <section className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <h2 className="text-lg sm:text-2xl font-black text-[var(--text-primary)]">
-                  {layoutCfg?.productsSection?.title || "جدیدترین محصولات و کالاهای دیجیتال"}
-                </h2>
-              </div>
-              <p className="text-xs text-[var(--text-secondary)] font-medium">
-                {layoutCfg?.productsSection?.subtitle || "محصولات آماده ارسال فوری با تضمین ۱۰۰٪ اصالت فیزیکی کالا"}
-              </p>
+      {/* ویترین اصلی محصولات */}
+      <section className="space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h2 className="text-lg sm:text-2xl font-black text-[var(--text-primary)]">
+                جدیدترین محصولات و کالاهای دیجیتال
+              </h2>
             </div>
-
-            <Link
-              href="/products"
-              className="text-xs font-black text-[var(--accent-blue)] hover:underline flex items-center gap-1"
-            >
-              <span>مشاهده همه محصولات ({products.length})</span>
-              <span>←</span>
-            </Link>
+            <p className="text-xs text-[var(--text-secondary)] font-medium">
+              محصولات آماده ارسال با تضمین ۱۰۰٪ اصالت فیزیکی کالا
+            </p>
           </div>
 
-          {products.length === 0 ? (
-            <div className="p-16 text-center rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4">
-              <span className="text-4xl block">📦</span>
-              <p className="text-xs font-bold text-[var(--text-secondary)]">
-                در حال حاضر محصولی در ویترین ثبت نشده است. می‌توانید از پنل مدیریت کالای جدید اضافه کنید.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {products.map((prod) => (
-                <div key={prod.id} className="max-w-sm mx-auto sm:max-w-none w-full">
-                  <ProductCard product={prod} />
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+          <Link
+            href="/products"
+            className="text-xs font-black text-[var(--accent-blue)] hover:underline flex items-center gap-1"
+          >
+            <span>مشاهده همه محصولات ({products.length})</span>
+            <span>←</span>
+          </Link>
+        </div>
+
+        {products.length === 0 ? (
+          <div className="p-16 text-center rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4">
+            <span className="text-4xl block">📦</span>
+            <p className="text-xs font-bold text-[var(--text-secondary)]">
+              در حال حاضر محصولی در این بخش قرار ندارد.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {products.map((prod) => (
+              <div key={prod.id} className="w-full">
+                <ProductCard product={prod} />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

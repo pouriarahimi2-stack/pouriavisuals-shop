@@ -8,7 +8,7 @@ import { formatPrice } from "@/lib/formatters";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function CartDrawer() {
-  const { isCartOpen, closeCart, cartItems, updateQuantity, removeFromCart, totalPrice, finalPayable, discountAmount } = useCart();
+  const { isCartOpen, closeCart, cartItems, updateQuantity, removeFromCart, finalPayable, discountAmount } = useCart();
 
   if (!isCartOpen) return null;
 
@@ -16,7 +16,6 @@ export default function CartDrawer() {
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-start dir-rtl animate-fadeIn font-sans select-none">
       <div className="w-full sm:max-w-md bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-full flex flex-col justify-between p-6 shadow-2xl text-[var(--text-primary)] animate-in slide-in-from-right duration-200">
         <div>
-          {/* هدر کشو */}
           <div className="flex items-center justify-between pb-4 border-b border-[var(--card-border)]">
             <div className="flex items-center gap-2">
               <ShoppingBag size={20} className="text-[var(--accent-blue)]" />
@@ -34,7 +33,6 @@ export default function CartDrawer() {
             </button>
           </div>
 
-          {/* لیست اقلام */}
           <div className="mt-4 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             {cartItems.length === 0 ? (
               <div className="py-24 text-center text-xs text-[var(--text-secondary)] font-bold space-y-2">
@@ -95,7 +93,6 @@ export default function CartDrawer() {
           </div>
         </div>
 
-        {/* فوتر تسویه حساب */}
         {cartItems.length > 0 && (
           <div className="pt-4 border-t border-[var(--card-border)] space-y-4">
             <div className="space-y-1.5 text-xs font-bold">

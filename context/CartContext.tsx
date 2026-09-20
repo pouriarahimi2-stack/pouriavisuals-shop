@@ -82,13 +82,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadStoredCart();
 
-    const handleOpenDrawerEvent = () => {
-      setIsCartOpen(true);
-    };
-
-    const handleCartUpdatedEvent = () => {
-      loadStoredCart();
-    };
+    const handleOpenDrawerEvent = () => setIsCartOpen(true);
+    const handleCartUpdatedEvent = () => loadStoredCart();
 
     window.addEventListener("open_cart_drawer", handleOpenDrawerEvent);
     window.addEventListener("cart_updated", handleCartUpdatedEvent);

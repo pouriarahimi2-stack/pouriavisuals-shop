@@ -9,6 +9,7 @@ export interface CartItem {
   name?: string;
   price: number;
   discountPrice?: number;
+  discount_price?: number;
   image: string;
   quantity: number;
   stock?: number;
@@ -41,78 +42,73 @@ interface CartContextType {
   totalAmount: number;
   discountAmount: number;
   finalPayable: number;
-  freeShippingThreshold: number;
-  amountUntilFreeShipping: number;
-  submitOrder?: (orderData: any) => { id: string; [key: string]: any };
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 const CART_STORAGE_KEY = "axon_cart_store_v2026";
+const LEGACY_CART_KEY = "axon_cart";
 const COUPON_STORAGE_KEY = "axon_active_coupon_v2026";
-const ORDERS_HISTORY_STORAGE_KEY = "axon_orders_history_v2026";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
-  const [freeShippingThreshold] = useState<number>(2000000);
 
-  useEffect(() => {
+  const loadStoredCart = useCallback(() => {
     try {
-      const localCart = localStorage.getItem(CART_STORAGE_KEY);
-      if (localCart) {
-        const parsed = JSON.parse(localCart);
-        if (Array.isArray(parsed)) setCartItems(parsed);
+      let items: CartItem[] = [];
+      const primary = localStorage.getItem(CART_STORAGE_KEY);
+      const legacy = localStorage.getItem(LEGACY_CART_KEY);
+
+      if (primary) {
+        items = JSON.parse(primary);
+      } else if (legacy) {
+        items = JSON.parse(legacy);
       }
 
-      const localCoupon = localStorage.getItem(COUPON_STORAGE_KEY);
-      if (localCoupon) {
-        const parsed = JSON.parse(localCoupon);
-        if (parsed && typeof parsed === "object") setAppliedCoupon(parsed);
+      if (Array.isArray(items)) {
+        setCartItems(items);
       }
-    } catch (err) {
-      console.error("Cart hydration error:", err);
+
+      const cpn = localStorage.getItem(COUPON_STORAGE_KEY);
+      if (cpn) {
+        setAppliedCoupon(JSON.parse(cpn));
+      }
+    } catch (e) {
+      console.error("Cart hydration error:", e);
     }
   }, []);
 
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === CART_STORAGE_KEY && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed)) setCartItems(parsed);
-        } catch {}
-      }
-      if (e.key === COUPON_STORAGE_KEY) {
-        try {
-          setAppliedCoupon(e.newValue ? JSON.parse(e.newValue) : null);
-        } catch {}
-      }
+    loadStoredCart();
+
+    const handleOpenDrawerEvent = () => {
+      setIsCartOpen(true);
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+    const handleCartUpdatedEvent = () => {
+      loadStoredCart();
+    };
+
+    window.addEventListener("open_cart_drawer", handleOpenDrawerEvent);
+    window.addEventListener("cart_updated", handleCartUpdatedEvent);
+
+    return () => {
+      window.removeEventListener("open_cart_drawer", handleOpenDrawerEvent);
+      window.removeEventListener("cart_updated", handleCartUpdatedEvent);
+    };
+  }, [loadStoredCart]);
 
   const persistCart = useCallback((items: CartItem[]) => {
     setCartItems(items);
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(items));
+      window.dispatchEvent(new Event("cart_updated"));
     } catch {}
   }, []);
 
-  const persistCoupon = useCallback((coupon: AppliedCoupon | null) => {
-    setAppliedCoupon(coupon);
-    try {
-      if (coupon) {
-        localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(coupon));
-      } else {
-        localStorage.removeItem(COUPON_STORAGE_KEY);
-      }
-    } catch {}
-  }, []);
-
-  const addToCart = useCallback((item: any, openDrawer: boolean = false) => {
+  const addToCart = useCallback((item: any, openDrawer: boolean = true) => {
     const itemId = String(item.id);
     const itemTitle = item.title || item.name || "کالای دیجیتال";
     const itemPrice = Number(item.discount_price || item.discountPrice || item.price || 0);
@@ -136,7 +132,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             title: itemTitle,
             name: itemTitle,
             price: itemPrice,
-            discountPrice: item.discountPrice ? Number(item.discountPrice) : undefined,
+            discountPrice: item.discount_price ? Number(item.discount_price) : undefined,
             image: itemImage,
             quantity: Math.min(itemStock, addQuantity),
             stock: itemStock,
@@ -147,6 +143,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       try {
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -161,6 +158,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const updated = prev.filter((i) => String(i.id) !== String(id));
       try {
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -180,16 +178,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const filtered = prev.filter((i) => String(i.id) !== String(id));
         try {
           localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(filtered));
+          localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(filtered));
         } catch {}
         return filtered;
       }
 
       const maxLimit = existing.stock !== undefined && existing.stock !== null ? existing.stock : 999;
       const finalQty = Math.min(maxLimit, newQty);
-
       const updated = prev.map((i) => (String(i.id) === String(id) ? { ...i, quantity: finalQty } : i));
+
       try {
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(LEGACY_CART_KEY, JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -197,18 +197,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = useCallback(() => {
     persistCart([]);
-    persistCoupon(null);
-  }, [persistCart, persistCoupon]);
+    setAppliedCoupon(null);
+    try {
+      localStorage.removeItem(COUPON_STORAGE_KEY);
+    } catch {}
+  }, [persistCart]);
 
   const openCart = () => setIsCartOpen(true);
   const closeCart = () => setIsCartOpen(false);
   const toggleCart = () => setIsCartOpen((prev) => !prev);
 
   const totalPrice = useMemo(() => {
-    return cartItems.reduce(
-      (acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity,
-      0
-    );
+    return cartItems.reduce((acc, item) => acc + (item.discountPrice ?? item.price) * item.quantity, 0);
   }, [cartItems]);
 
   const discountAmount = useMemo(() => {
@@ -228,8 +228,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
   }, [cartItems]);
 
-  const amountUntilFreeShipping = Math.max(0, freeShippingThreshold - totalPrice);
-
   const applyCoupon = async (code: string) => {
     const clean = code.trim().toUpperCase();
     const res = await couponService.validateCoupon(clean, totalPrice);
@@ -245,31 +243,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         maxDiscount: res.coupon.max_discount || res.coupon.max_discount_amount || undefined,
       };
 
-      persistCoupon(newCoupon);
+      setAppliedCoupon(newCoupon);
+      localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(newCoupon));
       return { success: true, message: res.message };
     }
     return { success: false, message: res.message || "کد تخفیف نامعتبر است." };
   };
 
-  const removeCoupon = () => persistCoupon(null);
-
-  // رفع باگ آلودگی کلید CART_STORAGE_KEY: ذخیره در کلید مستقل سوابق
-  const submitOrder = (orderData: any) => {
-    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
-    const fullOrder = {
-      id: orderId,
-      ...orderData,
-      items: cartItems,
-      totalAmount: totalPrice,
-      finalAmount: finalPayable,
-      discountAmount,
-      createdAt: new Date().toISOString(),
-    };
-    try {
-      const existing = JSON.parse(localStorage.getItem(ORDERS_HISTORY_STORAGE_KEY) || "[]");
-      localStorage.setItem(ORDERS_HISTORY_STORAGE_KEY, JSON.stringify([fullOrder, ...existing]));
-    } catch {}
-    return fullOrder;
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    localStorage.removeItem(COUPON_STORAGE_KEY);
   };
 
   return (
@@ -294,9 +277,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         totalAmount: totalPrice,
         discountAmount,
         finalPayable,
-        freeShippingThreshold,
-        amountUntilFreeShipping,
-        submitOrder,
       }}
     >
       {children}

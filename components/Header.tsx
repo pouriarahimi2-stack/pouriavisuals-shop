@@ -11,20 +11,11 @@ import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function Header() {
   const pathname = usePathname();
-  const cart = useCart() as any;
+  const { openCart, totalItems } = useCart();
   const [headerCfg, setHeaderCfg] = useState<HeaderConfig>(DEFAULT_HEADER_CONFIG);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
-
-  const cartItems: any[] = Array.isArray(cart?.cartItems)
-    ? cart.cartItems
-    : (Array.isArray(cart?.items) ? cart.items : []);
-
-  const cartCount = cartItems.reduce(
-    (acc: number, item: any) => acc + (Number(item?.quantity) || 1),
-    0
-  );
 
   const syncHeader = () => {
     siteInfoService.getSiteInfo().then((info) => {
@@ -173,12 +164,12 @@ export default function Header() {
             <button
               onClick={() => {
                 soundEngine.playClick();
-                if (typeof cart?.openCart === "function") cart.openCart();
+                openCart();
               }}
-              className="px-4 sm:px-5 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 transition flex items-center gap-2 cursor-pointer"
+              className="px-4 sm:px-5 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 transition flex items-center gap-2 cursor-pointer active:scale-95"
             >
               <span>🛒</span>
-              <span className="bg-white/20 px-2 py-0.5 rounded-full font-mono text-[11px]">{cartCount}</span>
+              <span className="bg-white/20 px-2 py-0.5 rounded-full font-mono text-[11px]">{totalItems}</span>
             </button>
           )}
         </div>

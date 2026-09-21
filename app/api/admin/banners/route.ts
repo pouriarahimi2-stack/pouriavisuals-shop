@@ -1,150 +1,204 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import fs from "fs";
-import path from "path";
 import { randomUUID } from "crypto";
+import { requireAdmin } from "@/lib/authSecurityHelper";
+import fs from "fs";
 
 export const dynamic = "force-dynamic";
 
-const BANNERS_FILE = path.join(process.cwd(), "data", "banners.json");
+const TMP_BANNERS_FILE = "/tmp/axon_banners.json";
 
-function readLocalBanners(): any[] {
+function readTmpBanners(): any[] {
   try {
-    if (fs.existsSync(BANNERS_FILE)) {
-      const content = fs.readFileSync(BANNERS_FILE, "utf8");
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) return parsed;
+    const content = fs.readFileSync(TMP_BANNERS_FILE, "utf8");
+    const parsed  = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeTmpBanners(banners: any[]) {
+  try {
+    fs.writeFileSync(TMP_BANNERS_FILE, JSON.stringify(banners, null, 2), "utf8");
+  } catch {}
+}
+
+async function getBannersFromSiteInfo(): Promise<any[]> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("site_info")
+      .select("homepage_layout_config")
+      .limit(1)
+      .maybeSingle();
+    if (data?.homepage_layout_config?.banners) {
+      return Array.isArray(data.homepage_layout_config.banners)
+        ? data.homepage_layout_config.banners
+        : [];
     }
   } catch {}
   return [];
 }
 
-function writeLocalBanners(banners: any[]) {
+async function saveBannersToSiteInfo(banners: any[]) {
   try {
-    const dir = path.dirname(BANNERS_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners, null, 2), "utf8");
-  } catch (err) {
-    console.error("Local banner write error:", err);
-  }
+    const { data: row } = await supabaseAdmin
+      .from("site_info")
+      .select("id, homepage_layout_config")
+      .limit(1)
+      .maybeSingle();
+    if (row) {
+      const cfg   = row.homepage_layout_config || {};
+      cfg.banners = banners;
+      await supabaseAdmin
+        .from("site_info")
+        .update({ homepage_layout_config: cfg })
+        .eq("id", row.id);
+    }
+  } catch {}
 }
 
+// ── GET ──────────────────────────────────────────────────────────
 export async function GET() {
   try {
-    let list: any[] = readLocalBanners();
+    // اولویت ۱: جدول banners (اگر در Supabase ایجاد شده باشد)
+    const { data: supabanners, error } = await supabaseAdmin
+      .from("banners")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    if (supabaseAdmin) {
-      try {
-        const { data, error } = await supabaseAdmin.from("banners").select("*").order("created_at", { ascending: false });
-        if (!error && data && data.length > 0) {
-          list = data;
-          writeLocalBanners(data);
-        }
-      } catch {}
-
-      if (list.length === 0) {
-        try {
-          const res = await supabaseAdmin.from("site_info").select("homepage_layout_config").limit(1).maybeSingle();
-          const siteRow: any = res?.data;
-          if (siteRow && siteRow.homepage_layout_config && Array.isArray(siteRow.homepage_layout_config.banners)) {
-            list = siteRow.homepage_layout_config.banners;
-            writeLocalBanners(list);
-          }
-        } catch {}
-      }
+    if (!error && supabanners && supabanners.length > 0) {
+      writeTmpBanners(supabanners);
+      return NextResponse.json({ success: true, banners: supabanners });
     }
 
-    return NextResponse.json({ success: true, banners: list });
+    // اولویت ۲: site_info JSONB
+    const siBanners = await getBannersFromSiteInfo();
+    if (siBanners.length > 0) {
+      writeTmpBanners(siBanners);
+      return NextResponse.json({ success: true, banners: siBanners });
+    }
+
+    // اولویت ۳: فایل /tmp
+    return NextResponse.json({ success: true, banners: readTmpBanners() });
   } catch {
-    return NextResponse.json({ success: true, banners: readLocalBanners() });
+    return NextResponse.json({ success: true, banners: readTmpBanners() });
   }
 }
 
+// ── POST ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.res;
+
   try {
-    const body = await req.json();
-    const title = String(body.title || "").trim();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, message: "فرمت درخواست نامعتبر است (JSON parse error)." },
+        { status: 400 }
+      );
+    }
+
+    const title    = String(body.title     || "").trim();
     const imageUrl = String(body.image_url || body.image || "").trim();
-    const linkUrl = String(body.link_url || body.link || "/products").trim();
+    const linkUrl  = String(body.link_url  || body.link  || "/products").trim();
     const isActive = body.is_active !== false;
 
-    if (!title || !imageUrl) {
-      return NextResponse.json({ success: false, message: "عنوان و تصویر بنر الزامی هستند." }, { status: 400 });
+    if (!title) {
+      return NextResponse.json(
+        { success: false, message: "عنوان بنر الزامی است." },
+        { status: 400 }
+      );
+    }
+    if (!imageUrl) {
+      return NextResponse.json(
+        { success: false, message: "تصویر بنر الزامی است. ابتدا یک عکس انتخاب کنید." },
+        { status: 400 }
+      );
     }
 
-    const bannerId = (body.id && String(body.id).length > 5) ? String(body.id) : randomUUID();
+    const isEdit   = body.id && String(body.id).trim().length > 5 && body.id !== "undefined";
+    const bannerId = isEdit ? String(body.id).trim() : randomUUID();
+    const now      = new Date().toISOString();
 
     const bannerRecord = {
-      id: bannerId,
+      id:         bannerId,
       title,
-      image_url: imageUrl,
-      link_url: linkUrl,
-      is_active: isActive,
-      updated_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
+      image_url:  imageUrl,
+      link_url:   linkUrl,
+      is_active:  isActive,
+      updated_at: now,
+      created_at: isEdit ? (body.created_at || now) : now,
     };
 
-    let currentBanners = readLocalBanners();
-    if (body.id) {
-      currentBanners = currentBanners.map((b) => (String(b.id) === String(body.id) ? bannerRecord : b));
+    let allBanners = readTmpBanners();
+    if (allBanners.length === 0) {
+      allBanners = await getBannersFromSiteInfo();
+    }
+
+    if (isEdit) {
+      allBanners = allBanners.map((b) => String(b.id) === bannerId ? bannerRecord : b);
     } else {
-      currentBanners = [bannerRecord, ...currentBanners];
+      allBanners = [bannerRecord, ...allBanners];
     }
-    writeLocalBanners(currentBanners);
 
-    if (supabaseAdmin) {
-      try {
-        if (body.id) {
-          await supabaseAdmin.from("banners").update(bannerRecord).eq("id", body.id);
-        } else {
-          await supabaseAdmin.from("banners").insert([bannerRecord]);
-        }
-      } catch {}
+    writeTmpBanners(allBanners);
+    await saveBannersToSiteInfo(allBanners);
 
-      try {
-        const res = await supabaseAdmin.from("site_info").select("id, homepage_layout_config").limit(1).maybeSingle();
-        const siteRow: any = res?.data;
-        if (siteRow) {
-          const cfg = siteRow.homepage_layout_config || {};
-          cfg.banners = currentBanners;
-          await supabaseAdmin.from("site_info").update({ homepage_layout_config: cfg }).eq("id", siteRow.id);
-        }
-      } catch {}
-    }
+    try {
+      if (isEdit) {
+        await supabaseAdmin.from("banners").update(bannerRecord).eq("id", bannerId);
+      } else {
+        await supabaseAdmin.from("banners").insert([bannerRecord]);
+      }
+    } catch {}
 
     return NextResponse.json({
       success: true,
-      message: "بنر با موفقیت ثبت و ذخیره شد.",
-      banner: bannerRecord,
-      banners: currentBanners,
+      message: isEdit ? "✓ بنر ویرایش شد." : "✓ بنر جدید ثبت شد.",
+      banner:  bannerRecord,
+      banners: allBanners,
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || "خطا در ثبت بنر." }, { status: 500 });
+    console.error("Banners POST error:", err);
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در ثبت بنر." },
+      { status: 500 }
+    );
   }
 }
 
+// ── DELETE ───────────────────────────────────────────────────────
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.res;
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    if (!id) return NextResponse.json({ success: false, message: "شناسه بنر الزامی است." }, { status: 400 });
-
-    let current = readLocalBanners().filter((b) => String(b.id) !== String(id));
-    writeLocalBanners(current);
-
-    if (supabaseAdmin) {
-      try { await supabaseAdmin.from("banners").delete().eq("id", id); } catch {}
-      try {
-        const res = await supabaseAdmin.from("site_info").select("id, homepage_layout_config").limit(1).maybeSingle();
-        const siteRow: any = res?.data;
-        if (siteRow && siteRow.homepage_layout_config) {
-          siteRow.homepage_layout_config.banners = current;
-          await supabaseAdmin.from("site_info").update({ homepage_layout_config: siteRow.homepage_layout_config }).eq("id", siteRow.id);
-        }
-      } catch {}
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: "شناسه بنر الزامی است." },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ success: true, message: "بنر با موفقیت حذف شد.", banners: current });
+    let allBanners = readTmpBanners();
+    if (allBanners.length === 0) allBanners = await getBannersFromSiteInfo();
+    const filtered = allBanners.filter((b) => String(b.id) !== String(id));
+
+    writeTmpBanners(filtered);
+    await saveBannersToSiteInfo(filtered);
+    try { await supabaseAdmin.from("banners").delete().eq("id", id); } catch {}
+
+    return NextResponse.json({
+      success: true,
+      message: "✓ بنر حذف شد.",
+      banners: filtered,
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

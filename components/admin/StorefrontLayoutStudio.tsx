@@ -30,6 +30,17 @@ export default function StorefrontLayoutStudio() {
   const [newMenuTitle, setNewMenuTitle] = useState("");
   const [newMenuUrl, setNewMenuUrl] = useState("");
   const [newMenuBadge, setNewMenuBadge] = useState("");
+  // state های مدیریت لینک‌های فوتر
+  const [editingQuickId,   setEditingQuickId]   = useState<string|null>(null);
+  const [editingServiceId, setEditingServiceId] = useState<string|null>(null);
+  const [newQuickTitle,    setNewQuickTitle]    = useState("");
+  const [newQuickUrl,      setNewQuickUrl]      = useState("");
+  const [newServiceTitle,  setNewServiceTitle]  = useState("");
+  const [newServiceUrl,    setNewServiceUrl]    = useState("");
+  const [editQuickTitle,   setEditQuickTitle]   = useState("");
+  const [editQuickUrl,     setEditQuickUrl]     = useState("");
+  const [editServiceTitle, setEditServiceTitle] = useState("");
+  const [editServiceUrl,   setEditServiceUrl]   = useState("");
 
   const [mediaModal, setMediaModal] = useState<{
     open: boolean;
@@ -360,11 +371,13 @@ export default function StorefrontLayoutStudio() {
         </div>
       )}
 
-      {/* تب ۲: سکشن‌های صفحه اصلی */}
+      {/* تب ۲: سکشن‌های صفحه اصلی + ویرایش متن هیرو */}
       {activeTab === "sections" && (
-        <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
-          <h3 className="font-black text-sm text-[var(--accent-blue)]">مدیریت نمایش و کنترل بخش‌های صفحه اصلی:</h3>
+        <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
+          
+          {/* نمایش/مخفی بخش‌ها */}
           <div className="space-y-3">
+            <h3 className="font-black text-sm text-[var(--accent-blue)]">🔀 نمایش/مخفی‌کردن بخش‌های صفحه اصلی:</h3>
             <label className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] cursor-pointer">
               <span className="font-bold">۱. بخش هیرو و بنر اصلی</span>
               <input type="checkbox" checked={config.hero.show} onChange={(e) => setConfig({ ...config, hero: { ...config.hero, show: e.target.checked } })} className="w-4 h-4 rounded" />
@@ -374,33 +387,213 @@ export default function StorefrontLayoutStudio() {
               <input type="checkbox" checked={config.productsSection.show} onChange={(e) => setConfig({ ...config, productsSection: { ...config.productsSection, show: e.target.checked } })} className="w-4 h-4 rounded" />
             </label>
             <label className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] cursor-pointer">
-              <span className="font-bold">۳. نمایشگاه سه‌بعدی کالاها (منحصراً موبایل و تبلت)</span>
+              <span className="font-bold">۳. نمایشگاه سه‌بعدی کالاها</span>
               <input type="checkbox" checked={config.showcase3D.show} onChange={(e) => setConfig({ ...config, showcase3D: { ...config.showcase3D, show: e.target.checked } })} className="w-4 h-4 rounded" />
             </label>
             <label className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] cursor-pointer">
-              <span className="font-bold">۴. آیکون شناور دستیار هوشمند در صفحه اصلی</span>
+              <span className="font-bold">۴. آیکون شناور دستیار هوشمند</span>
               <input type="checkbox" checked={config.aiChat?.autoHideNearFooter !== false} onChange={(e) => setConfig({ ...config, aiChat: { ...config.aiChat, autoHideNearFooter: e.target.checked } })} className="w-4 h-4 rounded" />
             </label>
+          </div>
+
+          {/* ── ویرایش متن بخش هیرو ── */}
+          <div className="border-t border-[var(--card-border)] pt-5 space-y-4">
+            <h3 className="font-black text-sm text-[var(--accent-blue)]">✍️ ویرایش متن بخش هیرو (صفحه اصلی):</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان اصلی هیرو:</label>
+                <input
+                  type="text"
+                  value={config.hero.title}
+                  onChange={(e) => setConfig({ ...config, hero: { ...config.hero, title: e.target.value } })}
+                  placeholder="عنوان جذاب برای صفحه اصلی..."
+                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">متن دکمه اصلی:</label>
+                <input
+                  type="text"
+                  value={config.hero.buttonText}
+                  onChange={(e) => setConfig({ ...config, hero: { ...config.hero, buttonText: e.target.value } })}
+                  placeholder="مشاهده کاتالوگ..."
+                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block font-bold text-[var(--text-secondary)] mb-1">زیرعنوان هیرو (توضیح کوتاه):</label>
+              <textarea
+                rows={2}
+                value={config.hero.subtitle}
+                onChange={(e) => setConfig({ ...config, hero: { ...config.hero, subtitle: e.target.value } })}
+                placeholder="توضیح کوتاهی درباره محصولات و خدمات..."
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs leading-relaxed outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">لینک دکمه هیرو:</label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={config.hero.buttonLink}
+                  onChange={(e) => setConfig({ ...config, hero: { ...config.hero, buttonLink: e.target.value } })}
+                  placeholder="/products"
+                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-xs outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── ویرایش عنوان بخش محصولات ── */}
+          <div className="border-t border-[var(--card-border)] pt-5 space-y-3">
+            <h3 className="font-black text-sm text-[var(--accent-blue)]">📦 ویرایش عنوان بخش محصولات:</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">عنوان بخش:</label>
+                <input
+                  type="text"
+                  value={config.productsSection.title}
+                  onChange={(e) => setConfig({ ...config, productsSection: { ...config.productsSection, title: e.target.value } })}
+                  placeholder="محصولات منتخب..."
+                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">زیرعنوان:</label>
+                <input
+                  type="text"
+                  value={config.productsSection.subtitle}
+                  onChange={(e) => setConfig({ ...config, productsSection: { ...config.productsSection, subtitle: e.target.value } })}
+                  placeholder="ارسال سریع..."
+                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none"
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* تب ۳: فوتر و نشان‌ها */}
+      {/* تب ۳: فوتر کامل — متن، لینک‌های دسترسی سریع و خدمات مشتریان */}
       {activeTab === "footer" && (
         <div className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] shadow-xl space-y-6 text-xs">
-          <div className="border-b border-[var(--card-border)] pb-4 space-y-3">
-            <h3 className="font-black text-sm text-[var(--accent-blue)]">متن معرفی برند در فوتر:</h3>
-            <textarea
-              rows={3}
-              value={config.footer.description}
-              onChange={(e) => setConfig({ ...config, footer: { ...config.footer, description: e.target.value } })}
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] leading-relaxed text-xs"
-            />
+
+          {/* عنوان برند و توضیح */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-[var(--card-border)] pb-5">
+            <div className="space-y-2">
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">🏷️ نام برند در فوتر:</h3>
+              <input
+                type="text"
+                value={config.footer.brandTitle}
+                onChange={(e) => setConfig({ ...config, footer: { ...config.footer, brandTitle: e.target.value } })}
+                placeholder="آکسون کور | Axon Core"
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">📝 معرفی‌نامه کوتاه فوتر:</h3>
+              <textarea
+                rows={3}
+                value={config.footer.description}
+                onChange={(e) => setConfig({ ...config, footer: { ...config.footer, description: e.target.value } })}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] leading-relaxed outline-none"
+              />
+            </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
+          {/* ── مدیریت لینک‌های دسترسی سریع ── */}
+          <div className="space-y-3 border-b border-[var(--card-border)] pb-5">
+            <h3 className="font-black text-sm text-[var(--accent-blue)]">⚡ لینک‌های دسترسی سریع (ستون ۲ فوتر):</h3>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {(config.footer.quickLinks?.links || []).map((lnk: any) => (
+                <div key={lnk.id} className="flex items-center gap-2 p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                  {editingQuickId === lnk.id ? (
+                    <>
+                      <input value={editQuickTitle} onChange={(e) => setEditQuickTitle(e.target.value)} className="flex-1 p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--accent-blue)] text-xs font-bold" />
+                      <input value={editQuickUrl} onChange={(e) => setEditQuickUrl(e.target.value)} dir="ltr" className="w-28 p-1.5 rounded-lg bg-[var(--modal-bg)] border text-xs font-mono" />
+                      <button type="button" onClick={() => {
+                        const updated = (config.footer.quickLinks?.links || []).map((l: any) => l.id === lnk.id ? { ...l, title: editQuickTitle, url: editQuickUrl } : l);
+                        setConfig({ ...config, footer: { ...config.footer, quickLinks: { ...config.footer.quickLinks, links: updated } } });
+                        setEditingQuickId(null);
+                      }} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">✓</button>
+                      <button type="button" onClick={() => setEditingQuickId(null)} className="px-2 py-1 rounded-lg bg-slate-600 text-white text-[10px]">✕</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 font-bold truncate">{lnk.title}</span>
+                      <span className="text-slate-400 font-mono text-[10px] w-20 truncate" dir="ltr">{lnk.url}</span>
+                      <button type="button" onClick={() => { setEditingQuickId(lnk.id); setEditQuickTitle(lnk.title); setEditQuickUrl(lnk.url); }} className="px-2 py-1 rounded-lg bg-[var(--modal-bg)] border text-[10px] font-bold hover:border-[var(--accent-blue)]">✏️</button>
+                      <button type="button" onClick={() => {
+                        const updated = (config.footer.quickLinks?.links || []).filter((l: any) => l.id !== lnk.id);
+                        setConfig({ ...config, footer: { ...config.footer, quickLinks: { ...config.footer.quickLinks, links: updated } } });
+                      }} className="text-rose-500 font-bold px-1.5 text-xs">✕</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <input value={newQuickTitle} onChange={(e) => setNewQuickTitle(e.target.value)} placeholder="عنوان لینک جدید..." className="flex-1 p-2 rounded-xl bg-[var(--input-bg)] border text-xs font-bold outline-none" />
+              <input value={newQuickUrl}   onChange={(e) => setNewQuickUrl(e.target.value)}   placeholder="/products" dir="ltr" className="w-28 p-2 rounded-xl bg-[var(--input-bg)] border text-xs font-mono outline-none" />
+              <button type="button" onClick={() => {
+                if (!newQuickTitle.trim() || !newQuickUrl.trim()) return;
+                const newLink = { id: `q_${Date.now()}`, title: newQuickTitle.trim(), url: newQuickUrl.trim() };
+                const updated = [...(config.footer.quickLinks?.links || []), newLink];
+                setConfig({ ...config, footer: { ...config.footer, quickLinks: { ...config.footer.quickLinks, links: updated } } });
+                setNewQuickTitle(""); setNewQuickUrl("");
+              }} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs cursor-pointer">+ افزودن</button>
+            </div>
+          </div>
+
+          {/* ── مدیریت لینک‌های خدمات مشتریان ── */}
+          <div className="space-y-3 border-b border-[var(--card-border)] pb-5">
+            <h3 className="font-black text-sm text-[var(--accent-blue)]">🛎️ لینک‌های خدمات مشتریان (ستون ۳ فوتر):</h3>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {(config.footer.customerServices?.links || []).map((lnk: any) => (
+                <div key={lnk.id} className="flex items-center gap-2 p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                  {editingServiceId === lnk.id ? (
+                    <>
+                      <input value={editServiceTitle} onChange={(e) => setEditServiceTitle(e.target.value)} className="flex-1 p-1.5 rounded-lg bg-[var(--modal-bg)] border border-[var(--accent-blue)] text-xs font-bold" />
+                      <input value={editServiceUrl}   onChange={(e) => setEditServiceUrl(e.target.value)}   dir="ltr" className="w-28 p-1.5 rounded-lg bg-[var(--modal-bg)] border text-xs font-mono" />
+                      <button type="button" onClick={() => {
+                        const updated = (config.footer.customerServices?.links || []).map((l: any) => l.id === lnk.id ? { ...l, title: editServiceTitle, url: editServiceUrl } : l);
+                        setConfig({ ...config, footer: { ...config.footer, customerServices: { ...config.footer.customerServices, links: updated } } });
+                        setEditingServiceId(null);
+                      }} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">✓</button>
+                      <button type="button" onClick={() => setEditingServiceId(null)} className="px-2 py-1 rounded-lg bg-slate-600 text-white text-[10px]">✕</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 font-bold truncate">{lnk.title}</span>
+                      <span className="text-slate-400 font-mono text-[10px] w-20 truncate" dir="ltr">{lnk.url}</span>
+                      <button type="button" onClick={() => { setEditingServiceId(lnk.id); setEditServiceTitle(lnk.title); setEditServiceUrl(lnk.url); }} className="px-2 py-1 rounded-lg bg-[var(--modal-bg)] border text-[10px] font-bold hover:border-[var(--accent-blue)]">✏️</button>
+                      <button type="button" onClick={() => {
+                        const updated = (config.footer.customerServices?.links || []).filter((l: any) => l.id !== lnk.id);
+                        setConfig({ ...config, footer: { ...config.footer, customerServices: { ...config.footer.customerServices, links: updated } } });
+                      }} className="text-rose-500 font-bold px-1.5 text-xs">✕</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <input value={newServiceTitle} onChange={(e) => setNewServiceTitle(e.target.value)} placeholder="عنوان خدمت جدید..." className="flex-1 p-2 rounded-xl bg-[var(--input-bg)] border text-xs font-bold outline-none" />
+              <input value={newServiceUrl}   onChange={(e) => setNewServiceUrl(e.target.value)}   placeholder="/contact"  dir="ltr" className="w-28 p-2 rounded-xl bg-[var(--input-bg)] border text-xs font-mono outline-none" />
+              <button type="button" onClick={() => {
+                if (!newServiceTitle.trim() || !newServiceUrl.trim()) return;
+                const newLink = { id: `s_${Date.now()}`, title: newServiceTitle.trim(), url: newServiceUrl.trim() };
+                const updated = [...(config.footer.customerServices?.links || []), newLink];
+                setConfig({ ...config, footer: { ...config.footer, customerServices: { ...config.footer.customerServices, links: updated } } });
+                setNewServiceTitle(""); setNewServiceUrl("");
+              }} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs cursor-pointer">+ افزودن</button>
+            </div>
+          </div>
+
+          {/* اینماد */}
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
             <span className="font-black text-[var(--text-primary)] block">📜 نماد اعتماد الکترونیکی (اینماد) و درگاه پرداخت:</span>
-            <p className="text-[11px] text-slate-400">کد رسمی اینماد ۷۴۳۴۴۰۴ و نشان رسمی شاپرک زرین‌پال در فوتر سایت فعال هستند.</p>
+            <p className="text-[11px] text-slate-400">کد رسمی اینماد و نشان زرین‌پال در فوتر سایت فعال هستند و از ادمین مدیریت می‌شوند.</p>
           </div>
         </div>
       )}

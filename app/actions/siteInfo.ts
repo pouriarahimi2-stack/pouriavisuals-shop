@@ -62,7 +62,7 @@ function getDefaultSiteInfo(): SiteInfo {
     site_name: "آکسون | Axon",
     siteName: "آکسون | Axon",
     storeName: "آکسون | Axon",
-    tagline: "مرجع تخصصی تجهیزات تصویر، مانیتور و استودیو",
+    tagline: "مرجع تخصصی عرضه کالاهای فناوری و دیجیتال",
     allow_google_index: true,
     allowGoogleIndex: true,
     maintenance_mode: "none",

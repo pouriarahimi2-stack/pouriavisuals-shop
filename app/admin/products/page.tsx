@@ -1,118 +1,156 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, ArrowRight, Video, CheckCircle } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  Plus, Trash2, Edit, ArrowRight, Search, SlidersHorizontal,
+  X, Image as ImageIcon, Video, CheckCircle, LayoutGrid, List,
+  Package, ChevronDown, ChevronUp
+} from "lucide-react";
 import Link from "next/link";
 
-interface SpecItem {
-  key: string;
-  value: string;
-}
+interface SpecItem { key: string; value: string; }
+
+type SortKey = "newest" | "oldest" | "price_asc" | "price_desc" | "stock_asc" | "stock_desc";
+type ViewMode = "grid" | "table";
 
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // ── محصولات ───────────────────────────────────────────────────
+  const [products,  setProducts]  = useState<any[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [viewMode,  setViewMode]  = useState<ViewMode>("table");
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
-  const [priceToman, setPriceToman] = useState<string>("");
-  const [discountToman, setDiscountToman] = useState<string>("");
-  const [stock, setStock] = useState<number>(10);
-  const [warranty, setWarranty] = useState<string>("");
-  const [videoUrl, setVideoUrl] = useState<string>("");
-  const [description, setDescription] = useState("");
-  const [images, setImages] = useState<string[]>([]);
-  const [imgInput, setImgInput] = useState("");
-  const [specsList, setSpecsList] = useState<SpecItem[]>([]);
+  // ── جستجو / فیلتر ─────────────────────────────────────────────
+  const [searchQuery,        setSearchQuery]        = useState("");
+  const [filterCategory,     setFilterCategory]     = useState("all");
+  const [filterAvailability, setFilterAvailability] = useState<"all"|"in_stock"|"out_of_stock">("all");
+  const [filterSort,         setFilterSort]         = useState<SortKey>("newest");
+  const [showFilters,        setShowFilters]        = useState(false);
+
+  // ── فرم افزودن / ویرایش ────────────────────────────────────────
+  const [isModalOpen,   setIsModalOpen]   = useState(false);
+  const [saving,        setSaving]        = useState(false);
+  const [editingId,     setEditingId]     = useState<string | null>(null);
+  const [title,         setTitle]         = useState("");
+  const [category,      setCategory]      = useState("");
+  const [priceToman,    setPriceToman]    = useState("");
+  const [discountToman, setDiscountToman] = useState("");
+  const [stock,         setStock]         = useState<number>(10);
+  const [warranty,      setWarranty]      = useState("");
+  const [videoUrl,      setVideoUrl]      = useState("");
+  const [description,   setDescription]   = useState("");
+  const [images,        setImages]        = useState<string[]>([]);
+  const [imgInput,      setImgInput]      = useState("");
+  const [specsList,     setSpecsList]     = useState<SpecItem[]>([]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/products");
+      const res  = await fetch("/api/admin/products");
       const data = await res.json();
-      if (data.success) {
-        setProducts(data.products || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+      if (data.success) setProducts(data.products || []);
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchProducts(); }, []);
+
+  // ── دسته‌های منحصربه‌فرد از محصولات بارگذاری‌شده ────────────────
+  const categories = useMemo(() => {
+    const cats = new Set(products.map((p) => String(p.category || "عمومی").trim()).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [products]);
+
+  // ── لیست فیلترشده و مرتب‌شده ─────────────────────────────────
+  const filteredProducts = useMemo(() => {
+    let list = [...products];
+
+    // جستجو در نام، دسته و توضیحات
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((p) =>
+        (p.title || p.name || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q)
+      );
     }
-  };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+    // فیلتر دسته
+    if (filterCategory !== "all") {
+      list = list.filter((p) => (p.category || "عمومی") === filterCategory);
+    }
 
-  const formatNumber = (val: string) => {
-    const raw = String(val || "").replace(/\D/g, "");
-    return raw.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  };
+    // فیلتر موجودی
+    if (filterAvailability === "in_stock")    list = list.filter((p) => Number(p.stock) > 0);
+    if (filterAvailability === "out_of_stock") list = list.filter((p) => Number(p.stock) <= 0);
 
-  const parseRawNumber = (formatted: string) => {
-    return Number(String(formatted || "").replace(/,/g, "")) || 0;
-  };
-
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const reader = new FileReader();
-      reader.onload = (e) => { img.src = e.target?.result as string; };
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1200;
-        const scale = Math.min(1, MAX_WIDTH / img.width);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/webp", 0.82));
-      };
-      img.onerror = reject;
-      reader.readAsDataURL(file);
+    // مرتب‌سازی
+    list.sort((a, b) => {
+      switch (filterSort) {
+        case "oldest":     return new Date(a.created_at||0).getTime() - new Date(b.created_at||0).getTime();
+        case "price_asc":  return Number(a.price||0) - Number(b.price||0);
+        case "price_desc": return Number(b.price||0) - Number(a.price||0);
+        case "stock_asc":  return Number(a.stock||0) - Number(b.stock||0);
+        case "stock_desc": return Number(b.stock||0) - Number(a.stock||0);
+        default:           return new Date(b.created_at||0).getTime() - new Date(a.created_at||0).getTime();
+      }
     });
+
+    return list;
+  }, [products, searchQuery, filterCategory, filterAvailability, filterSort]);
+
+  const activeFiltersCount = [
+    searchQuery.trim() ? 1 : 0,
+    filterCategory     !== "all" ? 1 : 0,
+    filterAvailability !== "all" ? 1 : 0,
+    filterSort         !== "newest" ? 1 : 0,
+  ].reduce((a, b) => a + b, 0);
+
+  const resetFilters = () => {
+    setSearchQuery(""); setFilterCategory("all");
+    setFilterAvailability("all"); setFilterSort("newest");
   };
+
+  // ── آپلود تصویر ───────────────────────────────────────────────
+  const compressImage = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const img = new Image(); const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target?.result as string; };
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const MAX = 1200; const scale = Math.min(1, MAX / img.width);
+      canvas.width  = img.width  * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/webp", 0.82));
+    };
+    img.onerror = reject; reader.readAsDataURL(file);
+  });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+    const files = e.target.files; if (!files) return;
     for (const file of Array.from(files)) {
       try {
         const compressed = await compressImage(file);
         setImages((prev) => [...prev, compressed]);
-      } catch (err) {
-        console.error(err);
-      }
+      } catch {}
     }
   };
 
   const addImageByUrl = () => {
     const url = imgInput.trim();
-    if (url && !images.includes(url)) {
-      setImages([...images, url]);
-      setImgInput("");
-    }
+    if (url && !images.includes(url)) { setImages([...images, url]); setImgInput(""); }
   };
 
-  // قرار دادن تصویر انتخابی به عنوان تصویر اول (شاخص)
-  const setAsPrimaryImage = (index: number) => {
-    if (index === 0) return;
-    const reordered = [...images];
-    const [selected] = reordered.splice(index, 1);
-    reordered.unshift(selected);
-    setImages(reordered);
-  };
+  const formatNumber  = (v: string) => String(v||"").replace(/\D/g,"").replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  const parseRawNumber = (v: string) => Number(String(v||"").replace(/,/g,"")) || 0;
 
+  // ── ویرایش محصول ──────────────────────────────────────────────
   const handleEditClick = (p: any) => {
     setEditingId(p.id);
     setTitle(p.title || p.name || "");
     setCategory(p.category || "");
     setPriceToman(formatNumber(String(p.price || "")));
     setDiscountToman(p.discount_price ? formatNumber(String(p.discount_price)) : "");
-    setStock(p.stock !== undefined ? p.stock : 10);
+    setStock(p.stock ?? 10);
 
     let rawDesc = p.description || "";
     let extractedImages: string[] = [];
@@ -125,40 +163,35 @@ export default function AdminProductsPage() {
       try {
         const meta = JSON.parse(metaMatch[1]);
         if (Array.isArray(meta.images)) extractedImages = meta.images;
-        if (meta.warranty) extractedWarranty = meta.warranty;
-        if (meta.video_url) extractedVideo = meta.video_url;
-        if (meta.specs) extractedSpecs = meta.specs;
+        if (meta.warranty)  extractedWarranty = meta.warranty;
+        if (meta.video_url) extractedVideo    = meta.video_url;
+        if (meta.specs)     extractedSpecs    = meta.specs;
         rawDesc = rawDesc.replace(metaMatch[0], "").trim();
-      } catch (err) {}
+      } catch {}
     }
+    if (extractedImages.length === 0 && p.image_url) extractedImages = [p.image_url];
 
-    if (extractedImages.length === 0 && p.image_url) {
-      extractedImages = [p.image_url];
-    }
-
-    setImages(extractedImages);
-    setWarranty(extractedWarranty);
-    setVideoUrl(extractedVideo);
-    setDescription(rawDesc);
-
+    setImages(extractedImages); setWarranty(extractedWarranty);
+    setVideoUrl(extractedVideo); setDescription(rawDesc);
     const sp = Object.entries(extractedSpecs).map(([key, value]) => ({ key, value: String(value) }));
     setSpecsList(sp.length > 0 ? sp : [{ key: "توان مصرفی", value: "" }, { key: "ظرفیت مخزن", value: "" }]);
-
     setIsModalOpen(true);
+  };
+
+  const resetForm = () => {
+    setEditingId(null); setTitle(""); setCategory(""); setPriceToman("");
+    setDiscountToman(""); setStock(10); setWarranty(""); setVideoUrl("");
+    setDescription(""); setImages([]); setImgInput("");
+    setSpecsList([{ key: "توان مصرفی", value: "" }, { key: "ظرفیت مخزن", value: "" }]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      alert("نام محصول الزامی است.");
-      return;
-    }
+    if (!title.trim()) { alert("نام محصول الزامی است."); return; }
 
     const specsObject: Record<string, string> = {};
     specsList.forEach((item) => {
-      if (item.key.trim() && item.value.trim()) {
-        specsObject[item.key.trim()] = item.value.trim();
-      }
+      if (item.key.trim() && item.value.trim()) specsObject[item.key.trim()] = item.value.trim();
     });
 
     const payload = {
@@ -167,376 +200,386 @@ export default function AdminProductsPage() {
       category: category.trim() || "عمومی",
       price: parseRawNumber(priceToman),
       discount_price: discountToman ? parseRawNumber(discountToman) : null,
-      stock: Number(stock),
-      warranty: warranty.trim() || null,
-      video_url: videoUrl.trim() || null,
-      description,
-      images,
-      specs: specsObject,
+      stock: Number(stock), warranty: warranty.trim() || null,
+      video_url: videoUrl.trim() || null, description, images, specs: specsObject,
     };
 
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
+      const res  = await fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "خطا در ارتباط با سرور");
-      }
-
-      alert("کالا با موفقیت ذخیره گردید!");
-      setIsModalOpen(false);
-      fetchProducts();
-    } catch (err: any) {
-      alert("خطا: " + err.message);
-    } finally {
-      setSaving(false);
-    }
+      if (!res.ok || !data.success) throw new Error(data.message || "خطا در ارتباط با سرور");
+      alert("کالا با موفقیت ذخیره گردید!"); setIsModalOpen(false); fetchProducts();
+    } catch (err: any) { alert("خطا: " + err.message); }
+    finally { setSaving(false); }
   };
 
-  const resetForm = () => {
-    setEditingId(null);
-    setTitle("");
-    setCategory("");
-    setPriceToman("");
-    setDiscountToman("");
-    setStock(10);
-    setWarranty("");
-    setVideoUrl("");
-    setDescription("");
-    setImages([]);
-    setImgInput("");
-    setSpecsList([{ key: "توان مصرفی", value: "" }, { key: "ظرفیت مخزن", value: "" }]);
+  const handleDelete = async (id: string) => {
+    if (!confirm("آیا از حذف این کالا مطمئن هستید؟")) return;
+    try {
+      const res  = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) { setProducts((prev) => prev.filter((p) => p.id !== id)); }
+      else alert("خطا در حذف: " + data.message);
+    } catch (err: any) { alert("خطا: " + err.message); }
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-6 lg:p-10 dir-rtl">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 border-b border-[var(--card-border)]">
-        <div>
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="p-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--card-hover)] text-sm font-bold flex items-center gap-2">
-              <ArrowRight size={18} />
-              پیشخوان
-            </Link>
-            <h1 className="text-2xl font-black">مدیریت کاتالوگ و انبار کالاها</h1>
-          </div>
-          <p className="text-xs text-[var(--text-secondary)] mt-2">
-            تنظیم تصویر شاخص، امبد ویدیو و مدیریت ویژگی‌های فنی کالا
-          </p>
-        </div>
+    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-4 sm:p-6 lg:p-10 dir-rtl">
 
-        <button
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="px-6 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2"
-        >
-          <Plus size={18} />
-          افزودن محصول جدید
-        </button>
+      {/* ── هدر صفحه ─────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--card-border)]">
+        <div className="flex items-center gap-3">
+          <Link href="/admin" className="p-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--card-hover)] text-sm font-bold flex items-center gap-2">
+            <ArrowRight size={18} /> پیشخوان
+          </Link>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black flex items-center gap-2">
+              <Package size={24} className="text-[var(--accent-blue)]" />
+              مدیریت کاتالوگ و انبار کالاها
+            </h1>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              {products.length} محصول ثبت‌شده · نمایش {filteredProducts.length} مورد
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setViewMode(v => v === "table" ? "grid" : "table")}
+            className="p-2.5 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:bg-[var(--card-hover)] transition"
+            title={viewMode === "table" ? "نمای کارتی" : "نمای جدول"}
+          >
+            {viewMode === "table" ? <LayoutGrid size={18} /> : <List size={18} />}
+          </button>
+          <button
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="px-5 py-2.5 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white font-bold text-sm shadow-lg flex items-center gap-2"
+          >
+            <Plus size={18} /> افزودن محصول
+          </button>
+        </div>
       </div>
 
-      <div className="mt-8">
-        {loading ? (
-          <div className="text-center py-20 text-sm font-bold text-[var(--text-secondary)]">در حال بارگذاری کاتالوگ...</div>
-        ) : products.length === 0 ? (
-          <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-16 text-center">
-            <p className="text-sm font-bold text-[var(--text-secondary)]">هنوز کالایی ثبت نشده است.</p>
+      {/* ── نوار جستجو و فیلتر ──────────────────────────────────── */}
+      <div className="mt-5 space-y-3">
+        <div className="flex items-center gap-2">
+          {/* جستجو */}
+          <div className="relative flex-1">
+            <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="جستجو در نام، دسته‌بندی یا توضیحات محصول..."
+              className="w-full py-2.5 pr-10 pl-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] text-sm font-bold outline-none focus:border-[var(--accent-blue)] transition"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-400">
+                <X size={15} />
+              </button>
+            )}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((p) => {
-              const displayImg = p.image_url || "/placeholder.png";
-              return (
-                <div key={p.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-5 flex flex-col justify-between shadow-sm">
-                  <div>
-                    <div className="w-full h-48 rounded-2xl bg-zinc-900/50 overflow-hidden mb-4 relative flex items-center justify-center border border-[var(--card-border)]">
-                      <img src={displayImg} alt={p.title || p.name} className="w-full h-full object-contain p-2" />
-                      <span className="absolute top-3 right-3 text-[10px] font-bold px-3 py-1 rounded-full bg-blue-500/90 text-white">
-                        {p.category || "عمومی"}
-                      </span>
-                    </div>
 
-                    <h3 className="font-bold text-sm line-clamp-2 leading-relaxed">{p.title || p.name}</h3>
+          {/* دکمه نمایش/مخفی فیلترها */}
+          <button
+            onClick={() => setShowFilters(f => !f)}
+            className={`px-4 py-2.5 rounded-2xl border font-bold text-sm flex items-center gap-2 transition ${
+              showFilters || activeFiltersCount > 0
+                ? "bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white"
+                : "bg-[var(--card-bg)] border-[var(--card-border)] hover:bg-[var(--card-hover)]"
+            }`}
+          >
+            <SlidersHorizontal size={16} />
+            فیلتر
+            {activeFiltersCount > 0 && (
+              <span className="bg-white text-[var(--accent-blue)] rounded-full w-5 h-5 text-[11px] flex items-center justify-center font-black">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+        </div>
 
-                    <div className="mt-4 pt-3 border-t border-[var(--card-border)] flex justify-between items-center text-xs">
-                      <span className="text-[var(--text-secondary)]">قیمت:</span>
-                      <div className="text-left font-bold">
-                        <div>{Number(p.price || 0).toLocaleString("fa-IR")} تومان</div>
-                        <div className="text-[10px] text-[var(--text-secondary)]">
-                          {(Number(p.price || 0) * 10).toLocaleString("fa-IR")} تومان
-                        </div>
-                      </div>
-                    </div>
+        {/* پنل فیلترها */}
+        {showFilters && (
+          <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs animate-fadeIn">
+            {/* دسته‌بندی */}
+            <div>
+              <label className="block font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی:</label>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+              >
+                <option value="all">همه دسته‌ها</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
 
-                    <div className="mt-2 flex justify-between items-center text-xs">
-                      <span className="text-[var(--text-secondary)]">موجودی:</span>
-                      <span className="font-bold">{p.stock} عدد</span>
-                    </div>
-                  </div>
+            {/* موجودی */}
+            <div>
+              <label className="block font-bold text-[var(--text-secondary)] mb-1">وضعیت موجودی:</label>
+              <select
+                value={filterAvailability}
+                onChange={(e) => setFilterAvailability(e.target.value as any)}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+              >
+                <option value="all">همه</option>
+                <option value="in_stock">موجود (stock &gt; 0)</option>
+                <option value="out_of_stock">ناموجود (stock = 0)</option>
+              </select>
+            </div>
 
-                  <div className="mt-6 pt-3 border-t border-[var(--card-border)] flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => handleEditClick(p)}
-                      className="p-2.5 text-blue-400 hover:bg-blue-500/10 rounded-xl transition flex items-center gap-1.5 text-xs font-bold"
-                    >
-                      <Edit size={16} />
-                      ویرایش
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
-                          await fetch(`/api/admin/products?id=${p.id}`, { method: "DELETE" });
-                          fetchProducts();
-                        }
-                      }}
-                      className="p-2.5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {/* مرتب‌سازی */}
+            <div>
+              <label className="block font-bold text-[var(--text-secondary)] mb-1">مرتب‌سازی:</label>
+              <select
+                value={filterSort}
+                onChange={(e) => setFilterSort(e.target.value as SortKey)}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+              >
+                <option value="newest">جدیدترین</option>
+                <option value="oldest">قدیمی‌ترین</option>
+                <option value="price_asc">ارزان‌ترین</option>
+                <option value="price_desc">گران‌ترین</option>
+                <option value="stock_asc">کمترین موجودی</option>
+                <option value="stock_desc">بیشترین موجودی</option>
+              </select>
+            </div>
+
+            {activeFiltersCount > 0 && (
+              <button
+                onClick={resetFilters}
+                className="sm:col-span-3 py-2 rounded-xl border border-rose-500/30 text-rose-500 font-bold hover:bg-rose-500/10 transition"
+              >
+                پاک‌کردن همه فیلترها ✕
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#121214] border border-[#27272a] rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl text-right">
-            <div className="flex items-center justify-between pb-4 border-b border-[#27272a]">
-              <h2 className="text-lg font-black text-white flex items-center gap-2">
-                {editingId ? <Edit size={20} className="text-[#0071e3]" /> : <Plus size={20} className="text-[#0071e3]" />}
-                {editingId ? "ویرایش مشخصات کالا" : "ایجاد کالای جدید"}
-              </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 text-zinc-400 hover:text-white">
-                <X size={20} />
+      {/* ── نتایج ──────────────────────────────────────────────── */}
+      <div className="mt-5">
+        {loading ? (
+          <div className="text-center py-20 text-sm font-bold text-[var(--text-secondary)]">
+            <div className="w-8 h-8 border-2 border-[var(--accent-blue)] border-t-transparent animate-spin rounded-full mx-auto mb-3" />
+            در حال بارگذاری کاتالوگ...
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-16 text-center space-y-3">
+            <Search size={40} className="mx-auto text-slate-400" />
+            <p className="text-sm font-bold text-[var(--text-secondary)]">
+              {searchQuery || activeFiltersCount > 0
+                ? "محصولی با این مشخصات یافت نشد."
+                : "هنوز کالایی ثبت نشده است."}
+            </p>
+            {activeFiltersCount > 0 && (
+              <button onClick={resetFilters} className="text-xs text-[var(--accent-blue)] underline font-bold">
+                حذف فیلترها
               </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">نام و مدل کالا *</label>
-                  <input
-                    type="text"
-                    required
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
-                  />
+            )}
+          </div>
+        ) : viewMode === "table" ? (
+          /* ── نمای جدول ─── */
+          <div className="overflow-x-auto rounded-3xl border border-[var(--card-border)]">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-[var(--card-bg)] border-b border-[var(--card-border)] text-[var(--text-secondary)] font-bold">
+                  <th className="py-3 px-4 text-right">تصویر</th>
+                  <th className="py-3 px-4 text-right">نام محصول</th>
+                  <th className="py-3 px-4 text-right">دسته</th>
+                  <th className="py-3 px-4 text-right">قیمت (تومان)</th>
+                  <th className="py-3 px-4 text-right">تخفیف</th>
+                  <th className="py-3 px-4 text-right">موجودی</th>
+                  <th className="py-3 px-4 text-right">عملیات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--card-border)]">
+                {filteredProducts.map((p) => (
+                  <tr key={p.id} className="hover:bg-[var(--card-hover)] transition group">
+                    <td className="py-2.5 px-4">
+                      <img
+                        src={p.image_url || "/placeholder.png"}
+                        alt={p.title || p.name}
+                        className="w-12 h-12 object-contain rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] p-1"
+                      />
+                    </td>
+                    <td className="py-2.5 px-4 max-w-[200px]">
+                      <p className="font-bold line-clamp-2 leading-relaxed">{p.title || p.name}</p>
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 font-bold whitespace-nowrap">
+                        {p.category || "عمومی"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 font-mono font-bold text-emerald-400">
+                      {Number(p.price||0).toLocaleString("fa-IR")}
+                    </td>
+                    <td className="py-2.5 px-4 font-mono text-slate-400">
+                      {p.discount_price ? Number(p.discount_price).toLocaleString("fa-IR") : "—"}
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <span className={`font-bold ${Number(p.stock) > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {Number(p.stock)} عدد
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleEditClick(p)}
+                          className="px-3 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-blue-400 text-blue-400 font-bold flex items-center gap-1.5 transition"
+                        >
+                          <Edit size={13} /> ویرایش
+                        </button>
+                        <button
+                          onClick={() => handleDelete(p.id)}
+                          className="px-3 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-rose-400 text-rose-400 font-bold flex items-center gap-1.5 transition"
+                        >
+                          <Trash2 size={13} /> حذف
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* ── نمای کارتی ─── */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filteredProducts.map((p) => (
+              <div key={p.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-4 flex flex-col shadow-sm hover:shadow-md transition">
+                <div className="w-full h-40 rounded-2xl bg-zinc-900/50 overflow-hidden mb-3 relative flex items-center justify-center border border-[var(--card-border)]">
+                  <img src={p.image_url || "/placeholder.png"} alt={p.title||p.name} className="w-full h-full object-contain p-2" />
+                  <span className="absolute top-2 right-2 text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-500/90 text-white">
+                    {p.category || "عمومی"}
+                  </span>
+                  <span className={`absolute top-2 left-2 text-[10px] font-bold px-2.5 py-1 rounded-full ${Number(p.stock) > 0 ? "bg-emerald-500/90 text-white" : "bg-rose-500/90 text-white"}`}>
+                    {Number(p.stock) > 0 ? `${p.stock} عدد` : "ناموجود"}
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">دسته‌بندی کالا *</label>
-                  <input
-                    type="text"
-                    required
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
-                  />
+                <h3 className="font-bold text-xs line-clamp-2 flex-1">{p.title || p.name}</h3>
+                <div className="mt-3 pt-3 border-t border-[var(--card-border)] space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">قیمت:</span>
+                    <span className="font-mono font-bold text-emerald-400">{Number(p.price||0).toLocaleString("fa-IR")} ت</span>
+                  </div>
+                  {p.discount_price && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">قیمت تخفیف:</span>
+                      <span className="font-mono font-bold text-amber-400">{Number(p.discount_price).toLocaleString("fa-IR")} ت</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => handleEditClick(p)} className="flex-1 py-1.5 rounded-xl border border-[var(--card-border)] hover:border-blue-400 text-blue-400 font-bold text-[11px] flex items-center justify-center gap-1 transition">
+                    <Edit size={12} /> ویرایش
+                  </button>
+                  <button onClick={() => handleDelete(p.id)} className="flex-1 py-1.5 rounded-xl border border-[var(--card-border)] hover:border-rose-400 text-rose-400 font-bold text-[11px] flex items-center justify-center gap-1 transition">
+                    <Trash2 size={12} /> حذف
+                  </button>
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ── Modal افزودن / ویرایش (دست‌نخورده از نسخه قبل) ─────── */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3">
+          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-[var(--modal-bg)] border-b border-[var(--card-border)] px-6 py-4 flex items-center justify-between z-10">
+              <h2 className="font-black text-base">{editingId ? "ویرایش کالا" : "افزودن کالای جدید"}</h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-xl hover:bg-[var(--card-hover)] transition"><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">نام محصول *</label>
+                  <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="نام کامل محصول..." className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]" />
+                </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">قیمت اصلی (تومان) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={priceToman}
-                    onChange={(e) => setPriceToman(formatNumber(e.target.value))}
-                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
-                  />
-                  {parseRawNumber(priceToman) > 0 && (
-                    <div className="text-[11px] text-zinc-400 mt-1.5 flex justify-between">
-                      <span>تومان:</span>
-                      <span className="text-emerald-400 font-bold">{(parseRawNumber(priceToman) * 10).toLocaleString("fa-IR")} تومان</span>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">دسته‌بندی</label>
+                  <input value={category} onChange={(e) => setCategory(e.target.value)} list="category-list" placeholder="مثال: لپ‌تاپ / موبایل..." className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" />
+                  <datalist id="category-list">{categories.map(c => <option key={c} value={c} />)}</datalist>
+                </div>
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">موجودی انبار</label>
+                  <input type="number" min={0} value={stock} onChange={(e) => setStock(Number(e.target.value))} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" />
+                </div>
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">قیمت (تومان)</label>
+                  <input value={priceToman} onChange={(e) => setPriceToman(formatNumber(e.target.value))} placeholder="مثال: 5,000,000" dir="ltr" className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none" />
+                </div>
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">قیمت تخفیف (تومان)</label>
+                  <input value={discountToman} onChange={(e) => setDiscountToman(formatNumber(e.target.value))} placeholder="در صورت وجود..." dir="ltr" className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none" />
+                </div>
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">گارانتی</label>
+                  <input value={warranty} onChange={(e) => setWarranty(e.target.value)} placeholder="مثال: ۱۸ ماه شرکتی..." className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" />
+                </div>
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">آدرس ویدیو (اختیاری)</label>
+                  <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://..." dir="ltr" className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none" />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">توضیحات محصول</label>
+                  <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="توضیحات کامل..." className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] leading-relaxed outline-none" />
+                </div>
+
+                {/* تصاویر */}
+                <div className="sm:col-span-2 space-y-2">
+                  <label className="block font-bold text-[var(--text-secondary)]">تصاویر محصول</label>
+                  <label className="flex items-center justify-center gap-2 p-3 rounded-2xl border-2 border-dashed border-[var(--card-border)] cursor-pointer hover:border-[var(--accent-blue)] transition font-bold text-[var(--text-secondary)]">
+                    <ImageIcon size={18} /> انتخاب تصویر از دستگاه
+                    <input type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" />
+                  </label>
+                  <div className="flex gap-2">
+                    <input value={imgInput} onChange={(e) => setImgInput(e.target.value)} placeholder="یا آدرس URL تصویر..." dir="ltr" className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none" />
+                    <button type="button" onClick={addImageByUrl} className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold">افزودن</button>
+                  </div>
+                  {images.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2">
+                      {images.map((img, i) => (
+                        <div key={i} className="relative group">
+                          <img src={img} alt="" className={`w-full aspect-square object-contain rounded-xl border-2 ${i===0?"border-[var(--accent-blue)]":"border-[var(--card-border)]"} bg-black/5 p-1`} />
+                          {i === 0 && <span className="absolute top-1 right-1 text-[9px] bg-blue-500 text-white px-1.5 py-0.5 rounded font-bold">شاخص</span>}
+                          <button type="button" onClick={() => setImages(images.filter((_,j)=>j!==i))} className="absolute top-1 left-1 bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">✕</button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">قیمت با تخفیف (تومان)</label>
-                  <input
-                    type="text"
-                    value={discountToman}
-                    onChange={(e) => setDiscountToman(formatNumber(e.target.value))}
-                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">موجودی انبار *</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={stock}
-                    onChange={(e) => setStock(Number(e.target.value))}
-                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">مدت گارانتی محصول (اختیاری)</label>
-                  <input
-                    type="text"
-                    value={warranty}
-                    onChange={(e) => setWarranty(e.target.value)}
-                    placeholder="مثلاً: ۱۲ ماه گارانتی تعویض شرکتی"
-                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-2">لینک ویدیوی محصول (آپارات یا یوتیوب)</label>
-                  <input
-                    type="text"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://www.aparat.com/v/... یا https://youtu.be/..."
-                    className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3] text-left"
-                  />
-                </div>
-              </div>
-
-              {/* گالری با قابلیت تعیین تصویر شاخص */}
-              <div className="p-4 rounded-2xl bg-[#161618] border border-[#27272a]">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-xs font-black text-white">تصاویر محصول (انتخاب تصویر شاخص با یک کلیک)</label>
-                  <span className="text-[11px] text-zinc-400">عکس اول به عنوان تصویر شاخص نمایش داده می‌شود.</span>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                  <input
-                    type="text"
-                    value={imgInput}
-                    onChange={(e) => setImgInput(e.target.value)}
-                    placeholder="آدرس تصویر اینترنتی (URL)"
-                    className="flex-1 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs text-white outline-none focus:border-[#0071e3]"
-                  />
-                  <button type="button" onClick={addImageByUrl} className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white">
-                    افزودن لینک
-                  </button>
-                  <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ED] text-xs font-bold text-white flex items-center justify-center gap-2">
-                    <ImageIcon size={14} />
-                    انتخاب از سیستم
-                    <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
-                  </label>
-                </div>
-
-                {images.length > 0 && (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-3">
-                    {images.map((img, idx) => (
-                      <div key={idx} className="relative rounded-xl overflow-hidden border border-zinc-700 bg-black flex flex-col items-center">
-                        <div className="w-full h-20 p-1">
-                          <img src={img} alt="preview" className="w-full h-full object-contain" />
-                        </div>
-                        <div className="w-full p-1 bg-zinc-900 flex justify-between items-center border-t border-zinc-800">
-                          {idx === 0 ? (
-                            <span className="text-[10px] text-emerald-400 font-bold px-2 py-0.5 bg-emerald-500/10 rounded-md">
-                              شاخص
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setAsPrimaryImage(idx)}
-                              className="text-[10px] text-blue-400 hover:underline font-bold"
-                            >
-                              انتخاب شاخص
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setImages(images.filter((_, i) => i !== idx))}
-                            className="text-rose-400 hover:text-rose-500 p-0.5"
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                {/* مشخصات فنی */}
+                <div className="sm:col-span-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-[var(--text-secondary)]">مشخصات فنی</label>
+                    <button type="button" onClick={() => setSpecsList([...specsList, { key: "", value: "" }])} className="text-[var(--accent-blue)] font-bold text-[11px] flex items-center gap-1">
+                      <Plus size={13} /> افزودن ردیف
+                    </button>
                   </div>
-                )}
-              </div>
-
-              {/* ویژگی‌های فنی */}
-              <div className="p-4 rounded-2xl bg-[#161618] border border-[#27272a]">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-xs font-black text-white">ویژگی‌ها و مشخصات فنی تفکیک‌شده</label>
-                  <button
-                    type="button"
-                    onClick={() => setSpecsList([...specsList, { key: "", value: "" }])}
-                    className="text-xs font-bold text-[#0071e3] hover:underline flex items-center gap-1"
-                  >
-                    <Plus size={14} />
-                    افزودن ویژگی
-                  </button>
-                </div>
-
-                <div className="space-y-3">
                   {specsList.map((spec, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        value={spec.key}
-                        onChange={(e) => {
-                          const updated = [...specsList];
-                          updated[idx].key = e.target.value;
-                          setSpecsList(updated);
-                        }}
-                        placeholder="عنوان (مثلاً توان مصرفی)"
-                        className="w-1/3 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
-                      />
-                      <input
-                        type="text"
-                        value={spec.value}
-                        onChange={(e) => {
-                          const updated = [...specsList];
-                          updated[idx].value = e.target.value;
-                          setSpecsList(updated);
-                        }}
-                        placeholder="مقدار (مثلاً ۱۲۰۰ وات)"
-                        className="flex-1 p-2.5 rounded-xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setSpecsList(specsList.filter((_, i) => i !== idx))}
-                        className="p-2 text-zinc-500 hover:text-rose-400"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    <div key={idx} className="flex gap-2">
+                      <input value={spec.key} onChange={(e) => { const n=[...specsList]; n[idx]={...n[idx],key:e.target.value}; setSpecsList(n); }} placeholder="نام مشخصه..." className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none" />
+                      <input value={spec.value} onChange={(e) => { const n=[...specsList]; n[idx]={...n[idx],value:e.target.value}; setSpecsList(n); }} placeholder="مقدار..." className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none" />
+                      <button type="button" onClick={() => setSpecsList(specsList.filter((_,i)=>i!==idx))} className="text-rose-400 px-2 font-bold">✕</button>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-2">توضیحات کالا</label>
-                <textarea
-                  rows={4}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="توضیحات معرفی کالا..."
-                  className="w-full p-3 rounded-2xl bg-[#1c1c1f] border border-[#27272a] text-xs font-bold text-white outline-none focus:border-[#0071e3]"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-[#27272a] flex items-center justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-2xl bg-zinc-800 text-xs font-bold text-zinc-300">
-                  انصراف
+              <div className="flex gap-3 pt-3 border-t border-[var(--card-border)]">
+                <button type="submit" disabled={saving} className="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
+                  {saving ? <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" /> : <CheckCircle size={18} />}
+                  {saving ? "در حال ذخیره..." : editingId ? "ذخیره تغییرات" : "ثبت محصول جدید"}
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-8 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ED] text-white text-xs font-bold shadow-lg flex items-center gap-2 disabled:opacity-50"
-                >
-                  <Save size={16} />
-                  {saving ? "در حال ذخیره‌سازی..." : (editingId ? "ذخیره تغییرات" : "ثبت نهایی کالا")}
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] font-bold hover:bg-[var(--card-hover)] transition">
+                  انصراف
                 </button>
               </div>
             </form>

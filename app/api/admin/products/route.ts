@@ -1,5 +1,6 @@
 import { adminHasPermission } from "@/lib/rbacGuard";
 import { NextRequest, NextResponse } from "next/server";
+import { logAuditEvent, getClientIp } from "@/lib/auditLogger";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { randomUUID } from "crypto";

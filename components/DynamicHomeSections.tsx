@@ -43,14 +43,21 @@ export default function DynamicHomeSections({
 
   useEffect(() => {
     // کانال سبک و اشتراکی وب‌سوکت سوپابیس
+    // debounce 3 ثانیه: جلوگیری از لودینگ مداوم در تب مرورگر
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const debouncedSync = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => silentSync(), 3000);
+    };
+
     const channel = supabase
-      .channel("realtime-storefront-silent-sync")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => silentSync())
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => silentSync())
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => silentSync())
+      .channel("realtime-storefront-v2")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, debouncedSync)
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, debouncedSync)
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, []);

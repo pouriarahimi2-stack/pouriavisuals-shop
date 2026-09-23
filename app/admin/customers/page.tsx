@@ -1,7 +1,8 @@
 "use client";
-import React from "react";
-import AdminCustomers from "@/components/admin/AdminCustomers";
-
-export default function AdminCustomersRoute() {
-  return <AdminCustomers />;
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+export default function Redirect() {
+  const r = useRouter();
+  useEffect(() => { r.replace("/admin/financial?tab=crm"); }, []);
+  return null;
 }

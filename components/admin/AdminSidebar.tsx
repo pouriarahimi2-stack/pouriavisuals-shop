@@ -16,14 +16,11 @@ interface NavGroup {
 
 const NAV_SECTIONS: NavGroup[] = [
   {
-    groupTitle: "مدیریت فروش و فاکتورها",
+    groupTitle: "مدیریت فروش و مالی",
     items: [
-      { name: "داشبورد تحلیلی", href: "/admin/dashboard", icon: "📊" },
-      { name: "سفارشات و بارنامه", href: "/admin/orders", icon: "📦" },
-      { name: "مشتریان و CRM", href: "/admin/customers", icon: "👥" },
-      { name: "حسابداری و انبار", href: "/admin/inventory", icon: "📈" },
-      { name: "گزارش‌های مالی", href: "/admin/reports", icon: "📑" },
-      { name: "کدهای تخفیف", href: "/admin/coupons", icon: "🏷️" },
+      { name: "داشبورد تحلیلی",         href: "/admin/dashboard", icon: "📊" },
+      { name: "مرکز مالی و سفارشات",    href: "/admin/financial", icon: "💰" },
+      { name: "کدهای تخفیف",            href: "/admin/coupons",   icon: "🏷️" },
     ],
   },
   {

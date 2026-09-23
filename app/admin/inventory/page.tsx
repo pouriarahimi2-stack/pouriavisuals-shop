@@ -1,7 +1,8 @@
 "use client";
-import React from "react";
-import AdminInventoryManager from "@/components/AdminInventoryManager";
-
-export default function AdminInventoryRoute() {
-  return <AdminInventoryManager />;
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+export default function Redirect() {
+  const r = useRouter();
+  useEffect(() => { r.replace("/admin/financial?tab=inventory"); }, []);
+  return null;
 }

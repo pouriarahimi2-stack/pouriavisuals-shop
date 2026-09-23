@@ -3,6 +3,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 export default function Redirect() {
   const r = useRouter();
-  useEffect(() => { r.replace("/admin/financial?tab=inventory"); }, []);
+  useEffect(() => { r.replace("/admin/financial"); }, []);
   return null;
 }

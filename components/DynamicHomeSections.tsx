@@ -196,8 +196,8 @@ export default function DynamicHomeSections({
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {products.map((prod) => (
-              <div key={prod.id} className="w-full">
+            {products.map((prod, idx) => (
+              <div key={prod.id} className={"axon-reveal-scale stagger-" + (idx % 8) + " w-full"} >
                 <ProductCard product={prod} />
               </div>
             ))}

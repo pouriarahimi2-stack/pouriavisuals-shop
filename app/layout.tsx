@@ -2,6 +2,7 @@ import AnnouncementBar from "@/components/AnnouncementBar";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import LayoutShell from "@/components/LayoutShell";
+import MotionInit from "@/components/MotionInit";
 import { CartProvider } from "@/context/CartContext";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
@@ -93,6 +94,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-[var(--accent-blue)] selection:text-white">
         <AnnouncementBar />
+        <MotionInit />
         <CartProvider>
           <LayoutShell>
             <div className="pb-16 lg:pb-0">{children}</div>

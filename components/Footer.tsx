@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { siteInfoService } from "@/services/siteInfoService";
+import { useSiteInfo } from "@/context/SiteInfoContext";
 import EnamadBadge from "@/components/EnamadBadge";
 import AnimatedLogo from "@/components/AnimatedLogo";
 
@@ -23,19 +23,7 @@ const DEFAULT_SERVICE_LINKS = [
 ];
 
 export default function Footer() {
-  const [siteInfo, setSiteInfo] = useState<any>(null);
-
-  const syncFooter = () => {
-    siteInfoService.getSiteInfo().then((info) => {
-      if (info) setSiteInfo(info);
-    });
-  };
-
-  useEffect(() => {
-    syncFooter();
-    window.addEventListener("site_info_updated", syncFooter);
-    return () => window.removeEventListener("site_info_updated", syncFooter);
-  }, []);
+  const { siteInfo } = useSiteInfo();
 
   const footerCfg  = siteInfo?.homepage_layout_config?.footer;
   const storeName  = footerCfg?.brandTitle  || siteInfo?.storeName || siteInfo?.site_name || "آکسون کور | Axon Core";

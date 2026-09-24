@@ -8,7 +8,11 @@ import { SiteInfoProvider } from "@/context/SiteInfoContext";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const viewport: Viewport = {
-  width: "device-width", initialScale: 1, maximumScale: 5,
+  width: "device-width",
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   themeColor: "#0284c7",
 };
 

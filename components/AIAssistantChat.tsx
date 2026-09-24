@@ -1,23 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AIAssistantChat() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen]     = useState(false);
   const [messages, setMessages] = useState<{ role: "user" | "bot"; text: string }[]>([
-    {
-      role: "bot",
-      text: "سلام! من دستیار هوشمند آکسون هستم. برای انتخاب کالا، مشخصات فنی یا پیگیری سفارش چگونه می‌توانم کمکتان کنم؟",
-    },
+    { role: "bot", text: "سلام! دستیار هوشمند آکسون کور هستم. چطور می‌توانم کمکتان کنم؟" },
   ]);
-  const [input, setInput] = useState("");
+  const [input,   setInput]   = useState("");
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isOpen]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
-
     soundEngine.playClick();
     const userText = input.trim();
     setInput("");
@@ -27,19 +28,17 @@ export default function AIAssistantChat() {
 
     try {
       const res = await fetch("/api/ai-assistant", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText }),
+        body:    JSON.stringify({ message: userText, history: newMsgs }),
       });
       const data = await res.json();
-      if (data?.response) {
-        soundEngine.playSuccess();
-        setMessages([...newMsgs, { role: "bot", text: data.response }]);
-      } else {
-        setMessages([...newMsgs, { role: "bot", text: "در حال حاضر سیستم پاسخگویی موقتاً در دسترس نیست." }]);
-      }
+      setMessages([...newMsgs, {
+        role: "bot",
+        text: data.reply || data.message || "متأسفم، پاسخی دریافت نشد.",
+      }]);
     } catch {
-      setMessages([...newMsgs, { role: "bot", text: "خطا در اتصال به هوش مصنوعی." }]);
+      setMessages([...newMsgs, { role: "bot", text: "خطا در اتصال. مجدداً تلاش کنید." }]);
     } finally {
       setLoading(false);
     }
@@ -47,74 +46,111 @@ export default function AIAssistantChat() {
 
   return (
     <>
-      <div className="fixed bottom-20 md:bottom-6 left-4 md:left-6 z-40 font-sans select-none" dir="rtl">
-        {!isOpen && (
-          <button
-            onClick={() => {
-              soundEngine.playClick();
-              setIsOpen(true);
-            }}
-            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-black shadow-2xl hover:scale-105 transition flex items-center gap-2 cursor-pointer border border-white/20"
-          >
-            <span className="text-base animate-pulse">🤖</span>
-            <span>دستیار هوشمند آکسون</span>
-          </button>
-        )}
-      </div>
+      {/* دکمه شناور کوچک */}
+      <button
+        className="ai-chat-float-btn"
+        onClick={() => { soundEngine.playClick(); setIsOpen(!isOpen); }}
+        aria-label="دستیار هوشمند آکسون"
+        title="دستیار هوشمند"
+      >
+        <span className="text-white text-base select-none">
+          {isOpen ? "✕" : "🤖"}
+        </span>
+      </button>
 
+      {/* پنل چت */}
       {isOpen && (
-        <div className="fixed bottom-20 md:bottom-6 left-4 md:left-6 z-50 w-[92vw] sm:w-96 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden font-sans text-xs flex flex-col justify-between h-[480px] animate-fadeIn" dir="rtl">
-          <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🤖</span>
-              <span className="font-black text-xs">مشاور و دستیار هوشمند آکسون کور</span>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="w-7 h-7 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center font-bold text-xs"
-            >
-              ✕
-            </button>
-          </div>
+        <>
+          {/* overlay موبایل */}
+          <div
+            className="fixed inset-0 z-40 bg-black/20 md:hidden"
+            onClick={() => setIsOpen(false)}
+          />
 
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[var(--bg-primary)]/50">
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`p-3 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
-                  m.role === "user"
-                    ? "bg-[var(--accent-blue)] text-white mr-auto rounded-tr-none"
-                    : "bg-[var(--input-bg)] text-[var(--text-primary)] border border-[var(--card-border)] ml-auto rounded-tl-none font-medium"
-                }`}
+          <div
+            className={[
+              "fixed z-50 bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl rounded-3xl",
+              "flex flex-col overflow-hidden",
+              // موبایل: bottom sheet
+              "bottom-[120px] right-3 left-3 md:left-auto",
+              // دسکتاپ
+              "md:bottom-[80px] md:right-20 md:w-80 md:h-[420px]",
+              // ارتفاع موبایل
+              "h-[60vh] md:h-[420px]",
+            ].join(" ")}
+            dir="rtl"
+          >
+            {/* هدر */}
+            <div className="p-4 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--accent-blue)] rounded-t-3xl">
+              <div className="flex items-center gap-2 text-white">
+                <span className="text-lg">🤖</span>
+                <div>
+                  <p className="text-xs font-black">دستیار هوشمند آکسون</p>
+                  <p className="text-[10px] opacity-80">آنلاین و آماده پاسخگویی</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-white/80 hover:text-white font-black cursor-pointer text-lg"
               >
-                {m.text}
-              </div>
-            ))}
-            {loading && (
-              <div className="p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-slate-400 animate-pulse w-fit font-bold">
-                در حال تایپ پاسخ...
-              </div>
-            )}
-          </div>
+                ✕
+              </button>
+            </div>
 
-          <form onSubmit={handleSend} className="p-3 border-t border-[var(--card-border)] bg-[var(--modal-bg)] flex gap-2">
-            <input
-              type="text"
-              required
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="پرسش خود را بنویسید..."
-              className="flex-1 p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs outline-none focus:border-[var(--accent-blue)]"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 disabled:opacity-50"
-            >
-              ارسال
-            </button>
-          </form>
-        </div>
+            {/* پیام‌ها */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
+              {messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}
+                >
+                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl font-medium leading-relaxed ${
+                    m.role === "user"
+                      ? "bg-[var(--accent-blue)] text-white"
+                      : "bg-[var(--input-bg)] text-[var(--text-primary)]"
+                  }`}>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex justify-end">
+                  <div className="bg-[var(--input-bg)] px-4 py-2 rounded-2xl">
+                    <span className="inline-flex gap-1">
+                      {[0,1,2].map(i => (
+                        <span
+                          key={i}
+                          className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)] animate-bounce"
+                          style={{ animationDelay: i * 150 + "ms" }}
+                        />
+                      ))}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* ورودی */}
+            <form onSubmit={handleSend} className="p-3 border-t border-[var(--card-border)] flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="سؤال یا درخواست خود را بنویسید..."
+                className="flex-1 px-3 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]"
+                style={{ fontSize: "16px" }}
+              />
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="px-3 py-2 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs disabled:opacity-50 cursor-pointer"
+              >
+                ←
+              </button>
+            </form>
+          </div>
+        </>
       )}
     </>
   );

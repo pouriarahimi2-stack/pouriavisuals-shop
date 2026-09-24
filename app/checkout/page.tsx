@@ -375,8 +375,12 @@ export default function CheckoutPage() {
                   <div className="flex gap-3">
                     <input
                       ref={otpRef}
-                      type="text" inputMode="numeric" maxLength={6}
-                      value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      autoComplete="one-time-code"
+                      value={otpCode}
+                      onChange={e => setOtpCode(e.target.value.replace(/\D/g, ""))}
                       placeholder="_ _ _ _ _ _"
                       className="flex-1 p-4 rounded-2xl bg-[var(--input-bg)] border-2 border-[var(--accent-blue)] font-mono font-black text-2xl text-center tracking-widest outline-none"
                     />

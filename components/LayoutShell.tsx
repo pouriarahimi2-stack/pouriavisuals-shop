@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -8,22 +8,15 @@ import ContactDock from "@/components/ContactDock";
 import CartDrawer from "@/components/CartDrawer";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import ThemeProvider from "@/components/ThemeProvider";
-import { siteInfoService } from "@/services/siteInfoService";
+import { useSiteInfo } from "@/context/SiteInfoContext";
 import MaintenancePage from "@/app/maintenance/page";
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAdminRoute = pathname?.startsWith("/admin");
-  const [siteInfo, setSiteInfo] = useState<any>(null);
+  // استفاده از context مشترک — بدون fetch جداگانه
+  const { siteInfo } = useSiteInfo();
 
-  useEffect(() => {
-    siteInfoService.getSiteInfo().then(setSiteInfo);
-    const sync = () => siteInfoService.getSiteInfo().then(setSiteInfo);
-    window.addEventListener("site_info_updated", sync);
-    return () => window.removeEventListener("site_info_updated", sync);
-  }, []);
-
-  // اگر سایت روی حالت در دست تعمیر باشد، دسترسی کاربران عادی به صفحه تعمیرات هدایت می‌شود
   const isMaintenanceActive = !isAdminRoute && siteInfo?.maintenance_mode && siteInfo.maintenance_mode !== "none";
 
   if (isMaintenanceActive) {

@@ -5,55 +5,52 @@ import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import { useSiteInfo } from "@/context/SiteInfoContext";
 import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
 
 interface DynamicHomeSectionsProps {
   initialProducts: any[];
-  initialBanners: any[];
+  initialBanners:  any[];
   initialSiteInfo?: any;
 }
 
 export default function DynamicHomeSections({
   initialProducts,
   initialBanners,
-  initialSiteInfo,
 }: DynamicHomeSectionsProps) {
-  // رندر آنی بدون تاخیر از داده‌های سرور
-  const [products, setProducts] = useState<any[]>(initialProducts || []);
-  const [banners, setBanners] = useState<any[]>(initialBanners || []);
-  const [siteInfo, setSiteInfo] = useState<any>(initialSiteInfo || null);
+  const [products, setProducts]             = useState<any[]>(initialProducts || []);
+  const [banners, setBanners]               = useState<any[]>(initialBanners || []);
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
 
-  // به‌روزرسانی کاملاً بی‌صدا و در پس‌زمینه بدون ایجاد لودینگ روی صفحه
+  // از context مشترک استفاده می‌کنیم — بدون fetch جداگانه
+  const { siteInfo } = useSiteInfo();
+
+  // sync محصولات و بنرها در پس‌زمینه
   const silentSync = async () => {
     try {
-      const [prodRes, bannerRes, siteRes] = await Promise.all([
+      const [prodRes, bannerRes] = await Promise.all([
         fetch("/api/products").then((r) => r.json()).catch(() => null),
         fetch("/api/admin/banners").then((r) => r.json()).catch(() => null),
-        fetch("/api/site-info").then((r) => r.json()).catch(() => null),
       ]);
-
       if (prodRes?.success && Array.isArray(prodRes.data)) setProducts(prodRes.data);
       if (bannerRes?.success && Array.isArray(bannerRes.banners)) {
         setBanners(bannerRes.banners.filter((b: any) => b.is_active));
       }
-      if (siteRes?.data) setSiteInfo(siteRes.data);
     } catch {}
   };
 
   useEffect(() => {
-    // کانال سبک و اشتراکی وب‌سوکت سوپابیس
-    // debounce 3 ثانیه: جلوگیری از لودینگ مداوم در تب مرورگر
     let debounceTimer: ReturnType<typeof setTimeout>;
     const debouncedSync = () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => silentSync(), 3000);
     };
 
+    // فقط روی products و banners — نه site_info (آن در context هست)
     const channel = supabase
-      .channel("realtime-storefront-v2")
+      .channel("realtime-storefront-products-v3")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, debouncedSync)
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, debouncedSync)
+      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, debouncedSync)
       .subscribe();
 
     return () => {
@@ -71,13 +68,13 @@ export default function DynamicHomeSections({
   }, [banners.length]);
 
   const layoutCfg = siteInfo?.homepage_layout_config;
-  const heroTitle = layoutCfg?.hero?.title || "دنیای نوآوری، تکنولوژی مدرن و ابزارهای هوشمند";
+  const heroTitle    = layoutCfg?.hero?.title    || "دنیای نوآوری، تکنولوژی مدرن و ابزارهای هوشمند";
   const heroSubtitle = layoutCfg?.hero?.subtitle || "مرجع تخصصی خرید آنلاین جدیدترین کالاهای تکنولوژی، گجت‌های هوشمند و ابزارهای دیجیتال با تضمین اصالت فیزیکی و ارسال سریع.";
 
   return (
     <div className="space-y-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
-      
-      {/* هیرو اسلایدر بنرها */}
+
+      {/* بنر هیرو */}
       {banners.length > 0 ? (
         <div className="relative w-full rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl aspect-[16/8] sm:aspect-[21/9] max-h-[460px]">
           {banners.map((b, idx) => (
@@ -123,28 +120,13 @@ export default function DynamicHomeSections({
               <span>⚡</span>
               <span>تامین جدیدترین ابزارها و گجت‌های هوشمند بازار</span>
             </div>
-
-            <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight">
-              {heroTitle}
-            </h1>
-
-            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed max-w-2xl mx-auto">
-              {heroSubtitle}
-            </p>
-
+            <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight">{heroTitle}</h1>
+            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed max-w-2xl mx-auto">{heroSubtitle}</p>
             <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-              <Link
-                href="/products"
-                onClick={() => soundEngine.playClick()}
-                className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-xl"
-              >
+              <Link href="/products" onClick={() => soundEngine.playClick()} className="px-8 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-black hover:opacity-90 transition shadow-xl">
                 مشاهده کاتالوگ محصولات ←
               </Link>
-              <Link
-                href="/news"
-                onClick={() => soundEngine.playClick()}
-                className="px-8 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition"
-              >
+              <Link href="/news" onClick={() => soundEngine.playClick()} className="px-8 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition">
                 رادار اخبار تکنولوژی 📡
               </Link>
             </div>
@@ -152,7 +134,7 @@ export default function DynamicHomeSections({
         </div>
       )}
 
-      {/* اسلایدر ۳D پرسپکتیو: منحصراً برای موبایل و تبلت */}
+      {/* اسلایدر ۳D — فقط موبایل و تبلت */}
       {products.length > 0 && (
         <div className="block lg:hidden">
           <ProductPerspectiveSlider
@@ -163,7 +145,7 @@ export default function DynamicHomeSections({
         </div>
       )}
 
-      {/* ویترین اصلی محصولات با بارگذاری آنی */}
+      {/* ویترین محصولات */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
           <div className="space-y-1">
@@ -177,11 +159,7 @@ export default function DynamicHomeSections({
               محصولات آماده ارسال با تضمین ۱۰۰٪ اصالت فیزیکی کالا
             </p>
           </div>
-
-          <Link
-            href="/products"
-            className="text-xs font-black text-[var(--accent-blue)] hover:underline flex items-center gap-1"
-          >
+          <Link href="/products" className="text-xs font-black text-[var(--accent-blue)] hover:underline flex items-center gap-1">
             <span>مشاهده همه محصولات ({products.length})</span>
             <span>←</span>
           </Link>
@@ -190,14 +168,12 @@ export default function DynamicHomeSections({
         {products.length === 0 ? (
           <div className="p-16 text-center rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4">
             <span className="text-4xl block">📦</span>
-            <p className="text-xs font-bold text-[var(--text-secondary)]">
-              در حال حاضر محصولی در این بخش قرار ندارد.
-            </p>
+            <p className="text-xs font-bold text-[var(--text-secondary)]">در حال حاضر محصولی در این بخش قرار ندارد.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {products.map((prod, idx) => (
-              <div key={prod.id} className={"axon-reveal-scale stagger-" + (idx % 8) + " w-full"} >
+              <div key={prod.id} className={"axon-reveal-scale stagger-" + (idx % 8) + " w-full"}>
                 <ProductCard product={prod} />
               </div>
             ))}

@@ -6,6 +6,18 @@ import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import AdminNotificationProvider from "@/components/admin/AdminNotificationProvider";
 
+// رفع access_denied از middleware RBAC
+function AccessDeniedBanner() {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.get("access_denied")) return null;
+  return (
+    <div className="fixed top-0 inset-x-0 z-50 bg-rose-600 text-white text-xs font-bold py-2 text-center shadow-lg">
+      ⛔ شما دسترسی به این بخش را ندارید. لطفاً با مدیر ارشد تماس بگیرید.
+    </div>
+  );
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/admin/login";

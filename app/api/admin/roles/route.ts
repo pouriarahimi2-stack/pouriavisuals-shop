@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const { username, password, full_name, role } = body;
     if (!username || !password || !role)
       return NextResponse.json({ success: false, message: "نام کاربری، رمز عبور و نقش الزامی‌اند." }, { status: 400 });
-    if (!ROLE_PERMISSIONS[role])
+    if (!ROLE_PERMISSIONS[role as import('@/lib/rolePermissions').AdminRole])
       return NextResponse.json({ success: false, message: "نقش نامعتبر است." }, { status: 400 });
 
     const { data: existing } = await supabaseAdmin.from("admin_users").select("id").eq("username", username.toLowerCase()).maybeSingle();
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       created_at:    new Date().toISOString(),
     }]);
     if (error) throw error;
-    return NextResponse.json({ success: true, message: "✓ کاربر «" + username + "» با نقش «" + ROLE_PERMISSIONS[role].label + "» ثبت شد." });
+    return NextResponse.json({ success: true, message: "✓ کاربر «" + username + "» با نقش «" + ROLE_PERMISSIONS[role as import('@/lib/rolePermissions').AdminRole]?.label + "» ثبت شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -73,7 +73,7 @@ export async function PATCH(req: NextRequest) {
     if (!id) return NextResponse.json({ success: false, message: "شناسه کاربر الزامی است." }, { status: 400 });
 
     const updates: any = { updated_at: new Date().toISOString() };
-    if (role      && ROLE_PERMISSIONS[role]) updates.role      = role;
+    if (role      && ROLE_PERMISSIONS[role as import('@/lib/rolePermissions').AdminRole]) updates.role      = role;
     if (full_name) updates.full_name = full_name;
     if (password  && password.length >= 4) {
       const hashed = authSecurity.hashPassword(password);

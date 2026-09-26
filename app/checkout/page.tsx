@@ -377,8 +377,9 @@ export default function CheckoutPage() {
                       ref={otpRef}
                       type="text"
                       inputMode="numeric"
-                      maxLength={6}
                       autoComplete="one-time-code"
+                      maxLength={6}
+                      
                       value={otpCode}
                       onChange={e => setOtpCode(e.target.value.replace(/\D/g, ""))}
                       placeholder="_ _ _ _ _ _"

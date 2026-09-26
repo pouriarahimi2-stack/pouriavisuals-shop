@@ -1,40 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/authSecurityHelper";
-
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (!auth.ok) return auth.res;
-    const { data } = await supabaseAdmin
-      .from("site_info")
-      .select("site_name,tagline,description,phone,email,address,working_hours,allow_google_index,maintenance_mode,free_shipping_threshold,header_announcement,currency,favicon_url,logo_url")
-      .limit(1)
-      .maybeSingle();
-    return NextResponse.json({ success: true, settings: data || {} });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.res;
+  const { data } = await supabaseAdmin.from("site_info").select("*").limit(1).maybeSingle();
+  return NextResponse.json({ success: true, settings: data || {} });
 }
-
 export async function POST(req: NextRequest) {
-  try {
-    const auth = await requireAdmin(req);
-    if (!auth.ok) return auth.res;
-    const body    = await req.json();
-    const payload = { ...body, updated_at: new Date().toISOString() };
-    delete payload.id;
-
-    const { data: existing } = await supabaseAdmin.from("site_info").select("id").limit(1).maybeSingle();
-    if (existing?.id) {
-      await supabaseAdmin.from("site_info").update(payload).eq("id", existing.id);
-    } else {
-      await supabaseAdmin.from("site_info").insert([{ ...payload, created_at: new Date().toISOString() }]);
-    }
-    return NextResponse.json({ success: true, message: "تنظیمات با موفقیت ذخیره شد." });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
-  }
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.res;
+  const body = await req.json();
+  delete body.id;
+  body.updated_at = new Date().toISOString();
+  const { data: ex } = await supabaseAdmin.from("site_info").select("id").limit(1).maybeSingle();
+  if (ex?.id) { await supabaseAdmin.from("site_info").update(body).eq("id", ex.id); }
+  else { await supabaseAdmin.from("site_info").insert([{ ...body, created_at: new Date().toISOString() }]); }
+  return NextResponse.json({ success: true, message: "تنظیمات ذخیره شد." });
 }

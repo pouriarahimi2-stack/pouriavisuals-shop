@@ -1,182 +1,133 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { ArrowRight, Save, ShieldAlert, Globe } from "lucide-react";
 import { soundEngine } from "@/lib/soundEngine";
 
 export default function AdminSettingsPage() {
-  const [siteName, setSiteName] = useState("آکسون کور");
-  const [phone, setPhone] = useState("09376110200");
-  const [email, setEmail] = useState("Pouriarahimi@yahoo.com");
-  const [address, setAddress] = useState("شیراز - ستارخان");
-  const [workingHours, setWorkingHours] = useState("شنبه تا چهارشنبه ۹ الی ۱۸");
-  const [allowGoogleIndex, setAllowGoogleIndex] = useState(true);
-  const [maintenanceMode, setMaintenanceMode] = useState<"none" | "timed" | "indefinite">("none");
-  const [maintenanceMessage, setMaintenanceMessage] = useState("سایت در حال بروزرسانی و ارتقای فنی است. به زودی بازمی‌گردیم.");
+  const [form, setForm] = useState({
+    site_name: "", tagline: "", description: "", phone: "", email: "",
+    address: "", working_hours: "", header_announcement: "",
+    allow_google_index: true, maintenance_mode: "none",
+    free_shipping_threshold: 2000000, currency: "تومان",
+  });
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [msg,    setMsg]    = useState<{type:"success"|"error";text:string}|null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/settings")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.settings) {
-          const s = d.settings;
-          if (s.site_name) setSiteName(s.site_name);
-          if (s.phone) setPhone(s.phone);
-          if (s.email) setEmail(s.email);
-          if (s.address) setAddress(s.address);
-          if (s.working_hours) setWorkingHours(s.working_hours);
-          if (s.allow_google_index !== undefined) setAllowGoogleIndex(s.allow_google_index);
-          if (s.maintenance_mode) setMaintenanceMode(s.maintenance_mode);
-          if (s.header_announcement) setMaintenanceMessage(s.header_announcement);
-        }
-      })
-      .catch(() => {});
+    fetch("/api/admin/settings").then(r => r.json()).then(d => {
+      if (d.success && d.settings) setForm(prev => ({ ...prev, ...d.settings }));
+    }).catch(() => {});
   }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     soundEngine.playClick();
-    setSaving(true);
-    setSaved(false);
-
+    setSaving(true); setMsg(null);
     try {
-      const res = await fetch("/api/admin/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          site_name: siteName,
-          phone,
-          email,
-          address,
-          working_hours: workingHours,
-          allow_google_index: allowGoogleIndex,
-          maintenance_mode: maintenanceMode,
-          maintenance_message: maintenanceMessage,
-        }),
+      const res  = await fetch("/api/admin/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
       });
-
-      if (res.ok) {
-        soundEngine.playSuccess();
-        setSaved(true);
-        setTimeout(() => setSaved(false), 4000);
+      const data = await res.json();
+      if (data.success) {
+        soundEngine.playSuccess?.();
+        setMsg({ type: "success", text: "✓ تنظیمات با موفقیت ذخیره و اعمال شد." });
+      } else {
+        setMsg({ type: "error", text: data.message || "خطا" });
       }
+    } catch (e: any) {
+      setMsg({ type: "error", text: e.message });
     } finally {
       setSaving(false);
+      setTimeout(() => setMsg(null), 4000);
     }
   };
 
+  const inp = "w-full px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)] text-[var(--text-primary)]";
+
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] p-4 sm:p-6 lg:p-10 dir-rtl font-sans select-none">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[var(--card-border)]">
-        <div>
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="p-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--card-hover)] text-sm font-bold flex items-center gap-2">
-              <ArrowRight size={18} />
-              پیشخوان
-            </Link>
-            <h1 className="text-xl sm:text-2xl font-black">تنظیمات عمومی، سئو گوگل و حالت تعمیرات</h1>
-          </div>
-          <p className="text-xs text-[var(--text-secondary)] mt-2">
-            کنترل ایندکس موتورهای جستجو، قطع دسترسی و حالت در دست تعمیر، و مشخصات رسمی فروشگاه
-          </p>
-        </div>
+    <div className="space-y-6 font-sans text-[var(--text-primary)] max-w-3xl" dir="rtl">
+      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+        <h1 className="text-xl font-black text-[var(--accent-blue)]">⚙️ تنظیمات عمومی فروشگاه</h1>
       </div>
 
-      <div className="max-w-3xl mt-8">
-        <form onSubmit={handleSave} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-3xl p-6 sm:p-8 space-y-6 text-xs">
-          
-          {/* حالت تعمیرات سایت */}
-          <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-amber-500 font-black">
-                <ShieldAlert size={18} />
-                <span>حالت در دست تعمیر (قطع دسترسی عموم به سایت):</span>
-              </div>
-              <select
-                value={maintenanceMode}
-                onChange={(e: any) => setMaintenanceMode(e.target.value)}
-                className="p-2 rounded-xl bg-[var(--input-bg)] border border-amber-500 font-bold outline-none cursor-pointer"
-              >
-                <option value="none">سایت فعال و آنلاین است ✓</option>
-                <option value="indefinite">حالت تعمیرات فعال (قطع دسترسی)</option>
-              </select>
-            </div>
-            {maintenanceMode !== "none" && (
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-amber-400">متن پیام نمایش داده شده به بازدیدکنندگان:</label>
-                <input
-                  type="text"
-                  value={maintenanceMessage}
-                  onChange={(e) => setMaintenanceMessage(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-amber-500 font-bold"
-                />
-              </div>
-            )}
-          </div>
+      {msg && (
+        <div className={`p-4 rounded-2xl text-xs font-bold border ${msg.type==="success" ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600" : "bg-rose-500/15 border-rose-500/30 text-rose-600"}`}>
+          {msg.text}
+        </div>
+      )}
 
-          {/* کلید ایندکس گوگل */}
-          <div className="p-5 rounded-2xl bg-blue-500/10 border border-blue-500/20 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[var(--accent-blue)] font-black">
-                <Globe size={18} />
-                <span>دسترسی خزنده‌های گوگل و موتورهای جستجو:</span>
-              </div>
-              <label className="flex items-center gap-2 font-bold cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={allowGoogleIndex}
-                  onChange={(e) => setAllowGoogleIndex(e.target.checked)}
-                  className="w-4 h-4 rounded text-blue-600"
-                />
-                {allowGoogleIndex ? "ایندکس گوگل مجاز است" : "هاید کامل از گوگل (noindex)"}
-              </label>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              در صورت غیرفعال کردن، متاتگ noindex, nofollow در کل صفحات درج می‌شود تا گوگل سایت را ایندکس نکند.
-            </p>
-          </div>
+      <div className="space-y-6 p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
 
+        {/* اطلاعات اصلی */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-black border-b border-[var(--card-border)] pb-2">🏪 اطلاعات فروشگاه</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-bold mb-1.5">نام رسمی فروشگاه:</label>
-              <input type="text" value={siteName} onChange={(e) => setSiteName(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none" />
-            </div>
-            <div>
-              <label className="block font-bold mb-1.5">تلفن پشتیبانی:</label>
-              <input type="text" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none text-center" />
-            </div>
-            <div>
-              <label className="block font-bold mb-1.5">ایمیل رسمی:</label>
-              <input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none text-center" />
-            </div>
-            <div>
-              <label className="block font-bold mb-1.5">ساعات کاری:</label>
-              <input type="text" value={workingHours} onChange={(e) => setWorkingHours(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block font-bold mb-1.5">نشانی پستی دفتر و انبار مرکزی:</label>
-              <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none" />
-            </div>
+            {[
+              { key:"site_name",   label:"نام فروشگاه" },
+              { key:"tagline",     label:"شعار فروشگاه" },
+              { key:"phone",       label:"تلفن تماس" },
+              { key:"email",       label:"ایمیل" },
+              { key:"address",     label:"آدرس" },
+              { key:"working_hours",label:"ساعات کاری" },
+            ].map(f => (
+              <div key={f.key} className="space-y-1">
+                <label className="text-xs font-bold text-[var(--text-secondary)]">{f.label}</label>
+                <input type="text" value={(form as any)[f.key] || ""} onChange={e => setForm({...form,[f.key]:e.target.value})} className={inp} />
+              </div>
+            ))}
           </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-[var(--text-secondary)]">توضیحات (meta description)</label>
+            <textarea rows={3} value={form.description || ""} onChange={e => setForm({...form,description:e.target.value})}
+              className={inp + " resize-none"} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-[var(--text-secondary)]">متن اعلان هدر سایت</label>
+            <input type="text" value={form.header_announcement || ""} onChange={e => setForm({...form,header_announcement:e.target.value})} className={inp} />
+          </div>
+        </div>
 
-          {saved && (
-            <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-center">
-              ✓ تنظیمات عمومی با موفقیت در دیتابیس ذخیره شد.
+        {/* حالت تعمیر */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-black border-b border-[var(--card-border)] pb-2">🔧 حالت تعمیر (Maintenance)</h2>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value:"none",       label:"سایت فعال",        color:"emerald", desc:"همه کاربران دسترسی دارند" },
+              { value:"timed",      label:"تعمیر موقت",       color:"amber",   desc:"۲۴ ساعت آینده" },
+              { value:"indefinite", label:"قطع نامحدود",      color:"rose",    desc:"تا اطلاع ثانوی" },
+            ].map(m => (
+              <button key={m.value} onClick={() => { soundEngine.playClick(); setForm({...form,maintenance_mode:m.value}); }}
+                className={`p-3 rounded-2xl border text-xs font-bold transition cursor-pointer text-right space-y-1 ${form.maintenance_mode===m.value ? "border-"+m.color+"-500 bg-"+m.color+"-500/10 text-"+m.color+"-600" : "border-[var(--card-border)] bg-[var(--input-bg)] text-[var(--text-secondary)]"}`}>
+                <div>{m.label}</div>
+                <div className="font-normal text-[10px] opacity-70">{m.desc}</div>
+              </button>
+            ))}
+          </div>
+          {form.maintenance_mode !== "none" && (
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs font-bold text-amber-600">
+              ⚠️ وقتی حالت تعمیر فعال است، تمام صفحات سایت یک پیام «در حال تعمیر» نمایش می‌دهند. فقط ادمین دسترسی دارد.
             </div>
           )}
+        </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black hover:opacity-90 transition shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            <Save size={16} />
-            {saving ? "در حال ذخیره‌سازی..." : "ذخیره تغییرات در دیتابیس"}
-          </button>
-        </form>
+        {/* دسترسی موتورهای جستجو */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-black border-b border-[var(--card-border)] pb-2">🔍 دسترسی موتورهای جستجو (SEO)</h2>
+          <label className="flex items-center gap-3 cursor-pointer p-4 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)]">
+            <input type="checkbox" checked={form.allow_google_index} onChange={e => setForm({...form,allow_google_index:e.target.checked})}
+              className="w-5 h-5 rounded cursor-pointer accent-[var(--accent-blue)]" />
+            <div className="space-y-0.5">
+              <span className="text-xs font-black">اجازه ایندکس شدن توسط گوگل و سایر موتورهای جستجو</span>
+              <p className="text-[10px] text-[var(--text-secondary)]">
+                {form.allow_google_index ? "✅ سایت در گوگل ایندکس می‌شود — robots.txt: Allow: /" : "❌ سایت ایندکس نمی‌شود — robots.txt: Disallow: /"}
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <button onClick={handleSave} disabled={saving}
+          className="w-full py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-sm hover:opacity-90 transition disabled:opacity-50 cursor-pointer shadow-lg">
+          {saving ? "در حال ذخیره..." : "💾 ذخیره تنظیمات"}
+        </button>
       </div>
     </div>
   );

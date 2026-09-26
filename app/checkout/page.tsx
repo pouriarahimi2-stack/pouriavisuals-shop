@@ -377,7 +377,6 @@ export default function CheckoutPage() {
                       ref={otpRef}
                       type="text"
                       inputMode="numeric"
-                      autoComplete="one-time-code"
                       maxLength={6}
                       
                       value={otpCode}

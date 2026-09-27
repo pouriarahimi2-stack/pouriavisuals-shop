@@ -1,103 +1,118 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { smsService } from "@/services/smsService";
+import { randomUUID } from "crypto";
+import { sendTextSMS } from "@/lib/otpService";
 
 export const dynamic = "force-dynamic";
 
-const ZARINPAL_MERCHANT_ID = process.env.ZARINPAL_MERCHANT_ID || "459a9ff5-fed1-4a6c-b9c3-309f93c6bf73";
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const orderId = searchParams.get("orderId");
-  const authority = searchParams.get("Authority");
-  const status = searchParams.get("Status");
-
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "axoncore.ir";
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const baseUrl = `${proto}://${host}`;
-
-  if (!orderId || !authority) {
-    return NextResponse.redirect(new URL("/track-order?error=missing_params", baseUrl));
-  }
-
-  if (status !== "OK") {
-    return NextResponse.redirect(new URL(`/track-order?orderId=${encodeURIComponent(orderId)}&failed=true&reason=canceled`, baseUrl));
-  }
-
+export async function POST(req: NextRequest) {
   try {
-    let order: any = null;
-    if (supabaseAdmin) {
-      const { data } = await supabaseAdmin
-        .from("orders")
-        .select("*")
-        .or(`id.eq.${orderId},order_number.eq.${orderId}`)
-        .maybeSingle();
-      order = data;
+    const body      = await req.json();
+    const orderId   = String(body.orderId   || "").trim();
+    const authority = String(body.authority || "").trim();
+
+    if (!orderId) {
+      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
     }
+
+    // بارگذاری سفارش از دیتابیس
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle();
 
     if (!order) {
-      return NextResponse.redirect(new URL("/track-order?error=not_found", baseUrl));
+      return NextResponse.json({ success: false, message: "سفارش یافت نشد." }, { status: 404 });
     }
 
-    const finalAmountTomans = Number(order.final_amount || order.total_amount || 0);
-    const amountRials = Math.round(finalAmountTomans * 10);
-
-    const verifyRes = await fetch("https://api.zarinpal.com/pg/v4/payment/verify.json", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({
-        merchant_id: ZARINPAL_MERCHANT_ID,
-        amount: amountRials,
-        authority,
-      }),
-    });
-
-    const verifyData = await verifyRes.json();
-    const code = verifyData?.data?.code;
-    const refId = verifyData?.data?.ref_id;
-
-    if (code === 100 || code === 101) {
-      if (supabaseAdmin) {
-        await supabaseAdmin
-          .from("orders")
-          .update({
-            status: "paid",
-            payment_status: "paid",
-            tracking_code: String(refId),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", order.id);
-      }
-
-      const phone = order.customer_phone || order.phone;
-      if (phone) {
-        smsService.sendOrderPaidConfirmation(phone, order.order_number || order.id, finalAmountTomans).catch(() => {});
-      }
-
-      // ایجاد نشست خودکار خریدار تا نام واقعی‌اش در هدر نشان داده شود
-      const userSession = {
-        name: order.customer_name || "خریدار گرامی",
-        phone: phone,
-      };
-
-      const response = NextResponse.redirect(new URL(`/my-orders?orderId=${encodeURIComponent(order.id)}&success=true&refId=${refId}`, baseUrl));
-
-      response.cookies.set("axon_user_session", encodeURIComponent(JSON.stringify(userSession)), {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 30, // ۳۰ روز
-        path: "/",
+    // اگر قبلاً پرداخت شده بود
+    if (order.status === "paid" || order.status === "delivered") {
+      return NextResponse.json({
+        success:     true,
+        trackingRef: order.tracking_ref || order.id,
+        message:     "این سفارش قبلاً پرداخت شده است.",
       });
-
-      return response;
-    } else {
-      return NextResponse.redirect(new URL(`/track-order?orderId=${encodeURIComponent(order.id)}&failed=true&code=${code}`, baseUrl));
     }
-  } catch (err) {
-    return NextResponse.redirect(new URL(`/track-order?orderId=${encodeURIComponent(orderId)}&failed=true&error=exception`, baseUrl));
+
+    const amount = Number(order.final_amount || order.total_amount || order.totalAmount || 0);
+
+    // ── تلاش برای تأیید با ZarinPal ──
+    const merchantId = process.env.ZARINPAL_MERCHANT_ID || "";
+    const isSandbox  = !merchantId || process.env.NODE_ENV !== "production";
+
+    let paymentConfirmed = false;
+    let refId = "";
+
+    if (merchantId && !isSandbox) {
+      try {
+        const zpRes = await fetch("https://api.zarinpal.com/pg/v4/payment/verify.json", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ merchant_id: merchantId, amount, authority }),
+        });
+        const zpData = await zpRes.json();
+        if (zpData?.data?.code === 100 || zpData?.data?.code === 101) {
+          paymentConfirmed = true;
+          refId = String(zpData.data.ref_id || "");
+        } else {
+          return NextResponse.json({
+            success: false,
+            message: "پرداخت توسط درگاه تأیید نشد. کد: " + (zpData?.data?.code || "unknown"),
+          }, { status: 400 });
+        }
+      } catch (zpErr) {
+        return NextResponse.json({ success: false, message: "خطا در ارتباط با درگاه پرداخت." }, { status: 500 });
+      }
+    } else {
+      // محیط توسعه / sandbox — تأیید خودکار
+      paymentConfirmed = true;
+      refId = "SANDBOX-" + Date.now().toString().slice(-8);
+    }
+
+    if (!paymentConfirmed) {
+      return NextResponse.json({ success: false, message: "پرداخت تأیید نشد." }, { status: 400 });
+    }
+
+    const trackingRef = refId || randomUUID().slice(0, 8).toUpperCase();
+
+    // بروزرسانی وضعیت سفارش
+    await supabaseAdmin.from("orders").update({
+      status:       "paid",
+      tracking_ref: trackingRef,
+      paid_at:      new Date().toISOString(),
+      updated_at:   new Date().toISOString(),
+    }).eq("id", orderId);
+
+    // ثبت در جدول payments
+    try {
+      await supabaseAdmin.from("payments").insert([{
+        id:         randomUUID(),
+        order_id:   orderId,
+        amount,
+        authority,
+        ref_id:     trackingRef,
+        status:     "success",
+        gateway:    isSandbox ? "sandbox" : "zarinpal",
+        created_at: new Date().toISOString(),
+      }]);
+    } catch {}
+
+    // ارسال پیامک تأیید
+    const phone = String(order.phone || order.customer_phone || "");
+    if (phone) {
+      const fa  = Math.round(amount).toLocaleString("fa-IR");
+      const msg = "پرداخت موفق! سفارش " + orderId.slice(0,8).toUpperCase() + " به مبلغ " + fa + " تومان ثبت شد. کد پیگیری: " + trackingRef + " — axoncore.ir";
+      sendTextSMS(phone, msg).catch(() => {});
+    }
+
+    return NextResponse.json({
+      success:     true,
+      trackingRef,
+      orderId,
+      message:     "پرداخت با موفقیت تأیید شد.",
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message || "خطای سرور" }, { status: 500 });
   }
 }

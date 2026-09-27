@@ -3,81 +3,61 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-const ZARINPAL_MERCHANT_ID = process.env.ZARINPAL_MERCHANT_ID || "459a9ff5-fed1-4a6c-b9c3-309f93c6bf73";
-
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { orderId } = body;
+    const body      = await req.json();
+    const orderId   = String(body.orderId || "").trim();
+    const phone     = String(body.phone   || "").trim();
+    const callbackUrl = process.env.NEXT_PUBLIC_SITE_URL
+      ? process.env.NEXT_PUBLIC_SITE_URL + "/payment?orderId=" + orderId
+      : "https://axoncore.ir/payment?orderId=" + orderId;
 
     if (!orderId) {
-      return NextResponse.json({ success: false, message: "شناسه فاکتور سفارش الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
     }
 
-    const { data: order, error } = await supabaseAdmin
-      .from("orders")
-      .select("*")
-      .or(`id.eq.${orderId},order_number.eq.${orderId}`)
-      .maybeSingle();
+    const { data: order } = await supabaseAdmin
+      .from("orders").select("*").eq("id", orderId).maybeSingle();
 
-    if (error || !order) {
-      return NextResponse.json({ success: false, message: "سفارش مورد نظر در سامانه یافت نشد." }, { status: 404 });
+    if (!order) {
+      return NextResponse.json({ success: false, message: "سفارش یافت نشد." }, { status: 404 });
     }
 
-    const finalAmountTomans = Number(order.final_amount || order.total_amount || 0);
-    if (finalAmountTomans <= 0) {
-      return NextResponse.json({ success: false, message: "مبلغ قابل پرداخت فاکتور نامعتبر است." }, { status: 400 });
+    const amount     = Number(order.final_amount || order.total_amount || 0);
+    const merchantId = process.env.ZARINPAL_MERCHANT_ID || "";
+
+    if (!merchantId || process.env.NODE_ENV !== "production") {
+      // sandbox — برگشت مستقیم
+      return NextResponse.json({
+        success:    true,
+        authority:  "SANDBOX-" + Date.now().toString().slice(-8),
+        paymentUrl: "/payment?orderId=" + orderId + "&sandbox=1",
+        sandbox:    true,
+      });
     }
 
-    const amountRials = Math.round(finalAmountTomans * 10);
-    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "axoncore.ir";
-    const proto = req.headers.get("x-forwarded-proto") || "https";
-    const baseUrl = `${proto}://${host}`;
-    const callbackUrl = `${baseUrl}/api/payment/verify?orderId=${encodeURIComponent(order.id)}`;
-
-    const zarinpalRes = await fetch("https://api.zarinpal.com/pg/v4/payment/request.json", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
+    const zpRes  = await fetch("https://api.zarinpal.com/pg/v4/payment/request.json", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        merchant_id: ZARINPAL_MERCHANT_ID,
-        amount: amountRials,
-        description: `پرداخت سفارش ${order.order_number || order.id} در فروشگاه آکسون کور`,
+        merchant_id:  merchantId,
+        amount,
+        description:  "خرید از فروشگاه آکسون کور — سفارش " + orderId.slice(0,8),
         callback_url: callbackUrl,
-        metadata: {
-          mobile: order.customer_phone || order.phone || "",
-          email: "support@axoncore.ir",
-        },
+        mobile:       phone,
       }),
     });
+    const zpData = await zpRes.json();
 
-    const zarinData = await zarinpalRes.json();
-
-    if (zarinData?.data?.code === 100 && zarinData?.data?.authority) {
-      const authority = zarinData.data.authority;
-      const paymentUrl = `https://www.zarinpal.com/pg/StartPay/${authority}`;
-
-      await supabaseAdmin
-        .from("orders")
-        .update({
-          payment_method: "zarinpal",
-          notes: `${order.notes ? order.notes + " | " : ""}ZarinPal Authority: ${authority}`,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
-
-      return NextResponse.json({
-        success: true,
-        paymentUrl,
-        authority,
-      });
-    } else {
-      const errMsg = zarinData?.errors?.message || "خطا در برقراری ارتباط با شبکه بانکی زرین‌پال.";
-      return NextResponse.json({ success: false, message: errMsg, details: zarinData }, { status: 400 });
+    if (zpData?.data?.code !== 100) {
+      throw new Error("خطای درگاه: " + (zpData?.errors?.message || JSON.stringify(zpData?.data)));
     }
+
+    const authority = zpData.data.authority;
+    const paymentUrl = "https://www.zarinpal.com/pg/StartPay/" + authority;
+
+    return NextResponse.json({ success: true, authority, paymentUrl });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || "خطای سرور در اتصال به شاپرک." }, { status: 500 });
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

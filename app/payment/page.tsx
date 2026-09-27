@@ -1,291 +1,182 @@
 "use client";
-
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { orderService } from "@/services/orderService";
 import { soundEngine } from "@/lib/soundEngine";
 import { formatPrice } from "@/lib/formatters";
 
-function PaymentGatewayForm() {
-  const router = useRouter();
+function PaymentForm() {
+  const router       = useRouter();
   const searchParams = useSearchParams();
-  const orderId = searchParams.get("orderId") || "";
+  const orderId      = searchParams.get("orderId") || "";
+  const sandbox      = searchParams.get("sandbox") === "1";
 
-  const [order, setOrder] = useState<any>(null);
-  const [amount, setAmount] = useState<number>(0);
-  const [cardNumber, setCardNumber] = useState("");
-  const [cvv2, setCvv2] = useState("");
-  const [expMonth, setExpMonth] = useState("");
-  const [expYear, setExpYear] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpTimer, setOtpTimer] = useState(120);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [status, setStatus] = useState<"idle" | "success" | "failed">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [txnRef, setTxnRef] = useState("");
+  const [amount,   setAmount]   = useState(0);
+  const [order,    setOrder]    = useState<any>(null);
+  const [card,     setCard]     = useState("");
+  const [cvv2,     setCvv2]     = useState("");
+  const [month,    setMonth]    = useState("");
+  const [year,     setYear]     = useState("");
+  const [otp,      setOtp]      = useState("");
+  const [timer,    setTimer]    = useState(120);
+  const [paying,   setPaying]   = useState(false);
+  const [success,  setSuccess]  = useState(false);
+  const [ref,      setRef]      = useState("");
+  const [error,    setError]    = useState("");
 
   useEffect(() => {
-    async function loadOrderInfo() {
-      if (orderId) {
-        try {
-          const found = await orderService.getById(orderId);
-          if (found) {
-            setOrder(found);
-            const finalPayable = Number(found.finalAmount || (found as any).final_amount || found.totalAmount || 0);
-            setAmount(finalPayable);
-            return;
-          }
-        } catch (e) {
-          console.error("Order load error:", e);
-        }
-      }
+    // خواندن مبلغ از session یا DB
+    const saved = sessionStorage.getItem("pending_payment_amount");
+    if (saved) setAmount(Number(saved) || 0);
 
-      const savedAmount = sessionStorage.getItem("pending_payment_amount");
-      if (savedAmount) {
-        setAmount(Number(savedAmount));
-      }
+    if (orderId) {
+      fetch("/api/orders/" + orderId).then(r => r.json()).then(d => {
+        if (d.success && d.order) {
+          setOrder(d.order);
+          const v = Number(d.order.final_amount || d.order.total_amount || 0);
+          if (v > 0) setAmount(v);
+        }
+      }).catch(() => {});
     }
 
-    loadOrderInfo();
-
-    const timer = setInterval(() => {
-      setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(timer);
+    const iv = setInterval(() => setTimer(t => t > 0 ? t - 1 : 0), 1000);
+    return () => clearInterval(iv);
   }, [orderId]);
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    const cleanCard = card.replace(/\D/g, "");
+    if (cleanCard.length !== 16) { setError("شماره کارت باید ۱۶ رقم باشد"); return; }
+    if (cvv2.length < 3)         { setError("CVV2 نامعتبر است");             return; }
+    if (!otp || otp.length < 5)  { setError("رمز پویا الزامی است");          return; }
+
     soundEngine.playClick();
-    setErrorMsg("");
-
-    const cleanCard = cardNumber.replace(/\D/g, "");
-    if (cleanCard.length !== 16) {
-      setErrorMsg("شماره کارت بانکی باید ۱۶ رقم کامل باشد.");
-      return;
-    }
-
-    if (cvv2.length < 3 || cvv2.length > 4) {
-      setErrorMsg("کد CVV2 نامعتبر است.");
-      return;
-    }
-
-    if (!otp || otp.length < 5) {
-      setErrorMsg("رمز پویای پیامک‌شده را وارد نمایید.");
-      return;
-    }
-
-    setIsProcessing(true);
-
+    setPaying(true);
     try {
-      const verifyRes = await fetch("/api/payment/verify", {
-        method: "POST",
+      const res  = await fetch("/api/payment/verify", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId,
-          authority: "AUTH_" + Date.now().toString().slice(-8),
-        }),
+        body: JSON.stringify({ orderId, authority: "PAY-" + Date.now().toString().slice(-8) }),
       });
-
-      const resJson = await verifyRes.json();
-      if (!verifyRes.ok || !resJson.success) {
-        throw new Error(resJson.message || "تراکنش بانکی تایید نشد.");
-      }
-
-      setTxnRef(resJson.trackingRef || Date.now().toString().slice(-8));
-
-      // پاکسازی کامل ذخیره‌سازی محلی و فراخوانی همگام‌سازی سبد
-      if (typeof window !== "undefined") {
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "پرداخت تأیید نشد");
+      setRef(String(data.trackingRef || ""));
+      try {
         localStorage.removeItem("axon_cart_store_v2026");
-        localStorage.removeItem("axon_active_coupon_v2026");
         sessionStorage.removeItem("pending_payment_amount");
         sessionStorage.removeItem("pending_payment_order_id");
         window.dispatchEvent(new CustomEvent("cart_updated", { detail: [] }));
-      }
-
-      soundEngine.playSuccess();
-      setStatus("success");
+      } catch {}
+      soundEngine.playSuccess?.();
+      setSuccess(true);
     } catch (err: any) {
-      setStatus("failed");
-      setErrorMsg(err.message || "تراکنش توسط بانک رد شد.");
+      setError(err.message || "خطا در پردازش پرداخت");
     } finally {
-      setIsProcessing(false);
+      setPaying(false);
     }
   };
 
-  return (
-    <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl font-sans text-slate-100" dir="rtl">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-2.5">
-          <span className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-md">
-            💳
-          </span>
-          <div>
-            <h2 className="text-sm font-black text-white">درگاه پرداخت الکترونیک شتاب</h2>
-            <span className="text-[10px] text-slate-400 font-mono font-bold">شاپرک (پرداخت امن و رمزنگاری‌شده)</span>
+  const inp = "w-full px-4 py-3 rounded-2xl bg-slate-800/60 border border-slate-700 text-white text-sm font-mono outline-none focus:border-blue-500 transition placeholder:text-slate-500";
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 font-sans" dir="rtl">
+        <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--modal-bg)] border border-emerald-500/30 text-center space-y-6 shadow-2xl">
+          <div className="w-20 h-20 rounded-full bg-emerald-500/15 border-2 border-emerald-500/40 text-emerald-500 text-4xl flex items-center justify-center mx-auto">✓</div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-emerald-500">پرداخت موفق!</h2>
+            <p className="text-xs text-[var(--text-secondary)]">سفارش شما ثبت شد و در حال آماده‌سازی است.</p>
           </div>
-        </div>
-        <div className="text-left">
-          <span className="text-[10px] text-slate-400 block font-bold">شناسه فاکتور:</span>
-          <span className="text-xs font-mono font-black text-amber-400">{orderId || "ORD-PENDING"}</span>
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs space-y-2 text-right font-mono">
+            <div className="flex justify-between"><span className="text-[var(--text-secondary)]">کد پیگیری:</span><span className="font-black text-[var(--accent-blue)]">{ref}</span></div>
+            <div className="flex justify-between"><span className="text-[var(--text-secondary)]">شماره سفارش:</span><span className="font-black">{orderId?.slice(0,8).toUpperCase()}</span></div>
+            <div className="flex justify-between"><span className="text-[var(--text-secondary)]">مبلغ:</span><span className="font-black text-emerald-500" suppressHydrationWarning>{formatPrice(amount)} تومان</span></div>
+          </div>
+          <div className="flex gap-3">
+            <a href="/my-orders" className="flex-1 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs text-center hover:opacity-90 transition">پیگیری سفارش</a>
+            <a href="/"          className="flex-1 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-center hover:border-[var(--accent-blue)] transition">صفحه اصلی</a>
+          </div>
         </div>
       </div>
+    );
+  }
 
-      {status === "success" ? (
-        <div className="text-center py-8 space-y-4 animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-3xl flex items-center justify-center mx-auto shadow-lg">
-            ✓
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 font-sans" dir="rtl"
+      style={{ background: "linear-gradient(135deg, #0a0c10 0%, #0f1420 50%, #0a0c10 100%)" }}>
+      <div className="w-full max-w-md space-y-4">
+        {/* هدر */}
+        <div className="text-center space-y-1">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-[11px] font-bold">
+            🔒 اتصال امن SSL — درگاه پرداخت آکسون
           </div>
-          <h3 className="text-base font-black text-white">پرداخت شما با موفقیت تایید شد!</h3>
-          <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-            سفارش شما در مرحله بسته‌بندی استودیویی و صدور بارنامه پیشتاز قرار گرفت.
-          </p>
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-1">
-            <p className="text-slate-400">کد پیگیری تراکنش بانکی: {txnRef}</p>
-            <p className="text-emerald-400 font-bold" suppressHydrationWarning>مبلغ واریزی: {formatPrice(amount)} تومان</p>
-          </div>
-          <button
-            onClick={() => router.push(`/track-order?orderId=${orderId}&success=true`)}
-            className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer"
-          >
-            پیگیری لحظه‌ای بسته پستی 📦
-          </button>
+          {sandbox && <p className="text-amber-400 text-[10px] font-bold">⚠️ حالت آزمایشی — پرداخت واقعی نیست</p>}
         </div>
-      ) : (
-        <form onSubmit={handlePay} className="space-y-4 text-xs">
-          {errorMsg && (
-            <div className="p-3 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold">
-              {errorMsg}
-            </div>
+
+        {/* مبلغ */}
+        <div className="p-5 rounded-3xl border border-slate-700 bg-slate-900/80 text-center space-y-1">
+          <p className="text-slate-400 text-xs">مبلغ قابل پرداخت</p>
+          <p className="text-3xl font-black text-white" suppressHydrationWarning>
+            {amount > 0 ? formatPrice(amount) : "—"}
+          </p>
+          <p className="text-slate-400 text-xs font-bold">تومان</p>
+        </div>
+
+        {/* فرم کارت */}
+        <form onSubmit={handlePay} className="p-6 rounded-3xl border border-slate-700 bg-slate-900/80 space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold">{error}</div>
           )}
 
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex justify-between items-center">
-            <span className="text-slate-400 font-bold">مبلغ فاکتور قابل پرداخت:</span>
-            <span className="text-base font-black text-emerald-400 font-mono" suppressHydrationWarning>
-              {formatPrice(amount)} تومان
-            </span>
-          </div>
-
           <div className="space-y-1">
-            <label className="font-bold text-slate-300">شماره کارت بانکی (۱۶ رقم):</label>
-            <input
-              type="text"
-              required
-              maxLength={19}
-              placeholder="6037 - 9975 - **** - ****"
-              value={cardNumber}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "").slice(0, 16);
-                const formatted = val.match(/.{1,4}/g)?.join(" - ") || val;
-                setCardNumber(formatted);
-              }}
-              className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-center text-sm font-black text-white tracking-widest outline-none focus:border-amber-500 transition"
-            />
+            <label className="text-slate-400 text-xs font-bold">شماره کارت بانکی</label>
+            <input type="text" value={card} onChange={e => setCard(e.target.value.replace(/\D/g,"").slice(0,16))}
+              placeholder="xxxx xxxx xxxx xxxx" inputMode="numeric" maxLength={16}
+              className={inp} dir="ltr"/>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">کد CVV2:</label>
-              <input
-                type="password"
-                required
-                maxLength={4}
-                placeholder="***"
-                value={cvv2}
-                onChange={(e) => setCvv2(e.target.value.replace(/\D/g, ""))}
-                className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-center font-bold text-white outline-none focus:border-amber-500 transition"
-              />
+              <label className="text-slate-400 text-xs font-bold">ماه</label>
+              <input type="text" value={month} onChange={e => setMonth(e.target.value.replace(/\D/g,"").slice(0,2))}
+                placeholder="MM" inputMode="numeric" maxLength={2} className={inp} dir="ltr"/>
             </div>
-
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">تاریخ انقضا (ماه / سال):</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  required
-                  maxLength={2}
-                  placeholder="ماه"
-                  value={expMonth}
-                  onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, ""))}
-                  className="w-1/2 p-3 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-center font-bold text-white outline-none focus:border-amber-500 transition"
-                />
-                <input
-                  type="text"
-                  required
-                  maxLength={2}
-                  placeholder="سال"
-                  value={expYear}
-                  onChange={(e) => setExpYear(e.target.value.replace(/\D/g, ""))}
-                  className="w-1/2 p-3 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-center font-bold text-white outline-none focus:border-amber-500 transition"
-                />
-              </div>
+              <label className="text-slate-400 text-xs font-bold">سال</label>
+              <input type="text" value={year} onChange={e => setYear(e.target.value.replace(/\D/g,"").slice(0,2))}
+                placeholder="YY" inputMode="numeric" maxLength={2} className={inp} dir="ltr"/>
+            </div>
+            <div className="space-y-1">
+              <label className="text-slate-400 text-xs font-bold">CVV2</label>
+              <input type="password" value={cvv2} onChange={e => setCvv2(e.target.value.replace(/\D/g,"").slice(0,4))}
+                placeholder="***" inputMode="numeric" maxLength={4} className={inp} dir="ltr"/>
             </div>
           </div>
 
           <div className="space-y-1">
-            <div className="flex justify-between items-center">
-              <label className="font-bold text-slate-300">رمز دوم پویا:</label>
-              <span className="text-[10px] font-mono text-amber-400 font-bold" suppressHydrationWarning>
-                {Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, "0")} مانده
-              </span>
+            <div className="flex items-center justify-between">
+              <label className="text-slate-400 text-xs font-bold">رمز پویا (OTP)</label>
+              <span className="text-slate-500 text-[10px] font-mono">{timer > 0 ? timer + "s" : "منقضی"}</span>
             </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                required
-                maxLength={7}
-                placeholder="رمز پیامک‌شده"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                className="flex-1 p-3 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-center font-black text-white outline-none focus:border-amber-500 transition"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playClick();
-                  setOtp("584920");
-                  setOtpTimer(120);
-                }}
-                className="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-amber-400 transition cursor-pointer"
-              >
-                دریافت رمز پیامکی
-              </button>
-            </div>
+            <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g,"").slice(0,6))}
+              placeholder="رمز ۶ رقمی پیامک‌شده" inputMode="numeric" maxLength={6}
+              autoComplete="one-time-code" className={inp} dir="ltr"/>
           </div>
 
-          <div className="pt-3 border-t border-slate-800 flex gap-2">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="px-5 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 font-bold text-slate-300 transition cursor-pointer"
-            >
-              انصراف
-            </button>
-            <button
-              type="submit"
-              disabled={isProcessing}
-              className="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {isProcessing ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
-              ) : (
-                <span>پرداخت نهایی و تایید فاکتور 🔒</span>
-              )}
-            </button>
-          </div>
+          <button type="submit" disabled={paying}
+            className="w-full py-4 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-sm transition disabled:opacity-50 cursor-pointer shadow-lg">
+            {paying ? "در حال پردازش..." : "💳 پرداخت " + (amount > 0 ? formatPrice(amount) + " تومان" : "")}
+          </button>
         </form>
-      )}
+      </div>
     </div>
   );
 }
 
-export default function PaymentGatewayPage() {
+export default function PaymentPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-slate-100 font-sans select-none">
-      <Suspense fallback={<div className="text-xs text-slate-400 animate-pulse">در حال اتصال به شاپرک...</div>}>
-        <PaymentGatewayForm />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white text-sm">بارگذاری...</div>}>
+      <PaymentForm/>
+    </Suspense>
   );
 }

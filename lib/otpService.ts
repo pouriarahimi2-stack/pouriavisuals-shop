@@ -1,125 +1,106 @@
 /**
  * lib/otpService.ts
- * IPPanel Edge API — ارسال OTP با Pattern SMS
- * مستندات: https://ippanelcom.github.io/Edge-Document/docs/send/pattern
- * Base URL: https://edge.ippanel.com/v1
+ * IPPanel — دو روش ارسال:
+ * ۱. Edge API (https://edge.ippanel.com/v1/api/send)
+ * ۲. Classic API (https://api.ippanel.com/v1/api/send/pattern) — fallback
  */
 
-interface SendOtpOptions {
-  mobile: string; // فرمت: 09xxxxxxxxx
-  code:   string; // کد ۶ رقمی
-}
+interface OtpOptions { mobile: string; code: string; }
 
-/**
- * تبدیل شماره ایرانی به فرمت E.164 که IPPanel نیاز دارد
- * 09123456789 → +989123456789
- */
 function toE164(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("98")) return "+" + digits;
-  if (digits.startsWith("09")) return "+98" + digits.slice(1);
-  if (digits.startsWith("9") && digits.length === 10) return "+98" + digits;
-  return "+" + digits;
+  const d = phone.replace(/\D/g, "");
+  if (d.startsWith("98")) return "+" + d;
+  if (d.startsWith("09")) return "+98" + d.slice(1);
+  if (d.startsWith("9") && d.length === 10) return "+98" + d;
+  return "+" + d;
 }
 
-export async function sendOtpPattern({ mobile, code }: SendOtpOptions): Promise<boolean> {
+export async function sendOtpPattern({ mobile, code }: OtpOptions): Promise<boolean> {
+  const apiKey      = process.env.IPPANEL_API_KEY;
+  const patternCode = process.env.IPPANEL_PATTERN_CODE;
+  const originator  = process.env.IPPANEL_ORIGIN_NUMBER || "+983000505";
+
+  // محیط توسعه — فقط log کن
+  if (!apiKey || !patternCode) {
+    console.log("[OTP DEV] کد:", code, "→ موبایل:", mobile);
+    return true; // در dev موفق تلقی میشه
+  }
+
+  const recipient = toE164(mobile);
+
+  // روش اول: Edge API
   try {
-    const apiKey      = process.env.IPPANEL_API_KEY;
-    const patternCode = process.env.IPPANEL_PATTERN_CODE;
-    const fromNumber  = process.env.IPPANEL_ORIGIN_NUMBER || "+983000505";
-
-    if (!apiKey || !patternCode) {
-      console.error("[OTP] متغیرهای IPPANEL_API_KEY یا IPPANEL_PATTERN_CODE تعریف نشده‌اند.");
-      // در محیط توسعه، کد را log می‌کنیم
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[OTP DEV] کد:", code, "به شماره:", mobile);
-      }
-      return process.env.NODE_ENV !== "production";
-    }
-
-    const recipient = toE164(mobile);
-
-    // IPPanel Edge API — Send Pattern SMS
-    // POST https://edge.ippanel.com/v1/api/send
-    const payload = {
-      sending_type: "pattern",
-      from_number:  fromNumber,
-      code:         patternCode,
-      recipients:   [recipient],
-      params: {
-        code: code, // کلید باید با placeholder پترن در پنل IPPanel یکی باشد
-      },
-    };
-
-    const response = await fetch("https://edge.ippanel.com/v1/api/send", {
-      method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": apiKey, // IPPanel Edge از header Authorization استفاده می‌کند
-      },
-      body: JSON.stringify(payload),
+    const res = await fetch("https://edge.ippanel.com/v1/api/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": apiKey },
+      body: JSON.stringify({
+        sending_type: "pattern",
+        from_number:  originator,
+        code:         patternCode,
+        recipients:   [recipient],
+        params:       { code },
+      }),
     });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok || data?.meta?.status === false) {
-      console.error("[OTP] IPPanel Edge API Error:", response.status, data?.meta?.message || data);
-      return false;
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.meta?.status !== false) {
+      console.log("[OTP] Edge API موفق:", recipient);
+      return true;
     }
+    console.warn("[OTP] Edge API رد کرد، fallback...", data?.meta?.message);
+  } catch (e) {
+    console.warn("[OTP] Edge API خطا، fallback...");
+  }
 
-    console.log("[OTP] Pattern SMS ارسال شد به", recipient, "| bulk_id:", data?.data?.message_outbox_ids?.[0]);
-    return true;
-  } catch (error) {
-    console.error("[OTP] خطا در ارسال پیامک:", error);
+  // روش دوم: Classic API
+  try {
+    const res = await fetch("https://api.ippanel.com/v1/api/send/pattern", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": apiKey },
+      body: JSON.stringify({
+        code:      patternCode,
+        sender:    originator,
+        recipient,
+        variable:  { code },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.status !== "error") {
+      console.log("[OTP] Classic API موفق:", recipient);
+      return true;
+    }
+    console.error("[OTP] Classic API هم رد کرد:", data);
+    return false;
+  } catch (e) {
+    console.error("[OTP] هر دو روش شکست خورد:", e);
     return false;
   }
 }
 
-/**
- * ارسال پیامک متنی ساده (Webservice SMS)
- * POST https://edge.ippanel.com/v1/api/send
- */
 export async function sendTextSMS(mobile: string, message: string): Promise<boolean> {
-  try {
-    const apiKey     = process.env.IPPANEL_API_KEY;
-    const fromNumber = process.env.IPPANEL_ORIGIN_NUMBER || "+983000505";
+  const apiKey    = process.env.IPPANEL_API_KEY;
+  const originator= process.env.IPPANEL_ORIGIN_NUMBER || "+983000505";
 
-    if (!apiKey) {
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[SMS DEV] پیام:", message, "به:", mobile);
-        return true;
-      }
-      return false;
-    }
-
-    const recipient = toE164(mobile);
-
-    const payload = {
-      sending_type: "webservice",
-      from_number:  fromNumber,
-      message:      message,
-      recipients:   [recipient],
-    };
-
-    const response = await fetch("https://edge.ippanel.com/v1/api/send", {
-      method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": apiKey,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok || data?.meta?.status === false) {
-      console.error("[SMS] IPPanel Error:", response.status, data?.meta?.message);
-      return false;
-    }
-
+  if (!apiKey) {
+    console.log("[SMS DEV]", mobile, ":", message);
     return true;
-  } catch (error) {
-    console.error("[SMS] خطا:", error);
+  }
+
+  const recipient = toE164(mobile);
+
+  try {
+    const res = await fetch("https://edge.ippanel.com/v1/api/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": apiKey },
+      body: JSON.stringify({
+        sending_type: "webservice",
+        from_number:  originator,
+        message,
+        recipients:   [recipient],
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok && data?.meta?.status !== false;
+  } catch {
     return false;
   }
 }

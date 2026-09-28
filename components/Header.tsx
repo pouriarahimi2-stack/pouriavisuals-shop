@@ -80,7 +80,7 @@ export default function Header() {
 
   const brandName = headerCfg.brand.name || "آکسون کور | Axon Core";
   const logoSrc = headerCfg.brand.logoUrl;
-  const menuItems = headerCfg.menu.items.filter((m) => m.show !== false);
+  const menuItems = headerCfg.menu.items.filter((m: any) => m.show !== false);
 
   return (
     <>
@@ -117,7 +117,7 @@ export default function Header() {
             {/* منوی دسکتاپ */}
             {headerCfg.menu.show && (
               <nav className="hidden md:flex items-center gap-5 lg:gap-6 text-xs font-bold text-[var(--text-secondary)]">
-                {menuItems.map((item) => {
+                {menuItems.map((item: any) => {
                   const isActive = pathname === item.url;
                   return (
                     <Link
@@ -203,7 +203,7 @@ export default function Header() {
             </Link>
 
             {/* آیتم‌های منو از DB */}
-            {menuItems.map((item) => {
+            {menuItems.map((item: any) => {
               const isActive = pathname === item.url;
               return (
                 <Link

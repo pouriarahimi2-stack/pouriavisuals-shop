@@ -1,110 +1,78 @@
-// File Path: services/smsService.ts
+/**
+ * services/smsService.ts
+ * سرویس پیامک — wrapper روی otpService
+ */
 
-export interface SendSmsResponse {
-  success:        boolean;
-  message?:       string;
-  simulatedCode?: string;
-  token?:         string;
-  verified?:      boolean;
-}
-
-function getApiBaseUrl(): string {
+function getBase(): string {
   if (typeof window !== "undefined") return "";
-  if (process.env.NEXT_PUBLIC_SITE_URL)  return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "");
-  if (process.env.VERCEL_URL)            return "https://" + process.env.VERCEL_URL;
-  return "http://localhost:3000";
+  return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
+    (process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : "http://localhost:3000");
 }
 
-function cleanPhone(phone: string): string {
-  return String(phone)
-    .trim()
-    .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString())
-    .replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+function clean(phone: string): string {
+  return String(phone || "").trim()
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632))
     .replace(/\D/g, "");
 }
 
 export const smsService = {
-  async sendOtp(phone: string): Promise<SendSmsResponse> {
+  async sendOtp(phone: string) {
     try {
-      const cp  = cleanPhone(phone);
-      const url = getApiBaseUrl() + "/api/send-otp";
-      const res = await fetch(url, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ phone: cp, action: "send" }),
-        cache:   "no-store",
+      const res  = await fetch(getBase() + "/api/send-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: clean(phone), action: "send" }),
+        cache: "no-store",
       });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e.message || "خطا در ارسال OTP.");
-      }
       return await res.json();
-    } catch (err: any) {
-      return { success: false, message: err?.message || "خطا در ارتباط با سامانه پیامک." };
+    } catch (e: any) {
+      return { success: false, message: e?.message || "خطای ارتباط" };
     }
   },
 
-  async verifyOtp(phone: string, code: string, token?: string): Promise<SendSmsResponse> {
+  async verifyOtp(phone: string, code: string, token?: string) {
     try {
-      const cp   = cleanPhone(phone);
-      const cc   = cleanPhone(code);
-      const url  = getApiBaseUrl() + "/api/send-otp";
-      const res  = await fetch(url, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ phone: cp, code: cc, token, action: "verify" }),
-        cache:   "no-store",
+      const res  = await fetch(getBase() + "/api/send-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: clean(phone), code: clean(code), token, action: "verify" }),
+        cache: "no-store",
       });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e.message || "کد تایید نادرست است.");
-      }
       return await res.json();
-    } catch (err: any) {
-      return { success: false, message: err?.message || "خطا در بررسی کد." };
+    } catch (e: any) {
+      return { success: false, message: e?.message || "خطای ارتباط" };
     }
   },
 
   async sendSMS(phone: string, message: string): Promise<boolean> {
     try {
-      const cp  = cleanPhone(phone);
-      const url = getApiBaseUrl() + "/api/sms/send";
-      const res = await fetch(url, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ phone: cp, message }),
-        cache:   "no-store",
+      const res  = await fetch(getBase() + "/api/sms/send", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: clean(phone), message }),
+        cache: "no-store",
       });
-      const json = await res.json().catch(() => ({}));
-      return res.ok && json.success === true;
-    } catch {
-      return false;
-    }
-  },
-
-  async sendTrackingCode(phone: string, customerName: string, trackingCode: string): Promise<boolean> {
-    const msg = customerName + " گرامی، سفارش شما تحویل شرکت ملی پست گردید. کد رهگیری مرسوله پیشتاز: " + trackingCode + " - پیگیری: axoncore.ir/track-order";
-    return this.sendSMS(phone, msg);
-  },
-
-  async sendOrderStatusChange(phone: string, orderId: string, statusName: string): Promise<boolean> {
-    const msg = "خریدار گرامی، وضعیت سفارش #" + orderId + " شما در آکسون به «" + statusName + "» تغییر یافت. پیگیری: axoncore.ir/track-order";
-    return this.sendSMS(phone, msg);
+      const d = await res.json().catch(() => ({}));
+      return res.ok && d.success === true;
+    } catch { return false; }
   },
 
   async sendOrderPaidConfirmation(phone: string, orderId: string, amount: number): Promise<boolean> {
-    const fa  = Math.round(amount).toLocaleString("fa-IR");
-    const msg = "سفارش #" + orderId + " به مبلغ " + fa + " تومان با موفقیت پرداخت شد. سپاس از خرید شما - آکسون کور";
-    return this.sendSMS(phone, msg);
+    const fa  = Number(amount || 0).toLocaleString("fa-IR");
+    return this.sendSMS(phone, `پرداخت موفق! سفارش ${orderId.slice(0,8).toUpperCase()} به مبلغ ${fa} تومان. کد رهگیری: axoncore.ir/track-order`);
+  },
+
+  async sendOrderStatusChange(phone: string, orderId: string, statusName: string): Promise<boolean> {
+    return this.sendSMS(phone, `وضعیت سفارش ${orderId.slice(0,8).toUpperCase()} شما به «${statusName}» تغییر یافت — axoncore.ir/track-order`);
+  },
+
+  async sendTrackingCode(phone: string, name: string, code: string): Promise<boolean> {
+    return this.sendSMS(phone, `${name} عزیز، مرسوله شما ارسال شد. کد رهگیری: ${code} — axoncore.ir/track-order`);
   },
 };
 
 export const sendSMS               = smsService.sendSMS.bind(smsService);
 export const sendOtp               = smsService.sendOtp.bind(smsService);
 export const verifyOtp             = smsService.verifyOtp.bind(smsService);
-export const sendTrackingCode      = smsService.sendTrackingCode.bind(smsService);
-export const sendOrderStatusChange = smsService.sendOrderStatusChange.bind(smsService);
-export const sendVerificationSMS   = async (phone: string, code: string): Promise<boolean> => {
+export const sendVerificationSMS   = async (phone: string, code: string) => {
   const { sendOtpPattern } = await import("@/lib/otpService");
   return sendOtpPattern({ mobile: phone, code });
 };

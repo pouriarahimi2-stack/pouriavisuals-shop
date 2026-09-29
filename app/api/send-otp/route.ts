@@ -4,26 +4,30 @@ import { sendOtpPattern } from "@/lib/otpService";
 
 export const dynamic = "force-dynamic";
 
-// کلید HMAC — از env یا fallback امن
-const HMAC_KEY = process.env.OTP_HMAC_SECRET ||
-  process.env.ADMIN_SESSION_SECRET ||
-  "axon-otp-fallback-secret-2026-secure";
+// کلید HMAC — از env مستقیم، نه از import
+const HMAC_KEY = (() => {
+  const k = process.env.OTP_HMAC_SECRET ||
+    process.env.ADMIN_SESSION_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    "axon-otp-secure-fallback-key-2026";
+  if (!k || k.length < 8) return "axon-otp-secure-fallback-key-2026";
+  return k;
+})();
 
-// rate limit در حافظه
 const otpMap = new Map<string, { attempts: number; lockedUntil: number; lastSent: number }>();
 
-function cleanPhone(raw: string): string {
+function cp(raw: string): string {
   return String(raw || "").trim().replace(/\D/g, "");
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body   = await req.json();
-    const phone  = cleanPhone(body.phone || "");
+    const phone  = cp(body.phone || "");
     const action = String(body.action || "send");
 
     if (!phone || phone.length !== 11 || !phone.startsWith("09")) {
-      return NextResponse.json({ success: false, message: "شماره موبایل معتبر ۱۱ رقمی الزامی است." }, { status: 400 });
+      return NextResponse.json({ success: false, message: "شماره موبایل معتبر الزامی است." }, { status: 400 });
     }
 
     const now     = Date.now();
@@ -31,10 +35,9 @@ export async function POST(req: NextRequest) {
 
     if (tracker.lockedUntil > now) {
       const wait = Math.ceil((tracker.lockedUntil - now) / 60000);
-      return NextResponse.json({ success: false, message: `دسترسی ${wait} دقیقه مسدود است.` }, { status: 429 });
+      return NextResponse.json({ success: false, message: "دسترسی " + wait + " دقیقه مسدود است." }, { status: 429 });
     }
 
-    // ── ارسال کد ──────────────────────────────
     if (action === "send") {
       if (now - tracker.lastSent < 60_000) {
         return NextResponse.json({ success: false, message: "لطفاً ۱ دقیقه صبر کنید." }, { status: 429 });
@@ -44,33 +47,31 @@ export async function POST(req: NextRequest) {
       const expiresAt = new Date(now + 3 * 60 * 1000).toISOString();
       const nonce     = crypto.randomBytes(4).toString("hex");
       const sig       = crypto.createHmac("sha256", HMAC_KEY)
-        .update(`${phone}:${code}:${expiresAt}:${nonce}`).digest("hex");
+        .update(phone + ":" + code + ":" + expiresAt + ":" + nonce).digest("hex");
 
       tracker.lastSent = now;
       tracker.attempts = 0;
       otpMap.set(phone, tracker);
 
-      // ارسال پیامک
       const sent = await sendOtpPattern({ mobile: phone, code });
       if (!sent && process.env.NODE_ENV === "production") {
-        return NextResponse.json({ success: false, message: "خطا در ارسال پیامک. مجدداً تلاش کنید." }, { status: 500 });
+        return NextResponse.json({ success: false, message: "خطا در ارسال پیامک." }, { status: 500 });
       }
 
       return NextResponse.json({
         success: true,
-        message: "کد ۶ رقمی به موبایل ارسال شد.",
-        token:   `${expiresAt}:${nonce}:${sig}`,
+        message: "کد ۶ رقمی ارسال شد.",
+        token:   expiresAt + ":" + nonce + ":" + sig,
         ...(process.env.NODE_ENV !== "production" && { debug_code: code }),
       });
     }
 
-    // ── تأیید کد ──────────────────────────────
     if (action === "verify") {
-      const code  = cleanPhone(body.code || "");
+      const code  = cp(body.code || "");
       const token = String(body.token || "").trim();
 
       if (!code || !token) {
-        return NextResponse.json({ success: false, verified: false, message: "کد یا توکن ناقص است." }, { status: 400 });
+        return NextResponse.json({ success: false, verified: false, message: "کد یا توکن ناقص." }, { status: 400 });
       }
 
       const parts = token.split(":");
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
       }
 
       const expected = crypto.createHmac("sha256", HMAC_KEY)
-        .update(`${phone}:${code}:${expiresAtStr}:${nonce}`).digest("hex");
+        .update(phone + ":" + code + ":" + expiresAtStr + ":" + nonce).digest("hex");
 
       let match = false;
       try {
@@ -100,12 +101,12 @@ export async function POST(req: NextRequest) {
         otpMap.set(phone, tracker);
         return NextResponse.json({
           success: false, verified: false,
-          message: `کد اشتباه است. (${Math.max(0, 5 - tracker.attempts)} فرصت باقی)`,
+          message: "کد اشتباه است. (" + Math.max(0, 5 - tracker.attempts) + " فرصت باقی)",
         }, { status: 400 });
       }
 
       otpMap.delete(phone);
-      return NextResponse.json({ success: true, verified: true, message: "شماره موبایل تأیید شد." });
+      return NextResponse.json({ success: true, verified: true, message: "تأیید شد." });
     }
 
     return NextResponse.json({ success: false, message: "عملیات نامعتبر." }, { status: 400 });

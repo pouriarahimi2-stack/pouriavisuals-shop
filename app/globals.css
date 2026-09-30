@@ -391,3 +391,161 @@ body {
 * { box-sizing: border-box; }
 img { max-width: 100%; height: auto; }
 .overflow-x-safe { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+
+/* ═══════════════════════════════════════════════════════
+   AXON RESPONSIVE SYSTEM — Mobile + Tablet + Desktop
+   ═══════════════════════════════════════════════════════ */
+
+/* رفع zoom ناخواسته در موبایل */
+@media screen and (max-width: 768px) {
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
+}
+
+/* CSS Variables کامل */
+:root {
+  --accent-blue: #0071e3;
+  --accent-purple: #4f46e5;
+  --border-radius-card: 1.5rem;
+  --font-primary: "Vazirmatn", sans-serif;
+}
+
+/* دارک/لایت تم کامل */
+:root:not(.dark) {
+  --bg-primary:    #f8fafc;
+  --bg-secondary:  #f1f5f9;
+  --text-primary:  #0f172a;
+  --text-secondary:#475569;
+  --modal-bg:      #ffffff;
+  --input-bg:      #f1f5f9;
+  --card-border:   rgba(15,23,42,0.08);
+  --card-hover:    #f8fafc;
+  --card-bg:       #f1f5f9;
+}
+.dark {
+  --bg-primary:    #07090e;
+  --bg-secondary:  #0c1017;
+  --text-primary:  #f8fafc;
+  --text-secondary:#94a3b8;
+  --modal-bg:      #0c1017;
+  --input-bg:      rgba(255,255,255,0.04);
+  --card-border:   rgba(255,255,255,0.08);
+  --card-hover:    #111827;
+  --card-bg:       #111827;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-primary:    #07090e;
+    --bg-secondary:  #0c1017;
+    --text-primary:  #f8fafc;
+    --text-secondary:#94a3b8;
+    --modal-bg:      #0c1017;
+    --input-bg:      rgba(255,255,255,0.04);
+    --card-border:   rgba(255,255,255,0.08);
+    --card-hover:    #111827;
+    --card-bg:       #111827;
+  }
+}
+
+/* ═══ Box sizing ═══ */
+*, *::before, *::after { box-sizing: border-box; }
+img { max-width: 100%; height: auto; }
+
+/* ═══ overflow جداول در موبایل ═══ */
+.overflow-x-safe {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.admin-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 1rem;
+}
+.admin-table-wrapper table {
+  min-width: 600px;
+}
+
+/* ═══ safe-area برای iOS ═══ */
+.pb-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.nav-bottom-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+}
+
+/* ═══ AI Chat Float Button ═══ */
+.ai-chat-float-btn {
+  position: fixed;
+  z-index: 40;
+  border-radius: 50%;
+  background: var(--accent-blue, #0071e3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 24px rgba(0,113,227,0.35);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.ai-chat-float-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 32px rgba(0,113,227,0.5);
+}
+@media (max-width: 768px) {
+  .ai-chat-float-btn {
+    bottom: 76px;
+    right: 14px;
+    width: 42px;
+    height: 42px;
+  }
+}
+@media (min-width: 769px) {
+  .ai-chat-float-btn {
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ═══ انیمیشن‌های کارت محصول ═══ */
+.axon-reveal-scale {
+  animation: axonReveal 0.4s ease both;
+}
+@keyframes axonReveal {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.stagger-0 { animation-delay: 0ms; }
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
+.stagger-7 { animation-delay: 350ms; }
+
+/* ═══ تبلت — رفع layout ═══ */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .admin-sidebar-tablet {
+    width: 240px !important;
+  }
+  .product-grid-tablet {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* ═══ موبایل — رفع layout ═══ */
+@media (max-width: 767px) {
+  .mobile-full-width { width: 100% !important; }
+  .mobile-px { padding-left: 1rem; padding-right: 1rem; }
+  .mobile-stack { flex-direction: column !important; }
+  .hide-mobile { display: none !important; }
+  /* رفع overflow در ادمین */
+  .admin-content { overflow-x: hidden; }
+}

@@ -7,10 +7,10 @@ import AddToCartButton from "@/components/AddToCartButton";
 
 interface ProductCardProps {
   product: {
-    id:             string | number;
-    title?:         string;
-    name?:          string;
-    price:          number;
+    id:              string | number;
+    title?:          string;
+    name?:           string;
+    price:           number;
     discount_price?: number | null;
     discountPrice?:  number | null;
     image?:          string | null;
@@ -22,109 +22,84 @@ interface ProductCardProps {
   };
 }
 
-function getProductImage(product: ProductCardProps["product"]): string {
-  // اولویت: images[] → image_url → image
-  if (Array.isArray(product.images) && product.images.length > 0) {
-    const first = product.images[0];
-    if (first && first.startsWith("http")) return first;
-    if (first && first.startsWith("/"))    return first;
+function getImg(p: ProductCardProps["product"]): string {
+  if (Array.isArray(p.images) && p.images.length > 0) {
+    const f = p.images[0];
+    if (f && (f.startsWith("http") || f.startsWith("/"))) return f;
   }
-  if (product.image_url && product.image_url.trim()) return product.image_url;
-  if (product.image      && product.image.trim())     return product.image;
+  if (p.image_url?.trim()) return p.image_url;
+  if (p.image?.trim())     return p.image;
   return "/placeholder.png";
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const title        = product.title || product.name || "کالای دیجیتال";
-  const displayPrice = Number(product.price || 0);
-  const discountVal  = product.discount_price || product.discountPrice;
-  const finalPrice   = discountVal && Number(discountVal) > 0 ? Number(discountVal) : displayPrice;
-  const discountPct  = discountVal && displayPrice > 0
-    ? Math.round((1 - Number(discountVal) / displayPrice) * 100)
-    : 0;
-
-  const rawImage      = getProductImage(product);
-  const [imgSrc, setImgSrc] = useState(rawImage);
-
-  const isLowStock = product.stock !== undefined && product.stock <= 3 && product.stock > 0;
+  const title       = product.title || product.name || "کالای دیجیتال";
+  const basePrice   = Number(product.price || 0);
+  const discountVal = product.discount_price || product.discountPrice;
+  const finalPrice  = discountVal && Number(discountVal) > 0 ? Number(discountVal) : basePrice;
+  const discPct     = discountVal && basePrice > 0 ? Math.round((1 - Number(discountVal) / basePrice) * 100) : 0;
+  const [imgSrc, setImgSrc] = useState(getImg(product));
+  const isLowStock  = product.stock !== undefined && product.stock > 0 && product.stock <= 3;
 
   return (
-    <div className={
-      "group rounded-[2rem] bg-[var(--modal-bg)] border border-[var(--card-border)] " +
-      "hover:border-[var(--accent-blue)]/60 overflow-hidden shadow-sm " +
-      "flex flex-col justify-between relative transition-all duration-300"
-    }>
-      <div className={
-        "absolute inset-0 rounded-[2rem] opacity-0 group-hover:opacity-100 " +
-        "bg-gradient-to-b from-[var(--accent-blue)]/5 to-transparent " +
-        "transition-opacity duration-500 pointer-events-none"
-      } />
+    <div className="group rounded-2xl sm:rounded-[1.75rem] bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)]/50 overflow-hidden shadow-sm flex flex-col justify-between relative transition-all duration-300 h-full">
 
-      <Link href={"/products/" + product.id} onClick={() => soundEngine.playClick()} className="space-y-3 block p-4">
-        {/* تصویر با fallback */}
-        <div className="relative aspect-square rounded-2xl bg-slate-50 dark:bg-white/5 overflow-hidden flex items-center justify-center p-3">
+      <Link href={"/products/" + product.id} onClick={() => soundEngine.playClick()} className="flex-1 block p-3 sm:p-4 space-y-2 sm:space-y-3">
+        {/* تصویر */}
+        <div className="relative aspect-square rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-white/5 overflow-hidden flex items-center justify-center p-2 sm:p-3">
           <img
             src={imgSrc}
             alt={title}
             loading="lazy"
             decoding="async"
-            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-700 ease-out"
-            onError={() => {
-              if (imgSrc !== "/placeholder.png") setImgSrc("/placeholder.png");
-            }}
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+            onError={() => { if (imgSrc !== "/placeholder.png") setImgSrc("/placeholder.png"); }}
           />
-          {discountPct > 0 && (
-            <span className={
-              "absolute top-2.5 right-2.5 px-2.5 py-1 rounded-xl " +
-              "bg-gradient-to-l from-rose-600 to-rose-500 text-white text-[10px] font-black shadow-lg"
-            }>
-              {discountPct}٪ تخفیف
+          {discPct > 0 && (
+            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-rose-500 text-white text-[9px] sm:text-[10px] font-black shadow">
+              {discPct}٪
             </span>
           )}
           {isLowStock && (
-            <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-xl bg-amber-500/90 text-white text-[9px] font-black">
-              فقط {product.stock} عدد
+            <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-lg bg-amber-500/90 text-white text-[8px] sm:text-[9px] font-black">
+              {product.stock} عدد
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-2xl">
-              <span className="px-3 py-1 rounded-xl bg-black/70 text-white text-xs font-black">ناموجود</span>
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-xl">
+              <span className="px-2 py-0.5 rounded-lg bg-black/70 text-white text-[10px] font-black">ناموجود</span>
             </div>
           )}
         </div>
 
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-bold text-[var(--accent-blue)] block truncate">
+        {/* اطلاعات */}
+        <div className="space-y-1">
+          <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent-blue)] block truncate">
             {product.category || "لوازم دیجیتال"}
           </span>
-          <h3 className={
-            "text-xs font-black text-[var(--text-primary)] line-clamp-2 leading-relaxed " +
-            "min-h-[36px] group-hover:text-[var(--accent-blue)] transition-colors duration-200"
-          }>
+          <h3 className="text-[11px] sm:text-xs font-black text-[var(--text-primary)] line-clamp-2 leading-relaxed min-h-[32px] sm:min-h-[36px]">
             {title}
           </h3>
         </div>
       </Link>
 
-      <div className="p-4 pt-0 space-y-3 border-t border-[var(--card-border)]/50 mt-auto">
-        <div className="flex items-center justify-between pt-2 text-xs">
-          <span className="text-[10px] text-[var(--text-secondary)] font-bold">قیمت:</span>
-          <div className="text-left font-mono">
-            {discountVal && Number(discountVal) > 0 ? (
-              <div className="space-y-0.5">
-                <span className="line-through text-slate-400 text-[10px] block" suppressHydrationWarning>
-                  {formatPrice(displayPrice)}
-                </span>
-                <span className="text-emerald-500 font-black text-sm block" suppressHydrationWarning>
-                  {formatPrice(finalPrice)} ت
-                </span>
-              </div>
-            ) : (
-              <span className="text-[var(--text-primary)] font-black text-sm" suppressHydrationWarning>
-                {formatPrice(displayPrice)} ت
+      {/* قیمت و دکمه */}
+      <div className="p-3 sm:p-4 pt-0 border-t border-[var(--card-border)]/50 space-y-2 sm:space-y-3">
+        <div className="flex items-center justify-between text-xs">
+          {discountVal && Number(discountVal) > 0 ? (
+            <div className="space-y-0.5 text-left">
+              <span className="line-through text-slate-400 text-[9px] sm:text-[10px] block" suppressHydrationWarning>
+                {formatPrice(basePrice)}
               </span>
-            )}
-          </div>
+              <span className="text-emerald-500 font-black text-sm sm:text-base block" suppressHydrationWarning>
+                {formatPrice(finalPrice)} ت
+              </span>
+            </div>
+          ) : (
+            <span className="text-[var(--text-primary)] font-black text-sm sm:text-base" suppressHydrationWarning>
+              {formatPrice(basePrice)} ت
+            </span>
+          )}
         </div>
         <AddToCartButton product={{ ...product, image: imgSrc }} showCounter={false} />
       </div>

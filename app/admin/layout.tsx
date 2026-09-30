@@ -1,42 +1,35 @@
 "use client";
-
 import React from "react";
-import { usePathname } from "next/navigation";
 import AdminSidebar from "@/components/admin/AdminSidebar";
-import AdminHeader from "@/components/AdminHeader";
-import AdminNotificationProvider from "@/components/admin/AdminNotificationProvider";
-
-// رفع access_denied از middleware RBAC
-function AccessDeniedBanner() {
-  if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
-  if (!params.get("access_denied")) return null;
-  return (
-    <div className="fixed top-0 inset-x-0 z-50 bg-rose-600 text-white text-xs font-bold py-2 text-center shadow-lg">
-      ⛔ شما دسترسی به این بخش را ندارید. لطفاً با مدیر ارشد تماس بگیرید.
-    </div>
-  );
-}
+import { SiteInfoProvider } from "@/context/SiteInfoContext";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isLoginPage = pathname === "/admin/login";
-
-  if (isLoginPage) {
-    return <main className="min-h-screen bg-slate-950">{children}</main>;
-  }
-
   return (
-    <AdminNotificationProvider>
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans " dir="rtl">
-        <AdminHeader />
-        <div className="flex">
-          <AdminSidebar />
-          <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+    <SiteInfoProvider>
+      <div className="flex min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans" dir="rtl">
+        <AdminSidebar />
+        <main className="flex-1 min-w-0 overflow-x-hidden">
+          {/* هدر ادمین */}
+          <div className="sticky top-0 z-30 border-b border-[var(--card-border)] bg-[var(--modal-bg)]/95 backdrop-blur-xl px-4 sm:px-6 py-3 flex items-center gap-3">
+            <div>
+              <span className="font-black text-xs text-[var(--accent-blue)]">آکسون کور</span>
+              <span className="mx-2 text-[var(--text-secondary)] text-xs">|</span>
+              <span className="text-xs text-[var(--text-secondary)] font-bold">(پنل مدیریت)</span>
+            </div>
+            <div className="mr-auto flex items-center gap-2">
+              <a href="/" target="_blank"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-secondary)] hover:border-[var(--accent-blue)] transition">
+                🏪 مشاهده فروشگاه
+              </a>
+            </div>
+          </div>
+
+          {/* محتوا */}
+          <div className="p-3 sm:p-4 lg:p-6 overflow-x-hidden">
             {children}
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
-    </AdminNotificationProvider>
+    </SiteInfoProvider>
   );
 }

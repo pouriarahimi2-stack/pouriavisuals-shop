@@ -1,7 +1,8 @@
+// File Path: app/admin/menu/page.tsx
 "use client";
 import React from "react";
-import AdminMenu from "@/components/AdminMenu";
+import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
 
 export default function AdminMenuRoute() {
-  return <AdminMenu />;
+  return <StorefrontLayoutStudio defaultTab="menus" />;
 }

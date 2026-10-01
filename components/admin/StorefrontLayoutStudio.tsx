@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
 import MediaUploadModal from "@/components/admin/MediaUploadModal";
+import AdminMenu from "@/components/AdminMenu";
 
 const GLOBAL_NAV_KEY = "axon_global_header_footer_v2026";
 const STORAGE_PREFIX = "axon_puck_page_data_v2026_";
@@ -15,6 +16,12 @@ export interface HomeSectionConfig {
   title: string;
   subtitle: string;
   enabled: boolean;
+}
+
+export interface FooterCustomLink {
+  id: string;
+  title: string;
+  url: string;
 }
 
 const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
@@ -48,16 +55,25 @@ const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
   },
 ];
 
-export default function StorefrontLayoutStudio() {
-  const [activeTab, setActiveTab] = useState<"header" | "footer" | "sections">("header");
+export default function StorefrontLayoutStudio({
+  defaultTab = "header",
+}: {
+  defaultTab?: "header" | "footer" | "sections" | "menus";
+}) {
+  const [activeTab, setActiveTab] = useState<"header" | "footer" | "sections" | "menus">(defaultTab);
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile" | "tablet">("desktop");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [uploadTarget, setUploadTarget] = useState<"logo" | "favicon" | "footerLogo" | null>(null);
 
-  // استیت‌های هدر و فاوآیکون
+  // استیت‌های هدر، ویرایشگر لوگو و فاوآیکون
   const [brandName, setBrandName] = useState("Axon | آکسون");
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoWidth, setLogoWidth] = useState<number>(40);
+  const [logoHeight, setLogoHeight] = useState<number>(40);
+  const [logoRadius, setLogoRadius] = useState<string>("12px");
+  const [logoObjectFit, setLogoObjectFit] = useState<"contain" | "cover">("contain");
   const [faviconUrl, setFaviconUrl] = useState("/favicon.ico");
   const [announcementText, setAnnouncementText] = useState("ارسال سریع و رایگان سفارش‌های ویژه به سراسر کشور 🚀");
   const [announcementEnabled, setAnnouncementEnabled] = useState(true);
@@ -65,7 +81,7 @@ export default function StorefrontLayoutStudio() {
   const [ctaUrl, setCtaUrl] = useState("/products");
   const [headerBg, setHeaderBg] = useState("#07090e");
 
-  // استیت‌های فوتر و اینماد
+  // استیت‌های فوتر، اینماد و لینک‌های پویا (ترب و...)
   const [footerLogoUrl, setFooterLogoUrl] = useState("");
   const [footerTitle, setFooterTitle] = useState("Axon | آکسون");
   const [footerSubtitle, setFooterSubtitle] = useState("مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال");
@@ -77,6 +93,12 @@ export default function StorefrontLayoutStudio() {
   const [enamadLink, setEnamadLink] = useState("");
   const [enamadEnabled, setEnamadEnabled] = useState(true);
   const [copyrightText, setCopyrightText] = useState("تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026");
+  const [externalLinks, setExternalLinks] = useState<FooterCustomLink[]>([
+    { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob" },
+    { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml" },
+  ]);
+  const [newExtTitle, setNewExtTitle] = useState("");
+  const [newExtUrl, setNewExtUrl] = useState("");
 
   // استیت چینش سکشن‌های صفحه اصلی
   const [sections, setSections] = useState<HomeSectionConfig[]>(DEFAULT_HOME_SECTIONS);
@@ -115,6 +137,10 @@ export default function StorefrontLayoutStudio() {
           if (cfg.globalHeader) {
             if (cfg.globalHeader.brandName) setBrandName(cfg.globalHeader.brandName);
             if (cfg.globalHeader.logoUrl) setLogoUrl(cfg.globalHeader.logoUrl);
+            if (cfg.globalHeader.logoWidth) setLogoWidth(Number(cfg.globalHeader.logoWidth));
+            if (cfg.globalHeader.logoHeight) setLogoHeight(Number(cfg.globalHeader.logoHeight));
+            if (cfg.globalHeader.logoRadius) setLogoRadius(cfg.globalHeader.logoRadius);
+            if (cfg.globalHeader.logoObjectFit) setLogoObjectFit(cfg.globalHeader.logoObjectFit);
             if (cfg.globalHeader.faviconUrl) setFaviconUrl(cfg.globalHeader.faviconUrl);
             if (cfg.globalHeader.ctaText) setCtaText(cfg.globalHeader.ctaText);
             if (cfg.globalHeader.ctaUrl) setCtaUrl(cfg.globalHeader.ctaUrl);
@@ -138,6 +164,9 @@ export default function StorefrontLayoutStudio() {
               setEnamadEnabled(Boolean(cfg.globalFooter.enamadEnabled));
             }
             if (cfg.globalFooter.copyright) setCopyrightText(cfg.globalFooter.copyright);
+            if (Array.isArray(cfg.globalFooter.externalLinks)) {
+              setExternalLinks(cfg.globalFooter.externalLinks);
+            }
           }
           if (Array.isArray(cfg.homeSections) && cfg.homeSections.length > 0) {
             setSections(cfg.homeSections);
@@ -179,15 +208,22 @@ export default function StorefrontLayoutStudio() {
 
   const toggleSection = (id: string) => {
     soundEngine.playClick();
-    setSections((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s))
-    );
+    setSections((prev) => prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
   };
 
   const updateSectionText = (id: string, field: "title" | "subtitle", val: string) => {
-    setSections((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, [field]: val } : s))
-    );
+    setSections((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: val } : s)));
+  };
+
+  const handleAddExternalLink = () => {
+    if (!newExtTitle.trim() || !newExtUrl.trim()) return;
+    soundEngine.playClick();
+    setExternalLinks((prev) => [
+      ...prev,
+      { id: "ext_" + Date.now(), title: newExtTitle.trim(), url: newExtUrl.trim() },
+    ]);
+    setNewExtTitle("");
+    setNewExtUrl("");
   };
 
   const applyFaviconInDom = (iconHref: string) => {
@@ -205,8 +241,8 @@ export default function StorefrontLayoutStudio() {
     }
   };
 
-  const handleSaveAll = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveAll = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     soundEngine.playClick();
     setSaving(true);
     setFeedback(null);
@@ -216,6 +252,10 @@ export default function StorefrontLayoutStudio() {
         brandName: brandName.trim(),
         logoText: brandName.trim(),
         logoUrl: logoUrl.trim(),
+        logoWidth,
+        logoHeight,
+        logoRadius,
+        logoObjectFit,
         faviconUrl: faviconUrl.trim() || "/favicon.ico",
         announcementText: announcementText.trim(),
         announcementEnabled,
@@ -226,6 +266,9 @@ export default function StorefrontLayoutStudio() {
       },
       globalFooter: {
         footerLogoUrl: footerLogoUrl.trim() || logoUrl.trim(),
+        logoWidth,
+        logoHeight,
+        logoRadius,
         brandTitle: footerTitle.trim() || brandName.trim(),
         brandSubtitle: footerSubtitle.trim(),
         supportPhone: supportPhone.trim(),
@@ -235,6 +278,7 @@ export default function StorefrontLayoutStudio() {
         enamadCode: enamadEnabled ? enamadCode.trim() : "",
         enamadLink: enamadLink.trim(),
         enamadEnabled,
+        externalLinks,
         copyright: copyrightText.trim(),
         bgColor: "#020617",
         textColor: "#94a3b8",
@@ -253,8 +297,8 @@ export default function StorefrontLayoutStudio() {
         id: "global-header-core",
         brandText: brandName.trim(),
         logoUrl: logoUrl.trim(),
-        logoWidth: 36,
-        logoHeight: 36,
+        logoWidth,
+        logoHeight,
         menu1Text: ctaText.trim() || "کاتالوگ محصولات",
         menu1Url: ctaUrl.trim() || "/products",
         menu2Text: "اخبار تکنولوژی",
@@ -321,7 +365,6 @@ export default function StorefrontLayoutStudio() {
         }).catch(() => null),
       ]);
 
-      // همگام‌سازی مستقیم با صفحه‌ساز ماژولار (home) و localStorage
       const puckBodyBlocks = sections
         .filter((s) => s.enabled && s.type !== "banners_slider")
         .map((s) => {
@@ -388,7 +431,9 @@ export default function StorefrontLayoutStudio() {
       }
 
       soundEngine.playSuccess();
-      setFeedback("✓ تمامی تغییرات استودیوی ظاهر، هدر، فوتر، فاوآیکون، اینماد و چینش سکشن‌ها به صورت بلادرنگ در کل سایت اعمال شد.");
+      setFeedback(
+        "✓ تمامی تغییرات هدر، ابعاد لوگو، فوتر، لینک‌های پویا (ترب/اینماد) و سکشن‌ها به صورت بلادرنگ در کل سایت اعمال شد."
+      );
     } catch {
       setFeedback("خطا در ذخیره‌سازی تنظیمات.");
     } finally {
@@ -399,24 +444,27 @@ export default function StorefrontLayoutStudio() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* هدر یکپارچه ادغام استودیوی ظاهر با منو و دسته‌بندی‌ها */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🎨</span> استودیوی یکپارچه ظاهر، هدر، فوتر، اینماد و چینش سکشن‌ها
+            <span>🎨</span> مرکز یکپارچه استودیوی ظاهر، هدر، فوتر، لوگو و درخت منوها
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            کنترل ۱۰۰٪ واقعی هدر، فاوآیکون تب مرورگر، فوتر، نماد اعتماد و چیدمان سکشن‌های صفحه اصلی با وب‌سوکت بلادرنگ
+            ادغام کامل تنظیمات هدر، ویرایشگر حرفه‌ای لوگو، لینک‌های پویای فوتر (اینماد/ترب)، چینش سکشن‌ها و منوهای ۳ سطحی
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSaveAll}
-          disabled={saving}
-          className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
-        >
-          {saving ? "در حال انتشار در کل سایت..." : "💾 ذخیره و انتشار آنی در کل سایت"}
-        </button>
+        {activeTab !== "menus" && (
+          <button
+            type="button"
+            onClick={() => handleSaveAll()}
+            disabled={saving}
+            className="w-full lg:w-auto px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
+          >
+            {saving ? "در حال انتشار در کل سایت..." : "💾 ذخیره و انتشار آنی در کل سایت"}
+          </button>
+        )}
       </div>
 
       {feedback && (
@@ -425,11 +473,13 @@ export default function StorefrontLayoutStudio() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-black">
+      {/* زیرمنوهای یکپارچه */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-black">
         {[
-          { id: "header", label: "🧭 هدر، لوگو و فاوآیکون تب مرورگر" },
-          { id: "footer", label: "🏛️ فوتر، اطلاعات تماس و نشان اینماد" },
-          { id: "sections", label: "📑 چینش و مدیریت سکشن‌های صفحه اصلی" },
+          { id: "header", label: "🧭 ۱. هدر، ویرایشگر لوگو و فاوآیکون" },
+          { id: "footer", label: "🏛️ ۲. فوتر، اینماد و لینک‌های پویا (ترب)" },
+          { id: "sections", label: "📑 ۳. چینش سکشن‌های صفحه اصلی" },
+          { id: "menus", label: "🌳 ۴. منوهای درختی و دسته‌بندی‌ها" },
         ].map((t) => (
           <button
             key={t.id}
@@ -439,7 +489,7 @@ export default function StorefrontLayoutStudio() {
               setActiveTab(t.id as any);
             }}
             className={
-              "flex-1 py-3 px-4 rounded-xl transition cursor-pointer text-center whitespace-nowrap " +
+              "py-3 px-3 rounded-xl transition cursor-pointer text-center truncate " +
               (activeTab === t.id
                 ? "bg-[var(--accent-blue)] text-white shadow-md"
                 : "bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]")
@@ -450,128 +500,260 @@ export default function StorefrontLayoutStudio() {
         ))}
       </div>
 
-      {loading ? (
+      {/* تب ۴: منو و دسته‌بندی‌های درختی ادغام‌شده */}
+      {activeTab === "menus" && <AdminMenu />}
+
+      {loading && activeTab !== "menus" ? (
         <div className="p-12 text-center text-xs text-slate-400 font-bold">
           در حال بارگذاری تنظیمات استودیوی ظاهر...
         </div>
-      ) : (
+      ) : activeTab !== "menus" ? (
         <form onSubmit={handleSaveAll} className="space-y-6 text-xs">
           {activeTab === "header" && (
-            <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5">
-              <h3 className="text-sm font-black text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-                تنظیمات هدر سراسری، لوگو و آیکون تب مرورگر (Favicon)
-              </h3>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
+                <h3 className="text-sm font-black text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
+                  تنظیمات هدر، ویرایشگر ابعاد لوگو و فاوآیکون تب مرورگر
+                </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نام برند در هدر و تب مرورگر:</label>
-                  <input
-                    type="text"
-                    value={brandName}
-                    onChange={(e) => setBrandName(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">رنگ پس‌زمینه کپسول هدر:</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={headerBg}
-                      onChange={(e) => setHeaderBg(e.target.value)}
-                      className="w-12 h-11 rounded-xl border border-[var(--card-border)] cursor-pointer bg-transparent"
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام برند در هدر:</label>
                     <input
                       type="text"
-                      dir="ltr"
-                      value={headerBg}
-                      onChange={(e) => setHeaderBg(e.target.value)}
-                      className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                      value={brandName}
+                      onChange={(e) => setBrandName(e.target.value)}
+                      className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 font-bold text-[var(--text-secondary)]">رنگ پس‌زمینه هدر:</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={headerBg}
+                        onChange={(e) => setHeaderBg(e.target.value)}
+                        className="w-11 h-11 rounded-xl border border-[var(--card-border)] cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={headerBg}
+                        onChange={(e) => setHeaderBg(e.target.value)}
+                        className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 font-bold text-[var(--text-secondary)]">تصویر لوگوی اصلی:</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={logoUrl}
+                        onChange={(e) => setLogoUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setUploadTarget("logo")}
+                        className="px-3.5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer shrink-0"
+                      >
+                        ☁️ آپلود
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 font-bold text-[var(--text-secondary)]">آیکون تب مرورگر (Favicon):</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={faviconUrl}
+                        onChange={(e) => setFaviconUrl(e.target.value)}
+                        placeholder="/favicon.ico"
+                        className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setUploadTarget("favicon")}
+                        className="px-3.5 py-3 rounded-2xl bg-indigo-600 text-white font-bold cursor-pointer shrink-0"
+                      >
+                        ☁️ آپلود
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تصویر لوگوی اصلی هدر:</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      dir="ltr"
-                      value={logoUrl}
-                      onChange={(e) => setLogoUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setUploadTarget("logo")}
-                      className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer shrink-0"
-                    >
-                      ☁️ آپلود لوگو
-                    </button>
+                {/* ویرایشگر حرفه‌ای ابعاد و استایل لوگو */}
+                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                  <h4 className="font-black text-xs text-[var(--accent-blue)]">
+                    📐 ویرایشگر حرفه‌ای ابعاد و استایل لوگو:
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">عرض لوگو (px):</label>
+                      <input
+                        type="number"
+                        min={20}
+                        max={180}
+                        value={logoWidth}
+                        onChange={(e) => setLogoWidth(Number(e.target.value))}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">ارتفاع لوگو (px):</label>
+                      <input
+                        type="number"
+                        min={20}
+                        max={120}
+                        value={logoHeight}
+                        onChange={(e) => setLogoHeight(Number(e.target.value))}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">گردی کادر لوگو:</label>
+                      <select
+                        value={logoRadius}
+                        onChange={(e) => setLogoRadius(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                      >
+                        <option value="0px">مربعی (0px)</option>
+                        <option value="8px">ملایم (8px)</option>
+                        <option value="12px">استاندارد (12px)</option>
+                        <option value="999px">دایره‌ای کامل</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-[10px] font-bold text-slate-400">حالت برش:</label>
+                      <select
+                        value={logoObjectFit}
+                        onChange={(e) => setLogoObjectFit(e.target.value as any)}
+                        className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
+                      >
+                        <option value="contain">کامل (Contain)</option>
+                        <option value="cover">پر کردن (Cover)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">آیکون تب مرورگر (Favicon):</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      dir="ltr"
-                      value={faviconUrl}
-                      onChange={(e) => setFaviconUrl(e.target.value)}
-                      placeholder="/favicon.ico"
-                      className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setUploadTarget("favicon")}
-                      className="px-4 py-3 rounded-2xl bg-indigo-600 text-white font-bold cursor-pointer shrink-0"
-                    >
-                      ☁️ آپلود فاوآیکون
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن دکمه اصلی هدر (CTA):</label>
-                  <input
-                    type="text"
-                    value={ctaText}
-                    onChange={(e) => setCtaText(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">لینک دکمه اصلی هدر:</label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={ctaUrl}
-                    onChange={(e) => setCtaUrl(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
-                  />
-                </div>
-
-                <div className="md:col-span-2 space-y-2">
-                  <label className="block font-bold text-[var(--text-secondary)]">متن نوار اعلان بالای سایت (Announcement Bar):</label>
+                <div className="space-y-2">
+                  <label className="block font-bold text-[var(--text-secondary)]">متن نوار اعلان بالای سایت:</label>
                   <input
                     type="text"
                     value={announcementText}
                     onChange={(e) => setAnnouncementText(e.target.value)}
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
-                  <label className="flex items-center gap-2 font-bold cursor-pointer pt-1">
+                  <label className="flex items-center gap-2 font-bold cursor-pointer">
                     <input
                       type="checkbox"
                       checked={announcementEnabled}
                       onChange={(e) => setAnnouncementEnabled(e.target.checked)}
                       className="rounded accent-[var(--accent-blue)]"
                     />
-                    <span>نمایش فعال نوار اعلان در بالای تمامی صفحات</span>
+                    <span>نمایش فعال نوار اعلان بالای سایت</span>
                   </label>
+                </div>
+              </div>
+
+              {/* پیش‌نمایش زنده ریسپانسیو هدر و لوگو (دسکتاپ، موبایل، تبلت) */}
+              <div className="lg:col-span-5 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col justify-between space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
+                  <h4 className="font-black text-sm">پیش‌نمایش زنده هدر و لوگو</h4>
+                  <div className="flex gap-1 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[10px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice("desktop")}
+                      className={
+                        "px-2.5 py-1 rounded-lg cursor-pointer " +
+                        (previewDevice === "desktop" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+                      }
+                    >
+                      🖥️ دسکتاپ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice("mobile")}
+                      className={
+                        "px-2.5 py-1 rounded-lg cursor-pointer " +
+                        (previewDevice === "mobile" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+                      }
+                    >
+                      📱 موبایل
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice("tablet")}
+                      className={
+                        "px-2.5 py-1 rounded-lg cursor-pointer " +
+                        (previewDevice === "tablet" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+                      }
+                    >
+                      📟 تبلت
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex items-center justify-center bg-[var(--input-bg)] rounded-2xl p-4 border border-[var(--card-border)]">
+                  <div
+                    className={
+                      "transition-all duration-300 space-y-2 " +
+                      (previewDevice === "mobile"
+                        ? "w-[260px]"
+                        : previewDevice === "tablet"
+                        ? "w-[360px]"
+                        : "w-full")
+                    }
+                  >
+                    {announcementEnabled && (
+                      <div className="p-2 rounded-xl bg-[var(--accent-blue)] text-white text-[10px] font-bold text-center truncate">
+                        {announcementText}
+                      </div>
+                    )}
+                    <div
+                      style={{ backgroundColor: headerBg }}
+                      className="p-3.5 rounded-2xl border border-white/10 flex items-center justify-between gap-2 text-white shadow-xl"
+                    >
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        {logoUrl ? (
+                          <img
+                            src={logoUrl}
+                            alt="Logo"
+                            style={{
+                              width: logoWidth + "px",
+                              height: logoHeight + "px",
+                              borderRadius: logoRadius,
+                              objectFit: logoObjectFit,
+                            }}
+                            className="border border-white/15 shrink-0"
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: logoWidth + "px",
+                              height: logoHeight + "px",
+                              borderRadius: logoRadius,
+                            }}
+                            className="bg-sky-500 text-white flex items-center justify-center font-black shrink-0"
+                          >
+                            A
+                          </div>
+                        )}
+                        <span className="font-black text-xs truncate">{brandName}</span>
+                      </div>
+                      <span className="px-3 py-1.5 rounded-xl bg-sky-500 text-white text-[10px] font-black shrink-0">
+                        {ctaText}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -580,12 +762,12 @@ export default function StorefrontLayoutStudio() {
           {activeTab === "footer" && (
             <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5">
               <h3 className="text-sm font-black text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-                تنظیمات فوتر سراسری، اطلاعات پشتیبانی و نماد اعتماد الکترونیکی (اینماد)
+                تنظیمات کامل فوتر، نشان اینماد و مدیریت پویا لینک‌های خارجی (ترب، ایمالز و...)
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">عنوان برند در فوتر:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان برند در فوتر:</label>
                   <input
                     type="text"
                     value={footerTitle}
@@ -593,9 +775,8 @@ export default function StorefrontLayoutStudio() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">زیرعنوان معرفی در فوتر:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">زیرعنوان معرفی در فوتر:</label>
                   <input
                     type="text"
                     value={footerSubtitle}
@@ -603,9 +784,8 @@ export default function StorefrontLayoutStudio() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">شماره تماس پشتیبانی:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">شماره تماس پشتیبانی:</label>
                   <input
                     type="text"
                     dir="ltr"
@@ -614,9 +794,8 @@ export default function StorefrontLayoutStudio() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">ایمیل پشتیبانی:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">ایمیل پشتیبانی:</label>
                   <input
                     type="email"
                     dir="ltr"
@@ -625,9 +804,8 @@ export default function StorefrontLayoutStudio() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">نشانی دفتر / انبار مرکزی:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">نشانی دفتر / انبار مرکزی:</label>
                   <input
                     type="text"
                     value={warehouseAddress}
@@ -635,9 +813,8 @@ export default function StorefrontLayoutStudio() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">ساعات پاسخگویی:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">ساعات پاسخگویی:</label>
                   <input
                     type="text"
                     value={workingHours}
@@ -645,9 +822,8 @@ export default function StorefrontLayoutStudio() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کد رهگیری نشان اینماد:</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد رهگیری نشان اینماد:</label>
                   <input
                     type="text"
                     dir="ltr"
@@ -656,9 +832,8 @@ export default function StorefrontLayoutStudio() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">لینک مستقیم استعلام اینماد (اختیاری):</label>
+                  <label className="block mb-1 font-bold text-[var(--text-secondary)]">لینک مستقیم استعلام اینماد:</label>
                   <input
                     type="text"
                     dir="ltr"
@@ -668,43 +843,98 @@ export default function StorefrontLayoutStudio() {
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
                   />
                 </div>
+              </div>
 
-                <div className="md:col-span-2">
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">متن کپی‌رایت فوتر:</label>
+              {/* مدیریت لینک‌های پویا فوتر (ترب، ایمالز و لینک‌های آینده) */}
+              <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3">
+                <h4 className="font-black text-xs text-[var(--accent-blue)]">
+                  🔗 مدیریت لینک‌های فوتر (ترب، ایمالز، شبکه‌های اجتماعی و لینک‌های آینده):
+                </h4>
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
-                    value={copyrightText}
-                    onChange={(e) => setCopyrightText(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                    value={newExtTitle}
+                    onChange={(e) => setNewExtTitle(e.target.value)}
+                    placeholder="عنوان لینک (مثال: مشاهده در ترب)"
+                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
                   />
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={newExtUrl}
+                    onChange={(e) => setNewExtUrl(e.target.value)}
+                    placeholder="/api/torob یا https://..."
+                    className="flex-1 p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddExternalLink}
+                    className="px-4 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shrink-0"
+                  >
+                    + افزودن به فوتر
+                  </button>
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className="flex items-center gap-2 font-bold cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={enamadEnabled}
-                      onChange={(e) => setEnamadEnabled(e.target.checked)}
-                      className="rounded accent-[var(--accent-blue)]"
-                    />
-                    <span>نمایش نشان رسمی اعتماد الکترونیکی (eNamad) در فوتر سایت</span>
-                  </label>
+                <div className="space-y-2">
+                  {externalLinks.map((lnk, idx) => (
+                    <div
+                      key={lnk.id}
+                      className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 w-full">
+                        <input
+                          type="text"
+                          value={lnk.title}
+                          onChange={(e) => {
+                            const copy = [...externalLinks];
+                            copy[idx] = { ...copy[idx], title: e.target.value };
+                            setExternalLinks(copy);
+                          }}
+                          className="p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                        />
+                        <input
+                          type="text"
+                          dir="ltr"
+                          value={lnk.url}
+                          onChange={(e) => {
+                            const copy = [...externalLinks];
+                            copy[idx] = { ...copy[idx], url: e.target.value };
+                            setExternalLinks(copy);
+                          }}
+                          className="p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExternalLinks(externalLinks.filter((x) => x.id !== lnk.id))
+                        }
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 font-bold cursor-pointer self-end sm:self-center"
+                      >
+                        🗑️ حذف
+                      </button>
+                    </div>
+                  ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن کپی‌‌رایت فوتر:</label>
+                <input
+                  type="text"
+                  value={copyrightText}
+                  onChange={(e) => setCopyrightText(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                />
               </div>
             </div>
           )}
 
           {activeTab === "sections" && (
             <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-              <div className="border-b border-[var(--card-border)] pb-3">
-                <h3 className="text-sm font-black text-[var(--accent-blue)]">
-                  مدیریت ترتیب، نمایش و عناوین سکشن‌های صفحه اصلی
-                </h3>
-                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  با دکمه‌های ⬆️ و ⬇️ ترتیب سکشن‌ها را جابجا کنید یا هر بخش را فعال/غیرفعال نمایید:
-                </p>
-              </div>
-
+              <h3 className="text-sm font-black text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
+                مدیریت ترتیب، ویرایش عناوین و مخفی‌سازی سکشن‌های صفحه اصلی
+              </h3>
               <div className="space-y-3">
                 {sections.map((sec, idx) => (
                   <div
@@ -717,37 +947,27 @@ export default function StorefrontLayoutStudio() {
                     }
                   >
                     <div className="flex-1 space-y-2 w-full">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-lg bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] font-mono font-black text-[10px]">
-                          ردیف {idx + 1}
-                        </span>
-                        <span className="font-mono text-[10px] text-slate-400">({sec.type})</span>
-                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <input
                           type="text"
                           value={sec.title}
                           onChange={(e) => updateSectionText(sec.id, "title", e.target.value)}
-                          placeholder="عنوان سکشن"
-                          className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold text-xs outline-none focus:border-[var(--accent-blue)]"
+                          className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
                         />
                         <input
                           type="text"
                           value={sec.subtitle}
                           onChange={(e) => updateSectionText(sec.id, "subtitle", e.target.value)}
-                          placeholder="زیرعنوان سکشن"
-                          className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs outline-none focus:border-[var(--accent-blue)]"
+                          className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] outline-none"
                         />
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2 self-end md:self-center shrink-0">
                       <button
                         type="button"
                         onClick={() => moveSection(idx, "up")}
                         disabled={idx === 0}
-                        className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] disabled:opacity-30 cursor-pointer"
-                        title="انتقال به بالا"
+                        className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
                       >
                         ⬆️
                       </button>
@@ -755,8 +975,7 @@ export default function StorefrontLayoutStudio() {
                         type="button"
                         onClick={() => moveSection(idx, "down")}
                         disabled={idx === sections.length - 1}
-                        className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] disabled:opacity-30 cursor-pointer"
-                        title="انتقال به پایین"
+                        className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
                       >
                         ⬇️
                       </button>
@@ -764,10 +983,10 @@ export default function StorefrontLayoutStudio() {
                         type="button"
                         onClick={() => toggleSection(sec.id)}
                         className={
-                          "px-3.5 py-2 rounded-xl font-black text-xs cursor-pointer transition " +
+                          "px-3.5 py-2 rounded-xl font-black cursor-pointer " +
                           (sec.enabled
-                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                            : "bg-rose-500/15 text-rose-400 border border-rose-500/30")
+                            ? "bg-emerald-500/15 text-emerald-400"
+                            : "bg-rose-500/15 text-rose-400")
                         }
                       >
                         {sec.enabled ? "فعال ✓" : "مخفی ✕"}
@@ -779,16 +998,12 @@ export default function StorefrontLayoutStudio() {
             </div>
           )}
         </form>
-      )}
+      ) : null}
 
       <MediaUploadModal
         isOpen={uploadTarget !== null}
         bucket="site-assets"
-        title={
-          uploadTarget === "favicon"
-            ? "آپلود آیکون تب مرورگر (Favicon)"
-            : "آپلود لوگوی رسمی برند"
-        }
+        title={uploadTarget === "favicon" ? "آپلود آیکون تب مرورگر (Favicon)" : "آپلود لوگوی برند"}
         onClose={() => setUploadTarget(null)}
         onUploadSuccess={(url) => {
           if (uploadTarget === "logo") setLogoUrl(url);

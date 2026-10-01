@@ -1,3 +1,4 @@
+// File Path: app/api/torob/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
@@ -35,13 +36,19 @@ export async function GET() {
 
     const formattedList = rawProducts.map((p: any) => {
       const basePrice = Number(p.price || 0);
-      const discountVal = p.discount_price || p.discountPrice ? Number(p.discount_price || p.discountPrice) : undefined;
+      const discountVal =
+        p.discount_price || p.discountPrice
+          ? Number(p.discount_price || p.discountPrice)
+          : undefined;
       const finalPrice = discountVal && discountVal > 0 ? discountVal : basePrice;
-      const isAvailable = p.is_available !== false && p.isAvailable !== false && (p.stock === undefined || p.stock === null || Number(p.stock) > 0);
+      const isAvailable =
+        p.is_available !== false &&
+        p.isAvailable !== false &&
+        (p.stock === undefined || p.stock === null || Number(p.stock) > 0);
 
       let images: string[] = [];
       if (Array.isArray(p.images) && p.images.length > 0) {
-        images = p.images.map((img: string) => img.startsWith("http") ? img : baseUrl + img);
+        images = p.images.map((img: string) => (img.startsWith("http") ? img : baseUrl + img));
       } else if (p.image_url || p.image) {
         const single = String(p.image_url || p.image);
         images = [single.startsWith("http") ? single : baseUrl + single];
@@ -51,12 +58,12 @@ export async function GET() {
 
       return {
         page_unique_id: String(p.id),
-        title: p.title || p.name || "تجهیزات استودیویی آکسون",
+        title: p.title || p.name || "محصولات دیجیتال و تکنولوژی آکسون",
         subtitle: p.title_fa || p.short_description || "",
         price: finalPrice,
         old_price: discountVal && discountVal < basePrice ? basePrice : undefined,
         availability: isAvailable ? "instock" : "outofstock",
-        category_name: p.category || p.category_name || "تجهیزات استودیو و تدوین",
+        category_name: p.category || p.category_name || "کالای دیجیتال و تکنولوژی",
         image_links: images,
         page_url: baseUrl + "/products/" + p.id,
         spec: p.specs && typeof p.specs === "object" ? p.specs : undefined,

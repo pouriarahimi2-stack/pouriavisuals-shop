@@ -1,3 +1,4 @@
+// File Path: app/api/theme-builder/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
@@ -17,24 +18,24 @@ export async function GET() {
       config: data?.theme_builder_config || {
         globalHeader: {
           brandName: "AXON CORE",
-          logoText: "آکسون استودیو",
+          logoText: "آکسون کور",
           ctaText: "کاتالوگ محصولات",
           ctaUrl: "/products",
           bgColor: "#0f172a",
-          textColor: "#ffffff"
+          textColor: "#ffffff",
         },
         globalFooter: {
-          copyright: "تمامی حقوق محفوظ است © 2026 آکسون استودیو",
+          copyright: "تمامی حقوق محفوظ است © 2026 آکسون کور | مرجع تخصصی تکنولوژی و دیجیتال",
           supportPhone: "09376110200",
           bgColor: "#020617",
-          textColor: "#94a3b8"
+          textColor: "#94a3b8",
         },
         designTokens: {
           accentColor: "#0284c7",
           borderRadius: "2xl",
-          containerWidth: "7xl"
-        }
-      }
+          containerWidth: "7xl",
+        },
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "✓ تنظیمات Theme Builder سراسری با موفقیت ذخیره و در کل سایت منتشر شد."
+      message: "✓ تنظیمات Theme Builder سراسری با موفقیت ذخیره و در کل سایت منتشر شد.",
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });

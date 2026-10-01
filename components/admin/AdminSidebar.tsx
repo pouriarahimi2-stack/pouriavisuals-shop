@@ -1,165 +1,332 @@
+// File Path: components/admin/AdminSidebar.tsx
 "use client";
+
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
 
-const NAV = [
+export interface SidebarNavItem {
+  id: string;
+  label: string;
+  href: string;
+  icon: string;
+  badge?: string;
+  requiredPerm: string[];
+}
+
+const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
   {
-    group: "مدیریت فروش",
-    items: [
-      { name: "داشبورد",          href: "/admin/dashboard",  icon: "📊" },
-      { name: "سفارشات",          href: "/admin/financial",  icon: "📦" },
-      { name: "مشتریان و CRM",    href: "/admin/customers",  icon: "👥" },
-      { name: "حسابداری و انبار", href: "/admin/inventory",  icon: "📈" },
-      { name: "گزارش‌های مالی",   href: "/admin/reports",    icon: "📑" },
-      { name: "کدهای تخفیف",      href: "/admin/coupons",    icon: "🏷️" },
-    ],
+    id: "dashboard",
+    label: "داشبورد تحلیلی و فرماندهی",
+    href: "/admin/dashboard",
+    icon: "📊",
+    requiredPerm: ["dashboard", "all"],
   },
   {
-    group: "ویترین",
-    items: [
-      { name: "استودیوی ظاهر",    href: "/admin/appearance", icon: "🎨" },
-      { name: "محصولات",          href: "/admin/products",   icon: "💻" },
-      { name: "بنرها",            href: "/admin/banners",    icon: "🖼️" },
-      { name: "صفحه‌ساز",         href: "/admin/pages",      icon: "📐" },
-      { name: "وبلاگ و مقالات",   href: "/admin/blog",       icon: "📚" },
-      { name: "اخبار فناوری",     href: "/admin/news",       icon: "📡" },
-      { name: "منو و دسته‌بندی",  href: "/admin/menu",       icon: "🔗" },
-      { name: "پیام‌ها",          href: "/admin/messages",   icon: "📩" },
-      { name: "دیدگاه‌ها",        href: "/admin/reviews",    icon: "⭐" },
-    ],
+    id: "inventory_hub",
+    label: "حسابداری، انبار، سفارشات و مالی",
+    href: "/admin/inventory",
+    icon: "🏛️",
+    badge: "یکپارچه",
+    requiredPerm: ["inventory", "orders", "financial", "reports", "all"],
   },
   {
-    group: "هوش مصنوعی",
-    items: [
-      { name: "مرکز AI",          href: "/admin/ai",         icon: "🤖" },
-      { name: "هویت بصری",        href: "/admin/styles",     icon: "✨" },
-      { name: "سئو",              href: "/admin/seo",        icon: "🔍" },
-    ],
+    id: "products",
+    label: "کاتالوگ محصولات و قیمت‌ها",
+    href: "/admin/products",
+    icon: "🛍️",
+    requiredPerm: ["products", "all"],
   },
   {
-    group: "سیستم",
-    items: [
-      { name: "دسترسی‌ها",        href: "/admin/roles",      icon: "🛡️" },
-      { name: "لاگ‌های امنیتی",   href: "/admin/audit-logs", icon: "📝" },
-      { name: "پشتیبان‌گیری",     href: "/admin/backup",     icon: "💾" },
-      { name: "تنظیمات",          href: "/admin/settings",   icon: "⚙️" },
-      { name: "رمز عبور",         href: "/admin/change-pin", icon: "🔐" },
-    ],
+    id: "customers",
+    label: "مشتریان (CRM) و پیامک",
+    href: "/admin/customers",
+    icon: "👥",
+    requiredPerm: ["customers", "all"],
+  },
+  {
+    id: "coupons",
+    label: "کدهای تخفیف زمان‌دار و هدفمند",
+    href: "/admin/coupons",
+    icon: "🏷️",
+    requiredPerm: ["coupons", "all"],
+  },
+  {
+    id: "appearance_hub",
+    label: "استودیوی ظاهر، هدر، فوتر و منوها",
+    href: "/admin/appearance",
+    icon: "🎨",
+    badge: "یکپارچه",
+    requiredPerm: ["appearance", "menu", "all"],
+  },
+  {
+    id: "pages",
+    label: "صفحه‌ساز ماژولار (ریسپانسیو)",
+    href: "/admin/pages",
+    icon: "⚡",
+    requiredPerm: ["pages", "all"],
+  },
+  {
+    id: "styles",
+    label: "هویت بصری، فونت‌ها و CSS",
+    href: "/admin/styles",
+    icon: "✨",
+    requiredPerm: ["appearance", "styles", "all"],
+  },
+  {
+    id: "banners",
+    label: "بنرها و اسلایدر کاتالوگ",
+    href: "/admin/banners",
+    icon: "🖼️",
+    requiredPerm: ["banners", "all"],
+  },
+  {
+    id: "seo",
+    label: "دستیار تخصصی سئو (رنک ۱)",
+    href: "/admin/seo",
+    icon: "🚀",
+    badge: "SEO",
+    requiredPerm: ["seo", "all"],
+  },
+  {
+    id: "blog",
+    label: "وبلاگ و مقالات سئو (متصل به کالا)",
+    href: "/admin/blog",
+    icon: "📚",
+    requiredPerm: ["blog", "seo", "all"],
+  },
+  {
+    id: "news",
+    label: "رادار خودکار اخبار فناوری",
+    href: "/admin/news",
+    icon: "📡",
+    requiredPerm: ["news", "seo", "all"],
+  },
+  {
+    id: "ai",
+    label: "مرکز هوش مصنوعی و کوپایلوت",
+    href: "/admin/ai",
+    icon: "🤖",
+    requiredPerm: ["ai", "all"],
+  },
+  {
+    id: "messages",
+    label: "تیکت‌ها و پیام‌های کاربران",
+    href: "/admin/messages",
+    icon: "📩",
+    requiredPerm: ["messages", "all"],
+  },
+  {
+    id: "reviews",
+    label: "دیدگاه‌ها و رضایت خریداران",
+    href: "/admin/reviews",
+    icon: "⭐",
+    requiredPerm: ["reviews", "all"],
+  },
+  {
+    id: "roles",
+    label: "مدیران و ماتریس دسترسی‌ها",
+    href: "/admin/roles",
+    icon: "🛡️",
+    requiredPerm: ["roles", "all"],
+  },
+  {
+    id: "change_pin",
+    label: "تغییر رمز عبور و پین امنیتی",
+    href: "/admin/change-pin",
+    icon: "🔐",
+    requiredPerm: ["dashboard", "all"],
+  },
+  {
+    id: "audit_logs",
+    label: "لاگ‌های امنیتی و اسکنر هوشمند",
+    href: "/admin/audit-logs",
+    icon: "🚨",
+    requiredPerm: ["audit_logs", "all"],
+  },
+  {
+    id: "backup",
+    label: "بکاپ خودکار روزانه و بازیابی",
+    href: "/admin/backup",
+    icon: "💾",
+    requiredPerm: ["backup", "all"],
+  },
+  {
+    id: "settings",
+    label: "تنظیمات کلان و حالت تعمیرات",
+    href: "/admin/settings",
+    icon: "⚙️",
+    requiredPerm: ["settings", "all"],
   },
 ];
 
-export default function AdminSidebar() {
+export function AdminSidebar(props: any = {}) {
   const pathname = usePathname();
-  const [open,     setOpen]    = useState(false);
-  const [unread,   setUnread]  = useState(0);
-  const [isAdmin,  setIsAdmin] = useState(false);
+  const [adminUser, setAdminUser] = useState<{
+    username?: string;
+    role?: string;
+    permissions?: string[];
+  } | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  // چک کن آیا ادمین لاگین کرده
-  useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const r = await fetch("/api/admin/session", { cache: "no-store" });
-        const d = await r.json();
-        if (d.success && d.admin) {
-          setIsAdmin(true);
-          // فقط بعد از تأیید admin، پیام‌ها رو بگیر
-          const r2 = await fetch("/api/admin/messages?count=true");
-          const d2 = await r2.json();
-          if (d2.unread) setUnread(d2.unread);
-        }
-      } catch {}
-    };
-    // فقط در صفحات ادمین (نه login)
-    if (!pathname?.includes("/admin/login")) {
-      checkAdmin();
-    }
-  }, [pathname]);
-
-  const logout = async () => {
-    soundEngine.playClick();
-    await fetch("/api/admin/logout", { method: "POST" }).catch(() => {});
-    window.location.href = "/admin/login";
+  const fetchSessionPermissions = async () => {
+    try {
+      const res = await fetch("/api/admin/auth", { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.authenticated && json.user) {
+        setAdminUser(json.user);
+      }
+    } catch {}
   };
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* لوگو */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--card-border)] shrink-0">
-        <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-base shadow-md shrink-0">⚡</div>
-        <div className="min-w-0">
-          <p className="font-black text-xs text-[var(--text-primary)] truncate">آکسون کور</p>
-          <p className="text-[9px] font-mono text-blue-500 font-bold">ADMIN PANEL</p>
-        </div>
-      </div>
+  useEffect(() => {
+    fetchSessionPermissions();
 
-      {/* منو */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
-        {NAV.map((sec, si) => (
-          <div key={si} className="space-y-0.5">
-            <p className="text-[9px] font-black text-slate-500 px-2 uppercase tracking-wider mb-1">{sec.group}</p>
-            {sec.items.map(item => {
-              const isActive  = pathname === item.href || (pathname?.startsWith(item.href + "/") && item.href !== "/admin");
-              const hasUnread = item.href === "/admin/messages" && unread > 0;
-              return (
-                <Link key={item.href} href={item.href}
-                  onClick={() => { soundEngine.playClick(); setOpen(false); }}
-                  className={"flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer " + (isActive ? "bg-blue-600 text-white shadow" : "text-[var(--text-secondary)] hover:bg-[var(--input-bg)] hover:text-[var(--text-primary)]")}>
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 text-sm">{item.icon}</span>
-                    <span className="truncate">{item.name}</span>
-                  </span>
-                  {hasUnread && (
-                    <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[9px] font-mono flex items-center justify-center shrink-0 ml-1">
-                      {unread > 9 ? "9+" : unread}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
+    const ch = supabase
+      .channel("realtime-sidebar-permissions")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
+        fetchSessionPermissions();
+      })
+      .subscribe();
 
-      {/* پایین */}
-      <div className="border-t border-[var(--card-border)] p-2 space-y-1 shrink-0">
-        <Link href="/" target="_blank"
-          className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-blue-500 transition cursor-pointer text-[var(--text-secondary)]">
-          <span>مشاهده سایت</span><span>↗</span>
-        </Link>
-        <button onClick={logout}
-          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition cursor-pointer">
-          <span>خروج از پنل</span><span>🚪</span>
-        </button>
-      </div>
-    </div>
-  );
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, []);
+
+  const userPerms = adminUser?.permissions || ["all"];
+  const isSuper =
+    adminUser?.role === "superadmin" || userPerms.includes("all");
+
+  const allowedMenuItems = UNIFIED_ADMIN_NAV.filter((item) => {
+    if (isSuper) return true;
+    return item.requiredPerm.some((p) => userPerms.includes(p));
+  });
+
+  const getRoleBadgeLabel = (role?: string) => {
+    if (role === "superadmin") return "👑 مدیر ارشد کل سیستم";
+    if (role === "product_manager") return "📦 مدیر کاتالوگ و انبار";
+    if (role === "order_manager") return "💳 پشتیبان سفارشات و مالی";
+    if (role === "content_seo_manager") return "🚀 کارشناس محتوا و سئو";
+    if (role === "viewer_reporter") return "👁️ بیننده و گزارش‌دهنده";
+    return "🛡️️ مدیر سیستم";
+  };
 
   return (
     <>
-      {/* دسکتاپ + تبلت */}
-      <aside className="hidden md:flex flex-col w-56 lg:w-60 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-screen sticky top-0 shadow-xl" dir="rtl">
-        <SidebarContent />
-      </aside>
-
-      {/* موبایل — دکمه float بالای MobileBottomNav */}
-      <div className="md:hidden fixed bottom-[72px] left-3 z-50">
-        <button onClick={() => { soundEngine.playClick(); setOpen(!open); }}
-          className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-2xl font-bold text-base cursor-pointer active:scale-95 transition">
-          {open ? "✕" : "☰"}
+      {/* نوار بالای موبایل و تبلت برای باز کردن منو */}
+      <div className="lg:hidden flex items-center justify-between p-3.5 mb-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-black">
+        <div className="flex items-center gap-2">
+          <span className="text-base">⚡</span>
+          <span>پنل فرماندهی آکسون</span>
+          {adminUser?.role && (
+            <span className="px-2 py-0.5 rounded-lg bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] text-[10px]">
+              {getRoleBadgeLabel(adminUser.role)}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            soundEngine.playClick();
+            setMobileOpen(!mobileOpen);
+          }}
+          className="px-3.5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black cursor-pointer"
+        >
+          {mobileOpen ? "✕ بستن منو" : "☰ منوی مدیریت"}
         </button>
       </div>
 
-      {/* overlay موبایل */}
-      {open && <div className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />}
-
-      {/* drawer موبایل */}
       <aside
+        className={
+          "w-full lg:w-72 shrink-0 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 shadow-2xl font-sans select-none space-y-4 transition-all " +
+          (mobileOpen ? "block" : "hidden lg:block")
+        }
         dir="rtl"
-        className={"md:hidden fixed inset-y-0 right-0 z-50 w-64 bg-[var(--modal-bg)] border-l border-[var(--card-border)] shadow-2xl transition-transform duration-300 " + (open ? "translate-x-0" : "translate-x-full")}>
-        <SidebarContent />
+      >
+        <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="font-black text-xs text-[var(--accent-blue)]">AXON ADMIN OS</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          </div>
+          <div className="text-[11px] font-bold text-[var(--text-primary)] truncate">
+            {adminUser?.username ? "حساب: @" + adminUser.username : "مدیریت یکپارچه سایت"}
+          </div>
+          <div className="text-[10px] font-bold text-emerald-400">
+            {getRoleBadgeLabel(adminUser?.role)}
+          </div>
+        </div>
+
+        <nav className="space-y-1.5 max-h-[70vh] overflow-y-auto pr-1 text-xs">
+          {allowedMenuItems.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.id === "inventory_hub" &&
+                (pathname?.startsWith("/admin/inventory") ||
+                  pathname?.startsWith("/admin/orders") ||
+                  pathname?.startsWith("/admin/financial") ||
+                  pathname?.startsWith("/admin/reports"))) ||
+              (item.id === "appearance_hub" &&
+                (pathname?.startsWith("/admin/appearance") ||
+                  pathname?.startsWith("/admin/menu")));
+
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setMobileOpen(false);
+                  if (typeof props.onSelectTab === "function") {
+                    props.onSelectTab(item.id);
+                  }
+                }}
+                className={
+                  "flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl font-bold transition " +
+                  (isActive
+                    ? "bg-[var(--accent-blue)] text-white shadow-lg font-black"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--input-bg)] hover:text-[var(--text-primary)]")
+                }
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <span className="text-sm shrink-0">{item.icon}</span>
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span
+                    className={
+                      "px-2 py-0.5 rounded-md text-[9px] font-black shrink-0 " +
+                      (isActive
+                        ? "bg-white/20 text-white"
+                        : "bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]")
+                    }
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="pt-3 border-t border-[var(--card-border)] flex items-center justify-between text-[11px]">
+          <Link
+            href="/"
+            target="_blank"
+            className="font-bold text-[var(--accent-blue)] hover:underline"
+          >
+            🌐 مشاهده زنده فروشگاه
+          </Link>
+          <span className="font-mono text-[10px] text-slate-400">
+            {allowedMenuItems.length} ماژول فعال
+          </span>
+        </div>
       </aside>
     </>
   );
 }
+
+export default AdminSidebar;

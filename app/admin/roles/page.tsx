@@ -20,20 +20,21 @@ const ALL_PERMISSIONS = [
   { id: "products", label: "🛍️ کاتالوگ محصولات و قیمت‌ها" },
   { id: "inventory", label: "🏭 انبارداری و موجودی" },
   { id: "financial", label: "💳 امور مالی و حسابداری" },
+  { id: "reports", label: "📈 گزارش‌های مالی و گردش ماهانه" },
   { id: "customers", label: "👥 مشتریان (CRM) و پیامک" },
   { id: "coupons", label: "🏷️ کدهای تخفیف و کمپین‌ها" },
   { id: "appearance", label: "🎨 استودیوی ظاهر، هدر و فوتر" },
   { id: "pages", label: "⚡ صفحه‌ساز ماژولار" },
-  { id: "menu", label: "🧭 منوها و دسته‌بندی‌ها" },
+  { id: "menu", label: "🧭 منوهای درختی و دسته‌بندی‌ها" },
   { id: "banners", label: "🖼️ مدیریت بنرها و اسلایدر" },
   { id: "blog", label: "📚 مجله و مقالات سئو" },
   { id: "news", label: "📡 رادار اخبار تکنولوژی" },
-  { id: "seo", label: "🚀 مرکز فرماندهی سئو" },
+  { id: "seo", label: "🚀 دستیار تخصصی سئو" },
   { id: "ai", label: "🤖 سوئیت هوش مصنوعی و کوپایلوت" },
   { id: "messages", label: "📩 تیکت‌ها و پیام‌های کاربران" },
   { id: "reviews", label: "⭐ دیدگاه‌ها و نظرات" },
   { id: "settings", label: "⚙️ تنظیمات کلان و حالت تعمیرات" },
-  { id: "backup", label: "💾 بکاپ و بازگردانی دیتابیس" },
+  { id: "backup", label: "💾 بکاپ روزانه و بازگردانی دیتابیس" },
   { id: "audit_logs", label: "🛡️ لاگ‌های امنیتی" },
 ];
 
@@ -94,6 +95,8 @@ export default function AdminRolesPage() {
       setSelectedPerms(["dashboard", "orders", "customers", "financial", "coupons", "messages"]);
     } else if (newRole === "content_seo_manager") {
       setSelectedPerms(["dashboard", "blog", "news", "seo", "ai", "pages", "appearance"]);
+    } else if (newRole === "viewer_reporter") {
+      setSelectedPerms(["dashboard", "reports", "financial", "audit_logs"]);
     }
   };
 
@@ -123,7 +126,7 @@ export default function AdminRolesPage() {
     if (u.role === "superadmin" || (u.permissions && u.permissions.includes("all"))) {
       setSelectedPerms(ALL_PERMISSIONS.map((p) => p.id));
     } else {
-      setSelectedPerms(Array.isArray(u.permissions) ? u.permissions : ["dashboard", "products"]);
+      setSelectedPerms(Array.isArray(u.permissions) ? u.permissions : ["dashboard"]);
     }
   };
 
@@ -151,7 +154,9 @@ export default function AdminRolesPage() {
         soundEngine.playSuccess();
         setFeedback({
           type: "success",
-          text: json.message || "✓ حساب مدیر و ماتریس دسترسی‌های تیک‌دار با موفقیت ذخیره شد.",
+          text:
+            json.message ||
+            "✓ حساب مدیر ثبت شد و منوی پنل مدیریت برای این نقش به صورت خودکار محدود گردید.",
         });
         resetForm();
         fetchAdmins();
@@ -188,10 +193,10 @@ export default function AdminRolesPage() {
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🛡️</span> مدیریت مدیران، نقش‌ها و ماتریس تیک‌دار سطح دسترسی (Granular RBAC)
+            <span>🛡️</span> مدیریت نقش‌ها، زیرمجموعه‌ها و محدودسازی واقعی پنل ادمین (RBAC)
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تعریف و ویرایش مدیران سیستم با انتخاب دقیق و تیک‌دار ماژول‌های مجاز برای هر مدیر
+            با انتخاب هر نقش (مدیر ارشد، کارشناس سئو، پشتیبان سفارشات، بیننده و گزارش‌‌دهنده)، پنل ادمین منحصراً به همان دسترسی‌ها محدود می‌شود
           </p>
         </div>
 
@@ -201,7 +206,7 @@ export default function AdminRolesPage() {
             onClick={resetForm}
             className="px-4 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer"
           >
-            + ایجاد مدیر جدید
+            + ایجاد زیرمجموعه جدید
           </button>
         )}
       </div>
@@ -225,7 +230,7 @@ export default function AdminRolesPage() {
           className="lg:col-span-6 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
         >
           <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-            {editingId ? "✏️ ویرایش مدیر و دسترسی‌های تیک‌دار" : "➕ تعریف مدیر جدید با دسترسی سفارشی"}
+            {editingId ? "✏️ ویرایش زیرمجموعه و دسترسی‌ها" : "➕ افزودن زیرمجموعه مدیریتی جدید"}
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -237,26 +242,26 @@ export default function AdminRolesPage() {
                 dir="ltr"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin_sales"
+                placeholder="seo_specialist"
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام و نام خانوادگی مدیر *</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان / نام کامل *</label>
               <input
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="مثال: کارشناس فروش"
+                placeholder="مثال: کارشناس محتوا و سئو"
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
 
             <div>
               <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                {editingId ? "رمز عبور جدید (در صورت تمایل به تغییر):" : "کلمه عبور امنیتی *"}
+                {editingId ? "رمز عبور جدید (اختیاری):" : "کلمه عبور امنیتی *"}
               </label>
               <input
                 type="password"
@@ -270,16 +275,17 @@ export default function AdminRolesPage() {
             </div>
 
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نقش سازمانی پایه:</label>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب نقش سازمانی:</label>
               <select
                 value={role}
                 onChange={(e) => applyPresetByRole(e.target.value)}
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
               >
                 <option value="superadmin">👑 مدیر ارشد کل سیستم (Super Admin)</option>
+                <option value="content_seo_manager">🚀 کارشناس محتوا و سئو (Content & SEO)</option>
+                <option value="order_manager">💳 پشتیبان سفارشات و مالی (Order Support)</option>
                 <option value="product_manager">📦 مدیر کاتالوگ و انبار (Product Manager)</option>
-                <option value="order_manager">💳 مدیر سفارشات و مالی (Order & Finance)</option>
-                <option value="content_seo_manager">🚀 مدیر سئو و محتوا (SEO & Content)</option>
+                <option value="viewer_reporter">👁️ بیننده و گزارش‌دهنده (Viewer & Reporter)</option>
               </select>
             </div>
           </div>
@@ -287,7 +293,7 @@ export default function AdminRolesPage() {
           <div className="space-y-2.5 pt-2 border-t border-[var(--card-border)]">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-black text-[var(--accent-blue)]">
-                ☑️ انتخاب تیک‌دار و جزئی بخش‌های مجاز برای این مدیر ({selectedPerms.length} از {ALL_PERMISSIONS.length}):
+                ☑️ منوهای مجاز قابل مشاهده برای این نقش ({selectedPerms.length} از {ALL_PERMISSIONS.length}):
               </span>
               <div className="flex gap-1.5">
                 <button
@@ -302,7 +308,7 @@ export default function AdminRolesPage() {
                   onClick={() => setSelectedPerms(["dashboard"])}
                   className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-400 font-bold text-[10px] cursor-pointer"
                 >
-                  پاک کردن همه
+                  فقط داشبورد
                 </button>
               </div>
             </div>
@@ -342,20 +348,18 @@ export default function AdminRolesPage() {
             {saving
               ? "در حال ذخیره در دیتابیس..."
               : editingId
-              ? "💾 ذخیره تغییرات مدیر و دسترسی‌ها"
-              : "💾 ثبت مدیر جدید با دسترسی‌های انتخاب‌شده"}
+              ? "💾 بروزرسانی نقش و محدودیت منوهای این مدیر"
+              : "💾 ثبت مدیر جدید و اعمال محدودیت دسترسی"}
           </button>
         </form>
 
         <div className="lg:col-span-6 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit">
           <h2 className="font-black text-sm border-b border-[var(--card-border)] pb-3">
-            لیست مدیران ثبت‌شده در سیستم ({users.length})
+            لیست مدیران و زیرمجموعه‌های فعال ({users.length})
           </h2>
 
           {loading ? (
             <div className="py-12 text-center text-slate-400">در حال بارگذاری لیست مدیران...</div>
-          ) : users.length === 0 ? (
-            <div className="py-12 text-center text-slate-400">هیچ مدیری یافت نشد.</div>
           ) : (
             <div className="space-y-3">
               {users.map((u) => (
@@ -380,7 +384,7 @@ export default function AdminRolesPage() {
                         onClick={() => handleSelectEdit(u)}
                         className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
                       >
-                        ✏️ ویرایش دسترسی‌ها
+                        ✏️ ویرایش دسترسی
                       </button>
                       <button
                         type="button"

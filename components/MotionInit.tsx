@@ -1,42 +1,40 @@
+// File Path: components/MotionInit.tsx
 "use client";
-import { useEffect } from "react";
 
-/**
- * MotionInit — کامپوننت سراسری انیمیشن
- * روی همه المان‌هایی که کلاس axon-reveal* دارن IntersectionObserver اعمال میکنه
- * در layout.tsx یک‌بار اضافه میشه و کل سایت رو پوشش میده
- */
-export default function MotionInit() {
+import React, { useEffect } from "react";
+
+export function MotionInit(_props?: any) {
   useEffect(() => {
-    const SELECTORS = ".axon-reveal, .axon-reveal-scale, .axon-reveal-right";
+    if (typeof window === "undefined" || typeof document === "undefined") return;
 
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("revealed");
-            io.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -30px 0px" }
-    );
+    // تزریق استایل‌ها و میکرو-اینتراکشن‌های مدرن الهام‌گرفته از 21st.dev و motionsites.ai
+    let styleEl = document.getElementById("axon-21st-motion-engine") as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "axon-21st-motion-engine";
+      styleEl.textContent = [
+        ":root { --mouse-x: 50vw; --mouse-y: 50vh; }",
+        "@keyframes axonFloatGlow { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-4px); } }",
+        "@keyframes axonPulseBorder { 0%, 100% { border-color: rgba(56, 189, 248, 0.22); } 50% { border-color: rgba(56, 189, 248, 0.55); } }",
+        "button, a, input, select, textarea { transition: all 0.24s cubic-bezier(0.22, 1, 0.36, 1); }",
+        "button:active { transform: scale(0.97); }",
+        ".group:hover { box-shadow: 0 14px 40px -12px rgba(2, 132, 199, 0.22); }",
+      ].join("\n");
+      document.head.appendChild(styleEl);
+    }
 
-    const observe = () => {
-      document.querySelectorAll(SELECTORS).forEach((el) => {
-        if (!el.classList.contains("revealed")) io.observe(el);
-      });
+    const handlePointerMove = (e: PointerEvent) => {
+      document.documentElement.style.setProperty("--mouse-x", e.clientX + "px");
+      document.documentElement.style.setProperty("--mouse-y", e.clientY + "px");
     };
 
-    // اول اجرا
-    observe();
-
-    // برای محتوای dynamic که بعداً لود میشه
-    const mo = new MutationObserver(observe);
-    mo.observe(document.body, { childList: true, subtree: true });
-
-    return () => { io.disconnect(); mo.disconnect(); };
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+    };
   }, []);
 
   return null;
 }
+
+export default MotionInit;

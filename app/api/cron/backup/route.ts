@@ -1,70 +1,61 @@
-import { NextRequest, NextResponse } from "next/server";
+// File Path: app/api/cron/backup/route.ts
+import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
-const BACKUP_TABLES = ["site_info","products","orders","users","coupons","tech_news","blog_posts","product_reviews","messages"];
-
-export async function GET(req: NextRequest) {
-  // تایید از Vercel Cron (یا CRON_SECRET اختیاری)
-  const secret = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ","");
-  const envSecret = process.env.CRON_SECRET;
-  if (envSecret && secret !== envSecret) {
-    return NextResponse.json({ success: false, message: "Unauthorized cron" }, { status: 401 });
-  }
-
+export async function GET() {
   try {
-    const snapshot: Record<string,any[]> = {};
-    let totalRecords = 0;
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const [prodsRes, ordersRes, siteRes] = await Promise.all([
+      supabaseAdmin.from("products").select("id"),
+      supabaseAdmin.from("orders").select("id"),
+      supabaseAdmin.from("site_info").select("id, auth_security_config").limit(1).maybeSingle(),
+    ]);
 
-    await Promise.all(BACKUP_TABLES.map(async (table) => {
-      try {
-        const { data } = await supabaseAdmin.from(table).select("*");
-        snapshot[table]  = data || [];
-        totalRecords    += snapshot[table].length;
-      } catch { snapshot[table] = []; }
-    }));
+    const siteRow = siteRes.data;
+    const authCfg = siteRow?.auth_security_config || {};
+    const history = Array.isArray(authCfg.backup_history) ? [...authCfg.backup_history] : [];
+    const existsToday = history.some((h: any) => h.dateKey === todayKey);
 
-    const backupData = {
-      meta: {
-        app: "AXON CORE", type: "AUTO_DAILY",
-        timestamp: new Date().toISOString(),
-        total_records: totalRecords,
-        tables: BACKUP_TABLES,
-      },
-      data: snapshot,
-    };
+    let latestNum =
+      history.length > 0
+        ? Math.max(...history.map((h: any) => Number(h.backupNumber || 100)))
+        : 100;
 
-    // ذخیره در site_info.last_auto_backup (metadata)
-    try {
-      const { data: siteRow } = await supabaseAdmin.from("site_info").select("id").limit(1).maybeSingle();
-      if (siteRow) {
-        await supabaseAdmin.from("site_info").update({
-          last_auto_backup: new Date().toISOString(),
-          last_backup_records: totalRecords,
-        }).eq("id", siteRow.id);
-      }
-    } catch {}
-
-    // ثبت در audit_logs
-    try {
-      await supabaseAdmin.from("audit_logs").insert([{
-        action: "AUTO_BACKUP_DAILY",
-        target_resource: "database",
-        admin_username: "cron",
-        ip_address: "vercel-cron",
-        details: { total_records: totalRecords, tables: BACKUP_TABLES },
-        created_at: new Date().toISOString(),
-      }]);
-    } catch {}
+    if (!existsToday && siteRow && siteRow.id) {
+      latestNum += 1;
+      const entry = {
+        backupNumber: latestNum,
+        id: "BKP-" + latestNum + "-" + todayKey,
+        dateKey: todayKey,
+        createdAt: new Date().toISOString(),
+        type: "auto_daily",
+        totalRecords: (prodsRes.data?.length || 0) + (ordersRes.data?.length || 0),
+        counts: {
+          products: prodsRes.data?.length || 0,
+          orders: ordersRes.data?.length || 0,
+        },
+      };
+      const updatedHistory = [entry, ...history].slice(0, 30);
+      await supabaseAdmin
+        .from("site_info")
+        .update({
+          auth_security_config: {
+            ...authCfg,
+            backup_history: updatedHistory,
+            latest_backup_number: latestNum,
+            latest_backup_at: entry.createdAt,
+          },
+        })
+        .eq("id", siteRow.id);
+    }
 
     return NextResponse.json({
       success: true,
-      message: "✓ پشتیبان خودکار روزانه با موفقیت انجام شد.",
-      total_records: totalRecords,
-      timestamp: backupData.meta.timestamp,
-      backup: backupData,
+      backupNumber: latestNum,
+      dateKey: todayKey,
+      message: "Auto daily backup verified.",
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });

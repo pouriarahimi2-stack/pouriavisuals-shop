@@ -1,68 +1,110 @@
+// File Path: app/api/admin/reviews/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { requireAdmin } from "@/lib/authSecurityHelper";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-// جدول‌های ممکن برای reviews
-const REVIEW_TABLES = ["product_reviews", "reviews"];
-
-async function findReviewTable(): Promise<string | null> {
-  for (const t of REVIEW_TABLES) {
-    const { error } = await supabaseAdmin.from(t).select("id").limit(1);
-    if (!error || !error.message.includes("does not exist")) return t;
-  }
-  return null;
-}
-
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (!auth.ok) return auth.res;
-
-    const table = await findReviewTable();
-    if (!table) {
-      return NextResponse.json({ success: true, reviews: [], total: 0, note: "جدول دیدگاه هنوز ایجاد نشده." });
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
     }
 
     const { data, error } = await supabaseAdmin
-      .from(table)
+      .from("reviews")
       .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .order("created_at", { ascending: false });
 
-    if (error) throw error;
-    return NextResponse.json({ success: true, reviews: data || [], total: data?.length || 0 });
+    if (error) {
+      const fallback = await supabaseAdmin
+        .from("product_reviews")
+        .select("*")
+        .order("created_at", { ascending: false });
+      return NextResponse.json({
+        success: true,
+        reviews: fallback.data || [],
+        data: fallback.data || [],
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      reviews: data || [],
+      data: data || [],
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: true, reviews: [], total: 0, error: err.message });
+    return NextResponse.json({ success: true, reviews: [], data: [], message: err.message });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (!auth.ok) return auth.res;
-    const { id, is_approved } = await req.json();
-    if (!id) return NextResponse.json({ success: false, message: "شناسه الزامی" }, { status: 400 });
-    const table = await findReviewTable();
-    if (!table) return NextResponse.json({ success: false, message: "جدول یافت نشد" }, { status: 404 });
-    await supabaseAdmin.from(table).update({ is_approved }).eq("id", id);
-    return NextResponse.json({ success: true, message: is_approved ? "✓ تایید شد" : "✓ رد شد" });
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { id, is_approved, status, admin_reply, comment } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه دیدگاه الزامی است." }, { status: 400 });
+    }
+
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (is_approved !== undefined) updatePayload.is_approved = Boolean(is_approved);
+    if (status !== undefined) updatePayload.status = status;
+    if (admin_reply !== undefined) updatePayload.admin_reply = admin_reply;
+    if (comment !== undefined) updatePayload.comment = comment;
+
+    const { data, error } = await supabaseAdmin
+      .from("reviews")
+      .update(updatePayload)
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      await supabaseAdmin.from("product_reviews").update(updatePayload).eq("id", id);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "وضعیت دیدگاه با موفقیت بروزرسانی شد.",
+      review: data,
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
+export async function PUT(req: NextRequest) {
+  return PATCH(req);
+}
+
 export async function DELETE(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
-    if (!auth.ok) return auth.res;
-    const id = new URL(req.url).searchParams.get("id");
-    if (!id) return NextResponse.json({ success: false, message: "شناسه الزامی" }, { status: 400 });
-    const table = await findReviewTable();
-    if (!table) return NextResponse.json({ success: false, message: "جدول یافت نشد" }, { status: 404 });
-    await supabaseAdmin.from(table).delete().eq("id", id);
-    return NextResponse.json({ success: true });
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه دیدگاه الزامی است." }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin.from("reviews").delete().eq("id", id);
+    if (error) {
+      await supabaseAdmin.from("product_reviews").delete().eq("id", id);
+    }
+
+    return NextResponse.json({ success: true, message: "دیدگاه با موفقیت حذف گردید." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

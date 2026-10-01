@@ -1,641 +1,558 @@
+// File Path: components/AdminBlogManager.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
-import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
-import { productService, Product } from "@/services/productService";
 import { supabase } from "@/lib/supabase";
+import MediaUploadModal from "@/components/admin/MediaUploadModal";
 
-export interface BlogPost {
+export interface BlogPostItem {
   id: string;
   title: string;
   slug: string;
   content: string;
   category?: string;
-  imageUrl?: string;
   image_url?: string;
-  metaDescription?: string;
   meta_description?: string;
-  isPublished?: boolean;
-  is_published?: boolean;
-  createdAt?: string;
+  is_published: boolean;
   created_at?: string;
+  updated_at?: string;
 }
 
-export default function AdminBlogManager() {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
+interface CatalogProductItem {
+  id: string;
+  title: string;
+  category: string;
+  price: number;
+  image: string;
+  warranty: string;
+}
 
+export function AdminBlogManager() {
+  const [posts, setPosts] = useState<BlogPostItem[]>([]);
+  const [products, setProducts] = useState<CatalogProductItem[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
-  const [category, setCategory] = useState("راهنمای خرید و بررسی");
-  const [imageUrl, setImageUrl] = useState("");
+  const [category, setCategory] = useState("راهنمای خرید و بررسی تخصصی");
+  const [targetKeyword, setTargetKeyword] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [content, setContent] = useState("");
   const [isPublished, setIsPublished] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const [availableFonts, setAvailableFonts] = useState<CustomFontItem[]>([]);
-  const [selectedFontFamily, setSelectedFontFamily] = useState("Vazirmatn");
-  const [selectedFontWeight, setSelectedFontWeight] = useState(400);
+  const notify = (text: string, type: "success" | "error" = "success") => {
+    setStatusMsg({ type, text });
+    setTimeout(() => setStatusMsg(null), 4000);
+  };
 
-  const [wordCount, setWordCount] = useState(0);
-  const [charCount, setCharCount] = useState(0);
-  const [readTime, setReadTime] = useState(1);
-
-  // بخش دستیار هوش مصنوعی
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiCustomTopic, setAiCustomTopic] = useState("");
-  const [aiTargetKeyword, setAiTargetKeyword] = useState("");
-  const [aiSelectedProductId, setAiSelectedProductId] = useState<string>("all");
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
-
-  const [saving, setSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const editorRef = useRef<HTMLDivElement>(null);
-  const fontUploadInputRef = useRef<HTMLInputElement>(null);
-
-  const fetchPosts = async () => {
+  const fetchPostsAndProducts = async () => {
     try {
-      const [res, prods] = await Promise.all([
-        fetch("/api/blogs", { cache: "no-store" }),
-        productService.getAll(),
+      const [postsRes, prodsRes] = await Promise.all([
+        fetch("/api/blogs", { cache: "no-store" }).catch(() => null),
+        fetch("/api/products", { cache: "no-store" }).catch(() => null),
       ]);
-      const data = await res.json();
-      if (data.data || data.posts) {
-        setPosts(data.data || data.posts || []);
+
+      if (postsRes && postsRes.ok) {
+        const bJson = await postsRes.json();
+        const list = bJson.posts || bJson.data || [];
+        setPosts(Array.isArray(list) ? list : []);
       }
-      if (prods) setProducts(prods);
+
+      if (prodsRes && prodsRes.ok) {
+        const pJson = await prodsRes.json();
+        const pList = pJson.data || pJson.products || [];
+        const mapped: CatalogProductItem[] = (Array.isArray(pList) ? pList : []).map((p: any) => ({
+          id: String(p.id),
+          title: p.title || p.name || "کالای دیجیتال",
+          category: p.category || "کالای دیجیتال و تکنولوژی",
+          price: Number(p.discount_price || p.price || 0),
+          image: p.image || (Array.isArray(p.images) && p.images[0]) || "/placeholder.png",
+          warranty: p.warranty || "۱۸ ماه گارانتی اصالت طلایی",
+        }));
+        setProducts(mapped);
+      }
     } catch (e) {
-      console.error("Error loading blog posts:", e);
+      console.error("Blog manager load error:", e);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPosts();
-    setAvailableFonts(fontEngine.getAllFonts());
+    fetchPostsAndProducts();
 
-    // اتصال بلادرنگ به تغییرات مقالات در دیتابیس
-    const channel = supabase
-      .channel("realtime-blog-posts")
+    const chPosts = supabase
+      .channel("realtime-admin-blog-posts")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
-        fetchPosts();
+        fetchPostsAndProducts();
+      })
+      .subscribe();
+
+    const chProducts = supabase
+      .channel("realtime-admin-blog-products")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        fetchPostsAndProducts();
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(chPosts);
+      supabase.removeChannel(chProducts);
     };
   }, []);
 
-  const updateStats = () => {
-    if (!editorRef.current) return;
-    const text = editorRef.current.innerText || "";
-    const words = text.trim().split(/\s+/).filter(Boolean).length;
-    const chars = text.length;
-    setWordCount(words);
-    setCharCount(chars);
-    setReadTime(Math.max(1, Math.ceil(words / 220)));
+  const makeSlug = (val: string) =>
+    val
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+  // پر شدن هوشمند و خودکار موضوع، کلمه کلیدی، متا و محتوا با انتخاب محصول از کاتالوگ
+  const handleSelectProductAutoFill = (prodId: string) => {
+    soundEngine.playClick();
+    setSelectedProductId(prodId);
+    if (!prodId) return;
+
+    const prod = products.find((p) => p.id === prodId);
+    if (!prod) return;
+
+    const autoKey = "خرید و قیمت " + prod.title;
+    const autoTitle = "بررسی تخصصی، مشخصات و راهنمای خرید " + prod.title;
+    const autoSlug = makeSlug(prod.title) + "-review";
+    const autoMeta =
+      "بررسی تخصصی " +
+      prod.title +
+      " در دسته " +
+      prod.category +
+      " به همراه جدول ارزش خرید، مشخصات فنی و خرید مستقیم با " +
+      prod.warranty +
+      " در فروشگاه آکسون.";
+
+    const autoContent = [
+      "<h2>معرفی و بررسی تخصصی " + prod.title + "</h2>",
+      "<p>اگر به دنبال <strong>" +
+        autoKey +
+        "</strong> با تضمین اصالت و بالاترین کیفیت ساخت هستید، " +
+        prod.title +
+        " یکی از بهترین گزینه‌های موجود در دسته " +
+        prod.category +
+        " به شمار می‌رود.</p>",
+      "<h3>ویژگی‌های برجسته و ارزش خرید</h3>",
+      "<ul>",
+      "  <li>کیفیت ساخت ممتاز و بهره‌گیری از قطعات اورجینال نسل جدید</li>",
+      "  <li>سازگاری کامل با اکوسیستم‌های مدرن دیجیتال و درگاه‌های پرسرعت</li>",
+      "  <li>عرضه رسمی همراه با " + prod.warranty + "</li>",
+      "</ul>",
+      "<h3>خرید مستقیم از کاتالوگ آکسون</h3>",
+      "<p>شما می‌توانید همین حالا <strong>" +
+        prod.title +
+        "</strong> را با قیمت رقابتی " +
+        prod.price.toLocaleString("fa-IR") +
+        " تومان از طریق لینک مستقیم زیر سفارش دهید:</p>",
+      '<p><a href="/products/' +
+        prod.id +
+        '"><strong>🔗 مشاهده و خرید مستقیم ' +
+        prod.title +
+        " در فروشگاه آکسون</strong></a></p>",
+    ].join("\n\n");
+
+    setTargetKeyword(autoKey);
+    setTitle(autoTitle);
+    setSlug(autoSlug);
+    setCategory(prod.category || "راهنمای خرید و بررسی تخصصی");
+    setMetaDescription(autoMeta);
+    if (prod.image) setImageUrl(prod.image);
+    if (!editingId) setContent(autoContent);
+
+    notify("✓ اطلاعات سئو، کلمه کلیدی و ساختار مقاله بر اساس محصول «" + prod.title + "» به صورت خودکار تکمیل شد.");
   };
 
-  const handleSelectPost = (p: BlogPost) => {
+  const handleGenerateAiSeoPost = async () => {
+    const kw = targetKeyword.trim() || title.trim() || "تجهیزات دیجیتال پرچمدار";
     soundEngine.playClick();
-    setSelectedPost(p);
-    setTitle(p.title);
-    setSlug(p.slug);
-    setCategory(p.category || "راهنمای خرید و بررسی");
-    setImageUrl(p.imageUrl || p.image_url || "");
-    setMetaDescription(p.metaDescription || p.meta_description || "");
-    setIsPublished(p.isPublished !== false && p.is_published !== false);
-
-    if (editorRef.current) {
-      editorRef.current.innerHTML = p.content || "";
-      setTimeout(updateStats, 100);
-    }
-  };
-
-  const handleCreateNew = () => {
-    soundEngine.playClick();
-    setSelectedPost(null);
-    setTitle("");
-    setSlug("");
-    setCategory("راهنمای خرید و بررسی");
-    setImageUrl("");
-    setMetaDescription("");
-    setIsPublished(true);
-
-    if (editorRef.current) {
-      editorRef.current.innerHTML = "<h2>مقدمه و بررسی تخصصی</h2><p>متن تحلیل خود را اینجا آغاز کنید یا از دکمه «تولید مقاله با هوش مصنوعی» استفاده نمایید...</p>";
-      setTimeout(updateStats, 100);
-    }
-  };
-
-  const exec = (command: string, value: string | undefined = undefined) => {
-    soundEngine.playClick();
-    document.execCommand(command, false, value);
-    updateStats();
-  };
-
-  const handleFontChange = (fontFamily: string) => {
-    soundEngine.playClick();
-    setSelectedFontFamily(fontFamily);
-    if (editorRef.current) {
-      editorRef.current.style.fontFamily = `'${fontFamily}', sans-serif`;
-    }
-  };
-
-  const handleWeightChange = (weight: number) => {
-    soundEngine.playClick();
-    setSelectedFontWeight(weight);
-    if (editorRef.current) {
-      editorRef.current.style.fontWeight = String(weight);
-    }
-  };
-
-  // حذف مستقیم مقاله از دیتابیس
-  const handleDeletePost = async (id: string, postTitle: string) => {
-    if (!confirm(`آیا از حذف کامل مقاله «${postTitle}» از پایگاه داده اطمینان دارید؟`)) return;
-    soundEngine.playClick();
+    setGeneratingAi(true);
     try {
-      const res = await fetch(`/api/blogs?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "✓ مقاله با موفقیت از سیستم حذف گردید." });
-        if (selectedPost?.id === id) handleCreateNew();
-        fetchPosts();
-      } else {
-        alert(json.message || "خطا در حذف مقاله.");
-      }
-    } catch {
-      alert("خطا در برقراری ارتباط با سرور.");
-    } finally {
-      setTimeout(() => setStatusMessage(null), 3000);
-    }
-  };
-
-  // تولید مقاله سئو رنک ۱ با هوش مصنوعی و تزریق دکمه‌های خرید
-  const handleGenerateAiSeoArticle = async () => {
-    soundEngine.playClick();
-    setIsAiGenerating(true);
-
-    let targetProducts = products;
-    if (aiSelectedProductId !== "all") {
-      targetProducts = products.filter((p) => String(p.id) === String(aiSelectedProductId));
-    }
-
-    try {
-      const prompt = `به عنوان متخصص ارشد سئو فنی و تولید محتوا برای فروشگاه تخصصی آکسون (مرجع مانیتورهای 5K و سخت‌افزار استودیو):
-موضوع: ${aiCustomTopic || "بررسی و راهنمای خرید مانیتورهای حرفه‌ای تدوین"}
-کلمه کلیدی هدف سئو: ${aiTargetKeyword || "خرید مانیتور 5K"}
-محصولات مرتبط برای لینک‌دهی: ${targetProducts.map(p => p.title).join(", ")}
-
-یک مقاله ۲۵۰۰ کلمه‌ای، فوق تخصصی با ساختار تمیز HTML (شامل H2, H3, پاراگراف‌های جاستیفای، جدول مقایسه مشخصات فنی و کال تو اکشن خرید) بنویس.
-همچنین یک عنوان جذاب H1 و یک متادسکریپشن ۱۵۰ کاراکتری ارائه بده.`;
-
-      const res = await fetch("/api/ai-assistant", {
+      const res = await fetch("/api/ai-seo-autopilot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          role: "admin",
-          prompt,
-          targetTopic: aiCustomTopic,
-          productsData: targetProducts,
+          targetKeyword: kw,
+          productId: selectedProductId || undefined,
         }),
       });
-
-      const data = await res.json();
-      if (data.success && data.response) {
+      const json = await res.json();
+      if (res.ok && json.success) {
         soundEngine.playSuccess();
-        const raw = data.response;
-
-        const generatedTitle = aiCustomTopic.trim() || (targetProducts[0]?.title ? `راهنمای خرید و بررسی تخصصی ${targetProducts[0].title}` : "راهنمای جامع تجهیزات استودیویی");
-        setTitle(generatedTitle);
-        setSlug(generatedTitle.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, "-"));
-        setMetaDescription(`بررسی تخصصی، مقایسه گاموت رنگی و راهنمای خرید ${generatedTitle} با ضمانت اصالت طلایی و ارسال سریع در فروشگاه آکسون.`);
-
-        if (editorRef.current) {
-          editorRef.current.innerHTML = raw;
-          updateStats();
-        }
-
-        setIsAiModalOpen(false);
-        setStatusMessage({ type: "success", text: "✓ مقاله رنک ۱ گوگل با استانداردهای کامل سئو و متادیتا در ویراستار بارگذاری شد." });
+        notify(json.message || "✓ مقاله سئو با هوش مصنوعی تولید و در مجله منتشر شد.");
+        fetchPostsAndProducts();
+      } else {
+        notify(json.message || "خطا در تولید خودکار مقاله.", "error");
       }
     } catch {
-      alert("خطا در ارتباط با هوش مصنوعی.");
+      notify("خطا در ارتباط با موتور هوش مصنوعی.", "error");
     } finally {
-      setIsAiGenerating(false);
-      setTimeout(() => setStatusMessage(null), 4000);
+      setGeneratingAi(false);
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const contentHtml = editorRef.current?.innerHTML || "";
+  const resetForm = () => {
+    setEditingId(null);
+    setSelectedProductId("");
+    setTitle("");
+    setSlug("");
+    setTargetKeyword("");
+    setCategory("راهنمای خرید و بررسی تخصصی");
+    setMetaDescription("");
+    setImageUrl("");
+    setContent("");
+    setIsPublished(true);
+  };
 
-    if (!title.trim() || !contentHtml.trim()) {
-      setStatusMessage({ type: "error", text: "عنوان و محتوای مقاله الزامی هستند." });
+  const handleEditPost = (post: BlogPostItem) => {
+    soundEngine.playClick();
+    setEditingId(post.id);
+    setTitle(post.title || "");
+    setSlug(post.slug || "");
+    setCategory(post.category || "راهنمای خرید و بررسی تخصصی");
+    setMetaDescription(post.meta_description || "");
+    setImageUrl(post.image_url || "");
+    setContent(post.content || "");
+    setIsPublished(post.is_published !== false);
+  };
+
+  const handleSavePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !content.trim()) {
+      notify("عنوان و متن مقاله الزامی هستند.", "error");
       return;
     }
 
+    soundEngine.playClick();
     setSaving(true);
-    setStatusMessage(null);
-
-    const cleanSlug = slug.trim()
-      ? slug.trim().toLowerCase().replace(/\s+/g, "-")
-      : title.trim().toLowerCase().replace(/\s+/g, "-");
-
-    const payload = {
-      id: selectedPost?.id,
-      title: title.trim(),
-      slug: cleanSlug,
-      content: contentHtml,
-      category,
-      imageUrl: imageUrl.trim() || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-      image_url: imageUrl.trim() || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-      metaDescription: metaDescription.trim() || title.trim(),
-      meta_description: metaDescription.trim() || title.trim(),
-      isPublished,
-      is_published: isPublished,
-    };
 
     try {
       const res = await fetch("/api/blogs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          id: editingId || undefined,
+          title: title.trim(),
+          slug: slug.trim() || makeSlug(title),
+          category: category.trim() || "راهنمای خرید و بررسی تخصصی",
+          image_url: imageUrl.trim() || "/placeholder.png",
+          meta_description: metaDescription.trim() || title.trim(),
+          content: content.trim(),
+          is_published: isPublished,
+        }),
       });
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      const json = await res.json();
+      if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: "✓ مقاله با موفقیت در دیتابیس ذخیره و در مجله سایت منتشر شد." });
-        fetchPosts();
-        if (!selectedPost && data.data) {
-          setSelectedPost(data.data);
-        }
+        notify(json.message || "✓ مقاله با موفقیت در دیتابیس ذخیره و منتشر شد.");
+        resetForm();
+        fetchPostsAndProducts();
       } else {
-        setStatusMessage({ type: "error", text: data.message || "خطا در ذخیره‌سازی مقاله." });
+        notify(json.message || "خطا در ذخیره‌سازی مقاله.", "error");
       }
     } catch {
-      setStatusMessage({ type: "error", text: "خطا در برقراری ارتباط با سرور." });
+      notify("خطا در ارتباط با سرور.", "error");
     } finally {
       setSaving(false);
-      setTimeout(() => setStatusMessage(null), 3500);
     }
   };
 
+  const handleDeletePost = async (id: string) => {
+    if (!confirm("آیا از حذف این مقاله اطمینان دارید؟")) return;
+    soundEngine.playClick();
+    try {
+      const res = await fetch("/api/blogs?id=" + encodeURIComponent(id), { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        notify("مقاله با موفقیت حذف شد.");
+        if (editingId === id) resetForm();
+        fetchPostsAndProducts();
+      }
+    } catch {
+      notify("خطا در حذف مقاله.", "error");
+    }
+  };
+
+  const filteredPosts = posts.filter((p) =>
+    (p.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <input type="file" ref={fontUploadInputRef} accept=".woff2,.woff,.ttf,.otf" className="hidden" />
-
-      {/* سربرگ بخش نگارش مقالات */}
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📚</span> ویراستار مقالات سئو با هوش مصنوعی و تایپوگرافی جهانی
-          </h2>
+          <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>📚</span> مدیریت هوشمند مجله، وبلاگ و مقالات سئو (مجهز به اتصال خودکار کاتالوگ)
+          </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تولید خودکار مقالات رنک ۱ گوگل با لینک‌دهی داخلی، اسکیما مارک‌آپ، مدیریت مستقیم و ذخیره در دیتابیس
+            با انتخاب هر محصول، موضوع، کلمه کلیدی، متا دیسکریپشن و لینک خرید مستقیم به صورت خودکار پر می‌شود
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button
             type="button"
-            onClick={() => { soundEngine.playClick(); setIsAiModalOpen(true); }}
-            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs transition shadow-lg flex items-center gap-2 cursor-pointer"
+            disabled={generatingAi}
+            onClick={handleGenerateAiSeoPost}
+            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-sky-600 text-white font-black text-xs shadow-lg hover:opacity-90 transition cursor-pointer disabled:opacity-50"
           >
-            <span>🤖</span>
-            <span>تولید مقاله با هوش مصنوعی (رنک ۱ گوگل)</span>
+            {generatingAi ? "در حال نگارش هوشمند..." : "🤖 تولید و انتشار فوری مقاله با AI"}
           </button>
-
-          <button
-            onClick={handleCreateNew}
-            className="px-5 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold transition cursor-pointer"
-          >
-            + نگارش دستی
-          </button>
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer"
+            >
+              + مقاله جدید
+            </button>
+          )}
         </div>
       </div>
 
-      {statusMessage && (
-        <div className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30" : "bg-rose-500/15 text-rose-600 border border-rose-500/30")}>
-          {statusMessage.text}
+      {statusMsg && (
+        <div
+          className={
+            "p-4 rounded-2xl text-xs font-bold animate-fadeIn " +
+            (statusMsg.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-500"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-500")
+          }
+        >
+          {statusMsg.text}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* ستون سمت راست: لیست مقالات با دکمه‌های مستقیم ویرایش (✏️) و حذف (🗑️) */}
-        <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
-          <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-            <h3 className="text-xs font-black">
-              📑 مقالات منتشر شده ({posts.length})
-            </h3>
-            <button onClick={handleCreateNew} className="text-[11px] text-[var(--accent-blue)] font-bold hover:underline cursor-pointer">
-              + مقاله جدید
-            </button>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+        <form
+          onSubmit={handleSavePost}
+          className="lg:col-span-7 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4"
+        >
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)]/40 space-y-2">
+            <label className="block font-black text-[var(--accent-blue)]">
+              🎯 گام ۱: انتخاب محصول از کاتالوگ (پر شدن خودکار موضوع، کلمه کلیدی و کارت خرید):
+            </label>
+            <select
+              value={selectedProductId}
+              onChange={(e) => handleSelectProductAutoFill(e.target.value)}
+              className="w-full p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer text-[var(--text-primary)]"
+            >
+              <option value="">-- انتخاب محصول از کاتالوگ برای پر کردن خودکار فرم مقاله --</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  📦 {p.title} ({p.price.toLocaleString("fa-IR")} تومان)
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
-            {posts.length === 0 ? (
-              <p className="text-xs text-center py-12 text-slate-400 font-bold">هنوز مقاله‌ای ثبت نشده است.</p>
-            ) : (
-              posts.map((p) => (
-                <div
-                  key={p.id}
-                  className={"p-3 rounded-2xl border transition flex items-center justify-between gap-2 " + (
-                    selectedPost?.id === p.id
-                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-sm"
-                      : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                  )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                کلمه کلیدی هدف سئو (Target Keyword):
+              </label>
+              <input
+                type="text"
+                value={targetKeyword}
+                onChange={(e) => setTargetKeyword(e.target.value)}
+                placeholder="مثال: خرید و قیمت ..."
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">دسته‌بندی مقاله:</label>
+              <input
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان مقاله *</label>
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (!editingId) setSlug(makeSlug(e.target.value));
+                }}
+                placeholder="عنوان جامع مقاله..."
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نامک (Slug):</label>
+              <input
+                type="text"
+                dir="ltr"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">تصویر شاخص:</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsUploadOpen(true)}
+                  className="px-3.5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-bold cursor-pointer shrink-0"
                 >
-                  <div
-                    onClick={() => handleSelectPost(p)}
-                    className="overflow-hidden flex-1 cursor-pointer space-y-1"
-                  >
-                    <h4 className="text-xs font-black truncate">{p.title}</h4>
-                    <span className="text-[10px] text-[var(--accent-blue)] font-bold block">{p.category || "مقاله تخصصی"}</span>
+                  ☁️ آپلود
+                </button>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                توضیحات متا سئو (Meta Description):
+              </label>
+              <textarea
+                rows={2}
+                value={metaDescription}
+                onChange={(e) => setMetaDescription(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-relaxed"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                محتوای کامل مقاله (پشتیبانی از تگ‌های HTML و لینک خرید) *
+              </label>
+              <textarea
+                rows={8}
+                required
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-loose"
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 font-bold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isPublished}
+              onChange={(e) => setIsPublished(e.target.checked)}
+              className="rounded accent-[var(--accent-blue)]"
+            />
+            <span>انتشار مستقیم در مجله سایت و نقشه سایت گوگل (Sitemap)</span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-xl cursor-pointer disabled:opacity-50"
+          >
+            {saving
+              ? "در حال ذخیره در دیتابیس..."
+              : editingId
+              ? "💾 بروزرسانی مقاله"
+              : "💾 ذخیره و انتشار مقاله سئو"}
+          </button>
+        </form>
+
+        <div className="lg:col-span-5 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--card-border)] pb-3">
+            <h3 className="font-black text-sm">آرشیو مقالات منتشرشده ({posts.length})</h3>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 جستجو در مقالات..."
+              className="p-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold outline-none"
+            />
+          </div>
+
+          {loading ? (
+            <div className="py-12 text-center text-slate-400">در حال بارگذاری مقالات...</div>
+          ) : filteredPosts.length === 0 ? (
+            <div className="py-12 text-center text-slate-400">مقاله‌ای یافت نشد.</div>
+          ) : (
+            <div className="space-y-2.5 max-h-[640px] overflow-y-auto pr-1">
+              {filteredPosts.map((post) => (
+                <div
+                  key={post.id}
+                  className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3 hover:border-[var(--accent-blue)] transition"
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {post.image_url && (
+                      <img
+                        src={post.image_url}
+                        alt=""
+                        className="w-14 h-12 rounded-xl object-cover shrink-0 border border-[var(--card-border)]"
+                      />
+                    )}
+                    <div className="overflow-hidden space-y-0.5">
+                      <h4 className="font-black text-xs truncate">{post.title}</h4>
+                      <span className="text-[10px] font-mono text-slate-400 block truncate">
+                        /blog/{post.slug || post.id}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* دکمه‌های مستقیم ویرایش و حذف در کارت */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleSelectPost(p)}
-                      className="p-1.5 px-2 rounded-xl bg-[var(--modal-bg)] hover:border-[var(--accent-blue)] border border-[var(--card-border)] text-xs font-bold transition cursor-pointer"
-                      title="ویرایش مقاله"
+                      onClick={() => handleEditPost(post)}
+                      className="px-2.5 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
                     >
                       ✏️
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePost(p.id, p.title);
-                      }}
-                      className="p-1.5 px-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/20 text-xs font-bold transition cursor-pointer"
-                      title="حذف کامل از دیتابیس"
+                      onClick={() => handleDeletePost(post.id)}
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold cursor-pointer"
                     >
                       🗑️
                     </button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* ستون سمت چپ: بوم نگارش، ویرایش و نوار ابزار پیشرفته */}
-        <div className="lg:col-span-8">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">عنوان اصلی مقاله (H1) *</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: مقایسه جامع مانیتورهای ۵K و ۴K برای تدوین"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">دسته‌بندی موضوعی</label>
-                <input
-                  type="text"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="مثال: راهنمای خرید و بررسی تخصصی"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">نامک انگلیسی آدرس (Slug)</label>
-                <input
-                  type="text"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  placeholder="5k-vs-4k-monitors-editing"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">تصویر شاخص مقاله (URL)</label>
-                <input
-                  type="text"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
+              ))}
             </div>
-
-            <div>
-              <label className="block font-bold text-[var(--text-secondary)] mb-1.5">توضیحات متای سئو (Meta Description)</label>
-              <input
-                type="text"
-                value={metaDescription}
-                onChange={(e) => setMetaDescription(e.target.value)}
-                placeholder="خلاصه جذاب برای گوگل (حداکثر ۱۶۰ کاراکتر)..."
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            {/* نوار ابزار پیشرفته */}
-            <div className="space-y-3 border-t border-[var(--card-border)] pt-4">
-              <div className="flex flex-wrap justify-between items-center gap-2">
-                <span className="font-bold text-[var(--text-secondary)]">🎛️ نوار ابزار پیشرفته و تایپوگرافی لایو:</span>
-                <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--text-secondary)]">
-                  <span>کلمات: <strong>{wordCount}</strong></span>
-                  <span>کاراکترها: <strong>{charCount}</strong></span>
-                  <span>زمان مطالعه: <strong>~{readTime} دقیقه</strong></span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 p-3.5 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] shadow-inner">
-                <select
-                  value={selectedFontFamily}
-                  onChange={(e) => handleFontChange(e.target.value)}
-                  className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none"
-                >
-                  {availableFonts.map((f) => (
-                    <option key={f.id} value={f.fontFamily}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedFontWeight}
-                  onChange={(e) => handleWeightChange(Number(e.target.value))}
-                  className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer outline-none font-mono"
-                >
-                  <option value={100}>100 - نازک (Thin)</option>
-                  <option value={300}>300 - روشن (Light)</option>
-                  <option value={400}>400 - عادی (Regular)</option>
-                  <option value={500}>500 - متوسط (Medium)</option>
-                  <option value={600}>600 - نیمه‌ضخیم (SemiBold)</option>
-                  <option value={700}>700 - ضخیم (Bold)</option>
-                  <option value={800}>800 - خیلی ضخیم (ExtraBold)</option>
-                  <option value={900}>900 - توپر (Black)</option>
-                </select>
-
-                <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
-
-                <button type="button" onClick={() => exec("bold")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black text-xs" title="Bold"><b>B</b></button>
-                <button type="button" onClick={() => exec("italic")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] italic text-xs" title="Italic"><i>I</i></button>
-                <button type="button" onClick={() => exec("underline")} className="p-2 px-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] underline text-xs" title="Underline"><u>U</u></button>
-
-                <div className="w-[1px] h-6 bg-[var(--card-border)] mx-1" />
-
-                <div className="flex items-center gap-1 bg-[var(--modal-bg)] p-1 rounded-xl border border-[var(--card-border)]">
-                  <span className="text-[10px] font-bold px-1">رنگ:</span>
-                  <input type="color" onChange={(e) => exec("foreColor", e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none" />
-                </div>
-
-                <button type="button" onClick={() => exec("justifyRight")} className="p-2 px-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs" title="راست‌چین">👉</button>
-                <button type="button" onClick={() => exec("justifyFull")} className="p-2 px-3 rounded-xl bg-[var(--accent-blue)] text-white font-bold text-xs" title="Justify">≡ جاستیفای</button>
-              </div>
-            </div>
-
-            {/* بوم نگارش مقاله */}
-            <div className="space-y-1.5">
-              <label className="font-bold text-[var(--text-secondary)] block">محیط نگارش زنده سند (WYSIWYG Live Canvas):</label>
-              <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={updateStats}
-                className="w-full min-h-[420px] max-h-[600px] overflow-y-auto p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none leading-loose text-xs focus:border-[var(--accent-blue)] shadow-inner text-[var(--text-primary)] transition-all"
-                style={{
-                  textAlign: "justify",
-                  fontFamily: `'${selectedFontFamily}', sans-serif`,
-                  fontWeight: selectedFontWeight,
-                }}
-              />
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
-              <input
-                type="checkbox"
-                id="blogPublishedCheckbox"
-                checked={isPublished}
-                onChange={(e) => setIsPublished(e.target.checked)}
-                className="w-5 h-5 rounded-lg text-[var(--accent-blue)] cursor-pointer"
-              />
-              <label htmlFor="blogPublishedCheckbox" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
-                مقاله فعال و در مجله تخصصی سایت منتشر شود
-              </label>
-            </div>
-
-            <div className="flex gap-3 pt-4 border-t border-[var(--card-border)]">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 shadow-xl shadow-blue-500/25 disabled:opacity-50"
-              >
-                {saving ? "در حال ذخیره‌سازی در دیتابیس..." : "💾 ذخیره و انتشار کامل مقاله در مجله"}
-              </button>
-            </div>
-          </form>
+          )}
         </div>
       </div>
 
-      {/* مدال هوش مصنوعی تولید مقالات رنک ۱ گوگل با کلمات کلیدی */}
-      {isAiModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-xl w-full rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 sm:p-8 space-y-5 text-xs shadow-2xl text-[var(--text-primary)]">
-            <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🚀</span>
-                <h3 className="font-black text-sm text-[var(--accent-blue)]">دستیار فوق هوشمند نگارش مقاله رنک ۱ گوگل</h3>
-              </div>
-              <button
-                onClick={() => setIsAiModalOpen(false)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">
-                  کالای هدف جهت تزریق دکمه خرید مستقیم و مشخصات فنی:
-                </label>
-                <select
-                  value={aiSelectedProductId}
-                  onChange={(e) => setAiSelectedProductId(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer"
-                >
-                  <option value="all">🌟 تمامی محصولات فروشگاه (مقاله جامع مقایسه‌ای)</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      📦 {p.title || p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">
-                  موضوع و سرفصل مقاله:
-                </label>
-                <input
-                  type="text"
-                  value={aiCustomTopic}
-                  onChange={(e) => setAiCustomTopic(e.target.value)}
-                  placeholder="مثال: مقایسه جامع مانیتورهای ۵K و ۴K برای ادیتورها و کالریست‌ها در سال ۲۰۲۶"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1">
-                  کلمه کلیدی اصلی سئو (Focus Keyword):
-                </label>
-                <input
-                  type="text"
-                  value={aiTargetKeyword}
-                  onChange={(e) => setAiTargetKeyword(e.target.value)}
-                  placeholder="مثال: خرید مانیتور تدوین رنگ 5K"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 leading-relaxed font-medium">
-                ⚡ هوش مصنوعی مقاله را با چگالی استاندارد کلمات کلیدی، عناوین جذاب، اسلاگ، تگ‌های معنایی و جدول مقایسه تولید و در ویراستار قرار خواهد داد.
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--card-border)]">
-              <button
-                type="button"
-                onClick={() => setIsAiModalOpen(false)}
-                className="px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] font-bold text-[var(--text-secondary)] cursor-pointer"
-              >
-                انصراف
-              </button>
-              <button
-                type="button"
-                disabled={isAiGenerating}
-                onClick={handleGenerateAiSeoArticle}
-                className="px-6 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 shadow-md cursor-pointer disabled:opacity-50"
-              >
-                {isAiGenerating ? "در حال تولید مهندسی‌شده مقاله..." : "نگارش هوشمند سئو 🚀"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <MediaUploadModal
+        isOpen={isUploadOpen}
+        bucket="blog"
+        title="آپلود تصویر شاخص مقاله سئو"
+        currentValue={imageUrl}
+        onClose={() => setIsUploadOpen(false)}
+        onUploadSuccess={(url) => setImageUrl(url)}
+      />
     </div>
   );
 }
+
+export default AdminBlogManager;

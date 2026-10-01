@@ -1,8 +1,8 @@
+// File Path: app/admin/reports/page.tsx
 "use client";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-export default function Redirect() {
-  const r = useRouter();
-  useEffect(() => { r.replace("/admin/financial"); }, []);
-  return null;
+import React from "react";
+import AdminInventoryManager from "@/components/AdminInventoryManager";
+
+export default function AdminReportsRoute() {
+  return <AdminInventoryManager defaultSubTab="reports" />;
 }

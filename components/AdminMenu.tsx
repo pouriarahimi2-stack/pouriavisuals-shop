@@ -13,6 +13,7 @@ export interface NavMenuItem {
   title: string;
   url: string;
   is_active: boolean;
+  children?: NavMenuItem[];
 }
 
 export interface CategoryRecord {
@@ -24,12 +25,117 @@ export interface CategoryRecord {
   is_active: boolean;
 }
 
+const SMART_TREE_TEMPLATES: Array<{
+  label: string;
+  tree: NavMenuItem;
+}> = [
+  {
+    label: "🏠 تجهیزات خانه ⬅ آشپزخانه هوشمند ⬅ همزن برقی هوشمند",
+    tree: {
+      id: "tpl_home_" + Date.now(),
+      title: "تجهیزات خانه",
+      url: "/products?category=تجهیزات خانه",
+      is_active: true,
+      children: [
+        {
+          id: "tpl_kitchen_1",
+          title: "تجهیزات هوشمند آشپزخانه",
+          url: "/products?category=تجهیزات هوشمند آشپزخانه",
+          is_active: true,
+          children: [
+            {
+              id: "tpl_mixer_1",
+              title: "همزن برقی هوشمند",
+              url: "/products?search=همزن برقی هوشمند",
+              is_active: true,
+            },
+            {
+              id: "tpl_espresso_1",
+              title: "اسپرسوساز و قهوه‌ساز هوشمند",
+              url: "/products?search=اسپرسوساز",
+              is_active: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    label: "💻 کالای دیجیتال ⬅ لپ‌تاپ و نمایشگر ⬅ مانیتورهای 5K و 4K",
+    tree: {
+      id: "tpl_digital_" + Date.now(),
+      title: "کالای دیجیتال و سخت‌افزار",
+      url: "/products?category=کالای دیجیتال",
+      is_active: true,
+      children: [
+        {
+          id: "tpl_display_1",
+          title: "نمایشگر و مانیتورهای تخصصی",
+          url: "/products?category=مانیتور",
+          is_active: true,
+          children: [
+            {
+              id: "tpl_mon_5k",
+              title: "مانیتورهای 5K و رتینا",
+              url: "/products?search=5K",
+              is_active: true,
+            },
+            {
+              id: "tpl_mon_4k",
+              title: "مانیتورهای 4K اولترا اچ‌دی",
+              url: "/products?search=4K",
+              is_active: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    label: "🔌 جانبی و اتصال ⬅ کابل و هاب پرسرعت ⬅ تاندربولت ۵ و USB4",
+    tree: {
+      id: "tpl_acc_" + Date.now(),
+      title: "لوازم جانبی و اتصالات",
+      url: "/products?category=لوازم جانبی",
+      is_active: true,
+      children: [
+        {
+          id: "tpl_hub_1",
+          title: "کابل، داک و هاب پرسرعت",
+          url: "/products?category=کابل و مبدل",
+          is_active: true,
+          children: [
+            {
+              id: "tpl_tb5",
+              title: "کابل و تجهیزات تاندربولت ۵",
+              url: "/products?search=Thunderbolt",
+              is_active: true,
+            },
+            {
+              id: "tpl_magsafe",
+              title: "شارژر و هولدر مگ‌سیف",
+              url: "/products?search=مگ سیف",
+              is_active: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+];
+
 const DEFAULT_NAV_ITEMS: NavMenuItem[] = [
-  { id: "nav_1", title: "کاتالوگ محصولات", url: "/products", is_active: true },
-  { id: "nav_2", title: "اخبار تکنولوژی", url: "/news", is_active: true },
-  { id: "nav_3", title: "مجله سئو", url: "/blog", is_active: true },
-  { id: "nav_4", title: "پیگیری سفارش", url: "/track-order", is_active: true },
-  { id: "nav_5", title: "تماس با ما", url: "/contact", is_active: true },
+  {
+    id: "nav_1",
+    title: "کاتالوگ محصولات",
+    url: "/products",
+    is_active: true,
+    children: [],
+  },
+  { id: "nav_2", title: "اخبار تکنولوژی", url: "/news", is_active: true, children: [] },
+  { id: "nav_3", title: "مجله سئو", url: "/blog", is_active: true, children: [] },
+  { id: "nav_4", title: "پیگیری سفارش", url: "/track-order", is_active: true, children: [] },
+  { id: "nav_5", title: "تماس با ما", url: "/contact", is_active: true, children: [] },
 ];
 
 export function AdminMenu() {
@@ -40,11 +146,9 @@ export function AdminMenu() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // فرم افزودن آیتم منوی جدید
   const [newMenuTitle, setNewMenuTitle] = useState("");
   const [newMenuUrl, setNewMenuUrl] = useState("/products");
 
-  // فرم افزودن / ویرایش دسته‌بندی
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [catName, setCatName] = useState("");
   const [catSlug, setCatSlug] = useState("");
@@ -147,7 +251,7 @@ export function AdminMenu() {
       }
 
       soundEngine.playSuccess();
-      notify("✓ ساختار منوهای ناوبری هدر و موبایل به صورت بلادرنگ در کل سایت ذخیره شد.");
+      notify("✓ درخت منو و زیرمنوهای ۳ سطحی به صورت بلادرنگ در کل سایت ذخیره شد.");
     } finally {
       setSaving(false);
     }
@@ -155,31 +259,62 @@ export function AdminMenu() {
 
   const handleAddMenuItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMenuTitle.trim() || !newMenuUrl.trim()) return;
+    if (!newMenuTitle.trim()) return;
     soundEngine.playClick();
     const nextList: NavMenuItem[] = [
       ...navItems,
       {
         id: "nav_" + Date.now(),
         title: newMenuTitle.trim(),
-        url: newMenuUrl.trim(),
+        url: newMenuUrl.trim() || "/products",
         is_active: true,
+        children: [],
       },
     ];
     setNavItems(nextList);
     setNewMenuTitle("");
-    setNewMenuUrl("/products");
     syncHeaderNavigationEverywhere(nextList);
   };
 
-  const handleMoveMenu = (index: number, dir: "up" | "down") => {
+  const handleInjectSmartTemplate = (tplTree: NavMenuItem) => {
+    soundEngine.playSuccess();
+    const cloned: NavMenuItem = JSON.parse(JSON.stringify(tplTree));
+    cloned.id = "smart_" + Date.now();
+    const nextList = [...navItems, cloned];
+    setNavItems(nextList);
+    syncHeaderNavigationEverywhere(nextList);
+  };
+
+  const addSubMenuLevel2 = (parentIdx: number) => {
     soundEngine.playClick();
-    const target = dir === "up" ? index - 1 : index + 1;
-    if (target < 0 || target >= navItems.length) return;
     const copy = [...navItems];
-    const temp = copy[index];
-    copy[index] = copy[target];
-    copy[target] = temp;
+    const parent = copy[parentIdx];
+    const children = Array.isArray(parent.children) ? [...parent.children] : [];
+    children.push({
+      id: "sub2_" + Date.now(),
+      title: "زیرمنوی جدید " + parent.title,
+      url: "/products?category=" + encodeURIComponent(parent.title),
+      is_active: true,
+      children: [],
+    });
+    copy[parentIdx] = { ...parent, children };
+    setNavItems(copy);
+  };
+
+  const addSubMenuLevel3 = (parentIdx: number, sub2Idx: number) => {
+    soundEngine.playClick();
+    const copy = [...navItems];
+    const sub2List = [...(copy[parentIdx].children || [])];
+    const sub2 = sub2List[sub2Idx];
+    const sub3List = Array.isArray(sub2.children) ? [...sub2.children] : [];
+    sub3List.push({
+      id: "sub3_" + Date.now(),
+      title: "زیرمجموعه سطح ۳",
+      url: "/products?search=" + encodeURIComponent(sub2.title),
+      is_active: true,
+    });
+    sub2List[sub2Idx] = { ...sub2, children: sub3List };
+    copy[parentIdx] = { ...copy[parentIdx], children: sub2List };
     setNavItems(copy);
   };
 
@@ -224,86 +359,49 @@ export function AdminMenu() {
       const res = await fetch("/api/categories?id=" + encodeURIComponent(id), {
         method: "DELETE",
       });
-      const json = await res.json();
-      if (res.ok && json.success) {
+      if (res.ok) {
         soundEngine.playSuccess();
-        notify("دسته‌‌بندی با موفقیت حذف شد.");
         fetchMenusAndCategories();
-      } else {
-        alert(json.message || "خطا در حذف دسته‌بندی.");
       }
     } catch {}
   };
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      {/* نوار ناوبری یکپارچه استودیوی طراحی */}
-      <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/admin/appearance"
-            className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold transition"
-          >
-            🎨 استودیوی ظاهر و سکشن‌ها
-          </Link>
-          <Link
-            href="/admin/pages"
-            className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold transition"
-          >
-            ⚡ صفحه‌ساز ماژولار
-          </Link>
-          <span className="px-3.5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black shadow">
-            🧭 منو و دسته‌بندی‌ها
-          </span>
-          <Link
-            href="/admin/styles"
-            className="px-3.5 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold transition"
-          >
-            ✨ هویت بصری، فونت و CSS
-          </Link>
-        </div>
-      </div>
-
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🧭</span> مدیریت یکپارچه منوهای ناوبری و دسته‌بندی‌های کاتالوگ
-          </h1>
+          <h2 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🧭</span> مهندسی درخت منو، زیرمنوهای ۳ سطحی هوشمند و دسته‌بندی‌ها
+          </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            متصل به هدر دسکتاپ، منوی موبایل، تبلت و صفحه‌ساز ماژولار از طریق وب‌سوکت بلادرنگ
+            قابلیت ساخت منو، زیرمنو و زیرمجموعه زیرمنو به همراه پیشنهادگر هوشمند درختی و اتصال به کاتالوگ
           </p>
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto text-xs font-black">
           <button
             type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              setActiveTab("menus");
-            }}
+            onClick={() => setActiveTab("menus")}
             className={
-              "flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer " +
+              "flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl transition cursor-pointer " +
               (activeTab === "menus"
                 ? "bg-[var(--accent-blue)] text-white shadow-md"
                 : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]")
             }
           >
-            🔗 منوهای ناوبری سایت ({navItems.length})
+            🌳 درخت منو و زیرمنو ({navItems.length})
           </button>
           <button
             type="button"
-            onClick={() => {
-              soundEngine.playClick();
-              setActiveTab("categories");
-            }}
+            onClick={() => setActiveTab("categories")}
             className={
-              "flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer " +
+              "flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl transition cursor-pointer " +
               (activeTab === "categories"
                 ? "bg-[var(--accent-blue)] text-white shadow-md"
                 : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]")
             }
           >
-            📁 دسته‌بندی‌های محصولات ({categories.length})
+            📁 دسته‌بندی‌های کاتالوگ ({categories.length})
           </button>
         </div>
       </div>
@@ -316,132 +414,254 @@ export function AdminMenu() {
 
       {activeTab === "menus" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
-          <form
-            onSubmit={handleAddMenuItem}
-            className="lg:col-span-4 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit"
-          >
-            <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-              ➕ افزودن لینک جدید به منوی سایت
-            </h3>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان منو *</label>
-              <input
-                type="text"
-                required
-                value={newMenuTitle}
-                onChange={(e) => setNewMenuTitle(e.target.value)}
-                placeholder="مثال: جشنواره تخفیف‌ها"
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب سریع مقصد یا آدرس لینک *</label>
-              <select
-                onChange={(e) => {
-                  if (e.target.value) setNewMenuUrl(e.target.value);
-                }}
-                className="w-full p-2.5 mb-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-              >
-                <option value="/products">🛍️ کاتالوگ محصولات (/products)</option>
-                <option value="/news">📡 اخبار تکنولوژی (/news)</option>
-                <option value="/blog">📚 مجله تخصصی (/blog)</option>
-                <option value="/track-order">📦 پیگیری سفارش (/track-order)</option>
-                <option value="/contact">📞 تماس با ما (/contact)</option>
-                <option value="/about">ℹ️ درباره ما (/about)</option>
-              </select>
-              <input
-                type="text"
-                required
-                dir="ltr"
-                value={newMenuUrl}
-                onChange={(e) => setNewMenuUrl(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg cursor-pointer"
+          <div className="lg:col-span-4 space-y-4">
+            <form
+              onSubmit={handleAddMenuItem}
+              className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3.5"
             >
-              افزودن به منوی سایت +
-            </button>
-          </form>
+              <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-2.5">
+                ➕ افزودن سرشاخه منوی اصلی (سطح ۱)
+              </h3>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">عنوان منوی مادر *</label>
+                <input
+                  type="text"
+                  required
+                  value={newMenuTitle}
+                  onChange={(e) => setNewMenuTitle(e.target.value)}
+                  placeholder="مثال: تجهیزات خانه"
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-[var(--text-secondary)]">آدرس لینک مقصد:</label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={newMenuUrl}
+                  onChange={(e) => setNewMenuUrl(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg cursor-pointer"
+              >
+                افزودن منوی مادر +
+              </button>
+            </form>
 
+            {/* موتور پیشنهادگر هوشمند زیرمنوهای ۳ سطحی */}
+            <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-indigo-500/30 shadow-xl space-y-3">
+              <h3 className="font-black text-xs text-indigo-400 flex items-center gap-1.5">
+                <span>🤖</span> پیشنهادگر هوشمند درخت منو و زیرمنو (۳ سطحی):
+              </h3>
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                با یک کلیک، ساختار کامل منو، زیرمنو و زیرمجموعه سطح سوم را به درخت منوی سایت اضافه کنید:
+              </p>
+              <div className="space-y-2">
+                {SMART_TREE_TEMPLATES.map((item, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleInjectSmartTemplate(item.tree)}
+                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-indigo-500 text-right font-bold text-[11px] transition cursor-pointer flex items-center justify-between gap-2"
+                  >
+                    <span className="truncate">{item.label}</span>
+                    <span className="text-indigo-400 shrink-0">+ افزودن</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ویرایشگر درختی ۳ سطحی منو و زیرمنوها */}
           <div className="lg:col-span-8 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
-              <h3 className="font-black text-sm">چیدمان و ویرایش منوهای فعال هدر و موبایل</h3>
+              <h3 className="font-black text-sm">ویرایشگر کامل منوها و زیرمنوهای تو در تو</h3>
               <button
                 type="button"
                 disabled={saving}
                 onClick={() => syncHeaderNavigationEverywhere(navItems)}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black cursor-pointer shadow"
+                className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black cursor-pointer shadow-lg"
               >
-                {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار منوها در هدر سایت"}
+                {saving ? "در حال ذخیره..." : "💾 ذخیره و انتشار درخت منو در کل سایت"}
               </button>
             </div>
 
-            <div className="space-y-2.5">
-              {navItems.map((item, idx) => (
+            <div className="space-y-4">
+              {navItems.map((item, pIdx) => (
                 <div
                   key={item.id}
-                  className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                  className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-3"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 w-full">
-                    <input
-                      type="text"
-                      value={item.title}
-                      onChange={(e) => {
-                        const copy = [...navItems];
-                        copy[idx] = { ...copy[idx], title: e.target.value };
-                        setNavItems(copy);
-                      }}
-                      className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none"
-                    />
-                    <input
-                      type="text"
-                      dir="ltr"
-                      value={item.url}
-                      onChange={(e) => {
-                        const copy = [...navItems];
-                        copy[idx] = { ...copy[idx], url: e.target.value };
-                        setNavItems(copy);
-                      }}
-                      className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
-                    />
+                  {/* سطح ۱ */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 w-full">
+                      <input
+                        type="text"
+                        value={item.title}
+                        onChange={(e) => {
+                          const copy = [...navItems];
+                          copy[pIdx] = { ...copy[pIdx], title: e.target.value };
+                          setNavItems(copy);
+                        }}
+                        className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-black outline-none"
+                      />
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={item.url}
+                        onChange={(e) => {
+                          const copy = [...navItems];
+                          copy[pIdx] = { ...copy[pIdx], url: e.target.value };
+                          setNavItems(copy);
+                        }}
+                        className="p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono outline-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => addSubMenuLevel2(pIdx)}
+                        className="px-3 py-2 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 font-black text-[11px] cursor-pointer"
+                      >
+                        + زیرمنو (سطح ۲)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = navItems.filter((x) => x.id !== item.id);
+                          setNavItems(next);
+                        }}
+                        className="p-2 px-2.5 rounded-xl bg-rose-500/15 text-rose-400 font-bold cursor-pointer"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleMoveMenu(idx, "up")}
-                      disabled={idx === 0}
-                      className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
-                    >
-                      ⬆️
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveMenu(idx, "down")}
-                      disabled={idx === navItems.length - 1}
-                      className="p-2 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] disabled:opacity-30 cursor-pointer"
-                    >
-                      ⬇️
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const filtered = navItems.filter((n) => n.id !== item.id);
-                        setNavItems(filtered);
-                        syncHeaderNavigationEverywhere(filtered);
-                      }}
-                      className="p-2 px-3 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold cursor-pointer"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                  {/* سطح ۲ */}
+                  {Array.isArray(item.children) && item.children.length > 0 && (
+                    <div className="pr-4 sm:pr-6 border-r-2 border-[var(--accent-blue)]/40 space-y-2.5">
+                      {item.children.map((sub2, s2Idx) => (
+                        <div
+                          key={sub2.id}
+                          className="p-3 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2"
+                        >
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 w-full">
+                              <input
+                                type="text"
+                                value={sub2.title}
+                                onChange={(e) => {
+                                  const copy = [...navItems];
+                                  const c2 = [...(copy[pIdx].children || [])];
+                                  c2[s2Idx] = { ...c2[s2Idx], title: e.target.value };
+                                  copy[pIdx] = { ...copy[pIdx], children: c2 };
+                                  setNavItems(copy);
+                                }}
+                                className="p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+                              />
+                              <input
+                                type="text"
+                                dir="ltr"
+                                value={sub2.url}
+                                onChange={(e) => {
+                                  const copy = [...navItems];
+                                  const c2 = [...(copy[pIdx].children || [])];
+                                  c2[s2Idx] = { ...c2[s2Idx], url: e.target.value };
+                                  copy[pIdx] = { ...copy[pIdx], children: c2 };
+                                  setNavItems(copy);
+                                }}
+                                className="p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => addSubMenuLevel3(pIdx, s2Idx)}
+                                className="px-2.5 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 font-bold text-[10px] cursor-pointer"
+                              >
+                                + زیرمجموعه (سطح ۳)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const copy = [...navItems];
+                                  copy[pIdx].children = (copy[pIdx].children || []).filter(
+                                    (x) => x.id !== sub2.id
+                                  );
+                                  setNavItems(copy);
+                                }}
+                                className="p-1.5 px-2 rounded-lg bg-rose-500/15 text-rose-400 cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* سطح ۳ */}
+                          {Array.isArray(sub2.children) && sub2.children.length > 0 && (
+                            <div className="pr-4 border-r-2 border-indigo-500/40 space-y-1.5 pt-1">
+                              {sub2.children.map((sub3, s3Idx) => (
+                                <div key={sub3.id} className="flex items-center gap-2">
+                                  <span className="text-indigo-400 font-bold">↳</span>
+                                  <input
+                                    type="text"
+                                    value={sub3.title}
+                                    onChange={(e) => {
+                                      const copy = [...navItems];
+                                      const c2 = [...(copy[pIdx].children || [])];
+                                      const c3 = [...(c2[s2Idx].children || [])];
+                                      c3[s3Idx] = { ...c3[s3Idx], title: e.target.value };
+                                      c2[s2Idx] = { ...c2[s2Idx], children: c3 };
+                                      copy[pIdx] = { ...copy[pIdx], children: c2 };
+                                      setNavItems(copy);
+                                    }}
+                                    className="flex-1 p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold outline-none"
+                                  />
+                                  <input
+                                    type="text"
+                                    dir="ltr"
+                                    value={sub3.url}
+                                    onChange={(e) => {
+                                      const copy = [...navItems];
+                                      const c2 = [...(copy[pIdx].children || [])];
+                                      const c3 = [...(c2[s2Idx].children || [])];
+                                      c3[s3Idx] = { ...c3[s3Idx], url: e.target.value };
+                                      c2[s2Idx] = { ...c2[s2Idx], children: c3 };
+                                      copy[pIdx] = { ...copy[pIdx], children: c2 };
+                                      setNavItems(copy);
+                                    }}
+                                    className="flex-1 p-2 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-mono outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const copy = [...navItems];
+                                      const c2 = [...(copy[pIdx].children || [])];
+                                      c2[s2Idx].children = (c2[s2Idx].children || []).filter(
+                                        (x) => x.id !== sub3.id
+                                      );
+                                      copy[pIdx].children = c2;
+                                      setNavItems(copy);
+                                    }}
+                                    className="p-1.5 text-rose-400 cursor-pointer"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -453,119 +673,65 @@ export function AdminMenu() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
           <form
             onSubmit={handleSaveCategory}
-            className="lg:col-span-4 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit"
+            className="lg:col-span-4 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 h-fit"
           >
             <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
               {editingCatId ? "✏️ ویرایش دسته‌بندی" : "➕ ایجاد دسته‌بندی محصول جدید"}
             </h3>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام دسته‌بندی *</label>
-              <input
-                type="text"
-                required
-                value={catName}
-                onChange={(e) => setCatName(e.target.value)}
-                placeholder="مثال: لپ‌تاپ و اولترابوک"
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">نامک (Slug)</label>
-                <input
-                  type="text"
-                  dir="ltr"
-                  value={catSlug}
-                  onChange={(e) => setCatSlug(e.target.value)}
-                  placeholder="laptops"
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
-                />
-              </div>
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">آیکون</label>
-                <input
-                  type="text"
-                  value={catIcon}
-                  onChange={(e) => setCatIcon(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-center outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">توضیح کوتاه دسته‌بندی</label>
-              <textarea
-                rows={2}
-                value={catDesc}
-                onChange={(e) => setCatDesc(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
-              />
-            </div>
-
+            <input
+              type="text"
+              required
+              value={catName}
+              onChange={(e) => setCatName(e.target.value)}
+              placeholder="نام دسته‌بندی..."
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+            />
+            <input
+              type="text"
+              dir="ltr"
+              value={catSlug}
+              onChange={(e) => setCatSlug(e.target.value)}
+              placeholder="slug-name"
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+            />
             <button
               type="submit"
               disabled={saving}
               className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg cursor-pointer"
             >
-              {editingCatId ? "💾 بروزرسانی دسته‌بندی" : "💾 ثبت دسته‌بندی در دیتابیس"}
+              ذخیره دسته‌بندی 💾
             </button>
           </form>
 
-          <div className="lg:col-span-8 p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-            <h3 className="font-black text-sm border-b border-[var(--card-border)] pb-3">
-              دسته‌بندی‌های فعال کاتالوگ ({categories.length})
-            </h3>
-
-            {loading ? (
-              <div className="py-12 text-center text-slate-400">در حال بارگذاری...</div>
-            ) : categories.length === 0 ? (
-              <div className="py-12 text-center text-slate-400">هنوز دسته‌بندی ثبت نشده است.</div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {categories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3"
+          <div className="lg:col-span-8 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl grid grid-cols-1 sm:grid-cols-2 gap-3 h-fit">
+            {categories.map((cat) => (
+              <div
+                key={cat.id}
+                className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between"
+              >
+                <span className="font-black">{cat.name}</span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingCatId(cat.id);
+                      setCatName(cat.name);
+                      setCatSlug(cat.slug || "");
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-[var(--modal-bg)] cursor-pointer"
                   >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <span className="text-2xl">{cat.icon || "📁"}</span>
-                      <div className="overflow-hidden">
-                        <h4 className="font-black text-xs truncate">{cat.name}</h4>
-                        <span className="text-[10px] font-mono text-slate-400 block truncate">
-                          /{cat.slug}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setEditingCatId(cat.id);
-                          setCatName(cat.name);
-                          setCatSlug(cat.slug || "");
-                          setCatIcon(cat.icon || "💻");
-                          setCatDesc(cat.description || "");
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCategory(cat.id)}
-                        className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold cursor-pointer"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCategory(cat.id)}
+                    className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-400 cursor-pointer"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
       )}

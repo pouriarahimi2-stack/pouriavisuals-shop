@@ -1,7 +1,9 @@
+// File Path: app/api/contact/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
 import { validatePhoneNumber, sanitizeInput, createApiError, createApiSuccess } from "@/lib/validationGuard";
+import { smsService } from "@/services/smsService";
 
 export const dynamic = "force-dynamic";
 
@@ -93,9 +95,26 @@ export async function PATCH(req: NextRequest) {
 
     if (error) throw error;
 
+    if (admin_reply && updated && updated.phone) {
+      const cleanPhone = String(updated.phone).replace(/\D/g, "");
+      if (cleanPhone.length === 11) {
+        try {
+          await smsService.sendSMS(
+            cleanPhone,
+            "کاربر گرامی " +
+              (updated.full_name || "") +
+              "، پاسخ مدیریت آکسون به پیام شما: " +
+              String(admin_reply).trim()
+          );
+        } catch (smsErr) {
+          console.warn("SMS send warning on contact reply:", smsErr);
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: "پاسخ مدیریت با موفقیت در دیتابیس ثبت شد.",
+      message: "پاسخ مدیریت با موفقیت در دیتابیس ثبت و پیامک اطلاع‌رسانی ارسال شد.",
       data: updated,
     });
   } catch (err: any) {

@@ -1,3 +1,4 @@
+// File Path: app/api/coupons/validate/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
@@ -18,7 +19,6 @@ export async function POST(req: NextRequest) {
 
     const cleanCode = rawCode.trim().toUpperCase();
 
-    // واکشی کوپن فعال از دیتابیس با supabaseAdmin
     const { data: coupon, error } = await supabaseAdmin
       .from("coupons")
       .select("*")
@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۱. بررسی فعال بودن کوپن
     if (coupon.is_active === false) {
       return NextResponse.json(
         { valid: false, message: "این کد تخفیف در حال حاضر غیرفعال است." },
@@ -40,7 +39,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۲. بررسی تاریخ انقضا
+    if (coupon.starts_at && new Date(coupon.starts_at).getTime() > Date.now()) {
+      return NextResponse.json(
+        { valid: false, message: "زمان استفاده از این کد تخفیف هنوز آغاز نشده است." },
+        { status: 400 }
+      );
+    }
+
     if (coupon.expires_at && new Date(coupon.expires_at).getTime() < Date.now()) {
       return NextResponse.json(
         { valid: false, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." },
@@ -48,11 +53,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۳. بررسی سقف تعداد دفعات استفاده
+    const usedCount = Number(coupon.times_used ?? coupon.used_count ?? 0);
     if (
       typeof coupon.usage_limit === "number" &&
       coupon.usage_limit > 0 &&
-      (coupon.times_used || 0) >= coupon.usage_limit
+      usedCount >= coupon.usage_limit
     ) {
       return NextResponse.json(
         { valid: false, message: "سقف ظرفیت استفاده از این کد تخفیف تکمیل شده است." },
@@ -60,31 +65,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ۴. بررسی شرط حداقل خرید (Minimum Purchase)
-    if (coupon.min_purchase && cartTotal < coupon.min_purchase) {
+    const minRequired = Number(coupon.min_purchase ?? coupon.min_order_amount ?? 0);
+    if (minRequired > 0 && cartTotal < minRequired) {
       return NextResponse.json(
         {
           valid: false,
-          message: `این کد تنها برای سفارش‌های بالاتر از ${Number(coupon.min_purchase).toLocaleString("fa-IR")} تومان معتبر است.`,
+          message:
+            "این کد تنها برای سفارش‌های بالاتر از " +
+            minRequired.toLocaleString("fa-IR") +
+            " تومان معتبر است.",
         },
         { status: 400 }
       );
     }
 
-    // ۵. محاسبه دقیق مبلغ کسر شده
     let discountAmount = 0;
-    if (coupon.discount_type === "percent" || coupon.percent) {
-      const p = Number(coupon.discount_percent || coupon.percent || 0);
-      discountAmount = Math.round((cartTotal * p) / 100);
-      if (coupon.max_discount && discountAmount > coupon.max_discount) {
-        discountAmount = coupon.max_discount;
+    const isPercent =
+      coupon.discount_type === "percent" ||
+      coupon.type === "percent" ||
+      Boolean(coupon.discount_percent) ||
+      Boolean(coupon.percent);
+
+    const maxCap = Number(coupon.max_discount ?? coupon.max_discount_amount ?? 0);
+
+    if (isPercent) {
+      const pct = Number(
+        coupon.discount_percent ?? coupon.percent ?? coupon.value ?? coupon.discount_value ?? 0
+      );
+      discountAmount = Math.round((cartTotal * pct) / 100);
+      if (maxCap > 0 && discountAmount > maxCap) {
+        discountAmount = maxCap;
       }
-    } else if (coupon.discount_amount || coupon.amount) {
-      discountAmount = Number(coupon.discount_amount || coupon.amount || 0);
+    } else {
+      discountAmount = Number(
+        coupon.discount_amount ?? coupon.amount ?? coupon.value ?? coupon.discount_value ?? 0
+      );
     }
 
-    // تضمین اینکه تخفیف از کل مبلغ سبد فراتر نرود
-    discountAmount = Math.min(discountAmount, cartTotal);
+    discountAmount = Math.max(0, Math.min(discountAmount, cartTotal));
 
     return NextResponse.json({
       valid: true,
@@ -92,8 +110,10 @@ export async function POST(req: NextRequest) {
         id: coupon.id,
         code: coupon.code,
         discount_amount: discountAmount,
-        discount_percent: coupon.discount_percent || coupon.percent || null,
-        description: coupon.description || "تخفیف سفارش",
+        discount_percent: isPercent
+          ? Number(coupon.discount_percent ?? coupon.percent ?? coupon.value ?? coupon.discount_value ?? 0)
+          : null,
+        description: coupon.description || "تخفیف ویژه سفارش",
       },
       message: "کد تخفیف با موفقیت روی سفارش اعمال شد.",
     });

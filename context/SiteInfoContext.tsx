@@ -4,18 +4,22 @@ import { supabase } from "@/lib/supabase";
 
 interface SiteInfoContextValue {
   siteInfo: any;
-  loading: boolean;
-  refresh: () => Promise<void>;
+  loading:  boolean;
+  refresh:  () => Promise<void>;
 }
 
 const Ctx = createContext<SiteInfoContextValue>({
   siteInfo: {}, loading: true, refresh: async () => {},
 });
 
+// شمارنده برای channel name یکتا
+let channelCounter = 0;
+
 export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
   const [siteInfo, setSiteInfo] = useState<any>({});
   const [loading,  setLoading]  = useState(true);
-  const fetchedRef = useRef(false);
+  const mountedRef  = useRef(false);
+  const channelRef  = useRef<any>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -26,30 +30,48 @@ export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
+    // جلوگیری از double-mount در React StrictMode
+    if (mountedRef.current) return;
+    mountedRef.current = true;
+
     setLoading(true);
     refresh().finally(() => setLoading(false));
 
-    // گوش دادن به تغییرات realtime
-    let debounce: ReturnType<typeof setTimeout>;
-    const channel = supabase
-      .channel("site-info-global")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
-        clearTimeout(debounce);
-        debounce = setTimeout(refresh, 1000);
-      })
-      .subscribe();
+    // channel با نام یکتا برای جلوگیری از تداخل
+    channelCounter++;
+    const chName = "site-info-ch-" + channelCounter + "-" + Date.now();
 
-    // گوش دادن به event دستی
+    let debounce: ReturnType<typeof setTimeout>;
+
+    const channel = supabase
+      .channel(chName)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          clearTimeout(debounce);
+          debounce = setTimeout(refresh, 1500);
+        }
+      )
+      .subscribe((status: string) => {
+        if (status === "CHANNEL_ERROR") {
+          console.warn("[SiteInfo] channel error, retrying...");
+        }
+      });
+
+    channelRef.current = channel;
+
     const handleUpdate = () => refresh();
-    window.addEventListener("site_info_updated", handleUpdate);
+    window.addEventListener("site_info_updated",   handleUpdate);
     window.addEventListener("site_styles_updated", handleUpdate);
 
     return () => {
       clearTimeout(debounce);
-      supabase.removeChannel(channel);
-      window.removeEventListener("site_info_updated", handleUpdate);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      window.removeEventListener("site_info_updated",   handleUpdate);
       window.removeEventListener("site_styles_updated", handleUpdate);
     };
   }, [refresh]);

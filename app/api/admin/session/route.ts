@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPayload, COOKIE_NAME } from "@/lib/session";
+import { requireAdmin } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get(COOKIE_NAME)?.value;
-    if (!token) {
-      return NextResponse.json({ authenticated: false }, { status: 200 });
+    const auth = await requireAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ success: false, admin: null });
     }
-
-    const payload = await verifyPayload(token);
-    if (payload && payload.username && payload.role) {
-      return NextResponse.json({
-        authenticated: true,
-        user: {
-          id: payload.id,
-          username: payload.username,
-          full_name: payload.full_name || payload.username,
-          role: payload.role,
-        },
-      });
-    }
-
-    return NextResponse.json({ authenticated: false }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      admin: {
+        username: auth.session?.username || "admin",
+        role:     auth.session?.role     || "superadmin",
+      },
+    });
   } catch {
-    return NextResponse.json({ authenticated: false }, { status: 200 });
+    return NextResponse.json({ success: false, admin: null });
   }
 }

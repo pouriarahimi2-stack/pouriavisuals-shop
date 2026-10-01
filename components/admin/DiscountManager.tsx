@@ -37,8 +37,17 @@ export default function DiscountManager() {
     };
 
     window.addEventListener("coupons_updated", handleCouponsUpdate);
+
+    const channel = supabase
+      .channel("realtime-discount-manager")
+      .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
+        fetchCoupons();
+      })
+      .subscribe();
+
     return () => {
       window.removeEventListener("coupons_updated", handleCouponsUpdate);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -70,7 +79,10 @@ export default function DiscountManager() {
       const created = await couponService.create(payload);
       if (created) {
         soundEngine.playSuccess();
-        setStatusMessage({ type: "success", text: `⚡ کد تخفیف «${created.code}» با موفقیت در دیتابیس ثبت و فعال شد.` });
+        setStatusMessage({
+          type: "success",
+          text: "⚡ کد تخفیف «" + created.code + "» با موفقیت در دیتابیس ثبت و فعال شد.",
+        });
         setCode("");
         setValue(10);
         setMinOrder("");
@@ -104,12 +116,14 @@ export default function DiscountManager() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex items-center justify-between">
+      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🏷️</span> مدیریت کدهای تخفیف، جشنواره‌ها و کمپین‌ها
           </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">ایجاد و مدیریت کوپن‌های درصدی یا نقدی با فعال‌سازی بلادرنگ</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            ایجاد و مدیریت کوپن‌های درصدی یا نقدی با فعال‌سازی بلادرنگ وب‌سوکت
+          </p>
         </div>
         <span className="px-4 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-black">
           {coupons.length} کوپن ثبت‌شده
@@ -118,24 +132,30 @@ export default function DiscountManager() {
 
       {statusMessage && (
         <div
-          className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${
-            statusMessage.type === "success"
+          className={
+            "p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " +
+            (statusMessage.type === "success"
               ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400"
-          }`}
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400")
+          }
         >
           {statusMessage.text}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <form onSubmit={handleCreateCoupon} className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl h-fit text-xs">
+        <form
+          onSubmit={handleCreateCoupon}
+          className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl h-fit text-xs"
+        >
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             + ایجاد کوپن تخفیف جدید
           </h3>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">کد لاتین تخفیف *</label>
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
+              کد لاتین تخفیف *
+            </label>
             <input
               type="text"
               placeholder="مثلاً: AXON2026"
@@ -146,9 +166,11 @@ export default function DiscountManager() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">نوع محاسبه تخفیف</label>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
+                نوع محاسبه تخفیف
+              </label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as any)}
@@ -160,22 +182,26 @@ export default function DiscountManager() {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">مقدار تخفیف *</label>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
+                مقدار تخفیف *
+              </label>
               <input
                 type="number"
                 min="1"
                 placeholder={type === "percent" ? "مثلا: 20" : "مثلا: 100000"}
                 value={value}
-                onChange={(e) => setValue(Number(e.target.value))}
+                onChange={(e) => setValue(e.target.value ? Number(e.target.value) : "")}
                 className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none"
                 required
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">سقف تخفیف (تومان)</label>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
+                سقف تخفیف (تومان)
+              </label>
               <input
                 type="number"
                 placeholder="۵۰۰,۰۰۰"
@@ -186,7 +212,9 @@ export default function DiscountManager() {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">حداقل خرید (تومان)</label>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
+                حداقل خرید (تومان)
+              </label>
               <input
                 type="number"
                 placeholder="۱,۰۰۰,۰۰۰"
@@ -198,7 +226,9 @@ export default function DiscountManager() {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">تاریخ انقضا (اختیاری)</label>
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
+              تاریخ انقضا (اختیاری)
+            </label>
             <input
               type="date"
               value={expiresAt}
@@ -216,18 +246,22 @@ export default function DiscountManager() {
           </button>
         </form>
 
-        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
+        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
           <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
             📋 لیست کدهای تخفیف فعال و آرشیو ({coupons.length})
           </h3>
 
           <div className="space-y-3 max-h-[480px] overflow-y-auto">
             {coupons.length === 0 ? (
-              <p className="text-xs text-center py-12 text-[var(--text-secondary)] font-bold">هیچ کد تخفیفی ثبت نشده است.</p>
+              <p className="text-xs text-center py-12 text-[var(--text-secondary)] font-bold">
+                هیچ کد تخفیفی ثبت نشده است.
+              </p>
             ) : (
               coupons.map((c) => {
                 const isPercent = c.type === "percent" || c.discount_type === "percent";
-                const discountVal = Number(c.value ?? c.discount_value ?? 0);
+                const discountVal = Number(
+                  c.value ?? c.discount_value ?? (c as any).discount_percent ?? (c as any).discount_amount ?? 0
+                );
                 const isItemActive = c.is_active !== false;
 
                 return (
@@ -237,9 +271,13 @@ export default function DiscountManager() {
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-sm text-[var(--accent-blue)] tracking-wider">{c.code}</span>
+                        <span className="font-mono font-black text-sm text-[var(--accent-blue)] tracking-wider">
+                          {c.code}
+                        </span>
                         <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
-                          {isPercent ? `${discountVal}٪ تخفیف` : `${discountVal.toLocaleString("fa-IR")} تومان تخفیف`}
+                          {isPercent
+                            ? discountVal + "٪ تخفیف"
+                            : discountVal.toLocaleString("fa-IR") + " تومان تخفیف"}
                         </span>
                       </div>
                       {c.max_discount && (
@@ -252,11 +290,12 @@ export default function DiscountManager() {
                     <div className="flex items-center gap-2 self-end sm:self-center">
                       <button
                         onClick={() => toggleStatus(c.id!, isItemActive)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition ${
-                          isItemActive
+                        className={
+                          "px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition " +
+                          (isItemActive
                             ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                            : "bg-slate-500/15 text-slate-500 border border-slate-500/30"
-                        }`}
+                            : "bg-slate-500/15 text-slate-500 border border-slate-500/30")
+                        }
                       >
                         {isItemActive ? "فعال ✓" : "غیرفعال"}
                       </button>

@@ -1,9 +1,21 @@
+// File Path: app/api/admin/news/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/authSecurityHelper";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
+
+function normalizeNewsRecord(row: any) {
+  if (!row) return row;
+  return {
+    ...row,
+    excerpt: row.excerpt || row.summary || "",
+    summary: row.summary || row.excerpt || "",
+    cover_image: row.cover_image || row.image_url || "/placeholder.png",
+    image_url: row.image_url || row.cover_image || "/placeholder.png",
+  };
+}
 
 export async function GET() {
   try {
@@ -13,11 +25,16 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      const fallback = await supabaseAdmin.from("news").select("*").order("created_at", { ascending: false });
-      return NextResponse.json({ success: true, news: fallback.data || [] });
+      const fallback = await supabaseAdmin
+        .from("news")
+        .select("*")
+        .order("created_at", { ascending: false });
+      const normalizedFallback = (fallback.data || []).map(normalizeNewsRecord);
+      return NextResponse.json({ success: true, news: normalizedFallback });
     }
 
-    return NextResponse.json({ success: true, news: data || [] });
+    const normalized = (data || []).map(normalizeNewsRecord);
+    return NextResponse.json({ success: true, news: normalized });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -56,10 +73,18 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabaseAdmin.from("tech_news").insert([payload]).select().single();
+    const { data, error } = await supabaseAdmin
+      .from("tech_news")
+      .insert([payload])
+      .select()
+      .single();
     if (error) throw error;
 
-    return NextResponse.json({ success: true, news: data, message: "خبر با موفقیت منتشر شد." });
+    return NextResponse.json({
+      success: true,
+      news: normalizeNewsRecord(data),
+      message: "خبر با موفقیت منتشر شد.",
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -94,7 +119,11 @@ export async function PUT(req: NextRequest) {
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ success: true, news: data, message: "خبر با موفقیت بروزرسانی شد." });
+    return NextResponse.json({
+      success: true,
+      news: normalizeNewsRecord(data),
+      message: "خبر با موفقیت بروزرسانی شد.",
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

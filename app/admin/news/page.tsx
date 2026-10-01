@@ -1,7 +1,9 @@
+// File Path: app/admin/news/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
 import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
 import MediaUploadModal from "@/components/admin/MediaUploadModal";
 
 interface Article {
@@ -9,8 +11,10 @@ interface Article {
   title: string;
   slug: string;
   excerpt: string;
+  summary?: string;
   content: string;
   cover_image?: string | null;
+  image_url?: string | null;
   tags?: string[];
   is_published: boolean;
   created_at?: string;
@@ -45,8 +49,7 @@ export default function AdminNewsPage() {
 
   const fetchArticles = async () => {
     try {
-      setLoading(true);
-      const res = await fetch("/api/admin/news");
+      const res = await fetch("/api/admin/news", { cache: "no-store" });
       const json = await res.json();
       if (res.ok && json.success) {
         setArticles(json.news || []);
@@ -60,6 +63,17 @@ export default function AdminNewsPage() {
 
   useEffect(() => {
     fetchArticles();
+
+    const channel = supabase
+      .channel("realtime-admin-news-page")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tech_news" }, () => {
+        fetchArticles();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleOpenCreate = () => {
@@ -84,9 +98,9 @@ export default function AdminNewsPage() {
       id: art.id,
       title: art.title,
       slug: art.slug,
-      excerpt: art.excerpt || "",
+      excerpt: art.excerpt || art.summary || "",
       content: art.content || "",
-      cover_image: art.cover_image || "",
+      cover_image: art.cover_image || art.image_url || "",
       tags: Array.isArray(art.tags) ? art.tags : [],
       is_published: art.is_published !== false,
     });
@@ -97,7 +111,9 @@ export default function AdminNewsPage() {
     if (!confirm("آیا از حذف این مقاله اطمینان دارید؟")) return;
     soundEngine.playClick();
     try {
-      const res = await fetch(`/api/admin/news?id=${id}`, { method: "DELETE" });
+      const res = await fetch("/api/admin/news?id=" + encodeURIComponent(id), {
+        method: "DELETE",
+      });
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
@@ -132,7 +148,11 @@ export default function AdminNewsPage() {
       const res = await fetch("/api/admin/news", {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          summary: form.excerpt,
+          image_url: form.cover_image,
+        }),
       });
 
       const json = await res.json();
@@ -150,14 +170,13 @@ export default function AdminNewsPage() {
 
   return (
     <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
-      {/* هدر صفحه */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📰</span> مدیریت مقالات، وبلاگ و اخبار
+          <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>📰</span> مدیریت مقالات، وبلاگ و اخبار تکنولوژی
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تولید و ویرایش محتوا، مدیریت تگ‌ها، سئو و تصاویر شاخص
+            تولید و ویرایش محتوا، مدیریت تگ‌ها، سئو و تصاویر شاخص (همگام‌سازی زنده وب‌سوکت)
           </p>
         </div>
 
@@ -169,80 +188,82 @@ export default function AdminNewsPage() {
         </button>
       </div>
 
-      {/* فهرست مقالات */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
+      <div className="p-4 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl">
         {loading ? (
           <div className="p-12 text-center text-xs text-slate-400">در حال دریافت مقالات...</div>
         ) : articles.length === 0 ? (
           <div className="p-12 text-center text-xs text-slate-400">هیچ مقاله‌ای منتشر نشده است.</div>
         ) : (
           <div className="space-y-3">
-            {articles.map((art) => (
-              <div
-                key={art.id}
-                className="p-4 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-[var(--accent-blue)] transition"
-              >
-                <div className="flex items-center gap-3">
-                  {art.cover_image ? (
-                    <img
-                      src={art.cover_image}
-                      alt={art.title}
-                      className="w-16 h-12 object-cover rounded-xl border border-[var(--card-border)] shrink-0"
-                    />
-                  ) : (
-                    <div className="w-16 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-xs shrink-0">
-                      📄
-                    </div>
-                  )}
+            {articles.map((art) => {
+              const imgSrc = art.cover_image || art.image_url || "";
+              return (
+                <div
+                  key={art.id}
+                  className="p-4 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-[var(--accent-blue)] transition"
+                >
+                  <div className="flex items-center gap-3">
+                    {imgSrc ? (
+                      <img
+                        src={imgSrc}
+                        alt={art.title}
+                        className="w-16 h-12 object-cover rounded-xl border border-[var(--card-border)] shrink-0"
+                      />
+                    ) : (
+                      <div className="w-16 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-xs shrink-0">
+                        📄
+                      </div>
+                    )}
 
-                  <div>
-                    <h3 className="text-xs font-bold text-[var(--text-primary)]">{art.title}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[11px] font-mono text-slate-400">/{art.slug}</span>
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                          art.is_published
-                            ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                            : "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                        }`}
-                      >
-                        {art.is_published ? "منتشر شده" : "پیش‌نویس"}
-                      </span>
+                    <div>
+                      <h3 className="text-xs font-bold text-[var(--text-primary)]">{art.title}</h3>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="text-[11px] font-mono text-slate-400">/{art.slug}</span>
+                        <span
+                          className={
+                            "px-2 py-0.5 rounded-md text-[10px] font-bold border " +
+                            (art.is_published
+                              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                              : "bg-amber-500/15 border-amber-500/30 text-amber-400")
+                          }
+                        >
+                          {art.is_published ? "منتشر شده" : "پیش‌نویس"}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => handleOpenEdit(art)}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--card-border)] text-xs font-bold hover:bg-slate-700 transition"
-                  >
-                    ویرایش
-                  </button>
-                  <button
-                    onClick={() => handleDelete(art.id)}
-                    className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs transition"
-                  >
-                    حذف
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <button
+                      onClick={() => handleOpenEdit(art)}
+                      className="px-3 py-1.5 rounded-xl bg-[var(--card-border)] text-xs font-bold hover:bg-slate-700 transition cursor-pointer"
+                    >
+                      ویرایش
+                    </button>
+                    <button
+                      onClick={() => handleDelete(art.id)}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs transition cursor-pointer"
+                    >
+                      حذف
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* مودال ایجاد و ویرایش مقاله */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto space-y-5">
+          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-5 sm:p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto space-y-5">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
               <h3 className="text-sm font-black text-[var(--text-primary)]">
                 {editingArticle ? "✏️ ویرایش مقاله" : "➕ انتشار مقاله جدید"}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white transition font-mono"
+                className="text-slate-400 hover:text-white transition font-mono cursor-pointer"
               >
                 ✕
               </button>
@@ -251,7 +272,9 @@ export default function AdminNewsPage() {
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">عنوان مقاله:</label>
+                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                    عنوان مقاله:
+                  </label>
                   <input
                     type="text"
                     required
@@ -261,7 +284,9 @@ export default function AdminNewsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">نامک (Slug):</label>
+                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                    نامک (Slug):
+                  </label>
                   <input
                     type="text"
                     required
@@ -272,16 +297,17 @@ export default function AdminNewsPage() {
                 </div>
               </div>
 
-              {/* تصویر شاخص با مودال بارگذاری */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-[var(--text-secondary)]">تصویر شاخص (Cover Image):</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)]">
+                  تصویر شاخص (Cover Image):
+                </label>
                 {form.cover_image ? (
                   <div className="relative rounded-2xl overflow-hidden border border-[var(--card-border)] aspect-[16/7] max-h-48">
                     <img src={form.cover_image} alt="Cover Preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, cover_image: "" })}
-                      className="absolute top-2 left-2 px-2.5 py-1 rounded-xl bg-rose-600 text-white text-[10px] font-bold shadow"
+                      className="absolute top-2 left-2 px-2.5 py-1 rounded-xl bg-rose-600 text-white text-[10px] font-bold shadow cursor-pointer"
                     >
                       تغییر تصویر
                     </button>
@@ -290,7 +316,7 @@ export default function AdminNewsPage() {
                   <button
                     type="button"
                     onClick={() => setIsUploadOpen(true)}
-                    className="w-full py-5 rounded-2xl border-2 border-dashed border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition flex items-center justify-center gap-2"
+                    className="w-full py-5 rounded-2xl border-2 border-dashed border-[var(--card-border)] bg-[var(--input-bg)] text-xs font-bold text-[var(--accent-blue)] hover:border-[var(--accent-blue)] transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>☁️</span> بارگذاری تصویر شاخص مقاله
                   </button>
@@ -298,7 +324,9 @@ export default function AdminNewsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">خلاصه مقاله (Excerpt):</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                  خلاصه مقاله (Excerpt):
+                </label>
                 <textarea
                   rows={2}
                   value={form.excerpt}
@@ -309,7 +337,9 @@ export default function AdminNewsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">متن کامل محتوا:</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                  متن کامل محتوا:
+                </label>
                 <textarea
                   rows={6}
                   required
@@ -319,9 +349,10 @@ export default function AdminNewsPage() {
                 />
               </div>
 
-              {/* مدیریت تگ‌ها */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-[var(--text-secondary)]">برچسب‌ها (Tags):</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)]">
+                  برچسب‌ها (Tags):
+                </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -338,19 +369,24 @@ export default function AdminNewsPage() {
                         setTagInput("");
                       }
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--card-border)] text-xs font-bold"
+                    className="px-3 py-1.5 rounded-xl bg-[var(--card-border)] text-xs font-bold cursor-pointer"
                   >
                     افزودن
                   </button>
                 </div>
                 <div className="flex gap-1.5 flex-wrap pt-1">
                   {form.tags.map((t, idx) => (
-                    <span key={idx} className="px-2.5 py-0.5 rounded-lg bg-[var(--card-border)] text-xs flex items-center gap-1">
+                    <span
+                      key={idx}
+                      className="px-2.5 py-0.5 rounded-lg bg-[var(--card-border)] text-xs flex items-center gap-1"
+                    >
                       #{t}
                       <button
                         type="button"
-                        onClick={() => setForm({ ...form, tags: form.tags.filter((_, i) => i !== idx) })}
-                        className="text-rose-400 text-[10px]"
+                        onClick={() =>
+                          setForm({ ...form, tags: form.tags.filter((_, i) => i !== idx) })
+                        }
+                        className="text-rose-400 text-[10px] cursor-pointer"
                       >
                         ✕
                       </button>
@@ -373,13 +409,13 @@ export default function AdminNewsPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+                  className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer"
                 >
                   انصراف
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md hover:opacity-90 transition"
+                  className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer"
                 >
                   ذخیره و انتشار 💾
                 </button>

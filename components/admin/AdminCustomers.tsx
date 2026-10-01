@@ -1,3 +1,4 @@
+// File Path: components/admin/AdminCustomers.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -28,7 +29,6 @@ export default function AdminCustomers() {
   const [search, setSearch] = useState("");
   const [selectedStage, setSelectedStage] = useState<string>("all");
 
-  // وضعیت‌های مدال پرونده و فرم
   const [editingCustomer, setEditingCustomer] = useState<Partial<CrmCustomer> | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
@@ -61,12 +61,13 @@ export default function AdminCustomers() {
   useEffect(() => {
     fetchCrmData();
 
-    // اتصال وب‌سوکت بلادرنگ به جدول CRM و فاکتورها
-    const crmCh = supabase.channel("realtime-crm")
+    const crmCh = supabase
+      .channel("realtime-crm")
       .on("postgres_changes", { event: "*", schema: "public", table: "crm_customers" }, () => fetchCrmData())
       .subscribe();
 
-    const ordersCh = supabase.channel("realtime-crm-orders")
+    const ordersCh = supabase
+      .channel("realtime-crm-orders")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchCrmData())
       .subscribe();
 
@@ -126,10 +127,12 @@ export default function AdminCustomers() {
   };
 
   const handleDeleteCustomer = async (c: CrmCustomer) => {
-    if (!confirm(`آیا از حذف پرونده «${c.full_name}» از سامانه CRM اطمینان دارید؟`)) return;
+    const confirmMsg = "آیا از حذف پرونده «" + c.full_name + "» از سامانه CRM اطمینان دارید؟";
+    if (!confirm(confirmMsg)) return;
     soundEngine.playClick();
     try {
-      const res = await fetch(`/api/crm?id=${encodeURIComponent(c.id)}&phone=${encodeURIComponent(c.phone)}`, {
+      const url = "/api/crm?id=" + encodeURIComponent(c.id) + "&phone=" + encodeURIComponent(c.phone);
+      const res = await fetch(url, {
         method: "DELETE",
       });
       const json = await res.json();
@@ -143,12 +146,16 @@ export default function AdminCustomers() {
     }
   };
 
-  // تولید سریع کد تخفیف یکتا و درج در متن پیامک
   const handleGenerateRewardCoupon = async (c: CrmCustomer) => {
     soundEngine.playClick();
     const code = "VIP-" + Math.random().toString(36).substring(2, 7).toUpperCase();
     setRewardCouponCode(code);
-    setSmsText(`${c.full_name} عزیز، به پاس همراهی ارزشمند شما با آکسون، کد تخفیف اختصاصی ${code} با اعتبار ۷ روزه تقدیم می‌گردد. axoncore.ir`);
+    setSmsText(
+      c.full_name +
+        " عزیز، به پاس همراهی ارزشمند شما با آکسون، کد تخفیف اختصاصی " +
+        code +
+        " (۱۵٪ تخفیف ویژه) با اعتبار ۷ روزه تقدیم می‌گردد. axoncore.ir"
+    );
   };
 
   const handleSendSms = async (e: React.FormEvent) => {
@@ -158,18 +165,40 @@ export default function AdminCustomers() {
     soundEngine.playClick();
     setSendingSms(true);
     try {
-      // اگر کد تخفیف ایجاد شده بود، کوپن را در جدول coupons دیتابیس فعال می‌کند
       if (rewardCouponCode) {
-        await fetch("/api/site-info", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "create_coupon",
-            code: rewardCouponCode,
-            value: 15, // 15 درصد
-            type: "percent",
-          }),
-        });
+        const expiresDate = new Date();
+        expiresDate.setDate(expiresDate.getDate() + 7);
+
+        try {
+          await fetch("/api/admin/coupons", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code: rewardCouponCode,
+              type: "percent",
+              discount_type: "percent",
+              value: 15,
+              discount_percent: 15,
+              usage_limit: 1,
+              expires_at: expiresDate.toISOString(),
+              description: "کوپن هدیه اختصاصی CRM برای " + activeSmsCustomer.full_name,
+              is_active: true,
+            }),
+          });
+        } catch {}
+
+        try {
+          await fetch("/api/site-info", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "create_coupon",
+              code: rewardCouponCode,
+              value: 15,
+              type: "percent",
+            }),
+          });
+        } catch {}
       }
 
       const res = await fetch("/api/sms/send", {
@@ -184,7 +213,7 @@ export default function AdminCustomers() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        showFeedback("پیامک بازاریابی و کد تخفیف با موفقیت ارسال گردید.", "success");
+        showFeedback("پیامک بازاریابی و کد تخفیف با موفقیت ارسال و در دیتابیس فعال گردید.", "success");
         setIsSmsModalOpen(false);
         setSmsText("");
         setRewardCouponCode("");
@@ -199,40 +228,64 @@ export default function AdminCustomers() {
   const getStageBadge = (stage: CrmCustomer["lifecycle_stage"]) => {
     switch (stage) {
       case "vip":
-        return <span className="px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 font-black text-[10px]">💎 VIP الماس</span>;
+        return (
+          <span className="px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 font-black text-[10px] whitespace-nowrap">
+            💎 VIP الماس
+          </span>
+        );
       case "active":
-        return <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-black text-[10px]">🟢 خریدار فعال</span>;
+        return (
+          <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-black text-[10px] whitespace-nowrap">
+            🟢 خریدار فعال
+          </span>
+        );
       case "prospect":
-        return <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-[10px]">🟡 در حال مذاکره</span>;
+        return (
+          <span className="px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-[10px] whitespace-nowrap">
+            🟡 در حال مذاکره
+          </span>
+        );
       case "at_risk":
-        return <span className="px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-black text-[10px]">🔴 ریسک ریزش</span>;
+        return (
+          <span className="px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-black text-[10px] whitespace-nowrap">
+            🔴 ریسک ریزش
+          </span>
+        );
       default:
-        return <span className="px-3 py-1 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-300 font-black text-[10px]">⚪ سرنخ (Lead)</span>;
+        return (
+          <span className="px-3 py-1 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-300 font-black text-[10px] whitespace-nowrap">
+            ⚪ سرنخ (Lead)
+          </span>
+        );
     }
   };
 
   const filtered = customers.filter((c) => {
-    const matchSearch = c.full_name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
+    const matchSearch =
+      (c.full_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (c.phone || "").includes(search);
     const matchStage = selectedStage === "all" || c.lifecycle_stage === selectedStage;
     return matchSearch && matchStage;
   });
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
-      
       {actionFeedback && (
-        <div className={"p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " + (
-          actionFeedback.type === "success" ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 border border-rose-500/30 text-rose-500"
-        )}>
+        <div
+          className={
+            "p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " +
+            (actionFeedback.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-500")
+          }
+        >
           {actionFeedback.text}
         </div>
       )}
 
-      {/* سربرگ سامانه سازمانی CRM */}
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>👥</span> سامانه هوشمند مدیریت ارتباط با مشتریان (Enterprise CRM)
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
@@ -240,10 +293,10 @@ export default function AdminCustomers() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           <button
             onClick={handleOpenNewCustomer}
-            className="px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center gap-1.5"
+            className="flex-1 md:flex-initial justify-center px-5 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer flex items-center gap-1.5"
           >
             <span>➕</span>
             <span>افزودن دستی مخاطب</span>
@@ -258,30 +311,35 @@ export default function AdminCustomers() {
         </div>
       </div>
 
-      {/* خط لوله و فیلترهای استراتژیک مرحله مشتری */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
-        <div className="flex gap-2 overflow-x-auto w-full sm:w-auto pb-1 text-xs scrollbar-none">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm">
+        <div className="flex gap-2 overflow-x-auto w-full lg:w-auto pb-1 text-xs scrollbar-none">
           {[
             { id: "all", label: "همه مخاطبان", count: customers.length },
-            { id: "vip", label: "💎 VIP الماس", count: customers.filter(c => c.lifecycle_stage === "vip").length },
-            { id: "active", label: "🟢 خریداران فعال", count: customers.filter(c => c.lifecycle_stage === "active").length },
-            { id: "prospect", label: "🟡 در حال مذاکره", count: customers.filter(c => c.lifecycle_stage === "prospect").length },
-            { id: "lead", label: "⚪ سرنخ‌ها", count: customers.filter(c => c.lifecycle_stage === "lead").length },
-            { id: "at_risk", label: "🔴 ریسک ریزش", count: customers.filter(c => c.lifecycle_stage === "at_risk").length },
+            { id: "vip", label: "💎 VIP الماس", count: customers.filter((c) => c.lifecycle_stage === "vip").length },
+            { id: "active", label: "🟢 خریداران فعال", count: customers.filter((c) => c.lifecycle_stage === "active").length },
+            { id: "prospect", label: "🟡 در حال مذاکره", count: customers.filter((c) => c.lifecycle_stage === "prospect").length },
+            { id: "lead", label: "⚪ سرنخ‌ها", count: customers.filter((c) => c.lifecycle_stage === "lead").length },
+            { id: "at_risk", label: "🔴 ریسک ریزش", count: customers.filter((c) => c.lifecycle_stage === "at_risk").length },
           ].map((st) => (
             <button
               key={st.id}
-              onClick={() => { soundEngine.playClick(); setSelectedStage(st.id); }}
-              className={"px-3.5 py-2 rounded-2xl font-bold transition whitespace-nowrap cursor-pointer " + (
-                selectedStage === st.id ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]"
-              )}
+              onClick={() => {
+                soundEngine.playClick();
+                setSelectedStage(st.id);
+              }}
+              className={
+                "px-3.5 py-2 rounded-2xl font-bold transition whitespace-nowrap cursor-pointer " +
+                (selectedStage === st.id
+                  ? "bg-[var(--accent-blue)] text-white shadow-md"
+                  : "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-secondary)]")
+              }
             >
               {st.label} ({st.count})
             </button>
           ))}
         </div>
 
-        <div className="w-full sm:w-72">
+        <div className="w-full lg:w-72">
           <input
             type="text"
             placeholder="🔍 جستجو در نام، موبایل، نشانی..."
@@ -292,9 +350,8 @@ export default function AdminCustomers() {
         </div>
       </div>
 
-      {/* جدول پیشرفته پرونده‌های CRM */}
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl overflow-x-auto">
-        <table className="w-full text-right text-xs border-collapse min-w-[900px]">
+      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl overflow-x-auto">
+        <table className="w-full text-right text-xs border-collapse min-w-[760px]">
           <thead>
             <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)] font-black pb-3">
               <th className="p-3.5">نام و نام خانوادگی</th>
@@ -309,20 +366,27 @@ export default function AdminCustomers() {
           <tbody className="divide-y divide-[var(--card-border)] font-medium">
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">در حال بارگذاری پایگاه داده مخاطبان CRM...</td>
+                <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                  در حال بارگذاری پایگاه داده مخاطبان CRM...
+                </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">مخاطبی در این دسته‌بندی یافت نشد.</td>
+                <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                  مخاطبی در این دسته‌بندی یافت نشد.
+                </td>
               </tr>
             ) : (
               filtered.map((c) => (
                 <tr key={c.id} className="hover:bg-[var(--input-bg)]/60 transition">
                   <td className="p-3.5">
                     <div className="font-black text-[var(--text-primary)]">{c.full_name}</div>
-                    <div className="flex gap-1 mt-1">
+                    <div className="flex flex-wrap gap-1 mt-1">
                       {(c.tags || []).map((t, idx) => (
-                        <span key={idx} className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] text-slate-400">
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] text-slate-400"
+                        >
                           {t}
                         </span>
                       ))}
@@ -346,7 +410,7 @@ export default function AdminCustomers() {
                           handleGenerateRewardCoupon(c);
                           setIsSmsModalOpen(true);
                         }}
-                        className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-slate-950 font-bold text-[11px] transition cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-slate-950 font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
                         title="ارسال پیامک و کد تخفیف"
                       >
                         🎁 پیامک / کوپن
@@ -354,7 +418,7 @@ export default function AdminCustomers() {
 
                       <button
                         onClick={() => handleOpenEditCustomer(c)}
-                        className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] transition cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-[11px] transition cursor-pointer whitespace-nowrap"
                         title="ویرایش پرونده"
                       >
                         ✏️ پرونده
@@ -376,15 +440,19 @@ export default function AdminCustomers() {
         </table>
       </div>
 
-      {/* مدال ایجاد / ویرایش پرونده کامل مشتری */}
       {isModalOpen && editingCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-xl w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="max-w-xl w-full p-5 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
               <h3 className="font-black text-sm">
                 {editingCustomer.id ? "ویرایش پرونده مشتری در CRM" : "ثبت پرونده مشتری جدید"}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
 
             <form onSubmit={handleSaveCustomer} className="space-y-4">
@@ -426,7 +494,9 @@ export default function AdminCustomers() {
                   <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">مرحله چرخه عمر مخاطب</label>
                   <select
                     value={editingCustomer.lifecycle_stage || "lead"}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, lifecycle_stage: e.target.value as any })}
+                    onChange={(e) =>
+                      setEditingCustomer({ ...editingCustomer, lifecycle_stage: e.target.value as any })
+                    }
                     className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
                   >
                     <option value="lead">سرنخ اولیه (Lead)</option>
@@ -468,7 +538,9 @@ export default function AdminCustomers() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">یادداشت‌های محرمانه داخلی کارشناس فروش:</label>
+                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                    یادداشت‌های محرمانه داخلی کارشناس فروش:
+                  </label>
                   <textarea
                     rows={3}
                     value={editingCustomer.internal_notes || ""}
@@ -491,13 +563,19 @@ export default function AdminCustomers() {
         </div>
       )}
 
-      {/* مدال ارسال پیامک هوشمند و تولید کوپن وفاداری */}
       {isSmsModalOpen && activeSmsCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl">
+          <div className="max-w-md w-full p-5 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 text-xs text-[var(--text-primary)] shadow-2xl">
             <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
-              <h3 className="font-black text-sm">ارسال پیامک پاداش و کد تخفیف: {activeSmsCustomer.full_name}</h3>
-              <button onClick={() => setIsSmsModalOpen(false)} className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold">✕</button>
+              <h3 className="font-black text-sm">
+                ارسال پیامک پاداش و کد تخفیف: {activeSmsCustomer.full_name}
+              </h3>
+              <button
+                onClick={() => setIsSmsModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
 
             <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex justify-between items-center">

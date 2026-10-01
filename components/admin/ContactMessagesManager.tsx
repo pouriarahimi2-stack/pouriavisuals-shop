@@ -1,3 +1,4 @@
+// File Path: components/admin/ContactMessagesManager.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -27,7 +28,6 @@ export default function ContactMessagesManager() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
 
-  // حالت‌های ویرایش پیام اصلی یا ویرایش پاسخ مدیر
   const [isEditingUserMessage, setIsEditingUserMessage] = useState(false);
   const [editUserMessageText, setEditUserMessageText] = useState("");
   const [isEditingAdminReply, setIsEditingAdminReply] = useState(false);
@@ -40,10 +40,11 @@ export default function ContactMessagesManager() {
       const json = await res.json();
       if (json.success && json.data) {
         setMessages(json.data);
-        if (selectedMessage) {
-          const current = json.data.find((m: ContactMessage) => m.id === selectedMessage.id);
-          if (current) setSelectedMessage(current);
-        }
+        setSelectedMessage((prev) => {
+          if (!prev) return null;
+          const updated = json.data.find((m: ContactMessage) => m.id === prev.id);
+          return updated || prev;
+        });
       }
     } catch (e) {
       console.error("Error fetching messages:", e);
@@ -55,7 +56,6 @@ export default function ContactMessagesManager() {
   useEffect(() => {
     fetchMessages();
 
-    // وب‌سوکت بلادرنگ دیتابیس Supabase Realtime CDC برای دریافت پیام‌ها بدون رفرش
     const channel = supabase
       .channel("realtime-contact-messages")
       .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => {
@@ -75,7 +75,6 @@ export default function ContactMessagesManager() {
     setIsEditingUserMessage(false);
     setIsEditingAdminReply(false);
 
-    // علامت‌گذاری به عنوان خوانده‌شده
     if (!msg.is_read) {
       try {
         await fetch("/api/contact", {
@@ -88,7 +87,6 @@ export default function ContactMessagesManager() {
     }
   };
 
-  // ارسال پاسخ جدید توسط مدیر + ارسال خودکار پیامک
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMessage || !replyText.trim()) return;
@@ -110,7 +108,7 @@ export default function ContactMessagesManager() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        alert("✓ پاسخ در دیتابیس ثبت و پیامک اطلاع‌رسانی برای خریدار ارسال گردید.");
+        alert("✓ پاسخ در دیتابیس ثبت و پیامک اطلاع‌رسانی برای کاربر ارسال گردید.");
         fetchMessages();
       } else {
         alert(json.message || "خطا در ارسال پاسخ.");
@@ -120,7 +118,6 @@ export default function ContactMessagesManager() {
     }
   };
 
-  // ذخیره ویرایش متن پیام اصلی کاربر
   const handleSaveEditedUserMessage = async () => {
     if (!selectedMessage || !editUserMessageText.trim()) return;
     soundEngine.playClick();
@@ -145,7 +142,6 @@ export default function ContactMessagesManager() {
     }
   };
 
-  // ذخیره ویرایش متن پاسخ مدیر
   const handleSaveEditedAdminReply = async () => {
     if (!selectedMessage || !editAdminReplyText.trim()) return;
     soundEngine.playClick();
@@ -170,12 +166,11 @@ export default function ContactMessagesManager() {
     }
   };
 
-  // حذف تیکت از دیتابیس
   const handleDeleteMessage = async (id: string) => {
     if (!confirm("آیا از حذف این تیکت و تمام سوابق آن از پایگاه داده اطمینان دارید؟")) return;
     soundEngine.playClick();
     try {
-      const res = await fetch(`/api/contact?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await fetch("/api/contact?id=" + encodeURIComponent(id), { method: "DELETE" });
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
@@ -189,8 +184,8 @@ export default function ContactMessagesManager() {
 
   const filtered = messages.filter((m) => {
     const matchSearch =
-      m.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      m.phone.includes(search) ||
+      (m.full_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (m.phone || "").includes(search) ||
       (m.subject || "").toLowerCase().includes(search.toLowerCase());
 
     if (filterStatus === "pending") return matchSearch && m.status === "pending";
@@ -200,11 +195,9 @@ export default function ContactMessagesManager() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
-      {/* هدر ماژول پیام‌ها و تیکت‌ها */}
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>📩</span> مرکز مدیریت تیکت‌های مشاوره و پیام‌های بلادرنگ
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
@@ -212,20 +205,32 @@ export default function ContactMessagesManager() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button
-            onClick={() => { soundEngine.playClick(); setFilterStatus("all"); }}
-            className={"px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer " + (
-              filterStatus === "all" ? "bg-[var(--accent-blue)] text-white shadow-md" : "bg-[var(--input-bg)] border border-[var(--card-border)]"
-            )}
+            onClick={() => {
+              soundEngine.playClick();
+              setFilterStatus("all");
+            }}
+            className={
+              "flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer " +
+              (filterStatus === "all"
+                ? "bg-[var(--accent-blue)] text-white shadow-md"
+                : "bg-[var(--input-bg)] border border-[var(--card-border)]")
+            }
           >
             همه ({messages.length})
           </button>
           <button
-            onClick={() => { soundEngine.playClick(); setFilterStatus("pending"); }}
-            className={"px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer " + (
-              filterStatus === "pending" ? "bg-amber-500 text-slate-950 font-black" : "bg-[var(--input-bg)] border border-[var(--card-border)] text-amber-500"
-            )}
+            onClick={() => {
+              soundEngine.playClick();
+              setFilterStatus("pending");
+            }}
+            className={
+              "flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer " +
+              (filterStatus === "pending"
+                ? "bg-amber-500 text-slate-950 font-black"
+                : "bg-[var(--input-bg)] border border-[var(--card-border)] text-amber-500")
+            }
           >
             در انتظار پاسخ ({messages.filter((m) => m.status === "pending").length})
           </button>
@@ -233,10 +238,8 @@ export default function ContactMessagesManager() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* لیست تیکت‌ها در سمت راست */}
-        <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 h-[640px] flex flex-col justify-between shadow-xl">
-          <div className="space-y-3">
+        <div className="lg:col-span-4 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 min-h-[360px] lg:h-[640px] flex flex-col justify-between shadow-xl">
+          <div className="space-y-3 flex-1 flex flex-col overflow-hidden">
             <div className="border-b border-[var(--card-border)] pb-2">
               <input
                 type="text"
@@ -247,7 +250,7 @@ export default function ContactMessagesManager() {
               />
             </div>
 
-            <div className="space-y-2 overflow-y-auto max-h-[530px] pr-1">
+            <div className="space-y-2 overflow-y-auto max-h-[380px] lg:max-h-[530px] pr-1">
               {loading ? (
                 <p className="text-xs text-center py-12 text-slate-400 font-bold">در حال دریافت تیکت‌ها...</p>
               ) : filtered.length === 0 ? (
@@ -257,21 +260,25 @@ export default function ContactMessagesManager() {
                   <div
                     key={msg.id}
                     onClick={() => handleSelectMessage(msg)}
-                    className={"p-3.5 rounded-2xl border transition cursor-pointer space-y-1.5 " + (
-                      selectedMessage?.id === msg.id
+                    className={
+                      "p-3.5 rounded-2xl border transition cursor-pointer space-y-1.5 " +
+                      (selectedMessage?.id === msg.id
                         ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 shadow-sm"
-                        : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                    )}
+                        : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50")
+                    }
                   >
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-2">
                       <h4 className="font-black text-xs text-[var(--text-primary)] truncate max-w-[170px]">
                         {msg.full_name}
                       </h4>
-                      <span className={"px-2 py-0.5 rounded-md text-[9px] font-bold " + (
-                        msg.status === "answered"
-                          ? "bg-emerald-500/15 text-emerald-500"
-                          : "bg-amber-500/15 text-amber-500 animate-pulse"
-                      )}>
+                      <span
+                        className={
+                          "px-2 py-0.5 rounded-md text-[9px] font-bold whitespace-nowrap " +
+                          (msg.status === "answered"
+                            ? "bg-emerald-500/15 text-emerald-500"
+                            : "bg-amber-500/15 text-amber-500 animate-pulse")
+                        }
+                      >
                         {msg.status === "answered" ? "پاسخ داده شده ✓" : "در انتظار"}
                       </span>
                     </div>
@@ -291,22 +298,21 @@ export default function ContactMessagesManager() {
           </div>
         </div>
 
-        {/* پنل نمایش، پاسخ و ویرایش پیام در سمت چپ */}
-        <div className="lg:col-span-8 bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] h-[640px] flex flex-col justify-between shadow-xl">
+        <div className="lg:col-span-8 bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] min-h-[420px] lg:h-[640px] flex flex-col justify-between shadow-xl">
           {selectedMessage ? (
             <div className="space-y-4 flex-1 flex flex-col justify-between overflow-y-auto">
-              
-              {/* هدر تیکت انتخاب‌شده */}
               <div className="space-y-3 border-b border-[var(--card-border)] pb-4">
-                <div className="flex justify-between items-start">
+                <div className="flex flex-wrap justify-between items-start gap-2">
                   <div>
                     <h3 className="font-black text-sm text-[var(--text-primary)]">
                       {selectedMessage.subject || "درخواست مشاوره تخصصی"}
                     </h3>
-                    <div className="flex items-center gap-3 mt-1 text-xs">
+                    <div className="flex flex-wrap items-center gap-3 mt-1 text-xs">
                       <span className="font-bold text-[var(--accent-blue)]">{selectedMessage.full_name}</span>
                       <span className="font-mono text-slate-400 font-bold">{selectedMessage.phone}</span>
-                      {selectedMessage.email && <span className="font-mono text-slate-400">{selectedMessage.email}</span>}
+                      {selectedMessage.email && (
+                        <span className="font-mono text-slate-400">{selectedMessage.email}</span>
+                      )}
                     </div>
                   </div>
 
@@ -322,7 +328,6 @@ export default function ContactMessagesManager() {
                 </div>
               </div>
 
-              {/* کادر متن پیام کاربر با قابلیت ویرایش */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-[var(--text-secondary)]">💬 متن پیام کاربر:</span>
@@ -360,7 +365,6 @@ export default function ContactMessagesManager() {
                 )}
               </div>
 
-              {/* کادر پاسخ قبلی مدیر در صورت وجود با امکان ویرایش */}
               {selectedMessage.admin_reply && (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
@@ -389,7 +393,7 @@ export default function ContactMessagesManager() {
                         disabled={savingEdit}
                         className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs cursor-pointer"
                       >
-                        {savingEdit ? "در حال به‌روزرسانی..." : "به‌روزرسانی پاسخ در دیتابیس ✓"}
+                        {savingEdit ? "در حال به‌روزرسانی..." : "به‌‌روزرسانی پاسخ در دیتابیس ✓"}
                       </button>
                     </div>
                   ) : (
@@ -400,7 +404,6 @@ export default function ContactMessagesManager() {
                 </div>
               )}
 
-              {/* فرم درج پاسخ جدید و ارسال پیامک */}
               <form onSubmit={handleSendReply} className="space-y-3 pt-3 border-t border-[var(--card-border)]">
                 <label className="block text-xs font-bold text-[var(--text-secondary)]">
                   ارسال پاسخ رسمی مدیریت (به همراه پیامک خودکار به شماره {selectedMessage.phone}):
@@ -418,14 +421,18 @@ export default function ContactMessagesManager() {
                   disabled={sendingReply}
                   className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition cursor-pointer shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <span>{sendingReply ? "در حال ارسال پیامک و ثبت در دیتابیس..." : "ثبت پاسخ در دیتابیس و ارسال پیامک به خریدار 🚀"}</span>
+                  <span>
+                    {sendingReply
+                      ? "در حال ارسال پیامک و ثبت در دیتابیس..."
+                      : "ثبت پاسخ در دیتابیس و ارسال پیامک به کاربر 🚀"}
+                  </span>
                 </button>
               </form>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center space-y-2 text-slate-400 text-xs font-bold">
+            <div className="h-full min-h-[280px] flex flex-col items-center justify-center space-y-2 text-slate-400 text-xs font-bold text-center px-4">
               <span className="text-3xl">✉️</span>
-              <span>یک پیام را از لیست سمت راست جهت مشاهده، پاسخ، ویرایش یا حذف انتخاب فرمایید.</span>
+              <span>یک پیام را از لیست جهت مشاهده، پاسخ، ویرایش یا حذف انتخاب فرمایید.</span>
             </div>
           )}
         </div>

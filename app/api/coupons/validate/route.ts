@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const rawCode = body.code;
     const cartTotal = Number(body.cartTotal) || 0;
+    const cartItems = Array.isArray(body.items) ? body.items : [];
 
     if (!rawCode || typeof rawCode !== "string") {
       return NextResponse.json(
@@ -39,16 +40,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (coupon.starts_at && new Date(coupon.starts_at).getTime() > Date.now()) {
+    const nowMs = Date.now();
+
+    if (coupon.starts_at && new Date(coupon.starts_at).getTime() > nowMs) {
+      const startFormatted = new Date(coupon.starts_at).toLocaleString("fa-IR");
       return NextResponse.json(
-        { valid: false, message: "زمان استفاده از این کد تخفیف هنوز آغاز نشده است." },
+        {
+          valid: false,
+          message: "زمان استفاده از این کد تخفیف هنوز فرا نرسیده است (شروع از: " + startFormatted + ").",
+        },
         { status: 400 }
       );
     }
 
-    if (coupon.expires_at && new Date(coupon.expires_at).getTime() < Date.now()) {
+    if (coupon.expires_at && new Date(coupon.expires_at).getTime() < nowMs) {
       return NextResponse.json(
-        { valid: false, message: "مهلت استفاده از این کد تخفیف به پایان رسیده است." },
+        { valid: false, message: "مهلت زمانی (روز و ساعت) استفاده از این کد تخفیف به پایان رسیده است." },
         { status: 400 }
       );
     }
@@ -79,6 +86,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // بررسی محدودیت کوپن برای یک محصول خاص
+    let eligibleTotal = cartTotal;
+    if (coupon.target_type === "product" && coupon.target_id && cartItems.length > 0) {
+      const matchedItems = cartItems.filter(
+        (item: any) =>
+          String(item.id || item.productId || item.product_id) === String(coupon.target_id)
+      );
+      if (matchedItems.length === 0) {
+        return NextResponse.json(
+          {
+            valid: false,
+            message: "این کد تخفیف منحصراً برای یک محصول خاص تعریف شده که در سبد خرید شما نیست.",
+          },
+          { status: 400 }
+        );
+      }
+      eligibleTotal = matchedItems.reduce(
+        (sum: number, i: any) =>
+          sum + Number(i.discount_price || i.discountPrice || i.price || 0) * Number(i.quantity || 1),
+        0
+      );
+    }
+
     let discountAmount = 0;
     const isPercent =
       coupon.discount_type === "percent" ||
@@ -92,7 +122,7 @@ export async function POST(req: NextRequest) {
       const pct = Number(
         coupon.discount_percent ?? coupon.percent ?? coupon.value ?? coupon.discount_value ?? 0
       );
-      discountAmount = Math.round((cartTotal * pct) / 100);
+      discountAmount = Math.round((eligibleTotal * pct) / 100);
       if (maxCap > 0 && discountAmount > maxCap) {
         discountAmount = maxCap;
       }
@@ -102,7 +132,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    discountAmount = Math.max(0, Math.min(discountAmount, cartTotal));
+    discountAmount = Math.max(0, Math.min(discountAmount, eligibleTotal));
 
     return NextResponse.json({
       valid: true,
@@ -113,9 +143,11 @@ export async function POST(req: NextRequest) {
         discount_percent: isPercent
           ? Number(coupon.discount_percent ?? coupon.percent ?? coupon.value ?? coupon.discount_value ?? 0)
           : null,
+        target_type: coupon.target_type || "all",
+        target_id: coupon.target_id || null,
         description: coupon.description || "تخفیف ویژه سفارش",
       },
-      message: "کد تخفیف با موفقیت روی سفارش اعمال شد.",
+      message: "کد تخفیف با موفقیت بررسی و روی سفارش شما اعمال شد.",
     });
   } catch (err: any) {
     return NextResponse.json(

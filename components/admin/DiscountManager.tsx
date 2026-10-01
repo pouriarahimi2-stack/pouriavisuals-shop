@@ -8,45 +8,54 @@ import { couponService, Coupon } from "@/services/couponService";
 
 export default function DiscountManager() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [products, setProducts] = useState<Array<{ id: string; title: string }>>([]);
   const [code, setCode] = useState("");
   const [type, setType] = useState<"percent" | "fixed">("percent");
   const [value, setValue] = useState<number | "">(10);
   const [minOrder, setMinOrder] = useState<number | "">("");
   const [maxDiscount, setMaxDiscount] = useState<number | "">("");
   const [usageLimit, setUsageLimit] = useState<number | "">(100);
+  const [targetType, setTargetType] = useState<"all" | "product">("all");
+  const [targetId, setTargetId] = useState<string>("");
+  const [startsAt, setStartsAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const fetchCoupons = async () => {
+  const fetchCouponsAndProducts = async () => {
     try {
-      const data = await couponService.getAll();
+      const [data, prodRes] = await Promise.all([
+        couponService.getAll(),
+        fetch("/api/products", { cache: "no-store" }).catch(() => null),
+      ]);
       setCoupons(data || []);
+      if (prodRes && prodRes.ok) {
+        const pJson = await prodRes.json();
+        const pList = pJson.data || pJson.products || [];
+        const mapped = (Array.isArray(pList) ? pList : []).map((p: any) => ({
+          id: String(p.id),
+          title: p.title || p.name || "کالا",
+        }));
+        setProducts(mapped);
+        if (!targetId && mapped.length > 0) setTargetId(mapped[0].id);
+      }
     } catch (e) {
       console.error("Error loading coupons in DiscountManager:", e);
     }
   };
 
   useEffect(() => {
-    fetchCoupons();
-
-    const handleCouponsUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setCoupons(e.detail);
-      else fetchCoupons();
-    };
-
-    window.addEventListener("coupons_updated", handleCouponsUpdate);
+    fetchCouponsAndProducts();
 
     const channel = supabase
       .channel("realtime-discount-manager")
       .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
-        fetchCoupons();
+        fetchCouponsAndProducts();
       })
       .subscribe();
 
     return () => {
-      window.removeEventListener("coupons_updated", handleCouponsUpdate);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -61,16 +70,19 @@ export default function DiscountManager() {
     soundEngine.playClick();
     setSaving(true);
 
-    const payload: Partial<Coupon> = {
+    const payload: Record<string, any> = {
       code: code.trim().toUpperCase(),
       type,
       discount_type: type,
       value: Number(value),
       discount_value: Number(value),
-      min_order_amount: minOrder ? Number(minOrder) : undefined,
+      min_order_amount: minOrder ? Number(minOrder) : 0,
       max_discount: maxDiscount ? Number(maxDiscount) : undefined,
       max_discount_amount: maxDiscount ? Number(maxDiscount) : undefined,
       usage_limit: usageLimit ? Number(usageLimit) : 100,
+      target_type: targetType,
+      target_id: targetType === "product" ? targetId : null,
+      starts_at: startsAt ? new Date(startsAt).toISOString() : new Date().toISOString(),
       expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       is_active: true,
     };
@@ -81,17 +93,13 @@ export default function DiscountManager() {
         soundEngine.playSuccess();
         setStatusMessage({
           type: "success",
-          text: "⚡ کد تخفیف «" + created.code + "» با موفقیت در دیتابیس ثبت و فعال شد.",
+          text: "⚡ کد تخفیف هدفمند «" + created.code + "» با موفقیت در دیتابیس ثبت و فعال شد.",
         });
         setCode("");
         setValue(10);
-        setMinOrder("");
-        setMaxDiscount("");
-        setUsageLimit(100);
+        setStartsAt("");
         setExpiresAt("");
-        fetchCoupons();
-      } else {
-        throw new Error("خطا در ایجاد کد تخفیف");
+        fetchCouponsAndProducts();
       }
     } catch (err: any) {
       setStatusMessage({ type: "error", text: err.message || "خطا در ثبت کد تخفیف." });
@@ -116,200 +124,183 @@ export default function DiscountManager() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🏷️</span> مدیریت کدهای تخفیف، جشنواره‌ها و کمپین‌ها
-          </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            ایجاد و مدیریت کوپن‌های درصدی یا نقدی با فعال‌سازی بلادرنگ وب‌سوکت
-          </p>
-        </div>
-        <span className="px-4 py-1.5 rounded-xl bg-[var(--accent-blue)]/15 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 text-xs font-black">
-          {coupons.length} کوپن ثبت‌شده
-        </span>
-      </div>
-
       {statusMessage && (
         <div
           className={
             "p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " +
             (statusMessage.type === "success"
-              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-              : "bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400")
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-500"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-500")
           }
         >
           {statusMessage.text}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs">
         <form
           onSubmit={handleCreateCoupon}
-          className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl h-fit text-xs"
+          className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-3.5 shadow-xl h-fit"
         >
-          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            + ایجاد کوپن تخفیف جدید
+          <h3 className="font-black border-b border-[var(--card-border)] pb-3">
+            + ایجاد کوپن تخفیف زمان‌دار و هدفمند
           </h3>
 
-          <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
               کد لاتین تخفیف *
             </label>
             <input
               type="text"
-              placeholder="مثلاً: AXON2026"
+              placeholder="AXON2026"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-black uppercase text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black uppercase outline-none"
               required
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
-                نوع محاسبه تخفیف
-              </label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">نوع</label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as any)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer"
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
               >
                 <option value="percent">درصدی (%)</option>
-                <option value="fixed">مبلغ ثابت (تومان)</option>
+                <option value="fixed">مبلغ ثابت</option>
               </select>
             </div>
-
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
-                مقدار تخفیف *
-              </label>
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">مقدار *</label>
               <input
                 type="number"
                 min="1"
-                placeholder={type === "percent" ? "مثلا: 20" : "مثلا: 100000"}
                 value={value}
                 onChange={(e) => setValue(e.target.value ? Number(e.target.value) : "")}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none"
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold outline-none"
                 required
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
-                سقف تخفیف (تومان)
-              </label>
-              <input
-                type="number"
-                placeholder="۵۰۰,۰۰۰"
-                value={maxDiscount}
-                onChange={(e) => setMaxDiscount(e.target.value ? Number(e.target.value) : "")}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none"
-              />
-            </div>
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+              محدوده اعمال (همه یا محصول خاص):
+            </label>
+            <select
+              value={targetType}
+              onChange={(e) => setTargetType(e.target.value as any)}
+              className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none mb-2"
+            >
+              <option value="all">همه محصولات سایت</option>
+              <option value="product">📦 فقط روی یک محصول خاص</option>
+            </select>
 
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
-                حداقل خرید (تومان)
-              </label>
-              <input
-                type="number"
-                placeholder="۱,۰۰۰,۰۰۰"
-                value={minOrder}
-                onChange={(e) => setMinOrder(e.target.value ? Number(e.target.value) : "")}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold text-[var(--text-primary)] outline-none"
-              />
-            </div>
+            {targetType === "product" && (
+              <select
+                value={targetId}
+                onChange={(e) => setTargetId(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--accent-blue)] font-bold outline-none"
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    📦 {p.title}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
-          <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-[var(--text-secondary)]">
-              تاریخ انقضا (اختیاری)
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+              🕒 روز و ساعت شروع تخفیف:
             </label>
             <input
-              type="date"
+              type="datetime-local"
+              dir="ltr"
+              value={startsAt}
+              onChange={(e) => setStartsAt(e.target.value)}
+              className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+              ⏳ روز و ساعت انقضای تخفیف:
+            </label>
+            <input
+              type="datetime-local"
+              dir="ltr"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none cursor-pointer"
+              className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
           >
-            {saving ? "در حال ثبت..." : "💾 ثبت و فعال‌سازی فوری کوپن"}
+            {saving ? "در حال ثبت..." : "💾 ثبت و فعال‌سازی کوپن"}
           </button>
         </form>
 
-        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
-          <h3 className="text-xs font-black text-[var(--text-primary)] border-b border-[var(--card-border)] pb-3">
-            📋 لیست کدهای تخفیف فعال و آرشیو ({coupons.length})
+        <div className="lg:col-span-2 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl">
+          <h3 className="font-black border-b border-[var(--card-border)] pb-3">
+            📋 لیست کدهای تخفیف ثبت‌شده ({coupons.length})
           </h3>
-
-          <div className="space-y-3 max-h-[480px] overflow-y-auto">
-            {coupons.length === 0 ? (
-              <p className="text-xs text-center py-12 text-[var(--text-secondary)] font-bold">
-                هیچ کد تخفیفی ثبت نشده است.
-              </p>
-            ) : (
-              coupons.map((c) => {
-                const isPercent = c.type === "percent" || c.discount_type === "percent";
-                const discountVal = Number(
-                  c.value ?? c.discount_value ?? (c as any).discount_percent ?? (c as any).discount_amount ?? 0
-                );
-                const isItemActive = c.is_active !== false;
-
-                return (
-                  <div
-                    key={c.id}
-                    className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-sm text-[var(--accent-blue)] tracking-wider">
-                          {c.code}
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
-                          {isPercent
-                            ? discountVal + "٪ تخفیف"
-                            : discountVal.toLocaleString("fa-IR") + " تومان تخفیف"}
-                        </span>
+          <div className="space-y-3 max-h-[520px] overflow-y-auto">
+            {coupons.map((c: any) => {
+              const isPercent = c.type === "percent" || c.discount_type === "percent";
+              const discountVal = Number(c.value ?? c.discount_value ?? c.discount_percent ?? 0);
+              const isItemActive = c.is_active !== false;
+              return (
+                <div
+                  key={c.id}
+                  className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-black text-sm text-[var(--accent-blue)]">
+                        {c.code}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 text-[10px] font-bold">
+                        {isPercent
+                          ? discountVal + "٪ تخفیف"
+                          : discountVal.toLocaleString("fa-IR") + " تومان"}
+                      </span>
+                    </div>
+                    {c.expires_at && (
+                      <div className="text-[10px] font-mono text-slate-400">
+                        انقضا: {new Date(c.expires_at).toLocaleString("fa-IR")}
                       </div>
-                      {c.max_discount && (
-                        <p className="text-[11px] text-[var(--text-secondary)] font-medium">
-                          سقف تخفیف: {Number(c.max_discount).toLocaleString("fa-IR")} تومان
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 self-end sm:self-center">
-                      <button
-                        onClick={() => toggleStatus(c.id!, isItemActive)}
-                        className={
-                          "px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition " +
-                          (isItemActive
-                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                            : "bg-slate-500/15 text-slate-500 border border-slate-500/30")
-                        }
-                      >
-                        {isItemActive ? "فعال ✓" : "غیرفعال"}
-                      </button>
-                      <button
-                        onClick={() => deleteCoupon(c.id!)}
-                        className="p-2 px-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                    )}
                   </div>
-                );
-              })
-            )}
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <button
+                      onClick={() => toggleStatus(c.id!, isItemActive)}
+                      className={
+                        "px-3 py-1.5 rounded-xl font-bold cursor-pointer " +
+                        (isItemActive
+                          ? "bg-emerald-500/15 text-emerald-400"
+                          : "bg-slate-500/15 text-slate-400")
+                      }
+                    >
+                      {isItemActive ? "فعال ✓" : "غیرفعال"}
+                    </button>
+                    <button
+                      onClick={() => deleteCoupon(c.id!)}
+                      className="p-2 px-3 rounded-xl bg-rose-500/15 text-rose-400 font-bold cursor-pointer"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

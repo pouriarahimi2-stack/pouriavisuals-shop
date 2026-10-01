@@ -21,14 +21,35 @@ interface Coupon {
   usage_limit?: number | null;
   times_used?: number;
   used_count?: number;
+  target_type?: "all" | "product";
+  target_id?: string | null;
+  starts_at?: string | null;
   expires_at?: string | null;
   description?: string | null;
   is_active: boolean;
   created_at?: string;
 }
 
+interface SimpleProduct {
+  id: string;
+  title: string;
+}
+
+function toLocalDateTimeInput(isoStr?: string | null): string {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return "";
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+  } catch {
+    return "";
+  }
+}
+
 export default function AdminCouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [products, setProducts] = useState<SimpleProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -42,28 +63,47 @@ export default function AdminCouponsPage() {
     min_purchase: number | "";
     max_discount: number | "";
     usage_limit: number | "";
+    target_type: "all" | "product";
+    target_id: string;
+    starts_at: string;
     expires_at: string;
     description: string;
     is_active: boolean;
   }>({
     code: "",
     discount_type: "percent",
-    discount_percent: "",
+    discount_percent: 10,
     discount_amount: "",
     min_purchase: "",
     max_discount: "",
     usage_limit: 100,
+    target_type: "all",
+    target_id: "",
+    starts_at: "",
     expires_at: "",
     description: "",
     is_active: true,
   });
 
-  const fetchCoupons = async () => {
+  const fetchCouponsAndProducts = async () => {
     try {
-      const res = await fetch("/api/admin/coupons", { cache: "no-store" });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        setCoupons(json.coupons || []);
+      const [cRes, pRes] = await Promise.all([
+        fetch("/api/admin/coupons", { cache: "no-store" }),
+        fetch("/api/products", { cache: "no-store" }).catch(() => null),
+      ]);
+      const cJson = await cRes.json();
+      if (cRes.ok && cJson.success) {
+        setCoupons(cJson.coupons || []);
+      }
+      if (pRes && pRes.ok) {
+        const pJson = await pRes.json();
+        const pList = pJson.data || pJson.products || [];
+        setProducts(
+          (Array.isArray(pList) ? pList : []).map((p: any) => ({
+            id: String(p.id),
+            title: p.title || p.name || "کالای دیجیتال",
+          }))
+        );
       }
     } catch {
       console.error("خطا در واکشی کدهای تخفیف.");
@@ -73,12 +113,12 @@ export default function AdminCouponsPage() {
   };
 
   useEffect(() => {
-    fetchCoupons();
+    fetchCouponsAndProducts();
 
     const channel = supabase
       .channel("realtime-admin-coupons-page")
       .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
-        fetchCoupons();
+        fetchCouponsAndProducts();
       })
       .subscribe();
 
@@ -98,6 +138,9 @@ export default function AdminCouponsPage() {
       min_purchase: 500000,
       max_discount: 200000,
       usage_limit: 50,
+      target_type: "all",
+      target_id: products[0]?.id || "",
+      starts_at: "",
       expires_at: "",
       description: "",
       is_active: true,
@@ -123,7 +166,10 @@ export default function AdminCouponsPage() {
       min_purchase: c.min_purchase ?? c.min_order_amount ?? "",
       max_discount: c.max_discount ?? c.max_discount_amount ?? "",
       usage_limit: c.usage_limit ?? "",
-      expires_at: c.expires_at ? c.expires_at.slice(0, 10) : "",
+      target_type: c.target_type === "product" ? "product" : "all",
+      target_id: c.target_id || products[0]?.id || "",
+      starts_at: toLocalDateTimeInput(c.starts_at),
+      expires_at: toLocalDateTimeInput(c.expires_at),
       description: c.description || "",
       is_active: c.is_active !== false,
     });
@@ -140,7 +186,7 @@ export default function AdminCouponsPage() {
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        fetchCoupons();
+        fetchCouponsAndProducts();
       } else {
         alert(json.message || "خطا در حذف کد تخفیف.");
       }
@@ -189,6 +235,9 @@ export default function AdminCouponsPage() {
       max_discount: form.max_discount ? Number(form.max_discount) : null,
       max_discount_amount: form.max_discount ? Number(form.max_discount) : null,
       usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
+      target_type: form.target_type,
+      target_id: form.target_type === "product" ? form.target_id : null,
+      starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : new Date().toISOString(),
       expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
     };
 
@@ -204,7 +253,7 @@ export default function AdminCouponsPage() {
       if (res.ok && json.success) {
         soundEngine.playSuccess();
         setIsModalOpen(false);
-        fetchCoupons();
+        fetchCouponsAndProducts();
       } else {
         alert(json.message || "خطا در ذخیره‌سازی کوپن.");
       }
@@ -214,14 +263,14 @@ export default function AdminCouponsPage() {
   };
 
   return (
-    <div className="space-y-6 font-sans text-[var(--text-primary)]" dir="rtl">
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🏷️</span> مدیریت کوپن‌ها و کدهای تخفیف
+          <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🏷️</span> مدیریت هوشمند کوپن‌ها (ویژه محصول خاص، روز خاص و ساعت دقیق)
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تعریف کمپین‌های تخفیفی درصدی و ریالی، کنترل محدودیت استفاده و انقضا (همگام‌سازی زنده وب‌سوکت)
+            تعریف کمپین‌های تخفیفی زمان‌دار (بر اساس روز و ساعت) و امکان اختصاص کد تخفیف به یک کالای مشخص
           </p>
         </div>
 
@@ -229,7 +278,7 @@ export default function AdminCouponsPage() {
           onClick={handleOpenCreate}
           className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs hover:opacity-90 transition shadow-md flex items-center gap-2 cursor-pointer"
         >
-          <span>➕</span> ایجاد کوپن جدید
+          <span>➕</span> ایجاد کوپن زمان‌دار جدید
         </button>
       </div>
 
@@ -240,15 +289,14 @@ export default function AdminCouponsPage() {
           <div className="p-12 text-center text-xs text-slate-400">هیچ کد تخفیفی یافت نشد.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs min-w-[680px]">
+            <table className="w-full text-right text-xs min-w-[780px]">
               <thead>
                 <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
                   <th className="pb-3 px-3">کد تخفیف</th>
-                  <th className="pb-3 px-3">نوع تخفیف</th>
                   <th className="pb-3 px-3">مقدار</th>
-                  <th className="pb-3 px-3">حداقل خرید</th>
-                  <th className="pb-3 px-3">دفعات مصرف</th>
-                  <th className="pb-3 px-3">تاریخ انقضا</th>
+                  <th className="pb-3 px-3">محدوده اعمال</th>
+                  <th className="pb-3 px-3">زمان شروع و انقضا (روز و ساعت)</th>
+                  <th className="pb-3 px-3">مصرف</th>
                   <th className="pb-3 px-3">وضعیت</th>
                   <th className="pb-3 px-3 text-left">عملیات</th>
                 </tr>
@@ -261,8 +309,11 @@ export default function AdminCouponsPage() {
                       ? c.discount_percent ?? c.value ?? c.discount_value ?? 0
                       : c.discount_amount ?? c.value ?? c.discount_value ?? 0
                   );
-                  const minBuy = Number(c.min_purchase ?? c.min_order_amount ?? 0);
                   const used = Number(c.times_used ?? c.used_count ?? 0);
+                  const targetProd =
+                    c.target_type === "product" && c.target_id
+                      ? products.find((p) => p.id === String(c.target_id))
+                      : null;
 
                   return (
                     <tr key={c.id} className="hover:bg-[var(--input-bg)]/40 transition">
@@ -271,20 +322,29 @@ export default function AdminCouponsPage() {
                           {c.code}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-slate-300">
-                        {isPct ? "درصدی" : "مبلغ ثابت"}
-                      </td>
                       <td className="py-3 px-3 font-mono font-bold text-emerald-400">
                         {isPct ? valNum + "%" : valNum.toLocaleString("fa-IR") + " ت"}
                       </td>
-                      <td className="py-3 px-3 font-mono text-slate-400">
-                        {minBuy > 0 ? minBuy.toLocaleString("fa-IR") + " ت" : "بدون محدودیت"}
+                      <td className="py-3 px-3">
+                        {c.target_type === "product" ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-400 font-bold text-[11px]">
+                            📦 محصول: {targetProd ? targetProd.title : c.target_id}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">همه محصولات سایت</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-slate-300 space-y-0.5">
+                        {c.starts_at && (
+                          <div>شروع: {new Date(c.starts_at).toLocaleString("fa-IR")}</div>
+                        )}
+                        <div>
+                          انقضا:{" "}
+                          {c.expires_at ? new Date(c.expires_at).toLocaleString("fa-IR") : "همیشگی"}
+                        </div>
                       </td>
                       <td className="py-3 px-3 font-mono text-slate-300">
-                        {used} / {c.usage_limit || "نامحدود"}
-                      </td>
-                      <td className="py-3 px-3 font-mono text-slate-400">
-                        {c.expires_at ? new Date(c.expires_at).toLocaleDateString("fa-IR") : "همیشگی"}
+                        {used} / {c.usage_limit || "∞"}
                       </td>
                       <td className="py-3 px-3">
                         <span
@@ -323,10 +383,10 @@ export default function AdminCouponsPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-xs">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
               <h3 className="text-sm font-black text-[var(--text-primary)]">
-                {editingCoupon ? "✏️ ویرایش کد تخفیف" : "➕ ایجاد کد تخفیف جدید"}
+                {editingCoupon ? "✏️ ویرایش کد تخفیف هدفمند" : "➕ ایجاد کد تخفیف جدید"}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -337,9 +397,9 @@ export default function AdminCouponsPage() {
             </div>
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">
                     کد تخفیف (لاتین):
                   </label>
                   <input
@@ -347,30 +407,28 @@ export default function AdminCouponsPage() {
                     required
                     value={form.code}
                     onChange={(e) => handleCodeChange(e.target.value)}
-                    placeholder="SPRING1405"
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono uppercase focus:outline-none focus:border-[var(--accent-blue)]"
+                    placeholder="AXONVIP"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono uppercase outline-none focus:border-[var(--accent-blue)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">نوع تخفیف:</label>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">نوع تخفیف:</label>
                   <select
                     value={form.discount_type}
                     onChange={(e) =>
                       setForm({ ...form, discount_type: e.target.value as "percent" | "fixed" })
                     }
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
                   >
                     <option value="percent">درصدی (%)</option>
                     <option value="fixed">مبلغ ثابت (تومان)</option>
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {form.discount_type === "percent" ? (
                   <div>
-                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">
                       درصد تخفیف (۱ تا ۱۰۰):
                     </label>
                     <input
@@ -385,12 +443,12 @@ export default function AdminCouponsPage() {
                           discount_percent: e.target.value === "" ? "" : Number(e.target.value),
                         })
                       }
-                      className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
                     />
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                    <label className="block font-bold text-[var(--text-secondary)] mb-1">
                       مبلغ تخفیف (تومان):
                     </label>
                     <input
@@ -404,14 +462,14 @@ export default function AdminCouponsPage() {
                           discount_amount: e.target.value === "" ? "" : Number(e.target.value),
                         })
                       }
-                      className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
-                    حداقل مبلغ خرید (تومان):
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">
+                    حداقل خرید (تومان):
                   </label>
                   <input
                     type="number"
@@ -423,96 +481,120 @@ export default function AdminCouponsPage() {
                         min_purchase: e.target.value === "" ? "" : Number(e.target.value),
                       })
                     }
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
-                    حداکثر سقف تخفیف (تومان):
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.max_discount}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        max_discount: e.target.value === "" ? "" : Number(e.target.value),
-                      })
-                    }
-                    placeholder="اختیاری برای درصدی"
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
-                    سقف مجاز تعداد مصرف:
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.usage_limit}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        usage_limit: e.target.value === "" ? "" : Number(e.target.value),
-                      })
-                    }
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
-                  تاریخ انقضا:
+              {/* انتخابگر اعمال روی همه محصولات یا محصول خاص */}
+              <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
+                <label className="block font-black text-[var(--accent-blue)]">
+                  🎯 محدوده اعمال کد تخفیف:
                 </label>
-                <input
-                  type="date"
-                  value={form.expires_at}
-                  onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-blue)]"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, target_type: "all" })}
+                    className={
+                      "py-2 rounded-xl font-bold cursor-pointer transition " +
+                      (form.target_type === "all"
+                        ? "bg-[var(--accent-blue)] text-white"
+                        : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]")
+                    }
+                  >
+                    همه محصولات سایت
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, target_type: "product" })}
+                    className={
+                      "py-2 rounded-xl font-bold cursor-pointer transition " +
+                      (form.target_type === "product"
+                        ? "bg-[var(--accent-blue)] text-white"
+                        : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]")
+                    }
+                  >
+                    📦 یک محصول خاص
+                  </button>
+                </div>
+
+                {form.target_type === "product" && (
+                  <select
+                    value={form.target_id}
+                    onChange={(e) => setForm({ ...form, target_id: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
+                  >
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        📦 {p.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* زمان‌بندی دقیق بر اساس روز خاص و ساعت خاص */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">
+                    🕒 تاریخ و ساعت دقیق شروع:
+                  </label>
+                  <input
+                    type="datetime-local"
+                    dir="ltr"
+                    value={form.starts_at}
+                    onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[var(--text-secondary)] mb-1">
+                    ⏳ تاریخ و ساعت دقیق انقضا:
+                  </label>
+                  <input
+                    type="datetime-local"
+                    dir="ltr"
+                    value={form.expires_at}
+                    onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                <label className="block font-bold text-[var(--text-secondary)] mb-1">
                   توضیحات کوپن:
                 </label>
                 <input
                   type="text"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="مثال: ویژه اولین خرید کاربران جدید"
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)]"
+                  placeholder="مثال: جشنواره فروش ویژه آخر هفته"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none"
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-xs font-bold text-[var(--text-primary)] cursor-pointer select-none">
+              <label className="flex items-center gap-2 font-bold cursor-pointer">
                 <input
                   type="checkbox"
                   checked={form.is_active}
                   onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                   className="rounded accent-[var(--accent-blue)]"
                 />
-                کوپن فعال و قابل استفاده در سبد خرید باشد
+                <span>کوپن فعال و قابل استفاده در سبد خرید باشد</span>
               </label>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
                 >
                   انصراف
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-bold shadow-md hover:opacity-90 transition cursor-pointer"
                 >
                   ذخیره کوپن 💾
                 </button>

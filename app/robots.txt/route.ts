@@ -1,12 +1,46 @@
-import { NextRequest, NextResponse } from "next/server";
+// File Path: app/robots.txt/route.ts
+import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+
 export const dynamic = "force-dynamic";
-export async function GET(_req: NextRequest) {
-  let allow = true;
+
+export async function GET() {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
+  let disallowAll = false;
+
   try {
-    const { data } = await supabaseAdmin.from("site_info").select("allow_google_index").limit(1).maybeSingle();
-    if (data) allow = data.allow_google_index !== false;
+    if (supabaseAdmin) {
+      const { data: row } = await supabaseAdmin
+        .from("site_info")
+        .select("auth_security_config")
+        .limit(1)
+        .maybeSingle();
+
+      const sys = row?.auth_security_config?.system_settings;
+      if (sys && (sys.seo_noindex === true || sys.maintenance_mode === true)) {
+        disallowAll = true;
+      }
+    }
   } catch {}
-  const txt = allow ? "User-agent: *\nAllow: /\nSitemap: https://axoncore.ir/sitemap.xml" : "User-agent: *\nDisallow: /";
-  return new NextResponse(txt, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+
+  const content = disallowAll
+    ? ["User-agent: *", "Disallow: /"].join("\n")
+    : [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin/",
+        "Disallow: /api/",
+        "Disallow: /checkout/",
+        "Disallow: /account/",
+        "",
+        "Sitemap: " + baseUrl + "/sitemap.xml",
+      ].join("\n");
+
+  return new NextResponse(content, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
 }

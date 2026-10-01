@@ -1,370 +1,605 @@
 // File Path: components/AdminBanners.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { bannerService, Banner } from "@/services/bannerService";
+import React, { useState, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
+import MediaUploadModal from "@/components/admin/MediaUploadModal";
+
+export interface BannerItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  image_url: string;
+  link_url: string;
+  cta_text?: string;
+  badge_text?: string;
+  position?: string;
+  sort_order?: number;
+  is_active: boolean;
+  created_at?: string;
+}
+
+interface CatalogProduct {
+  id: string;
+  title: string;
+  category?: string;
+  price?: number;
+  image?: string;
+}
+
+interface CatalogCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 export default function AdminBanners() {
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [selectedBanner, setSelectedBanner] = useState<Banner | null>(null);
+  const [banners, setBanners] = useState<BannerItem[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
-  const [badgeText, setBadgeText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [linkUrl, setLinkUrl] = useState("/products");
-  const [buttonText, setButtonText] = useState("مشاهده و بررسی کالا");
+  const [ctaText, setCtaText] = useState("مشاهده و خرید");
+  const [badgeText, setBadgeText] = useState("پیشنهاد ویژه");
   const [isActive, setIsActive] = useState(true);
 
-  const [saving, setSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [linkMode, setLinkMode] = useState<"product" | "category" | "page" | "custom">("product");
+  const [productSearch, setProductSearch] = useState("");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const showFeedback = (text: string, type: "success" | "error" = "success") => {
+    setStatusMsg({ type, text });
+    setTimeout(() => setStatusMsg(null), 4000);
+  };
 
-  const fetchBanners = async () => {
+  const fetchBannersAndCatalog = async () => {
     try {
-      const data = await bannerService.getAll();
-      setBanners(data || []);
+      const [bannersRes, prodsRes, catsRes] = await Promise.all([
+        fetch("/api/admin/banners", { cache: "no-store" }).catch(() => null),
+        fetch("/api/products", { cache: "no-store" }).catch(() => null),
+        fetch("/api/categories", { cache: "no-store" }).catch(() => null),
+      ]);
+
+      if (bannersRes && bannersRes.ok) {
+        const bJson = await bannersRes.json();
+        const list = bJson.banners || bJson.data || [];
+        setBanners(Array.isArray(list) ? list : []);
+      } else {
+        const { data: supaBanners } = await supabase
+          .from("banners")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (supaBanners) setBanners(supaBanners as any);
+      }
+
+      if (prodsRes && prodsRes.ok) {
+        const pJson = await prodsRes.json();
+        const pList = pJson.data || pJson.products || [];
+        setProducts(
+          (Array.isArray(pList) ? pList : []).map((p: any) => ({
+            id: String(p.id),
+            title: p.title || p.name || "کالای دیجیتال",
+            category: p.category || "کالای دیجیتال",
+            price: Number(p.price || 0),
+            image: p.image || (Array.isArray(p.images) ? p.images[0] : ""),
+          }))
+        );
+      }
+
+      if (catsRes && catsRes.ok) {
+        const cJson = await catsRes.json();
+        const cList = cJson.categories || cJson.data || [];
+        setCategories(Array.isArray(cList) ? cList : []);
+      }
     } catch (e) {
-      console.error("Error fetching banners:", e);
+      console.error("Error loading banners/catalog:", e);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBanners();
+    fetchBannersAndCatalog();
 
-    const handleBannersUpdate = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) setBanners(e.detail);
-      else fetchBanners();
-    };
+    const chBanners = supabase
+      .channel("realtime-admin-banners")
+      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
+        fetchBannersAndCatalog();
+      })
+      .subscribe();
 
-    window.addEventListener("banners_updated", handleBannersUpdate);
+    const chProducts = supabase
+      .channel("realtime-admin-banners-products")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        fetchBannersAndCatalog();
+      })
+      .subscribe();
+
     return () => {
-      window.removeEventListener("banners_updated", handleBannersUpdate);
+      supabase.removeChannel(chBanners);
+      supabase.removeChannel(chProducts);
     };
   }, []);
 
-  const handleSelectBanner = (b: Banner) => {
+  const resetForm = () => {
+    setEditingId(null);
+    setTitle("");
+    setSubtitle("");
+    setImageUrl("");
+    setLinkUrl("/products");
+    setCtaText("مشاهده و خرید");
+    setBadgeText("پیشنهاد ویژه");
+    setIsActive(true);
+    setProductSearch("");
+  };
+
+  const handleSelectEdit = (b: BannerItem) => {
     soundEngine.playClick();
-    setSelectedBanner(b);
-    setTitle(b.title);
+    setEditingId(b.id);
+    setTitle(b.title || "");
     setSubtitle(b.subtitle || "");
-    setBadgeText(b.badge || b.badge_text || "");
-    setImageUrl(b.image || b.image_url || "");
-    setLinkUrl(b.link || b.link_url || "/products");
-    setButtonText(b.button_text || b.buttonText || "مشاهده و بررسی کالا");
+    setImageUrl(b.image_url || (b as any).image || "");
+    setLinkUrl(b.link_url || (b as any).link || "/products");
+    setCtaText(b.cta_text || "مشاهده و خرید");
+    setBadgeText(b.badge_text || "پیشنهاد ویژه");
     setIsActive(b.is_active !== false);
   };
 
-  const handleCreateNew = () => {
+  const handlePickProductForBanner = (p: CatalogProduct) => {
     soundEngine.playClick();
-    if (banners.length >= 10) {
-      alert("حداکثر ۱۰ اسلاید فعال برای اسلایدر صفحه اصلی مجاز است.");
-      return;
-    }
-    setSelectedBanner(null);
-    setTitle("");
-    setSubtitle("");
-    setBadgeText("");
-    setImageUrl("");
-    setLinkUrl("/products");
-    setButtonText("مشاهده و بررسی کالا");
-    setIsActive(true);
+    setLinkUrl("/products/" + p.id);
+    if (!title.trim()) setTitle(p.title);
+    if (!imageUrl.trim() && p.image) setImageUrl(p.image);
+    showFeedback("محصول «" + p.title + "» به عنوان مقصد بنر انتخاب شد.");
   };
 
-  // فشرده‌سازی خودکار تصویر بنر قبل از ذخیره
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 1600;
-          const MAX_HEIGHT = 900;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height = Math.round((height * MAX_WIDTH) / width);
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width = Math.round((width * MAX_HEIGHT) / height);
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx?.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL("image/webp", 0.85);
-          resolve(compressedDataUrl);
-        };
-      };
-    });
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const optimizedUrl = await compressImage(file);
-      setImageUrl(optimizedUrl);
-    }
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !imageUrl.trim()) {
-      setStatusMessage({ type: "error", text: "عنوان بنر و تصویر الزامی هستند." });
+      showFeedback("عنوان بنر و تصویر بنر الزامی هستند.", "error");
       return;
     }
 
     soundEngine.playClick();
     setSaving(true);
-    const payload = {
+
+    const payload: Record<string, any> = {
+      id: editingId || undefined,
       title: title.trim(),
-      subtitle: subtitle.trim() || null,
-      badge: badgeText.trim() || null,
-      badge_text: badgeText.trim() || null,
-      image: imageUrl.trim(),
+      subtitle: subtitle.trim(),
       image_url: imageUrl.trim(),
-      link: linkUrl.trim() || "/products",
+      image: imageUrl.trim(),
       link_url: linkUrl.trim() || "/products",
-      button_text: buttonText.trim() || "مشاهده و بررسی کالا",
+      link: linkUrl.trim() || "/products",
+      cta_text: ctaText.trim() || "مشاهده و خرید",
+      badge_text: badgeText.trim() || "پیشنهاد ویژه",
       is_active: isActive,
-      updated_at: new Date().toISOString(),
     };
 
     try {
-      if (selectedBanner?.id && !selectedBanner.id.startsWith("default-")) {
-        const { error } = await supabase.from("banners").update(payload).eq("id", selectedBanner.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("banners").insert([payload]);
-        if (error) throw error;
-      }
+      const res = await fetch("/api/admin/banners", {
+        method: editingId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      soundEngine.playSuccess();
-      setStatusMessage({ type: "success", text: "⚡ بنر با موفقیت در دیتابیس ذخیره و در اسلایدر فعال شد." });
-      fetchBanners();
-      if (!selectedBanner) handleCreateNew();
-    } catch (err: any) {
-      setStatusMessage({ type: "error", text: err.message || "خطا در ذخیره‌سازی بنر." });
+      const json = await res.json();
+      if (res.ok && (json.success || json.banner || json.data)) {
+        soundEngine.playSuccess();
+        showFeedback(editingId ? "بنر با موفقیت ویرایش شد." : "بنر جدید با موفقیت ثبت و در سایت فعال شد.");
+        resetForm();
+        fetchBannersAndCatalog();
+        window.dispatchEvent(new CustomEvent("banners_updated"));
+      } else {
+        const postRes = await fetch("/api/admin/banners", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const postJson = await postRes.json();
+        if (postRes.ok && postJson.success !== false) {
+          soundEngine.playSuccess();
+          showFeedback("بنر با موفقیت در دیتابیس ذخیره شد.");
+          resetForm();
+          fetchBannersAndCatalog();
+          window.dispatchEvent(new CustomEvent("banners_updated"));
+        } else {
+          showFeedback(postJson.message || "خطا در ذخیره بنر.", "error");
+        }
+      }
+    } catch {
+      showFeedback("خطا در ارتباط با سرور.", "error");
     } finally {
       setSaving(false);
-      setTimeout(() => setStatusMessage(null), 3500);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این بنر اطمینان دارید؟")) return;
+  const handleDeleteBanner = async (id: string) => {
+    if (!confirm("آیا از حذف این بنر تبلیغاتی اطمینان دارید؟")) return;
+    soundEngine.playClick();
     try {
-      soundEngine.playClick();
-      if (!id.startsWith("default-")) {
-        const { error } = await supabase.from("banners").delete().eq("id", id);
-        if (error) throw error;
+      const res = await fetch("/api/admin/banners?id=" + encodeURIComponent(id), {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        soundEngine.playSuccess();
+        showFeedback("بنر با موفقیت حذف شد.");
+        if (editingId === id) resetForm();
+        fetchBannersAndCatalog();
+        window.dispatchEvent(new CustomEvent("banners_updated"));
       }
-      handleCreateNew();
-      fetchBanners();
-      setStatusMessage({ type: "success", text: "بنر با موفقیت حذف گردید." });
-    } catch {}
+    } catch {
+      showFeedback("خطا در حذف بنر.", "error");
+    }
   };
+
+  const filteredProducts = products.filter(
+    (p) =>
+      (p.title || "").toLowerCase().includes(productSearch.toLowerCase()) ||
+      (p.category || "").toLowerCase().includes(productSearch.toLowerCase())
+  );
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>🖼️</span> مدیریت اسلایدر صفحه اصلی (تا ۱۰ اسلاید متحرک)
+          <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+            <span>🖼️</span> مدیریت هوشمند بنرها، اسلایدرها و لینک‌دهی کاتالوگ محصولات
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            طراحی، تغییر اسلایدها و بارگذاری تصویر بهینه از گوشی و سیستم با انیمیشن روان
+            اتصال مستقیم هر بنر به محصول دلخواه از کاتالوگ، دسته‌بندی یا صفحات سایت با همگام‌سازی بلادرنگ وب‌سوکت
           </p>
         </div>
-        <button
-          onClick={handleCreateNew}
-          className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer"
-        >
-          + ایجاد اسلاید جدید ({banners.length}/10)
-        </button>
+
+        {editingId && (
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              resetForm();
+            }}
+            className="px-4 py-2 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold cursor-pointer"
+          >
+            + ساخت بنر جدید
+          </button>
+        )}
       </div>
 
-      {statusMessage && (
-        <div className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}`}>
-          {statusMessage.text}
+      {statusMsg && (
+        <div
+          className={
+            "p-4 rounded-2xl text-xs font-bold animate-fadeIn " +
+            (statusMsg.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-500"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-500")
+          }
+        >
+          {statusMsg.text}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1 bg-[var(--modal-bg)] p-4 rounded-3xl border border-[var(--card-border)] space-y-3 shadow-xl h-fit">
-          <h3 className="text-xs font-black border-b border-[var(--card-border)] pb-3">
-            📋 اسلایدهای فعال ({banners.length})
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <form
+          onSubmit={handleSaveBanner}
+          className="lg:col-span-5 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs h-fit"
+        >
+          <h3 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
+            {editingId ? "✏️ ویرایش بنر انتخاب‌شده" : "➕ افزودن بنر جدید به سایت"}
           </h3>
-          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-            {banners.map((b) => (
-              <div
-                key={b.id}
-                onClick={() => handleSelectBanner(b)}
-                className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
-                  selectedBanner?.id === b.id
-                    ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10 shadow-sm"
-                    : "border-[var(--card-border)] bg-[var(--input-bg)] hover:border-[var(--accent-blue)]/50"
-                }`}
-              >
-                <div className="overflow-hidden">
-                  <h4 className="text-xs font-black truncate">{b.title}</h4>
-                  <span className="text-[10px] text-[var(--text-secondary)] font-mono truncate block">{b.link || b.link_url}</span>
-                </div>
-                <span className={`w-2.5 h-2.5 rounded-full ${b.is_active !== false ? "bg-emerald-500" : "bg-slate-400"}`} />
-              </div>
-            ))}
+
+          <div className="space-y-1.5">
+            <label className="block font-bold text-[var(--text-secondary)]">عنوان اصلی بنر *</label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="مثال: جشنواره فروش ویژه تجهیزات دیجیتال"
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+            />
           </div>
-        </div>
 
-        <div className="lg:col-span-3">
-          <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-5 shadow-xl text-xs">
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
+          <div className="space-y-1.5">
+            <label className="block font-bold text-[var(--text-secondary)]">زیرعنوان / توضیح کوتاه</label>
+            <input
+              type="text"
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="با ۱۸ ماه گارانتی طلایی و ارسال فوری"
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)]"
+            />
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">عنوان اصلی اسلاید *</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: مانیتورهای تدوین و تصحیح رنگ ۵K"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
+          <div className="space-y-2">
+            <label className="block font-bold text-[var(--text-secondary)]">تصویر بنر *</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                required
+                dir="ltr"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://..."
+                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none focus:border-[var(--accent-blue)]"
+              />
+              <button
+                type="button"
+                onClick={() => setIsUploadOpen(true)}
+                className="px-4 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black cursor-pointer shrink-0"
+              >
+                ☁️ آپلود
+              </button>
+            </div>
+            {imageUrl && (
+              <div className="rounded-2xl overflow-hidden border border-[var(--card-border)] max-h-36 bg-black/20">
+                <img src={imageUrl} alt="Banner Preview" className="w-full h-32 object-cover" />
               </div>
+            )}
+          </div>
 
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">برچسب کوچک نئونی (Badge)</label>
-                <input
-                  type="text"
-                  value={badgeText}
-                  onChange={(e) => setBadgeText(e.target.value)}
-                  placeholder="مثال: پیشنهاد ویژه نوروز"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
+          <div className="space-y-2 p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+            <label className="block font-black text-[var(--accent-blue)]">
+              🔗 انتخاب هوشمند مقصد لینک بنر:
+            </label>
 
-              <div className="md:col-span-2">
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">زیرعنوان و توضیحات اسلاید</label>
-                <input
-                  type="text"
-                  value={subtitle}
-                  onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder="توضیحات کوتاه برای معرفی مزیت محصول در اسلایدر..."
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div className="md:col-span-2 space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="font-bold text-[var(--text-secondary)]">تصویر عریض اسلایدر (URL یا فایل) *</label>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-sm flex items-center gap-1.5"
-                  >
-                    <span>📁</span>
-                    <span>انتخاب عکس از دستگاه</span>
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">لینک مقصد هنگام کلیک</label>
-                <input
-                  type="text"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder="/products"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-primary)] outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[var(--text-secondary)] mb-1.5">متن دکمه روی بنر</label>
-                <input
-                  type="text"
-                  value={buttonText}
-                  onChange={(e) => setButtonText(e.target.value)}
-                  placeholder="مشاهده و بررسی کالا"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold text-[var(--text-primary)] outline-none"
-                />
-              </div>
-
-              <div className="md:col-span-2 flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="bannerActiveCheckbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  className="w-5 h-5 rounded-lg text-[var(--accent-blue)] cursor-pointer"
-                />
-                <label htmlFor="bannerActiveCheckbox" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
-                  اسلاید فعال و در چرخه اسلایدر صفحه نخست نمایش داده شود
-                </label>
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px] font-bold">
+              {[
+                { id: "product", label: "📦 محصول کاتالوگ" },
+                { id: "category", label: "📁 دسته‌بندی" },
+                { id: "page", label: "📄 صفحات سایت" },
+                { id: "custom", label: "🌐 لینک دلخواه" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setLinkMode(m.id as any);
+                  }}
+                  className={
+                    "py-2 px-2 rounded-xl transition cursor-pointer text-center " +
+                    (linkMode === m.id
+                      ? "bg-[var(--accent-blue)] text-white shadow"
+                      : "bg-[var(--modal-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]")
+                  }
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
 
-            {imageUrl && (
-              <div className="space-y-2 border-t border-[var(--card-border)] pt-4">
-                <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش زنده بنر:</span>
-                <div
-                  className="w-full h-44 rounded-2xl bg-cover bg-center border border-[var(--card-border)] p-6 flex items-center shadow-inner relative overflow-hidden"
-                  style={{
-                    backgroundImage: `linear-gradient(to left, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.3)), url(${imageUrl})`,
-                  }}
-                >
-                  <div className="text-white space-y-1.5 z-10">
-                    {badgeText && <span className="px-3 py-1 rounded-full bg-white/20 text-[10px] font-black">{badgeText}</span>}
-                    <h4 className="font-black text-base">{title || "عنوان پیش‌نمایش"}</h4>
-                    <p className="text-xs text-slate-300">{subtitle || "توضیحات پیش‌نمایش"}</p>
-                  </div>
+            {linkMode === "product" && (
+              <div className="space-y-2 pt-2">
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="🔍 جستجو در بین محصولات کاتالوگ..."
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none focus:border-[var(--accent-blue)]"
+                />
+                <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                  {filteredProducts.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 text-center py-3">محصولی یافت نشد.</p>
+                  ) : (
+                    filteredProducts.map((p) => {
+                      const targetHref = "/products/" + p.id;
+                      const isSelected = linkUrl === targetHref;
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => handlePickProductForBanner(p)}
+                          className={
+                            "p-2 rounded-xl border transition cursor-pointer flex items-center justify-between gap-2 " +
+                            (isSelected
+                              ? "border-emerald-500 bg-emerald-500/15 text-emerald-400 font-black"
+                              : "border-[var(--card-border)] bg-[var(--modal-bg)] hover:border-[var(--accent-blue)]")
+                          }
+                        >
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            {p.image && (
+                              <img
+                                src={p.image}
+                                alt=""
+                                className="w-8 h-8 rounded-lg object-cover shrink-0 border border-[var(--card-border)]"
+                              />
+                            )}
+                            <span className="truncate text-[11px]">{p.title}</span>
+                          </div>
+                          <span className="font-mono text-[10px] shrink-0">
+                            {isSelected ? "انتخاب شد ✓" : "انتخاب ←"}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
 
-            <div className="flex gap-3 pt-4 border-t border-[var(--card-border)]">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer hover:opacity-90 shadow-lg disabled:opacity-50"
-              >
-                {saving ? "در حال ذخیره‌سازی..." : "💾 ذخیره و فعال‌سازی در اسلایدر"}
-              </button>
-              {selectedBanner?.id && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(selectedBanner.id)}
-                  className="px-6 py-4 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500 hover:text-white transition cursor-pointer"
+            {linkMode === "category" && (
+              <div className="pt-2">
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) setLinkUrl("/products?category=" + encodeURIComponent(e.target.value));
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer"
                 >
-                  حذف اسلاید ✕
-                </button>
-              )}
+                  <option value="">-- انتخاب دسته‌بندی محصول --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      📁 {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {linkMode === "page" && (
+              <div className="pt-2">
+                <select
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-bold outline-none cursor-pointer"
+                >
+                  <option value="/products">🛍️ کاتالوگ تمام محصولات (/products)</option>
+                  <option value="/blog">📚 مجله تخصصی سئو (/blog)</option>
+                  <option value="/news">📡 رادار اخبار تکنولوژی (/news)</option>
+                  <option value="/contact">📞 تماس با ما و مشاوره (/contact)</option>
+                  <option value="/about">ℹ️ درباره آکسون (/about)</option>
+                  <option value="/track-order">📦 پیگیری سفارش (/track-order)</option>
+                </select>
+              </div>
+            )}
+
+            <div className="pt-1">
+              <label className="block text-[10px] font-bold text-slate-400 mb-1">آدرس نهایی لینک بنر:</label>
+              <input
+                type="text"
+                dir="ltr"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] font-mono text-xs outline-none focus:border-[var(--accent-blue)]"
+              />
             </div>
-          </form>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">متن دکمه (CTA)</label>
+              <input
+                type="text"
+                value={ctaText}
+                onChange={(e) => setCtaText(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+              />
+            </div>
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">بج بالای بنر</label>
+              <input
+                type="text"
+                value={badgeText}
+                onChange={(e) => setBadgeText(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 font-bold cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+              className="rounded accent-[var(--accent-blue)]"
+            />
+            <span>نمایش فعال این بنر در صفحه اصلی سایت</span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
+          >
+            {saving ? "در حال ذخیره در دیتابیس..." : editingId ? "💾 بروزرسانی بنر" : "💾 ثبت و انتشار فوری بنر"}
+          </button>
+        </form>
+
+        <div className="lg:col-span-7 bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] space-y-4 shadow-xl text-xs">
+          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+            <h3 className="font-black text-sm">لیست بنرهای ثبت‌شده ({banners.length})</h3>
+            <button
+              type="button"
+              onClick={fetchBannersAndCatalog}
+              className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
+            >
+              🔄 بروزرسانی
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="py-12 text-center text-slate-400 font-bold">در حال بارگذاری بنرها...</div>
+          ) : banners.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 font-bold">
+              هنوز بنری ثبت نشده است. از فرم سمت راست اولین بنر خود را بسازید.
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
+              {banners.map((b) => {
+                const img = b.image_url || (b as any).image || "/placeholder.png";
+                const lnk = b.link_url || (b as any).link || "/products";
+                return (
+                  <div
+                    key={b.id}
+                    className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-[var(--accent-blue)] transition"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <img
+                        src={img}
+                        alt={b.title}
+                        className="w-24 h-16 object-cover rounded-xl border border-[var(--card-border)] shrink-0"
+                      />
+                      <div className="space-y-1 overflow-hidden">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-black text-xs truncate">{b.title}</h4>
+                          <span
+                            className={
+                              "px-2 py-0.5 rounded-md text-[9px] font-bold " +
+                              (b.is_active !== false
+                                ? "bg-emerald-500/15 text-emerald-400"
+                                : "bg-rose-500/15 text-rose-400")
+                            }
+                          >
+                            {b.is_active !== false ? "فعال" : "غیرفعال"}
+                          </span>
+                        </div>
+                        {b.subtitle && (
+                          <p className="text-[11px] text-[var(--text-secondary)] truncate">{b.subtitle}</p>
+                        )}
+                        <span className="text-[10px] font-mono text-[var(--accent-blue)] block truncate" dir="ltr">
+                          🔗 {lnk}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectEdit(b)}
+                        className="px-3 py-1.5 rounded-xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
+                      >
+                        ✏️ ویرایش
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBanner(b.id)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold cursor-pointer transition"
+                      >
+                        🗑️ حذف
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
+
+      <MediaUploadModal
+        isOpen={isUploadOpen}
+        bucket="banners"
+        title="بارگذاری تصویر بنر تبلیغاتی"
+        currentValue={imageUrl}
+        onClose={() => setIsUploadOpen(false)}
+        onUploadSuccess={(url) => setImageUrl(url)}
+      />
     </div>
   );
 }

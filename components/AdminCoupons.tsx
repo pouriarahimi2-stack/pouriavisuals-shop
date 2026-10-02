@@ -1,3 +1,4 @@
+// File Path: components/AdminCoupons.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -15,7 +16,6 @@ export default function AdminCoupons() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // فرم ایجاد کوپن
   const [code, setCode] = useState("");
   const [type, setType] = useState<"percent" | "fixed">("percent");
   const [value, setValue] = useState<number>(15);
@@ -23,7 +23,6 @@ export default function AdminCoupons() {
   const [maxDiscount, setMaxDiscount] = useState<number | "">("");
   const [usageLimit, setUsageLimit] = useState<number>(50);
 
-  // هدف‌گذاری و زمان‌بندی
   const [targetType, setTargetType] = useState<"all" | "category" | "product">("all");
   const [targetId, setTargetId] = useState<string>("");
   const [startsAt, setStartsAt] = useState<string>("");
@@ -52,7 +51,6 @@ export default function AdminCoupons() {
   useEffect(() => {
     loadData();
 
-    // وب‌سوکت بلادرنگ جدول coupons برای همگام‌سازی لحظه‌ای بدون رفرش
     const channel = supabase
       .channel("realtime-admin-coupons")
       .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
@@ -65,13 +63,12 @@ export default function AdminCoupons() {
     };
   }, []);
 
-  // دکمه تولید رندوم کد تخفیف جذاب و استاندارد
   const handleGenerateRandomCode = () => {
     soundEngine.playClick();
-    const prefixes = ["AXON", "STUDIO", "VIP", "SPECIAL", "GIFT", "OFF"];
+    const prefixes = ["AXON", "TECH", "VIP", "SPECIAL", "GIFT", "OFF"];
     const randomPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
     const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    setCode(`${randomPrefix}-${randomSuffix}`);
+    setCode(randomPrefix + "-" + randomSuffix);
   };
 
   const handleCreateCoupon = async (e: React.FormEvent) => {
@@ -104,7 +101,7 @@ export default function AdminCoupons() {
       const created = await couponService.create(payload);
       if (created) {
         soundEngine.playSuccess();
-        showToast(`✓ کد تخفیف «${created.code}» با موفقیت در دیتابیس ثبت و منتشر شد.`);
+        showToast("✓ کد تخفیف «" + created.code + "» با موفقیت در دیتابیس ثبت و منتشر شد.");
         setCode("");
         setValue(15);
         setMinOrder("");
@@ -133,7 +130,7 @@ export default function AdminCoupons() {
   };
 
   const handleDeleteCoupon = async (c: Coupon) => {
-    if (!confirm(`آیا از حذف کامل کد تخفیف «${c.code}» اطمینان دارید؟`)) return;
+    if (!confirm("آیا از حذف کامل کد تخفیف «" + c.code + "» اطمینان دارید؟")) return;
     soundEngine.playClick();
     const ok = await couponService.delete(c.id);
     if (ok) {
@@ -145,22 +142,20 @@ export default function AdminCoupons() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      
       {toast && (
-        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black flex items-center gap-2 shadow-xl animate-fadeIn">
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-black flex items-center gap-2 shadow-xl animate-fadeIn">
           <span>✓</span>
           <span>{toast}</span>
         </div>
       )}
 
-      {/* هدر ماژول کدهای تخفیف */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h3 className="font-black text-base flex items-center gap-2 text-[var(--accent-blue)]">
             <span>🏷️</span> سیستم هوشمند کدهای تخفیف، جشنواره‌ها و کمپین‌ها
           </h3>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            تولید رندوم کدهای اختصاصی، هدف‌گذاری روی دسته یا کالای خاص، بازه زمانی و سقف مصرف
+            تولید رندوم کدهای اختصاصی، هدف‌گذاری روی دسته یا کالای خاص، روز خاص و ساعت دقیق
           </p>
         </div>
 
@@ -169,8 +164,10 @@ export default function AdminCoupons() {
         </span>
       </div>
 
-      {/* فرم ثبت کوپن با تولید رندوم و انتخاب دسته/کالا */}
-      <form onSubmit={handleCreateCoupon} className="p-6 md:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
+      <form
+        onSubmit={handleCreateCoupon}
+        className="p-5 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs"
+      >
         <div className="flex justify-between items-center border-b border-[var(--card-border)] pb-3">
           <h4 className="font-black text-xs text-[var(--text-primary)]">➕ تعریف و انتشار کوپن جدید</h4>
           <button
@@ -185,11 +182,14 @@ export default function AdminCoupons() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">کد تخفیف (لاتین) *</label>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+              کد تخفیف (لاتین) *
+            </label>
             <input
               type="text"
               required
-              placeholder="مثال: AXON-50"
+              dir="ltr"
+              placeholder="AXON-50"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-black uppercase text-[var(--text-primary)] focus:border-[var(--accent-blue)]"
@@ -223,20 +223,22 @@ export default function AdminCoupons() {
           </div>
 
           <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">ظرفیت استفاده (تعداد مجاز)</label>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+              ظرفیت استفاده (تعداد مجاز)
+            </label>
             <input
               type="number"
               min={1}
               value={usageLimit}
               onChange={(e) => setUsageLimit(Number(e.target.value))}
-              placeholder="مثال: ۱۰۰"
               className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-[var(--text-primary)]"
             />
           </div>
 
-          {/* هدف‌گذاری تخفیف روی دسته یا کالا */}
           <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">دامنه اعمال تخفیف</label>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+              دامنه اعمال تخفیف
+            </label>
             <select
               value={targetType}
               onChange={(e) => {
@@ -251,10 +253,13 @@ export default function AdminCoupons() {
             </select>
           </div>
 
-          {/* انتخاب دسته یا محصول وابسته */}
           <div>
             <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-              {targetType === "category" ? "انتخاب دسته‌بندی هدف:" : targetType === "product" ? "انتخاب محصول هدف:" : "هدف‌گذاری عمومی"}
+              {targetType === "category"
+                ? "انتخاب دسته‌بندی هدف:"
+                : targetType === "product"
+                ? "انتخاب محصول هدف:"
+                : "هدف‌گذاری عمومی"}
             </label>
             {targetType === "category" ? (
               <select
@@ -264,7 +269,9 @@ export default function AdminCoupons() {
               >
                 <option value="">-- انتخاب دسته‌بندی --</option>
                 {categories.map((c) => (
-                  <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                  <option key={c.id || c.name} value={c.name}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             ) : targetType === "product" ? (
@@ -275,7 +282,9 @@ export default function AdminCoupons() {
               >
                 <option value="">-- انتخاب کالا --</option>
                 {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.title || p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.title || p.name}
+                  </option>
                 ))}
               </select>
             ) : (
@@ -289,7 +298,9 @@ export default function AdminCoupons() {
           </div>
 
           <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">حداقل خرید فاکتور (تومان)</label>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+              حداقل خرید فاکتور (تومان)
+            </label>
             <input
               type="number"
               value={minOrder}
@@ -300,7 +311,9 @@ export default function AdminCoupons() {
           </div>
 
           <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">سقف تخفیف (تومان)</label>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+              سقف تخفیف (تومان)
+            </label>
             <input
               type="number"
               value={maxDiscount}
@@ -311,22 +324,28 @@ export default function AdminCoupons() {
           </div>
 
           <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تاریخ شروع اعتبار</label>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+              🕒 روز و ساعت شروع اعتبار
+            </label>
             <input
-              type="date"
+              type="datetime-local"
+              dir="ltr"
               value={startsAt}
               onChange={(e) => setStartsAt(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-sans font-bold cursor-pointer"
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold cursor-pointer"
             />
           </div>
 
           <div>
-            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">تاریخ پایان اعتبار (انقضا)</label>
+            <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+              ⏳ روز و ساعت پایان اعتبار (انقضا)
+            </label>
             <input
-              type="date"
+              type="datetime-local"
+              dir="ltr"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-sans font-bold cursor-pointer"
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold cursor-pointer"
             />
           </div>
 
@@ -336,18 +355,23 @@ export default function AdminCoupons() {
               disabled={submitting}
               className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
             >
-              {submitting ? "در حال ثبت و انتشار در دیتابیس..." : "💾 ایجاد و انتشار فوری کد تخفیف"}
+              {submitting
+                ? "در حال ثبت و انتشار در دیتابیس..."
+                : "💾 ایجاد و انتشار فوری کد تخفیف"}
             </button>
           </div>
         </div>
       </form>
 
-      {/* جدول نمایش کوپن‌ها با قابلیت حذف و تغییر وضعیت لحظه‌ای */}
-      <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl overflow-x-auto">
         {loading ? (
-          <div className="py-12 text-center text-xs font-bold text-[var(--text-secondary)]">در حال بارگذاری کدهای تخفیف...</div>
+          <div className="py-12 text-center text-xs font-bold text-[var(--text-secondary)]">
+            در حال بارگذاری کدهای تخفیف...
+          </div>
         ) : coupons.length === 0 ? (
-          <div className="py-12 text-center text-xs font-bold text-[var(--text-secondary)]">هیچ کد تخفیفی در دیتابیس تعریف نشده است.</div>
+          <div className="py-12 text-center text-xs font-bold text-[var(--text-secondary)]">
+            هیچ کد تخفیفی در دیتابیس تعریف نشده است.
+          </div>
         ) : (
           <table className="w-full text-right text-xs min-w-[750px] border-collapse">
             <thead>
@@ -373,20 +397,15 @@ export default function AdminCoupons() {
                       {c.code}
                     </td>
                     <td className="p-3 font-mono font-black">
-                      {isPercent ? `${val}٪ تخفیف` : `${val.toLocaleString("fa-IR")} ت`}
-                      {c.max_discount_amount && (
-                        <span className="text-[10px] text-slate-400 block font-normal">
-                          سقف: {Number(c.max_discount_amount).toLocaleString("fa-IR")} ت
-                        </span>
-                      )}
+                      {isPercent ? val + "٪ تخفیف" : val.toLocaleString("fa-IR") + " ت"}
                     </td>
                     <td className="p-3 text-[11px]">
                       {c.target_type === "category" ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-500 font-bold">
+                        <span className="px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-400 font-bold">
                           📂 {c.target_id || "دسته‌بندی"}
                         </span>
                       ) : c.target_type === "product" ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-purple-500/15 text-purple-500 font-bold">
+                        <span className="px-2 py-0.5 rounded-lg bg-purple-500/15 text-purple-400 font-bold">
                           📦 کالای مشخص
                         </span>
                       ) : (
@@ -397,23 +416,27 @@ export default function AdminCoupons() {
                       {c.used_count || 0} / {c.usage_limit || "نامحدود"}
                     </td>
                     <td className="p-3 text-[11px] font-mono text-slate-400">
-                      {c.expires_at ? new Date(c.expires_at).toLocaleDateString("fa-IR") : "بدون انقضا"}
+                      {c.expires_at ? new Date(c.expires_at).toLocaleString("fa-IR") : "بدون انقضا"}
                     </td>
                     <td className="p-3 text-center">
                       <button
+                        type="button"
                         onClick={() => handleToggleStatus(c)}
-                        className={"px-3 py-1 rounded-xl text-[10px] font-black transition cursor-pointer " + (
-                          isActive ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30" : "bg-slate-500/15 text-slate-500 border border-slate-500/30"
-                        )}
+                        className={
+                          "px-3 py-1 rounded-xl text-[10px] font-black transition cursor-pointer " +
+                          (isActive
+                            ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30"
+                            : "bg-slate-500/15 text-slate-500 border border-slate-500/30")
+                        }
                       >
                         {isActive ? "فعال ✓" : "غیرفعال"}
                       </button>
                     </td>
                     <td className="p-3 text-center">
                       <button
+                        type="button"
                         onClick={() => handleDeleteCoupon(c)}
-                        className="p-1.5 px-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-500 border border-rose-500/20 text-xs font-bold transition cursor-pointer"
-                        title="حذف از دیتابیس"
+                        className="p-1.5 px-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-500 border border-rose-500/20 text-xs font-bold transition cursor-pointer whitespace-nowrap"
                       >
                         🗑️ حذف
                       </button>

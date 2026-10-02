@@ -7,7 +7,8 @@ import { soundEngine } from "@/lib/soundEngine";
 import { formatPrice } from "@/lib/formatters";
 import AddToCartButton from "@/components/AddToCartButton";
 import ProductExplodedView from "@/components/ProductExplodedView";
-import { productService, Product } from "@/services/productService";
+import { productService } from "@/services/productService";
+import { supabase } from "@/lib/supabase";
 
 export interface ProductPerspectiveSliderProps {
   products?: any[];
@@ -25,18 +26,43 @@ export default function ProductPerspectiveSlider({
   const [products, setProducts] = useState<any[]>(initialProducts || []);
   const [activeIndex, setActiveIndex] = useState(0);
   const [teardownProduct, setTeardownProduct] = useState<any | null>(null);
+  const [isMobileScreen, setIsMobileScreen] = useState(false);
 
   const touchStartXRef = useRef<number>(0);
   const isDraggingRef = useRef<boolean>(false);
 
+  const loadLiveProducts = () => {
+    productService.getAll().then((data) => {
+      if (data && data.length > 0) setProducts(data);
+    });
+  };
+
   useEffect(() => {
     if (!initialProducts || initialProducts.length === 0) {
-      productService.getAll().then((data) => {
-        if (data && data.length > 0) setProducts(data);
-      });
+      loadLiveProducts();
     } else {
       setProducts(initialProducts);
     }
+
+    const checkScreen = () => {
+      if (typeof window !== "undefined") {
+        setIsMobileScreen(window.innerWidth < 640);
+      }
+    };
+    checkScreen();
+    window.addEventListener("resize", checkScreen, { passive: true });
+
+    const channel = supabase
+      .channel("realtime-perspective-slider-products")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        loadLiveProducts();
+      })
+      .subscribe();
+
+    return () => {
+      window.removeEventListener("resize", checkScreen);
+      supabase.removeChannel(channel);
+    };
   }, [initialProducts]);
 
   if (!products || products.length === 0) return null;
@@ -85,22 +111,35 @@ export default function ProductPerspectiveSlider({
 
   const cardSizeClasses =
     cardScale === "compact"
-      ? "w-[260px] sm:w-[300px] h-[410px] sm:h-[450px]"
+      ? "w-[250px] sm:w-[300px] h-[400px] sm:h-[450px]"
       : cardScale === "large"
-      ? "w-[310px] sm:w-[370px] h-[490px] sm:h-[540px]"
-      : "w-[290px] sm:w-[340px] h-[450px] sm:h-[490px]";
+      ? "w-[285px] sm:w-[370px] h-[460px] sm:h-[540px]"
+      : "w-[270px] sm:w-[340px] h-[435px] sm:h-[490px]";
 
   const containerHeightClass =
     cardScale === "compact"
-      ? "h-[440px] sm:h-[480px]"
+      ? "h-[430px] sm:h-[480px]"
       : cardScale === "large"
-      ? "h-[520px] sm:h-[580px]"
-      : "h-[480px] sm:h-[530px]";
+      ? "h-[490px] sm:h-[580px]"
+      : "h-[465px] sm:h-[530px]";
+
+  const stepTranslateX = isMobileScreen
+    ? 115
+    : cardScale === "compact"
+    ? 180
+    : cardScale === "large"
+    ? 230
+    : 210;
 
   return (
-    <section id="products-slider" className="w-full py-4 select-none font-sans space-y-4" dir="rtl" suppressHydrationWarning>
-      <div className="text-center space-y-1">
-        <h2 className="text-xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
+    <section
+      id="products-slider"
+      className="w-full py-4 select-none font-sans space-y-4 overflow-hidden"
+      dir="rtl"
+      suppressHydrationWarning
+    >
+      <div className="text-center space-y-1 px-4">
+        <h2 className="text-lg sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
           {customTitle || "نمایشگاه سه‌بعدی تجهیزات پرچمدار"}
         </h2>
         <p className="text-xs text-[var(--text-secondary)] font-medium">
@@ -113,7 +152,10 @@ export default function ProductPerspectiveSlider({
         onTouchEnd={handleTouchEnd}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
-        className={`relative w-full max-w-5xl mx-auto flex items-center justify-center overflow-hidden [perspective:1200px] cursor-grab active:cursor-grabbing ${containerHeightClass}`}
+        className={
+          "relative w-full max-w-5xl mx-auto flex items-center justify-center overflow-hidden [perspective:1200px] cursor-grab active:cursor-grabbing " +
+          containerHeightClass
+        }
       >
         {products.map((p, idx) => {
           let offset = idx - activeIndex;
@@ -125,16 +167,16 @@ export default function ProductPerspectiveSlider({
 
           if (!isVisible) return null;
 
-          const translateX = offset * (cardScale === "compact" ? 180 : cardScale === "large" ? 230 : 210);
-          const translateZ = -Math.abs(offset) * 170;
-          const rotateY = -offset * 22;
+          const translateX = offset * stepTranslateX;
+          const translateZ = -Math.abs(offset) * (isMobileScreen ? 130 : 170);
+          const rotateY = -offset * (isMobileScreen ? 16 : 22);
           const opacity = isActive ? 1 : Math.max(0.2, 0.65 - Math.abs(offset) * 0.25);
           const filter = isActive ? "none" : "grayscale(95%) opacity(50%) blur(0.5px)";
           const zIndex = 20 - Math.abs(offset);
 
           const isAvail = (p.stock ?? 10) > 0 && p.is_available !== false && p.isAvailable !== false;
           const finalPrice = p.discountPrice || p.discount_price || p.price;
-          const displayImage = p.image || p.images?.[0] || "/placeholder.png";
+          const displayImage = p.image || (p.images && p.images[0]) || "/placeholder.png";
 
           return (
             <div
@@ -146,20 +188,30 @@ export default function ProductPerspectiveSlider({
                 }
               }}
               style={{
-                transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg)`,
+                transform:
+                  "translateX(" +
+                  translateX +
+                  "px) translateZ(" +
+                  translateZ +
+                  "px) rotateY(" +
+                  rotateY +
+                  "deg)",
                 opacity,
                 filter,
                 zIndex,
               }}
-              className={`absolute rounded-[2.5rem] p-5 sm:p-6 glass-morphism border transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col justify-between cursor-pointer ${cardSizeClasses} ${
-                isActive
+              className={
+                "absolute rounded-[2.2rem] sm:rounded-[2.5rem] p-4 sm:p-6 glass-morphism border transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col justify-between cursor-pointer " +
+                cardSizeClasses +
+                " " +
+                (isActive
                   ? "border-[var(--accent-blue)] shadow-[0_20px_60px_rgba(2,132,199,0.35)] scale-100 ring-2 ring-blue-500/20"
-                  : "border-[var(--card-border)] scale-95"
-              }`}
+                  : "border-[var(--card-border)] scale-95")
+              }
             >
-              <div className="space-y-2.5 text-right">
+              <div className="space-y-2 text-right">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white font-bold text-[10px] border border-white/10">
+                  <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white font-bold text-[10px] border border-white/10 truncate max-w-[140px]">
                     {p.category || "تکنولوژی"}
                   </span>
                   <span className="font-mono text-[10px] text-[var(--accent-blue)] font-black uppercase">
@@ -167,8 +219,8 @@ export default function ProductPerspectiveSlider({
                   </span>
                 </div>
 
-                <div className="relative w-full h-44 sm:h-52 rounded-2xl bg-[var(--input-bg)] p-3 border border-[var(--card-border)] flex items-center justify-center overflow-hidden group">
-                  <Link href={`/products/${p.id}`} className="w-full h-full flex items-center justify-center">
+                <div className="relative w-full h-40 sm:h-52 rounded-2xl bg-[var(--input-bg)] p-3 border border-[var(--card-border)] flex items-center justify-center overflow-hidden group">
+                  <Link href={"/products/" + p.id} className="w-full h-full flex items-center justify-center">
                     <img
                       src={displayImage}
                       alt={p.title || "کالا"}
@@ -184,7 +236,7 @@ export default function ProductPerspectiveSlider({
                       soundEngine.playExplodeShift();
                       setTeardownProduct(p);
                     }}
-                    className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-blue-600 text-white font-bold text-[10px] border border-white/20 backdrop-blur-md transition flex items-center gap-1 shadow-md cursor-pointer z-10"
+                    className="absolute bottom-2 right-2 px-2.5 py-1.5 rounded-xl bg-black/75 hover:bg-blue-600 text-white font-bold text-[10px] border border-white/20 backdrop-blur-md transition flex items-center gap-1 shadow-md cursor-pointer z-10"
                     title="کالبدشکافی سه‌بعدی لایه‌ها"
                   >
                     <span>🧬</span>
@@ -193,8 +245,8 @@ export default function ProductPerspectiveSlider({
                 </div>
 
                 <div>
-                  <Link href={`/products/${p.id}`}>
-                    <h3 className="font-extrabold text-sm text-[var(--text-primary)] line-clamp-2 leading-snug hover:text-[var(--accent-blue)] transition">
+                  <Link href={"/products/" + p.id}>
+                    <h3 className="font-extrabold text-xs sm:text-sm text-[var(--text-primary)] line-clamp-2 leading-snug hover:text-[var(--accent-blue)] transition">
                       {p.title || p.name}
                     </h3>
                   </Link>
@@ -204,12 +256,12 @@ export default function ProductPerspectiveSlider({
                 </div>
               </div>
 
-              <div className="space-y-2.5 pt-3 border-t border-[var(--card-border)]">
+              <div className="space-y-2 pt-2.5 border-t border-[var(--card-border)]">
                 <div className="flex justify-between items-center" suppressHydrationWarning>
-                  <span className="font-mono font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400">
+                  <span className="font-mono font-black text-xs sm:text-base text-emerald-600 dark:text-emerald-400">
                     {formatPrice(finalPrice)} تومان
                   </span>
-                  <span className={`text-[10px] font-bold ${isAvail ? "text-emerald-500" : "text-rose-500"}`}>
+                  <span className={"text-[10px] font-bold " + (isAvail ? "text-emerald-500" : "text-rose-500")}>
                     {isAvail ? "موجود در انبار ✓" : "ناموجود"}
                   </span>
                 </div>
@@ -233,6 +285,7 @@ export default function ProductPerspectiveSlider({
       <div className="flex flex-col items-center gap-2">
         <div className="flex items-center gap-4">
           <button
+            type="button"
             onClick={handlePrev}
             className="w-10 h-10 rounded-full bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm font-black transition cursor-pointer shadow-sm active:scale-90"
             title="قبلی"
@@ -240,11 +293,15 @@ export default function ProductPerspectiveSlider({
             →
           </button>
 
-          <span className="font-mono font-black text-sm text-[var(--text-primary)] tracking-widest px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]" suppressHydrationWarning>
+          <span
+            className="font-mono font-black text-sm text-[var(--text-primary)] tracking-widest px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]"
+            suppressHydrationWarning
+          >
             {String(activeIndex + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
           </span>
 
           <button
+            type="button"
             onClick={handleNext}
             className="w-10 h-10 rounded-full bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-sm font-black transition cursor-pointer shadow-sm active:scale-90"
             title="بعدی"

@@ -1,12 +1,19 @@
 // File Path: app/api/send-otp/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { sendOtpPattern } from "@/lib/otpService";
+import { sendOtpPatternDetailed } from "@/lib/otpService";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-const memoryOtpStore = new Map<string, { hash: string; expiresAt: number }>();
+interface OtpRecord {
+  hash: string;
+  expiresAt: number;
+  createdAt: number;
+  attempts: number;
+}
+
+const memoryOtpStore = new Map<string, OtpRecord>();
 
 function hashOtp(phone: string, code: string): string {
   const secret =
@@ -14,6 +21,17 @@ function hashOtp(phone: string, code: string): string {
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "axon-core-otp-hmac-secret-2026";
   return crypto.createHmac("sha256", secret).update(phone + ":" + code).digest("hex");
+}
+
+function cleanupExpiredOtps(otps: Record<string, any>) {
+  const now = Date.now();
+  const clean: Record<string, any> = {};
+  Object.keys(otps || {}).forEach((k) => {
+    if (otps[k]?.expiresAt && now < Number(otps[k].expiresAt)) {
+      clean[k] = otps[k];
+    }
+  });
+  return clean;
 }
 
 export async function POST(req: NextRequest) {
@@ -48,7 +66,6 @@ export async function POST(req: NextRequest) {
         : {};
     const currentSec = layoutCfg.auth_security_config || {};
     const otpLength = Number(currentSec?.userDeck?.otpLength || 4);
-    const configuredTestCode = String(currentSec?.userDeck?.testOtpCode || "").trim();
 
     if (action === "verify") {
       const code = String(body.code || "")
@@ -64,43 +81,84 @@ export async function POST(req: NextRequest) {
       }
 
       const activeOtps = currentSec.active_otps || {};
-      const dbRecord = activeOtps[rawPhone];
-      const memRecord = memoryOtpStore.get(rawPhone);
+      const dbRecord: OtpRecord | undefined = activeOtps[rawPhone];
+      const memRecord: OtpRecord | undefined = memoryOtpStore.get(rawPhone);
       const record = dbRecord || memRecord;
+
+      if (!record || !record.hash || !record.expiresAt) {
+        return NextResponse.json(
+          {
+            success: false,
+            verified: false,
+            message: "کد تاییدی برای این شماره یافت نشد یا منقضی شده است. لطفاً مجدداً درخواست کد دهید.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (Date.now() > Number(record.expiresAt)) {
+        memoryOtpStore.delete(rawPhone);
+        return NextResponse.json(
+          {
+            success: false,
+            verified: false,
+            message: "مهلت کد تایید به پایان رسیده است. لطفاً ارسال مجدد را بزنید.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const currentAttempts = Number(record.attempts || 0) + 1;
+      if (currentAttempts > 5) {
+        memoryOtpStore.delete(rawPhone);
+        if (siteRow && siteRow.id && activeOtps[rawPhone]) {
+          const updatedOtps = { ...activeOtps };
+          delete updatedOtps[rawPhone];
+          await supabaseAdmin
+            .from("site_info")
+            .update({
+              homepage_layout_config: {
+                ...layoutCfg,
+                auth_security_config: { ...currentSec, active_otps: updatedOtps },
+              },
+            })
+            .eq("id", siteRow.id);
+        }
+        return NextResponse.json(
+          {
+            success: false,
+            verified: false,
+            message: "تعداد تلاش‌های ناموفق بیش از حد مجاز بود. کد قبلی باطل شد؛ لطفاً مجدداً درخواست کد دهید.",
+          },
+          { status: 429 }
+        );
+      }
+
       const expectedHash = hashOtp(rawPhone, code);
+      const isHashValid = crypto.timingSafeEqual(
+        Buffer.from(record.hash, "hex"),
+        Buffer.from(expectedHash, "hex")
+      );
 
-      const isTestBypassValid =
-        configuredTestCode.length >= 4 && code === configuredTestCode;
-
-      if (!isTestBypassValid) {
-        if (!record || !record.hash || !record.expiresAt) {
-          return NextResponse.json(
-            {
-              success: false,
-              verified: false,
-              message: "کد تاییدی برای این شماره یافت نشد یا منقضی شده است.",
-            },
-            { status: 400 }
-          );
+      if (!isHashValid) {
+        record.attempts = currentAttempts;
+        memoryOtpStore.set(rawPhone, record);
+        if (siteRow && siteRow.id && activeOtps[rawPhone]) {
+          const updatedOtps = { ...activeOtps, [rawPhone]: record };
+          await supabaseAdmin
+            .from("site_info")
+            .update({
+              homepage_layout_config: {
+                ...layoutCfg,
+                auth_security_config: { ...currentSec, active_otps: updatedOtps },
+              },
+            })
+            .eq("id", siteRow.id);
         }
-
-        if (Date.now() > Number(record.expiresAt)) {
-          return NextResponse.json(
-            {
-              success: false,
-              verified: false,
-              message: "مهلت کد تایید به پایان رسیده است. لطفاً ارسال مجدد را بزنید.",
-            },
-            { status: 400 }
-          );
-        }
-
-        if (record.hash !== expectedHash) {
-          return NextResponse.json(
-            { success: false, verified: false, message: "کد تایید پیامکی وارد شده اشتباه است." },
-            { status: 400 }
-          );
-        }
+        return NextResponse.json(
+          { success: false, verified: false, message: "کد تایید پیامکی وارد شده اشتباه است." },
+          { status: 400 }
+        );
       }
 
       memoryOtpStore.delete(rawPhone);
@@ -114,14 +172,14 @@ export async function POST(req: NextRequest) {
               ...layoutCfg,
               auth_security_config: {
                 ...currentSec,
-                active_otps: updatedOtps,
+                active_otps: cleanupExpiredOtps(updatedOtps),
               },
             },
           })
           .eq("id", siteRow.id);
       }
 
-      const sessionToken = "USR-" + crypto.randomBytes(12).toString("hex").toUpperCase();
+      const sessionToken = "USR-" + crypto.randomBytes(16).toString("hex").toUpperCase();
       return NextResponse.json({
         success: true,
         verified: true,
@@ -131,17 +189,84 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const existingActive =
+      (currentSec.active_otps && currentSec.active_otps[rawPhone]) ||
+      memoryOtpStore.get(rawPhone);
+
+    if (
+      existingActive &&
+      existingActive.createdAt &&
+      Date.now() - Number(existingActive.createdAt) < 55 * 1000
+    ) {
+      const waitSec = Math.ceil(
+        (55 * 1000 - (Date.now() - Number(existingActive.createdAt))) / 1000
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          sent: false,
+          message: "کد تایید به تازگی ارسال شده است. لطفاً " + waitSec + " ثانیه دیگر تلاش کنید.",
+        },
+        { status: 429 }
+      );
+    }
+
     const minVal = Math.pow(10, Math.max(3, otpLength - 1));
     const maxVal = Math.pow(10, Math.max(4, otpLength)) - 1;
     const generatedCode = crypto.randomInt(minVal, maxVal).toString();
-    const expiresAt = Date.now() + 3 * 60 * 1000;
+    const now = Date.now();
+    const expiresAt = now + 2 * 60 * 1000;
     const codeHash = hashOtp(rawPhone, generatedCode);
 
-    memoryOtpStore.set(rawPhone, { hash: codeHash, expiresAt });
+    const smsResult = await sendOtpPatternDetailed({
+      mobile: rawPhone,
+      code: generatedCode,
+    });
+
+    if (!smsResult.ok) {
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert([
+          {
+            action: "SMS_GATEWAY_ERROR",
+            user_id: rawPhone,
+            details: {
+              resource: "ippanel:edge",
+              status: smsResult.status,
+              errorMessage: smsResult.errorMessage,
+              rawResponse: smsResult.rawResponse,
+            },
+            ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+            severity: "error",
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch {}
+
+      return NextResponse.json(
+        {
+          success: false,
+          sent: false,
+          message:
+            "خطا در ارسال پیامک از سمت اپراتور (" +
+            (smsResult.errorMessage || "عدم پاسخگویی درگاه پیامک") +
+            ").",
+        },
+        { status: 502 }
+      );
+    }
+
+    const newRecord: OtpRecord = {
+      hash: codeHash,
+      expiresAt,
+      createdAt: now,
+      attempts: 0,
+    };
+
+    memoryOtpStore.set(rawPhone, newRecord);
 
     if (siteRow && siteRow.id) {
-      const activeOtps = { ...(currentSec.active_otps || {}) };
-      activeOtps[rawPhone] = { hash: codeHash, expiresAt, createdAt: Date.now() };
+      const activeOtps = cleanupExpiredOtps({ ...(currentSec.active_otps || {}) });
+      activeOtps[rawPhone] = newRecord;
       await supabaseAdmin
         .from("site_info")
         .update({
@@ -156,24 +281,11 @@ export async function POST(req: NextRequest) {
         .eq("id", siteRow.id);
     }
 
-    const sentOk = await sendOtpPattern({ mobile: rawPhone, code: generatedCode });
-
-    if (!sentOk) {
-      return NextResponse.json(
-        {
-          success: false,
-          sent: false,
-          message: "خطا در ارسال پیامک از درگاه IPPanel Edge. لطفاً اتصال یا اعتبار پنل پیامک را بررسی کنید.",
-        },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({
       success: true,
       sent: true,
       otpLength,
-      expiresInSeconds: 180,
+      expiresInSeconds: 120,
       message: "کد تایید پیامکی به شماره " + rawPhone + " ارسال گردید.",
     });
   } catch (err: any) {

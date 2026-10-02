@@ -1,9 +1,15 @@
 // File Path: lib/otpService.ts
-import { supabaseAdmin } from "@/lib/supabaseServer";
-
 export interface OtpOptions {
   mobile: string;
   code: string;
+}
+
+export interface SmsSendResult {
+  ok: boolean;
+  provider?: string;
+  status?: number;
+  errorMessage?: string;
+  rawResponse?: any;
 }
 
 const EXACT_IPPANEL_API_KEY =
@@ -11,146 +17,248 @@ const EXACT_IPPANEL_API_KEY =
 const EXACT_ORIGIN_NUMBER = "+983000505";
 const EXACT_PATTERN_CODE = "3d6fa1f8ud3ma1w";
 
+const BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
 export function toE164(phone: string): string {
   const d = String(phone || "")
     .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776))
     .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))
     .replace(/\D/g, "");
-  if (d.startsWith("98") && d.length === 12) return "+" + d;
+  if (d.startsWith("98") && d.length >= 11) return "+" + d;
   if (d.startsWith("09") && d.length === 11) return "+98" + d.slice(1);
   if (d.startsWith("9") && d.length === 10) return "+98" + d;
+  if (
+    d.startsWith("3000") ||
+    d.startsWith("5000") ||
+    d.startsWith("2000") ||
+    d.startsWith("1000")
+  ) {
+    return "+98" + d;
+  }
   return "+98" + d.replace(/^0+/, "");
 }
 
-function buildAuthTokens(rawKey: string): string[] {
-  const clean = String(rawKey || "").trim();
-  const tokens: string[] = [];
-  if (clean.length % 4 !== 0) {
-    const padded = clean + "=".repeat((4 - (clean.length % 4)) % 4);
-    tokens.push(padded);
-  }
-  tokens.push(clean);
-  return Array.from(new Set(tokens));
+export function toLocalZero(phone: string): string {
+  const d = String(phone || "")
+    .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))
+    .replace(/\D/g, "");
+  if (d.startsWith("98") && d.length === 12) return "0" + d.slice(2);
+  if (d.startsWith("9") && d.length === 10) return "0" + d;
+  return d;
 }
 
-async function resolveSmsConfig() {
-  let apiKey = process.env.IPPANEL_API_KEY || EXACT_IPPANEL_API_KEY;
-  let originNumber = process.env.IPPANEL_ORIGIN_NUMBER || EXACT_ORIGIN_NUMBER;
-  let patternCode = process.env.IPPANEL_PATTERN_CODE || EXACT_PATTERN_CODE;
+function getCleanCredentials() {
+  let rawKey = (process.env.IPPANEL_API_KEY || EXACT_IPPANEL_API_KEY)
+    .replace(/["'\s]/g, "")
+    .trim();
 
-  // اگر کلید قدیمی اشتباه در env مانده بود، با کلید صحیح جدید جایگزین کن
-  if (apiKey.includes("MmM1OTdm") || apiKey.includes("ZmFmYTMx")) {
-    apiKey = EXACT_IPPANEL_API_KEY;
+  if (!rawKey || rawKey.includes("MmM1OTdm") || rawKey.includes("ZmFmYTMx")) {
+    rawKey = EXACT_IPPANEL_API_KEY;
   }
 
-  try {
-    const { data: siteRow } = await supabaseAdmin
-      .from("site_info")
-      .select("*")
-      .limit(1)
-      .maybeSingle();
+  const rawOrigin = (process.env.IPPANEL_ORIGIN_NUMBER || EXACT_ORIGIN_NUMBER)
+    .replace(/["'\s]/g, "")
+    .trim();
+  const originE164 = rawOrigin.startsWith("+") ? rawOrigin : toE164(rawOrigin);
 
-    if (siteRow) {
-      const cfg = siteRow.homepage_layout_config || {};
-      if (siteRow.ippanel_api_key) apiKey = siteRow.ippanel_api_key;
-      else if (cfg.ippanel_api_key) apiKey = cfg.ippanel_api_key;
-
-      if (siteRow.ippanel_origin_number) originNumber = siteRow.ippanel_origin_number;
-      if (siteRow.ippanel_pattern_code) patternCode = siteRow.ippanel_pattern_code;
-    }
-  } catch {}
+  const patternCode = (process.env.IPPANEL_PATTERN_CODE || EXACT_PATTERN_CODE)
+    .replace(/["'\s]/g, "")
+    .trim();
 
   return {
-    apiKey: String(apiKey).trim(),
-    originNumber: String(originNumber).trim() || EXACT_ORIGIN_NUMBER,
-    patternCode: String(patternCode).trim() || EXACT_PATTERN_CODE,
+    apiKey: rawKey,
+    originNumber: originE164 || EXACT_ORIGIN_NUMBER,
+    patternCode: patternCode || EXACT_PATTERN_CODE,
   };
 }
 
-export async function sendOtpPattern({ mobile, code }: OtpOptions): Promise<boolean> {
-  const { apiKey, originNumber, patternCode } = await resolveSmsConfig();
-  const recipient = toE164(mobile);
-  const cleanCode = String(code).trim();
-  const authTokens = buildAuthTokens(apiKey);
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 4500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
-  // نام‌های احتمالی متغیر داخل پترن 3d6fa1f8ud3ma1w در پنل IPPanel
-  const paramCandidates: Array<Record<string, string>> = [
+export async function sendOtpPatternDetailed({
+  mobile,
+  code,
+}: OtpOptions): Promise<SmsSendResult> {
+  const { apiKey, originNumber, patternCode } = getCleanCredentials();
+  const recipientE164 = toE164(mobile);
+  const recipientLocal = toLocalZero(mobile);
+  const cleanCode = String(code).trim();
+
+  let lastError = "";
+  let lastRaw: any = null;
+  let lastStatus = 0;
+
+  const edgeParamsList: Array<Record<string, string>> = [
     { code: cleanCode },
     { "verification-code": cleanCode },
     { "vefification-code": cleanCode },
+    { code: cleanCode, "verification-code": cleanCode, "vefification-code": cleanCode },
   ];
 
-  for (const token of authTokens) {
-    for (const paramsObj of paramCandidates) {
-      try {
-        const res = await fetch("https://edge.ippanel.com/v1/api/send", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: token,
-          },
-          body: JSON.stringify({
-            sending_type: "pattern",
-            from_number: originNumber,
-            code: patternCode,
-            recipients: [recipient],
-            params: paramsObj,
-          }),
-        });
-
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.meta?.status !== false) {
-          console.log("[IPPanel Edge Pattern OK] Sent to:", recipient);
-          return true;
-        }
-
-        // اگر خطا مربوط به احراز هویت (401) بود، سراغ فرمت بعدی توکن برو
-        if (res.status === 401) {
-          break;
-        }
-      } catch (err) {
-        console.warn("[IPPanel Edge Network Warning]:", err);
-      }
-    }
-  }
-
-  return false;
-}
-
-export async function sendTextSMS(mobile: string, message: string): Promise<boolean> {
-  const { apiKey, originNumber } = await resolveSmsConfig();
-  const recipient = toE164(mobile);
-  const authTokens = buildAuthTokens(apiKey);
-
-  // ۱. تلاش برای ارسال وب‌سرویس از طریق IPPanel Edge
-  for (const token of authTokens) {
+  // ۱. ارسال از طریق وب‌سرویس رسمی IPPanel Edge (https://edge.ippanel.com/v1/api/send)
+  for (const paramsObj of edgeParamsList) {
     try {
-      const res = await fetch("https://edge.ippanel.com/v1/api/send", {
+      const res = await fetchWithTimeout("https://edge.ippanel.com/v1/api/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          Authorization: token,
+          Authorization: apiKey,
+          "User-Agent": BROWSER_USER_AGENT,
         },
         body: JSON.stringify({
-          sending_type: "webservice",
+          sending_type: "pattern",
           from_number: originNumber,
-          message: String(message).trim(),
-          recipients: [recipient],
+          code: patternCode,
+          recipients: [recipientE164],
+          params: paramsObj,
         }),
       });
 
+      lastStatus = res.status;
       const data = await res.json().catch(() => ({}));
+      lastRaw = data;
+
       if (res.ok && data?.meta?.status !== false) {
-        return true;
+        return {
+          ok: true,
+          provider: "IPPanel-Edge",
+          status: res.status,
+          rawResponse: data,
+        };
       }
-      if (res.status === 401) continue;
+
+      lastError =
+        data?.meta?.message ||
+        data?.message ||
+        "Edge HTTP " + res.status;
+
+      if (res.status === 401 || res.status === 403) {
+        break;
+      }
+    } catch (err: any) {
+      lastError = err?.message || "Edge Network Error";
+      break;
+    }
+  }
+
+  // ۲. فال‌بک به وب‌سرویس API2 IPPanel (https://api2.ippanel.com/api/v1/sms/pattern/normal/send)
+  for (const rec of [recipientLocal, recipientE164]) {
+    try {
+      const res2 = await fetchWithTimeout(
+        "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            apikey: apiKey,
+            "User-Agent": BROWSER_USER_AGENT,
+          },
+          body: JSON.stringify({
+            code: patternCode,
+            sender: originNumber,
+            recipient: rec,
+            variable: {
+              code: cleanCode,
+              "verification-code": cleanCode,
+              "vefification-code": cleanCode,
+            },
+          }),
+        }
+      );
+
+      const data2 = await res2.json().catch(() => ({}));
+      if (res2.ok && data2?.status !== "error" && data2?.code !== 401) {
+        return {
+          ok: true,
+          provider: "IPPanel-API2",
+          status: res2.status,
+          rawResponse: data2,
+        };
+      }
+      if (!lastError && data2?.error_message) {
+        lastError = data2.error_message;
+      }
     } catch {}
   }
 
-  // ۲. از آنجایی که خط +983000505 خط خدماتی اشتراکی مخصوص پترن است،
-  // در صورت عدم مجوز وب‌سرویس، کد یا شناسه داخل پیام را با پترن Edge ارسال کن
+  // ۳. فال‌بک به Classic Pattern API
+  try {
+    const res3 = await fetchWithTimeout("https://api.ippanel.com/v1/api/send/pattern", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        apikey: apiKey,
+        Authorization: apiKey,
+        "User-Agent": BROWSER_USER_AGENT,
+      },
+      body: JSON.stringify({
+        code: patternCode,
+        sender: originNumber,
+        recipient: recipientE164,
+        variable: { code: cleanCode },
+      }),
+    });
+
+    const data3 = await res3.json().catch(() => ({}));
+    if (res3.ok && data3?.status !== "error") {
+      return {
+        ok: true,
+        provider: "IPPanel-Classic",
+        status: res3.status,
+        rawResponse: data3,
+      };
+    }
+  } catch {}
+
+  return {
+    ok: false,
+    status: lastStatus,
+    errorMessage: lastError || "عدم پاسخگویی درگاه پیامک",
+    rawResponse: lastRaw,
+  };
+}
+
+export async function sendOtpPattern(opts: OtpOptions): Promise<boolean> {
+  const result = await sendOtpPatternDetailed(opts);
+  return result.ok;
+}
+
+export async function sendTextSMS(mobile: string, message: string): Promise<boolean> {
+  const { apiKey, originNumber } = getCleanCredentials();
+  const recipient = toE164(mobile);
+
+  try {
+    const res = await fetchWithTimeout("https://edge.ippanel.com/v1/api/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: apiKey,
+        "User-Agent": BROWSER_USER_AGENT,
+      },
+      body: JSON.stringify({
+        sending_type: "webservice",
+        from_number: originNumber,
+        message: String(message).trim(),
+        recipients: [recipient],
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.meta?.status !== false) return true;
+  } catch {}
+
   const matchCode = String(message).match(/[A-Z0-9-]{4,16}/i);
   const fallbackCode = matchCode ? matchCode[0] : "743440";
   return await sendOtpPattern({ mobile, code: fallbackCode });

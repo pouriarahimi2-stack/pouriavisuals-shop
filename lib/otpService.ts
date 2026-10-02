@@ -12,13 +12,11 @@ export interface SmsSendResult {
   rawResponse?: any;
 }
 
-const EXACT_IPPANEL_API_KEY =
-  "YTJjNDk1NTItNmJmOS00ZjY0LWJjMWQtMjM1OTdmN2M4NDdlMjc1ZmJhYTMxODk5OTNiMmFmM2FmZjA5YTNiYjBhZTY=";
+const RAW_KEY_UNPADDED =
+  "YTJjNDk1NTItNmJmOS00ZjY0LWJjMWQtMjM1OTdmN2M4NDdlMjc1ZmJhYTMxODk5OTNiMmFmM2FmZjA5YTNiYjBhZTY";
+const RAW_KEY_PADDED = RAW_KEY_UNPADDED + "=";
 const EXACT_ORIGIN_NUMBER = "+983000505";
 const EXACT_PATTERN_CODE = "3d6fa1f8ud3ma1w";
-
-const BROWSER_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 export function toE164(phone: string): string {
   const d = String(phone || "")
@@ -49,48 +47,36 @@ export function toLocalZero(phone: string): string {
   return d;
 }
 
-function ensureBase64Padding(key: string): string {
-  const clean = key.replace(/["'\s]/g, "").trim();
-  if (!clean) return EXACT_IPPANEL_API_KEY;
-  const rem = clean.length % 4;
-  if (rem === 0) return clean;
-  return clean + "=".repeat(4 - rem);
-}
-
 function getCleanCredentials() {
-  let rawKey = (process.env.IPPANEL_API_KEY || EXACT_IPPANEL_API_KEY)
+  let envKey = (process.env.IPPANEL_API_KEY || RAW_KEY_PADDED)
     .replace(/["'\s]/g, "")
     .trim();
 
-  if (!rawKey || rawKey.includes("MmM1OTdm") || rawKey.includes("ZmFmYTMx")) {
-    rawKey = EXACT_IPPANEL_API_KEY;
+  if (!envKey || envKey.includes("MmM1OTdm") || envKey.includes("ZmFmYTMx")) {
+    envKey = RAW_KEY_PADDED;
   }
 
-  const paddedKey = ensureBase64Padding(rawKey);
-  const unpaddedKey = paddedKey.replace(/=+$/, "");
+  const unpadded = envKey.replace(/=+$/, "");
+  const padded = unpadded.length % 4 === 0 ? unpadded : unpadded + "=".repeat(4 - (unpadded.length % 4));
 
   const rawOrigin = (process.env.IPPANEL_ORIGIN_NUMBER || EXACT_ORIGIN_NUMBER)
     .replace(/["'\s]/g, "")
     .trim();
   const originE164 = rawOrigin.startsWith("+") ? rawOrigin : toE164(rawOrigin);
-  const origin98 = originE164.replace(/^\+/, "");
-  const originPlain = originE164.replace(/^\+98/, "0");
 
   const patternCode = (process.env.IPPANEL_PATTERN_CODE || EXACT_PATTERN_CODE)
     .replace(/["'\s]/g, "")
     .trim();
 
   return {
-    paddedKey,
-    unpaddedKey,
+    padded,
+    unpadded,
     originNumber: originE164 || EXACT_ORIGIN_NUMBER,
-    origin98: origin98 || "983000505",
-    originPlain: originPlain || "3000505",
     patternCode: patternCode || EXACT_PATTERN_CODE,
   };
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3800) {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 4500) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -120,149 +106,131 @@ export async function sendOtpPatternDetailed({
   mobile,
   code,
 }: OtpOptions): Promise<SmsSendResult> {
-  const { paddedKey, unpaddedKey, originNumber, origin98, originPlain, patternCode } =
-    getCleanCredentials();
+  const { padded, unpadded, originNumber, patternCode } = getCleanCredentials();
   const recipientE164 = toE164(mobile);
-  const recipient98 = recipientE164.replace(/^\+/, "");
   const recipientLocal = toLocalZero(mobile);
   const cleanCode = String(code).trim();
 
   const attemptsLog: Array<Record<string, any>> = [];
 
-  // تابع کمکی برای تست یک نود خاص
-  const tryGateway = async (
-    name: string,
-    url: string,
-    headers: Record<string, string>,
-    bodyObj: Record<string, any>
-  ): Promise<SmsSendResult> => {
+  // ۱. تست درگاه API2 IPPanel (که کلیدهای Base64 استاندارد UUID+Hash برای آن صادر می‌شوند)
+  for (const keyCandidate of [padded, unpadded]) {
+    for (const varObj of [{ code: cleanCode }, { "verification-code": cleanCode }]) {
+      try {
+        const resApi2 = await fetchWithTimeout(
+          "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              apikey: keyCandidate,
+            },
+            body: JSON.stringify({
+              code: patternCode,
+              sender: originNumber,
+              recipient: recipientLocal,
+              variable: varObj,
+            }),
+          }
+        );
+
+        const parsed2 = await parseResponseSafe(resApi2);
+        const isArvan502 =
+          resApi2.status === 502 &&
+          String(parsed2?.rawSummary || "").includes("temporarily inaccessible");
+
+        attemptsLog.push({
+          gw: "api2.ippanel.com",
+          status: resApi2.status,
+          arvanFirewallBlocked: isArvan502,
+          res: parsed2,
+        });
+
+        if (resApi2.ok && parsed2?.status === "OK") {
+          return {
+            ok: true,
+            provider: "IPPanel-API2",
+            status: resApi2.status,
+            rawResponse: parsed2,
+          };
+        }
+        if (resApi2.status === 502 || resApi2.status === 401 || resApi2.status === 403) break;
+      } catch (e: any) {
+        attemptsLog.push({ gw: "api2.ippanel.com", error: e?.message });
+        break;
+      }
+    }
+  }
+
+  // ۲. تست درگاه Edge با هر ۴ حالت هدر Authorization
+  const edgeAuthCandidates = [
+    padded,
+    "AccessKey " + padded,
+    "Bearer " + padded,
+    unpadded,
+  ];
+
+  for (const authHeader of edgeAuthCandidates) {
     try {
-      const res = await fetchWithTimeout(url, {
+      const resEdge = await fetchWithTimeout("https://edge.ippanel.com/v1/api/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          "User-Agent": BROWSER_USER_AGENT,
-          ...headers,
+          Authorization: authHeader,
         },
-        body: JSON.stringify(bodyObj),
+        body: JSON.stringify({
+          sending_type: "pattern",
+          from_number: originNumber,
+          code: patternCode,
+          recipients: [recipientE164],
+          params: {
+            code: cleanCode,
+          },
+        }),
       });
 
-      const parsed = await parseResponseSafe(res);
+      const parsedEdge = await parseResponseSafe(resEdge);
       const isArvan502 =
-        res.status === 502 &&
-        String(parsed?.rawSummary || "").includes("temporarily inaccessible");
+        resEdge.status === 502 &&
+        String(parsedEdge?.rawSummary || "").includes("temporarily inaccessible");
 
       attemptsLog.push({
-        gw: name,
-        status: res.status,
+        gw: "edge.ippanel.com",
+        status: resEdge.status,
         arvanFirewallBlocked: isArvan502,
-        res: parsed,
+        res: parsedEdge,
       });
 
-      if (
-        res.ok &&
-        parsed?.meta?.status !== false &&
-        parsed?.status !== "error" &&
-        !parsed?.rawSummary
-      ) {
+      if (resEdge.ok && parsedEdge?.meta?.status !== false && !parsedEdge?.rawSummary) {
         return {
           ok: true,
-          provider: name,
-          status: res.status,
-          rawResponse: parsed,
+          provider: "IPPanel-Edge",
+          status: resEdge.status,
+          rawResponse: parsedEdge,
         };
       }
-      throw new Error(name + " HTTP " + res.status);
-    } catch (err: any) {
-      throw err;
+      if (isArvan502) break;
+    } catch (e: any) {
+      attemptsLog.push({ gw: "edge.ippanel.com", error: e?.message });
+      break;
     }
-  };
-
-  // اجرای هم‌زمان و موازی روی ۵ نود مختلف IPPanel (شامل نودهای مستقیم بدون فایروال ابرآروان برای سرورهای خارج از ایران)
-  const tasks = [
-    // ۱. نود رسمی Edge با کلید استاندارد
-    tryGateway(
-      "edge.ippanel.com (code)",
-      "https://edge.ippanel.com/v1/api/send",
-      { Authorization: paddedKey },
-      {
-        sending_type: "pattern",
-        from_number: originNumber,
-        code: patternCode,
-        recipients: [recipientE164],
-        params: { code: cleanCode },
-      }
-    ),
-    // ۲. نود رسمی Edge با متغیر verification-code
-    tryGateway(
-      "edge.ippanel.com (verification-code)",
-      "https://edge.ippanel.com/v1/api/send",
-      { Authorization: unpaddedKey },
-      {
-        sending_type: "pattern",
-        from_number: originNumber,
-        code: patternCode,
-        recipients: [recipientE164],
-        params: { "verification-code": cleanCode },
-      }
-    ),
-    // ۳. نود مستقیم rest.ippanel.com (بدون فایروال ابرآروان Edge)
-    tryGateway(
-      "rest.ippanel.com (AccessKey)",
-      "http://rest.ippanel.com/v1/messages/patterns/send",
-      { Authorization: "AccessKey " + paddedKey },
-      {
-        pattern_code: patternCode,
-        originator: originNumber,
-        recipient: recipient98,
-        values: { code: cleanCode },
-      }
-    ),
-    // ۴. نود API2 IPPanel با شماره محلی
-    tryGateway(
-      "api2.ippanel.com (apikey)",
-      "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
-      { apikey: paddedKey },
-      {
-        code: patternCode,
-        sender: originNumber,
-        recipient: recipientLocal,
-        variable: { code: cleanCode },
-      }
-    ),
-    // ۵. نود پورت مستقیم 8080 (عبور مستقیم از فایروال ابری)
-    tryGateway(
-      "ippanel.com:8080 (Direct Port)",
-      "http://ippanel.com:8080/v1/messages/patterns/send",
-      { Authorization: "AccessKey " + paddedKey },
-      {
-        pattern_code: patternCode,
-        originator: origin98,
-        recipient: recipient98,
-        values: { code: cleanCode },
-      }
-    ),
-  ];
-
-  try {
-    const firstSuccess = await Promise.any(tasks);
-    return firstSuccess;
-  } catch {
-    const allArvanBlocked = attemptsLog.some((a) => a.arvanFirewallBlocked === true);
-    const errorMsg = allArvanBlocked
-      ? "فایروال ابرآروانِ IPPanel ارتباط از آی‌پی خارج از کشور (سرور Vercel) را با کد 502 مسدود کرده است. در پنل پیامک خود بخش «دسترسی آی‌پی خارج از کشور» را فعال کنید."
-      : attemptsLog[0]?.res?.meta?.message ||
-        attemptsLog[0]?.res?.rawSummary ||
-        "HTTP 502 Bad Gateway";
-
-    return {
-      ok: false,
-      status: 502,
-      errorMessage: errorMsg,
-      rawResponse: attemptsLog,
-    };
   }
+
+  const isArvan502 = attemptsLog.some((a) => a.arvanFirewallBlocked === true);
+  const errorMsg = isArvan502
+    ? "فایروال ابرآروانِ IPPanel ارتباط از آی‌پی خارج از کشور (سرور Vercel) را با کد 502 مسدود کرده است."
+    : attemptsLog.find((a) => a.res?.error_message)?.res?.error_message ||
+      attemptsLog.find((a) => a.res?.meta?.message)?.res?.meta?.message ||
+      "HTTP " + (attemptsLog[0]?.status || 502);
+
+  return {
+    ok: false,
+    status: attemptsLog[0]?.status || 502,
+    errorMessage: errorMsg,
+    rawResponse: attemptsLog,
+  };
 }
 
 export async function sendOtpPattern(opts: OtpOptions): Promise<boolean> {

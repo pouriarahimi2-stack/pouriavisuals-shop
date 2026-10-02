@@ -1,195 +1,125 @@
-// File Path: app/checkout/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import * as CartContextModule from "@/context/CartContext";
+import { useRouter } from "next/navigation";
+import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
+import { IRAN_PROVINCES_CITIES } from "@/lib/iranProvinces";
+import { formatPrice } from "@/lib/formatters";
 
-const CHECKOUT_DRAFT_KEY = "axon_checkout_draft_v2026";
-
-const IRAN_PROVINCES_CITIES: Record<string, string[]> = {
-  "تهران": ["تهران", "شهریار", "اسلامشهر", "قدس", "ملارد", "پاکدشت", "ری", "ورامین", "پردیس", "دماوند", "رباط‌کریم", "شمیرانات"],
-  "فارس": ["شیراز", "مرودشت", "جهرم", "فسا", "کازرون", "داراب", "لار", "آباده", "نورآباد", "اقلید", "صدرا"],
-  "اصفهان": ["اصفهان", "کاشان", "خمینی‌شهر", "نجف‌آباد", "شاهین‌شهر", "شهرضا", "فولادشهر", "بهارستان", "مبارکه", "زرین‌شهر"],
-  "خراسان رضوی": ["مشهد", "نیشابور", "سبزوار", "تربت حیدریه", "کاشمر", "قوچان", "تربت جام", "تایباد", "چناران", "گلبهار"],
-  "آذربایجان شرقی": ["تبریز", "مراغه", "مرند", "میانه", "اهر", "بناب", "سراب", "آذرشهر", "سهند", "شبستر"],
-  "مازندران": ["ساری", "بابل", "آمل", "قائم‌شهر", "بهشهر", "چالوس", "نکا", "بابلسر", "تنکابن", "رامسر", "نوشهر"],
-  "البرز": ["کرج", "فردیس", "کمال‌شهر", "نظرآباد", "محمدشهر", "ماهدشت", "هشتگرد", "طالقان"],
-  "خوزستان": ["اهواز", "دزفول", "آبادان", "بندر ماهشهر", "خرمشهر", "اندیمشک", "ایذه", "بهبهان", "شوشتر", "امیدیه"],
-  "گیلان": ["رشت", "بندر انزلی", "لاهیجان", "لنگرود", "تالش", "آستارا", "صومعه‌سرا", "آستانه اشرفیه", "رودسر", "فومن"],
-  "کرمان": ["کرمان", "سیرجان", "رفسنجان", "جیرفت", "بم", "زرند", "کهنوج", "شهربابک", "بافت"],
-  "آذربایجان غربی": ["ارومیه", "خوی", "بوکان", "مهاباد", "میاندوآب", "سلماس", "پیرانشهر", "نقده", "ماکو"],
-  "هرمزگان": ["بندرعباس", "میناب", "قشم", "کیش", "بندر لنگه", "رودان", "حاجی‌آباد", "جاسک"],
-  "مرکزی": ["اراک", "ساوه", "خمین", "محلات", "دلیجان", "شازند", "تفرش"],
-  "همدان": ["همدان", "ملایر", "نهاوند", "اسدآباد", "تویسرکان", "بهار", "کبودرآهنگ"],
-  "یزد": ["یزد", "میبد", "اردکان", "بافق", "مهریز", "ابرکوه", "طبس"],
-  "کرمانشاه": ["کرمانشاه", "اسلام‌آباد غرب", "جوانرود", "کنگاور", "سرپل ذهاب", "سنقر", "هرسین"],
-  "قزوین": ["قزوین", "الوند", "تاکستان", "بوئین‌زهرا", "آبیک", "محمدیه"],
-  "سیستان و بلوچستان": ["زاهدان", "زابل", "ایرانشهر", "چابهار", "سراوان", "خاش", "کنارک"],
-  "قم": ["قم", "قنوات", "جعفریه", "کهک", "دستجرد"],
-  "گلستان": ["گرگان", "گنبد کاووس", "بندر ترکمن", "علی‌آباد کتول", "آق‌قلا", "کردکوی", "کلاله"],
-  "کردستان": ["سنندج", "سقز", "مریوان", "بانه", "قروه", "کامیاران", "بیجار"],
-  "لرستان": ["خرم‌آباد", "بروجرد", "دورود", "کوهدشت", "الیگودرز", "نورآباد", "ازنا"],
-  "بوشهر": ["بوشهر", "برازجان", "بندر گناوه", "بندر کنگان", "عسلویه", "خورموج", "جم"],
-  "زنجان": ["زنجان", "ابهر", "خرمدره", "قیدار", "ماه‌نشان"],
-  "اردبیل": ["اردبیل", "پارس‌آباد", "مشگین‌شهر", "خلخال", "گرمی"],
-  "سمنان": ["سمنان", "شاهرود", "دامغان", "گرمسار", "مهدی‌شهر"],
-  "چهارمحال و بختیاری": ["شهرکرد", "بروجن", "فرخ‌شهر", "فارسان", "لردگان"],
-  "ایلام": ["ایلام", "دهلران", "ایوان", "آبدانان", "دره‌شهر"],
-  "کهگیلویه و بویراحمد": ["یاسوج", "دوگنبدان", "دهدشت", "سی‌سخت"],
-  "خراسان شمالی": ["بجنورد", "شیروان", "اسفراین", "آشخانه"],
-  "خراسان جنوبی": ["بیرجند", "قائن", "فردوس", "نهبندان", "طبس"],
-};
+const CHECKOUT_DRAFT_KEY = "axon_checkout_form_draft_v2026";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const useCartHook = (CartContextModule as any).useCart;
-  const cartCtx = typeof useCartHook === "function" ? useCartHook() : null;
-
-  const [fallbackItems, setFallbackItems] = useState<any[]>([]);
-  const cartItems: any[] =
-    (cartCtx && (cartCtx.items || cartCtx.cartItems || cartCtx.cart)) || fallbackItems;
+  const {
+    cartItems,
+    totalPrice,
+    discountAmount,
+    finalPayable,
+    appliedCoupon,
+    applyCoupon,
+    removeCoupon,
+  } = useCart();
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [province, setProvince] = useState("تهران");
-  const [city, setCity] = useState("تهران");
+  const [province, setProvince] = useState("فارس");
+  const [city, setCity] = useState("شیراز");
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [notes, setNotes] = useState("");
+  const [couponInput, setCouponInput] = useState("");
+  const [couponMsg, setCouponMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  const [couponCode, setCouponCode] = useState("");
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [couponMessage, setCouponMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [validatingCoupon, setValidatingCoupon] = useState(false);
-
-  // وضعیت تایید پیامکی یکپارچه با دکمه پرداخت
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
   const [isPhoneVerified, setIsPhoneVerified] = useState(false);
-  const [verifiedPhoneValue, setVerifiedPhoneValue] = useState("");
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpInput, setOtpInput] = useState("");
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [gatewaySmsDown, setGatewaySmsDown] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const provincesList = Object.keys(IRAN_PROVINCES_CITIES);
-  const citiesList = IRAN_PROVINCES_CITIES[province] || ["مرکز استان"];
+  const shippingCost = finalPayable > 0 ? (finalPayable >= 5000000 ? 0 : 65000) : 0;
+  const grandTotal = finalPayable + shippingCost;
 
-  // ۱. بازیابی اطلاعات فرم و وضعیت لاگین از حافظه ضد رفرش
+  // ۱. بازیابی خودکار اطلاعات فرم از حافظه مرورگر (ضد رفرش و قطع اینترنت)
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     try {
-      const savedCart = localStorage.getItem("axon_cart") || localStorage.getItem("cart");
-      if (savedCart) {
-        const parsedCart = JSON.parse(savedCart);
-        if (Array.isArray(parsedCart)) setFallbackItems(parsedCart);
-      }
-    } catch {}
-
-    try {
-      const rawDraft = localStorage.getItem(CHECKOUT_DRAFT_KEY);
-      if (rawDraft) {
-        const draft = JSON.parse(rawDraft);
-        if (draft.fullName) setFullName(draft.fullName);
-        if (draft.phone) setPhone(draft.phone);
-        if (draft.province && IRAN_PROVINCES_CITIES[draft.province]) {
-          setProvince(draft.province);
-          if (draft.city) setCity(draft.city);
+      const savedDraft = localStorage.getItem(CHECKOUT_DRAFT_KEY);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.fullName) setFullName(parsed.fullName);
+        if (parsed.phone) setPhone(parsed.phone);
+        if (parsed.province && IRAN_PROVINCES_CITIES[parsed.province]) {
+          setProvince(parsed.province);
         }
-        if (draft.address) setAddress(draft.address);
-        if (draft.postalCode) setPostalCode(draft.postalCode);
-        if (draft.notes) setNotes(draft.notes);
-        if (draft.couponCode) setCouponCode(draft.couponCode);
-        if (draft.discountAmount) setDiscountAmount(Number(draft.discountAmount) || 0);
+        if (parsed.city) setCity(parsed.city);
+        if (parsed.address) setAddress(parsed.address);
+        if (parsed.postalCode) setPostalCode(parsed.postalCode);
+        if (parsed.notes) setNotes(parsed.notes);
       }
-    } catch {}
 
-    try {
-      const rawUser = localStorage.getItem("axon_user_session");
-      if (rawUser) {
-        const user = JSON.parse(rawUser);
-        if (user && user.phone) {
-          const clean = String(user.phone).replace(/\D/g, "");
-          setPhone((prev) => prev || clean);
-          setVerifiedPhoneValue(clean);
+      const userSession = localStorage.getItem("axon_user_session");
+      if (userSession) {
+        const user = JSON.parse(userSession);
+        if (user?.phone) {
+          setPhone((prev) => prev || user.phone);
           setIsPhoneVerified(true);
-          if (user.name || user.full_name) {
-            setFullName((prev) => prev || user.name || user.full_name);
-          }
+        }
+        if (user?.name) {
+          setFullName((prev) => prev || user.name);
         }
       }
     } catch {}
   }, []);
 
-  // ۲. ذخیره لحظه‌ای تمام فیلدها در حافظه مرورگر (ضد رفرش و ضد قطعی اینترنت)
+  // ۲. ذخیره لحظه‌ای تغییرات فرم در حافظه ضد رفرش
   useEffect(() => {
-    if (typeof window === "undefined") return;
     try {
-      const payload = {
-        fullName,
-        phone,
-        province,
-        city,
-        address,
-        postalCode,
-        notes,
-        couponCode,
-        discountAmount,
-      };
-      localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify(payload));
+      localStorage.setItem(
+        CHECKOUT_DRAFT_KEY,
+        JSON.stringify({
+          fullName,
+          phone,
+          province,
+          city,
+          address,
+          postalCode,
+          notes,
+        })
+      );
     } catch {}
-  }, [fullName, phone, province, city, address, postalCode, notes, couponCode, discountAmount]);
+  }, [fullName, phone, province, city, address, postalCode, notes]);
+
+  const availableCities = IRAN_PROVINCES_CITIES[province] || ["مرکز استان"];
 
   const handleProvinceChange = (newProv: string) => {
-    soundEngine.playClick();
     setProvince(newProv);
-    const availableCities = IRAN_PROVINCES_CITIES[newProv] || [];
-    setCity(availableCities[0] || "");
+    const cities = IRAN_PROVINCES_CITIES[newProv] || [];
+    setCity(cities[0] || "");
   };
-
-  const rawSubtotal = cartItems.reduce(
-    (sum: number, item: any) =>
-      sum + Number(item.discount_price || item.discountPrice || item.price || 0) * Number(item.quantity || 1),
-    0
-  );
-  const shippingCost = rawSubtotal > 5000000 || rawSubtotal === 0 ? 0 : 65000;
-  const finalPayable = Math.max(0, rawSubtotal - discountAmount + shippingCost);
 
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
+    if (!couponInput.trim()) return;
     soundEngine.playClick();
-    setValidatingCoupon(true);
-    setCouponMessage(null);
-    try {
-      const res = await fetch("/api/coupons/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponCode.trim(), cartTotal: rawSubtotal }),
-      });
-      const json = await res.json();
-      if (res.ok && json.valid && json.coupon) {
-        soundEngine.playSuccess();
-        setDiscountAmount(Number(json.coupon.discount_amount || 0));
-        setCouponMessage({ type: "success", text: json.message || "کد تخفیف اعمال شد." });
-      } else {
-        setDiscountAmount(0);
-        setCouponMessage({ type: "error", text: json.message || "کد تخفیف معتبر نیست." });
-      }
-    } catch {
-      setCouponMessage({ type: "error", text: "خطا در بررسی کد تخفیف." });
-    } finally {
-      setValidatingCoupon(false);
-    }
+    const res = await applyCoupon(couponInput.trim());
+    setCouponMsg({
+      type: res.success ? "ok" : "err",
+      text: res.message,
+    });
   };
 
-  const finalizeOrderAndRedirectToGateway = async (cleanPhone: string) => {
-    setSubmittingOrder(true);
+  // ثبت نهایی سفارش و انتقال مستقیم به درگاه زرین‌پال
+  const finalizeOrderAndRedirectToZarinPal = async () => {
+    setSubmitting(true);
     setErrorMsg(null);
+
     try {
-      const res = await fetch("/api/checkout", {
+      const cleanPhone = phone
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/\D/g, "");
+
+      const orderRes = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -203,140 +133,132 @@ export default function CheckoutPage() {
             notes: notes.trim(),
           },
           items: cartItems,
-          subtotal: rawSubtotal,
+          subtotal: totalPrice,
           discountAmount,
           shippingCost,
-          finalAmount: finalPayable,
-          couponCode: couponCode.trim() || undefined,
+          finalAmount: grandTotal,
+          couponCode: appliedCoupon?.code || null,
         }),
       });
 
-      const json = await res.json();
-      if (res.ok && json.success && json.order) {
-        soundEngine.playSuccess();
-        // لاگین خودکار مشتری در حساب کاربری
-        const userSession = {
-          phone: cleanPhone,
-          name: fullName.trim(),
-          full_name: fullName.trim(),
-          token: "VERIFIED-BUYER-" + Date.now(),
-        };
-        localStorage.setItem("axon_user_session", JSON.stringify(userSession));
-        window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: userSession }));
-
-        // هدایت به درگاه پرداخت
-        const orderId = encodeURIComponent(json.order.id);
-        const trackingCode = encodeURIComponent(json.order.tracking_code || json.order.id);
-        router.push(
-          "/checkout/payment?orderId=" +
-            orderId +
-            "&trackingCode=" +
-            trackingCode +
-            "&amount=" +
-            finalPayable +
-            "&phone=" +
-            encodeURIComponent(cleanPhone)
-        );
-      } else {
-        setErrorMsg(json.message || "خطا در ثبت سفارش. لطفاً مجدداً تلاش کنید.");
+      const orderData = await orderRes.json();
+      if (!orderRes.ok || !orderData.success) {
+        throw new Error(orderData.message || "خطا در ثبت سفارش");
       }
-    } catch {
-      setErrorMsg("خطا در برقراری ارتباط با سرور ثبت سفارش.");
-    } finally {
-      setSubmittingOrder(false);
+
+      const orderId = orderData.order?.id || orderData.order?.order_number;
+      const trackingCode = orderData.order?.tracking_code || orderId;
+
+      soundEngine.playSuccess();
+      router.push(
+        "/checkout/payment?orderId=" +
+          encodeURIComponent(String(orderId)) +
+          "&amount=" +
+          encodeURIComponent(String(grandTotal)) +
+          "&phone=" +
+          encodeURIComponent(cleanPhone) +
+          "&trackingCode=" +
+          encodeURIComponent(String(trackingCode))
+      );
+    } catch (err: any) {
+      setErrorMsg(err.message || "خطا در ثبت نهایی سفارش.");
+      setSubmitting(false);
     }
   };
 
-  // ۳. دکمه یکپارچه «تایید نهایی و پرداخت» (اول تایید شماره موبایل، سپس انتقال به درگاه)
-  const handleUnifiedSubmitAndPay = async (e: React.FormEvent) => {
+  const handlePrimaryCheckoutClick = async (e: React.FormEvent) => {
     e.preventDefault();
     soundEngine.playClick();
     setErrorMsg(null);
+    setGatewaySmsDown(false);
 
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (!fullName.trim() || fullName.trim().length < 3) {
-      setErrorMsg("لطفاً نام و نام خانوادگی گیرنده را به صورت کامل وارد کنید.");
-      return;
-    }
-    if (cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
-      setErrorMsg("شماره موبایل باید ۱۱ رقمی و با ۰۹ شروع شود.");
-      return;
-    }
-    if (!province || !city) {
-      setErrorMsg("لطفاً استان و شهر مقصد را از لیست انتخاب کنید.");
-      return;
-    }
-    if (!address.trim() || address.trim().length < 8) {
-      setErrorMsg("لطفاً نشانی دقیق پستی را وارد فرمایید.");
+    const cleanPhone = phone
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/\D/g, "");
+
+    if (!fullName.trim() || cleanPhone.length !== 11 || !address.trim()) {
+      setErrorMsg("لطفاً نام گیرنده، شماره موبایل ۱۱ رقمی و نشانی دقیق پستی را وارد نمایید.");
       return;
     }
 
-    // اگر شماره قبلاً تایید شده است، مستقیماً سفارش ثبت و به درگاه هدایت شود
-    if (isPhoneVerified && verifiedPhoneValue === cleanPhone) {
-      await finalizeOrderAndRedirectToGateway(cleanPhone);
+    if (cartItems.length === 0) {
+      setErrorMsg("سبد خرید شما خالی است.");
       return;
     }
 
-    // ارسال کد تایید پیامکی و باز کردن مودال تایید شماره قبل از درگاه پرداخت
-    setSendingOtp(true);
+    if (isPhoneVerified) {
+      await finalizeOrderAndRedirectToZarinPal();
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const res = await fetch("/api/send-otp", {
+      const otpRes = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: cleanPhone, action: "send" }),
       });
-      const json = await res.json();
-      if (res.ok && (json.success || json.sent !== false)) {
-        setOtpInput("");
-        setShowOtpModal(true);
+      const otpJson = await otpRes.json();
+
+      if (otpRes.ok && otpJson.success) {
+        setOtpModalOpen(true);
+        setSubmitting(false);
       } else {
-        setErrorMsg(json.message || json.error || "خطا در ارسال کد تایید پیامکی.");
+        setErrorMsg(otpJson.message || "خطا در ارسال پیامک تایید.");
+        if (otpRes.status === 502 || otpRes.status === 500) {
+          setGatewaySmsDown(true);
+        }
+        setSubmitting(false);
       }
     } catch {
-      setErrorMsg("خطا در ارتباط با سامانه پیامکی.");
-    } finally {
-      setSendingOtp(false);
+      setErrorMsg("درگاه پیامک اپراتور پاسخگو نیست.");
+      setGatewaySmsDown(true);
+      setSubmitting(false);
     }
   };
 
-  const handleVerifyOtpAndProceed = async (e: React.FormEvent) => {
+  const handleVerifyOtpAndPay = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (!otpInput.trim() || otpInput.trim().length < 4) return;
-
     soundEngine.playClick();
-    setSubmittingOrder(true);
+    setSubmitting(true);
     setErrorMsg(null);
 
     try {
-      const res = await fetch("/api/send-otp", {
+      const cleanPhone = phone
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/\D/g, "");
+
+      const vRes = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone: cleanPhone,
-          code: otpInput.trim(),
+          code: otpCode.trim(),
           action: "verify",
         }),
       });
-      const json = await res.json();
-      if (res.ok && (json.verified === true || json.success === true)) {
+      const vJson = await vRes.json();
+
+      if (vRes.ok && vJson.verified) {
         setIsPhoneVerified(true);
-        setVerifiedPhoneValue(cleanPhone);
-        setShowOtpModal(false);
-        await finalizeOrderAndRedirectToGateway(cleanPhone);
+        setOtpModalOpen(false);
+        await finalizeOrderAndRedirectToZarinPal();
       } else {
-        setErrorMsg(json.message || json.error || "کد تایید وارد شده اشتباه یا منقضی شده است.");
-        setSubmittingOrder(false);
+        setErrorMsg(vJson.message || "کد تایید وارد شده صحیح نیست.");
+        setSubmitting(false);
       }
     } catch {
-      setErrorMsg("خطا در اعتبارسنجی کد پیامکی.");
-      setSubmittingOrder(false);
+      setErrorMsg("خطا در اعتبارسنجی کد تایید.");
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-text text-[var(--text-primary)]" dir="rtl">
-      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
+    <div
+      className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 font-sans select-text text-[var(--text-primary)] space-y-6"
+      dir="rtl"
+    >
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🛡️</span> تکمیل مشخصات گیرنده و پرداخت امن
@@ -345,6 +267,7 @@ export default function CheckoutPage() {
             مجهز به حافظه هوشمند فرم (اطلاعات شما با رفرش شدن صفحه یا قطع اینترنت پاک نمی‌شود)
           </p>
         </div>
+
         <Link
           href="/products"
           className="px-4 py-2 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-[var(--accent-blue)] transition"
@@ -354,15 +277,31 @@ export default function CheckoutPage() {
       </div>
 
       {errorMsg && (
-        <div className="mb-6 p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold animate-fadeIn">
-          ⚠️ {errorMsg}
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold space-y-3 animate-fadeIn">
+          <div className="flex items-center justify-between gap-2">
+            <span>⚠️ {errorMsg}</span>
+          </div>
+          {gatewaySmsDown && (
+            <div className="pt-2 border-t border-rose-500/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-[11px] text-[var(--text-primary)] font-bold">
+                به دلیل مسدود بودن آی‌پی سرور خارج از کشور (Vercel) روی فایروال ابرآروانِ اپراتور پیامک، می‌توانید بدون توقف مستقیماً وارد درگاه پرداخت امن زرین‌پال شوید:
+              </span>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={finalizeOrderAndRedirectToZarinPal}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg cursor-pointer shrink-0 transition"
+              >
+                💳 ادامه خرید و ورود مستقیم به درگاه زرین‌پال ←
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      <form onSubmit={handleUnifiedSubmitAndPay} className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
-        {/* ستون راست: فرم مشخصات و آدرس با انتخابگر استاندارد استان و شهر */}
-        <div className="lg:col-span-7 p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 h-fit">
-          <h2 className="text-sm font-black text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
+      <form onSubmit={handlePrimaryCheckoutClick} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7 p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs">
+          <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
             ۱. مشخصات خریدار و نشانی دقیق تحویل مرسوله
           </h2>
 
@@ -373,7 +312,6 @@ export default function CheckoutPage() {
               </label>
               <input
                 type="text"
-                name="checkout_full_name"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -386,28 +324,19 @@ export default function CheckoutPage() {
               <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
                 شماره تلفن همراه (جهت دریافت کد پیگیری) *
               </label>
-              <div className="relative">
-                <input
-                  type="tel"
-                  name="checkout_phone"
-                  required
-                  dir="ltr"
-                  maxLength={11}
-                  value={phone}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, "");
-                    setPhone(val);
-                    if (val !== verifiedPhoneValue) setIsPhoneVerified(false);
-                  }}
-                  placeholder="09123456789"
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
-                />
-                {isPhoneVerified && verifiedPhoneValue === phone && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-500 text-[10px] font-black">
-                    تایید شده ✓
-                  </span>
-                )}
-              </div>
+              <input
+                type="tel"
+                required
+                dir="ltr"
+                maxLength={11}
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setIsPhoneVerified(false);
+                }}
+                placeholder="09123456789"
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
+              />
             </div>
 
             <div>
@@ -415,12 +344,11 @@ export default function CheckoutPage() {
                 انتخاب استان *
               </label>
               <select
-                name="checkout_province"
                 value={province}
                 onChange={(e) => handleProvinceChange(e.target.value)}
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer focus:border-[var(--accent-blue)]"
               >
-                {provincesList.map((prov) => (
+                {Object.keys(IRAN_PROVINCES_CITIES).map((prov) => (
                   <option key={prov} value={prov}>
                     📍 استان {prov}
                   </option>
@@ -433,15 +361,11 @@ export default function CheckoutPage() {
                 انتخاب شهر *
               </label>
               <select
-                name="checkout_city"
                 value={city}
-                onChange={(e) => {
-                  soundEngine.playClick();
-                  setCity(e.target.value);
-                }}
+                onChange={(e) => setCity(e.target.value)}
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer focus:border-[var(--accent-blue)]"
               >
-                {citiesList.map((c) => (
+                {availableCities.map((c) => (
                   <option key={c} value={c}>
                     🏙️ {c}
                   </option>
@@ -454,13 +378,12 @@ export default function CheckoutPage() {
                 نشانی کامل پستی (خیابان، کوچه، پلاک، واحد) *
               </label>
               <textarea
-                name="checkout_address"
                 rows={3}
                 required
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="نشانی دقیق جهت ارسال با پست پیشتاز..."
-                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] leading-relaxed"
+                placeholder="نشانی دقیق جهت ارسال مرسوله پیشتاز..."
+                className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)] leading-relaxed"
               />
             </div>
 
@@ -470,12 +393,11 @@ export default function CheckoutPage() {
               </label>
               <input
                 type="text"
-                name="checkout_postal_code"
                 dir="ltr"
                 maxLength={10}
                 value={postalCode}
-                onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="1234567890"
+                onChange={(e) => setPostalCode(e.target.value)}
+                placeholder="7138141536"
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
               />
             </div>
@@ -486,7 +408,6 @@ export default function CheckoutPage() {
               </label>
               <input
                 type="text"
-                name="checkout_notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="ساعت تحویل یا نکته خاص..."
@@ -496,162 +417,151 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* ستون چپ: خلاصه فاکتور، کد تخفیف و دکمه یکپارچه تایید شماره و پرداخت */}
-        <div className="lg:col-span-5 p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 h-fit">
-          <h2 className="text-sm font-black text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
-            ۲. صورت‌حساب و تایید نهایی پرداخت
+        <div className="lg:col-span-5 p-5 sm:p-7 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-5 text-xs h-fit">
+          <h2 className="font-black text-sm text-[var(--accent-blue)] border-b border-[var(--card-border)] pb-3">
+            ۲. صورتحساب و تایید نهایی پرداخت
           </h2>
 
-          <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-            {cartItems.length === 0 ? (
-              <div className="p-4 rounded-2xl bg-[var(--input-bg)] text-center text-slate-400 font-bold">
-                سبد خرید شما خالی است یا در حال بارگذاری می‌باشد.
-              </div>
-            ) : (
-              cartItems.map((item: any, idx: number) => (
-                <div
-                  key={item.id || idx}
-                  className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2"
-                >
-                  <div className="overflow-hidden">
-                    <h4 className="font-bold truncate">{item.title || item.name}</h4>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      تعداد: {item.quantity || 1} عدد
-                    </span>
-                  </div>
-                  <span className="font-mono font-black text-emerald-500 shrink-0">
-                    {(
-                      Number(item.discount_price || item.discountPrice || item.price || 0) *
-                      Number(item.quantity || 1)
-                    ).toLocaleString("fa-IR")}{" "}
-                    تومان
-                  </span>
+          <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+            {cartItems.map((item) => (
+              <div
+                key={item.id}
+                className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-between gap-2"
+              >
+                <div className="truncate">
+                  <div className="font-black truncate">{item.title}</div>
+                  <div className="text-[10px] text-slate-400">تعداد: {item.quantity} عدد</div>
                 </div>
-              ))
-            )}
+                <span className="font-mono font-bold text-emerald-500 shrink-0">
+                  {formatPrice((item.discountPrice ?? item.price) * item.quantity)} تومان
+                </span>
+              </div>
+            ))}
           </div>
 
-          {/* کد تخفیف */}
           <div className="space-y-2 pt-2 border-t border-[var(--card-border)]">
             <label className="block font-bold text-[var(--text-secondary)]">کد تخفیف دارید؟</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 dir="ltr"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                 placeholder="VIP20"
-                className="flex-1 p-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold uppercase outline-none focus:border-[var(--accent-blue)]"
+                className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono uppercase outline-none"
               />
-              <button
-                type="button"
-                disabled={validatingCoupon}
-                onClick={handleApplyCoupon}
-                className="px-4 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black cursor-pointer"
-              >
-                {validatingCoupon ? "..." : "اعمال کد"}
-              </button>
+              {appliedCoupon ? (
+                <button
+                  type="button"
+                  onClick={removeCoupon}
+                  className="px-4 py-3 rounded-2xl bg-rose-500/15 text-rose-500 font-bold cursor-pointer"
+                >
+                  حذف کد
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  className="px-4 py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-black cursor-pointer"
+                >
+                  اعمال کد
+                </button>
+              )}
             </div>
-            {couponMessage && (
+            {couponMsg && (
               <p
                 className={
                   "text-[11px] font-bold " +
-                  (couponMessage.type === "success" ? "text-emerald-500" : "text-rose-500")
+                  (couponMsg.type === "ok" ? "text-emerald-500" : "text-rose-500")
                 }
               >
-                {couponMessage.text}
+                {couponMsg.text}
               </p>
             )}
           </div>
 
-          {/* جمع کل */}
-          <div className="space-y-2.5 p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+          <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2.5">
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">مجموع اقلام:</span>
-              <span className="font-mono font-bold">{rawSubtotal.toLocaleString("fa-IR")} تومان</span>
+              <span className="font-mono font-bold">{formatPrice(totalPrice)} تومان</span>
             </div>
             {discountAmount > 0 && (
-              <div className="flex justify-between text-emerald-500 font-bold">
+              <div className="flex justify-between text-emerald-500">
                 <span>کسر کد تخفیف:</span>
-                <span className="font-mono">-{discountAmount.toLocaleString("fa-IR")} تومان</span>
+                <span className="font-mono font-bold">-{formatPrice(discountAmount)} تومان</span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">هزینه ارسال پستی:</span>
               <span className="font-mono font-bold">
-                {shippingCost === 0 ? "رایگان ✓" : shippingCost.toLocaleString("fa-IR") + " تومان"}
+                {shippingCost === 0 ? "رایگان ✓" : formatPrice(shippingCost) + " تومان"}
               </span>
             </div>
-            <div className="flex justify-between pt-2 border-t border-[var(--card-border)] text-sm font-black">
-              <span>مبلغ قابل پرداخت:</span>
-              <span className="font-mono text-[var(--accent-blue)]">
-                {finalPayable.toLocaleString("fa-IR")} تومان
+            <div className="pt-2.5 border-t border-[var(--card-border)] flex justify-between items-center text-sm">
+              <span className="font-black">مبلغ قابل پرداخت:</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">
+                {formatPrice(grandTotal)} تومان
               </span>
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={submittingOrder || sendingOtp}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            disabled={submitting}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl cursor-pointer transition disabled:opacity-50"
           >
-            <span>🔒</span>
-            <span>
-              {sendingOtp
-                ? "در حال ارسال کد تایید پیامکی..."
-                : submittingOrder
-                ? "در حال ثبت سفارش و انتقال به درگاه..."
-                : isPhoneVerified && verifiedPhoneValue === phone
-                ? "تایید نهایی و انتقال به درگاه پرداخت ←"
-                : "تایید شماره همراه و پرداخت آنلاین ←"}
-            </span>
+            {submitting
+              ? "در حال پردازش..."
+              : isPhoneVerified
+              ? "💳 ثبت سفارش و ورود به درگاه زرین‌پال ←"
+              : "🔒 تایید شماره همراه و پرداخت آنلاین ←"}
           </button>
         </div>
       </form>
 
-      {/* مودال تایید پیامکی یکپارچه با دکمه پرداخت */}
-      {showOtpModal && (
+      {otpModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-5 shadow-2xl text-xs">
+          <form
+            onSubmit={handleVerifyOtpAndPay}
+            className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-5 text-center text-xs"
+          >
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
-              <h3 className="text-sm font-black text-[var(--accent-blue)]">
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">
                 📲 تایید شماره موبایل جهت ورود به درگاه پرداخت
               </h3>
               <button
                 type="button"
-                onClick={() => setShowOtpModal(false)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] flex items-center justify-center font-bold cursor-pointer"
+                onClick={() => setOtpModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <p className="text-[var(--text-secondary)] leading-relaxed">
-              کد تایید پیامکی به شماره <strong className="font-mono text-[var(--text-primary)]">{phone}</strong> ارسال گردید. پس از وارد کردن کد، به صورت خودکار وارد حساب خود شده و به درگاه بانک منتقل می‌شوید:
+              کد تایید پیامکی به شماره <strong className="font-mono">{phone}</strong> ارسال گردید. پس از وارد کردن کد، به درگاه زرین‌پال منتقل می‌شوید:
             </p>
 
-            <form onSubmit={handleVerifyOtpAndProceed} className="space-y-4">
-              <input
-                type="text"
-                inputMode="numeric"
-                required
-                dir="ltr"
-                maxLength={6}
-                value={otpInput}
-                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
-                placeholder="کد تایید را وارد کنید"
-                className="w-full p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black text-xl text-center tracking-widest outline-none focus:border-[var(--accent-blue)]"
-              />
+            <input
+              type="text"
+              inputMode="numeric"
+              required
+              dir="ltr"
+              maxLength={8}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value)}
+              placeholder="کد تایید را وارد کنید"
+              className="w-full p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black text-lg text-center outline-none focus:border-[var(--accent-blue)]"
+            />
 
-              <button
-                type="submit"
-                disabled={submittingOrder}
-                className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg cursor-pointer disabled:opacity-50"
-              >
-                {submittingOrder ? "در حال تایید و انتقال به درگاه..." : "✓ تایید کد و ورود به درگاه پرداخت"}
-              </button>
-            </form>
-          </div>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-xl cursor-pointer disabled:opacity-50"
+            >
+              {submitting ? "در حال انتقال به درگاه..." : "✓ تایید کد و ورود به درگاه پرداخت"}
+            </button>
+          </form>
         </div>
       )}
     </div>

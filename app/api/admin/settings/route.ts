@@ -1,145 +1,186 @@
 // File Path: app/api/admin/settings/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { requireAdmin } from "@/lib/authSecurityHelper";
+import { normalizeSystemSettings, parseExactNum } from "@/lib/systemSettings";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_SYSTEM_SETTINGS = {
-  maintenance_mode: false,
-  maintenance_message: "فروشگاه آکسون در حال بروزرسانی زیرساخت‌های فنی است. به زودی باز می‌گردیم.",
-  seo_noindex: false,
-  allow_guest_checkout: true,
-  sms_notifications_enabled: true,
-  default_shipping_cost: 65000,
-  free_shipping_threshold: 5000000,
-  vat_percent: 10,
-};
-
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const session = await verifyAdminSession(req);
-    if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-    }
-
     const { data: row } = await supabaseAdmin
       .from("site_info")
       .select("*")
       .limit(1)
       .maybeSingle();
 
-    const layoutCfg = row?.homepage_layout_config || {};
-    const storedCfg = layoutCfg?.auth_security_config?.system_settings || {};
+    const layoutCfg =
+      row?.homepage_layout_config && typeof row.homepage_layout_config === "object"
+        ? row.homepage_layout_config
+        : {};
 
-    const isMaint =
-      (row?.maintenance_mode && row.maintenance_mode !== "none" && row.maintenance_mode !== "false") ||
-      Boolean(storedCfg.maintenance_mode);
+    const settings = normalizeSystemSettings(layoutCfg);
 
-    const isNoIndex =
-      row?.allow_google_index === false || Boolean(storedCfg.seo_noindex);
-
-    const settings = {
-      maintenance_mode: isMaint,
-      maintenance_message:
-        storedCfg.maintenance_message || DEFAULT_SYSTEM_SETTINGS.maintenance_message,
-      seo_noindex: isNoIndex,
-      allow_guest_checkout:
-        storedCfg.allow_guest_checkout !== undefined
-          ? Boolean(storedCfg.allow_guest_checkout)
-          : true,
-      sms_notifications_enabled:
-        storedCfg.sms_notifications_enabled !== undefined
-          ? Boolean(storedCfg.sms_notifications_enabled)
-          : true,
-      default_shipping_cost: Number(
-        storedCfg.default_shipping_cost ?? DEFAULT_SYSTEM_SETTINGS.default_shipping_cost
-      ),
-      free_shipping_threshold: Number(
-        storedCfg.free_shipping_threshold ?? DEFAULT_SYSTEM_SETTINGS.free_shipping_threshold
-      ),
-      vat_percent: Number(storedCfg.vat_percent ?? DEFAULT_SYSTEM_SETTINGS.vat_percent),
-    };
-
-    return NextResponse.json({ success: true, settings, data: settings });
+    return NextResponse.json(
+      {
+        success: true,
+        settings,
+        system_settings: settings,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json(
-      { success: true, settings: DEFAULT_SYSTEM_SETTINGS, message: err.message },
-      { status: 200 }
+      { success: false, message: err.message || "خطا در خواندن تنظیمات سیستم." },
+      { status: 500 }
     );
   }
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.res;
+
   try {
-    const session: any = await verifyAdminSession(req);
-    if (!session) {
-      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-    }
-
     const body = await req.json();
-    const nextSettings = {
-      maintenance_mode: Boolean(body.maintenance_mode),
-      maintenance_message: String(
-        body.maintenance_message || DEFAULT_SYSTEM_SETTINGS.maintenance_message
-      ).trim(),
-      seo_noindex: Boolean(body.seo_noindex),
-      allow_guest_checkout: body.allow_guest_checkout !== false,
-      sms_notifications_enabled: body.sms_notifications_enabled !== false,
-      default_shipping_cost: Math.max(0, Number(body.default_shipping_cost ?? 65000)),
-      free_shipping_threshold: Math.max(0, Number(body.free_shipping_threshold ?? 5000000)),
-      vat_percent: Math.max(0, Math.min(30, Number(body.vat_percent ?? 10))),
-      updated_at: new Date().toISOString(),
-    };
+    const input = body.settings && typeof body.settings === "object" ? body.settings : body;
 
-    const { data: existing } = await supabaseAdmin
+    const { data: existingRow } = await supabaseAdmin
       .from("site_info")
       .select("id, homepage_layout_config")
       .limit(1)
       .maybeSingle();
 
-    const prevLayout =
-      existing?.homepage_layout_config && typeof existing.homepage_layout_config === "object"
-        ? existing.homepage_layout_config
+    const currentLayout =
+      existingRow?.homepage_layout_config &&
+      typeof existingRow.homepage_layout_config === "object"
+        ? existingRow.homepage_layout_config
         : {};
 
-    const updatedLayout = {
-      ...prevLayout,
-      auth_security_config: {
-        ...(prevLayout.auth_security_config || {}),
-        system_settings: nextSettings,
-      },
+    const currentSys = normalizeSystemSettings(currentLayout);
+
+    const updatedSettings = {
+      defaultShippingCost: parseExactNum(
+        input.defaultShippingCost ?? input.default_shipping_cost ?? input.shippingCost,
+        currentSys.defaultShippingCost
+      ),
+      freeShippingThreshold: parseExactNum(
+        input.freeShippingThreshold ?? input.free_shipping_threshold,
+        currentSys.freeShippingThreshold
+      ),
+      vatPercent: parseExactNum(
+        input.vatPercent ?? input.vat_percent ?? input.taxPercent,
+        currentSys.vatPercent
+      ),
+      allowGuestCheckout:
+        typeof input.allowGuestCheckout === "boolean"
+          ? input.allowGuestCheckout
+          : currentSys.allowGuestCheckout,
+      autoSendOrderSms:
+        typeof input.autoSendOrderSms === "boolean"
+          ? input.autoSendOrderSms
+          : currentSys.autoSendOrderSms,
+      maintenanceMode:
+        typeof input.maintenanceMode === "boolean"
+          ? input.maintenanceMode
+          : currentSys.maintenanceMode,
+      maintenanceMessage:
+        input.maintenanceMessage !== undefined
+          ? String(input.maintenanceMessage).trim()
+          : currentSys.maintenanceMessage,
+      noIndex:
+        typeof input.noIndex === "boolean"
+          ? input.noIndex
+          : typeof input.disallowRobots === "boolean"
+          ? input.disallowRobots
+          : currentSys.noIndex,
+      disallowRobots:
+        typeof input.disallowRobots === "boolean"
+          ? input.disallowRobots
+          : typeof input.noIndex === "boolean"
+          ? input.noIndex
+          : currentSys.noIndex,
+      updatedAt: new Date().toISOString(),
     };
 
-    if (existing && existing.id) {
+    const nextLayoutConfig = {
+      ...currentLayout,
+      system_settings: updatedSettings,
+      store_settings: updatedSettings,
+      defaultShippingCost: updatedSettings.defaultShippingCost,
+      freeShippingThreshold: updatedSettings.freeShippingThreshold,
+      vatPercent: updatedSettings.vatPercent,
+      allowGuestCheckout: updatedSettings.allowGuestCheckout,
+      autoSendOrderSms: updatedSettings.autoSendOrderSms,
+      maintenanceMode: updatedSettings.maintenanceMode,
+      maintenanceMessage: updatedSettings.maintenanceMessage,
+      noIndex: updatedSettings.noIndex,
+      disallowRobots: updatedSettings.disallowRobots,
+    };
+
+    if (existingRow?.id) {
       await supabaseAdmin
         .from("site_info")
         .update({
-          homepage_layout_config: updatedLayout,
-          allow_google_index: !nextSettings.seo_noindex,
-          maintenance_mode: nextSettings.maintenance_mode ? "indefinite" : "none",
+          homepage_layout_config: nextLayoutConfig,
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", existing.id);
+        .eq("id", existingRow.id);
     } else {
       await supabaseAdmin.from("site_info").insert([
         {
-          homepage_layout_config: updatedLayout,
-          allow_google_index: !nextSettings.seo_noindex,
-          maintenance_mode: nextSettings.maintenance_mode ? "indefinite" : "none",
+          site_name: "آکسون کور | AXON CORE",
+          homepage_layout_config: nextLayoutConfig,
+          updated_at: new Date().toISOString(),
         },
       ]);
     }
 
-    return NextResponse.json({
-      success: true,
-      settings: nextSettings,
-      message: "✓ تنظیمات کلان، وضعیت تعمیرات و ایندکس گوگل با موفقیت در دیتابیس ذخیره شد.",
-    });
+    try {
+      await supabaseAdmin.from("admin_audit_logs").insert([
+        {
+          action: "UPDATE_SYSTEM_SETTINGS",
+          user_id: auth.session?.username || "admin",
+          details: {
+            resource: "site_info:system_settings",
+            updatedSettings,
+          },
+          ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+          severity: "info",
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch {}
+
+    return NextResponse.json(
+      {
+        success: true,
+        settings: updatedSettings,
+        system_settings: updatedSettings,
+        message: "✓ تنظیمات کلان سیستم ذخیره شد و بلافاصله در سراسر سایت اعمال گردید.",
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در ذخیره تنظیمات." },
+      { status: 500 }
+    );
   }
 }
 
 export async function PUT(req: NextRequest) {
+  return POST(req);
+}
+
+export async function PATCH(req: NextRequest) {
   return POST(req);
 }

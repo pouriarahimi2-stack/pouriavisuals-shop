@@ -195,7 +195,6 @@ export default function CheckoutPage() {
     };
   }, [fetchLiveStoreRules]);
 
-  // محاسبه دقیق هزینه ارسال بر اساس تنظیمات ادمین (پشتیبانی کامل از عدد 0)
   const shippingCost =
     finalPayable <= 0
       ? 0
@@ -206,13 +205,11 @@ export default function CheckoutPage() {
       ? 0
       : financialRules.defaultShippingCost;
 
-  // محاسبه دقیق مالیات بر ارزش افزوده (پیش‌فرض ۱۰٪ یا مقدار تنظیم‌شده در پنل ادمین)
   const vatAmount =
     finalPayable > 0 && financialRules.vatPercent > 0
       ? Math.round((finalPayable * financialRules.vatPercent) / 100)
       : 0;
 
-  // مبلغ نهایی قابل پرداخت (پس از کسر تخفیف + افزودن مالیات بر ارزش افزوده + هزینه ارسال)
   const grandTotal = Math.max(0, finalPayable + vatAmount + shippingCost);
 
   useEffect(() => {

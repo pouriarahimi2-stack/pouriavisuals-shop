@@ -1,3 +1,4 @@
+// File Path: components/Header.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -13,29 +14,37 @@ import AnimatedLogo from "@/components/AnimatedLogo";
 export default function Header() {
   const pathname = usePathname();
   const { openCart, totalItems } = useCart();
-  // استفاده از context مشترک — بدون fetch جداگانه!
-  const { siteInfo } = useSiteInfo();
+  const { siteInfo, refresh } = useSiteInfo();
+
   const headerCfg = siteInfo?.homepage_layout_config?.header || DEFAULT_HEADER_CONFIG;
+  const themeHeader = siteInfo?.homepage_layout_config?.theme_builder_config?.globalHeader || {};
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [userName, setUserName] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
+
+  const logoSrc =
+    themeHeader.logoUrl ||
+    headerCfg?.brand?.logoUrl ||
+    siteInfo?.logo_url ||
+    "";
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [logoSrc]);
 
   const syncUserSession = () => {
     try {
-      const match = document.cookie.match(/(^|;)\s*axon_user_session=([^;]+)/);
-      if (match) {
-        const parsed = JSON.parse(decodeURIComponent(match[2]));
+      const local = localStorage.getItem("axon_user_session");
+      if (local) {
+        const parsed = JSON.parse(local);
         if (parsed?.name) setUserName(parsed.name);
+        else if (parsed?.username) setUserName(parsed.username);
         else if (parsed?.phone) setUserName(parsed.phone);
       } else {
-        const local = localStorage.getItem("axon_user_session");
-        if (local) {
-          const parsed = JSON.parse(local);
-          if (parsed?.name) setUserName(parsed.name);
-          else if (parsed?.phone) setUserName(parsed.phone);
-        }
+        setUserName(null);
       }
     } catch {}
   };
@@ -46,18 +55,29 @@ export default function Header() {
     }
     syncUserSession();
 
-    const handleScroll = () => { setIsScrolled(window.scrollY > 20); };
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    const handleConfigChange = () => {
+      if (typeof refresh === "function") refresh();
+    };
+
     window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("user_auth_changed", syncUserSession);
+    window.addEventListener("theme_builder_updated", handleConfigChange);
+    window.addEventListener("menus_updated", handleConfigChange);
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("user_auth_changed", syncUserSession);
+      window.removeEventListener("theme_builder_updated", handleConfigChange);
+      window.removeEventListener("menus_updated", handleConfigChange);
     };
-  }, []);
+  }, [refresh]);
 
-  // بستن منوی موبایل با تغییر صفحه
-  useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   const toggleTheme = () => {
     soundEngine.playClick();
@@ -68,9 +88,9 @@ export default function Header() {
     }
   };
 
-  if (!headerCfg.show) return null;
+  if (headerCfg.show === false) return null;
 
-  const isCapsule = headerCfg.variant === "capsule";
+  const isCapsule = headerCfg.variant !== "full-width";
   const positionClass =
     headerCfg.position === "fixed"
       ? "fixed top-3 inset-x-0 z-40"
@@ -78,104 +98,167 @@ export default function Header() {
       ? "sticky top-3 z-40"
       : "relative z-40";
 
-  const brandName = headerCfg.brand.name || "آکسون کور | Axon Core";
-  const logoSrc = headerCfg.brand.logoUrl;
-  const menuItems = headerCfg.menu.items.filter((m: any) => m.show !== false);
+  const brandName =
+    themeHeader.brandName ||
+    headerCfg?.brand?.name ||
+    siteInfo?.site_name ||
+    "آکسون کور | Axon Core";
+
+  const logoWidth = Number(themeHeader.logoWidth || headerCfg?.brand?.logoWidth || 38);
+  const logoHeight = Number(themeHeader.logoHeight || headerCfg?.brand?.logoHeight || 38);
+
+  const navMenuFromDb = siteInfo?.homepage_layout_config?.navigation_menu;
+  const menuItems =
+    Array.isArray(navMenuFromDb) && navMenuFromDb.length > 0
+      ? navMenuFromDb
+          .filter((m: any) => m.is_active !== false)
+          .map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            url: m.url || "/products",
+            children: Array.isArray(m.children) ? m.children : [],
+          }))
+      : (headerCfg?.menu?.items || DEFAULT_HEADER_CONFIG.menu.items).filter(
+          (m: any) => m.show !== false
+        );
 
   return (
     <>
-      <header data-axon-header="main" className={`w-full transition-all duration-300 ${positionClass} px-3 sm:px-6`} dir="rtl">
+      <header
+        data-axon-header="main"
+        className={"w-full transition-all duration-300 " + positionClass + " px-3 sm:px-6"}
+        dir="rtl"
+      >
         <div
           style={{
-            maxWidth: `${headerCfg.maxWidth || 1280}px`,
-            height: isScrolled && headerCfg.shrinkOnScroll ? `${Math.max(48, headerCfg.height - 8)}px` : `${headerCfg.height || 60}px`,
+            maxWidth: (headerCfg.maxWidth || 1280) + "px",
+            height:
+              isScrolled && headerCfg.shrinkOnScroll
+                ? Math.max(48, (headerCfg.height || 60) - 8) + "px"
+                : (headerCfg.height || 60) + "px",
           }}
-          className={`mx-auto w-full px-4 sm:px-8 transition-all duration-300 flex items-center justify-between gap-4 border shadow-xl backdrop-blur-2xl ${
-            isCapsule ? "rounded-full" : "rounded-2xl"
-          } bg-[var(--modal-bg)]/90 border-[var(--card-border)]`}
+          className={
+            "mx-auto w-full px-4 sm:px-8 transition-all duration-300 flex items-center justify-between gap-4 border shadow-xl backdrop-blur-2xl " +
+            (isCapsule ? "rounded-full" : "rounded-2xl") +
+            " bg-[var(--modal-bg)]/90 border-[var(--card-border)]"
+          }
         >
-          {/* راست: لوگو و لینک‌ها */}
           <div className="flex items-center gap-6 sm:gap-8">
             <Link
               href="/"
               onClick={() => soundEngine.playClick()}
               className="flex items-center gap-2.5 text-sm sm:text-base font-black tracking-tight text-[var(--text-primary)] hover:opacity-90 transition shrink-0"
             >
-              {logoSrc ? (
+              {logoSrc && !logoError ? (
                 <img
                   src={logoSrc}
                   alt={brandName}
-                  style={{ width: `${headerCfg.brand.logoWidth || 38}px`, height: `${headerCfg.brand.logoHeight || 38}px` }}
+                  onError={() => setLogoError(true)}
+                  style={{
+                    width: logoWidth + "px",
+                    height: logoHeight + "px",
+                  }}
                   className="object-contain rounded-lg"
                 />
               ) : (
                 <AnimatedLogo size={36} />
               )}
-              {headerCfg.brand.showName && <span className="font-black whitespace-nowrap hidden sm:inline">{brandName}</span>}
+              <span className="font-black whitespace-nowrap hidden sm:inline">{brandName}</span>
             </Link>
 
-            {/* منوی دسکتاپ */}
-            {headerCfg.menu.show && (
+            {headerCfg.menu?.show !== false && (
               <nav className="hidden md:flex items-center gap-5 lg:gap-6 text-xs font-bold text-[var(--text-secondary)]">
                 {menuItems.map((item: any) => {
                   const isActive = pathname === item.url;
+                  const hasSub = Array.isArray(item.children) && item.children.length > 0;
                   return (
-                    <Link
-                      key={item.id}
-                      href={item.url}
-                      className={`hover:text-[var(--text-primary)] transition whitespace-nowrap flex items-center gap-1.5 ${
-                        isActive ? "text-[var(--accent-blue)] font-black" : ""
-                      }`}
-                    >
-                      <span>{item.title}</span>
-                      {item.badge && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-[var(--accent-blue)] text-white text-[9px] font-mono">
-                          {item.badge}
-                        </span>
+                    <div key={item.id} className="relative group py-2">
+                      <Link
+                        href={item.url}
+                        className={
+                          "hover:text-[var(--text-primary)] transition whitespace-nowrap flex items-center gap-1 " +
+                          (isActive ? "text-[var(--accent-blue)] font-black" : "")
+                        }
+                      >
+                        <span>{item.title}</span>
+                        {hasSub && <span className="text-[9px] opacity-70">▼</span>}
+                      </Link>
+
+                      {hasSub && (
+                        <div className="absolute right-0 top-full pt-1 hidden group-hover:block z-50 min-w-[210px]">
+                          <div className="p-2 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-1">
+                            {item.children.map((sub2: any) => (
+                              <div key={sub2.id} className="space-y-1">
+                                <Link
+                                  href={sub2.url || "/products"}
+                                  className="block px-3 py-2 rounded-xl hover:bg-[var(--input-bg)] text-[var(--text-primary)] font-bold text-xs transition"
+                                >
+                                  {sub2.title}
+                                </Link>
+                                {Array.isArray(sub2.children) && sub2.children.length > 0 && (
+                                  <div className="pr-3 border-r border-[var(--card-border)] space-y-0.5">
+                                    {sub2.children.map((sub3: any) => (
+                                      <Link
+                                        key={sub3.id}
+                                        href={sub3.url || "/products"}
+                                        className="block px-2.5 py-1.5 rounded-lg hover:bg-[var(--input-bg)] text-[var(--text-secondary)] hover:text-[var(--accent-blue)] text-[11px] transition"
+                                      >
+                                        ↳ {sub3.title}
+                                      </Link>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                    </Link>
+                    </div>
                   );
                 })}
               </nav>
             )}
           </div>
 
-          {/* چپ: اکشن‌ها */}
           <div className="flex items-center gap-2 shrink-0">
-            {headerCfg.actions.themeToggle.show && (
-              <button
-                onClick={toggleTheme}
-                className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs transition cursor-pointer"
-                title="تغییر تم"
-              >
-                {isDarkMode ? "🌙" : "☀️"}
-              </button>
-            )}
-
-            {headerCfg.actions.account.show && (
-              <Link
-                href={userName ? "/my-orders" : "/login"}
-                onClick={() => soundEngine.playClick()}
-                className="hidden sm:flex px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition items-center gap-1.5 max-w-[160px] truncate"
-              >
-                <span>👤</span>
-                <span className="truncate">{userName ? `سلام، ${userName}` : "حساب کاربری"}</span>
-              </Link>
-            )}
-
-            {headerCfg.actions.cart.show && (
-              <button
-                onClick={() => { soundEngine.playClick(); openCart(); }}
-                className="px-4 sm:px-5 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 transition flex items-center gap-2 cursor-pointer active:scale-95"
-              >
-                <span>🛒</span>
-                <span className="bg-white/20 px-2 py-0.5 rounded-full font-mono text-[11px]">{totalItems}</span>
-              </button>
-            )}
-
-            {/* دکمه منوی موبایل — فقط در موبایل */}
             <button
-              onClick={() => { soundEngine.playClick(); setMobileMenuOpen(!mobileMenuOpen); }}
+              type="button"
+              onClick={toggleTheme}
+              className="w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] flex items-center justify-center text-xs transition cursor-pointer"
+              title="تغییر تم"
+            >
+              {isDarkMode ? "🌙" : "☀️"}
+            </button>
+
+            <Link
+              href={userName ? "/account" : "/login"}
+              onClick={() => soundEngine.playClick()}
+              className="hidden sm:flex px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition items-center gap-1.5 max-w-[160px] truncate"
+            >
+              <span>👤</span>
+              <span className="truncate">{userName ? "سلام، " + userName : "حساب کاربری"}</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                openCart();
+              }}
+              className="px-4 sm:px-5 py-2 rounded-full bg-[var(--accent-blue)] text-white text-xs font-black shadow-md hover:opacity-90 transition flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              <span>🛒</span>
+              <span className="bg-white/20 px-2 py-0.5 rounded-full font-mono text-[11px]">
+                {totalItems}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick();
+                setMobileMenuOpen(!mobileMenuOpen);
+              }}
               className="md:hidden w-9 h-9 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-sm font-bold transition cursor-pointer hover:border-[var(--accent-blue)]"
               aria-label="منوی ناوبری"
             >
@@ -185,74 +268,39 @@ export default function Header() {
         </div>
       </header>
 
-      {/* منوی موبایل Dropdown — با تمام آیتم‌ها */}
       {mobileMenuOpen && (
-        <div
-          className="md:hidden fixed inset-x-0 top-[76px] z-30 px-3"
-          dir="rtl"
-        >
+        <div className="md:hidden fixed inset-x-0 top-[76px] z-30 px-3" dir="rtl">
           <div className="rounded-3xl bg-[var(--modal-bg)]/98 backdrop-blur-2xl border border-[var(--card-border)] shadow-2xl p-4 space-y-1 max-h-[75vh] overflow-y-auto">
-            {/* لینک به حساب کاربری در موبایل */}
             <Link
-              href={userName ? "/my-orders" : "/login"}
+              href={userName ? "/account" : "/login"}
               onClick={() => soundEngine.playClick()}
               className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--accent-blue)]/10 border border-[var(--accent-blue)]/20 text-xs font-black text-[var(--accent-blue)] mb-3"
             >
               <span className="text-base">👤</span>
-              <span>{userName ? `سلام، ${userName}` : "ورود به حساب کاربری"}</span>
+              <span>{userName ? "پنل کاربری (" + userName + ")" : "ورود / ثبت‌نام سریع"}</span>
             </Link>
 
-            {/* آیتم‌های منو از DB */}
             {menuItems.map((item: any) => {
               const isActive = pathname === item.url;
               return (
-                <Link
-                  key={item.id}
-                  href={item.url}
-                  onClick={() => soundEngine.playClick()}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition ${
-                    isActive
-                      ? "bg-[var(--accent-blue)] text-white"
-                      : "hover:bg-[var(--input-bg)] text-[var(--text-primary)]"
-                  }`}
-                >
-                  <span>{item.title}</span>
-                  {item.badge && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-[var(--accent-blue)] text-white text-[9px] font-mono">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
+                <div key={item.id} className="space-y-1">
+                  <Link
+                    href={item.url}
+                    onClick={() => soundEngine.playClick()}
+                    className={
+                      "flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition " +
+                      (isActive
+                        ? "bg-[var(--accent-blue)] text-white"
+                        : "hover:bg-[var(--input-bg)] text-[var(--text-primary)]")
+                    }
+                  >
+                    <span>{item.title}</span>
+                  </Link>
+                </div>
               );
             })}
-
-            {/* لینک‌های ثابت اضافه در موبایل */}
-            <div className="pt-2 mt-2 border-t border-[var(--card-border)] grid grid-cols-2 gap-2">
-              <Link
-                href="/track-order"
-                onClick={() => soundEngine.playClick()}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-[var(--input-bg)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
-              >
-                <span>🚚</span><span>پیگیری سفارش</span>
-              </Link>
-              <Link
-                href="/contact"
-                onClick={() => soundEngine.playClick()}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-[var(--input-bg)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
-              >
-                <span>📞</span><span>تماس با ما</span>
-              </Link>
-            </div>
           </div>
         </div>
-      )}
-
-      {/* overlay برای بستن منوی موبایل */}
-      {mobileMenuOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-20 bg-black/40 backdrop-blur-sm"
-          onClick={() => setMobileMenuOpen(false)}
-        />
       )}
     </>
   );

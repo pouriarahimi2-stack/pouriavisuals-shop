@@ -29,18 +29,21 @@ export async function GET(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    const storedCfg =
-      row && row.auth_security_config && row.auth_security_config.system_settings
-        ? row.auth_security_config.system_settings
-        : {};
+    const layoutCfg = row?.homepage_layout_config || {};
+    const storedCfg = layoutCfg?.auth_security_config?.system_settings || {};
+
+    const isMaint =
+      (row?.maintenance_mode && row.maintenance_mode !== "none" && row.maintenance_mode !== "false") ||
+      Boolean(storedCfg.maintenance_mode);
+
+    const isNoIndex =
+      row?.allow_google_index === false || Boolean(storedCfg.seo_noindex);
 
     const settings = {
-      maintenance_mode: Boolean(row?.maintenance_mode ?? storedCfg.maintenance_mode ?? false),
+      maintenance_mode: isMaint,
       maintenance_message:
-        row?.maintenance_message ||
-        storedCfg.maintenance_message ||
-        DEFAULT_SYSTEM_SETTINGS.maintenance_message,
-      seo_noindex: Boolean(row?.seo_noindex ?? storedCfg.seo_noindex ?? false),
+        storedCfg.maintenance_message || DEFAULT_SYSTEM_SETTINGS.maintenance_message,
+      seo_noindex: isNoIndex,
       allow_guest_checkout:
         storedCfg.allow_guest_checkout !== undefined
           ? Boolean(storedCfg.allow_guest_checkout)
@@ -91,47 +94,41 @@ export async function POST(req: NextRequest) {
 
     const { data: existing } = await supabaseAdmin
       .from("site_info")
-      .select("id, auth_security_config")
+      .select("id, homepage_layout_config")
       .limit(1)
       .maybeSingle();
 
-    const updatedAuthConfig = {
-      ...(existing?.auth_security_config || {}),
-      system_settings: nextSettings,
+    const prevLayout =
+      existing?.homepage_layout_config && typeof existing.homepage_layout_config === "object"
+        ? existing.homepage_layout_config
+        : {};
+
+    const updatedLayout = {
+      ...prevLayout,
+      auth_security_config: {
+        ...(prevLayout.auth_security_config || {}),
+        system_settings: nextSettings,
+      },
     };
 
     if (existing && existing.id) {
       await supabaseAdmin
         .from("site_info")
         .update({
-          auth_security_config: updatedAuthConfig,
-          updated_at: new Date().toISOString(),
+          homepage_layout_config: updatedLayout,
+          allow_google_index: !nextSettings.seo_noindex,
+          maintenance_mode: nextSettings.maintenance_mode ? "indefinite" : "none",
         })
         .eq("id", existing.id);
     } else {
       await supabaseAdmin.from("site_info").insert([
         {
-          auth_security_config: updatedAuthConfig,
-          updated_at: new Date().toISOString(),
+          homepage_layout_config: updatedLayout,
+          allow_google_index: !nextSettings.seo_noindex,
+          maintenance_mode: nextSettings.maintenance_mode ? "indefinite" : "none",
         },
       ]);
     }
-
-    try {
-      await supabaseAdmin.from("audit_logs").insert([
-        {
-          admin_username: session.username || "admin",
-          action: "UPDATE_SYSTEM_SETTINGS",
-          target_resource: "site_info:system_settings",
-          details: {
-            maintenance_mode: nextSettings.maintenance_mode,
-            seo_noindex: nextSettings.seo_noindex,
-          },
-          ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
-          created_at: new Date().toISOString(),
-        },
-      ]);
-    } catch {}
 
     return NextResponse.json({
       success: true,

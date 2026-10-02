@@ -1,4 +1,3 @@
-// File Path: app/admin/audit-logs/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -21,6 +20,7 @@ export default function AdminAuditLogsPage() {
   const [suspiciousCount, setSuspiciousCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +49,7 @@ export default function AdminAuditLogsPage() {
 
     const channel = supabase
       .channel("realtime-admin-audit-logs")
-      .on("postgres_changes", { event: "*", schema: "public", table: "audit_logs" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "admin_audit_logs" }, () => {
         fetchLogs();
       })
       .subscribe();
@@ -82,7 +82,7 @@ export default function AdminAuditLogsPage() {
   };
 
   const getBadgeStyle = (action: string) => {
-    if (action.includes("DELETE") || action.includes("FAIL"))
+    if (action.includes("DELETE") || action.includes("FAIL") || action.includes("ERROR"))
       return "bg-rose-500/15 border-rose-500/30 text-rose-400";
     if (action.includes("CREATE") || action.includes("INSERT") || action.includes("AUTOFIX"))
       return "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
@@ -99,7 +99,7 @@ export default function AdminAuditLogsPage() {
             <span>🛡️</span> دفتر کل وقایع و اسکنر هوشمند امنیت (Audit Logs & Auto-Fix)
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            رصد بلادرنگ اقدامات مدیریتی، اسکن آسیب‌پذیری‌ها و پاکسازی خودکار نشست‌های مشکوک
+            رصد بلادرنگ اقدامات مدیریتی، اسکن آسیب‌پذیری‌ها و مشاهده جزئیات کامل هر رخداد با کلیک روی آن
           </p>
         </div>
 
@@ -163,15 +163,19 @@ export default function AdminAuditLogsPage() {
                 <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
                   <th className="pb-3 px-3">نوع عملیات</th>
                   <th className="pb-3 px-3">منبع هدف</th>
-                  <th className="pb-3 px-3">ادمین</th>
+                  <th className="pb-3 px-3">ادمین / کاربر</th>
                   <th className="pb-3 px-3">آدرس IP</th>
                   <th className="pb-3 px-3">تاریخ و زمان</th>
-                  <th className="pb-3 px-3">جزئیات</th>
+                  <th className="pb-3 px-3">جزئیات کامل</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--card-border)]">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-[var(--input-bg)]/40 transition">
+                  <tr
+                    key={log.id}
+                    onClick={() => setSelectedLog(log)}
+                    className="hover:bg-[var(--input-bg)]/60 transition cursor-pointer"
+                  >
                     <td className="py-3.5 px-3">
                       <span
                         className={
@@ -191,12 +195,13 @@ export default function AdminAuditLogsPage() {
                       {new Date(log.created_at).toLocaleString("fa-IR")}
                     </td>
                     <td className="py-3.5 px-3">
-                      <span
-                        className="font-mono text-[10px] text-slate-500 truncate max-w-[220px] block"
-                        title={JSON.stringify(log.details)}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLog(log)}
+                        className="px-3 py-1 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold text-[var(--accent-blue)] cursor-pointer"
                       >
-                        {JSON.stringify(log.details)}
-                      </span>
+                        🔍 مشاهده کامل JSON
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -205,6 +210,37 @@ export default function AdminAuditLogsPage() {
           </div>
         )}
       </div>
+
+      {selectedLog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedLog(null)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+              <h3 className="font-black text-sm text-[var(--accent-blue)]">
+                جزئیات کامل رخداد: {selectedLog.action}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedLog(null)}
+                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <pre
+              dir="ltr"
+              className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] overflow-x-auto max-h-96 whitespace-pre-wrap leading-relaxed"
+            >
+              {JSON.stringify(selectedLog.details, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
+// File Path: app/api/admin/send-discount-sms/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/authSecurityHelper";
-import { smsService } from "@/services/smsService";
+import { sendOtpPatternDetailed } from "@/lib/otpService";
 
 export const dynamic = "force-dynamic";
 
@@ -10,16 +12,63 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { phone, discountPercent, couponCode } = body;
-    const cleanPhone = String(phone || "").replace(/\D/g, "");
+    const phones: string[] = Array.isArray(body.phones)
+      ? body.phones
+      : body.phone
+      ? [body.phone]
+      : [];
+    const couponCode = String(body.code || body.couponCode || "VIP20").trim();
 
-    await smsService.sendSMS(
-      cleanPhone,
-      `مشتری گرامی آکسون کور، کد تخفیف اختصاصی ${discountPercent || 15}٪ شما: ${couponCode || "VIP"} - خرید در: axoncore.ir`
-    );
+    if (phones.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "حداقل یک شماره موبایل جهت ارسال پیامک انتخاب نمایید." },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json({ success: true, message: "پیامک کد تخفیف ارسال شد." });
+    let sentCount = 0;
+    for (const p of phones.slice(0, 50)) {
+      const cleanPhone = String(p)
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/\D/g, "");
+      if (cleanPhone.length === 11) {
+        const res = await sendOtpPatternDetailed({
+          mobile: cleanPhone,
+          code: couponCode,
+        });
+        if (res.ok) sentCount++;
+      }
+    }
+
+    try {
+      await supabaseAdmin.from("admin_audit_logs").insert([
+        {
+          action: "DISCOUNT_SMS_CAMPAIGN",
+          user_id: auth.session?.username || "admin",
+          details: {
+            couponCode,
+            totalTargets: phones.length,
+            sentCount,
+          },
+          ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+          severity: "info",
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch {}
+
+    return NextResponse.json({
+      success: sentCount > 0,
+      sentCount,
+      message:
+        sentCount > 0
+          ? "✓ پیامک کد تخفیف با موفقیت به " + sentCount + " شماره ارسال گردید."
+          : "خطا در ارسال پیامک کد تخفیف.",
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در ارسال پیامک تخفیف." },
+      { status: 500 }
+    );
   }
 }

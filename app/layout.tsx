@@ -1,3 +1,4 @@
+import LiveStoreSyncGuard from "@/components/LiveStoreSyncGuard";
 import AnnouncementBar from "@/components/AnnouncementBar";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
@@ -102,6 +103,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </LayoutShell>
           </SiteInfoProvider>
         </CartProvider>
+        <LiveStoreSyncGuard />
       </body>
     </html>
   );

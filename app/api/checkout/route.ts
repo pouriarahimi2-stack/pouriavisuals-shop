@@ -1,6 +1,7 @@
 // File Path: app/api/checkout/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -10,70 +11,118 @@ export async function POST(req: NextRequest) {
     const customer = body.customer || {};
     const items = Array.isArray(body.items) ? body.items : [];
 
-    const fullName = String(customer.fullName || body.customer_name || "").trim();
-    const cleanPhone = String(customer.phone || body.phone || "").replace(/\D/g, "");
-    const province = String(customer.province || "تهران").trim();
-    const city = String(customer.city || "تهران").trim();
+    const fullName = String(customer.fullName || body.customer_name || "خریدار محترم").trim();
+    const cleanPhone = String(customer.phone || body.phone || "")
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/\D/g, "");
+    const province = String(customer.province || body.province || "تهران").trim();
+    const city = String(customer.city || body.city || "تهران").trim();
     const address = String(customer.address || body.address || "").trim();
-    const postalCode = String(customer.postalCode || body.postal_code || "").trim();
+    const postalCode = String(customer.postalCode || body.postal_code || "").replace(/\D/g, "");
+    const notes = String(customer.notes || body.notes || "").trim();
 
-    if (!fullName || cleanPhone.length !== 11) {
+    if (!cleanPhone || cleanPhone.length !== 11) {
       return NextResponse.json(
-        { success: false, message: "نام کامل و شماره همراه ۱۱ رقمی الزامی است." },
+        { success: false, message: "شماره موبایل ۱۱ رقمی معتبر الزامی است." },
         { status: 400 }
       );
     }
 
-    const subtotal = Math.max(0, Number(body.subtotal || 0));
-    const discountAmount = Math.max(0, Number(body.discountAmount || 0));
-    const shippingCost = Math.max(0, Number(body.shippingCost || 0));
-    const finalAmount = Math.max(0, Number(body.finalAmount || subtotal - discountAmount + shippingCost));
+    if (items.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "سبد خرید شما خالی است." },
+        { status: 400 }
+      );
+    }
 
-    const orderId = "ORD-" + Date.now().toString().slice(-7) + "-" + Math.floor(100 + Math.random() * 900);
-    const trackingCode = "AXN-" + Date.now().toString().slice(-8);
+    const subtotal = Number(
+      body.subtotal ||
+        body.total_amount ||
+        items.reduce(
+          (sum: number, i: any) =>
+            sum + Number(i.discountPrice || i.discount_price || i.price || 0) * Number(i.quantity || 1),
+          0
+        )
+    );
+    const discountAmount = Number(body.discountAmount || body.discount_amount || 0);
+    const shippingCost = Number(body.shippingCost || body.shipping_fee || 0);
+    const finalAmount = Math.max(
+      0,
+      Number(body.finalAmount || body.final_amount || subtotal - discountAmount + shippingCost)
+    );
+
+    const shortCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const orderNumber = "AXN-" + shortCode;
+    const trackingCode = "TRK-" + Date.now().toString().slice(-6) + "-" + shortCode.slice(0, 3);
+    const fullAddress = province + "، " + city + " — " + address + (notes ? " (" + notes + ")" : "");
 
     const orderPayload: Record<string, any> = {
-      id: orderId,
+      id: orderNumber,
+      order_number: orderNumber,
       customer_name: fullName,
       phone: cleanPhone,
-      address: province + "، " + city + " - " + address + (postalCode ? " (کدپستی: " + postalCode + ")" : ""),
+      province,
+      city,
+      address: fullAddress,
       postal_code: postalCode || null,
       items,
       total_amount: subtotal,
       discount_amount: discountAmount,
-      shipping_cost: shippingCost,
       final_amount: finalAmount,
+      coupon_code: body.couponCode || null,
       status: "pending",
+      payment_status: "pending",
       tracking_code: trackingCode,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    const { data: createdOrder, error: orderErr } = await supabaseAdmin
+    let savedOrder: any = orderPayload;
+    const { data: insertedOrder, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert([orderPayload])
       .select()
       .maybeSingle();
 
-    if (orderErr) {
-      console.warn("Order insert fallback warning:", orderErr.message);
+    if (!orderErr && insertedOrder) {
+      savedOrder = insertedOrder;
+    } else {
+      // فال‌بک با حداقل ستون‌ها در صورت تفاوت اسکیمای جدول orders
+      const minimalOrder: Record<string, any> = {
+        id: randomUUID(),
+        customer_name: fullName,
+        phone: cleanPhone,
+        address: fullAddress,
+        items,
+        total_amount: subtotal,
+        final_amount: finalAmount,
+        status: "pending",
+        tracking_code: trackingCode,
+        created_at: new Date().toISOString(),
+      };
+      const { data: minInserted } = await supabaseAdmin
+        .from("orders")
+        .insert([minimalOrder])
+        .select()
+        .maybeSingle();
+      if (minInserted) savedOrder = minInserted;
     }
 
-    // ۱. کسر خودکار موجودی از جدول products و ثبت سند کسر انبار و حسابداری در inventory_logs
+    // کسر خودکار موجودی کالا از جدول products و ثبت در inventory_logs
     for (const item of items) {
-      const prodId = item.id || item.productId || item.product_id;
+      const prodId = String(item.id || item.productId || item.product_id || "");
       const qty = Math.max(1, Number(item.quantity || 1));
       if (!prodId) continue;
 
       try {
-        const { data: prod } = await supabaseAdmin
+        const { data: prodRow } = await supabaseAdmin
           .from("products")
           .select("id, title, name, stock, price, purchase_price")
           .eq("id", prodId)
           .maybeSingle();
 
-        if (prod) {
-          const currentStock = Number(prod.stock ?? 10);
+        if (prodRow) {
+          const currentStock = Number(prodRow.stock ?? 10);
           const nextStock = Math.max(0, currentStock - qty);
           await supabaseAdmin
             .from("products")
@@ -82,18 +131,18 @@ export async function POST(req: NextRequest) {
               is_available: nextStock > 0,
               updated_at: new Date().toISOString(),
             })
-            .eq("id", prod.id);
+            .eq("id", prodRow.id);
 
           await supabaseAdmin.from("inventory_logs").insert([
             {
-              id: "sale_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-              product_id: String(prod.id),
-              product_title: prod.title || prod.name || "کالای فروخته‌شده",
+              id: "sale_" + Date.now() + "_" + Math.random().toString(36).slice(2, 5),
+              product_id: String(prodRow.id),
+              product_title: prodRow.title || prodRow.name || item.title,
               change_type: "sale",
               quantity: qty,
-              cost_price: Number(prod.purchase_price || Math.round(Number(prod.price || 0) * 0.7)),
+              cost_price: Number(prodRow.purchase_price || Math.round(Number(prodRow.price || 0) * 0.7)),
               supplier: "فروش آنلاین سایت",
-              reference_note: "کسر خودکار بابت فاکتور " + orderId + " (کد پیگیری: " + trackingCode + ")",
+              reference_note: "کسر خودکار بابت فاکتور " + (savedOrder.order_number || savedOrder.id),
               created_at: new Date().toISOString(),
             },
           ]);
@@ -101,80 +150,34 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    // ۲. بروزرسانی خودکار پرونده خریدار در جدول crm_customers
+    // ثبت یا بروزرسانی خودکار مشتری در CRM
     try {
-      const { data: existingCrm } = await supabaseAdmin
-        .from("crm_customers")
-        .select("*")
-        .eq("phone", cleanPhone)
-        .maybeSingle();
-
-      if (existingCrm && existingCrm.id) {
-        const nextSpent = Number(existingCrm.total_spent || 0) + finalAmount;
-        const nextCount = Number(existingCrm.order_count || 0) + 1;
-        await supabaseAdmin
-          .from("crm_customers")
-          .update({
-            full_name: fullName,
-            province,
-            city,
-            address,
-            postal_code: postalCode || existingCrm.postal_code,
-            total_spent: nextSpent,
-            order_count: nextCount,
-            lifecycle_stage: nextSpent > 80000000 ? "vip" : "active",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingCrm.id);
-      } else {
-        await supabaseAdmin.from("crm_customers").insert([
-          {
-            id: "cust_" + Date.now(),
-            full_name: fullName,
-            phone: cleanPhone,
-            province,
-            city,
-            address,
-            postal_code: postalCode || null,
-            total_spent: finalAmount,
-            order_count: 1,
-            lifecycle_stage: finalAmount > 80000000 ? "vip" : "active",
-            tags: ["خریدار آنلاین"],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
-      }
+      await supabaseAdmin.from("crm_customers").upsert([
+        {
+          id: "cust_" + cleanPhone,
+          full_name: fullName,
+          phone: cleanPhone,
+          province,
+          city,
+          address: fullAddress,
+          postal_code: postalCode || null,
+          lifecycle_stage: "active",
+          updated_at: new Date().toISOString(),
+        },
+      ]);
     } catch {}
-
-    // ۳. ثبت مصرف کوپن در صورت استفاده
-    if (body.couponCode) {
-      try {
-        const cleanCode = String(body.couponCode).trim().toUpperCase();
-        const { data: cpn } = await supabaseAdmin
-          .from("coupons")
-          .select("id, times_used, used_count")
-          .eq("code", cleanCode)
-          .maybeSingle();
-        if (cpn && cpn.id) {
-          const used = Number(cpn.times_used ?? cpn.used_count ?? 0) + 1;
-          await supabaseAdmin
-            .from("coupons")
-            .update({ times_used: used, used_count: used })
-            .eq("id", cpn.id);
-        }
-      } catch {}
-    }
 
     return NextResponse.json({
       success: true,
-      order: createdOrder || orderPayload,
-      trackingCode,
-      message: "سفارش شما با موفقیت ثبت شد و آماده انتقال به درگاه پرداخت است.",
+      order: {
+        ...savedOrder,
+        tracking_code: savedOrder.tracking_code || trackingCode,
+      },
+      message: "✓ سفارش ثبت شد و در حال انتقال به درگاه پرداخت است.",
     });
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: err.message || "خطا در پردازش تسویه‌حساب." },
+      { success: false, message: err.message || "خطا در ثبت سفارش." },
       { status: 500 }
     );
   }

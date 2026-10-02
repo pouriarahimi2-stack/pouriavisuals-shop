@@ -1,49 +1,61 @@
+// File Path: app/maintenance/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
-import { siteInfoService } from "@/services/siteInfoService";
+import { useSiteInfo } from "@/context/SiteInfoContext";
+import AnimatedLogo from "@/components/AnimatedLogo";
 
 export default function MaintenancePage() {
-  const [siteInfo, setSiteInfo] = useState<any>(null);
+  const { siteInfo } = useSiteInfo();
+  const sysSettings =
+    siteInfo?.homepage_layout_config?.auth_security_config?.system_settings || {};
 
-  useEffect(() => {
-    siteInfoService.getSiteInfo().then(setSiteInfo);
-  }, []);
-
-  const storeName = siteInfo?.storeName || siteInfo?.site_name || "آکسون کور";
-  const message = siteInfo?.header_announcement || "سایت در حال ارتقای فنی و به‌روزرسانی سرورها است. به زودی با امکاناتی نو بازمی‌گردیم.";
-  const phone = siteInfo?.phone || "09376110200";
+  const brandName = siteInfo?.site_name || "آکسون کور | Axon Core";
+  const message =
+    sysSettings.maintenance_message ||
+    "فروشگاه آکسون کور در حال بروزرسانی و ارتقای زیرساخت‌های فنی است. به زودی با سرویس‌دهی کامل باز می‌گردیم.";
+  const supportPhone = siteInfo?.phone || "09376110200";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 font-sans select-none dir-rtl relative overflow-hidden">
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[140px] pointer-events-none" />
-
-      <div className="relative z-10 max-w-lg w-full bg-slate-900/90 border border-slate-800 rounded-[2.5rem] p-8 sm:p-12 text-center space-y-6 shadow-2xl backdrop-blur-2xl">
-        <div className="w-16 h-16 rounded-3xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-3xl flex items-center justify-center mx-auto shadow-lg animate-pulse">
-          ⚙️
+    <div
+      className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none text-center"
+      dir="rtl"
+    >
+      <div className="max-w-lg w-full p-8 sm:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">
+        <div className="flex justify-center">
+          <AnimatedLogo size={64} />
         </div>
 
         <div className="space-y-2">
-          <span className="px-3.5 py-1 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-black border border-amber-500/20">
-            حالت ارتقا و بهینه‌سازی فنی
+          <span className="inline-block px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-black">
+            🛠️ در حال بروزرسانی زیرساخت
           </span>
-          <h1 className="text-xl sm:text-2xl font-black text-white">{storeName}</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-[var(--accent-blue)]">
+            {brandName}
+          </h1>
         </div>
 
-        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+        <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed font-medium">
           {message}
         </p>
 
-        <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 flex justify-between items-center font-mono">
-          <span>تماس ضروری و هماهنگی سفارشات:</span>
-          <a href={`tel:${phone}`} className="font-bold text-blue-400">{phone}</a>
+        <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs space-y-1">
+          <span className="text-[var(--text-secondary)] block">پشتیبانی و پیگیری سفارشات:</span>
+          <a
+            href={"tel:" + supportPhone}
+            className="font-mono font-black text-sm text-[var(--accent-blue)] block"
+          >
+            📞 {supportPhone}
+          </a>
         </div>
 
-        <div className="pt-2 border-t border-slate-800 flex justify-center">
-          <Link href="/admin/login" className="text-[10px] text-slate-500 hover:text-slate-400 transition">
-            ورود به پنل مدیریت
+        <div className="pt-2">
+          <Link
+            href="/admin/dashboard"
+            className="text-[11px] text-slate-400 hover:text-[var(--accent-blue)] transition font-bold"
+          >
+            ورود مدیر سیستم ←
           </Link>
         </div>
       </div>

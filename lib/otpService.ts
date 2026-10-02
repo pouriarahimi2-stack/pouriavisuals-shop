@@ -1,4 +1,6 @@
 // File Path: lib/otpService.ts
+import { postViaNetafrazRelay } from "@/lib/netafrazRelay";
+
 export interface OtpOptions {
   mobile: string;
   code: string;
@@ -21,6 +23,7 @@ const RAW_KEY_UNPADDED =
 const RAW_KEY_PADDED = RAW_KEY_UNPADDED + "=";
 const EXACT_ORIGIN_NUMBER = "+983000505";
 const EXACT_PATTERN_CODE = "3d6fa1f8ud3ma1w";
+const NETAFRAZ_STATIC_IP = "185.106.201.79";
 
 export function toE164(phone: string): string {
   const d = String(phone || "")
@@ -119,48 +122,50 @@ export async function sendOtpPatternDetailed({
 
   const attemptsLog: Array<Record<string, any>> = [];
 
-  // پشتیبانی از سرور واسط آی‌پی ثابت ایران (در صورت تنظیم IRAN_STATIC_RELAY_URL)
-  const iranRelayUrl = process.env.IRAN_STATIC_RELAY_URL || "";
-  if (iranRelayUrl) {
-    try {
-      const relayRes = await fetchWithTimeout(iranRelayUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetUrl: "https://edge.ippanel.com/v1/api/send",
-          headers: { Authorization: padded },
-          payload: {
-            sending_type: "pattern",
-            from_number: originNumber,
-            code: patternCode,
-            recipients: [recipientE164],
-            params: { "vefification-code": cleanCode },
-          },
-        }),
-      });
-      const relayParsed = await parseResponseSafe(relayRes);
-      attemptsLog.push({
-        gateway: "Iran-Static-Relay",
-        httpStatus: relayRes.status,
-        responseBody: relayParsed,
-      });
-      if (relayRes.ok && relayParsed?.meta?.status !== false) {
-        return {
-          ok: true,
-          provider: "Iran-Static-Relay",
-          status: relayRes.status,
-          userSafeMessage: "کد تایید پیامکی با موفقیت ارسال گردید.",
-          adminTechnicalDiagnosis: "ارسال موفق از طریق سرور واسط آی‌پی ثابت ایران.",
-          adminSolutionGuide: [],
-          rawResponse: relayParsed,
-        };
-      }
-    } catch (e: any) {
-      attemptsLog.push({ gateway: "Iran-Static-Relay", networkError: e?.message });
+  // ۱. تلاش اول: ارسال از طریق پل هاست نت‌افراز شما (gate.axoncore.ir -> 185.106.201.79)
+  const relayResult = await postViaNetafrazRelay(
+    "https://edge.ippanel.com/v1/api/send",
+    { Authorization: padded },
+    {
+      sending_type: "pattern",
+      from_number: originNumber,
+      code: patternCode,
+      recipients: [recipientE164],
+      params: { "vefification-code": cleanCode },
     }
+  );
+
+  if (relayResult) {
+    attemptsLog.push({
+      gateway: "Netafraz-Iran-Relay (" + relayResult.relayUrl + ")",
+      httpStatus: relayResult.status,
+      responseBody: relayResult.data,
+    });
+
+    if (
+      relayResult.status >= 200 &&
+      relayResult.status < 300 &&
+      relayResult.data?.meta?.status !== false
+    ) {
+      return {
+        ok: true,
+        provider: "Netafraz-Iran-Relay",
+        status: relayResult.status,
+        userSafeMessage: "کد تایید پیامکی با موفقیت ارسال گردید.",
+        adminTechnicalDiagnosis: "ارسال موفق از طریق هاست نت‌افراز شما (185.106.201.79).",
+        adminSolutionGuide: [],
+        rawResponse: relayResult.data,
+      };
+    }
+  } else {
+    attemptsLog.push({
+      gateway: "Netafraz-Iran-Relay (https://gate.axoncore.ir/axon-relay.php)",
+      status: "NOT_UPLOADED_YET",
+      note: "فایل axon-relay.php هنوز روی ساب‌دامنه gate.axoncore.ir در هاست نت‌افراز آپلود نشده است.",
+    });
   }
 
-  // ۳ درگاه رسمی تاییدشده با کلید ...ZTY= و متغیر دقیق vefification-code (با تایپ صریح Record<string, string>)
+  // ۲. تلاش دوم: اتصال مستقیم از سرور جاری به درگاه‌های IPPanel
   const gateways: Array<{
     name: string;
     url: string;
@@ -260,9 +265,9 @@ export async function sendOtpPatternDetailed({
   }
 
   const hasArvan502 = attemptsLog.some((a) => a.blockedByArvanCloudWAF === true);
-  const firstStatus = attemptsLog[0]?.httpStatus || 502;
+  const firstStatus = attemptsLog.find((a) => a.httpStatus)?.httpStatus || 502;
   const diagnosisText = hasArvan502
-    ? "خطای 502 Bad Gateway از فایروال ابرآروان (ArvanCloud WAF): کلید API (...ZTY=)، خط +983000505 و متغیر vefification-code کاملاً صحیح هستند و از اینترنت ایران با کد 200 کار می‌کنند؛ اما چون بک‌اند سایت روی سرور Vercel (آمریکا) اجرا می‌شود، فایروال ابرآروانِ IPPanel درخواست‌های ورودی از آی‌پی دیتاسنترهای خارج از کشور را مسدود کرده است."
+    ? "خطای 502 از فایروال ابرآروان: درخواست از سرور Vercel (آمریکا) ارسال شده و فایل axon-relay.php هنوز روی ساب‌دامنه gate.axoncore.ir در هاست نت‌افراز شما فعال نشده است."
     : "خطا در پاسخ وب‌سرویس پیامک با کد وضعیت HTTP " + firstStatus;
 
   return {
@@ -273,8 +278,9 @@ export async function sendOtpPatternDetailed({
     userSafeMessage: "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
     adminTechnicalDiagnosis: diagnosisText,
     adminSolutionGuide: [
-      "۱. به پشتیبانی پنل پیامک (IPPanel / فراز اس‌ام‌اس) تیکت بزنید و درخواست کنید «دسترسی وب‌سرویس از آی‌پی خارج از کشور (بین‌الملل)» را برای کلید دسترسی (API Key) و کاربری شما روی فایروال ابرآروان باز کنند.",
-      "۲. یا با قرار دادن بک‌اند روی سرور/هاست دارای آی‌پی ثابت ایران، هم محدودیت فایروال ابرآروان IPPanel و هم محدودیت آی‌پی ثابت شاپرک/زرین‌پال به صورت هم‌زمان برطرف می‌شود.",
+      "۱. در پنل دایرکت‌ادمین نت‌افراز (netafraz.com)، در بخش «مدیریت زیر دامنه‌ها (Subdomain Management)»، یک زیر دامنه به نام gate بسازید (gate.axoncore.ir).",
+      "۲. فایل axon-relay.php که در پوشه اصلی پروژه شما ساخته شده را در مسیر domains/axoncore.ir/public_html/gate/axon-relay.php آپلود کنید.",
+      "۳. آی‌پی ثابت هاست نت‌افراز خود (" + NETAFRAZ_STATIC_IP + ") را در پنل زرین‌پال ثبت نمایید.",
     ],
     rawResponse: attemptsLog,
   };

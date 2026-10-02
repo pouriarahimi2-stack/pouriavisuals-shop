@@ -1,8 +1,8 @@
-// File Path: app/admin/inventory/page.tsx
-"use client";
 import React from "react";
 import AdminInventoryManager from "@/components/AdminInventoryManager";
 
-export default function AdminInventoryRoute() {
+export const dynamic = "force-dynamic";
+
+export default function AdminRoutePage() {
   return <AdminInventoryManager defaultSubTab="accounting" />;
 }

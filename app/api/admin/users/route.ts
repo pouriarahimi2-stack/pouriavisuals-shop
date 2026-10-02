@@ -10,10 +10,10 @@ async function getStoredPermissionsMap(): Promise<Record<string, string[]>> {
   try {
     const { data: row } = await supabaseAdmin
       .from("site_info")
-      .select("auth_security_config")
+      .select("homepage_layout_config")
       .limit(1)
       .maybeSingle();
-    return row?.auth_security_config?.admin_permissions_map || {};
+    return row?.homepage_layout_config?.auth_security_config?.admin_permissions_map || {};
   } catch {
     return {};
   }
@@ -23,20 +23,27 @@ async function saveStoredPermissionsMap(map: Record<string, string[]>) {
   try {
     const { data: row } = await supabaseAdmin
       .from("site_info")
-      .select("id, auth_security_config")
+      .select("id, homepage_layout_config")
       .limit(1)
       .maybeSingle();
+
+    const prevLayout =
+      row?.homepage_layout_config && typeof row.homepage_layout_config === "object"
+        ? row.homepage_layout_config
+        : {};
+
+    const updatedLayout = {
+      ...prevLayout,
+      auth_security_config: {
+        ...(prevLayout.auth_security_config || {}),
+        admin_permissions_map: map,
+      },
+    };
 
     if (row && row.id) {
       await supabaseAdmin
         .from("site_info")
-        .update({
-          auth_security_config: {
-            ...(row.auth_security_config || {}),
-            admin_permissions_map: map,
-          },
-          updated_at: new Date().toISOString(),
-        })
+        .update({ homepage_layout_config: updatedLayout })
         .eq("id", row.id);
     }
   } catch {}
@@ -120,7 +127,7 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     return NextResponse.json({
       success: true,
-      message: "اطلاعات و دسترسی‌های مدیر با موفقیت بروزرسانی شد.",
+      message: "✓ اطلاعات و دسترسی‌های تیک‌دار مدیر در دیتابیس بروزرسانی شد.",
       user: { ...data, permissions: permList },
     });
   }
@@ -150,7 +157,7 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   return NextResponse.json({
     success: true,
-    message: "مدیر جدید با دسترسی‌های انتخاب‌شده ثبت گردید.",
+    message: "✓ مدیر جدید با دسترسی‌های انتخاب‌شده در دیتابیس ثبت گردید.",
     user: { ...data, permissions: permList },
   });
 }
@@ -161,20 +168,12 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const session: any = await verifyAdminSession(req);
-  if (!session) {
-    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
-  }
-
-  if (session.role !== "superadmin") {
-    return NextResponse.json(
-      { success: false, message: "حذف مدیر فقط در حیطه اختیارات مدیر ارشد سیستم است." },
-      { status: 403 }
-    );
+  if (!session || session.role !== "superadmin") {
+    return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
-
   if (!id) {
     return NextResponse.json({ success: false, message: "شناسه کاربر الزامی است." }, { status: 400 });
   }

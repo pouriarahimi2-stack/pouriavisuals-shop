@@ -1,9 +1,8 @@
-// File Path: app/admin/styles/page.tsx
-"use client";
-
 import React from "react";
-import AdminStyleSettings from "@/components/AdminStyleSettings";
+import StyleFontManager from "@/components/admin/StyleFontManager";
 
-export default function AdminStylesPage() {
-  return <AdminStyleSettings />;
+export const dynamic = "force-dynamic";
+
+export default function AdminRoutePage() {
+  return <StyleFontManager />;
 }

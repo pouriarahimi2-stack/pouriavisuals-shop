@@ -1,8 +1,8 @@
-// File Path: app/admin/reports/page.tsx
-"use client";
 import React from "react";
 import AdminInventoryManager from "@/components/AdminInventoryManager";
 
-export default function AdminReportsRoute() {
+export const dynamic = "force-dynamic";
+
+export default function AdminRoutePage() {
   return <AdminInventoryManager defaultSubTab="reports" />;
 }

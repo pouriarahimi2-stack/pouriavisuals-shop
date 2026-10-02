@@ -1,8 +1,8 @@
-"use client";
-
 import React from "react";
 import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
 
-export default function AdminAppearancePage() {
-  return <StorefrontLayoutStudio />;
+export const dynamic = "force-dynamic";
+
+export default function AdminRoutePage() {
+  return <StorefrontLayoutStudio defaultTab="header" />;
 }

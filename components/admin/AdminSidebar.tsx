@@ -1,4 +1,3 @@
-// File Path: components/admin/AdminSidebar.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -40,6 +39,13 @@ const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
     requiredPerm: ["products", "all"],
   },
   {
+    id: "banners",
+    label: "بنرها و اسلایدر محصولات",
+    href: "/admin/banners",
+    icon: "🖼️",
+    requiredPerm: ["banners", "all"],
+  },
+  {
     id: "customers",
     label: "مشتریان (CRM) و پیامک",
     href: "/admin/customers",
@@ -55,18 +61,11 @@ const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
   },
   {
     id: "appearance_hub",
-    label: "استودیوی ظاهر، هدر، فوتر و منوها",
+    label: "استودیوی ظاهر، منوها و صفحه‌ساز",
     href: "/admin/appearance",
     icon: "🎨",
     badge: "یکپارچه",
-    requiredPerm: ["appearance", "menu", "all"],
-  },
-  {
-    id: "pages",
-    label: "صفحه‌ساز ماژولار (ریسپانسیو)",
-    href: "/admin/pages",
-    icon: "⚡",
-    requiredPerm: ["pages", "all"],
+    requiredPerm: ["appearance", "menu", "pages", "all"],
   },
   {
     id: "styles",
@@ -74,13 +73,6 @@ const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
     href: "/admin/styles",
     icon: "✨",
     requiredPerm: ["appearance", "styles", "all"],
-  },
-  {
-    id: "banners",
-    label: "بنرها و اسلایدر کاتالوگ",
-    href: "/admin/banners",
-    icon: "🖼️",
-    requiredPerm: ["banners", "all"],
   },
   {
     id: "seo",
@@ -198,8 +190,7 @@ export function AdminSidebar(props: any = {}) {
   }, []);
 
   const userPerms = adminUser?.permissions || ["all"];
-  const isSuper =
-    adminUser?.role === "superadmin" || userPerms.includes("all");
+  const isSuper = adminUser?.role === "superadmin" || userPerms.includes("all");
 
   const allowedMenuItems = UNIFIED_ADMIN_NAV.filter((item) => {
     if (isSuper) return true;
@@ -212,13 +203,12 @@ export function AdminSidebar(props: any = {}) {
     if (role === "order_manager") return "💳 پشتیبان سفارشات و مالی";
     if (role === "content_seo_manager") return "🚀 کارشناس محتوا و سئو";
     if (role === "viewer_reporter") return "👁️ بیننده و گزارش‌دهنده";
-    return "🛡️️ مدیر سیستم";
+    return "🛡 مدیر سیستم";
   };
 
   return (
     <>
-      {/* نوار بالای موبایل و تبلت برای باز کردن منو */}
-      <div className="lg:hidden flex items-center justify-between p-3.5 mb-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-black">
+      <div className="lg:hidden flex items-center justify-between p-3.5 m-3 mb-0 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] text-xs font-black">
         <div className="flex items-center gap-2">
           <span className="text-base">⚡</span>
           <span>پنل فرماندهی آکسون</span>
@@ -242,7 +232,7 @@ export function AdminSidebar(props: any = {}) {
 
       <aside
         className={
-          "w-full lg:w-72 shrink-0 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-4 shadow-2xl font-sans select-none space-y-4 transition-all " +
+          "w-full lg:w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] p-4 shadow-2xl font-sans select-none space-y-4 transition-all " +
           (mobileOpen ? "block" : "hidden lg:block")
         }
         dir="rtl"
@@ -260,7 +250,7 @@ export function AdminSidebar(props: any = {}) {
           </div>
         </div>
 
-        <nav className="space-y-1.5 max-h-[70vh] overflow-y-auto pr-1 text-xs">
+        <nav className="space-y-1.5 max-h-[72vh] overflow-y-auto pr-1 text-xs">
           {allowedMenuItems.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -271,7 +261,8 @@ export function AdminSidebar(props: any = {}) {
                   pathname?.startsWith("/admin/reports"))) ||
               (item.id === "appearance_hub" &&
                 (pathname?.startsWith("/admin/appearance") ||
-                  pathname?.startsWith("/admin/menu")));
+                  pathname?.startsWith("/admin/menu") ||
+                  pathname?.startsWith("/admin/pages")));
 
             return (
               <Link

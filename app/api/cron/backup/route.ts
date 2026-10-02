@@ -10,11 +10,15 @@ export async function GET() {
     const [prodsRes, ordersRes, siteRes] = await Promise.all([
       supabaseAdmin.from("products").select("id"),
       supabaseAdmin.from("orders").select("id"),
-      supabaseAdmin.from("site_info").select("id, auth_security_config").limit(1).maybeSingle(),
+      supabaseAdmin.from("site_info").select("id, homepage_layout_config").limit(1).maybeSingle(),
     ]);
 
     const siteRow = siteRes.data;
-    const authCfg = siteRow?.auth_security_config || {};
+    const layoutCfg =
+      siteRow?.homepage_layout_config && typeof siteRow.homepage_layout_config === "object"
+        ? siteRow.homepage_layout_config
+        : {};
+    const authCfg = layoutCfg.auth_security_config || {};
     const history = Array.isArray(authCfg.backup_history) ? [...authCfg.backup_history] : [];
     const existsToday = history.some((h: any) => h.dateKey === todayKey);
 
@@ -41,11 +45,14 @@ export async function GET() {
       await supabaseAdmin
         .from("site_info")
         .update({
-          auth_security_config: {
-            ...authCfg,
-            backup_history: updatedHistory,
-            latest_backup_number: latestNum,
-            latest_backup_at: entry.createdAt,
+          homepage_layout_config: {
+            ...layoutCfg,
+            auth_security_config: {
+              ...authCfg,
+              backup_history: updatedHistory,
+              latest_backup_number: latestNum,
+              latest_backup_at: entry.createdAt,
+            },
           },
         })
         .eq("id", siteRow.id);
@@ -55,7 +62,6 @@ export async function GET() {
       success: true,
       backupNumber: latestNum,
       dateKey: todayKey,
-      message: "Auto daily backup verified.",
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });

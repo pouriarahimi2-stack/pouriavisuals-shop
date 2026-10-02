@@ -1,8 +1,8 @@
-"use client";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-export default function Redirect() {
-  const r = useRouter();
-  useEffect(() => { r.replace("/admin/financial"); }, []);
-  return null;
+import React from "react";
+import AdminCustomers from "@/components/admin/AdminCustomers";
+
+export const dynamic = "force-dynamic";
+
+export default function AdminRoutePage() {
+  return <AdminCustomers />;
 }

@@ -27,11 +27,12 @@ export async function GET(req: NextRequest) {
     try {
       const { data: siteRow } = await supabaseAdmin
         .from("site_info")
-        .select("auth_security_config")
+        .select("homepage_layout_config")
         .limit(1)
         .maybeSingle();
 
-      const permMap = siteRow?.auth_security_config?.admin_permissions_map || {};
+      const permMap =
+        siteRow?.homepage_layout_config?.auth_security_config?.admin_permissions_map || {};
       if (username && Array.isArray(permMap[username]) && permMap[username].length > 0) {
         permissions = permMap[username];
       } else if (role === "superadmin") {

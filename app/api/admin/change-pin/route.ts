@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // اگر ادمین قصد تغییر رمز مدیر دیگری را دارد، حتماً باید superadmin باشد
     if (targetUsername && targetUsername !== String(session.username || "").toLowerCase()) {
       if (session.role !== "superadmin") {
         return NextResponse.json(
@@ -39,18 +38,8 @@ export async function POST(req: NextRequest) {
 
     const hashedNewPassword = authSecurity.hashPassword(newPassword);
 
-    // بررسی وجود کاربر در جدول admin_users (برای همه نقش‌ها)
     let userRecord: any = null;
-    if (session.id && (!body.targetUsername || targetUsername === String(session.username || "").toLowerCase())) {
-      const { data } = await supabaseAdmin
-        .from("admin_users")
-        .select("*")
-        .eq("id", session.id)
-        .maybeSingle();
-      userRecord = data;
-    }
-
-    if (!userRecord && targetUsername) {
+    if (targetUsername) {
       const { data } = await supabaseAdmin
         .from("admin_users")
         .select("*")
@@ -59,11 +48,19 @@ export async function POST(req: NextRequest) {
       userRecord = data;
     }
 
-    // اگر خود کاربر رمز خودش را عوض می‌کند و رکورد در دیتابیس دارد، صحت رمز فعلی بررسی شود
+    if (!userRecord && session.id) {
+      const { data } = await supabaseAdmin
+        .from("admin_users")
+        .select("*")
+        .eq("id", session.id)
+        .maybeSingle();
+      userRecord = data;
+    }
+
     if (
       userRecord &&
       currentPassword &&
-      session.role !== "superadmin" &&
+      targetUsername === String(session.username || "").toLowerCase() &&
       (userRecord.password_hash || userRecord.password)
     ) {
       const storedHash = userRecord.password_hash || userRecord.password;
@@ -89,7 +86,6 @@ export async function POST(req: NextRequest) {
 
       if (updateErr) throw updateErr;
     } else if (targetUsername) {
-      // اگر مدیر ارشد هنوز رکوردی در جدول admin_users نداشت، برایش ایجاد شود
       await supabaseAdmin.from("admin_users").insert([
         {
           username: targetUsername,
@@ -102,38 +98,14 @@ export async function POST(req: NextRequest) {
       ]);
     }
 
-    // اگر مدیر ارشد پین اصلی را تغییر داد، در site_info نیز همگام شود
-    if (session.role === "superadmin" && (!body.targetUsername || targetUsername === String(session.username || "").toLowerCase())) {
-      try {
-        const { data: siteRow } = await supabaseAdmin
-          .from("site_info")
-          .select("id, auth_security_config")
-          .limit(1)
-          .maybeSingle();
-
-        if (siteRow && siteRow.id) {
-          await supabaseAdmin
-            .from("site_info")
-            .update({
-              auth_security_config: {
-                ...(siteRow.auth_security_config || {}),
-                admin_pin_hash: hashedNewPassword,
-              },
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", siteRow.id);
-        }
-      } catch {}
-    }
-
     try {
-      await supabaseAdmin.from("audit_logs").insert([
+      await supabaseAdmin.from("admin_audit_logs").insert([
         {
-          admin_username: session.username || "admin",
           action: "CHANGE_ADMIN_PASSWORD",
-          target_resource: "admin_users:" + (targetUsername || session.id),
+          user_id: session.username || "admin",
           details: { role: session.role, target: targetUsername },
           ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+          severity: "info",
           created_at: new Date().toISOString(),
         },
       ]);
@@ -142,9 +114,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message:
-        "✓ رمز عبور / پین امنیتی برای حساب «" +
+        "✓ کلمه عبور جدید برای حساب «" +
         (targetUsername || session.username || "مدیر") +
-        "» با موفقیت رمزنگاری و در دیتابیس بروزرسانی شد.",
+        "» با موفقیت جایگزین رمز قبلی و در دیتابیس ذخیره شد.",
     });
   } catch (err: any) {
     return NextResponse.json(

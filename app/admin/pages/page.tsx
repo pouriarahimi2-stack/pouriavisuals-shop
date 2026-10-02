@@ -1,7 +1,8 @@
-"use client";
 import React from "react";
-import AdminModularPages from "@/components/admin/AdminModularPages";
+import StorefrontLayoutStudio from "@/components/admin/StorefrontLayoutStudio";
 
-export default function AdminPagesRoute() {
-  return <AdminModularPages />;
+export const dynamic = "force-dynamic";
+
+export default function AdminRoutePage() {
+  return <StorefrontLayoutStudio defaultTab="page_builder" />;
 }

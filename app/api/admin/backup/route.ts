@@ -29,7 +29,6 @@ async function buildFullSiteSnapshot() {
     siteInfoRes,
     stylesRes,
     messagesRes,
-    invLogsRes,
   ] = await Promise.all([
     supabaseAdmin.from("products").select("*"),
     supabaseAdmin.from("categories").select("*"),
@@ -42,8 +41,7 @@ async function buildFullSiteSnapshot() {
     supabaseAdmin.from("modular_pages").select("*"),
     supabaseAdmin.from("site_info").select("*"),
     supabaseAdmin.from("site_styles").select("*"),
-    supabaseAdmin.from("contact_messages").select("*"),
-    supabaseAdmin.from("inventory_logs").select("*"),
+    supabaseAdmin.from("messages").select("*"),
   ]);
 
   const tables: Record<string, any[]> = {
@@ -58,8 +56,7 @@ async function buildFullSiteSnapshot() {
     modular_pages: pagesRes.data || [],
     site_info: siteInfoRes.data || [],
     site_styles: stylesRes.data || [],
-    contact_messages: messagesRes.data || [],
-    inventory_logs: invLogsRes.data || [],
+    messages: messagesRes.data || [],
   };
 
   const counts: Record<string, number> = {};
@@ -88,9 +85,12 @@ export async function GET(req: NextRequest) {
     const snapshot = await buildFullSiteSnapshot();
     const todayKey = new Date().toISOString().slice(0, 10);
 
-    // بررسی و ثبت خودکار بکاپ روزانه شماره‌گذاری‌شده در پس‌زمینه
     const siteRow = snapshot.tables.site_info?.[0];
-    const authCfg = siteRow?.auth_security_config || {};
+    const layoutCfg =
+      siteRow?.homepage_layout_config && typeof siteRow.homepage_layout_config === "object"
+        ? siteRow.homepage_layout_config
+        : {};
+    const authCfg = layoutCfg.auth_security_config || {};
     const history: BackupHistoryEntry[] = Array.isArray(authCfg.backup_history)
       ? [...authCfg.backup_history]
       : [];
@@ -120,11 +120,14 @@ export async function GET(req: NextRequest) {
           await supabaseAdmin
             .from("site_info")
             .update({
-              auth_security_config: {
-                ...authCfg,
-                backup_history: trimmedHistory,
-                latest_backup_number: latestBackupNumber,
-                latest_backup_at: newEntry.createdAt,
+              homepage_layout_config: {
+                ...layoutCfg,
+                auth_security_config: {
+                  ...authCfg,
+                  backup_history: trimmedHistory,
+                  latest_backup_number: latestBackupNumber,
+                  latest_backup_at: newEntry.createdAt,
+                },
               },
             })
             .eq("id", siteRow.id);
@@ -135,6 +138,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       latestBackupNumber,
+      lastBackup: history[0]?.createdAt || new Date().toISOString(),
       todayKey,
       history: history.slice(0, 30),
       backup: {
@@ -156,12 +160,15 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    // اکشن ساخت بکاپ شماره‌دار جدید به صورت فوری
     if (body.action === "create_numbered_backup") {
       const snapshot = await buildFullSiteSnapshot();
       const todayKey = new Date().toISOString().slice(0, 10);
       const siteRow = snapshot.tables.site_info?.[0];
-      const authCfg = siteRow?.auth_security_config || {};
+      const layoutCfg =
+        siteRow?.homepage_layout_config && typeof siteRow.homepage_layout_config === "object"
+          ? siteRow.homepage_layout_config
+          : {};
+      const authCfg = layoutCfg.auth_security_config || {};
       const history: BackupHistoryEntry[] = Array.isArray(authCfg.backup_history)
         ? [...authCfg.backup_history]
         : [];
@@ -186,11 +193,14 @@ export async function POST(req: NextRequest) {
         await supabaseAdmin
           .from("site_info")
           .update({
-            auth_security_config: {
-              ...authCfg,
-              backup_history: nextHistory,
-              latest_backup_number: nextNum,
-              latest_backup_at: entry.createdAt,
+            homepage_layout_config: {
+              ...layoutCfg,
+              auth_security_config: {
+                ...authCfg,
+                backup_history: nextHistory,
+                latest_backup_number: nextNum,
+                latest_backup_at: entry.createdAt,
+              },
             },
           })
           .eq("id", siteRow.id);
@@ -206,7 +216,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // اکشن بازیابی کامل اطلاعات سایت از فایل پشتیبان JSON
     const tables = body?.tables || body?.backup?.tables;
     if (!tables || typeof tables !== "object") {
       return NextResponse.json(
@@ -235,21 +244,8 @@ export async function POST(req: NextRequest) {
       upsertTable("modular_pages", tables.modular_pages),
       upsertTable("site_info", tables.site_info),
       upsertTable("site_styles", tables.site_styles),
-      upsertTable("contact_messages", tables.contact_messages),
+      upsertTable("messages", tables.messages),
     ]);
-
-    try {
-      await supabaseAdmin.from("audit_logs").insert([
-        {
-          admin_username: session.username || "superadmin",
-          action: "DATABASE_BACKUP_RESTORE",
-          target_resource: "supabase:all_tables",
-          details: restoredCounts,
-          ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
-          created_at: new Date().toISOString(),
-        },
-      ]);
-    } catch {}
 
     return NextResponse.json({
       success: true,

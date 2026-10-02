@@ -12,12 +12,16 @@ export async function GET() {
     if (supabaseAdmin) {
       const { data: row } = await supabaseAdmin
         .from("site_info")
-        .select("auth_security_config")
+        .select("allow_google_index, maintenance_mode, homepage_layout_config")
         .limit(1)
         .maybeSingle();
 
-      const sys = row?.auth_security_config?.system_settings;
-      if (sys && (sys.seo_noindex === true || sys.maintenance_mode === true)) {
+      const sys = row?.homepage_layout_config?.auth_security_config?.system_settings;
+      if (
+        row?.allow_google_index === false ||
+        (row?.maintenance_mode && row.maintenance_mode !== "none" && row.maintenance_mode !== "false") ||
+        (sys && (sys.seo_noindex === true || sys.maintenance_mode === true))
+      ) {
         disallowAll = true;
       }
     }

@@ -10,12 +10,8 @@ export default function ContactDock() {
 
   return (
     <>
-      <div
-        className="fixed bottom-20 sm:bottom-6 left-3.5 sm:left-6 z-40 select-none"
-        dir="rtl"
-      >
+      <div className="fixed bottom-20 lg:bottom-6 left-3 sm:left-6 z-40 select-none" dir="rtl">
         <button
-          type="button"
           onClick={() => {
             soundEngine.playClick();
             setIsOpen(true);
@@ -39,7 +35,7 @@ export default function ContactDock() {
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
           </div>
 
-          <div className="text-right pr-0.5 sm:pr-1">
+          <div className="text-right pr-0.5">
             <span className="text-[9px] sm:text-[10px] uppercase font-mono tracking-wider opacity-85 block">
               LIVE AI
             </span>
@@ -51,19 +47,20 @@ export default function ContactDock() {
       </div>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 bg-black/65 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-lg max-h-[90vh] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden flex flex-col">
             <button
-              type="button"
               onClick={() => {
                 soundEngine.playClick();
                 setIsOpen(false);
               }}
-              className="absolute top-3.5 left-3.5 z-10 w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold text-[var(--text-primary)] hover:bg-rose-500 hover:text-white transition cursor-pointer"
+              className="absolute top-3.5 left-3.5 z-20 w-8 h-8 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold text-[var(--text-primary)] hover:bg-rose-500 hover:text-white transition cursor-pointer"
             >
               ✕
             </button>
-            <AIAssistantChat />
+            <div className="overflow-y-auto flex-1">
+              <AIAssistantChat />
+            </div>
           </div>
         </div>
       )}

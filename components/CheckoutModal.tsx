@@ -7,37 +7,37 @@ import { useCart } from "@/context/CartContext";
 import { couponService, Coupon } from "@/services/couponService";
 import { soundEngine } from "@/lib/soundEngine";
 
-const MODAL_DRAFT_KEY = "axon_checkout_draft_v2026";
+const MODAL_DRAFT_KEY = "axon_checkout_modal_draft_v2026";
 
-const IRAN_PROVINCES_CITIES: Record<string, string[]> = {
+const IRAN_PROVINCES_MAP: Record<string, string[]> = {
   "تهران": ["تهران", "شهریار", "اسلامشهر", "قدس", "ملارد", "پاکدشت", "ری", "ورامین", "پردیس", "دماوند"],
   "فارس": ["شیراز", "مرودشت", "جهرم", "فسا", "کازرون", "داراب", "لار", "آباده", "صدرا"],
   "اصفهان": ["اصفهان", "کاشان", "خمینی‌شهر", "نجف‌آباد", "شاهین‌‌شهر", "شهرضا", "فولادشهر"],
   "خراسان رضوی": ["مشهد", "نیشابور", "سبزوار", "تربت حیدریه", "کاشمر", "قوچان"],
-  "آذربایجان شرقی": ["تبریز", "مراغه", "مرند", "میانه", "اهر", "بناب", "سهند"],
-  "مازندران": ["ساری", "بابل", "آمل", "قائم‌شهر", "بهشهر", "چالوس", "بابلسر", "رامسر"],
-  "البرز": ["کرج", "فردیس", "کمال‌شهر", "نظرآباد", "محمدشهر", "مهرشهر"],
-  "خوزستان": ["اهواز", "دزفول", "آبادان", "بندر ماهشهر", "خرمشهر", "اندیمشک"],
-  "گیلان": ["رشت", "بندر انزلی", "لاهیجان", "لنگرود", "تالش", "آستارا"],
+  "آذربایجان شرقی": ["تبریز", "مراغه", "مرند", "میانه", "اهر", "بناب"],
+  "مازندران": ["ساری", "بابل", "آمل", "قائم‌شهر", "بهشهر", "چالوس", "بابلسر", "تنکابن", "رامسر"],
+  "البرز": ["کرج", "فردیس", "کمال‌شهر", "نظرآباد", "محمدشهر", "ماهدشت", "هشتگرد"],
+  "خوزستان": ["اهواز", "دزفول", "آبادان", "بندر ماهشهر", "خرمشهر", "اندیمشک", "بهبهان"],
+  "گیلان": ["رشت", "بندر انزلی", "لاهیجان", "لنگرود", "تالش", "آستارا", "رودسر"],
   "کرمان": ["کرمان", "سیرجان", "رفسنجان", "جیرفت", "بم", "زرند"],
   "آذربایجان غربی": ["ارومیه", "خوی", "بوکان", "مهاباد", "میاندوآب", "سلماس"],
   "هرمزگان": ["بندرعباس", "میناب", "قشم", "کیش", "بندر لنگه"],
   "مرکزی": ["اراک", "ساوه", "خمین", "محلات", "دلیجان"],
   "همدان": ["همدان", "ملایر", "نهاوند", "اسدآباد", "تویسرکان"],
   "یزد": ["یزد", "میبد", "اردکان", "بافق", "مهریز"],
-  "کرمانشاه": ["کرمانشاه", "اسلام‌آباد غرب", "جوانرود", "کنگاور"],
-  "قزوین": ["قزوین", "الوند", "تاکستان", "آبیک"],
-  "سیستان و بلوچستان": ["زاهدان", "زابل", "ایرانشهر", "چابهار"],
-  "قم": ["قم", "قنوات", "جعفریه"],
+  "کرمانشاه": ["کرمانشاه", "اسلام‌آباد غرب", "جوانرود", "کنگاور", "سرپل ذهاب"],
+  "قزوین": ["قزوین", "الوند", "تاکستان", "بوئین‌زهرا", "آبیک"],
+  "سیستان و بلوچستان": ["زاهدان", "زابل", "ایرانشهر", "چابهار", "سراوان"],
+  "قم": ["قم", "قنوات", "جعفریه", "کهک"],
   "گلستان": ["گرگان", "گنبد کاووس", "بندر ترکمن", "علی‌آباد کتول"],
   "کردستان": ["سنندج", "سقز", "مریوان", "بانه", "قروه"],
-  "لرستان": ["خرم‌آباد", "بروجرد", "دورود", "الیگودرز"],
-  "بوشهر": ["بوشهر", "برازجان", "بندر گناوه", "عسلویه"],
+  "لرستان": ["خرم‌آباد", "بروجرد", "دورود", "کوهدشت", "الیگودرز"],
+  "بوشهر": ["بوشهر", "برازجان", "بندر گناوه", "بندر کنگان", "عسلویه"],
   "زنجان": ["زنجان", "ابهر", "خرمدره", "قیدار"],
   "اردبیل": ["اردبیل", "پارس‌آباد", "مشگین‌شهر", "خلخال"],
   "سمنان": ["سمنان", "شاهرود", "دامغان", "گرمسار"],
-  "چهارمحال و بختیاری": ["شهرکرد", "بروجن", "فرخ‌شهر", "لردگان"],
-  "ایلام": ["ایلام", "دهلران", "ایوان"],
+  "چهارمحال و بختیاری": ["شهرکرد", "بروجن", "فرخ‌شهر", "فارسان"],
+  "ایلام": ["ایلام", "دهلران", "ایوان", "آبدانان"],
   "کهگیلویه و بویراحمد": ["یاسوج", "دوگنبدان", "دهدشت"],
   "خراسان شمالی": ["بجنورد", "شیروان", "اسفراین"],
   "خراسان جنوبی": ["بیرجند", "قائن", "فردوس", "طبس"],
@@ -50,11 +50,12 @@ interface CheckoutModalProps {
 
 export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const router = useRouter();
-  const { cartItems, totalPrice, clearCart } = useCart() as any;
+  const { cartItems, totalPrice } = useCart() as any;
 
   const items = cartItems || [];
 
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [province, setProvince] = useState("تهران");
   const [city, setCity] = useState("تهران");
@@ -68,35 +69,35 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponMessage, setCouponMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
-  const [verifiedPhone, setVerifiedPhone] = useState("");
   const [otpStep, setOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [verifiedPhone, setVerifiedPhone] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const provincesList = Object.keys(IRAN_PROVINCES_CITIES);
-  const citiesList = IRAN_PROVINCES_CITIES[province] || ["تهران"];
-
+  // بازیابی از حافظه ضد رفرش
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const rawDraft = localStorage.getItem(MODAL_DRAFT_KEY);
-      if (rawDraft) {
-        const d = JSON.parse(rawDraft);
-        if (d.fullName) setFullName(d.fullName);
+      const saved = localStorage.getItem(MODAL_DRAFT_KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.firstName) setFirstName(d.firstName);
+        if (d.lastName) setLastName(d.lastName);
         if (d.phone) setPhone(d.phone);
-        if (d.province && IRAN_PROVINCES_CITIES[d.province]) {
+        if (d.province && IRAN_PROVINCES_MAP[d.province]) {
           setProvince(d.province);
           if (d.city) setCity(d.city);
         }
-        if (d.address) setAddress(d.address);
         if (d.postalCode) setPostalCode(d.postalCode);
+        if (d.address) setAddress(d.address);
         if (d.notes) setNotes(d.notes);
       }
-      const rawUser = localStorage.getItem("axon_user_session");
-      if (rawUser) {
-        const u = JSON.parse(rawUser);
+      const userRaw = localStorage.getItem("axon_user_session");
+      if (userRaw) {
+        const u = JSON.parse(userRaw);
         if (u && u.phone) {
           const clean = String(u.phone).replace(/\D/g, "");
           setPhone((prev) => prev || clean);
@@ -105,33 +106,41 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         }
       }
     } catch {}
-  }, [isOpen]);
+  }, []);
 
+  // ذخیره آنی در حافظه ضد رفرش
   useEffect(() => {
-    if (typeof window === "undefined" || !isOpen) return;
+    if (typeof window === "undefined") return;
     try {
       localStorage.setItem(
         MODAL_DRAFT_KEY,
-        JSON.stringify({ fullName, phone, province, city, address, postalCode, notes })
+        JSON.stringify({ firstName, lastName, phone, province, city, postalCode, address, notes })
       );
     } catch {}
-  }, [fullName, phone, province, city, address, postalCode, notes, isOpen]);
+  }, [firstName, lastName, phone, province, city, postalCode, address, notes]);
 
   if (!isOpen) return null;
+
+  const provincesList = Object.keys(IRAN_PROVINCES_MAP);
+  const citiesList = IRAN_PROVINCES_MAP[province] || ["تهران"];
 
   const basePrice =
     typeof totalPrice === "number"
       ? totalPrice
       : items.reduce(
           (sum: number, item: any) =>
-            sum + Number(item.discount_price || item.price || 0) * Number(item.quantity || 1),
+            sum + Number(item.price || 0) * Number(item.quantity || 1),
           0
         );
 
   const finalPrice = Math.max(0, basePrice - discountAmount);
 
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
+    if (!couponCode.trim()) {
+      setCouponMessage({ type: "error", text: "لطفاً کد تخفیف را وارد کنید." });
+      return;
+    }
+
     soundEngine.playClick();
     setCouponLoading(true);
     setCouponMessage(null);
@@ -155,21 +164,30 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     }
   };
 
-  const finalizeOrderToGateway = async (cleanPhone: string) => {
+  const handleRemoveCoupon = () => {
+    soundEngine.playClick();
+    setAppliedCoupon(null);
+    setDiscountAmount(0);
+    setCouponCode("");
+    setCouponMessage(null);
+  };
+
+  const finalizeModalOrder = async (cleanPhone: string, cleanPostal: string) => {
     setSubmitting(true);
-    setFormError("");
+    const fullName = (firstName.trim() + " " + lastName.trim()).trim() || "خریدار محترم";
+
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer: {
-            fullName: fullName.trim() || "خریدار محترم",
+            fullName,
             phone: cleanPhone,
             province,
             city,
             address: address.trim(),
-            postalCode: postalCode.trim(),
+            postalCode: cleanPostal,
             notes: notes.trim(),
           },
           items,
@@ -180,19 +198,10 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         }),
       });
+
       const json = await res.json();
       if (res.ok && json.success && json.order) {
         soundEngine.playSuccess();
-        const userSession = {
-          phone: cleanPhone,
-          name: fullName.trim(),
-          full_name: fullName.trim(),
-          token: "VERIFIED-BUYER-" + Date.now(),
-        };
-        localStorage.setItem("axon_user_session", JSON.stringify(userSession));
-        window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: userSession }));
-
-        if (typeof clearCart === "function") clearCart();
         onClose();
         router.push(
           "/checkout/payment?orderId=" +
@@ -205,10 +214,10 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             encodeURIComponent(cleanPhone)
         );
       } else {
-        setFormError(json.message || "خطا در ثبت سفارش.");
+        setFormError(json.message || "خطا در ثبت اطلاعات سفارش.");
       }
     } catch {
-      setFormError("خطا در ارتباط با سرور ثبت سفارش.");
+      setFormError("خطا در ثبت اطلاعات سفارش در سیستم.");
     } finally {
       setSubmitting(false);
     }
@@ -223,9 +232,14 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       .trim()
       .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
       .replace(/\D/g, "");
-
     if (cleanPhone.length !== 11 || !cleanPhone.startsWith("09")) {
       setFormError("شماره همراه باید ۱۱ رقم و با ۰۹ شروع شود.");
+      return;
+    }
+
+    const cleanPostal = postalCode.trim().replace(/\D/g, "");
+    if (cleanPostal && cleanPostal.length !== 10) {
+      setFormError("کد پستی ۱۰ رقمی ایران باید دقیقاً ۱۰ رقم عددی باشد.");
       return;
     }
 
@@ -235,57 +249,55 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     }
 
     if (isPhoneVerified && verifiedPhone === cleanPhone) {
-      await finalizeOrderToGateway(cleanPhone);
+      await finalizeModalOrder(cleanPhone, cleanPostal);
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const otpRes = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone, action: "send" }),
-      });
-      const otpJson = await otpRes.json();
-      if (otpRes.ok && (otpJson.success || otpJson.sent !== false)) {
-        setOtpStep(true);
-        setOtpCode("");
-      } else {
-        setFormError(otpJson.message || "خطا در ارسال کد تایید پیامکی.");
+    if (!otpStep) {
+      setSubmitting(true);
+      try {
+        const otpRes = await fetch("/api/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: cleanPhone, action: "send" }),
+        });
+        const otpJson = await otpRes.json();
+        if (otpRes.ok && otpJson.success !== false) {
+          setOtpStep(true);
+        } else {
+          setFormError(otpJson.message || "خطا در ارسال کد تایید پیامکی.");
+        }
+      } catch {
+        setFormError("خطا در ارتباط با سامانه پیامک.");
+      } finally {
+        setSubmitting(false);
       }
-    } catch {
-      setFormError("خطا در ارتباط با سرویس پیامک.");
-    } finally {
-      setSubmitting(false);
+      return;
     }
-  };
 
-  const handleVerifyOtpModal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (!otpCode.trim()) return;
-    soundEngine.playClick();
+    // تایید کد OTP و انتقال به درگاه پرداخت
     setSubmitting(true);
-    setFormError("");
-
     try {
-      const res = await fetch("/api/send-otp", {
+      const vRes = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone, code: otpCode.trim(), action: "verify" }),
+        body: JSON.stringify({
+          phone: cleanPhone,
+          code: otpCode.trim(),
+          action: "verify",
+        }),
       });
-      const json = await res.json();
-      if (res.ok && (json.verified || json.success)) {
+      const vJson = await vRes.json();
+      if (vRes.ok && (vJson.verified || vJson.success)) {
         setIsPhoneVerified(true);
         setVerifiedPhone(cleanPhone);
-        setOtpStep(false);
-        await finalizeOrderToGateway(cleanPhone);
+        await finalizeModalOrder(cleanPhone, cleanPostal);
       } else {
-        setFormError(json.message || "کد تایید وارد شده نادرست است.");
+        setFormError(vJson.message || "کد تایید وارد شده نادرست است.");
         setSubmitting(false);
       }
     } catch {
-      setFormError("خطا در اعتبارسنجی کد.");
+      setFormError("خطا در بررسی کد تایید.");
       setSubmitting(false);
     }
   };
@@ -299,7 +311,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         <button
           onClick={onClose}
           type="button"
-          className="absolute top-4 left-4 w-8 h-8 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+          className="absolute top-4 left-4 w-8 h-8 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-blue)] transition cursor-pointer"
         >
           ✕
         </button>
@@ -308,204 +320,235 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           <span className="text-xl">🛡️</span>
           <div>
             <h2 className="text-sm sm:text-base font-black text-[var(--text-primary)]">
-              تکمیل مشخصات گیرنده و انتقال به درگاه پرداخت
+              تکمیل مشخصات تحویل و انتقال به درگاه پرداخت
             </h2>
             <p className="text-[11px] text-[var(--text-secondary)] font-medium">
-              مجهز به حافظه فرم ضد رفرش و انتخابگر استاندارد استان و شهر
+              دارای حافظه هوشمند فرم (اطلاعات با رفرش شدن پاک نمی‌شود)
             </p>
           </div>
         </div>
 
+        <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] mb-5 space-y-2 text-xs">
+          <div className="flex justify-between items-center">
+            <span className="text-[var(--text-secondary)] font-bold">
+              اقلام سفارش ({items.length} قلم):
+            </span>
+            <span className="font-mono font-bold">
+              {Number(basePrice).toLocaleString("fa-IR")} تومان
+            </span>
+          </div>
+
+          {discountAmount > 0 && (
+            <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-bold border-t border-[var(--card-border)] pt-2">
+              <span>تخفیف اعمال شده:</span>
+              <span className="font-mono">
+                - {Number(discountAmount).toLocaleString("fa-IR")} تومان
+              </span>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center text-sm font-black text-[var(--accent-blue)] border-t border-[var(--card-border)] pt-2">
+            <span>مبلغ نهایی قابل پرداخت:</span>
+            <span className="font-mono text-base">
+              {Number(finalPrice).toLocaleString("fa-IR")} تومان
+            </span>
+          </div>
+        </div>
+
+        <div className="mb-5 p-4 rounded-2xl border border-[var(--card-border)] bg-[var(--modal-bg)] space-y-2 text-xs">
+          <label className="block font-bold text-[var(--text-secondary)] text-right">
+            کد تخفیف دارید؟
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="کد تخفیف..."
+              value={couponCode}
+              disabled={!!appliedCoupon}
+              onChange={(e) => setCouponCode(e.target.value)}
+              className="flex-1 px-4 py-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-xs focus:border-[var(--accent-blue)] transition disabled:opacity-60 text-right uppercase"
+            />
+            {appliedCoupon ? (
+              <button
+                type="button"
+                onClick={handleRemoveCoupon}
+                className="px-4 py-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 text-xs font-bold hover:bg-rose-500/25 transition cursor-pointer"
+              >
+                حذف
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleApplyCoupon}
+                disabled={couponLoading}
+                className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white text-xs font-bold hover:opacity-90 transition cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {couponLoading ? "بررسی..." : "اعمال تخفیف"}
+              </button>
+            )}
+          </div>
+
+          {couponMessage && (
+            <div
+              className={
+                "p-2.5 rounded-xl text-[11px] font-bold text-right " +
+                (couponMessage.type === "success"
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                  : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30")
+              }
+            >
+              {couponMessage.text}
+            </div>
+          )}
+        </div>
+
         {formError && (
-          <div className="mb-4 p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold text-right">
+          <div className="mb-4 p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold text-right">
             ⚠️ {formError}
           </div>
         )}
 
-        {otpStep ? (
-          <form onSubmit={handleVerifyOtpModal} className="space-y-4 text-xs py-4">
-            <p className="text-[var(--text-secondary)] leading-relaxed">
-              کد تایید پیامکی به شماره <strong className="font-mono text-[var(--text-primary)]">{phone}</strong> ارسال شد. جهت ورود خودکار به حساب و انتقال به درگاه پرداخت، کد را وارد کنید:
-            </p>
-            <input
-              type="text"
-              inputMode="numeric"
-              required
-              dir="ltr"
-              maxLength={8}
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-              placeholder="کد تایید پیامکی"
-              className="w-full p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-black text-xl text-center tracking-widest outline-none focus:border-[var(--accent-blue)]"
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setOtpStep(false)}
-                className="px-4 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
-              >
-                ویرایش شماره
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-lg cursor-pointer disabled:opacity-50"
-              >
-                {submitting ? "در حال انتقال به درگاه..." : "✓ تایید کد و پرداخت آنلاین"}
-              </button>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs text-right">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                  نام و نام خانوادگی گیرنده *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: پوریا رحیمی"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)]"
-                />
-              </div>
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                  شماره تلفن همراه (۱۱ رقم) *
-                </label>
-                <input
-                  type="tel"
-                  required
-                  dir="ltr"
-                  maxLength={11}
-                  placeholder="09123456789"
-                  value={phone}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/\D/g, "");
-                    setPhone(v);
-                    if (v !== verifiedPhone) setIsPhoneVerified(false);
-                  }}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold text-center focus:border-[var(--accent-blue)]"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">استان *</label>
-                <select
-                  value={province}
-                  onChange={(e) => {
-                    const nextP = e.target.value;
-                    setProvince(nextP);
-                    setCity((IRAN_PROVINCES_CITIES[nextP] || [])[0] || "");
-                  }}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-                >
-                  {provincesList.map((p) => (
-                    <option key={p} value={p}>
-                      📍 استان {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">شهر *</label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none cursor-pointer"
-                >
-                  {citiesList.map((c) => (
-                    <option key={c} value={c}>
-                      🏙️ {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs text-right">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                نشانی دقیق پستی تحویل *
-              </label>
-              <textarea
-                rows={2}
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام گیرنده *</label>
+              <input
+                type="text"
                 required
-                placeholder="خیابان، کوچه، پلاک، واحد..."
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium leading-relaxed focus:border-[var(--accent-blue)]"
+                placeholder="مثلاً: پوریا"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] transition text-right"
               />
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                  کد پستی ۱۰ رقمی (اختیاری)
-                </label>
-                <input
-                  type="text"
-                  dir="ltr"
-                  maxLength={10}
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, ""))}
-                  className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none"
-                />
-              </div>
-              <div>
-                <label className="block mb-1 font-bold text-[var(--text-secondary)]">کد تخفیف:</label>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="VIP20"
-                    className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold uppercase outline-none"
-                  />
-                  <button
-                    type="button"
-                    disabled={couponLoading}
-                    onClick={handleApplyCoupon}
-                    className="px-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold cursor-pointer"
-                  >
-                    اعمال
-                  </button>
-                </div>
-              </div>
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">نام خانوادگی *</label>
+              <input
+                type="text"
+                required
+                placeholder="مثلاً: رحیمی"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold focus:border-[var(--accent-blue)] transition text-right"
+              />
             </div>
+          </div>
 
-            {couponMessage && (
-              <div
-                className={
-                  "p-2.5 rounded-xl text-[11px] font-bold " +
-                  (couponMessage.type === "success" ? "text-emerald-500" : "text-rose-500")
-                }
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب استان *</label>
+              <select
+                value={province}
+                onChange={(e) => {
+                  const nextP = e.target.value;
+                  setProvince(nextP);
+                  setCity((IRAN_PROVINCES_MAP[nextP] || [])[0] || "");
+                }}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold cursor-pointer"
               >
-                {couponMessage.text}
-              </div>
-            )}
-
-            <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex justify-between items-center text-sm font-black text-[var(--accent-blue)]">
-              <span>مبلغ نهایی قابل پرداخت:</span>
-              <span className="font-mono">{Number(finalPrice).toLocaleString("fa-IR")} تومان</span>
+                {provincesList.map((prov) => (
+                  <option key={prov} value={prov}>
+                    📍 استان {prov}
+                  </option>
+                ))}
+              </select>
             </div>
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">انتخاب شهر *</label>
+              <select
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-bold cursor-pointer"
+              >
+                {citiesList.map((c) => (
+                  <option key={c} value={c}>
+                    🏙️ {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                شماره تلفن همراه (۱۱ رقم) *
+              </label>
+              <input
+                type="tel"
+                required
+                maxLength={11}
+                placeholder="09123456789"
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setOtpStep(false);
+                }}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold focus:border-[var(--accent-blue)] transition text-center"
+              />
+            </div>
+            <div>
+              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+                کد پستی ۱۰ رقمی ایران (اختیاری)
+              </label>
+              <input
+                type="text"
+                maxLength={10}
+                placeholder="کد ۱۰ رقمی بدون خط تیره"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-mono font-bold focus:border-[var(--accent-blue)] transition text-center"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block mb-1 font-bold text-[var(--text-secondary)]">
+              نشانی دقیق پستی تحویل *
+            </label>
+            <textarea
+              rows={2}
+              required
+              placeholder="خیابان، کوچه، پلاک، واحد..."
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none font-medium leading-relaxed focus:border-[var(--accent-blue)] transition text-right"
+            />
+          </div>
+
+          {otpStep && (
+            <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/30 space-y-2 animate-fadeIn">
+              <label className="block font-black text-sky-400">
+                📲 کد تایید پیامک‌شده به شماره {phone} را وارد کنید:
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                required
+                dir="ltr"
+                maxLength={8}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="کد تایید پیامکی"
+                className="w-full p-3 rounded-xl bg-[var(--input-bg)] border border-sky-500 font-mono font-black text-lg text-center tracking-widest outline-none"
+              />
+            </div>
+          )}
+
+          <div className="pt-2">
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs transition cursor-pointer shadow-xl hover:opacity-90 disabled:opacity-50"
+              className="w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs transition cursor-pointer shadow-xl shadow-blue-500/25 hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting
                 ? "در حال پردازش..."
-                : isPhoneVerified && verifiedPhone === phone
-                ? "تایید نهایی و انتقال به درگاه پرداخت 💳"
-                : "تایید شماره همراه و پرداخت آنلاین 💳"}
+                : otpStep
+                ? "✓ تایید کد پیامکی و ورود به درگاه پرداخت 💳"
+                : "تایید نهایی و پرداخت آنلاین 💳"}
             </button>
-          </form>
-        )}
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -26,7 +26,7 @@ export default function ProductPerspectiveSlider({
   const [products, setProducts] = useState<any[]>(initialProducts || []);
   const [activeIndex, setActiveIndex] = useState(0);
   const [teardownProduct, setTeardownProduct] = useState<any | null>(null);
-  const [isMobileScreen, setIsMobileScreen] = useState(false);
+  const [viewportMode, setViewportMode] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
   const touchStartXRef = useRef<number>(0);
   const isDraggingRef = useRef<boolean>(false);
@@ -44,13 +44,15 @@ export default function ProductPerspectiveSlider({
       setProducts(initialProducts);
     }
 
-    const checkScreen = () => {
-      if (typeof window !== "undefined") {
-        setIsMobileScreen(window.innerWidth < 640);
-      }
+    const updateViewport = () => {
+      if (typeof window === "undefined") return;
+      if (window.innerWidth < 640) setViewportMode("mobile");
+      else if (window.innerWidth < 1024) setViewportMode("tablet");
+      else setViewportMode("desktop");
     };
-    checkScreen();
-    window.addEventListener("resize", checkScreen, { passive: true });
+
+    updateViewport();
+    window.addEventListener("resize", updateViewport, { passive: true });
 
     const channel = supabase
       .channel("realtime-perspective-slider-products")
@@ -60,7 +62,7 @@ export default function ProductPerspectiveSlider({
       .subscribe();
 
     return () => {
-      window.removeEventListener("resize", checkScreen);
+      window.removeEventListener("resize", updateViewport);
       supabase.removeChannel(channel);
     };
   }, [initialProducts]);
@@ -113,8 +115,8 @@ export default function ProductPerspectiveSlider({
     cardScale === "compact"
       ? "w-[250px] sm:w-[300px] h-[400px] sm:h-[450px]"
       : cardScale === "large"
-      ? "w-[285px] sm:w-[370px] h-[460px] sm:h-[540px]"
-      : "w-[270px] sm:w-[340px] h-[435px] sm:h-[490px]";
+      ? "w-[280px] sm:w-[370px] h-[460px] sm:h-[540px]"
+      : "w-[265px] sm:w-[340px] h-[435px] sm:h-[490px]";
 
   const containerHeightClass =
     cardScale === "compact"
@@ -123,13 +125,16 @@ export default function ProductPerspectiveSlider({
       ? "h-[490px] sm:h-[580px]"
       : "h-[465px] sm:h-[530px]";
 
-  const stepTranslateX = isMobileScreen
-    ? 115
-    : cardScale === "compact"
-    ? 180
-    : cardScale === "large"
-    ? 230
-    : 210;
+  const baseStepX =
+    viewportMode === "mobile"
+      ? 115
+      : viewportMode === "tablet"
+      ? 165
+      : cardScale === "compact"
+      ? 180
+      : cardScale === "large"
+      ? 230
+      : 210;
 
   return (
     <section
@@ -139,7 +144,7 @@ export default function ProductPerspectiveSlider({
       suppressHydrationWarning
     >
       <div className="text-center space-y-1 px-4">
-        <h2 className="text-lg sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
+        <h2 className="text-xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
           {customTitle || "نمایشگاه سه‌بعدی تجهیزات پرچمدار"}
         </h2>
         <p className="text-xs text-[var(--text-secondary)] font-medium">
@@ -167,14 +172,15 @@ export default function ProductPerspectiveSlider({
 
           if (!isVisible) return null;
 
-          const translateX = offset * stepTranslateX;
-          const translateZ = -Math.abs(offset) * (isMobileScreen ? 130 : 170);
-          const rotateY = -offset * (isMobileScreen ? 16 : 22);
+          const translateX = offset * baseStepX;
+          const translateZ = -Math.abs(offset) * (viewportMode === "mobile" ? 130 : 170);
+          const rotateY = -offset * (viewportMode === "mobile" ? 16 : 22);
           const opacity = isActive ? 1 : Math.max(0.2, 0.65 - Math.abs(offset) * 0.25);
           const filter = isActive ? "none" : "grayscale(95%) opacity(50%) blur(0.5px)";
           const zIndex = 20 - Math.abs(offset);
 
-          const isAvail = (p.stock ?? 10) > 0 && p.is_available !== false && p.isAvailable !== false;
+          const isAvail =
+            (p.stock ?? 10) > 0 && p.is_available !== false && p.isAvailable !== false;
           const finalPrice = p.discountPrice || p.discount_price || p.price;
           const displayImage = p.image || (p.images && p.images[0]) || "/placeholder.png";
 
@@ -211,7 +217,7 @@ export default function ProductPerspectiveSlider({
             >
               <div className="space-y-2 text-right">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white font-bold text-[10px] border border-white/10 truncate max-w-[140px]">
+                  <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white font-bold text-[10px] border border-white/10 truncate max-w-[130px]">
                     {p.category || "تکنولوژی"}
                   </span>
                   <span className="font-mono text-[10px] text-[var(--accent-blue)] font-black uppercase">
@@ -220,7 +226,10 @@ export default function ProductPerspectiveSlider({
                 </div>
 
                 <div className="relative w-full h-40 sm:h-52 rounded-2xl bg-[var(--input-bg)] p-3 border border-[var(--card-border)] flex items-center justify-center overflow-hidden group">
-                  <Link href={"/products/" + p.id} className="w-full h-full flex items-center justify-center">
+                  <Link
+                    href={"/products/" + p.id}
+                    className="w-full h-full flex items-center justify-center"
+                  >
                     <img
                       src={displayImage}
                       alt={p.title || "کالا"}
@@ -261,8 +270,13 @@ export default function ProductPerspectiveSlider({
                   <span className="font-mono font-black text-xs sm:text-base text-emerald-600 dark:text-emerald-400">
                     {formatPrice(finalPrice)} تومان
                   </span>
-                  <span className={"text-[10px] font-bold " + (isAvail ? "text-emerald-500" : "text-rose-500")}>
-                    {isAvail ? "موجود در انبار ✓" : "ناموجود"}
+                  <span
+                    className={
+                      "text-[10px] font-bold " +
+                      (isAvail ? "text-emerald-500" : "text-rose-500")
+                    }
+                  >
+                    {isAvail ? "موجود ✓" : "ناموجود"}
                   </span>
                 </div>
 
@@ -271,7 +285,7 @@ export default function ProductPerspectiveSlider({
                 ) : (
                   <button
                     type="button"
-                    className="w-full py-2.5 rounded-xl bg-[var(--input-bg)] text-xs font-bold text-[var(--text-secondary)]"
+                    className="w-full py-2 rounded-xl bg-[var(--input-bg)] text-xs font-bold text-[var(--text-secondary)]"
                   >
                     انتخاب کالا
                   </button>

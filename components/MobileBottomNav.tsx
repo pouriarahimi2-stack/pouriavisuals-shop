@@ -42,7 +42,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-30 md:hidden bg-[var(--modal-bg)] border-t border-[var(--card-border)] font-sans select-none"
+      className="fixed bottom-0 inset-x-0 z-30 md:hidden bg-[var(--modal-bg)] border-t border-[var(--card-border)] font-sans select-text"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <div className="h-14 px-1 flex items-center justify-around">

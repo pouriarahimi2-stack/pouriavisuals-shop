@@ -335,7 +335,7 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[var(--accent-blue)] flex items-center gap-2">

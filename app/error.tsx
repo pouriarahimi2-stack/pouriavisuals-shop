@@ -16,7 +16,7 @@ export default function ErrorPage({
   }, [error]);
 
   return (
-    <div className="min-h-[75vh] flex flex-col items-center justify-center p-6 text-center dir-rtl font-sans select-none bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-[75vh] flex flex-col items-center justify-center p-6 text-center dir-rtl font-sans select-text bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center justify-center text-3xl mb-4 shadow-lg">
         <AlertTriangle size={32} />
       </div>

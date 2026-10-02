@@ -194,7 +194,7 @@ export default function ContactMessagesManager() {
   });
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="bg-[var(--modal-bg)] p-4 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">

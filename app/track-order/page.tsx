@@ -56,7 +56,7 @@ export default function TrackOrderPage() {
   };
 
   return (
-    <div className="min-h-[80vh] py-12 px-4 max-w-3xl mx-auto space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="min-h-[80vh] py-12 px-4 max-w-3xl mx-auto space-y-8 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="text-center space-y-2">
         <h1 className="text-2xl sm:text-3xl font-black">📦 رهگیری آنلاین وضعیت سفارش</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium">

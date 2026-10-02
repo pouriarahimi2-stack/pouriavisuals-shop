@@ -73,6 +73,7 @@ function getCleanCredentials() {
     .replace(/["'\s]/g, "")
     .trim();
   const originE164 = rawOrigin.startsWith("+") ? rawOrigin : toE164(rawOrigin);
+  const origin98 = originE164.replace(/^\+/, "");
   const originPlain = originE164.replace(/^\+98/, "0");
 
   const patternCode = (process.env.IPPANEL_PATTERN_CODE || EXACT_PATTERN_CODE)
@@ -83,12 +84,13 @@ function getCleanCredentials() {
     paddedKey,
     unpaddedKey,
     originNumber: originE164 || EXACT_ORIGIN_NUMBER,
+    origin98: origin98 || "983000505",
     originPlain: originPlain || "3000505",
     patternCode: patternCode || EXACT_PATTERN_CODE,
   };
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 4200) {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3800) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -107,6 +109,7 @@ async function parseResponseSafe(res: Response) {
       .replace(/<style[\s\S]*?<\/style>/gi, "")
       .replace(/<script[\s\S]*?<\/script>/gi, "")
       .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
       .replace(/\s+/g, " ")
       .trim();
     return { rawSummary: cleanText.slice(0, 180) || "HTTP " + res.status };
@@ -117,197 +120,149 @@ export async function sendOtpPatternDetailed({
   mobile,
   code,
 }: OtpOptions): Promise<SmsSendResult> {
-  const { paddedKey, unpaddedKey, originNumber, originPlain, patternCode } =
+  const { paddedKey, unpaddedKey, originNumber, origin98, originPlain, patternCode } =
     getCleanCredentials();
   const recipientE164 = toE164(mobile);
+  const recipient98 = recipientE164.replace(/^\+/, "");
   const recipientLocal = toLocalZero(mobile);
   const cleanCode = String(code).trim();
 
   const attemptsLog: Array<Record<string, any>> = [];
 
-  const singleVarCandidates: Array<Record<string, string>> = [
-    { code: cleanCode },
-    { "verification-code": cleanCode },
-    { "vefification-code": cleanCode },
-  ];
-
-  // ۱. تلاش روی وب‌سرویس Edge با هدرهای استاندارد (خام، AccessKey و Bearer)
-  const edgeAuthHeaders = [paddedKey, unpaddedKey, "AccessKey " + paddedKey, "Bearer " + paddedKey];
-
-  for (const authVal of edgeAuthHeaders) {
-    let stopEdge = false;
-    for (const paramsObj of singleVarCandidates) {
-      try {
-        const res = await fetchWithTimeout("https://edge.ippanel.com/v1/api/send", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: authVal,
-            "User-Agent": BROWSER_USER_AGENT,
-          },
-          body: JSON.stringify({
-            sending_type: "pattern",
-            from_number: originNumber,
-            code: patternCode,
-            recipients: [recipientE164],
-            params: paramsObj,
-          }),
-        });
-
-        const parsed = await parseResponseSafe(res);
-        attemptsLog.push({
-          gw: "edge.ippanel.com",
-          authPrefix: authVal.split(" ")[0].slice(0, 10),
-          var: Object.keys(paramsObj)[0],
-          status: res.status,
-          res: parsed,
-        });
-
-        if (res.ok && parsed?.meta?.status !== false) {
-          return {
-            ok: true,
-            provider: "IPPanel-Edge",
-            status: res.status,
-            rawResponse: parsed,
-          };
-        }
-
-        // اگر کلودفلر یا گیت‌وی روی این هدر 502/401/403 داد، متغیرهای دیگر را با همین هدر تکرار نکن
-        if (res.status === 502 || res.status === 401 || res.status === 403 || res.status >= 500) {
-          break;
-        }
-      } catch (err: any) {
-        attemptsLog.push({ gw: "edge.ippanel.com", error: err?.message });
-        stopEdge = true;
-        break;
-      }
-    }
-    if (stopEdge) break;
-  }
-
-  // ۲. تلاش روی گیت‌وی API2 IPPanel (مستقیم بدون کلودفلر Edge)
-  for (const keyVal of [paddedKey, unpaddedKey]) {
-    for (const senderVal of [originNumber, originPlain, "+983000505", "3000505"]) {
-      let moveNextSender = false;
-      for (const varObj of singleVarCandidates) {
-        try {
-          const res2 = await fetchWithTimeout(
-            "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                apikey: keyVal,
-                Authorization: "AccessKey " + keyVal,
-                "User-Agent": BROWSER_USER_AGENT,
-              },
-              body: JSON.stringify({
-                code: patternCode,
-                sender: senderVal,
-                recipient: recipientLocal,
-                variable: varObj,
-              }),
-            }
-          );
-
-          const parsed2 = await parseResponseSafe(res2);
-          attemptsLog.push({
-            gw: "api2.ippanel.com",
-            sender: senderVal,
-            var: Object.keys(varObj)[0],
-            status: res2.status,
-            res: parsed2,
-          });
-
-          if (
-            res2.ok &&
-            parsed2?.status !== "error" &&
-            parsed2?.code !== 401 &&
-            !parsed2?.rawSummary
-          ) {
-            return {
-              ok: true,
-              provider: "IPPanel-API2",
-              status: res2.status,
-              rawResponse: parsed2,
-            };
-          }
-
-          if (res2.status === 502 || res2.status === 401 || res2.status === 403) {
-            moveNextSender = true;
-            break;
-          }
-        } catch {
-          moveNextSender = true;
-          break;
-        }
-      }
-      if (moveNextSender) break;
-    }
-  }
-
-  // ۳. تلاش روی درگاه مستقیم ippanel.com/api/select (وب‌سرویس ضد فایروال مستقیم ایران)
-  for (const varObj of singleVarCandidates) {
+  // تابع کمکی برای تست یک نود خاص
+  const tryGateway = async (
+    name: string,
+    url: string,
+    headers: Record<string, string>,
+    bodyObj: Record<string, any>
+  ): Promise<SmsSendResult> => {
     try {
-      const resDirect = await fetchWithTimeout("https://ippanel.com/api/select", {
+      const res = await fetchWithTimeout(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          Authorization: paddedKey,
-          apikey: paddedKey,
           "User-Agent": BROWSER_USER_AGENT,
+          ...headers,
         },
-        body: JSON.stringify({
-          op: "pattern",
-          user: paddedKey,
-          pass: "",
-          fromNum: originPlain,
-          toNum: recipientLocal,
-          patternCode: patternCode,
-          inputData: [varObj],
-        }),
+        body: JSON.stringify(bodyObj),
       });
 
-      const parsedDirect = await parseResponseSafe(resDirect);
+      const parsed = await parseResponseSafe(res);
+      const isArvan502 =
+        res.status === 502 &&
+        String(parsed?.rawSummary || "").includes("temporarily inaccessible");
+
       attemptsLog.push({
-        gw: "ippanel.com/api/select",
-        var: Object.keys(varObj)[0],
-        status: resDirect.status,
-        res: parsedDirect,
+        gw: name,
+        status: res.status,
+        arvanFirewallBlocked: isArvan502,
+        res: parsed,
       });
 
       if (
-        resDirect.ok &&
-        (typeof parsedDirect === "number" ||
-          (Array.isArray(parsedDirect) && parsedDirect[0] === 0))
+        res.ok &&
+        parsed?.meta?.status !== false &&
+        parsed?.status !== "error" &&
+        !parsed?.rawSummary
       ) {
         return {
           ok: true,
-          provider: "IPPanel-DirectSelect",
-          status: resDirect.status,
-          rawResponse: parsedDirect,
+          provider: name,
+          status: res.status,
+          rawResponse: parsed,
         };
       }
-      if (resDirect.status >= 500 || resDirect.status === 403) break;
-    } catch {}
-  }
-
-  const detailedReason =
-    attemptsLog.find((a) => a.res?.meta?.message)?.res?.meta?.message ||
-    attemptsLog.find((a) => a.res?.error_message)?.res?.error_message ||
-    attemptsLog.find((a) => a.res?.message)?.res?.message ||
-    attemptsLog.find((a) => a.res?.rawSummary)?.res?.rawSummary ||
-    "HTTP " + (attemptsLog[0]?.status || 502);
-
-  return {
-    ok: false,
-    status: attemptsLog[0]?.status || 502,
-    errorMessage: String(detailedReason).slice(0, 140),
-    rawResponse: attemptsLog,
+      throw new Error(name + " HTTP " + res.status);
+    } catch (err: any) {
+      throw err;
+    }
   };
+
+  // اجرای هم‌زمان و موازی روی ۵ نود مختلف IPPanel (شامل نودهای مستقیم بدون فایروال ابرآروان برای سرورهای خارج از ایران)
+  const tasks = [
+    // ۱. نود رسمی Edge با کلید استاندارد
+    tryGateway(
+      "edge.ippanel.com (code)",
+      "https://edge.ippanel.com/v1/api/send",
+      { Authorization: paddedKey },
+      {
+        sending_type: "pattern",
+        from_number: originNumber,
+        code: patternCode,
+        recipients: [recipientE164],
+        params: { code: cleanCode },
+      }
+    ),
+    // ۲. نود رسمی Edge با متغیر verification-code
+    tryGateway(
+      "edge.ippanel.com (verification-code)",
+      "https://edge.ippanel.com/v1/api/send",
+      { Authorization: unpaddedKey },
+      {
+        sending_type: "pattern",
+        from_number: originNumber,
+        code: patternCode,
+        recipients: [recipientE164],
+        params: { "verification-code": cleanCode },
+      }
+    ),
+    // ۳. نود مستقیم rest.ippanel.com (بدون فایروال ابرآروان Edge)
+    tryGateway(
+      "rest.ippanel.com (AccessKey)",
+      "http://rest.ippanel.com/v1/messages/patterns/send",
+      { Authorization: "AccessKey " + paddedKey },
+      {
+        pattern_code: patternCode,
+        originator: originNumber,
+        recipient: recipient98,
+        values: { code: cleanCode },
+      }
+    ),
+    // ۴. نود API2 IPPanel با شماره محلی
+    tryGateway(
+      "api2.ippanel.com (apikey)",
+      "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
+      { apikey: paddedKey },
+      {
+        code: patternCode,
+        sender: originNumber,
+        recipient: recipientLocal,
+        variable: { code: cleanCode },
+      }
+    ),
+    // ۵. نود پورت مستقیم 8080 (عبور مستقیم از فایروال ابری)
+    tryGateway(
+      "ippanel.com:8080 (Direct Port)",
+      "http://ippanel.com:8080/v1/messages/patterns/send",
+      { Authorization: "AccessKey " + paddedKey },
+      {
+        pattern_code: patternCode,
+        originator: origin98,
+        recipient: recipient98,
+        values: { code: cleanCode },
+      }
+    ),
+  ];
+
+  try {
+    const firstSuccess = await Promise.any(tasks);
+    return firstSuccess;
+  } catch {
+    const allArvanBlocked = attemptsLog.some((a) => a.arvanFirewallBlocked === true);
+    const errorMsg = allArvanBlocked
+      ? "فایروال ابرآروانِ IPPanel ارتباط از آی‌پی خارج از کشور (سرور Vercel) را با کد 502 مسدود کرده است. در پنل پیامک خود بخش «دسترسی آی‌پی خارج از کشور» را فعال کنید."
+      : attemptsLog[0]?.res?.meta?.message ||
+        attemptsLog[0]?.res?.rawSummary ||
+        "HTTP 502 Bad Gateway";
+
+    return {
+      ok: false,
+      status: 502,
+      errorMessage: errorMsg,
+      rawResponse: attemptsLog,
+    };
+  }
 }
 
 export async function sendOtpPattern(opts: OtpOptions): Promise<boolean> {
@@ -316,29 +271,6 @@ export async function sendOtpPattern(opts: OtpOptions): Promise<boolean> {
 }
 
 export async function sendTextSMS(mobile: string, message: string): Promise<boolean> {
-  const { paddedKey, originNumber } = getCleanCredentials();
-  const recipient = toE164(mobile);
-
-  try {
-    const res = await fetchWithTimeout("https://edge.ippanel.com/v1/api/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: paddedKey,
-        "User-Agent": BROWSER_USER_AGENT,
-      },
-      body: JSON.stringify({
-        sending_type: "webservice",
-        from_number: originNumber,
-        message: String(message).trim(),
-        recipients: [recipient],
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data?.meta?.status !== false) return true;
-  } catch {}
-
   const matchCode = String(message).match(/[A-Z0-9-]{4,16}/i);
   const fallbackCode = matchCode ? matchCode[0] : "743440";
   return await sendOtpPattern({ mobile, code: fallbackCode });

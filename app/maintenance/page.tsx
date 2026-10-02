@@ -19,7 +19,7 @@ export default function MaintenancePage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none text-center"
+      className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-text text-center"
       dir="rtl"
     >
       <div className="max-w-lg w-full p-8 sm:p-10 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6">

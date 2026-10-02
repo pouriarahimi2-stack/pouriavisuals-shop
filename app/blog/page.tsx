@@ -29,7 +29,7 @@ export default async function BlogPage() {
   } catch {}
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+    <div className="max-w-7xl mx-auto px-4 py-10 font-sans select-text text-[var(--text-primary)] space-y-8" dir="rtl">
       <div className="text-center space-y-2">
         <h1 className="text-2xl md:text-4xl font-black">مجله تخصصی فناوری و کالای دیجیتال</h1>
         <p className="text-xs text-[var(--text-secondary)] font-medium max-w-xl mx-auto leading-relaxed">

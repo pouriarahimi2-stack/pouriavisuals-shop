@@ -305,7 +305,7 @@ export default function AdminModularPages() {
 
   return (
     <div
-      className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]"
+      className="w-full flex flex-col font-sans select-text min-h-screen space-y-4 text-[var(--text-primary)]"
       dir="rtl"
     >
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">

@@ -328,7 +328,7 @@ export default function UserLoginPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 py-6 sm:p-6 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none transition-colors duration-500"
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-6 sm:p-6 bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-text transition-colors duration-500"
       dir="rtl"
     >
       <div className="relative w-full max-w-sm sm:max-w-md min-h-[460px] sm:min-h-[480px]">

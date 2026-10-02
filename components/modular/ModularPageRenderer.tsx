@@ -41,7 +41,7 @@ export default function ModularPageRenderer({ initialPage, slug }: Props) {
   }
 
   return (
-    <div className="w-full min-h-screen font-sans select-none overflow-x-hidden" dir="rtl">
+    <div className="w-full min-h-screen font-sans select-text overflow-x-hidden" dir="rtl">
       <Render config={puckConfig} data={page.puck_data} />
     </div>
   );

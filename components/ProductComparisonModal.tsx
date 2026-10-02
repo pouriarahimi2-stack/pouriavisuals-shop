@@ -30,7 +30,7 @@ export default function ProductComparisonModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xl font-sans select-none animate-fadeIn text-[var(--text-primary)]"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xl font-sans select-text animate-fadeIn text-[var(--text-primary)]"
       dir="rtl"
     >
       <div className="w-full max-w-5xl max-h-[92vh] rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl flex flex-col justify-between overflow-hidden">

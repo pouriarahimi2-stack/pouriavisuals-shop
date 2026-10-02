@@ -232,7 +232,7 @@ export function AdminSidebar(props: any = {}) {
 
       <aside
         className={
-          "w-full lg:w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] p-4 shadow-2xl font-sans select-none space-y-4 transition-all " +
+          "w-full lg:w-72 shrink-0 bg-[var(--modal-bg)] border-l border-[var(--card-border)] p-4 shadow-2xl font-sans select-text space-y-4 transition-all " +
           (mobileOpen ? "block" : "hidden lg:block")
         }
         dir="rtl"

@@ -129,7 +129,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   return (
     <article
-      className="max-w-4xl mx-auto px-4 py-6 sm:py-12 font-sans select-none text-[var(--text-primary)] space-y-6 sm:space-y-8"
+      className="max-w-4xl mx-auto px-4 py-6 sm:py-12 font-sans select-text text-[var(--text-primary)] space-y-6 sm:space-y-8"
       dir="rtl"
     >
       <script

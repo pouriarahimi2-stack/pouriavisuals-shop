@@ -279,7 +279,7 @@ export default function DynamicHomeSections({
 
   return (
     <div
-      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 font-sans select-none"
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 font-sans select-text"
       dir="rtl"
     >
       {configuredSections.map((sec: any) => renderSectionByConfig(sec))}

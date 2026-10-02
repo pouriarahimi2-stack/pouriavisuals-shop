@@ -52,7 +52,7 @@ export default function AdminHealthGuard() {
 
   return (
     <div
-      className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-sans select-none text-xs"
+      className="p-4 md:p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-sans select-text text-xs"
       dir="rtl"
     >
       <div className="flex items-center gap-3">

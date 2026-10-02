@@ -114,7 +114,7 @@ export default function OtpVerificationDeck({
       : "w-13 h-15 sm:w-14 sm:h-16 text-2xl";
 
   return (
-    <div className="w-full max-w-md mx-auto select-none font-sans px-2" dir="rtl">
+    <div className="w-full max-w-md mx-auto select-text font-sans px-2" dir="rtl">
       <div className="relative w-full [perspective:1000px] min-h-[290px]">
         <div
           className={

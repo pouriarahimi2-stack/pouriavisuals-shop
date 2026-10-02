@@ -21,7 +21,7 @@ export default function ContactDock() {
 
   return (
     <>
-      <div className="fixed bottom-20 md:bottom-6 left-3 sm:left-6 z-40 select-none" dir="rtl">
+      <div className="fixed bottom-20 md:bottom-6 left-3 sm:left-6 z-40 select-text" dir="rtl">
         <button
           type="button"
           onClick={() => {

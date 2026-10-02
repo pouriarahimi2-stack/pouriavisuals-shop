@@ -86,7 +86,7 @@ export default function AdminChangePinPage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="max-w-xl mx-auto space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-2">
         <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
           <span>🔐</span> تغییر رمز عبور و پین امنیتی مدیران (پشتیبانی از تمام نقش‌ها)

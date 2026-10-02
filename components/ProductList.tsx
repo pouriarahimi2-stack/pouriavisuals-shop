@@ -48,7 +48,7 @@ export default function ProductList({
   }, [initialProducts]);
 
   return (
-    <section className="py-6 space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <section className="py-6 space-y-8 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="border-b border-[var(--card-border)] pb-5 text-right">
         <h2 className="text-2xl sm:text-3xl font-black">
           {customHeading || "کاتالوگ تجهیزات و محصولات"}

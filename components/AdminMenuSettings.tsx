@@ -61,7 +61,7 @@ export default function AdminMenuSettings() {
   };
 
   return (
-    <div className="p-6 md:p-8 rounded-3xl space-y-6 select-none border border-[var(--card-border)] shadow-xl text-[var(--text-primary)] font-sans bg-[var(--modal-bg)]" dir="rtl">
+    <div className="p-6 md:p-8 rounded-3xl space-y-6 select-text border border-[var(--card-border)] shadow-xl text-[var(--text-primary)] font-sans bg-[var(--modal-bg)]" dir="rtl">
       <h3 className="text-base font-black flex items-center gap-2 border-b border-[var(--card-border)] pb-3 text-[var(--accent-blue)]">
         <span>🔗</span> مدیریت منوهای هدر سایت
       </h3>

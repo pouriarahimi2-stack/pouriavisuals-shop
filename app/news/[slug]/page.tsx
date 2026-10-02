@@ -86,7 +86,7 @@ export default async function NewsDetailPage({ params }: Props) {
   };
 
   return (
-    <article className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+    <article className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto font-sans select-text text-[var(--text-primary)] space-y-8" dir="rtl">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

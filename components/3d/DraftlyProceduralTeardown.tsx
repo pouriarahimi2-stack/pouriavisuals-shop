@@ -315,7 +315,7 @@ export default function DraftlyProceduralTeardown({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/95 backdrop-blur-2xl font-sans select-none animate-fadeIn text-slate-100" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/95 backdrop-blur-2xl font-sans select-text animate-fadeIn text-slate-100" dir="rtl">
       <div className="relative w-full max-w-6xl h-[92vh] max-h-[840px] bg-slate-900 border border-slate-700/60 rounded-[2.5rem] shadow-2xl flex flex-col justify-between overflow-hidden">
         <header className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-950/80 shrink-0">
           <div>

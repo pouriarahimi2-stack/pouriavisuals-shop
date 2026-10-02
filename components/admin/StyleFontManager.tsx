@@ -186,7 +186,7 @@ export default function StyleFontManager() {
   };
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <input
         type="file"
         ref={fontFileInputRef}

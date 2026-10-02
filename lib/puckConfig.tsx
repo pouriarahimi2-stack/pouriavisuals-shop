@@ -253,7 +253,7 @@ export const puckConfig: Config<ComponentProps> = {
         ].filter((m): m is { title: string; url: string } => Boolean(m.title && m.url));
 
         return (
-          <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 my-2 select-none font-sans" dir="rtl">
+          <header className="sticky top-3 z-50 w-full max-w-7xl mx-auto px-3 my-2 select-text font-sans" dir="rtl">
             <div
               style={{ backgroundColor: capsuleBg || "#07090e", borderColor: capsuleBorder || "#27272a" }}
               className="flex items-center justify-between px-6 py-3 rounded-full border backdrop-blur-2xl shadow-2xl"
@@ -310,7 +310,7 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: "transparent",
       },
       render: ({ topBadge, badgeColor, title, titleSize, subtitle, bgColor }) => (
-        <section style={{ backgroundColor: bgColor || "transparent" }} className="w-full relative overflow-hidden select-none font-sans text-white text-center py-6" dir="rtl">
+        <section style={{ backgroundColor: bgColor || "transparent" }} className="w-full relative overflow-hidden select-text font-sans text-white text-center py-6" dir="rtl">
           <div className="max-w-4xl mx-auto space-y-4 px-4 relative z-10">
             {topBadge && (
               <span style={{ color: badgeColor || "#38bdf8" }} className="px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-xs font-black inline-block">
@@ -340,7 +340,7 @@ export const puckConfig: Config<ComponentProps> = {
         sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی",
       },
       render: ({ sectionTitle, sectionSubtitle }) => (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-text py-4" dir="rtl">
           <ProductPerspectiveSlider customTitle={sectionTitle} customSubtitle={sectionSubtitle} />
         </div>
       ),
@@ -359,7 +359,7 @@ export const puckConfig: Config<ComponentProps> = {
         limit: 8,
       },
       render: ({ limit }) => (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-text py-4" dir="rtl">
           <PuckProductListWrapper limit={limit} />
         </div>
       ),
@@ -376,7 +376,7 @@ export const puckConfig: Config<ComponentProps> = {
         sectionTitle: "کالبدشکافی لایه‌های سخت‌افزاری",
       },
       render: ({ productTitle }) => (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-none py-4" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full select-text py-4" dir="rtl">
           <ProductExplodedView productTitle={productTitle || "Apple Studio Display 5K"} />
         </div>
       ),
@@ -395,7 +395,7 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: "transparent",
       },
       render: ({ title, content, bgColor }) => (
-        <section style={{ backgroundColor: bgColor || "transparent" }} className="max-w-5xl mx-auto px-4 py-8 font-sans select-none text-white space-y-4" dir="rtl">
+        <section style={{ backgroundColor: bgColor || "transparent" }} className="max-w-5xl mx-auto px-4 py-8 font-sans select-text text-white space-y-4" dir="rtl">
           {title && <h2 className="text-2xl font-black text-center">{title}</h2>}
           <div className="p-6 rounded-3xl bg-white/5 border border-white/10 text-sm leading-loose text-slate-300 whitespace-pre-line text-justify">
             {content}
@@ -427,7 +427,7 @@ export const puckConfig: Config<ComponentProps> = {
         bgColor: "transparent",
       },
       render: ({ heading, col1Title, col1Desc, col2Title, col2Desc, col3Title, col3Desc, bgColor }) => (
-        <section style={{ backgroundColor: bgColor || "transparent" }} className="max-w-7xl mx-auto px-4 py-8 font-sans select-none text-white space-y-6" dir="rtl">
+        <section style={{ backgroundColor: bgColor || "transparent" }} className="max-w-7xl mx-auto px-4 py-8 font-sans select-text text-white space-y-6" dir="rtl">
           {heading && <h2 className="text-2xl font-black text-center">{heading}</h2>}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2">
@@ -481,7 +481,7 @@ export const puckConfig: Config<ComponentProps> = {
         footerBg: "#07090e",
       },
       render: ({ footerLogoUrl, brandTitle, brandSubtitle, brandDesc, supportPhone, supportEmail, warehouseAddress, enamadCode, copyrightText, footerBg }) => (
-        <footer style={{ backgroundColor: footerBg || "#07090e" }} className="w-full border-t border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans select-none text-white mt-16" dir="rtl">
+        <footer style={{ backgroundColor: footerBg || "#07090e" }} className="w-full border-t border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans select-text text-white mt-16" dir="rtl">
           <div className="max-w-7xl mx-auto space-y-12">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
               <div className="md:col-span-5 space-y-4">

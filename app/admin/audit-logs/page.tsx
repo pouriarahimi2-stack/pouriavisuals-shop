@@ -21,6 +21,7 @@ export default function AdminAuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +82,15 @@ export default function AdminAuditLogsPage() {
     }
   };
 
+  const handleCopyJson = () => {
+    if (!selectedLog) return;
+    const text = JSON.stringify(selectedLog.details, null, 2);
+    navigator.clipboard.writeText(text);
+    soundEngine.playSuccess();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
   const getBadgeStyle = (action: string) => {
     if (action.includes("DELETE") || action.includes("FAIL") || action.includes("ERROR"))
       return "bg-rose-500/15 border-rose-500/30 text-rose-400";
@@ -92,14 +102,14 @@ export default function AdminAuditLogsPage() {
   };
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🛡️</span> دفتر کل وقایع و اسکنر هوشمند امنیت (Audit Logs & Auto-Fix)
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-            رصد بلادرنگ اقدامات مدیریتی، اسکن آسیب‌پذیری‌ها و مشاهده جزئیات کامل هر رخداد با کلیک روی آن
+            رصد بلادرنگ اقدامات مدیریتی، اسکن آسیب‌پذیری‌ها و مشاهده/کپی جزئیات کامل هر رخداد
           </p>
         </div>
 
@@ -200,7 +210,7 @@ export default function AdminAuditLogsPage() {
                         onClick={() => setSelectedLog(log)}
                         className="px-3 py-1 rounded-lg bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-[11px] font-bold text-[var(--accent-blue)] cursor-pointer"
                       >
-                        🔍 مشاهده کامل JSON
+                        🔍 مشاهده و کپی JSON
                       </button>
                     </td>
                   </tr>
@@ -217,24 +227,33 @@ export default function AdminAuditLogsPage() {
           onClick={() => setSelectedLog(null)}
         >
           <div
-            className="w-full max-w-2xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-xs"
+            className="w-full max-w-2xl rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] p-6 space-y-4 shadow-2xl text-xs select-text"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3 gap-2">
               <h3 className="font-black text-sm text-[var(--accent-blue)]">
                 جزئیات کامل رخداد: {selectedLog.action}
               </h3>
-              <button
-                type="button"
-                onClick={() => setSelectedLog(null)}
-                className="w-8 h-8 rounded-xl bg-[var(--input-bg)] font-bold cursor-pointer"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyJson}
+                  className="px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs cursor-pointer shadow"
+                >
+                  {copied ? "✓ کپی شد!" : "📋 کپی کامل متن JSON"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLog(null)}
+                  className="w-8 h-8 rounded-xl bg-[var(--input-bg)] font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <pre
               dir="ltr"
-              className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] overflow-x-auto max-h-96 whitespace-pre-wrap leading-relaxed"
+              className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono text-[11px] overflow-x-auto max-h-96 whitespace-pre-wrap leading-relaxed select-text"
             >
               {JSON.stringify(selectedLog.details, null, 2)}
             </pre>

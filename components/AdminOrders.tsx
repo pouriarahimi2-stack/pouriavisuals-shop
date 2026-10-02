@@ -258,7 +258,7 @@ export default function AdminOrders() {
   });
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--modal-bg)] border border-[var(--card-border)] p-5 sm:p-6 rounded-3xl shadow-xl">
         <div>
           <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">

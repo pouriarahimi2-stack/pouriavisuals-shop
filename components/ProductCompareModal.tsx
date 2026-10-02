@@ -38,7 +38,7 @@ export default function ProductCompareModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md font-sans select-none animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md font-sans select-text animate-fadeIn"
       dir="rtl"
     >
       <div className="relative w-full max-w-5xl max-h-[90vh] bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden text-[var(--text-primary)]">

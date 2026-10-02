@@ -133,7 +133,7 @@ export default function AdminAccountsManager() {
   };
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       {toast && (
         <div className={`p-4 rounded-2xl text-xs font-black flex items-center gap-2 shadow-lg animate-fadeIn ${
           toast.type === "success"

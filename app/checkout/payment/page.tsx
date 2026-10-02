@@ -117,7 +117,7 @@ function PaymentGatewayContent() {
 
   return (
     <div
-      className="min-h-[80vh] flex items-center justify-center px-4 py-10 font-sans select-none text-[var(--text-primary)]"
+      className="min-h-[80vh] flex items-center justify-center px-4 py-10 font-sans select-text text-[var(--text-primary)]"
       dir="rtl"
     >
       <div className="max-w-md w-full p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl text-center space-y-6">

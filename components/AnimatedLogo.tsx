@@ -13,7 +13,7 @@ export default function AnimatedLogo({ customLogoUrl, size = 52, className = "" 
   if (customLogoUrl && customLogoUrl.trim().length > 5) {
     return (
       <div
-        className={"relative flex items-center justify-center shrink-0 overflow-hidden select-none " + className}
+        className={"relative flex items-center justify-center shrink-0 overflow-hidden select-text " + className}
         style={{ width: size, height: size }}
       >
         <img
@@ -28,7 +28,7 @@ export default function AnimatedLogo({ customLogoUrl, size = 52, className = "" 
 
   return (
     <div
-      className={"relative flex items-center justify-center shrink-0 select-none " + className}
+      className={"relative flex items-center justify-center shrink-0 select-text " + className}
       style={{ width: size, height: size }}
     >
       <svg

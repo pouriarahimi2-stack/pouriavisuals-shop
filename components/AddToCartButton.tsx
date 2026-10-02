@@ -84,7 +84,7 @@ export default function AddToCartButton({
   const isAnimating = animState === "adding";
 
   return (
-    <div className={`flex flex-col items-center gap-1.5 w-full select-none ${className}`} dir="rtl" suppressHydrationWarning>
+    <div className={`flex flex-col items-center gap-1.5 w-full select-text ${className}`} dir="rtl" suppressHydrationWarning>
       <button
         type="button"
         disabled={!isAvailable || isMaxReached}

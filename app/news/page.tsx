@@ -52,7 +52,7 @@ export default function TechNewsHubPage() {
   );
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-none text-[var(--text-primary)] space-y-6" dir="rtl">
+    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto font-sans select-text text-[var(--text-primary)] space-y-6" dir="rtl">
       
       {/* سربرگ بدون متن پایش دو ساعت و بدون منوی دسته‌بندی */}
       <div className="p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

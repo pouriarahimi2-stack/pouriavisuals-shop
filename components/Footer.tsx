@@ -277,7 +277,7 @@ export function Footer() {
         ...(footerBgColor ? { backgroundColor: footerBgColor } : {}),
         ...(footerTextColor ? { color: footerTextColor } : {}),
       }}
-      className="mt-16 border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] font-sans select-none transition-all duration-300"
+      className="mt-16 border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] font-sans select-text transition-all duration-300"
       dir="rtl"
     >
       <div className={"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 " + pyClass}>

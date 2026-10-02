@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950 font-sans select-none text-white overflow-hidden" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950 font-sans select-text text-white overflow-hidden" dir="rtl">
       <div className="relative w-full max-w-md p-8 sm:p-10 rounded-[2.5rem] bg-slate-900/95 border border-slate-800 backdrop-blur-2xl shadow-2xl space-y-6">
         
         <div className="text-center space-y-2">

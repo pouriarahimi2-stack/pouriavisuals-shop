@@ -54,7 +54,7 @@ export default function TableOfContents({ contentHtml }: { contentHtml: string }
   if (headings.length === 0) return null;
 
   return (
-    <div className="my-6 p-5 sm:p-6 rounded-3xl bg-[var(--stitch-card)] border border-[var(--card-border)] shadow-md space-y-3 font-sans select-none" dir="rtl">
+    <div className="my-6 p-5 sm:p-6 rounded-3xl bg-[var(--stitch-card)] border border-[var(--card-border)] shadow-md space-y-3 font-sans select-text" dir="rtl">
       <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
         <div className="flex items-center gap-2">
           <span className="text-base">📑</span>

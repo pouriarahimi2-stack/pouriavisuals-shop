@@ -73,7 +73,7 @@ export default function CheckoutShipping({ formData, onChange }: ShippingProps) 
 
   return (
     <div
-      className="p-5 sm:p-8 rounded-[2.2rem] sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-none text-[var(--text-primary)]"
+      className="p-5 sm:p-8 rounded-[2.2rem] sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-6 font-sans select-text text-[var(--text-primary)]"
       dir="rtl"
     >
       <div className="flex items-center gap-3 border-b border-[var(--card-border)] pb-4">

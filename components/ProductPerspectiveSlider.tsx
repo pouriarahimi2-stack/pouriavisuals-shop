@@ -139,7 +139,7 @@ export default function ProductPerspectiveSlider({
   return (
     <section
       id="products-slider"
-      className="w-full py-4 select-none font-sans space-y-4 overflow-hidden"
+      className="w-full py-4 select-text font-sans space-y-4 overflow-hidden"
       dir="rtl"
       suppressHydrationWarning
     >

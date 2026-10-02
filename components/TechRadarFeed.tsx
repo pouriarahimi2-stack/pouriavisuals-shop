@@ -36,7 +36,7 @@ export default function TechRadarFeed() {
   const visibleNews = newsList.slice(startIndex, startIndex + 3);
 
   return (
-    <section className="w-full max-w-[1440px] mx-auto font-sans select-none px-1 my-1 overflow-hidden" dir="rtl" suppressHydrationWarning>
+    <section className="w-full max-w-[1440px] mx-auto font-sans select-text px-1 my-1 overflow-hidden" dir="rtl" suppressHydrationWarning>
       <div className="flex flex-col sm:flex-row items-center justify-between p-2 px-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] shadow-sm transition-all duration-300 gap-2">
         <div className="flex items-center gap-2 shrink-0">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 font-black text-[11px]">

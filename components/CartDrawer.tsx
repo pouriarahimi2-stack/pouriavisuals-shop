@@ -13,7 +13,7 @@ export default function CartDrawer() {
   if (!isCartOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-start dir-rtl animate-fadeIn font-sans select-none">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-start dir-rtl animate-fadeIn font-sans select-text">
       <div className="w-full sm:max-w-md bg-[var(--modal-bg)] border-l border-[var(--card-border)] h-full flex flex-col justify-between p-6 shadow-2xl text-[var(--text-primary)] animate-in slide-in-from-right duration-200">
         <div>
           <div className="flex items-center justify-between pb-4 border-b border-[var(--card-border)]">

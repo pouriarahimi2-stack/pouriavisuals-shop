@@ -93,7 +93,7 @@ export default function MyOrdersPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 font-sans select-none text-[var(--text-primary)] space-y-8" dir="rtl">
+    <div className="max-w-5xl mx-auto px-4 py-10 font-sans select-text text-[var(--text-primary)] space-y-8" dir="rtl">
       <div className="border-b border-[var(--card-border)] pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">

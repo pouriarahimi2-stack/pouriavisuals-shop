@@ -263,7 +263,7 @@ export default function AdminCouponsPage() {
   };
 
   return (
-    <div className="space-y-6 font-sans text-[var(--text-primary)] select-none" dir="rtl">
+    <div className="space-y-6 font-sans text-[var(--text-primary)] select-text" dir="rtl">
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">

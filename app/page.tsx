@@ -64,7 +64,7 @@ export default async function HomePage() {
   };
 
   return (
-    <div className="font-sans select-none text-[var(--text-primary)] space-y-12 pb-32 sm:pb-8" dir="rtl">
+    <div className="font-sans select-text text-[var(--text-primary)] space-y-12 pb-32 sm:pb-8" dir="rtl">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}

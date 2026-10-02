@@ -37,7 +37,7 @@ export default function AboutPage() {
     `مجموعه ${storeName} مرجع تخصصی تأمین و عرضه جدیدترین محصولات فناوری، گجت‌های هوشمند و تجهیزات دیجیتال در ایران است.\n\nما با بیش از سال‌ها تجربه در حوزه تجارت الکترونیک، متعهد به ارائه بهترین کالاها با تضمین اصالت، قیمت منصفانه و خدمات پس از فروش قابل‌اعتماد هستیم.`;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-none pb-32 md:pb-12" dir="rtl">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans select-text pb-32 md:pb-12" dir="rtl">
 
       {/* Hero بخش */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-14">

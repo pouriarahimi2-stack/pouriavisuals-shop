@@ -141,7 +141,7 @@ export default function AdminCoupons() {
   };
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       {toast && (
         <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-black flex items-center gap-2 shadow-xl animate-fadeIn">
           <span>✓</span>

@@ -34,7 +34,7 @@ export default function EnamadBadge({
       rel="noopener noreferrer"
       href={officialHref}
       className={
-        "inline-flex items-center justify-center p-2 rounded-2xl bg-white border border-[var(--card-border)] shadow-sm w-[110px] h-[125px] shrink-0 select-none " +
+        "inline-flex items-center justify-center p-2 rounded-2xl bg-white border border-[var(--card-border)] shadow-sm w-[110px] h-[125px] shrink-0 select-text " +
         className
       }
     >

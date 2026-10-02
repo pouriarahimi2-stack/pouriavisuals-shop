@@ -53,7 +53,7 @@ export default function AIAssistantChat() {
         aria-label="دستیار هوشمند آکسون"
         title="دستیار هوشمند"
       >
-        <span className="text-white text-base select-none">
+        <span className="text-white text-base select-text">
           {isOpen ? "✕" : "🤖"}
         </span>
       </button>

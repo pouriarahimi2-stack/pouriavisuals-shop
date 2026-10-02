@@ -1,6 +1,6 @@
 export default function BlogLoading() {
   return (
-    <div className="min-h-[70vh] p-6 max-w-7xl mx-auto dir-rtl space-y-6 animate-pulse font-sans select-none">
+    <div className="min-h-[70vh] p-6 max-w-7xl mx-auto dir-rtl space-y-6 animate-pulse font-sans select-text">
       <div className="h-8 bg-[var(--input-bg)] rounded-2xl w-64" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(6)].map((_, i) => (

@@ -76,7 +76,7 @@ export default function ColorGamutSimulator({ productTitle }: { productTitle: st
 
   return (
     <div
-      className="p-4 sm:p-6 md:p-8 rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 font-sans select-none text-[var(--text-primary)]"
+      className="p-4 sm:p-6 md:p-8 rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 font-sans select-text text-[var(--text-primary)]"
       dir="rtl"
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--card-border)] pb-5">

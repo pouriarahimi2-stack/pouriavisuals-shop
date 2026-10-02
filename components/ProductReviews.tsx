@@ -107,7 +107,7 @@ export function ProductReviews(props: ProductReviewsProps) {
 
   return (
     <section
-      className="mt-10 p-5 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl font-sans select-none text-[var(--text-primary)] space-y-6"
+      className="mt-10 p-5 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl font-sans select-text text-[var(--text-primary)] space-y-6"
       dir="rtl"
     >
       {/* هدر آمار رضایت خریداران و تعداد کل دیدگاه‌ها */}

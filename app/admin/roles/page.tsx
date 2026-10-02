@@ -189,7 +189,7 @@ export default function AdminRolesPage() {
   };
 
   return (
-    <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
@@ -321,7 +321,7 @@ export default function AdminRolesPage() {
                     key={perm.id}
                     onClick={() => togglePermission(perm.id)}
                     className={
-                      "p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2.5 select-none " +
+                      "p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2.5 select-text " +
                       (isChecked
                         ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] font-black text-[var(--text-primary)]"
                         : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")

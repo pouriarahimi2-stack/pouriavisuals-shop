@@ -185,7 +185,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
 
   if (!product) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl gap-4 font-sans select-none">
+      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl gap-4 font-sans select-text">
         <p className="text-sm font-bold text-[var(--text-primary)]">کالای مورد نظر یافت نشد.</p>
         <Link href="/products" className="px-5 py-2.5 rounded-2xl bg-[var(--accent-blue)] text-white font-bold text-xs">
           بازگشت به کاتالوگ محصولات
@@ -252,7 +252,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
   const finalPrice = Number(product.discount_price || product.discountPrice || product.price || 0);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-4 sm:p-6 lg:p-12 dir-rtl font-sans select-none">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-4 sm:p-6 lg:p-12 dir-rtl font-sans select-text">
       <div className="max-w-6xl mx-auto flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-6 font-bold">
         <Link href="/" className="hover:underline">خانه</Link>
         <span>/</span>
@@ -268,7 +268,7 @@ export default function ProductDetailClient({ initialProduct, productId }: Produ
             <img
               src={gallery[activeImageIndex]}
               alt={product.title}
-              className="w-full h-full object-contain transition-all duration-300 select-none p-2"
+              className="w-full h-full object-contain transition-all duration-300 select-text p-2"
             />
 
             {embedVideo && (

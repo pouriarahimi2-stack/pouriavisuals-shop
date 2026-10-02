@@ -2,21 +2,33 @@
 "use client";
 
 import React, { useState } from "react";
+import { usePathname } from "next/navigation";
 import { soundEngine } from "@/lib/soundEngine";
 import AIAssistantChat from "@/components/AIAssistantChat";
 
 export default function ContactDock() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+
+  // عدم نمایش دکمه شناور در صفحات ورود، تسویه‌حساب و پنل مدیریت تا هرگز روی دکمه‌های فرم نیفتد
+  if (
+    pathname?.startsWith("/login") ||
+    pathname?.startsWith("/checkout") ||
+    pathname?.startsWith("/admin")
+  ) {
+    return null;
+  }
 
   return (
     <>
-      <div className="fixed bottom-20 lg:bottom-6 left-3 sm:left-6 z-40 select-none" dir="rtl">
+      <div className="fixed bottom-20 md:bottom-6 left-3 sm:left-6 z-40 select-none" dir="rtl">
         <button
+          type="button"
           onClick={() => {
             soundEngine.playClick();
             setIsOpen(true);
           }}
-          className="group flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer border border-white/20 backdrop-blur-md"
+          className="group flex items-center gap-2.5 p-2.5 sm:px-4 sm:py-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer border border-white/20 backdrop-blur-md"
           title="دستیار هوشمند آکسون"
         >
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 relative">
@@ -35,11 +47,11 @@ export default function ContactDock() {
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
           </div>
 
-          <div className="text-right pr-0.5">
-            <span className="text-[9px] sm:text-[10px] uppercase font-mono tracking-wider opacity-85 block">
+          <div className="hidden sm:block text-right pr-0.5">
+            <span className="text-[10px] uppercase font-mono tracking-wider opacity-85 block">
               LIVE AI
             </span>
-            <span className="text-[11px] sm:text-xs font-black tracking-tight block whitespace-nowrap">
+            <span className="text-xs font-black tracking-tight block whitespace-nowrap">
               دستیار هوشمند آکسون
             </span>
           </div>
@@ -50,6 +62,7 @@ export default function ContactDock() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-fadeIn">
           <div className="relative w-full max-w-lg max-h-[90vh] rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden flex flex-col">
             <button
+              type="button"
               onClick={() => {
                 soundEngine.playClick();
                 setIsOpen(false);

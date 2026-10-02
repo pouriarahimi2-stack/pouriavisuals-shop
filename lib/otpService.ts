@@ -13,7 +13,7 @@ export interface SmsSendResult {
 }
 
 const EXACT_IPPANEL_API_KEY =
-  "YTJjNDk1NTItNmJmOS00ZjY0LWJjMWQtMjM1OTdmN2M4NDdlMjc1ZmJhYTMxODk5OTNiMmFmM2FmZjA5YTNiYjBhZTY";
+  "YTJjNDk1NTItNmJmOS00ZjY0LWJjMWQtMjM1OTdmN2M4NDdlMjc1ZmJhYTMxODk5OTNiMmFmM2FmZjA5YTNiYjBhZTY=";
 const EXACT_ORIGIN_NUMBER = "+983000505";
 const EXACT_PATTERN_CODE = "3d6fa1f8ud3ma1w";
 
@@ -49,6 +49,14 @@ export function toLocalZero(phone: string): string {
   return d;
 }
 
+function ensureBase64Padding(key: string): string {
+  const clean = key.replace(/["'\s]/g, "").trim();
+  if (!clean) return EXACT_IPPANEL_API_KEY;
+  const rem = clean.length % 4;
+  if (rem === 0) return clean;
+  return clean + "=".repeat(4 - rem);
+}
+
 function getCleanCredentials() {
   let rawKey = (process.env.IPPANEL_API_KEY || EXACT_IPPANEL_API_KEY)
     .replace(/["'\s]/g, "")
@@ -57,6 +65,9 @@ function getCleanCredentials() {
   if (!rawKey || rawKey.includes("MmM1OTdm") || rawKey.includes("ZmFmYTMx")) {
     rawKey = EXACT_IPPANEL_API_KEY;
   }
+
+  const paddedKey = ensureBase64Padding(rawKey);
+  const unpaddedKey = paddedKey.replace(/=+$/, "");
 
   const rawOrigin = (process.env.IPPANEL_ORIGIN_NUMBER || EXACT_ORIGIN_NUMBER)
     .replace(/["'\s]/g, "")
@@ -68,7 +79,8 @@ function getCleanCredentials() {
     .trim();
 
   return {
-    apiKey: rawKey,
+    paddedKey,
+    unpaddedKey,
     originNumber: originE164 || EXACT_ORIGIN_NUMBER,
     patternCode: patternCode || EXACT_PATTERN_CODE,
   };
@@ -84,149 +96,195 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 4
   }
 }
 
+async function parseResponseSafe(res: Response) {
+  const text = await res.text().catch(() => "");
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { rawHtmlOrText: text.slice(0, 220) };
+  }
+}
+
 export async function sendOtpPatternDetailed({
   mobile,
   code,
 }: OtpOptions): Promise<SmsSendResult> {
-  const { apiKey, originNumber, patternCode } = getCleanCredentials();
+  const { paddedKey, unpaddedKey, originNumber, patternCode } = getCleanCredentials();
   const recipientE164 = toE164(mobile);
   const recipientLocal = toLocalZero(mobile);
   const cleanCode = String(code).trim();
 
-  let lastError = "";
-  let lastRaw: any = null;
-  let lastStatus = 0;
+  const attemptsLog: Array<Record<string, any>> = [];
 
-  const edgeParamsList: Array<Record<string, string>> = [
+  // متغیرهای تک‌کلیدی استاندارد برای پترن 3d6fa1f8ud3ma1w
+  const singleVarCandidates: Array<Record<string, string>> = [
     { code: cleanCode },
     { "verification-code": cleanCode },
     { "vefification-code": cleanCode },
-    { code: cleanCode, "verification-code": cleanCode, "vefification-code": cleanCode },
   ];
 
-  // ۱. ارسال از طریق وب‌سرویس رسمی IPPanel Edge (https://edge.ippanel.com/v1/api/send)
-  for (const paramsObj of edgeParamsList) {
-    try {
-      const res = await fetchWithTimeout("https://edge.ippanel.com/v1/api/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: apiKey,
-          "User-Agent": BROWSER_USER_AGENT,
-        },
-        body: JSON.stringify({
-          sending_type: "pattern",
-          from_number: originNumber,
-          code: patternCode,
-          recipients: [recipientE164],
-          params: paramsObj,
-        }),
-      });
+  // ۱. تلاش از طریق وب‌سرویس رسمی IPPanel Edge با کلید دارای پدینگ استاندارد Base64 (=)
+  for (const token of [paddedKey, unpaddedKey]) {
+    let edgeDownOrBlocked = false;
 
-      lastStatus = res.status;
-      const data = await res.json().catch(() => ({}));
-      lastRaw = data;
-
-      if (res.ok && data?.meta?.status !== false) {
-        return {
-          ok: true,
-          provider: "IPPanel-Edge",
-          status: res.status,
-          rawResponse: data,
-        };
-      }
-
-      lastError =
-        data?.meta?.message ||
-        data?.message ||
-        "Edge HTTP " + res.status;
-
-      if (res.status === 401 || res.status === 403) {
-        break;
-      }
-    } catch (err: any) {
-      lastError = err?.message || "Edge Network Error";
-      break;
-    }
-  }
-
-  // ۲. فال‌بک به وب‌سرویس API2 IPPanel (https://api2.ippanel.com/api/v1/sms/pattern/normal/send)
-  for (const rec of [recipientLocal, recipientE164]) {
-    try {
-      const res2 = await fetchWithTimeout(
-        "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
-        {
+    for (const paramsObj of singleVarCandidates) {
+      try {
+        const res = await fetchWithTimeout("https://edge.ippanel.com/v1/api/send", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            apikey: apiKey,
+            Authorization: token,
             "User-Agent": BROWSER_USER_AGENT,
           },
           body: JSON.stringify({
+            sending_type: "pattern",
+            from_number: originNumber,
             code: patternCode,
-            sender: originNumber,
-            recipient: rec,
-            variable: {
-              code: cleanCode,
-              "verification-code": cleanCode,
-              "vefification-code": cleanCode,
-            },
+            recipients: [recipientE164],
+            params: paramsObj,
           }),
-        }
-      );
+        });
 
-      const data2 = await res2.json().catch(() => ({}));
-      if (res2.ok && data2?.status !== "error" && data2?.code !== 401) {
+        const parsed = await parseResponseSafe(res);
+        attemptsLog.push({
+          endpoint: "edge.ippanel.com",
+          status: res.status,
+          varKey: Object.keys(paramsObj)[0],
+          response: parsed,
+        });
+
+        if (res.ok && parsed?.meta?.status !== false) {
+          return {
+            ok: true,
+            provider: "IPPanel-Edge",
+            status: res.status,
+            rawResponse: parsed,
+          };
+        }
+
+        // اگر گیت‌وی Edge خطای 502/503/504 یا 401/403 داد، حلقه داخلی را متوقف کن
+        if (res.status >= 500 || res.status === 401 || res.status === 403) {
+          if (res.status >= 502) edgeDownOrBlocked = true;
+          break;
+        }
+      } catch (err: any) {
+        attemptsLog.push({
+          endpoint: "edge.ippanel.com",
+          error: err?.message || "network_error",
+        });
+        edgeDownOrBlocked = true;
+        break;
+      }
+    }
+
+    if (edgeDownOrBlocked) break;
+  }
+
+  // ۲. ارسال از طریق API2 IPPanel (با متغیرهای تکی تا خطای عدم تطابق تعداد متغیر رخ ندهد)
+  for (const token of [paddedKey, unpaddedKey]) {
+    for (const varObj of singleVarCandidates) {
+      try {
+        const res2 = await fetchWithTimeout(
+          "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              apikey: token,
+              "User-Agent": BROWSER_USER_AGENT,
+            },
+            body: JSON.stringify({
+              code: patternCode,
+              sender: originNumber,
+              recipient: recipientLocal,
+              variable: varObj,
+            }),
+          }
+        );
+
+        const parsed2 = await parseResponseSafe(res2);
+        attemptsLog.push({
+          endpoint: "api2.ippanel.com",
+          status: res2.status,
+          varKey: Object.keys(varObj)[0],
+          response: parsed2,
+        });
+
+        if (res2.ok && parsed2?.status !== "error" && parsed2?.code !== 401) {
+          return {
+            ok: true,
+            provider: "IPPanel-API2",
+            status: res2.status,
+            rawResponse: parsed2,
+          };
+        }
+
+        if (res2.status === 401 || res2.status === 403 || res2.status >= 500) {
+          break;
+        }
+      } catch (err: any) {
+        attemptsLog.push({
+          endpoint: "api2.ippanel.com",
+          error: err?.message || "network_error",
+        });
+        break;
+      }
+    }
+  }
+
+  // ۳. ارسال از طریق Classic Pattern API
+  for (const varObj of singleVarCandidates) {
+    try {
+      const res3 = await fetchWithTimeout("https://api.ippanel.com/v1/api/send/pattern", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          apikey: paddedKey,
+          Authorization: "AccessKey " + paddedKey,
+          "User-Agent": BROWSER_USER_AGENT,
+        },
+        body: JSON.stringify({
+          code: patternCode,
+          sender: originNumber,
+          recipient: recipientE164,
+          variable: varObj,
+        }),
+      });
+
+      const parsed3 = await parseResponseSafe(res3);
+      attemptsLog.push({
+        endpoint: "api.ippanel.com",
+        status: res3.status,
+        varKey: Object.keys(varObj)[0],
+        response: parsed3,
+      });
+
+      if (res3.ok && parsed3?.status !== "error") {
         return {
           ok: true,
-          provider: "IPPanel-API2",
-          status: res2.status,
-          rawResponse: data2,
+          provider: "IPPanel-Classic",
+          status: res3.status,
+          rawResponse: parsed3,
         };
       }
-      if (!lastError && data2?.error_message) {
-        lastError = data2.error_message;
-      }
+      if (res3.status === 401 || res3.status >= 500) break;
     } catch {}
   }
 
-  // ۳. فال‌بک به Classic Pattern API
-  try {
-    const res3 = await fetchWithTimeout("https://api.ippanel.com/v1/api/send/pattern", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        apikey: apiKey,
-        Authorization: apiKey,
-        "User-Agent": BROWSER_USER_AGENT,
-      },
-      body: JSON.stringify({
-        code: patternCode,
-        sender: originNumber,
-        recipient: recipientE164,
-        variable: { code: cleanCode },
-      }),
-    });
-
-    const data3 = await res3.json().catch(() => ({}));
-    if (res3.ok && data3?.status !== "error") {
-      return {
-        ok: true,
-        provider: "IPPanel-Classic",
-        status: res3.status,
-        rawResponse: data3,
-      };
-    }
-  } catch {}
+  const firstUsefulError =
+    attemptsLog.find((a) => a.response?.meta?.message)?.response?.meta?.message ||
+    attemptsLog.find((a) => a.response?.error_message)?.response?.error_message ||
+    attemptsLog.find((a) => a.response?.message)?.response?.message ||
+    "HTTP " + (attemptsLog[0]?.status || 502);
 
   return {
     ok: false,
-    status: lastStatus,
-    errorMessage: lastError || "عدم پاسخگویی درگاه پیامک",
-    rawResponse: lastRaw,
+    status: attemptsLog[0]?.status || 502,
+    errorMessage: String(firstUsefulError),
+    rawResponse: attemptsLog,
   };
 }
 
@@ -236,7 +294,7 @@ export async function sendOtpPattern(opts: OtpOptions): Promise<boolean> {
 }
 
 export async function sendTextSMS(mobile: string, message: string): Promise<boolean> {
-  const { apiKey, originNumber } = getCleanCredentials();
+  const { paddedKey, originNumber } = getCleanCredentials();
   const recipient = toE164(mobile);
 
   try {
@@ -245,7 +303,7 @@ export async function sendTextSMS(mobile: string, message: string): Promise<bool
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        Authorization: apiKey,
+        Authorization: paddedKey,
         "User-Agent": BROWSER_USER_AGENT,
       },
       body: JSON.stringify({

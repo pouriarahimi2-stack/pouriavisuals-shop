@@ -7,9 +7,15 @@ import ProductCard from "@/components/ProductCard";
 
 export interface ProductListProps {
   initialProducts?: Product[];
+  customHeading?: string;
+  customSubtitle?: string;
 }
 
-export default function ProductList({ initialProducts }: ProductListProps = {}) {
+export default function ProductList({
+  initialProducts,
+  customHeading,
+  customSubtitle,
+}: ProductListProps = {}) {
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [loading, setLoading] = useState(!initialProducts || initialProducts.length === 0);
 
@@ -42,18 +48,24 @@ export default function ProductList({ initialProducts }: ProductListProps = {}) 
   }, [initialProducts]);
 
   return (
-    <section className="py-8 space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
+    <section className="py-6 space-y-8 font-sans select-none text-[var(--text-primary)]" dir="rtl">
       <div className="border-b border-[var(--card-border)] pb-5 text-right">
-        <h2 className="text-2xl sm:text-3xl font-black">کاتالوگ تجهیزات و محصولات</h2>
+        <h2 className="text-2xl sm:text-3xl font-black">
+          {customHeading || "کاتالوگ تجهیزات و محصولات"}
+        </h2>
         <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-medium mt-1">
-          تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند
+          {customSubtitle ||
+            "تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند"}
         </p>
       </div>
 
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-pulse">
           {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="p-5 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4">
+            <div
+              key={idx}
+              className="p-5 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-4"
+            >
               <div className="w-full h-48 rounded-3xl bg-[var(--input-bg)]" />
               <div className="h-4 w-3/4 bg-[var(--input-bg)] rounded-full" />
               <div className="h-3 w-1/2 bg-[var(--input-bg)] rounded-full" />

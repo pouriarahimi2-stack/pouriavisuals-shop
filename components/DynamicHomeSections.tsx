@@ -17,11 +17,35 @@ interface Props {
   initialSiteInfo?: any;
 }
 
+const DEFAULT_SECTIONS_ORDER = [
+  {
+    id: "sec_banners",
+    type: "banners_slider",
+    title: "اسلایدر بنرهای تبلیغاتی و محصولات ویژه",
+    subtitle: "نمایش بنرهای کلیک‌پذیر متصل به صفحات محصول",
+    enabled: true,
+  },
+  {
+    id: "sec_perspective",
+    type: "NativePerspectiveSlider",
+    title: "نمایشگاه تعاملی سه‌بعدی محصولات پرچمدار",
+    subtitle: "بررسی لایه‌به‌لایه و ساختار مهندسی قطعات با کنترل لمسی",
+    enabled: true,
+  },
+  {
+    id: "sec_catalog",
+    type: "NativeProductCatalog",
+    title: "کاتالوگ تجهیزات و محصولات",
+    subtitle: "تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند",
+    enabled: true,
+  },
+];
+
 export default function DynamicHomeSections({
   initialProducts = [],
   initialBanners = [],
 }: Props) {
-  const { siteInfo } = useSiteInfo();
+  const { siteInfo, refresh } = useSiteInfo();
   const layoutCfg = siteInfo?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
 
   const [products, setProducts] = useState<any[]>(initialProducts);
@@ -52,6 +76,15 @@ export default function DynamicHomeSections({
   useEffect(() => {
     fetchLiveHomeData();
 
+    const handleStudioChange = () => {
+      fetchLiveHomeData();
+      if (typeof refresh === "function") refresh();
+    };
+
+    window.addEventListener("theme_builder_updated", handleStudioChange);
+    window.addEventListener("banners_updated", fetchLiveHomeData);
+    window.addEventListener("products_updated", fetchLiveHomeData);
+
     const chProds = supabase
       .channel("realtime-home-products")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
@@ -67,13 +100,14 @@ export default function DynamicHomeSections({
       .subscribe();
 
     return () => {
+      window.removeEventListener("theme_builder_updated", handleStudioChange);
+      window.removeEventListener("banners_updated", fetchLiveHomeData);
+      window.removeEventListener("products_updated", fetchLiveHomeData);
       supabase.removeChannel(chProds);
       supabase.removeChannel(chBanners);
     };
-  }, []);
+  }, [refresh]);
 
-  // ساخت اسلایدهای بنر: اگر بنر در جدول banners ثبت شده باشد از آن‌ها استفاده می‌شود،
-  // و اگر هنوز بنری ثبت نشده باشد، به صورت خودکار از محصولات کاتالوگ بنرهای کلیک‌پذیر می‌سازد.
   const effectiveSlides =
     banners.length > 0
       ? banners.map((b: any) => ({
@@ -83,7 +117,8 @@ export default function DynamicHomeSections({
           image: b.image_url || b.image || "/placeholder.png",
           link: b.link_url || b.link || "/products",
           price: b.price ? Number(b.price) : null,
-          badge: b.badge || "پیشنهاد ویژه",
+          badge: b.badge_text || b.badge || "پیشنهاد ویژه",
+          cta: b.cta_text || "مشاهده و خرید محصول",
         }))
       : products.slice(0, 5).map((p: any) => ({
           id: String(p.id),
@@ -91,7 +126,9 @@ export default function DynamicHomeSections({
           subtitle:
             p.short_description ||
             (p.description
-              ? String(p.description).replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "").slice(0, 110)
+              ? String(p.description)
+                  .replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "")
+                  .slice(0, 110)
               : "خرید مستقیم با گارانتی اصالت و ارسال سریع"),
           image:
             p.image ||
@@ -101,6 +138,7 @@ export default function DynamicHomeSections({
           link: "/products/" + p.id,
           price: Number(p.discount_price || p.discountPrice || p.price || 0),
           badge: p.category || "ویژه کاتالوگ",
+          cta: "مشاهده و خرید محصول",
         }));
 
   useEffect(() => {
@@ -111,16 +149,24 @@ export default function DynamicHomeSections({
     return () => clearInterval(timer);
   }, [effectiveSlides.length]);
 
-  const showcaseCfg = layoutCfg.showcase3D || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D;
+  const configuredSections =
+    Array.isArray(layoutCfg?.theme_builder_config?.homeSections) &&
+    layoutCfg.theme_builder_config.homeSections.length > 0
+      ? layoutCfg.theme_builder_config.homeSections
+      : Array.isArray(layoutCfg?.homeSections) && layoutCfg.homeSections.length > 0
+      ? layoutCfg.homeSections
+      : DEFAULT_SECTIONS_ORDER;
 
-  return (
-    <div
-      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 font-sans select-none"
-      dir="rtl"
-    >
-      {/* ۱. جایگزینی باکس متنی هیرو با اسلایدر بنرهای کلیک‌پذیر متصل به صفحه محصول (طبق عکس سوم) */}
-      {effectiveSlides.length > 0 && (
-        <section className="relative w-full rounded-[2.2rem] sm:rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] shadow-2xl bg-[var(--modal-bg)] min-h-[280px] sm:min-h-[380px] md:min-h-[430px] flex items-center">
+  const renderSectionByConfig = (sec: any) => {
+    if (sec.enabled === false) return null;
+
+    if (sec.type === "banners_slider") {
+      if (effectiveSlides.length === 0) return null;
+      return (
+        <section
+          key={sec.id}
+          className="relative w-full rounded-[2.2rem] sm:rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] shadow-2xl bg-[var(--modal-bg)] min-h-[280px] sm:min-h-[380px] md:min-h-[430px] flex items-center"
+        >
           {effectiveSlides.map((slide, idx) => {
             const isActive = idx === activeSlide;
             return (
@@ -153,7 +199,7 @@ export default function DynamicHomeSections({
 
                     <div className="pt-2 flex flex-wrap items-center gap-4">
                       <span className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs sm:text-sm shadow-xl hover:opacity-90 transition inline-flex items-center gap-2">
-                        <span>مشاهده و خرید محصول</span>
+                        <span>{slide.cta}</span>
                         <span>←</span>
                       </span>
 
@@ -200,25 +246,43 @@ export default function DynamicHomeSections({
             </div>
           )}
         </section>
-      )}
+      );
+    }
 
-      {/* ۲. نمایشگاه تعاملی سه‌بعدی: فقط در موبایل نمایش داده شود و در دسکتاپ مخفی باشد (طبق عکس چهارم) */}
-      {showcaseCfg?.show !== false && products.length > 0 && (
-        <div className="block md:hidden">
+    if (sec.type === "NativePerspectiveSlider") {
+      if (products.length === 0) return null;
+      return (
+        <div key={sec.id} className="block md:hidden">
           <ProductPerspectiveSlider
             products={products}
-            customTitle={showcaseCfg.title}
-            customSubtitle={showcaseCfg.subtitle}
+            customTitle={sec.title}
+            customSubtitle={sec.subtitle}
           />
         </div>
-      )}
+      );
+    }
 
-      {/* ۳. گرید کاتالوگ تجهیزات و محصولات: فقط در دسکتاپ و تبلت نمایش داده شود و در موبایل مخفی باشد (برعکس مورد بالا) */}
-      {layoutCfg.productsSection?.show !== false && (
-        <div className="hidden md:block">
-          <ProductList initialProducts={products} />
+    if (sec.type === "NativeProductCatalog") {
+      return (
+        <div key={sec.id} className="hidden md:block">
+          <ProductList
+            initialProducts={products}
+            customHeading={sec.title}
+            customSubtitle={sec.subtitle}
+          />
         </div>
-      )}
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <div
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 font-sans select-none"
+      dir="rtl"
+    >
+      {configuredSections.map((sec: any) => renderSectionByConfig(sec))}
     </div>
   );
 }

@@ -1,14 +1,114 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { IRAN_PROVINCES_CITIES } from "@/lib/iranProvinces";
 import { formatPrice } from "@/lib/formatters";
+import { supabase } from "@/lib/supabase";
 
 const CHECKOUT_DRAFT_KEY = "axon_checkout_form_draft_v2026";
+
+interface StoreFinancialRules {
+  defaultShippingCost: number;
+  freeShippingThreshold: number;
+  vatPercent: number;
+  allowGuestCheckout: boolean;
+  autoSendOrderSms: boolean;
+}
+
+function parseExactNumber(val: any, fallback: number): number {
+  if (val === undefined || val === null || val === "") return fallback;
+  const converted = String(val)
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/,/g, "")
+    .trim();
+  if (converted === "") return fallback;
+  const num = Number(converted);
+  return Number.isFinite(num) && num >= 0 ? num : fallback;
+}
+
+function extractFinancialRulesFromPayload(raw: any): StoreFinancialRules | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const candidates = [
+    raw.settings,
+    raw.system_settings,
+    raw.store_settings,
+    raw.homepage_layout_config?.system_settings,
+    raw.homepage_layout_config?.settings,
+    raw.homepage_layout_config?.store_settings,
+    raw.homepage_layout_config,
+    raw.siteInfo?.homepage_layout_config?.system_settings,
+    raw.siteInfo?.homepage_layout_config?.settings,
+    raw.siteInfo?.homepage_layout_config,
+    raw.siteInfo,
+    raw.data?.settings,
+    raw.data?.homepage_layout_config?.system_settings,
+    raw.data?.homepage_layout_config,
+    raw.data,
+    raw,
+  ].filter((c) => c && typeof c === "object");
+
+  let foundShipping: number | undefined;
+  let foundThreshold: number | undefined;
+  let foundVat: number | undefined;
+  let foundGuest: boolean | undefined;
+  let foundSms: boolean | undefined;
+
+  for (const obj of candidates) {
+    if (foundShipping === undefined) {
+      const sVal =
+        obj.defaultShippingCost ??
+        obj.default_shipping_cost ??
+        obj.shippingCost ??
+        obj.shipping_cost ??
+        obj.shipping_fee;
+      if (sVal !== undefined && sVal !== null && sVal !== "") {
+        foundShipping = parseExactNumber(sVal, 0);
+      }
+    }
+    if (foundThreshold === undefined) {
+      const tVal =
+        obj.freeShippingThreshold ??
+        obj.free_shipping_threshold ??
+        obj.freeShippingMinAmount ??
+        obj.free_shipping_limit;
+      if (tVal !== undefined && tVal !== null && tVal !== "") {
+        foundThreshold = parseExactNumber(tVal, 0);
+      }
+    }
+    if (foundVat === undefined) {
+      const vVal =
+        obj.vatPercent ??
+        obj.vat_percent ??
+        obj.taxPercent ??
+        obj.tax_percent ??
+        obj.vat ??
+        obj.tax_rate;
+      if (vVal !== undefined && vVal !== null && vVal !== "") {
+        foundVat = parseExactNumber(vVal, 10);
+      }
+    }
+    if (foundGuest === undefined && typeof obj.allowGuestCheckout === "boolean") {
+      foundGuest = obj.allowGuestCheckout;
+    }
+    if (foundSms === undefined && typeof obj.autoSendOrderSms === "boolean") {
+      foundSms = obj.autoSendOrderSms;
+    }
+  }
+
+  return {
+    defaultShippingCost: foundShipping !== undefined ? foundShipping : 0,
+    freeShippingThreshold: foundThreshold !== undefined ? foundThreshold : 0,
+    vatPercent: foundVat !== undefined ? foundVat : 10,
+    allowGuestCheckout: foundGuest !== undefined ? foundGuest : true,
+    autoSendOrderSms: foundSms !== undefined ? foundSms : true,
+  };
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -32,14 +132,88 @@ export default function CheckoutPage() {
   const [couponInput, setCouponInput] = useState("");
   const [couponMsg, setCouponMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
+  const [financialRules, setFinancialRules] = useState<StoreFinancialRules>({
+    defaultShippingCost: 0,
+    freeShippingThreshold: 0,
+    vatPercent: 10,
+    allowGuestCheckout: true,
+    autoSendOrderSms: true,
+  });
+
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [verifiedToken, setVerifiedToken] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const shippingCost = finalPayable > 0 ? (finalPayable >= 5000000 ? 0 : 65000) : 0;
-  const grandTotal = finalPayable + shippingCost;
+  const fetchLiveStoreRules = useCallback(async () => {
+    try {
+      const [settingsRes, siteInfoRes] = await Promise.allSettled([
+        fetch("/api/admin/settings", { cache: "no-store" }),
+        fetch("/api/site-info", { cache: "no-store" }),
+      ]);
+
+      if (settingsRes.status === "fulfilled" && settingsRes.value.ok) {
+        const sJson = await settingsRes.value.json();
+        const extracted = extractFinancialRulesFromPayload(sJson);
+        if (extracted) {
+          setFinancialRules(extracted);
+          return;
+        }
+      }
+
+      if (siteInfoRes.status === "fulfilled" && siteInfoRes.value.ok) {
+        const infoJson = await siteInfoRes.value.json();
+        const extracted = extractFinancialRulesFromPayload(infoJson);
+        if (extracted) {
+          setFinancialRules(extracted);
+        }
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchLiveStoreRules();
+
+    const channel = supabase
+      .channel("realtime-checkout-store-settings")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        (payload) => {
+          if (payload?.new) {
+            const updated = extractFinancialRulesFromPayload(payload.new);
+            if (updated) setFinancialRules(updated);
+          }
+          fetchLiveStoreRules();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchLiveStoreRules]);
+
+  // محاسبه دقیق هزینه ارسال بر اساس تنظیمات ادمین (پشتیبانی کامل از عدد 0)
+  const shippingCost =
+    finalPayable <= 0
+      ? 0
+      : financialRules.defaultShippingCost <= 0
+      ? 0
+      : financialRules.freeShippingThreshold > 0 &&
+        finalPayable >= financialRules.freeShippingThreshold
+      ? 0
+      : financialRules.defaultShippingCost;
+
+  // محاسبه دقیق مالیات بر ارزش افزوده (پیش‌فرض ۱۰٪ یا مقدار تنظیم‌شده در پنل ادمین)
+  const vatAmount =
+    finalPayable > 0 && financialRules.vatPercent > 0
+      ? Math.round((finalPayable * financialRules.vatPercent) / 100)
+      : 0;
+
+  // مبلغ نهایی قابل پرداخت (پس از کسر تخفیف + افزودن مالیات بر ارزش افزوده + هزینه ارسال)
+  const grandTotal = Math.max(0, finalPayable + vatAmount + shippingCost);
 
   useEffect(() => {
     try {
@@ -120,6 +294,8 @@ export default function CheckoutPage() {
           items: cartItems,
           subtotal: totalPrice,
           discountAmount,
+          vatPercent: financialRules.vatPercent,
+          vatAmount,
           shippingCost,
           finalAmount: grandTotal,
           couponCode: appliedCoupon?.code || null,
@@ -133,13 +309,14 @@ export default function CheckoutPage() {
 
       const orderId = orderData.order?.id || orderData.order?.order_number;
       const trackingCode = orderData.order?.tracking_code || orderId;
+      const confirmedFinalAmount = Number(orderData.order?.final_amount ?? grandTotal);
 
       soundEngine.playSuccess();
       router.push(
         "/checkout/payment?orderId=" +
           encodeURIComponent(String(orderId)) +
           "&amount=" +
-          encodeURIComponent(String(grandTotal)) +
+          encodeURIComponent(String(confirmedFinalAmount)) +
           "&phone=" +
           encodeURIComponent(cleanPhone) +
           "&trackingCode=" +
@@ -456,10 +633,16 @@ export default function CheckoutPage() {
             )}
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">هزینه ارسال پستی:</span>
-              <span className="font-mono font-bold">
+              <span className="font-mono font-bold text-emerald-500">
                 {shippingCost === 0 ? "رایگان ✓" : formatPrice(shippingCost) + " تومان"}
               </span>
             </div>
+            {financialRules.vatPercent > 0 && (
+              <div className="flex justify-between text-amber-500">
+                <span>مالیات بر ارزش افزوده ({financialRules.vatPercent}٪):</span>
+                <span className="font-mono font-bold">+{formatPrice(vatAmount)} تومان</span>
+              </div>
+            )}
             <div className="pt-2.5 border-t border-[var(--card-border)] flex justify-between items-center text-sm">
               <span className="font-black">مبلغ قابل پرداخت:</span>
               <span className="font-mono font-black text-[var(--accent-blue)]">

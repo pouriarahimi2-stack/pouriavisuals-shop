@@ -1,6 +1,8 @@
 // File Path: app/api/checkout/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyPhoneTokenSignature } from "@/app/api/send-otp/route";
+import { verifyCustomerToken, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +27,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, message: "شماره موبایل ۱۱ رقمی معتبر الزامی است." },
         { status: 400 }
+      );
+    }
+
+    const otpTokenFromBody = String(body.otpVerificationToken || "").trim();
+    const otpTokenFromCookie = req.cookies.get("axon_verified_phone_token")?.value || "";
+    const customerSessionCookie = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value || "";
+
+    let isPhoneCryptographicallyVerified =
+      verifyPhoneTokenSignature(cleanPhone, otpTokenFromBody) ||
+      verifyPhoneTokenSignature(cleanPhone, otpTokenFromCookie);
+
+    if (!isPhoneCryptographicallyVerified && customerSessionCookie) {
+      const custSession = await verifyCustomerToken(customerSessionCookie);
+      if (custSession && String(custSession.phone).replace(/\D/g, "") === cleanPhone) {
+        isPhoneCryptographicallyVerified = true;
+      }
+    }
+
+    if (!isPhoneCryptographicallyVerified) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "خطای امنیتی: شماره تلفن همراه شما هنوز از طریق کد پیامکی تایید نشده است.",
+        },
+        { status: 403 }
       );
     }
 
@@ -87,7 +114,6 @@ export async function POST(req: NextRequest) {
     if (!orderErr && insertedOrder) {
       savedOrder = insertedOrder;
     } else {
-      // فال‌بک با حداقل ستون‌ها در صورت تفاوت اسکیمای جدول orders
       const minimalOrder: Record<string, any> = {
         id: randomUUID(),
         customer_name: fullName,
@@ -108,7 +134,6 @@ export async function POST(req: NextRequest) {
       if (minInserted) savedOrder = minInserted;
     }
 
-    // کسر خودکار موجودی کالا از جدول products و ثبت در inventory_logs
     for (const item of items) {
       const prodId = String(item.id || item.productId || item.product_id || "");
       const qty = Math.max(1, Number(item.quantity || 1));
@@ -140,7 +165,9 @@ export async function POST(req: NextRequest) {
               product_title: prodRow.title || prodRow.name || item.title,
               change_type: "sale",
               quantity: qty,
-              cost_price: Number(prodRow.purchase_price || Math.round(Number(prodRow.price || 0) * 0.7)),
+              cost_price: Number(
+                prodRow.purchase_price || Math.round(Number(prodRow.price || 0) * 0.7)
+              ),
               supplier: "فروش آنلاین سایت",
               reference_note: "کسر خودکار بابت فاکتور " + (savedOrder.order_number || savedOrder.id),
               created_at: new Date().toISOString(),
@@ -150,7 +177,6 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    // ثبت یا بروزرسانی خودکار مشتری در CRM
     try {
       await supabaseAdmin.from("crm_customers").upsert([
         {

@@ -51,27 +51,16 @@ export async function POST(req: NextRequest) {
       encodeURIComponent(String(amount)) +
       (phone ? "&phone=" + encodeURIComponent(phone) : "");
 
-    const zpPayload = {
-      merchant_id: ZARINPAL_MERCHANT_ID,
-      amount: Math.round(amount),
-      currency: "IRT",
-      description: body.description || "پرداخت سفارش " + orderId + " در فروشگاه آکسون کور",
-      callback_url: callbackUrl,
-      metadata: {
-        ...(phone ? { mobile: phone } : {}),
-        order_id: orderId,
-      },
-    };
-
-    const endpoints = [
-      "https://payment.zarinpal.com/pg/v4/payment/request.json",
-      "https://api.zarinpal.com/pg/v4/payment/request.json",
-    ];
+    const descriptionText =
+      body.description || "پرداخت سفارش " + orderId + " در فروشگاه آکسون کور";
 
     let authority = "";
     let lastError = "";
 
-    for (const ep of endpoints) {
+    for (const ep of [
+      "https://payment.zarinpal.com/pg/v4/payment/request.json",
+      "https://api.zarinpal.com/pg/v4/payment/request.json",
+    ]) {
       try {
         const zpRes = await fetch(ep, {
           method: "POST",
@@ -79,7 +68,17 @@ export async function POST(req: NextRequest) {
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-          body: JSON.stringify(zpPayload),
+          body: JSON.stringify({
+            merchant_id: ZARINPAL_MERCHANT_ID,
+            amount: Math.round(amount),
+            currency: "IRT",
+            description: descriptionText,
+            callback_url: callbackUrl,
+            metadata: {
+              ...(phone ? { mobile: phone } : {}),
+              order_id: orderId,
+            },
+          }),
         });
 
         const zpJson = await zpRes.json().catch(() => ({}));
@@ -98,10 +97,27 @@ export async function POST(req: NextRequest) {
     }
 
     if (!authority) {
+      const isIpError = String(lastError).toLowerCase().includes("terminal ip not valid");
+      let detectedOutboundIp = "";
+      if (isIpError) {
+        try {
+          const ipRes = await fetch("https://api.ipify.org?format=json");
+          const ipJson = await ipRes.json();
+          if (ipJson?.ip) detectedOutboundIp = String(ipJson.ip);
+        } catch {}
+      }
+
       return NextResponse.json(
         {
           success: false,
-          message: "خطا در دریافت توکن از درگاه زرین‌پال: " + lastError,
+          outboundServerIp: detectedOutboundIp || undefined,
+          message: isIpError
+            ? "خطای Terminal IP not valid از زرین‌پال: آی‌پی 216.198.79.1 آی‌پی ورودی DNS است، اما آی‌پی خروجی فعلی سرور Vercel که زرین‌پال می‌بیند «" +
+              (detectedOutboundIp || "متغیر") +
+              "» است. در پنل زرین‌پال یا گزینه «بدون محدودیت IP» را انتخاب و ذخیره کنید، یا آی‌پی «" +
+              (detectedOutboundIp || "") +
+              "» را در کادر آی‌پی‌های سرور اضافه نمایید."
+            : "خطا در دریافت توکن از درگاه زرین‌پال: " + lastError,
         },
         { status: 502 }
       );

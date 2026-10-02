@@ -34,15 +34,13 @@ export default function CheckoutPage() {
 
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState("");
-  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
-  const [gatewaySmsDown, setGatewaySmsDown] = useState(false);
+  const [verifiedToken, setVerifiedToken] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const shippingCost = finalPayable > 0 ? (finalPayable >= 5000000 ? 0 : 65000) : 0;
   const grandTotal = finalPayable + shippingCost;
 
-  // ۱. بازیابی خودکار اطلاعات فرم از حافظه مرورگر (ضد رفرش و قطع اینترنت)
   useEffect(() => {
     try {
       const savedDraft = localStorage.getItem(CHECKOUT_DRAFT_KEY);
@@ -58,22 +56,9 @@ export default function CheckoutPage() {
         if (parsed.postalCode) setPostalCode(parsed.postalCode);
         if (parsed.notes) setNotes(parsed.notes);
       }
-
-      const userSession = localStorage.getItem("axon_user_session");
-      if (userSession) {
-        const user = JSON.parse(userSession);
-        if (user?.phone) {
-          setPhone((prev) => prev || user.phone);
-          setIsPhoneVerified(true);
-        }
-        if (user?.name) {
-          setFullName((prev) => prev || user.name);
-        }
-      }
     } catch {}
   }, []);
 
-  // ۲. ذخیره لحظه‌ای تغییرات فرم در حافظه ضد رفرش
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -109,8 +94,7 @@ export default function CheckoutPage() {
     });
   };
 
-  // ثبت نهایی سفارش و انتقال مستقیم به درگاه زرین‌پال
-  const finalizeOrderAndRedirectToZarinPal = async () => {
+  const finalizeOrderWithVerifiedToken = async (tokenToUse: string) => {
     setSubmitting(true);
     setErrorMsg(null);
 
@@ -123,6 +107,7 @@ export default function CheckoutPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          otpVerificationToken: tokenToUse,
           customer: {
             fullName: fullName.trim(),
             phone: cleanPhone,
@@ -170,7 +155,6 @@ export default function CheckoutPage() {
     e.preventDefault();
     soundEngine.playClick();
     setErrorMsg(null);
-    setGatewaySmsDown(false);
 
     const cleanPhone = phone
       .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
@@ -186,8 +170,8 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (isPhoneVerified) {
-      await finalizeOrderAndRedirectToZarinPal();
+    if (verifiedToken) {
+      await finalizeOrderWithVerifiedToken(verifiedToken);
       return;
     }
 
@@ -205,14 +189,10 @@ export default function CheckoutPage() {
         setSubmitting(false);
       } else {
         setErrorMsg(otpJson.message || "خطا در ارسال پیامک تایید.");
-        if (otpRes.status === 502 || otpRes.status === 500) {
-          setGatewaySmsDown(true);
-        }
         setSubmitting(false);
       }
     } catch {
-      setErrorMsg("درگاه پیامک اپراتور پاسخگو نیست.");
-      setGatewaySmsDown(true);
+      setErrorMsg("خطا در ارتباط با سرویس پیامک.");
       setSubmitting(false);
     }
   };
@@ -239,10 +219,10 @@ export default function CheckoutPage() {
       });
       const vJson = await vRes.json();
 
-      if (vRes.ok && vJson.verified) {
-        setIsPhoneVerified(true);
+      if (vRes.ok && vJson.verified && vJson.otpVerificationToken) {
+        setVerifiedToken(vJson.otpVerificationToken);
         setOtpModalOpen(false);
-        await finalizeOrderAndRedirectToZarinPal();
+        await finalizeOrderWithVerifiedToken(vJson.otpVerificationToken);
       } else {
         setErrorMsg(vJson.message || "کد تایید وارد شده صحیح نیست.");
         setSubmitting(false);
@@ -277,25 +257,8 @@ export default function CheckoutPage() {
       </div>
 
       {errorMsg && (
-        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold space-y-3 animate-fadeIn">
-          <div className="flex items-center justify-between gap-2">
-            <span>⚠️ {errorMsg}</span>
-          </div>
-          {gatewaySmsDown && (
-            <div className="pt-2 border-t border-rose-500/20 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <span className="text-[11px] text-[var(--text-primary)] font-bold">
-                به دلیل مسدود بودن آی‌پی سرور خارج از کشور (Vercel) روی فایروال ابرآروانِ اپراتور پیامک، می‌توانید بدون توقف مستقیماً وارد درگاه پرداخت امن زرین‌پال شوید:
-              </span>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={finalizeOrderAndRedirectToZarinPal}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg cursor-pointer shrink-0 transition"
-              >
-                💳 ادامه خرید و ورود مستقیم به درگاه زرین‌پال ←
-              </button>
-            </div>
-          )}
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold animate-fadeIn">
+          ⚠️ {errorMsg}
         </div>
       )}
 
@@ -332,7 +295,7 @@ export default function CheckoutPage() {
                 value={phone}
                 onChange={(e) => {
                   setPhone(e.target.value);
-                  setIsPhoneVerified(false);
+                  setVerifiedToken("");
                 }}
                 placeholder="09123456789"
                 className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
@@ -512,7 +475,7 @@ export default function CheckoutPage() {
           >
             {submitting
               ? "در حال پردازش..."
-              : isPhoneVerified
+              : verifiedToken
               ? "💳 ثبت سفارش و ورود به درگاه زرین‌پال ←"
               : "🔒 تایید شماره همراه و پرداخت آنلاین ←"}
           </button>
@@ -520,9 +483,13 @@ export default function CheckoutPage() {
       </form>
 
       {otpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+          onClick={() => setOtpModalOpen(false)}
+        >
           <form
             onSubmit={handleVerifyOtpAndPay}
+            onClick={(e) => e.stopPropagation()}
             className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-5 text-center text-xs"
           >
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">

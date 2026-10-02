@@ -1,4 +1,6 @@
 // File Path: lib/otpService.ts
+import https from "https";
+
 export interface OtpOptions {
   mobile: string;
   code: string;
@@ -17,6 +19,11 @@ const RAW_KEY_UNPADDED =
 const RAW_KEY_PADDED = RAW_KEY_UNPADDED + "=";
 const EXACT_ORIGIN_NUMBER = "+983000505";
 const EXACT_PATTERN_CODE = "3d6fa1f8ud3ma1w";
+
+const IRAN_EDGE_IPS: Record<string, string[]> = {
+  "edge.ippanel.com": ["185.143.233.131","185.143.234.131"],
+  "api2.ippanel.com": ["185.143.233.131","185.143.234.131"],
+};
 
 export function toE164(phone: string): string {
   const d = String(phone || "")
@@ -78,30 +85,76 @@ function getCleanCredentials() {
   };
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 5000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
+function httpsPostViaIranNode(
+  urlStr: string,
+  headers: Record<string, string>,
+  bodyObj: Record<string, any>,
+  pinnedIp?: string,
+  timeoutMs = 5000
+): Promise<{ status: number; data: any }> {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(urlStr);
+    const payload = JSON.stringify(bodyObj);
 
-async function parseResponseSafe(res: Response) {
-  const text = await res.text().catch(() => "");
-  try {
-    return JSON.parse(text);
-  } catch {
-    const cleanText = text
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    return { rawSummary: cleanText.slice(0, 180) || "HTTP " + res.status };
-  }
+    const reqOptions: https.RequestOptions = {
+      hostname: parsedUrl.hostname,
+      port: 443,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: "POST",
+      servername: parsedUrl.hostname,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "Content-Length": Buffer.byteLength(payload).toString(),
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0",
+        ...headers,
+      },
+      timeout: timeoutMs,
+    };
+
+    if (pinnedIp) {
+      reqOptions.lookup = (hostname, options: any, cb: any) => {
+        if (options && options.all) {
+          return cb(null, [{ address: pinnedIp, family: 4 }]);
+        }
+        return cb(null, pinnedIp, 4);
+      };
+    }
+
+    const req = https.request(reqOptions, (res) => {
+      let raw = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        raw += chunk;
+      });
+      res.on("end", () => {
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          const cleanText = raw
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&nbsp;/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          parsed = { rawSummary: cleanText.slice(0, 180) || "HTTP " + (res.statusCode || 500) };
+        }
+        resolve({ status: res.statusCode || 500, data: parsed });
+      });
+    });
+
+    req.on("timeout", () => {
+      req.destroy(new Error("Request Timeout"));
+    });
+    req.on("error", (err) => {
+      reject(err);
+    });
+
+    req.write(payload);
+    req.end();
+  });
 }
 
 export async function sendOtpPatternDetailed({
@@ -114,85 +167,107 @@ export async function sendOtpPatternDetailed({
   const cleanCode = String(code).trim();
 
   const attemptsLog: Array<Record<string, any>> = [];
+  const edgePinnedIp = IRAN_EDGE_IPS["edge.ippanel.com"]?.[0];
+  const api2PinnedIp = IRAN_EDGE_IPS["api2.ippanel.com"]?.[0];
 
-  // ۱. ارسال از طریق وب‌سرویس رسمی Edge با کلید دارای پدینگ (=) و متغیر دقیق vefification-code
-  try {
-    const resEdge = await fetchWithTimeout("https://edge.ippanel.com/v1/api/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: padded,
-      },
-      body: JSON.stringify({
-        sending_type: "pattern",
-        from_number: originNumber,
-        code: patternCode,
-        recipients: [recipientE164],
-        params: {
-          "vefification-code": cleanCode,
+  // ۱. ارسال از طریق Edge API با متغیر دقیق vefification-code
+  for (const pinIp of [edgePinnedIp, undefined]) {
+    try {
+      const resEdge = await httpsPostViaIranNode(
+        "https://edge.ippanel.com/v1/api/send",
+        { Authorization: padded },
+        {
+          sending_type: "pattern",
+          from_number: originNumber,
+          code: patternCode,
+          recipients: [recipientE164],
+          params: {
+            "vefification-code": cleanCode,
+          },
         },
-      }),
-    });
+        pinIp
+      );
 
-    const parsedEdge = await parseResponseSafe(resEdge);
-    attemptsLog.push({
-      gw: "edge.ippanel.com",
-      status: resEdge.status,
-      res: parsedEdge,
-    });
-
-    if (resEdge.ok && parsedEdge?.meta?.status !== false && !parsedEdge?.rawSummary) {
-      return {
-        ok: true,
-        provider: "IPPanel-Edge",
+      attemptsLog.push({
+        gw: "edge.ippanel.com",
+        routedIp: pinIp || "default-dns",
         status: resEdge.status,
-        rawResponse: parsedEdge,
-      };
+        res: resEdge.data,
+      });
+
+      if (
+        resEdge.status >= 200 &&
+        resEdge.status < 300 &&
+        resEdge.data?.meta?.status !== false &&
+        !resEdge.data?.rawSummary
+      ) {
+        return {
+          ok: true,
+          provider: "IPPanel-Edge",
+          status: resEdge.status,
+          rawResponse: resEdge.data,
+        };
+      }
+
+      if (resEdge.status !== 502 && resEdge.status !== 504) {
+        break;
+      }
+    } catch (err: any) {
+      attemptsLog.push({
+        gw: "edge.ippanel.com",
+        routedIp: pinIp || "default-dns",
+        error: err?.message,
+      });
     }
-  } catch (e: any) {
-    attemptsLog.push({ gw: "edge.ippanel.com", error: e?.message });
   }
 
-  // ۲. ارسال از طریق وب‌سرویس API2 با متغیر دقیق vefification-code (در صورتی که نود اول خطا داد)
-  try {
-    const resApi2 = await fetchWithTimeout(
-      "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          apikey: padded,
-        },
-        body: JSON.stringify({
+  // ۲. ارسال از طریق API2 IPPanel با متغیر دقیق vefification-code
+  for (const pinIp of [api2PinnedIp, undefined]) {
+    try {
+      const resApi2 = await httpsPostViaIranNode(
+        "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
+        { apikey: padded },
+        {
           code: patternCode,
           sender: originNumber,
           recipient: recipientLocal,
           variable: {
             "vefification-code": cleanCode,
           },
-        }),
-      }
-    );
+        },
+        pinIp
+      );
 
-    const parsedApi2 = await parseResponseSafe(resApi2);
-    attemptsLog.push({
-      gw: "api2.ippanel.com",
-      status: resApi2.status,
-      res: parsedApi2,
-    });
-
-    if (resApi2.ok && parsedApi2?.status === "OK") {
-      return {
-        ok: true,
-        provider: "IPPanel-API2",
+      attemptsLog.push({
+        gw: "api2.ippanel.com",
+        routedIp: pinIp || "default-dns",
         status: resApi2.status,
-        rawResponse: parsedApi2,
-      };
+        res: resApi2.data,
+      });
+
+      if (
+        resApi2.status >= 200 &&
+        resApi2.status < 300 &&
+        resApi2.data?.status === "OK"
+      ) {
+        return {
+          ok: true,
+          provider: "IPPanel-API2",
+          status: resApi2.status,
+          rawResponse: resApi2.data,
+        };
+      }
+
+      if (resApi2.status !== 502 && resApi2.status !== 504) {
+        break;
+      }
+    } catch (err: any) {
+      attemptsLog.push({
+        gw: "api2.ippanel.com",
+        routedIp: pinIp || "default-dns",
+        error: err?.message,
+      });
     }
-  } catch (e: any) {
-    attemptsLog.push({ gw: "api2.ippanel.com", error: e?.message });
   }
 
   const errorMsg =

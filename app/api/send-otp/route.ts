@@ -15,12 +15,46 @@ interface OtpRecord {
 
 const memoryOtpStore = new Map<string, OtpRecord>();
 
-function hashOtp(phone: string, code: string): string {
-  const secret =
+function getHmacSecret(): string {
+  return (
     process.env.OTP_HMAC_SECRET ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "axon-core-otp-hmac-secret-2026";
-  return crypto.createHmac("sha256", secret).update(phone + ":" + code).digest("hex");
+    "axon-core-otp-hmac-secret-2026"
+  );
+}
+
+function hashOtp(phone: string, code: string): string {
+  return crypto
+    .createHmac("sha256", getHmacSecret())
+    .update(phone + ":" + code)
+    .digest("hex");
+}
+
+export function createPhoneVerifiedToken(phone: string): string {
+  const exp = Date.now() + 30 * 60 * 1000;
+  const payload = phone + ":" + exp;
+  const sig = crypto
+    .createHmac("sha256", getHmacSecret())
+    .update("VERIFIED_PHONE:" + payload)
+    .digest("hex");
+  return Buffer.from(payload + ":" + sig).toString("base64");
+}
+
+export function verifyPhoneTokenSignature(phone: string, token: string): boolean {
+  try {
+    if (!token || !phone) return false;
+    const decoded = Buffer.from(token, "base64").toString("utf8");
+    const [tokPhone, expStr, sig] = decoded.split(":");
+    if (tokPhone !== phone) return false;
+    if (Date.now() > Number(expStr)) return false;
+    const expectedSig = crypto
+      .createHmac("sha256", getHmacSecret())
+      .update("VERIFIED_PHONE:" + tokPhone + ":" + expStr)
+      .digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expectedSig, "hex"));
+  } catch {
+    return false;
+  }
 }
 
 function cleanupExpiredOtps(otps: Record<string, any>) {
@@ -179,14 +213,25 @@ export async function POST(req: NextRequest) {
           .eq("id", siteRow.id);
       }
 
-      const sessionToken = "USR-" + crypto.randomBytes(16).toString("hex").toUpperCase();
-      return NextResponse.json({
+      const verifiedToken = createPhoneVerifiedToken(rawPhone);
+      const res = NextResponse.json({
         success: true,
         verified: true,
-        token: sessionToken,
-        user: { phone: rawPhone, token: sessionToken },
+        token: verifiedToken,
+        otpVerificationToken: verifiedToken,
+        user: { phone: rawPhone, token: verifiedToken },
         message: "شماره همراه شما با موفقیت تایید شد.",
       });
+
+      res.cookies.set("axon_verified_phone_token", verifiedToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 60,
+      });
+
+      return res;
     }
 
     const existingActive =

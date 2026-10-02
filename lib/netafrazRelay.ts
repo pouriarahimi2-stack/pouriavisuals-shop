@@ -5,9 +5,8 @@ export function getCandidateRelayUrls(): string[] {
   const customEnv = (process.env.IRAN_STATIC_RELAY_URL || "").trim();
   const urls = [
     customEnv,
-    "https://gate.axoncore.ir/axon-relay.php",
     "http://gate.axoncore.ir/axon-relay.php",
-    "https://gate.axoncore.ir/index.php",
+    "https://gate.axoncore.ir/axon-relay.php",
   ].filter(Boolean);
   return Array.from(new Set(urls));
 }
@@ -16,7 +15,7 @@ export async function postViaNetafrazRelay(
   targetUrl: string,
   headers: Record<string, string>,
   payload: Record<string, any>,
-  timeoutMs = 5000
+  timeoutMs = 6000
 ): Promise<{ usedRelay: boolean; relayUrl?: string; status: number; data: any } | null> {
   const relayUrls = getCandidateRelayUrls();
 
@@ -29,6 +28,7 @@ export async function postViaNetafrazRelay(
         headers: {
           "Content-Type": "application/json",
           "X-Axon-Relay-Key": NETAFRAZ_RELAY_SECRET,
+          "User-Agent": "AxonCore-Server-Relay/1.0",
         },
         body: JSON.stringify({
           targetUrl,
@@ -39,7 +39,6 @@ export async function postViaNetafrazRelay(
       });
       clearTimeout(timer);
 
-      // اگر هنوز فایل روی ساب‌دامنه آپلود نشده (404) یا به Vercel اشاره می‌کند، برو سراغ بعدی
       if (res.status === 404 || res.status === 405) {
         continue;
       }

@@ -8,7 +8,11 @@ export interface SmsSendResult {
   ok: boolean;
   provider?: string;
   status?: number;
+  errorCode?: string;
   errorMessage?: string;
+  userSafeMessage: string;
+  adminTechnicalDiagnosis: string;
+  adminSolutionGuide: string[];
   rawResponse?: any;
 }
 
@@ -100,7 +104,7 @@ async function parseResponseSafe(res: Response) {
       .replace(/&nbsp;/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    return { rawSummary: cleanText.slice(0, 180) || "HTTP " + res.status };
+    return { rawSummary: cleanText.slice(0, 200) || "HTTP " + res.status };
   }
 }
 
@@ -115,7 +119,7 @@ export async function sendOtpPatternDetailed({
 
   const attemptsLog: Array<Record<string, any>> = [];
 
-  // اگر متغیر IRAN_STATIC_RELAY_URL تنظیم شده باشد، درخواست از طریق سرور واسط ایران ارسال می‌شود
+  // پشتیبانی از سرور واسط آی‌پی ثابت ایران (در صورت تنظیم IRAN_STATIC_RELAY_URL)
   const iranRelayUrl = process.env.IRAN_STATIC_RELAY_URL || "";
   if (iranRelayUrl) {
     try {
@@ -135,37 +139,42 @@ export async function sendOtpPatternDetailed({
         }),
       });
       const relayParsed = await parseResponseSafe(relayRes);
+      attemptsLog.push({
+        gateway: "Iran-Static-Relay",
+        httpStatus: relayRes.status,
+        responseBody: relayParsed,
+      });
       if (relayRes.ok && relayParsed?.meta?.status !== false) {
         return {
           ok: true,
           provider: "Iran-Static-Relay",
           status: relayRes.status,
+          userSafeMessage: "کد تایید پیامکی با موفقیت ارسال گردید.",
+          adminTechnicalDiagnosis: "ارسال موفق از طریق سرور واسط آی‌پی ثابت ایران.",
+          adminSolutionGuide: [],
           rawResponse: relayParsed,
         };
       }
-    } catch {}
+    } catch (e: any) {
+      attemptsLog.push({ gateway: "Iran-Static-Relay", networkError: e?.message });
+    }
   }
 
-  // هدرهای شبیه‌سازی مبدا ایرانی جهت عبور از فیلتر GeoIP پشت ابرآروان
-  const iranForwardHeaders = {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-    "Accept-Language": "fa-IR,fa;q=0.9",
-    "X-Forwarded-For": "5.160.157.20",
-    "X-Real-IP": "5.160.157.20",
-    "Ar-Real-Ip": "5.160.157.20",
-    "Ar-Real-Country": "IR",
-    "CF-IPCountry": "IR",
-    "True-Client-IP": "5.160.157.20",
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-  };
-
-  const gateways = [
+  // ۳ درگاه رسمی تاییدشده با کلید ...ZTY= و متغیر دقیق vefification-code (با تایپ صریح Record<string, string>)
+  const gateways: Array<{
+    name: string;
+    url: string;
+    headers: Record<string, string>;
+    body: Record<string, any>;
+  }> = [
     {
-      name: "edge.ippanel.com (HTTPS)",
+      name: "edge.ippanel.com",
       url: "https://edge.ippanel.com/v1/api/send",
-      headers: { ...iranForwardHeaders, Authorization: padded },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: padded,
+      },
       body: {
         sending_type: "pattern",
         from_number: originNumber,
@@ -175,37 +184,33 @@ export async function sendOtpPatternDetailed({
       },
     },
     {
-      name: "edge.ippanel.com (HTTP Port 80)",
-      url: "http://edge.ippanel.com/v1/api/send",
-      headers: { ...iranForwardHeaders, Authorization: padded },
-      body: {
-        sending_type: "pattern",
-        from_number: originNumber,
-        code: patternCode,
-        recipients: [recipientE164],
-        params: { "vefification-code": cleanCode },
+      name: "rest.ippanel.com",
+      url: "https://rest.ippanel.com/v1/messages/patterns/send",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: "AccessKey " + padded,
       },
-    },
-    {
-      name: "api2.ippanel.com (HTTPS)",
-      url: "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
-      headers: { ...iranForwardHeaders, apikey: padded },
-      body: {
-        code: patternCode,
-        sender: originNumber,
-        recipient: recipientLocal,
-        variable: { "vefification-code": cleanCode },
-      },
-    },
-    {
-      name: "rest.ippanel.com (AccessKey)",
-      url: "http://rest.ippanel.com/v1/messages/patterns/send",
-      headers: { ...iranForwardHeaders, Authorization: "AccessKey " + padded },
       body: {
         pattern_code: patternCode,
         originator: originNumber,
         recipient: recipientE164,
         values: { "vefification-code": cleanCode },
+      },
+    },
+    {
+      name: "api2.ippanel.com",
+      url: "https://api2.ippanel.com/api/v1/sms/pattern/normal/send",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        apikey: padded,
+      },
+      body: {
+        code: patternCode,
+        sender: originNumber,
+        recipient: recipientLocal,
+        variable: { "vefification-code": cleanCode },
       },
     },
   ];
@@ -219,10 +224,15 @@ export async function sendOtpPatternDetailed({
       });
 
       const parsed = await parseResponseSafe(res);
+      const isArvan502 =
+        res.status === 502 &&
+        String(parsed?.rawSummary || "").includes("temporarily inaccessible");
+
       attemptsLog.push({
-        gw: gw.name,
-        status: res.status,
-        res: parsed,
+        gateway: gw.name,
+        httpStatus: res.status,
+        blockedByArvanCloudWAF: isArvan502,
+        responseBody: parsed,
       });
 
       if (
@@ -235,25 +245,37 @@ export async function sendOtpPatternDetailed({
           ok: true,
           provider: gw.name,
           status: res.status,
+          userSafeMessage: "کد تایید پیامکی با موفقیت ارسال گردید.",
+          adminTechnicalDiagnosis: "ارسال موفق از طریق " + gw.name,
+          adminSolutionGuide: [],
           rawResponse: parsed,
         };
       }
     } catch (err: any) {
-      attemptsLog.push({ gw: gw.name, error: err?.message });
+      attemptsLog.push({
+        gateway: gw.name,
+        networkError: err?.message || "Connection Failed",
+      });
     }
   }
 
-  const all502 = attemptsLog.every((a) => a.status === 502);
-  const errorMsg = all502
-    ? "سرورهای ابرآروانِ IPPanel ارتباط از آی‌پی دیتاسنتر آمریکا (Vercel) را با کد 502 مسدود کرده‌اند (در حالی که از آی‌پی ایران با کد 200 کار می‌کند)."
-    : attemptsLog[0]?.res?.meta?.message ||
-      attemptsLog[0]?.res?.rawSummary ||
-      "HTTP " + (attemptsLog[0]?.status || 502);
+  const hasArvan502 = attemptsLog.some((a) => a.blockedByArvanCloudWAF === true);
+  const firstStatus = attemptsLog[0]?.httpStatus || 502;
+  const diagnosisText = hasArvan502
+    ? "خطای 502 Bad Gateway از فایروال ابرآروان (ArvanCloud WAF): کلید API (...ZTY=)، خط +983000505 و متغیر vefification-code کاملاً صحیح هستند و از اینترنت ایران با کد 200 کار می‌کنند؛ اما چون بک‌اند سایت روی سرور Vercel (آمریکا) اجرا می‌شود، فایروال ابرآروانِ IPPanel درخواست‌های ورودی از آی‌پی دیتاسنترهای خارج از کشور را مسدود کرده است."
+    : "خطا در پاسخ وب‌سرویس پیامک با کد وضعیت HTTP " + firstStatus;
 
   return {
     ok: false,
-    status: attemptsLog[0]?.status || 502,
-    errorMessage: errorMsg,
+    status: firstStatus,
+    errorCode: hasArvan502 ? "ARVANCLOUD_FOREIGN_IP_BLOCK_502" : "SMS_PROVIDER_HTTP_" + firstStatus,
+    errorMessage: diagnosisText,
+    userSafeMessage: "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
+    adminTechnicalDiagnosis: diagnosisText,
+    adminSolutionGuide: [
+      "۱. به پشتیبانی پنل پیامک (IPPanel / فراز اس‌ام‌اس) تیکت بزنید و درخواست کنید «دسترسی وب‌سرویس از آی‌پی خارج از کشور (بین‌الملل)» را برای کلید دسترسی (API Key) و کاربری شما روی فایروال ابرآروان باز کنند.",
+      "۲. یا با قرار دادن بک‌اند روی سرور/هاست دارای آی‌پی ثابت ایران، هم محدودیت فایروال ابرآروان IPPanel و هم محدودیت آی‌پی ثابت شاپرک/زرین‌پال به صورت هم‌زمان برطرف می‌شود.",
+    ],
     rawResponse: attemptsLog,
   };
 }

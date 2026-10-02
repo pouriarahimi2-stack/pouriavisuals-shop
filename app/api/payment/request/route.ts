@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
     if (!orderId) {
       return NextResponse.json(
-        { success: false, message: "شناسه سفارش جهت اتصال به درگاه زرین‌پال الزامی است." },
+        { success: false, message: "اطلاعات سفارش یافت نشد." },
         { status: 400 }
       );
     }
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       body.description || "پرداخت سفارش " + orderId + " در فروشگاه آکسون کور";
 
     let authority = "";
-    let lastError = "";
+    const attemptsLog: Array<Record<string, any>> = [];
 
     for (const ep of [
       "https://payment.zarinpal.com/pg/v4/payment/request.json",
@@ -82,42 +82,77 @@ export async function POST(req: NextRequest) {
         });
 
         const zpJson = await zpRes.json().catch(() => ({}));
+        attemptsLog.push({
+          endpoint: ep,
+          httpStatus: zpRes.status,
+          response: zpJson,
+        });
+
         if (zpJson?.data?.code === 100 && zpJson?.data?.authority) {
           authority = zpJson.data.authority;
           break;
-        } else {
-          lastError =
-            zpJson?.errors?.message ||
-            JSON.stringify(zpJson?.errors || zpJson) ||
-            "خطای درگاه زرین‌پال";
         }
       } catch (e: any) {
-        lastError = e.message;
+        attemptsLog.push({
+          endpoint: ep,
+          error: e?.message,
+        });
       }
     }
 
     if (!authority) {
-      const isIpError = String(lastError).toLowerCase().includes("terminal ip not valid");
-      let detectedOutboundIp = "";
-      if (isIpError) {
-        try {
-          const ipRes = await fetch("https://api.ipify.org?format=json");
-          const ipJson = await ipRes.json();
-          if (ipJson?.ip) detectedOutboundIp = String(ipJson.ip);
-        } catch {}
-      }
+      let vercelOutboundIp = "نامشخص";
+      try {
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const ipJson = await ipRes.json();
+        if (ipJson?.ip) vercelOutboundIp = String(ipJson.ip);
+      } catch {}
 
+      const firstErrObj = attemptsLog[0]?.response?.errors || {};
+      const errCode = firstErrObj?.code || attemptsLog[0]?.httpStatus || 502;
+      const errMsg = firstErrObj?.message || "ZarinPal Connection Error";
+      const isIpInvalid = String(errMsg).toLowerCase().includes("terminal ip not valid");
+
+      // ثبت کامل علت خطا، کد خطا و آی‌پی خروجی سرور در لاگ‌های امنیتی ادمین (/admin/audit-logs)
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert([
+          {
+            action: "PAYMENT_GATEWAY_ERROR",
+            user_id: phone || orderId,
+            details: {
+              resource: "zarinpal:v4",
+              orderId,
+              amountIRT: amount,
+              zarinpalErrorCode: errCode,
+              zarinpalErrorMessage: errMsg,
+              vercelServerOutboundIp: vercelOutboundIp,
+              rootCauseExplanation: isIpInvalid
+                ? "خطای کد -12 زرین‌پال (Terminal ip not valid): در پنل زرین‌پال آی‌پی 216.198.79.1 ثبت شده که آی‌پی ورودی DNS است؛ اما درخواست فعلی از سرور Vercel با آی‌پی خروجی «" +
+                  vercelOutboundIp +
+                  "» به زرین‌پال ارسال شده است."
+                : "خطا در دریافت توکن پرداخت از زرین‌پال: " + errMsg,
+              howToFix: isIpInvalid
+                ? [
+                    "۱. آی‌پی خروجی فعلی سرور («" +
+                      vercelOutboundIp +
+                      "») را در پنل زرین‌پال در بخش ویرایش درگاه -> آی‌پی‌های سرور اضافه کنید.",
+                    "۲. توجه: از آنجایی که سرورهای رایگان Vercel آی‌پی خروجی متغیر (Dynamic IP) دارند، برای داشتن آی‌پی ثابت دائمی جهت شاپرک و رفع مسدودیت ابرآروان پیامک، از هاست/سرور دارای آی‌پی ثابت ایران استفاده نمایید.",
+                  ]
+                : ["بررسی وضعیت درگاه و مرچنت‌آیدی در پنل my.zarinpal.com"],
+              rawGatewayAttempts: attemptsLog,
+            },
+            ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
+            severity: "error",
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch {}
+
+      // به مشتری فقط یک پیام کوتاه و استاندارد نمایش داده می‌شود
       return NextResponse.json(
         {
           success: false,
-          outboundServerIp: detectedOutboundIp || undefined,
-          message: isIpError
-            ? "خطای Terminal IP not valid از زرین‌پال: آی‌پی 216.198.79.1 آی‌پی ورودی DNS است، اما آی‌پی خروجی فعلی سرور Vercel که زرین‌پال می‌بیند «" +
-              (detectedOutboundIp || "متغیر") +
-              "» است. در پنل زرین‌پال یا گزینه «بدون محدودیت IP» را انتخاب و ذخیره کنید، یا آی‌پی «" +
-              (detectedOutboundIp || "") +
-              "» را در کادر آی‌پی‌های سرور اضافه نمایید."
-            : "خطا در دریافت توکن از درگاه زرین‌پال: " + lastError,
+          message: "خطا در برقراری ارتباط با درگاه پرداخت. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
         },
         { status: 502 }
       );
@@ -131,9 +166,12 @@ export async function POST(req: NextRequest) {
       paymentUrl,
       url: paymentUrl,
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json(
-      { success: false, message: err.message || "خطا در اتصال به درگاه زرین‌پال." },
+      {
+        success: false,
+        message: "خطا در برقراری ارتباط با درگاه پرداخت. لطفاً مجدداً تلاش کنید.",
+      },
       { status: 500 }
     );
   }

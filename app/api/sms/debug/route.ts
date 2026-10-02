@@ -21,14 +21,9 @@ export async function GET(req: NextRequest) {
     ok: result.ok,
     provider: result.provider,
     httpStatus: result.status,
-    errorMessage: result.errorMessage,
+    errorCode: result.errorCode,
+    errorMessage: result.adminTechnicalDiagnosis,
+    howToFix: result.adminSolutionGuide,
     rawGatewayResponse: result.rawResponse,
-    troubleshootingGuide: result.ok
-      ? "✅ اتصال به IPPanel Edge کاملاً برقرار است و پیامک ارسال شد."
-      : [
-          "۱. وارد پنل IPPanel شوید و در بخش «توسعه‌دهندگان -> کلیدهای دسترسی (API Keys)»، بررسی کنید که روی کلید شما محدودیت آی‌پی (IP Whitelist) فعال نباشد تا سرورهای Vercel اجازه اتصال داشته باشند.",
-          "۲. در بخش «ارسال بر اساس پترن»، بررسی کنید که کد پترن 3d6fa1f8ud3ma1w در وضعیت «تایید شده (Active)» باشد.",
-          "۳. مطمئن شوید کیف پول پنل پیامک دارای اعتبار ریالی کافی برای ارسال خدماتی است.",
-        ],
   });
 }

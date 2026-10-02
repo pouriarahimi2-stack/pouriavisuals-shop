@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           verified: false,
-          message: "شماره موبایل باید ۱۱ رقمی و با ۰۹ شروع شود.",
+          message: "شماره موبایل وارد شده معتبر نیست.",
         },
         { status: 400 }
       );
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
           {
             success: false,
             verified: false,
-            message: "کد تاییدی برای این شماره یافت نشد یا منقضی شده است. لطفاً مجدداً درخواست کد دهید.",
+            message: "کد تایید منقضی شده است. لطفاً مجدداً درخواست کد دهید.",
           },
           { status: 400 }
         );
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
           {
             success: false,
             verified: false,
-            message: "مهلت کد تایید به پایان رسیده است. لطفاً ارسال مجدد را بزنید.",
+            message: "مهلت کد تایید به پایان رسیده است. لطفاً مجدداً تلاش کنید.",
           },
           { status: 400 }
         );
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
           {
             success: false,
             verified: false,
-            message: "تعداد تلاش‌های ناموفق بیش از حد مجاز بود. کد قبلی باطل شد؛ لطفاً مجدداً درخواست کد دهید.",
+            message: "تعداد تلاش‌های ناموفق بیش از حد مجاز بود. لطفاً مجدداً درخواست کد دهید.",
           },
           { status: 429 }
         );
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
             .eq("id", siteRow.id);
         }
         return NextResponse.json(
-          { success: false, verified: false, message: "کد تایید پیامکی وارد شده اشتباه است." },
+          { success: false, verified: false, message: "کد تایید وارد شده اشتباه است." },
           { status: 400 }
         );
       }
@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           sent: false,
-          message: "کد تایید به تازگی ارسال شده است. لطفاً " + waitSec + " ثانیه دیگر تلاش کنید.",
+          message: "لطفاً " + waitSec + " ثانیه دیگر مجدداً تلاش کنید.",
         },
         { status: 429 }
       );
@@ -269,6 +269,14 @@ export async function POST(req: NextRequest) {
     });
 
     if (!smsResult.ok) {
+      let vercelOutboundIp = "نامشخص";
+      try {
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const ipJson = await ipRes.json();
+        if (ipJson?.ip) vercelOutboundIp = String(ipJson.ip);
+      } catch {}
+
+      // ثبت گزارش کامل فنی، کد خطا، آی‌پی سرور و راه‌حل در لاگ‌های امنیتی ادمین (/admin/audit-logs)
       try {
         await supabaseAdmin.from("admin_audit_logs").insert([
           {
@@ -276,9 +284,15 @@ export async function POST(req: NextRequest) {
             user_id: rawPhone,
             details: {
               resource: "ippanel:edge",
-              status: smsResult.status,
-              errorMessage: smsResult.errorMessage,
-              rawResponse: smsResult.rawResponse,
+              httpStatusCode: smsResult.status,
+              errorCode: smsResult.errorCode,
+              vercelServerOutboundIp: vercelOutboundIp,
+              targetMobile: rawPhone,
+              patternCode: "3d6fa1f8ud3ma1w",
+              patternVariable: "vefification-code",
+              rootCauseExplanation: smsResult.adminTechnicalDiagnosis,
+              howToFix: smsResult.adminSolutionGuide,
+              gatewayAttemptsRaw: smsResult.rawResponse,
             },
             ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
             severity: "error",
@@ -287,14 +301,12 @@ export async function POST(req: NextRequest) {
         ]);
       } catch {}
 
+      // به کاربر فقط پیام استاندارد و مختصر نمایش داده می‌شود (بدون هیچ جزئیات فنی)
       return NextResponse.json(
         {
           success: false,
           sent: false,
-          message:
-            "خطا در ارسال پیامک از سمت اپراتور (" +
-            (smsResult.errorMessage || "عدم پاسخگویی درگاه پیامک") +
-            ").",
+          message: "خطا در ارسال پیامک تایید. لطفاً لحظاتی دیگر مجدداً تلاش کنید.",
         },
         { status: 502 }
       );
@@ -333,9 +345,13 @@ export async function POST(req: NextRequest) {
       expiresInSeconds: 120,
       message: "کد تایید پیامکی به شماره " + rawPhone + " ارسال گردید.",
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json(
-      { success: false, verified: false, message: err.message || "خطا در سرویس پیامک." },
+      {
+        success: false,
+        verified: false,
+        message: "خطا در ارسال پیامک تایید. لطفاً مجدداً تلاش کنید.",
+      },
       { status: 500 }
     );
   }

@@ -5,12 +5,11 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
-import Hero3DCanvas from "@/components/3d/Hero3DCanvas";
 import ProductPerspectiveSlider from "@/components/ProductPerspectiveSlider";
 import ProductList from "@/components/ProductList";
-import TechRadarFeed from "@/components/TechRadarFeed";
 import { useSiteInfo } from "@/context/SiteInfoContext";
 import { DEFAULT_HOMEPAGE_LAYOUT_CONFIG } from "@/services/siteInfoService";
+import { formatPrice } from "@/lib/formatters";
 
 interface Props {
   initialProducts?: any[];
@@ -38,20 +37,20 @@ export default function DynamicHomeSections({
       if (pRes && pRes.ok) {
         const pJson = await pRes.json();
         const pList = pJson.data || pJson.products || [];
-        if (Array.isArray(pList) && pList.length > 0) setProducts(pList);
+        if (Array.isArray(pList)) setProducts(pList);
       }
       if (bRes && bRes.ok) {
         const bJson = await bRes.json();
-        const bList = (bJson.banners || bJson.data || []).filter((b: any) => b.is_active !== false);
+        const bList = (bJson.banners || bJson.data || []).filter(
+          (b: any) => b.is_active !== false
+        );
         setBanners(bList);
       }
     } catch {}
   };
 
   useEffect(() => {
-    if (initialProducts.length === 0) {
-      fetchLiveHomeData();
-    }
+    fetchLiveHomeData();
 
     const chProds = supabase
       .channel("realtime-home-products")
@@ -73,99 +72,152 @@ export default function DynamicHomeSections({
     };
   }, []);
 
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const timer = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % banners.length);
-    }, 5500);
-    return () => clearInterval(timer);
-  }, [banners.length]);
+  // ساخت اسلایدهای بنر: اگر بنر در جدول banners ثبت شده باشد از آن‌ها استفاده می‌شود،
+  // و اگر هنوز بنری ثبت نشده باشد، به صورت خودکار از محصولات کاتالوگ بنرهای کلیک‌پذیر می‌سازد.
+  const effectiveSlides =
+    banners.length > 0
+      ? banners.map((b: any) => ({
+          id: String(b.id),
+          title: b.title || "پیشنهاد ویژه آکسون",
+          subtitle: b.subtitle || "مشاهده مشخصات و خرید آنلاین با گارانتی اصالت",
+          image: b.image_url || b.image || "/placeholder.png",
+          link: b.link_url || b.link || "/products",
+          price: b.price ? Number(b.price) : null,
+          badge: b.badge || "پیشنهاد ویژه",
+        }))
+      : products.slice(0, 5).map((p: any) => ({
+          id: String(p.id),
+          title: p.title || p.name || "محصول ویژه",
+          subtitle:
+            p.short_description ||
+            (p.description
+              ? String(p.description).replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "").slice(0, 110)
+              : "خرید مستقیم با گارانتی اصالت و ارسال سریع"),
+          image:
+            p.image ||
+            p.image_url ||
+            (Array.isArray(p.images) && p.images[0]) ||
+            "/placeholder.png",
+          link: "/products/" + p.id,
+          price: Number(p.discount_price || p.discountPrice || p.price || 0),
+          badge: p.category || "ویژه کاتالوگ",
+        }));
 
-  const heroCfg = layoutCfg.hero || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.hero;
+  useEffect(() => {
+    if (effectiveSlides.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % effectiveSlides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [effectiveSlides.length]);
+
   const showcaseCfg = layoutCfg.showcase3D || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.showcase3D;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 font-sans select-none" dir="rtl">
-      {/* ۱. نوار رادار اخبار تکنولوژی */}
-      {layoutCfg.newsTicker?.show !== false && <TechRadarFeed />}
-
-      {/* ۲. اسلایدر بنرهای تبلیغاتی (در صورت وجود بنر فعال) */}
-      {banners.length > 0 && (
-        <section className="relative w-full h-52 sm:h-72 md:h-96 rounded-3xl overflow-hidden border border-[var(--card-border)] shadow-2xl bg-[var(--modal-bg)] group">
-          {banners.map((b, idx) => (
-            <Link
-              key={b.id || idx}
-              href={b.link_url || b.link || "/products"}
-              onClick={() => soundEngine.playClick()}
-              className={
-                "absolute inset-0 transition-opacity duration-700 " +
-                (idx === activeSlide ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none")
-              }
-            >
-              <img
-                src={b.image_url || b.image}
-                alt={b.title || "بنر فروشگاه"}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent flex flex-col justify-end p-5 sm:p-8">
-                <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-white">
-                  {b.title}
-                </h2>
-                <span className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent-blue)] text-white font-black text-xs w-fit shadow-lg">
-                  مشاهده و خرید محصول ←
-                </span>
-              </div>
-            </Link>
-          ))}
-        </section>
-      )}
-
-      {/* ۳. سکشن هیرو اصلی سایت */}
-      {heroCfg?.show !== false && (
-        <section className="relative rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl overflow-hidden p-6 sm:p-12 text-center space-y-5">
-          <Hero3DCanvas />
-          <div className="relative z-10 max-w-3xl mx-auto space-y-4">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] text-xs font-black">
-              🚀 مرجع تخصصی تکنولوژی و گجت‌های هوشمند
-            </span>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-black leading-tight text-[var(--text-primary)]">
-              {heroCfg.title || "دنیای نوآوری، تکنولوژی مدرن و ابزارهای هوشمند"}
-            </h1>
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed max-w-2xl mx-auto font-medium">
-              {heroCfg.subtitle ||
-                "عرضه مستقیم جدیدترین گجت‌های هوشمند و تجهیزات دیجیتال با تضمین اصالت و ارسال سریع به سراسر ایران."}
-            </p>
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+    <div
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 font-sans select-none"
+      dir="rtl"
+    >
+      {/* ۱. جایگزینی باکس متنی هیرو با اسلایدر بنرهای کلیک‌پذیر متصل به صفحه محصول (طبق عکس سوم) */}
+      {effectiveSlides.length > 0 && (
+        <section className="relative w-full rounded-[2.2rem] sm:rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] shadow-2xl bg-[var(--modal-bg)] min-h-[280px] sm:min-h-[380px] md:min-h-[430px] flex items-center">
+          {effectiveSlides.map((slide, idx) => {
+            const isActive = idx === activeSlide;
+            return (
               <Link
-                href={heroCfg.buttonLink || "/products"}
+                key={slide.id + "_" + idx}
+                href={slide.link}
                 onClick={() => soundEngine.playClick()}
-                className="px-7 py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs sm:text-sm shadow-xl hover:opacity-90 transition"
+                className={
+                  "w-full h-full transition-all duration-700 " +
+                  (isActive
+                    ? "opacity-100 relative z-10 block"
+                    : "opacity-0 absolute inset-0 z-0 pointer-events-none")
+                }
               >
-                {heroCfg.buttonText || "مشاهده کاتالوگ محصولات"} ←
+                <div className="grid grid-cols-1 md:grid-cols-12 items-center gap-6 p-6 sm:p-10 md:p-12">
+                  <div className="md:col-span-7 space-y-4 text-right order-2 md:order-1">
+                    <span className="inline-block px-3.5 py-1 rounded-full bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] text-xs font-black">
+                      🔥 {slide.badge}
+                    </span>
+
+                    <h1 className="text-xl sm:text-3xl md:text-4xl font-black leading-snug text-[var(--text-primary)] hover:text-[var(--accent-blue)] transition">
+                      {slide.title}
+                    </h1>
+
+                    {slide.subtitle && (
+                      <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-2 font-medium max-w-xl">
+                        {slide.subtitle}
+                      </p>
+                    )}
+
+                    <div className="pt-2 flex flex-wrap items-center gap-4">
+                      <span className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs sm:text-sm shadow-xl hover:opacity-90 transition inline-flex items-center gap-2">
+                        <span>مشاهده و خرید محصول</span>
+                        <span>←</span>
+                      </span>
+
+                      {slide.price ? (
+                        <span className="font-mono font-black text-base sm:text-lg text-emerald-500">
+                          {formatPrice(slide.price)} تومان
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-5 flex items-center justify-center order-1 md:order-2">
+                    <div className="w-48 h-48 sm:w-64 sm:h-64 md:w-72 md:h-72 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-4 flex items-center justify-center overflow-hidden shadow-inner">
+                      <img
+                        src={slide.image}
+                        alt={slide.title}
+                        className="w-full h-full object-contain transition-transform duration-500 hover:scale-105"
+                      />
+                    </div>
+                  </div>
+                </div>
               </Link>
-              <Link
-                href="/track-order"
-                className="px-6 py-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] font-bold text-xs sm:text-sm transition"
-              >
-                🚚 پیگیری سفارش
-              </Link>
+            );
+          })}
+
+          {effectiveSlides.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+              {effectiveSlides.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    soundEngine.playClick();
+                    setActiveSlide(idx);
+                  }}
+                  className={
+                    "h-2 rounded-full transition-all cursor-pointer " +
+                    (idx === activeSlide ? "w-6 bg-[var(--accent-blue)]" : "w-2 bg-white/50")
+                  }
+                  aria-label={"اسلاید " + (idx + 1)}
+                />
+              ))}
             </div>
-          </div>
+          )}
         </section>
       )}
 
-      {/* ۴. نمایشگاه سه‌بعدی تعاملی محصولات */}
+      {/* ۲. نمایشگاه تعاملی سه‌بعدی: فقط در موبایل نمایش داده شود و در دسکتاپ مخفی باشد (طبق عکس چهارم) */}
       {showcaseCfg?.show !== false && products.length > 0 && (
-        <ProductPerspectiveSlider
-          products={products}
-          customTitle={showcaseCfg.title}
-          customSubtitle={showcaseCfg.subtitle}
-        />
+        <div className="block md:hidden">
+          <ProductPerspectiveSlider
+            products={products}
+            customTitle={showcaseCfg.title}
+            customSubtitle={showcaseCfg.subtitle}
+          />
+        </div>
       )}
 
-      {/* ۵. کاتالوگ کامل محصولات در صفحه اصلی */}
+      {/* ۳. گرید کاتالوگ تجهیزات و محصولات: فقط در دسکتاپ و تبلت نمایش داده شود و در موبایل مخفی باشد (برعکس مورد بالا) */}
       {layoutCfg.productsSection?.show !== false && (
-        <ProductList initialProducts={products} />
+        <div className="hidden md:block">
+          <ProductList initialProducts={products} />
+        </div>
       )}
     </div>
   );

@@ -9,36 +9,18 @@ export async function GET() {
     const { data, error } = await supabaseAdmin
       .from("banners")
       .select("*")
+      .eq("is_active", true)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      return NextResponse.json({ success: true, banners: [], data: [] });
-    }
-
-    const activeBanners = (data || [])
-      .filter((b: any) => b.is_active !== false)
-      .map((b: any) => ({
-        id: String(b.id),
-        title: b.title || "پیشنهاد ویژه آکسون",
-        subtitle: b.subtitle || "",
-        image_url: b.image_url || b.image || "/placeholder.png",
-        link_url: b.link_url || b.link || "/products",
-        cta_text: b.cta_text || "مشاهده و خرید",
-        badge_text: b.badge_text || "پیشنهاد ویژه",
-        is_active: true,
-      }));
-
-    return NextResponse.json({
-      success: true,
-      banners: activeBanners,
-      data: activeBanners,
-    });
+    if (error) throw error;
+    return NextResponse.json(
+      { success: true, banners: data || [], data: data || [] },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (err: any) {
-    return NextResponse.json({
-      success: true,
-      banners: [],
-      data: [],
-      message: err?.message,
-    });
+    return NextResponse.json(
+      { success: false, banners: [], data: [], message: err.message },
+      { status: 200 }
+    );
   }
 }

@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 import { fontEngine, CustomFontItem } from "@/lib/fontEngine";
+import { supabase } from "@/lib/supabase";
 
 export default function StyleFontManager() {
   const [primaryColor, setPrimaryColor] = useState("#0071e3");
@@ -12,7 +13,7 @@ export default function StyleFontManager() {
   const [selectedWeight, setSelectedWeight] = useState(400);
   const [borderRadius, setBorderRadius] = useState("1.5rem");
   const [customCss, setCustomCss] = useState("");
-  
+
   const [fontsList, setFontsList] = useState<CustomFontItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -40,13 +41,25 @@ export default function StyleFontManager() {
 
   useEffect(() => {
     fetchStyles();
+
+    const channel = supabase
+      .channel("realtime-style-font-manager")
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_styles" }, () => {
+        fetchStyles();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleFontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const fontName = prompt("نام این فونت را وارد کنید:", file.name.replace(/\.[^/.]+$/, "")) || "CustomFont";
+    const fontName =
+      prompt("نام این فونت را وارد کنید:", file.name.replace(/\.[^/.]+$/, "")) || "CustomFont";
     const reader = new FileReader();
 
     reader.onloadend = () => {
@@ -55,8 +68,8 @@ export default function StyleFontManager() {
         const format = ext === "woff2" ? "woff2" : ext === "woff" ? "woff" : "truetype";
 
         const newFont: CustomFontItem = {
-          id: `custom_${Date.now()}`,
-          name: `${fontName} (شخصی)`,
+          id: "custom_" + Date.now(),
+          name: fontName + " (اختصاصی)",
           fontFamily: fontName,
           fontUrlOrBase64: reader.result,
           format,
@@ -69,7 +82,6 @@ export default function StyleFontManager() {
         setSelectedFont(fontName);
         fontEngine.applyFontToTarget(fontName, "body");
         soundEngine.playSuccess();
-        alert(`فونت اختصاصی «${fontName}» با موفقیت بارگذاری و در حافظه سایت ذخیره شد.`);
       }
     };
     reader.readAsDataURL(file);
@@ -100,13 +112,18 @@ export default function StyleFontManager() {
       if (!res.ok || !json.success) throw new Error(json.message || "خطا در ذخیره دیتابیس");
 
       soundEngine.playSuccess();
-      setStatusMessage({ type: "success", text: "⚡ هویت بصری و فونت با موفقیت در دیتابیس ذخیره و در سراسر سایت اعمال شد." });
+      setStatusMessage({
+        type: "success",
+        text: "⚡ هویت بصری و فونت با موفقیت در دیتابیس ذخیره و در سراسر سایت اعمال شد.",
+      });
 
       document.documentElement.style.setProperty("--accent-blue", primaryColor);
       fontEngine.applyFontToTarget(selectedFont, "body");
     } catch (err: any) {
-      console.error("Error updating styles:", err);
-      setStatusMessage({ type: "error", text: err.message || "خطا در ذخیره‌سازی استایل‌ها در دیتابیس." });
+      setStatusMessage({
+        type: "error",
+        text: err.message || "خطا در ذخیره‌سازی استایل‌ها در دیتابیس.",
+      });
     } finally {
       setSaving(false);
       setTimeout(() => setStatusMessage(null), 3500);
@@ -115,22 +132,28 @@ export default function StyleFontManager() {
 
   return (
     <div className="space-y-6 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <input type="file" ref={fontFileInputRef} onChange={handleFontUpload} accept=".woff2,.woff,.ttf,.otf" className="hidden" />
+      <input
+        type="file"
+        ref={fontFileInputRef}
+        onChange={handleFontUpload}
+        accept=".woff2,.woff,.ttf,.otf"
+        className="hidden"
+      />
 
-      <div className="bg-[var(--modal-bg)] p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[var(--modal-bg)] p-5 sm:p-6 rounded-3xl border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
             <span>🎨</span> مدیریت هویت بصری، بارگذاری فونت و تایپوگرافی جهانی
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
             شخصی‌سازی رنگ سازمانی، آپلود فونت از سیستم/موبایل با ذخیره دائمی و تنظیم وزن فونت از ۱۰۰ تا ۹۰۰
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => fontFileInputRef.current?.click()}
-            className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5"
+            className="flex-1 sm:flex-initial justify-center px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg cursor-pointer flex items-center gap-1.5"
           >
             <span>🔤</span>
             <span>+ آپلود فونت اختصاصی</span>
@@ -139,7 +162,7 @@ export default function StyleFontManager() {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
+            className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs hover:opacity-90 transition shadow-lg cursor-pointer disabled:opacity-50"
           >
             {saving ? "در حال اعمال..." : "💾 ذخیره و انتشار سراسری"}
           </button>
@@ -147,16 +170,27 @@ export default function StyleFontManager() {
       </div>
 
       {statusMessage && (
-        <div className={`p-4 rounded-2xl text-xs font-bold transition animate-fadeIn ${statusMessage.type === "success" ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}`}>
+        <div
+          className={
+            "p-4 rounded-2xl text-xs font-bold transition animate-fadeIn " +
+            (statusMessage.type === "success"
+              ? "bg-emerald-500/15 text-emerald-500"
+              : "bg-rose-500/15 text-rose-500")
+          }
+        >
           {statusMessage.text}
         </div>
       )}
 
-      <form onSubmit={handleSave} className="bg-[var(--modal-bg)] p-6 md:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs">
+      <form
+        onSubmit={handleSave}
+        className="bg-[var(--modal-bg)] p-5 sm:p-8 rounded-3xl border border-[var(--card-border)] space-y-6 shadow-xl text-xs"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* انتخاب فونت */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">تایپوگرافی و قلم اصلی سایت (Font Family):</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">
+              تایپوگرافی و قلم اصلی سایت (Font Family):
+            </label>
             <select
               value={selectedFont}
               onChange={(e) => {
@@ -173,9 +207,10 @@ export default function StyleFontManager() {
             </select>
           </div>
 
-          {/* انتخاب وزن فونت */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">وزن ضخامت پیش‌فرض متون (Font Weight):</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">
+              وزن ضخامت پیش‌فرض متون (Font Weight):
+            </label>
             <select
               value={selectedWeight}
               onChange={(e) => setSelectedWeight(Number(e.target.value))}
@@ -192,9 +227,10 @@ export default function StyleFontManager() {
             </select>
           </div>
 
-          {/* رنگ اصلی */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">رنگ اصلی برند (Primary Accent):</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">
+              رنگ اصلی برند (Primary Accent):
+            </label>
             <div className="flex items-center gap-3">
               <input
                 type="color"
@@ -204,6 +240,7 @@ export default function StyleFontManager() {
               />
               <input
                 type="text"
+                dir="ltr"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
                 className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold uppercase outline-none focus:border-[var(--accent-blue)]"
@@ -211,9 +248,10 @@ export default function StyleFontManager() {
             </div>
           </div>
 
-          {/* رنگ مکمل */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">رنگ مکمل (Secondary Accent):</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">
+              رنگ مکمل (Secondary Accent):
+            </label>
             <div className="flex items-center gap-3">
               <input
                 type="color"
@@ -223,6 +261,7 @@ export default function StyleFontManager() {
               />
               <input
                 type="text"
+                dir="ltr"
                 value={secondaryColor}
                 onChange={(e) => setSecondaryColor(e.target.value)}
                 className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-mono font-bold uppercase outline-none focus:border-[var(--accent-blue)]"
@@ -230,9 +269,10 @@ export default function StyleFontManager() {
             </div>
           </div>
 
-          {/* انحنای کارت‌ها */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-[var(--text-secondary)]">میزان گردی گوشه‌ها (Border Radius):</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]">
+              میزان گردی گوشه‌ها (Border Radius):
+            </label>
             <select
               value={borderRadius}
               onChange={(e) => setBorderRadius(e.target.value)}
@@ -246,11 +286,13 @@ export default function StyleFontManager() {
           </div>
         </div>
 
-        {/* کدهای سفارشی CSS */}
         <div className="space-y-2 pt-4 border-t border-[var(--card-border)]">
-          <label className="block text-xs font-bold text-[var(--text-secondary)]">استایل‌های پیشرفته CSS:</label>
+          <label className="block text-xs font-bold text-[var(--text-secondary)]">
+            استایل‌های پیشرفته CSS:
+          </label>
           <textarea
             rows={3}
+            dir="ltr"
             value={customCss}
             onChange={(e) => setCustomCss(e.target.value)}
             placeholder="/* کدهای سفارشی CSS */"
@@ -258,12 +300,20 @@ export default function StyleFontManager() {
           />
         </div>
 
-        {/* پیش‌نمایش زنده */}
         <div className="p-5 rounded-2xl border border-[var(--card-border)] bg-[var(--input-bg)] space-y-3">
-          <span className="text-[11px] font-bold text-[var(--text-secondary)]">پیش‌نمایش زنده فونت و وزن انتخابی:</span>
-          <div style={{ fontFamily: `'${selectedFont}', sans-serif`, fontWeight: selectedWeight }} className="space-y-2">
-            <h4 className="text-base text-[var(--text-primary)]">فروشگاه تخصصی تجهیزات دیجیتال و مانیتورهای استودیویی ۵K</h4>
-            <p className="text-xs text-[var(--text-secondary)]">نمایشگر رتینا با کالیبراسیون سخت‌افزاری و تفکیک بیش از ۱ میلیارد رنگ با زاویه دید ۱۷۸ درجه.</p>
+          <span className="text-[11px] font-bold text-[var(--text-secondary)]">
+            پیش‌نمایش زنده فونت و وزن انتخابی:
+          </span>
+          <div
+            style={{ fontFamily: "'" + selectedFont + "', sans-serif", fontWeight: selectedWeight }}
+            className="space-y-2"
+          >
+            <h4 className="text-base text-[var(--text-primary)]">
+              فروشگاه تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال آکسون
+            </h4>
+            <p className="text-xs text-[var(--text-secondary)]">
+              نمایشگر رتینا با کالیبراسیون سخت‌افزاری، درگاه تاندربولت ۵ و تفکیک بیش از ۱ میلیارد رنگ با گارانتی اصالت طلایی.
+            </p>
           </div>
         </div>
       </form>

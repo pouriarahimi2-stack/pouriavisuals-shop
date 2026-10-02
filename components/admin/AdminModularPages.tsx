@@ -1,3 +1,4 @@
+// File Path: components/admin/AdminModularPages.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -6,7 +7,6 @@ import "@measured/puck/puck.css";
 import { puckConfig } from "@/lib/puckConfig";
 import { soundEngine } from "@/lib/soundEngine";
 import { supabase } from "@/lib/supabase";
-import { siteInfoService } from "@/services/siteInfoService";
 import Link from "next/link";
 
 const STORAGE_PREFIX = "axon_puck_page_data_v2026_";
@@ -34,8 +34,8 @@ const DEFAULT_GLOBAL_HEADER = {
     showTheme: true,
     showUser: true,
     capsuleBg: "#07090e",
-    capsuleBorder: "#27272a"
-  }
+    capsuleBorder: "#27272a",
+  },
 };
 
 const DEFAULT_GLOBAL_FOOTER = {
@@ -44,7 +44,7 @@ const DEFAULT_GLOBAL_FOOTER = {
     id: "global-footer-core",
     footerLogoUrl: "",
     brandTitle: "Axon | آکسون",
-    brandSubtitle: "مرجع تخصصی تجهیزات کالیبراسیون و مانیتورهای ۵K استودیو",
+    brandSubtitle: "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال",
     brandDesc: "",
     supportPhone: "09376110200",
     supportEmail: "Pouriarahimi@yahoo.com",
@@ -52,8 +52,8 @@ const DEFAULT_GLOBAL_FOOTER = {
     workingHours: "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
     enamadCode: "7434404",
     copyrightText: "تمامی حقوق مادی و معنوی برای Axon | آکسون محفوظ است © 2026",
-    footerBg: "#07090e"
-  }
+    footerBg: "#07090e",
+  },
 };
 
 function getPageSpecificBody(slug: string, title?: string): any[] {
@@ -63,11 +63,11 @@ function getPageSpecificBody(slug: string, title?: string): any[] {
         type: "NativeProductCatalog",
         props: {
           id: "catalog-page-main",
-          heading: "کاتالوگ جامع مانیتورها و تجهیزات تصویر",
+          heading: "کاتالوگ جامع تجهیزات تکنولوژی و کالای دیجیتال",
           subtitle: "دارای گارانتی اصالت طلایی و ارسال سریع پیشتاز به سراسر کشور",
-          limit: 12
-        }
-      }
+          limit: 12,
+        },
+      },
     ];
   }
 
@@ -77,31 +77,32 @@ function getPageSpecificBody(slug: string, title?: string): any[] {
         type: "NativeHero3D",
         props: {
           id: "hero-1",
-          topBadge: "🚀 مرجع تخصصی مانیتورهای ۵K استودیو",
+          topBadge: "🚀 مرجع تخصصی تکنولوژی و کالای دیجیتال",
           badgeColor: "#38bdf8",
-          title: "دیدن واقعیت رنگ‌ها بدون مصالحه و خطا",
+          title: "تجربه نسل جدید تکنولوژی و اصالت دیجیتال",
           titleSize: 42,
-          subtitle: "تأمین، کالیبراسیون و واردات مانیتورهای مرجع رنگ استودیو با ۱۸ ماه گارانتی طلایی.",
-          bgColor: "transparent"
-        }
+          subtitle:
+            "تأمین و عرضه مستقیم پرچمداران سخت‌افزار، گجت‌های هوشمند و تجهیزات دیجیتال با ۱۸ ماه گارانتی طلایی.",
+          bgColor: "transparent",
+        },
       },
       {
         type: "NativePerspectiveSlider",
         props: {
           id: "slider-1",
           sectionTitle: "نمایشگاه سه‌بعدی تجهیزات پرچمدار",
-          sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی"
-        }
+          sectionSubtitle: "پیمایش لمسی جهت بررسی دقیق مشخصات و گارانتی",
+        },
       },
       {
         type: "NativeProductCatalog",
         props: {
           id: "catalog-1",
-          heading: "کاتالوگ تجهیزات تخصصی و مانیتورها",
+          heading: "کاتالوگ تجهیزات تخصصی و کالای دیجیتال",
           subtitle: "تمامی کالاها با گارانتی اصالت طلایی عرضه می‌شوند",
-          limit: 8
-        }
-      }
+          limit: 8,
+        },
+      },
     ];
   }
 
@@ -111,10 +112,11 @@ function getPageSpecificBody(slug: string, title?: string): any[] {
       props: {
         id: "custom-page-" + slug,
         title: title || "صفحه جدید",
-        content: "محتوای اختصاصی این صفحه را از سایدبار تنظیم کنید یا بلوک‌های دلخواه را به آن اضافه نمایید.",
-        bgColor: "transparent"
-      }
-    }
+        content:
+          "محتوای اختصاصی این صفحه را از سایدبار تنظیم کنید یا بلوک‌های دلخواه را به آن اضافه نمایید.",
+        bgColor: "transparent",
+      },
+    },
   ];
 }
 
@@ -125,6 +127,7 @@ export default function AdminModularPages() {
   const [renderKey, setRenderKey] = useState<string>("init");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [viewportMode, setViewportMode] = useState<"desktop" | "mobile" | "tablet">("desktop");
 
   const [showNewPageModal, setShowNewPageModal] = useState(false);
   const [newPageTitle, setNewPageTitle] = useState("");
@@ -176,7 +179,12 @@ export default function AdminModularPages() {
     try {
       const res = await fetch("/api/pages?slug=" + encodeURIComponent(slug), { cache: "no-store" });
       const json = await res.json();
-      if (json.success && json.page && json.page.puck_data && Array.isArray(json.page.puck_data.content)) {
+      if (
+        json.success &&
+        json.page &&
+        json.page.puck_data &&
+        Array.isArray(json.page.puck_data.content)
+      ) {
         targetData = json.page.puck_data;
         if (typeof window !== "undefined") {
           localStorage.setItem(STORAGE_PREFIX + slug, JSON.stringify(targetData));
@@ -184,10 +192,14 @@ export default function AdminModularPages() {
       }
     } catch {}
 
-    // پاکسازی هرگونه بلاک FeaturesGridBlock (۳ کارت مزایا) که در گذشته ذخیره شده بود
-    let bodyBlocks = targetData?.content ? targetData.content.filter(
-      (b: any) => b.type !== "HeaderCapsuleBar" && b.type !== "GlobalFooterBlock" && b.type !== "FeaturesGridBlock"
-    ) : [];
+    let bodyBlocks = targetData?.content
+      ? targetData.content.filter(
+          (b: any) =>
+            b.type !== "HeaderCapsuleBar" &&
+            b.type !== "GlobalFooterBlock" &&
+            b.type !== "FeaturesGridBlock"
+        )
+      : [];
 
     if (bodyBlocks.length === 0) {
       bodyBlocks = getPageSpecificBody(slug, customTitle);
@@ -195,7 +207,7 @@ export default function AdminModularPages() {
 
     const mergedData: Data = {
       content: [currentGlobalHeader, ...bodyBlocks, currentGlobalFooter],
-      root: { props: { title: customTitle || slug } }
+      root: { props: { title: customTitle || slug } },
     };
 
     setPageData(mergedData);
@@ -206,6 +218,17 @@ export default function AdminModularPages() {
   useEffect(() => {
     fetchPages();
     loadPage("home");
+
+    const ch = supabase
+      .channel("realtime-admin-modular-pages")
+      .on("postgres_changes", { event: "*", schema: "public", table: "modular_pages" }, () => {
+        fetchPages();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ch);
+    };
   }, []);
 
   const handleSave = async (data: Data) => {
@@ -215,12 +238,19 @@ export default function AdminModularPages() {
     const cleanContent = (data.content || []).filter((b: any) => b.type !== "FeaturesGridBlock");
     const sanitizedData = { ...data, content: cleanContent };
 
-    const newHeaderBlock = sanitizedData.content.find((b: any) => b.type === "HeaderCapsuleBar") || DEFAULT_GLOBAL_HEADER;
-    const newFooterBlock = sanitizedData.content.find((b: any) => b.type === "GlobalFooterBlock") || DEFAULT_GLOBAL_FOOTER;
+    const newHeaderBlock =
+      sanitizedData.content.find((b: any) => b.type === "HeaderCapsuleBar") ||
+      DEFAULT_GLOBAL_HEADER;
+    const newFooterBlock =
+      sanitizedData.content.find((b: any) => b.type === "GlobalFooterBlock") ||
+      DEFAULT_GLOBAL_FOOTER;
 
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(GLOBAL_NAV_KEY, JSON.stringify({ header: newHeaderBlock, footer: newFooterBlock }));
+        localStorage.setItem(
+          GLOBAL_NAV_KEY,
+          JSON.stringify({ header: newHeaderBlock, footer: newFooterBlock })
+        );
         localStorage.setItem(STORAGE_PREFIX + currentSlug, JSON.stringify(sanitizedData));
       } catch {}
     }
@@ -243,7 +273,7 @@ export default function AdminModularPages() {
       });
 
       soundEngine.playSuccess();
-      setToast("✓ تغییرات با موفقیت ذخیره و منتشر شد.");
+      setToast("✓ تغییرات صفحه و چیدمان ریسپانسیو با موفقیت در دیتابیس ذخیره و منتشر شد.");
     } catch {
       setToast("خطا در ذخیره‌سازی.");
     } finally {
@@ -256,7 +286,11 @@ export default function AdminModularPages() {
     if (!newPageTitle.trim() || !newPageSlug.trim()) return;
 
     soundEngine.playSuccess();
-    const cleanSlug = newPageSlug.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const cleanSlug = newPageSlug
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
     const title = newPageTitle.trim();
 
     setPages((prev) => [...prev, { id: "page_" + Date.now(), slug: cleanSlug, title }]);
@@ -270,9 +304,12 @@ export default function AdminModularPages() {
   const targetLiveUrl = currentSlug === "home" ? "/" : "/" + currentSlug;
 
   return (
-    <div className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]" dir="rtl">
+    <div
+      className="w-full flex flex-col font-sans select-none min-h-screen space-y-4 text-[var(--text-primary)]"
+      dir="rtl"
+    >
       <div className="p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-md font-bold">
             ⚡
           </div>
@@ -293,7 +330,10 @@ export default function AdminModularPages() {
 
           <button
             type="button"
-            onClick={() => { soundEngine.playClick(); setShowNewPageModal(true); }}
+            onClick={() => {
+              soundEngine.playClick();
+              setShowNewPageModal(true);
+            }}
             className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-black shadow-md cursor-pointer transition flex items-center gap-1"
           >
             <span>➕</span>
@@ -301,26 +341,63 @@ export default function AdminModularPages() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* سوئیچر پیش‌نمایش ریسپانسیو به ترتیب اولویت: دسکتاپ، موبایل و تبلت */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setViewportMode("desktop")}
+              className={
+                "px-2.5 py-1.5 rounded-lg transition cursor-pointer " +
+                (viewportMode === "desktop" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+              }
+            >
+              🖥️ دسکتاپ
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewportMode("mobile")}
+              className={
+                "px-2.5 py-1.5 rounded-lg transition cursor-pointer " +
+                (viewportMode === "mobile" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+              }
+            >
+              📱 موبایل
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewportMode("tablet")}
+              className={
+                "px-2.5 py-1.5 rounded-lg transition cursor-pointer " +
+                (viewportMode === "tablet" ? "bg-[var(--accent-blue)] text-white" : "text-slate-400")
+              }
+            >
+              📟 تبلت
+            </button>
+          </div>
+
           <Link
             href={targetLiveUrl}
             target="_blank"
             className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold hover:border-sky-500 transition flex items-center gap-1.5"
           >
-            <span>مشاهده زنده این صفحه</span>
+            <span>مشاهده زنده صفحه</span>
             <span>🔗</span>
           </Link>
         </div>
       </div>
 
       {toast && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-fadeIn">
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-bold animate-fadeIn">
           {toast}
         </div>
       )}
 
       {showNewPageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans" dir="rtl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn font-sans"
+          dir="rtl"
+        >
           <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-5 shadow-2xl text-[var(--text-primary)]">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
               <h3 className="font-black text-sm text-sky-500 flex items-center gap-2">
@@ -337,7 +414,9 @@ export default function AdminModularPages() {
 
             <form onSubmit={handleCreateNewPage} className="space-y-4 text-xs">
               <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">عنوان فارسی صفحه *</label>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                  عنوان فارسی صفحه *
+                </label>
                 <input
                   type="text"
                   required
@@ -349,10 +428,13 @@ export default function AdminModularPages() {
               </div>
 
               <div>
-                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">آدرس انگلیسی / نامک (Slug) *</label>
+                <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
+                  آدرس انگلیسی / نامک (Slug) *
+                </label>
                 <input
                   type="text"
                   required
+                  dir="ltr"
                   placeholder="terms"
                   value={newPageSlug}
                   onChange={(e) => setNewPageSlug(e.target.value)}
@@ -380,16 +462,22 @@ export default function AdminModularPages() {
         </div>
       )}
 
-      <div className="w-full rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px]">
+      <div
+        className={
+          "mx-auto transition-all duration-300 rounded-3xl overflow-hidden border border-[var(--card-border)] bg-[var(--modal-bg)] shadow-2xl min-h-[880px] " +
+          (viewportMode === "mobile"
+            ? "w-full max-w-[420px]"
+            : viewportMode === "tablet"
+            ? "w-full max-w-[820px]"
+            : "w-full")
+        }
+      >
         {loading || !pageData ? (
-          <div className="py-32 text-center text-xs font-bold text-slate-400">در حال لود صفحه و همگام‌سازی...</div>
+          <div className="py-32 text-center text-xs font-bold text-slate-400">
+            در حال لود صفحه و همگام‌سازی...
+          </div>
         ) : (
-          <Puck
-            key={renderKey}
-            config={puckConfig}
-            data={pageData}
-            onPublish={handleSave}
-          />
+          <Puck key={renderKey} config={puckConfig} data={pageData} onPublish={handleSave} />
         )}
       </div>
     </div>

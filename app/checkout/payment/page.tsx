@@ -5,52 +5,69 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { soundEngine } from "@/lib/soundEngine";
-import * as CartContextModule from "@/context/CartContext";
+import { useCart } from "@/context/CartContext";
 
 function PaymentGatewayContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-
-  const useCartHook = (CartContextModule as any).useCart;
-  const cartCtx = typeof useCartHook === "function" ? useCartHook() : null;
+  const { clearCart } = useCart() as any;
 
   const orderId = searchParams.get("orderId") || "";
-  const initialTracking = searchParams.get("trackingCode") || "";
-  const amountParam = Number(searchParams.get("amount") || 0);
-  const phoneParam = searchParams.get("phone") || "";
+  const amount = Number(searchParams.get("amount") || 0);
+  const phone = searchParams.get("phone") || "";
+  const authority = searchParams.get("Authority") || searchParams.get("authority") || "";
+  const statusParam = searchParams.get("Status") || searchParams.get("status") || "";
 
-  const [paymentMethod, setPaymentMethod] = useState<"online_gateway" | "manual_receipt">("online_gateway");
-  const [receiptRef, setReceiptRef] = useState("");
-  const [processing, setProcessing] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [trackingCode, setTrackingCode] = useState(initialTracking);
-  const [refId, setRefId] = useState("");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"redirecting" | "verifying" | "success" | "failed">(
+    authority ? "verifying" : "redirecting"
+  );
+  const [message, setMessage] = useState<string>("");
+  const [refId, setRefId] = useState<string>("");
+  const [trackingCode, setTrackingCode] = useState<string>(
+    searchParams.get("trackingCode") || orderId
+  );
 
-  const clearShoppingCartAndDraft = () => {
-    try {
-      if (cartCtx && typeof cartCtx.clearCart === "function") {
-        cartCtx.clearCart();
-      }
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("axon_cart");
-        localStorage.removeItem("cart");
-        localStorage.removeItem("axon_checkout_draft_v2026");
-        window.dispatchEvent(new CustomEvent("cart_updated", { detail: [] }));
-      }
-    } catch {}
-  };
-
-  const handleConfirmPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ۱. انتقال خودکار به درگاه شاپرک زرین‌پال در صورتی که هنوز Authority دریافت نشده باشد
+  const startZarinpalPayment = async () => {
     if (!orderId) {
-      setErrorMsg("شناسه سفارش یافت نشد. لطفاً از صفحه تسویه‌حساب مجدداً اقدام نمایید.");
+      setPhase("failed");
+      setMessage("شناسه سفارش یافت نشد.");
       return;
     }
 
-    soundEngine.playClick();
-    setProcessing(true);
-    setErrorMsg(null);
+    setPhase("redirecting");
+    setMessage("در حال دریافت توکن امنیتی از درگاه پرداخت زرین‌پال (شاپرک)...");
+
+    try {
+      const res = await fetch("/api/payment/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, amount, phone }),
+      });
+      const json = await res.json();
+
+      if (res.ok && json.success && json.paymentUrl) {
+        window.location.href = json.paymentUrl;
+      } else {
+        setPhase("failed");
+        setMessage(json.message || "خطا در اتصال به درگاه زرین‌پال.");
+      }
+    } catch {
+      setPhase("failed");
+      setMessage("خطا در برقراری ارتباط با سرور پرداخت.");
+    }
+  };
+
+  // ۲. تایید خودکار تراکنش پس از بازگشت از درگاه زرین‌پال
+  const verifyZarinpalCallback = async () => {
+    if (statusParam && statusParam.toUpperCase() !== "OK") {
+      setPhase("failed");
+      setMessage("پرداخت توسط شما لغو شد یا تراکنش ناموفق بود.");
+      return;
+    }
+
+    setPhase("verifying");
+    setMessage("در حال استعلام و تایید نهایی تراکنش از زرین‌پال...");
 
     try {
       const res = await fetch("/api/payment/verify", {
@@ -58,203 +75,154 @@ function PaymentGatewayContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId,
-          trackingCode: initialTracking,
-          phone: phoneParam,
-          paymentMethod,
-          receiptRef: receiptRef.trim() || undefined,
+          authority,
+          status: statusParam || "OK",
+          amount,
+          phone,
         }),
       });
 
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setTrackingCode(json.trackingCode || initialTracking || orderId);
-        setRefId(json.refId || "REF-AXON");
-        setPaymentSuccess(true);
-
-        // لاگین خودکار خریدار در حساب کاربری
-        if (typeof window !== "undefined") {
-          const existingRaw = localStorage.getItem("axon_user_session");
-          const existingUser = existingRaw ? JSON.parse(existingRaw) : {};
-          const userObj = {
-            ...existingUser,
-            phone: json.user?.phone || phoneParam || existingUser.phone || "",
-            name: json.user?.name || existingUser.name || "خریدار محترم",
-            full_name: json.user?.full_name || existingUser.full_name || "خریدار محترم",
-            lastOrderId: orderId,
-            lastTrackingCode: json.trackingCode || initialTracking,
-            token: json.user?.token || existingUser.token || ("USER-" + Date.now()),
-          };
-          localStorage.setItem("axon_user_session", JSON.stringify(userObj));
-          window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: userObj }));
+        if (json.refId) setRefId(String(json.refId));
+        if (json.trackingCode) setTrackingCode(String(json.trackingCode));
+        if (json.user && typeof window !== "undefined") {
+          localStorage.setItem("axon_user_session", JSON.stringify(json.user));
+          window.dispatchEvent(new CustomEvent("user_auth_changed", { detail: json.user }));
         }
-
-        clearShoppingCartAndDraft();
-
-        // انتقال خودکار به پنل حساب کاربری پس از ۳ ثانیه جهت مشاهده جزئیات سفارش
+        if (typeof clearCart === "function") clearCart();
+        setPhase("success");
+        setMessage(json.message || "پرداخت شما با موفقیت تایید شد.");
         setTimeout(() => {
           router.push("/account?orderId=" + encodeURIComponent(orderId));
-        }, 3200);
+        }, 3500);
       } else {
-        setErrorMsg(json.message || "خطا در تایید پرداخت.");
+        setPhase("failed");
+        setMessage(json.message || "تراکنش در زرین‌پال تایید نشد.");
       }
     } catch {
-      setErrorMsg("خطا در برقراری ارتباط با درگاه پرداخت.");
-    } finally {
-      setProcessing(false);
+      setPhase("failed");
+      setMessage("خطا در تایید تراکنش.");
     }
   };
 
+  useEffect(() => {
+    if (authority) {
+      verifyZarinpalCallback();
+    } else if (orderId) {
+      startZarinpalPayment();
+    }
+  }, [authority, orderId]);
+
   return (
-    <div className="max-w-xl mx-auto px-4 py-10 sm:py-16 font-sans select-none text-[var(--text-primary)]" dir="rtl">
-      <div className="p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 text-xs">
-        {paymentSuccess ? (
-          <div className="space-y-6 text-center py-6 animate-fadeIn">
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-500 text-slate-950 flex items-center justify-center text-4xl font-black shadow-[0_0_50px_rgba(16,185,129,0.6)]">
-              ✓
-            </div>
-
-            <div className="space-y-2">
-              <h1 className="text-xl sm:text-2xl font-black text-emerald-400">
-                پرداخت و ثبت سفارش شما با موفقیت انجام شد!
-              </h1>
-              <p className="text-[var(--text-secondary)] leading-relaxed">
-                کد پیگیری سفارش به شماره همراه <strong className="font-mono text-[var(--text-primary)]">{phoneParam}</strong> پیامک شد و شما به صورت خودکار وارد حساب کاربری خود شدید.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-3xl bg-[var(--input-bg)] border border-emerald-500/30 space-y-3 text-right">
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--text-secondary)] font-bold">شماره فاکتور:</span>
-                <span className="font-mono font-black text-[var(--accent-blue)]">{orderId}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--text-secondary)] font-bold">کد پیگیری اختصاصی مرسوله:</span>
-                <span className="font-mono font-black text-sm text-emerald-400 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
-                  {trackingCode}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--text-secondary)] font-bold">شماره مرجع تراکنش:</span>
-                <span className="font-mono text-slate-400">{refId}</span>
-              </div>
-            </div>
-
-            <div className="pt-2 space-y-2">
-              <Link
-                href={"/account?orderId=" + encodeURIComponent(orderId)}
-                className="block w-full py-4 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs sm:text-sm shadow-xl hover:opacity-90 transition"
-              >
-                ورود مستقیم به حساب کاربری و مشاهده وضعیت سفارش ←
-              </Link>
-              <p className="text-[11px] text-slate-400 animate-pulse">
-                در حال انتقال خودکار به پنل حساب کاربری شما...
-              </p>
-            </div>
-          </div>
-        ) : (
+    <div
+      className="min-h-[80vh] flex items-center justify-center px-4 py-10 font-sans select-none text-[var(--text-primary)]"
+      dir="rtl"
+    >
+      <div className="max-w-md w-full p-6 sm:p-8 rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-2xl text-center space-y-6">
+        {phase === "redirecting" && (
           <>
-            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-4">
-              <div>
-                <h1 className="text-base sm:text-lg font-black text-[var(--accent-blue)] flex items-center gap-2">
-                  <span>💳</span> درگاه پرداخت امن و تایید نهایی سفارش
-                </h1>
-                <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                  شناسه فاکتور: <strong className="font-mono">{orderId || "---"}</strong>
-                </p>
-              </div>
-              <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-400 font-mono font-bold text-[11px]">
-                SSL 256-Bit ✓
-              </span>
+            <div className="w-16 h-16 mx-auto rounded-3xl bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full border-3 border-[var(--accent-blue)] border-t-transparent animate-spin" />
             </div>
-
-            {errorMsg && (
-              <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 font-bold">
-                ⚠️ {errorMsg}
+            <div className="space-y-2">
+              <h1 className="text-lg font-black text-[var(--accent-blue)]">
+                در حال انتقال به درگاه امن زرین‌پال
+              </h1>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{message}</p>
+            </div>
+            {amount > 0 && (
+              <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs flex justify-between items-center">
+                <span className="font-bold text-[var(--text-secondary)]">مبلغ قابل پرداخت:</span>
+                <span className="font-mono font-black text-emerald-500">
+                  {amount.toLocaleString("fa-IR")} تومان
+                </span>
               </div>
             )}
+            <button
+              type="button"
+              onClick={startZarinpalPayment}
+              className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg cursor-pointer"
+            >
+              ورود مستقیم به درگاه زرین‌پال 💳
+            </button>
+          </>
+        )}
 
-            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--text-secondary)] font-bold">شماره موبایل تاییدشده:</span>
-                <span className="font-mono font-bold">{phoneParam || "---"}</span>
+        {phase === "verifying" && (
+          <>
+            <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full border-3 border-emerald-500 border-t-transparent animate-spin" />
+            </div>
+            <h1 className="text-lg font-black text-emerald-400">
+              در حال تایید تراکنش شاپرک...
+            </h1>
+            <p className="text-xs text-[var(--text-secondary)]">{message}</p>
+          </>
+        )}
+
+        {phase === "success" && (
+          <>
+            <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-4xl font-black shadow-[0_0_40px_rgba(16,185,129,0.6)]">
+              ✓
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-xl font-black text-emerald-400">پرداخت با موفقیت انجام شد!</h1>
+              <p className="text-xs text-[var(--text-secondary)]">{message}</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs space-y-2.5 text-right">
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">شماره سفارش:</span>
+                <span className="font-mono font-black text-[var(--accent-blue)]">{orderId}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--text-secondary)] font-bold">مبلغ قابل پرداخت:</span>
-                <span className="font-mono font-black text-base text-emerald-400">
-                  {amountParam > 0 ? amountParam.toLocaleString("fa-IR") + " تومان" : "طبق فاکتور"}
-                </span>
+              {refId && (
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">شماره مرجع شاپرک (RefID):</span>
+                  <span className="font-mono font-black text-emerald-400">{refId}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">کد رهگیری مرسوله:</span>
+                <span className="font-mono font-black text-amber-400">{trackingCode}</span>
               </div>
             </div>
 
-            <form onSubmit={handleConfirmPayment} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setPaymentMethod("online_gateway");
-                  }}
-                  className={
-                    "p-3.5 rounded-2xl border font-black text-right transition cursor-pointer " +
-                    (paymentMethod === "online_gateway"
-                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 text-[var(--text-primary)]"
-                      : "border-[var(--card-border)] bg-[var(--input-bg)] text-[var(--text-secondary)]")
-                  }
-                >
-                  <div className="text-sm mb-1">🌐 پرداخت آنلاین شتاب</div>
-                  <div className="text-[10px] font-normal opacity-80">
-                    تایید آنی و صدور خودکار کد پیگیری
-                  </div>
-                </button>
+            <Link
+              href={"/account?orderId=" + encodeURIComponent(orderId)}
+              className="block w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-xl transition"
+            >
+              ورود به حساب کاربری و مشاهده فاکتور ←
+            </Link>
+          </>
+        )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setPaymentMethod("manual_receipt");
-                  }}
-                  className={
-                    "p-3.5 rounded-2xl border font-black text-right transition cursor-pointer " +
-                    (paymentMethod === "manual_receipt"
-                      ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/15 text-[var(--text-primary)]"
-                      : "border-[var(--card-border)] bg-[var(--input-bg)] text-[var(--text-secondary)]")
-                  }
-                >
-                  <div className="text-sm mb-1">🧾 ثبت فیش واریزی / کارت به کارت</div>
-                  <div className="text-[10px] font-normal opacity-80">
-                    ثبت شماره پیگیری فیش بانکی
-                  </div>
-                </button>
-              </div>
+        {phase === "failed" && (
+          <>
+            <div className="w-16 h-16 mx-auto rounded-3xl bg-rose-500/15 border border-rose-500/30 text-rose-500 flex items-center justify-center text-3xl font-black">
+              ✕
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-lg font-black text-rose-500">خطا یا انصراف از پرداخت</h1>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{message}</p>
+            </div>
 
-              {paymentMethod === "manual_receipt" && (
-                <div>
-                  <label className="block mb-1.5 font-bold text-[var(--text-secondary)]">
-                    شماره پیگیری فیش واریزی یا ۴ رقم آخر کارت:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    dir="ltr"
-                    value={receiptRef}
-                    onChange={(e) => setReceiptRef(e.target.value)}
-                    placeholder="مثال: 849201"
-                    className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono font-bold text-center outline-none focus:border-[var(--accent-blue)]"
-                  />
-                </div>
-              )}
-
+            <div className="space-y-2.5 pt-2">
               <button
-                type="submit"
-                disabled={processing}
-                className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm shadow-xl transition cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={startZarinpalPayment}
+                className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black text-xs shadow-lg cursor-pointer"
               >
-                {processing
-                  ? "در حال تایید تراکنش و ارسال پیامک کد پیگیری..."
-                  : "✓ تکمیل و تایید نهایی پرداخت (دریافت کد پیگیری)"}
+                🔄 تلاش مجدد و اتصال به درگاه زرین‌پال
               </button>
-            </form>
+              <Link
+                href="/checkout"
+                className="block w-full py-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] text-xs font-bold"
+              >
+                بازگشت به صفحه تسویه‌حساب
+              </Link>
+            </div>
           </>
         )}
       </div>
@@ -266,8 +234,8 @@ export default function CheckoutPaymentPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-xs font-bold text-slate-400">
-          در حال بارگذاری درگاه پرداخت امن آکسون...
+        <div className="min-h-[60vh] flex items-center justify-center text-xs font-bold">
+          در حال اتصال به درگاه زرین‌پال...
         </div>
       }
     >

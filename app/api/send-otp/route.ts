@@ -6,7 +6,6 @@ import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-// حافظه کمکی در سطح سرور برای اطمینان ۱۰۰٪ حتی در صورت تاخیر دیتابیس
 const memoryOtpStore = new Map<string, { hash: string; expiresAt: number }>();
 
 function hashOtp(phone: string, code: string): string {
@@ -37,7 +36,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // خواندن از ستون واقعی homepage_layout_config در جدول site_info
     const { data: siteRow } = await supabaseAdmin
       .from("site_info")
       .select("id, homepage_layout_config")
@@ -50,7 +48,7 @@ export async function POST(req: NextRequest) {
         : {};
     const currentSec = layoutCfg.auth_security_config || {};
     const otpLength = Number(currentSec?.userDeck?.otpLength || 4);
-    const configuredTestCode = String(currentSec?.userDeck?.testOtpCode || "1234").trim();
+    const configuredTestCode = String(currentSec?.userDeck?.testOtpCode || "").trim();
 
     if (action === "verify") {
       const code = String(body.code || "")
@@ -133,7 +131,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // تولید و ارسال کد تایید پیامکی
     const minVal = Math.pow(10, Math.max(3, otpLength - 1));
     const maxVal = Math.pow(10, Math.max(4, otpLength)) - 1;
     const generatedCode = crypto.randomInt(minVal, maxVal).toString();
@@ -159,7 +156,18 @@ export async function POST(req: NextRequest) {
         .eq("id", siteRow.id);
     }
 
-    await sendOtpPattern({ mobile: rawPhone, code: generatedCode });
+    const sentOk = await sendOtpPattern({ mobile: rawPhone, code: generatedCode });
+
+    if (!sentOk) {
+      return NextResponse.json(
+        {
+          success: false,
+          sent: false,
+          message: "خطا در ارسال پیامک از درگاه IPPanel Edge. لطفاً اتصال یا اعتبار پنل پیامک را بررسی کنید.",
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

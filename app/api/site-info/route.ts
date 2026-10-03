@@ -26,7 +26,6 @@ export async function GET() {
 
     const systemSettings = normalizeSystemSettings(layoutCfg);
 
-    // حذف هش‌های امنیتی حساس قبل از ارسال به کلاینت عمومی
     const cleanLayoutCfg = { ...layoutCfg };
     if (cleanLayoutCfg.auth_security_config) {
       cleanLayoutCfg.auth_security_config = {
@@ -34,16 +33,65 @@ export async function GET() {
       };
     }
 
+    const tbFooter = cleanLayoutCfg?.theme_builder_config?.globalFooter || {};
+    const tbHeader = cleanLayoutCfg?.theme_builder_config?.globalHeader || {};
+
+    const resolvedHeaderLogo =
+      tbHeader.logoUrl ||
+      cleanLayoutCfg?.header?.brand?.logoUrl ||
+      safeRow.logo_url ||
+      "";
+
+    const resolvedFooterLogo =
+      tbFooter.footerLogoUrl ||
+      cleanLayoutCfg?.footer?.footerLogoUrl ||
+      cleanLayoutCfg?.footer?.logoUrl ||
+      safeRow.footer_logo_url ||
+      resolvedHeaderLogo ||
+      "";
+
     const enrichedPayload = {
       ...safeRow,
-      site_name: safeRow.site_name || safeRow.store_name || "آکسون کور | Axon Core",
-      storeName: safeRow.site_name || safeRow.store_name || "آکسون کور | Axon Core",
-      phone: safeRow.phone || safeRow.contact_phone || "09376110200",
-      email: safeRow.email || safeRow.contact_email || "info@axoncore.ir",
-      address: safeRow.address || safeRow.contact_address || "شیراز، خیابان ستارخان",
-      working_hours: safeRow.working_hours || "شنبه تا چهارشنبه ۹ الی ۱۸",
+      site_name:
+        tbHeader.brandName ||
+        safeRow.site_name ||
+        safeRow.store_name ||
+        "آکسون کور | Axon Core",
+      storeName:
+        tbHeader.brandName ||
+        safeRow.site_name ||
+        safeRow.store_name ||
+        "آکسون کور | Axon Core",
+      logo_url: resolvedHeaderLogo,
+      logoUrl: resolvedHeaderLogo,
+      footer_logo_url: resolvedFooterLogo,
+      footerLogoUrl: resolvedFooterLogo,
+      phone:
+        tbFooter.supportPhone ||
+        safeRow.phone ||
+        safeRow.contact_phone ||
+        "09376110200",
+      email:
+        tbFooter.supportEmail ||
+        safeRow.email ||
+        safeRow.contact_email ||
+        "Pouriarahimi@yahoo.com",
+      address:
+        tbFooter.warehouseAddress ||
+        safeRow.address ||
+        safeRow.contact_address ||
+        "شیراز - ستارخان",
+      working_hours:
+        tbFooter.workingHours ||
+        safeRow.working_hours ||
+        "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
       homepage_layout_config: {
         ...cleanLayoutCfg,
+        footer: {
+          ...(cleanLayoutCfg.footer || {}),
+          logoUrl: resolvedFooterLogo,
+          footerLogoUrl: resolvedFooterLogo,
+        },
         system_settings: systemSettings,
         store_settings: systemSettings,
       },
@@ -146,9 +194,25 @@ export async function POST(req: NextRequest) {
         ? incoming.logoUrl
         : existing?.logo_url || "";
 
+    const footerLogoUrl =
+      incoming.footer_logo_url !== undefined
+        ? incoming.footer_logo_url
+        : incoming.footerLogoUrl !== undefined
+        ? incoming.footerLogoUrl
+        : mergedLayout?.theme_builder_config?.globalFooter?.footerLogoUrl ??
+          mergedLayout?.footer?.footerLogoUrl ??
+          mergedLayout?.footer?.logoUrl ??
+          existing?.footer_logo_url ??
+          logoUrl;
+
     if (mergedLayout.header?.brand) {
       mergedLayout.header.brand.name = siteName;
       if (logoUrl) mergedLayout.header.brand.logoUrl = logoUrl;
+    }
+
+    if (mergedLayout.footer) {
+      mergedLayout.footer.logoUrl = footerLogoUrl;
+      mergedLayout.footer.footerLogoUrl = footerLogoUrl;
     }
 
     const fullPayload: Record<string, any> = {
@@ -174,17 +238,18 @@ export async function POST(req: NextRequest) {
         incoming.contact_email ??
         incoming.support_email ??
         existing?.email ??
-        "info@axoncore.ir",
+        "Pouriarahimi@yahoo.com",
       address:
         incoming.address ??
         incoming.contact_address ??
         existing?.address ??
-        "شیراز، خیابان ستارخان",
+        "شیراز - ستارخان",
       working_hours:
         incoming.working_hours ??
         existing?.working_hours ??
         "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
       logo_url: logoUrl,
+      footer_logo_url: footerLogoUrl,
       favicon_url: incoming.favicon_url ?? existing?.favicon_url ?? "/favicon.ico",
       allow_google_index:
         incoming.allow_google_index !== undefined
@@ -246,6 +311,9 @@ export async function POST(req: NextRequest) {
         message: "✓ تغییرات سایت با موفقیت در دیتابیس ذخیره و به صورت زنده منتشر شد.",
         data: {
           ...savedData,
+          logo_url: logoUrl,
+          footer_logo_url: footerLogoUrl,
+          footerLogoUrl,
           homepage_layout_config: mergedLayout,
           theme_builder_config: mergedLayout.theme_builder_config,
           navigation_menu: mergedLayout.navigation_menu,

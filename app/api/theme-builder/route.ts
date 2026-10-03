@@ -19,50 +19,98 @@ export async function GET() {
         ? data.homepage_layout_config
         : DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
 
-    const storedTheme = layoutCfg.theme_builder_config || {
+    const existingTb = layoutCfg.theme_builder_config || {};
+    const existingGh = existingTb.globalHeader || {};
+    const existingGf = existingTb.globalFooter || {};
+
+    const resolvedFooterLogo =
+      existingGf.footerLogoUrl ??
+      layoutCfg?.footer?.footerLogoUrl ??
+      layoutCfg?.footer?.logoUrl ??
+      data?.footer_logo_url ??
+      data?.logo_url ??
+      "";
+
+    const storedTheme = {
+      ...existingTb,
       globalHeader: {
-        brandName: layoutCfg?.header?.brand?.name || data?.site_name || "آکسون کور | Axon Core",
-        logoText: layoutCfg?.header?.brand?.name || data?.site_name || "آکسون کور",
-        logoUrl: layoutCfg?.header?.brand?.logoUrl || data?.logo_url || "",
-        logoWidth: layoutCfg?.header?.brand?.logoWidth || 38,
-        logoHeight: layoutCfg?.header?.brand?.logoHeight || 38,
-        faviconUrl: data?.favicon_url || "/favicon.ico",
-        announcementText: data?.header_announcement || layoutCfg?.header?.announcement?.text || "",
-        announcementEnabled: Boolean(layoutCfg?.header?.announcement?.show),
-        ctaText: "کاتالوگ محصولات",
-        ctaUrl: "/products",
-        bgColor: "#07090e",
-        textColor: "#ffffff",
+        brandName:
+          existingGh.brandName ||
+          layoutCfg?.header?.brand?.name ||
+          data?.site_name ||
+          "آکسون کور | Axon Core",
+        logoText:
+          existingGh.logoText ||
+          layoutCfg?.header?.brand?.name ||
+          data?.site_name ||
+          "آکسون کور",
+        logoUrl:
+          existingGh.logoUrl !== undefined
+            ? existingGh.logoUrl
+            : layoutCfg?.header?.brand?.logoUrl || data?.logo_url || "",
+        logoWidth: Number(existingGh.logoWidth || layoutCfg?.header?.brand?.logoWidth || 38),
+        logoHeight: Number(existingGh.logoHeight || layoutCfg?.header?.brand?.logoHeight || 38),
+        faviconUrl: existingGh.faviconUrl || data?.favicon_url || "/favicon.ico",
+        announcementText:
+          existingGh.announcementText !== undefined
+            ? existingGh.announcementText
+            : data?.header_announcement || layoutCfg?.header?.announcement?.text || "",
+        announcementEnabled:
+          existingGh.announcementEnabled !== undefined
+            ? Boolean(existingGh.announcementEnabled)
+            : Boolean(layoutCfg?.header?.announcement?.show),
+        ctaText: existingGh.ctaText || "کاتالوگ محصولات",
+        ctaUrl: existingGh.ctaUrl || "/products",
+        bgColor: existingGh.bgColor || "#07090e",
+        textColor: existingGh.textColor || "#ffffff",
       },
       globalFooter: {
-        footerLogoUrl: layoutCfg?.footer?.logoUrl || data?.logo_url || "",
-        brandTitle: layoutCfg?.footer?.brandTitle || data?.site_name || "آکسون کور | Axon Core",
+        ...existingGf,
+        footerLogoUrl: resolvedFooterLogo,
+        brandTitle:
+          existingGf.brandTitle ||
+          layoutCfg?.footer?.brandTitle ||
+          data?.site_name ||
+          "آکسون کور | Axon Core",
         brandSubtitle:
+          existingGf.brandSubtitle ||
           layoutCfg?.footer?.brandSubtitle ||
           "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال",
-        supportPhone: data?.phone || "09376110200",
-        supportEmail: data?.email || "Pouriarahimi@yahoo.com",
-        warehouseAddress: data?.address || "شیراز - ستارخان",
-        workingHours: data?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-        enamadCode: "7434404",
+        supportPhone: existingGf.supportPhone || data?.phone || "09376110200",
+        supportEmail: existingGf.supportEmail || data?.email || "Pouriarahimi@yahoo.com",
+        warehouseAddress: existingGf.warehouseAddress || data?.address || "شیراز - ستارخان",
+        workingHours:
+          existingGf.workingHours || data?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+        enamadCode: existingGf.enamadCode || "7434404",
         enamadLink:
+          existingGf.enamadLink ||
           "https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD",
-        enamadEnabled: true,
+        enamadEnabled:
+          existingGf.enamadEnabled !== undefined ? Boolean(existingGf.enamadEnabled) : true,
         copyright:
+          existingGf.copyright ||
           layoutCfg?.footer?.bottomBar?.copyrightText ||
           "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
-        externalLinks: layoutCfg?.footer?.externalLinks || [
-          { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob" },
-          { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml" },
-        ],
+        externalLinks: existingGf.externalLinks ||
+          layoutCfg?.footer?.externalLinks || [
+            { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob" },
+            { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml" },
+          ],
       },
-      homeSections: layoutCfg.homeSections || [],
+      homeSections: Array.isArray(existingTb.homeSections)
+        ? existingTb.homeSections
+        : layoutCfg.homeSections || [],
     };
 
-    return NextResponse.json({
-      success: true,
-      config: storedTheme,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        config: storedTheme,
+      },
+      {
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -92,20 +140,38 @@ export async function POST(req: NextRequest) {
     const gf = config?.globalFooter || {};
     const homeSections = Array.isArray(config?.homeSections) ? config.homeSections : [];
 
+    const headerLogoUrl =
+      gh.logoUrl !== undefined ? String(gh.logoUrl).trim() : existing?.logo_url || "";
+    const dedicatedFooterLogoUrl =
+      gf.footerLogoUrl !== undefined
+        ? String(gf.footerLogoUrl).trim()
+        : prevLayout?.footer?.footerLogoUrl || prevLayout?.footer?.logoUrl || headerLogoUrl;
+
     const heroSec = homeSections.find((s: any) => s.type === "NativeHero3D");
     const sliderSec = homeSections.find((s: any) => s.type === "NativePerspectiveSlider");
     const catalogSec = homeSections.find((s: any) => s.type === "NativeProductCatalog");
 
     const updatedLayout = {
       ...prevLayout,
-      theme_builder_config: config,
+      theme_builder_config: {
+        ...config,
+        globalHeader: {
+          ...gh,
+          logoUrl: headerLogoUrl,
+        },
+        globalFooter: {
+          ...gf,
+          footerLogoUrl: dedicatedFooterLogoUrl,
+        },
+      },
       homeSections,
       header: {
         ...(prevLayout.header || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header),
         brand: {
-          ...((prevLayout.header && prevLayout.header.brand) || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header.brand),
+          ...((prevLayout.header && prevLayout.header.brand) ||
+            DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header.brand),
           name: gh.brandName || "آکسون کور | Axon Core",
-          logoUrl: gh.logoUrl !== undefined ? gh.logoUrl : "",
+          logoUrl: headerLogoUrl,
           logoWidth: Number(gh.logoWidth || 38),
           logoHeight: Number(gh.logoHeight || 38),
           showLogo: true,
@@ -145,26 +211,59 @@ export async function POST(req: NextRequest) {
         : prevLayout.productsSection || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.productsSection,
       footer: {
         ...(prevLayout.footer || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer),
-        logoUrl: gf.footerLogoUrl || gh.logoUrl || "",
+        logoUrl: dedicatedFooterLogoUrl || headerLogoUrl,
+        footerLogoUrl: dedicatedFooterLogoUrl,
         brandTitle: gf.brandTitle || gh.brandName || "آکسون کور | Axon Core",
         brandSubtitle: gf.brandSubtitle || "",
+        supportPhone: gf.supportPhone || "09376110200",
+        supportEmail: gf.supportEmail || "Pouriarahimi@yahoo.com",
+        warehouseAddress: gf.warehouseAddress || "شیراز - ستارخان",
+        workingHours: gf.workingHours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+        enamadCode: gf.enamadCode || "7434404",
+        enamadLink:
+          gf.enamadLink ||
+          "https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD",
+        enamadEnabled: gf.enamadEnabled !== false,
         externalLinks: gf.externalLinks || [],
         bottomBar: {
           ...((prevLayout.footer && prevLayout.footer.bottomBar) || {}),
           show: true,
-          copyrightText: gf.copyright || "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
+          copyrightText:
+            gf.copyright || "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
         },
       },
     };
 
+    const fullUpdateObj: Record<string, any> = {
+      site_name: gh.brandName || gf.brandTitle || existing?.site_name || "آکسون کور | Axon Core",
+      logo_url: headerLogoUrl,
+      footer_logo_url: dedicatedFooterLogoUrl,
+      favicon_url: gh.faviconUrl || existing?.favicon_url || "/favicon.ico",
+      phone: gf.supportPhone || existing?.phone || "09376110200",
+      email: gf.supportEmail || existing?.email || "Pouriarahimi@yahoo.com",
+      address: gf.warehouseAddress || existing?.address || "شیراز - ستارخان",
+      working_hours: gf.workingHours || existing?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+      homepage_layout_config: updatedLayout,
+      header_announcement: gh.announcementText || "",
+      updated_at: new Date().toISOString(),
+    };
+
     if (existing?.id) {
-      await supabaseAdmin
+      const { error: uErr } = await supabaseAdmin
         .from("site_info")
-        .update({
-          homepage_layout_config: updatedLayout,
-          header_announcement: gh.announcementText || "",
-        })
+        .update(fullUpdateObj)
         .eq("id", existing.id);
+
+      if (uErr) {
+        await supabaseAdmin
+          .from("site_info")
+          .update({
+            homepage_layout_config: updatedLayout,
+            header_announcement: gh.announcementText || "",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      }
     } else {
       await supabaseAdmin.from("site_info").insert([
         {
@@ -176,8 +275,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      config,
-      message: "✓ تنظیمات ظاهر، هدر، لوگو و فوتر با موفقیت در دیتابیس ذخیره و منتشر شد.",
+      config: updatedLayout.theme_builder_config,
+      message: "✓ تنظیمات ظاهر، هدر، لوگوی اختصاصی فوتر و اطلاعات تماس با موفقیت ذخیره و منتشر شد.",
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });

@@ -1,298 +1,273 @@
-// File Path: components/Footer.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSiteInfo } from "@/context/SiteInfoContext";
-import EnamadBadge from "@/components/EnamadBadge";
 import AnimatedLogo from "@/components/AnimatedLogo";
+import EnamadBadge from "@/components/EnamadBadge";
+import { supabase } from "@/lib/supabase";
 
-export interface FooterLinkItem {
-  id: string;
-  title: string;
-  url: string;
-  show?: boolean;
-}
+export default function Footer() {
+  const { siteInfo: ctxSiteInfo } = useSiteInfo();
+  const [liveInfo, setLiveInfo] = useState<any>(null);
 
-export function Footer() {
-  const { siteInfo, refresh } = useSiteInfo();
-  const [logoError, setLogoError] = useState(false);
+  const fetchLatestFooterConfig = useCallback(async () => {
+    try {
+      const res = await fetch("/api/site-info", { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json?.data || json?.siteInfo) {
+        setLiveInfo(json.data || json.siteInfo);
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
-    const handleSync = () => {
-      if (typeof refresh === "function") refresh();
-    };
-    window.addEventListener("theme_builder_updated", handleSync);
-    window.addEventListener("site_info_updated", handleSync);
+    fetchLatestFooterConfig();
+
+    const ch = supabase
+      .channel("realtime-footer-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          fetchLatestFooterConfig();
+        }
+      )
+      .subscribe();
+
+    const onCustomUpdate = () => fetchLatestFooterConfig();
+    window.addEventListener("site_info_updated", onCustomUpdate);
+
     return () => {
-      window.removeEventListener("theme_builder_updated", handleSync);
-      window.removeEventListener("site_info_updated", handleSync);
+      window.removeEventListener("site_info_updated", onCustomUpdate);
+      supabase.removeChannel(ch);
     };
-  }, [refresh]);
+  }, [fetchLatestFooterConfig]);
 
-  const layoutFooter = siteInfo?.homepage_layout_config?.footer || {};
-  const themeFooter = siteInfo?.homepage_layout_config?.theme_builder_config?.globalFooter || {};
+  const info = liveInfo || ctxSiteInfo || {};
+  const layoutCfg = info?.homepage_layout_config || {};
+  const tbFooter =
+    info?.theme_builder_config?.globalFooter ||
+    layoutCfg?.theme_builder_config?.globalFooter ||
+    {};
+  const footerCfg = layoutCfg?.footer || {};
 
-  if (layoutFooter.show === false || themeFooter.show === false) {
-    return null;
-  }
-
+  // اولویت ۱۰۰٪ اول با لوگوی اختصاصی فوتر (footerLogoUrl) و در صورت خالی بودن، لوگوی هدر
   const footerLogoUrl =
-    themeFooter.footerLogoUrl ??
-    layoutFooter.logoUrl ??
-    siteInfo?.footer_logo_url ??
-    siteInfo?.logo_url ??
+    tbFooter.footerLogoUrl ||
+    footerCfg.footerLogoUrl ||
+    footerCfg.logoUrl ||
+    info.footer_logo_url ||
+    info.footerLogoUrl ||
+    info.logo_url ||
+    info.logoUrl ||
     "";
 
-  useEffect(() => {
-    setLogoError(false);
-  }, [footerLogoUrl]);
-
-  const logoWidth = Number(themeFooter.logoWidth || layoutFooter.logoWidth || 44);
-  const logoHeight = Number(themeFooter.logoHeight || layoutFooter.logoHeight || 44);
-  const logoRadius = themeFooter.logoRadius || "12px";
-
   const brandTitle =
-    themeFooter.brandTitle ??
-    layoutFooter.brandTitle ??
-    siteInfo?.site_name ??
+    tbFooter.brandTitle ||
+    footerCfg.brandTitle ||
+    info.site_name ||
+    info.storeName ||
     "آکسون کور | Axon Core";
 
   const brandSubtitle =
-    themeFooter.brandSubtitle ??
-    layoutFooter.brandSubtitle ??
-    siteInfo?.tagline ??
+    tbFooter.brandSubtitle ||
+    footerCfg.brandSubtitle ||
+    info.tagline ||
     "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال";
 
-  const brandDescription =
-    themeFooter.brandDescription ??
-    layoutFooter.description ??
-    "";
-
   const supportPhone =
-    themeFooter.supportPhone ?? siteInfo?.phone ?? "09376110200";
+    tbFooter.supportPhone ||
+    footerCfg.supportPhone ||
+    info.phone ||
+    "09376110200";
+
   const supportEmail =
-    themeFooter.supportEmail ?? siteInfo?.email ?? "Pouriarahimi@yahoo.com";
+    tbFooter.supportEmail ||
+    footerCfg.supportEmail ||
+    info.email ||
+    "Pouriarahimi@yahoo.com";
+
   const warehouseAddress =
-    themeFooter.warehouseAddress ?? siteInfo?.address ?? "شیراز - ستارخان";
+    tbFooter.warehouseAddress ||
+    footerCfg.warehouseAddress ||
+    info.address ||
+    "شیراز - ستارخان";
+
   const workingHours =
-    themeFooter.workingHours ??
-    siteInfo?.working_hours ??
+    tbFooter.workingHours ||
+    footerCfg.workingHours ||
+    info.working_hours ||
     "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰";
 
-  const enamadCode = themeFooter.enamadCode ?? "7434404";
-  const enamadLink =
-    themeFooter.enamadLink ||
-    "https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD";
-  const enamadEnabled = themeFooter.enamadEnabled !== false;
-
   const copyrightText =
-    themeFooter.copyright ??
-    layoutFooter?.bottomBar?.copyrightText ??
-    siteInfo?.footer_text ??
+    tbFooter.copyright ||
+    footerCfg?.bottomBar?.copyrightText ||
     "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026";
 
-  // مقیاس اندازه نوشته‌ها و فاصله عمودی فوتر
-  const scaleMode: "compact" | "normal" | "large" =
-    themeFooter.scaleMode || layoutFooter.scaleMode || "normal";
-  const paddingMode: "compact" | "normal" | "relaxed" =
-    themeFooter.paddingMode || layoutFooter.paddingMode || "normal";
+  const enamadEnabled =
+    tbFooter.enamadEnabled !== undefined
+      ? Boolean(tbFooter.enamadEnabled)
+      : footerCfg.enamadEnabled !== undefined
+      ? Boolean(footerCfg.enamadEnabled)
+      : true;
 
-  const footerBgColor = themeFooter.bgColor || "";
-  const footerTextColor = themeFooter.textColor || "";
-
-  const quickLinksTitle =
-    themeFooter.quickLinksTitle || layoutFooter?.quickLinks?.title || "دسترسی سریع";
-  const supportColumnTitle =
-    themeFooter.supportColumnTitle || "پشتیبانی و سامانه‌های رسمی";
-
-  const quickLinks: FooterLinkItem[] = Array.isArray(themeFooter.quickLinks)
-    ? themeFooter.quickLinks
-    : Array.isArray(layoutFooter?.quickLinks?.links)
-    ? layoutFooter.quickLinks.links
-    : [
-        { id: "q1", title: "🛍️ کاتالوگ محصولات دیجیتال", url: "/products", show: true },
-        { id: "q2", title: "📡 رادار اخبار تکنولوژی", url: "/news", show: true },
-        { id: "q3", title: "📚 مجله تخصصی و راهنمای خرید", url: "/blog", show: true },
-        { id: "q4", title: "📦 پیگیری لحظه‌ای سفارشات", url: "/track-order", show: true },
-      ];
-
-  const externalLinks: FooterLinkItem[] = Array.isArray(themeFooter.externalLinks)
-    ? themeFooter.externalLinks
-    : [
-        { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob", show: true },
-        { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml", show: true },
-      ];
-
-  // ترتیب قابل جابجایی ستون‌های فوتر
-  const columnOrder: string[] = Array.isArray(themeFooter.columnOrder) && themeFooter.columnOrder.length === 4
-    ? themeFooter.columnOrder
-    : ["brand", "quick_links", "support", "enamad"];
-
-  const textSizeClass =
-    scaleMode === "compact"
-      ? "text-[11px]"
-      : scaleMode === "large"
-      ? "text-sm"
-      : "text-xs";
-
-  const headingSizeClass =
-    scaleMode === "compact"
-      ? "text-xs"
-      : scaleMode === "large"
-      ? "text-base"
-      : "text-sm";
-
-  const pyClass =
-    paddingMode === "compact"
-      ? "py-6 sm:py-8"
-      : paddingMode === "relaxed"
-      ? "py-14 sm:py-20"
-      : "py-10 sm:py-14";
-
-  const renderColumn = (colKey: string) => {
-    if (colKey === "brand") {
-      return (
-        <div key="brand" className="lg:col-span-4 space-y-3.5">
-          <div className="flex items-center gap-3">
-            {footerLogoUrl && !logoError ? (
-              <img
-                src={footerLogoUrl}
-                alt={brandTitle}
-                onError={() => setLogoError(true)}
-                style={{
-                  width: logoWidth + "px",
-                  height: logoHeight + "px",
-                  borderRadius: logoRadius,
-                }}
-                className="object-contain border border-[var(--card-border)] shrink-0"
-              />
-            ) : (
-              <AnimatedLogo size={logoWidth} />
-            )}
-            {brandTitle && (
-              <h3 className={"font-black text-[var(--accent-blue)] " + (scaleMode === "large" ? "text-xl" : "text-base sm:text-lg")}>
-                {brandTitle}
-              </h3>
-            )}
-          </div>
-          {brandSubtitle && (
-            <p className="text-[var(--text-secondary)] leading-relaxed font-medium">
-              {brandSubtitle}
-            </p>
-          )}
-          {brandDescription && (
-            <p className="text-[var(--text-secondary)]/80 leading-relaxed text-[11px]">
-              {brandDescription}
-            </p>
-          )}
-          <div className="pt-1 space-y-1.5 text-[11px] text-[var(--text-secondary)]">
-            {warehouseAddress && <div>📍 نشانی: {warehouseAddress}</div>}
-            {workingHours && <div>🕒 ساعات کاری: {workingHours}</div>}
-          </div>
-        </div>
-      );
-    }
-
-    if (colKey === "quick_links") {
-      const activeQuick = quickLinks.filter((l) => l.show !== false && l.title);
-      if (activeQuick.length === 0) return <div key="quick_links" className="lg:col-span-3" />;
-      return (
-        <div key="quick_links" className="lg:col-span-3 space-y-3">
-          <h4 className={"font-black text-[var(--text-primary)] " + headingSizeClass}>
-            {quickLinksTitle}
-          </h4>
-          <ul className="space-y-2 text-[var(--text-secondary)] font-bold">
-            {activeQuick.map((lnk) => (
-              <li key={lnk.id}>
-                <Link href={lnk.url || "/"} className="hover:text-[var(--accent-blue)] transition">
-                  {lnk.title}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
-    }
-
-    if (colKey === "support") {
-      const activeExt = externalLinks.filter((l) => l.show !== false && l.title);
-      return (
-        <div key="support" className="lg:col-span-3 space-y-3">
-          <h4 className={"font-black text-[var(--text-primary)] " + headingSizeClass}>
-            {supportColumnTitle}
-          </h4>
-          <div className="space-y-2 font-mono text-[11px]">
-            {supportPhone && (
-              <div>
-                📞 تلفن:{" "}
-                <a href={"tel:" + supportPhone} className="text-[var(--accent-blue)] font-bold">
-                  {supportPhone}
-                </a>
-              </div>
-            )}
-            {supportEmail && (
-              <div>
-                ✉️ ایمیل:{" "}
-                <a href={"mailto:" + supportEmail} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                  {supportEmail}
-                </a>
-              </div>
-            )}
-          </div>
-
-          {activeExt.length > 0 && (
-            <div className="pt-2 space-y-1.5 border-t border-[var(--card-border)]">
-              {activeExt.map((lnk) => (
-                <a
-                  key={lnk.id}
-                  href={lnk.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-[11px] font-bold text-[var(--accent-blue)] hover:underline"
-                >
-                  🔗 {lnk.title}
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (colKey === "enamad") {
-      return (
-        <div key="enamad" className="lg:col-span-2 flex flex-col items-center lg:items-end justify-center">
-          {enamadEnabled && <EnamadBadge code={enamadCode} link={enamadLink} />}
-        </div>
-      );
-    }
-
-    return null;
-  };
+  const externalLinks: Array<{ id?: string; title: string; url: string }> =
+    Array.isArray(tbFooter.externalLinks) && tbFooter.externalLinks.length > 0
+      ? tbFooter.externalLinks
+      : Array.isArray(footerCfg.externalLinks) && footerCfg.externalLinks.length > 0
+      ? footerCfg.externalLinks
+      : [
+          { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob" },
+          { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml" },
+        ];
 
   return (
     <footer
-      style={{
-        ...(footerBgColor ? { backgroundColor: footerBgColor } : {}),
-        ...(footerTextColor ? { color: footerTextColor } : {}),
-      }}
-      className="mt-16 border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] font-sans select-text transition-all duration-300"
+      className="mt-16 border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10"
       dir="rtl"
     >
-      <div className={"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 " + pyClass}>
-        <div className={"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 " + textSizeClass}>
-          {columnOrder.map((colKey) => renderColumn(colKey))}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 space-y-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
+          {/* ستون ۱: هویت برند و لوگوی اختصاصی فوتر */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-14 h-14 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+                {footerLogoUrl ? (
+                  <img
+                    src={footerLogoUrl}
+                    alt={brandTitle}
+                    className="w-11 h-11 object-contain rounded-xl"
+                  />
+                ) : (
+                  <AnimatedLogo size={38} />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-[var(--text-primary)]">
+                  {brandTitle}
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5 leading-relaxed">
+                  {brandSubtitle}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2 text-[11px] font-bold">
+              <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2">
+                <span>🛡️</span>
+                <span>ضمانت اصالت کالا</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2">
+                <span>🚀</span>
+                <span>ارسال سریع سراسری</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ستون ۲: دسترسی سریع و لینک‌های خارجی */}
+          <div className="lg:col-span-3 space-y-3 text-xs">
+            <h4 className="font-black text-sm text-[var(--accent-blue)]">دسترسی سریع</h4>
+            <ul className="space-y-2 font-bold text-[var(--text-secondary)]">
+              <li>
+                <Link href="/products" className="hover:text-[var(--accent-blue)] transition">
+                  🛍️ کاتالوگ محصولات
+                </Link>
+              </li>
+              <li>
+                <Link href="/track-order" className="hover:text-[var(--accent-blue)] transition">
+                  📦 پیگیری آنلاین سفارش
+                </Link>
+              </li>
+              <li>
+                <Link href="/blog" className="hover:text-[var(--accent-blue)] transition">
+                  📚 مجله تخصصی دیجیتال
+                </Link>
+              </li>
+              <li>
+                <Link href="/news" className="hover:text-[var(--accent-blue)] transition">
+                  📡 رادار اخبار تکنولوژی
+                </Link>
+              </li>
+              <li>
+                <Link href="/about" className="hover:text-[var(--accent-blue)] transition">
+                  ℹ️ درباره ما
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-[var(--accent-blue)] transition">
+                  📞 تماس و پشتیبانی
+                </Link>
+              </li>
+              {externalLinks.map((ext, i) => (
+                <li key={ext.id || i}>
+                  <a
+                    href={ext.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[var(--accent-blue)] transition"
+                  >
+                    🔗 {ext.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* ستون ۳: اطلاعات تماس و نشانی */}
+          <div className="lg:col-span-3 space-y-3 text-xs">
+            <h4 className="font-black text-sm text-[var(--accent-blue)]">مرکز ارتباط و پشتیبانی</h4>
+            <div className="space-y-2.5 text-[var(--text-secondary)] font-bold">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                <span>تلفن پشتیبانی:</span>
+                <a
+                  href={"tel:" + supportPhone}
+                  dir="ltr"
+                  className="font-mono font-black text-[var(--accent-blue)] hover:underline"
+                >
+                  {supportPhone}
+                </a>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+                <span>ایمیل رسمی:</span>
+                <a
+                  href={"mailto:" + supportEmail}
+                  dir="ltr"
+                  className="font-mono text-[11px] text-[var(--text-primary)] hover:underline truncate max-w-[160px]"
+                >
+                  {supportEmail}
+                </a>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+                <div className="text-[var(--text-primary)]">📍 نشانی: {warehouseAddress}</div>
+                <div className="text-[11px] text-[var(--text-secondary)]">
+                  🕒 ساعات کاری: {workingHours}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ستون ۴: نماد اعتماد الکترونیکی (اینماد) */}
+          <div className="lg:col-span-2 flex flex-col items-center justify-center space-y-2">
+            {enamadEnabled && (
+              <div className="p-3 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center justify-center shadow-inner">
+                <EnamadBadge />
+                <span className="text-[10px] font-bold text-[var(--text-secondary)] mt-1">
+                  نماد اعتماد الکترونیکی
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {copyrightText && (
-          <div className="pt-6 border-t border-[var(--card-border)] text-center sm:text-right text-[11px] text-[var(--text-secondary)] font-bold">
-            <span>{copyrightText}</span>
-          </div>
-        )}
+        <div className="pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-secondary)] font-bold">
+          <p>{copyrightText}</p>
+          <span className="font-mono text-[11px] text-[var(--accent-blue)]">
+            AXON CORE SECURE E-COMMERCE
+          </span>
+        </div>
       </div>
     </footer>
   );
 }
-
-export default Footer;

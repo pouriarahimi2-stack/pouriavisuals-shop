@@ -100,3 +100,21 @@ export async function PATCH(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   return PATCH(req);
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await verifyAdminSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
+    }
+    await supabaseAdmin.from("orders").delete().eq("id", id);
+    return NextResponse.json({ success: true, message: "✓ سفارش با موفقیت حذف گردید." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}

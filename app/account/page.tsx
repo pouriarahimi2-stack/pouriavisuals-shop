@@ -106,7 +106,6 @@ function computeOrderFinancialBreakdown(ord: CustomerOrder) {
 
   let shippingCost = ord.shipping_cost !== undefined ? Number(ord.shipping_cost) : 0;
 
-  // اگر سفارش قدیمی‌تر است و تفاوت مبلغ نهایی با جمع اقلام ناشی از مالیات یا ارسال است، دقیق تفکیک شود
   const diff = Math.max(0, finalTotal - afterDiscount);
   if (vatAmount === 0 && shippingCost === 0 && diff > 0) {
     const expectedTenPercentVat = Math.round(afterDiscount * 0.1);
@@ -158,7 +157,6 @@ function AccountDashboardContent() {
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
-  // فرم ویرایش پروفایل مشتری
   const [profName, setProfName] = useState("");
   const [profProvince, setProfProvince] = useState("فارس");
   const [profCity, setProfCity] = useState("شیراز");
@@ -335,7 +333,8 @@ function AccountDashboardContent() {
     router.push("/login");
   };
 
-  const handleCancelPendingOrder = async (ord: CustomerOrder) => {
+  const handleCancelPendingOrder = async (ord: CustomerOrder, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!confirm("آیا از لغو و حذف این سفارش پرداخت‌نشده اطمینان دارید؟")) return;
     soundEngine.playClick();
     setDeletingOrderId(ord.id);
@@ -583,7 +582,7 @@ function AccountDashboardContent() {
         >
           <div className="border-b border-[var(--card-border)] pb-3">
             <h2 className="font-black text-sm text-[var(--accent-blue)]">
-              ✏️ ویرایش مشخصات گیرنده و نشانی پیش‌فرض ارسال
+              ✏️ ویرایش مشخصات گیرنده و نشانی پیش‌‌فرض ارسال
             </h2>
             <p className="text-[11px] text-[var(--text-secondary)] mt-1">
               این اطلاعات برای ثبت سریع‌تر سفارش‌های بعدی و نمایش نام شما در بالای سایت استفاده می‌شود.
@@ -692,7 +691,7 @@ function AccountDashboardContent() {
         </form>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
-          {/* ستون راست: لیست سفارشات ثبت‌شده */}
+          {/* ستون راست: لیست سفارشات ثبت‌شده با دکمه‌های مستقیم پرداخت/حذف روی هر کارت ناتمام */}
           <div className="lg:col-span-5 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3 h-fit">
             <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
               <h2 className="font-black text-sm">📦 سفارش‌های ثبت‌شده شما ({orders.length})</h2>
@@ -720,11 +719,12 @@ function AccountDashboardContent() {
                 </Link>
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                 {orders.map((ord) => {
                   const badge = getOrderStateMeta(ord);
                   const isSelected = selectedOrder?.id === ord.id;
                   const shortOrderCode = formatReadableOrderCode(ord);
+                  const ordFinalAmt = Number(ord.final_amount || ord.total_amount || 0);
 
                   return (
                     <div
@@ -761,10 +761,7 @@ function AccountDashboardContent() {
                           📅 {new Date(ord.created_at).toLocaleDateString("fa-IR")}
                         </span>
                         <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                          {Number(ord.final_amount || ord.total_amount || 0).toLocaleString(
-                            "fa-IR"
-                          )}{" "}
-                          تومان
+                          {ordFinalAmt.toLocaleString("fa-IR")} تومان
                         </span>
                       </div>
 
@@ -774,6 +771,36 @@ function AccountDashboardContent() {
                           {ord.tracking_code || shortOrderCode}
                         </span>
                       </div>
+
+                      {/* دکمه‌های مستقیم پرداخت و حذف روی خود کارت سفارش ناتمام */}
+                      {badge.isUnpaid && (
+                        <div
+                          className="pt-2 border-t border-[var(--card-border)] flex items-center gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Link
+                            href={
+                              "/checkout/payment?orderId=" +
+                              encodeURIComponent(ord.id) +
+                              "&amount=" +
+                              encodeURIComponent(String(ordFinalAmt)) +
+                              "&phone=" +
+                              encodeURIComponent(ord.phone || "")
+                            }
+                            className="flex-1 py-2 px-3 rounded-xl bg-[var(--accent-blue)] text-white font-black text-[11px] text-center shadow hover:opacity-90 transition"
+                          >
+                            💳 پرداخت آنلاین
+                          </Link>
+                          <button
+                            type="button"
+                            disabled={deletingOrderId === ord.id}
+                            onClick={(e) => handleCancelPendingOrder(ord, e)}
+                            className="py-2 px-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white font-black text-[11px] transition cursor-pointer disabled:opacity-50"
+                          >
+                            {deletingOrderId === ord.id ? "..." : "🗑️ لغو و حذف"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -971,7 +998,7 @@ function AccountDashboardContent() {
                     <button
                       type="button"
                       disabled={deletingOrderId === selectedOrder.id}
-                      onClick={() => handleCancelPendingOrder(selectedOrder)}
+                      onClick={(e) => handleCancelPendingOrder(selectedOrder, e)}
                       className="px-5 py-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white font-black transition cursor-pointer disabled:opacity-50"
                     >
                       {deletingOrderId === selectedOrder.id

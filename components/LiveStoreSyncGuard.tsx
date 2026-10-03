@@ -8,6 +8,26 @@ export default function LiveStoreSyncGuard() {
   const pathname = usePathname() || "/";
   const router = useRouter();
 
+  const applyLiveStyles = useCallback((styleRow: any) => {
+    if (!styleRow || typeof styleRow !== "object" || typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (styleRow.primary_color) {
+      root.style.setProperty("--accent-blue", String(styleRow.primary_color));
+    }
+    if (styleRow.secondary_color) {
+      root.style.setProperty("--accent-purple", String(styleRow.secondary_color));
+    }
+    if (styleRow.border_radius) {
+      root.style.setProperty("--border-radius-card", String(styleRow.border_radius));
+    }
+    if (styleRow.font_family) {
+      root.style.setProperty(
+        "--font-primary",
+        JSON.stringify(styleRow.font_family) + ", Vazirmatn, sans-serif"
+      );
+    }
+  }, []);
+
   const applyLiveSiteConfig = useCallback(
     (payload: any) => {
       if (!payload || typeof payload !== "object") return;
@@ -25,11 +45,17 @@ export default function LiveStoreSyncGuard() {
         payload.siteInfo?.settings ||
         {};
 
-      const isMaintenance = Boolean(sys.maintenanceMode);
-      const isNoIndex = Boolean(sys.noIndex ?? sys.disallowRobots);
+      const isMaintenance =
+        Boolean(sys.maintenanceMode) ||
+        (payload.maintenance_mode &&
+          payload.maintenance_mode !== "none" &&
+          payload.maintenance_mode !== "false");
+
+      const isNoIndex =
+        Boolean(sys.noIndex ?? sys.disallowRobots) ||
+        payload.allow_google_index === false;
 
       if (typeof document !== "undefined") {
-        // ۱. اعمال زنده تگ NoIndex / Index گوگل
         let robotsMeta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
         if (isNoIndex) {
           if (!robotsMeta) {
@@ -42,7 +68,6 @@ export default function LiveStoreSyncGuard() {
           robotsMeta.content = "index, follow";
         }
 
-        // ۲. اعمال زنده متغیرهای استایل و رنگ‌بندی استودیوی ظاهر در موبایل، تبلت و دسکتاپ
         const customVars =
           layoutCfg.cssVariables ||
           layoutCfg.theme_variables ||
@@ -57,12 +82,9 @@ export default function LiveStoreSyncGuard() {
           });
         }
 
-        window.dispatchEvent(
-          new CustomEvent("axon-site-info-updated", { detail: payload })
-        );
+        window.dispatchEvent(new CustomEvent("site_info_updated", { detail: payload }));
       }
 
-      // ۳. هدایت زنده بازدیدکنندگان در صورت فعال شدن حالت تعمیرات (پنل ادمین همیشه باز می‌ماند)
       const isAdminRoute =
         pathname.startsWith("/admin") ||
         pathname.startsWith("/api") ||
@@ -78,40 +100,60 @@ export default function LiveStoreSyncGuard() {
     [pathname, router]
   );
 
-  const fetchAndSync = useCallback(async () => {
+  const fetchAndSyncAll = useCallback(async () => {
     try {
-      const res = await fetch("/api/site-info", { cache: "no-store" });
-      if (!res.ok) return;
-      const json = await res.json();
-      applyLiveSiteConfig(json);
+      const [infoRes, styleRes] = await Promise.allSettled([
+        fetch("/api/site-info", { cache: "no-store" }),
+        fetch("/api/styles", { cache: "no-store" }),
+      ]);
+
+      if (infoRes.status === "fulfilled" && infoRes.value.ok) {
+        const infoJson = await infoRes.value.json();
+        applyLiveSiteConfig(infoJson);
+      }
+      if (styleRes.status === "fulfilled" && styleRes.value.ok) {
+        const styleJson = await styleRes.value.json();
+        if (styleJson?.data) applyLiveStyles(styleJson.data);
+      }
     } catch {}
-  }, [applyLiveSiteConfig]);
+  }, [applyLiveSiteConfig, applyLiveStyles]);
 
   useEffect(() => {
-    fetchAndSync();
+    fetchAndSyncAll();
 
-    const channel = supabase
-      .channel("global-store-live-sync-v2")
+    const chInfo = supabase
+      .channel("global-store-live-sync-info")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "site_info" },
         (payload) => {
-          if (payload?.new) {
-            applyLiveSiteConfig(payload.new);
-          }
-          fetchAndSync();
+          if (payload?.new) applyLiveSiteConfig(payload.new);
+          fetchAndSyncAll();
         }
       )
       .subscribe();
 
-    const onFocus = () => fetchAndSync();
+    const chStyles = supabase
+      .channel("global-store-live-sync-styles")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_styles" },
+        (payload) => {
+          if (payload?.new) applyLiveStyles(payload.new);
+          fetchAndSyncAll();
+        }
+      )
+      .subscribe();
+
+    const onFocus = () => fetchAndSyncAll();
     window.addEventListener("focus", onFocus);
 
     return () => {
       window.removeEventListener("focus", onFocus);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(chInfo);
+      supabase.removeChannel(chStyles);
     };
-  }, [fetchAndSync, applyLiveSiteConfig]);
+  }, [fetchAndSyncAll, applyLiveSiteConfig, applyLiveStyles]);
 
   return null;
 }

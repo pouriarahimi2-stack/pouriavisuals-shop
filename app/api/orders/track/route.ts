@@ -23,21 +23,33 @@ function normalizeOrderRecord(row: any) {
   const resolvedPhone = row.phone || row.customer_phone || "";
   const resolvedOrderNum = row.order_number || row.id || "";
   const resolvedTracking = row.tracking_code || resolvedOrderNum;
+  const resolvedFinal = Number(row.final_amount ?? row.total_amount ?? row.total_price ?? 0);
+
   return {
     ...row,
     phone: resolvedPhone,
     customer_phone: resolvedPhone,
     order_number: resolvedOrderNum,
     tracking_code: resolvedTracking,
+    final_amount: resolvedFinal,
+    total_amount: Number(row.total_amount ?? resolvedFinal),
+    total_price: resolvedFinal,
   };
 }
 
-async function searchOrders(params: {
-  phone?: string;
-  code?: string;
-}) {
-  const cleanPhone = normalizePhone(params.phone);
-  const cleanCode = normalizeDigits(params.code).toUpperCase();
+async function searchOrders(params: { phone?: string; code?: string; query?: string }) {
+  let cleanPhone = normalizePhone(params.phone);
+  let cleanCode = normalizeDigits(params.code).toUpperCase();
+  const rawQuery = normalizeDigits(params.query);
+
+  if (rawQuery) {
+    const digitsOnly = rawQuery.replace(/\D/g, "");
+    if (/^0?9\d{9}$/.test(digitsOnly) || /^989\d{9}$/.test(digitsOnly)) {
+      cleanPhone = normalizePhone(digitsOnly);
+    } else {
+      cleanCode = rawQuery.toUpperCase();
+    }
+  }
 
   const { data: allOrders, error } = await supabaseAdmin
     .from("orders")
@@ -56,25 +68,23 @@ async function searchOrders(params: {
       const rowOrderNum = String(row.order_number || "").toUpperCase();
       const rowTracking = String(row.tracking_code || "").toUpperCase();
 
-      const phoneMatches = !cleanPhone || rowPhone === cleanPhone || rowPhone.endsWith(cleanPhone.slice(-10));
-      const codeMatches =
-        !cleanCode ||
-        rowId === cleanCode ||
-        rowOrderNum === cleanCode ||
-        rowTracking === cleanCode ||
-        rowId.includes(cleanCode) ||
-        rowOrderNum.includes(cleanCode) ||
-        rowTracking.includes(cleanCode);
+      const phoneMatches =
+        Boolean(cleanPhone) &&
+        (rowPhone === cleanPhone ||
+          (cleanPhone.length >= 10 && rowPhone.endsWith(cleanPhone.slice(-10))));
 
-      if (cleanPhone && cleanCode) {
-        return phoneMatches && codeMatches;
-      }
-      if (cleanCode) {
-        return codeMatches;
-      }
-      if (cleanPhone) {
-        return phoneMatches;
-      }
+      const codeMatches =
+        Boolean(cleanCode) &&
+        (rowId === cleanCode ||
+          rowOrderNum === cleanCode ||
+          rowTracking === cleanCode ||
+          rowId.includes(cleanCode) ||
+          rowOrderNum.includes(cleanCode) ||
+          rowTracking.includes(cleanCode));
+
+      if (cleanPhone && cleanCode) return phoneMatches && codeMatches;
+      if (cleanPhone) return phoneMatches;
+      if (cleanCode) return codeMatches;
       return false;
     })
     .map(normalizeOrderRecord);
@@ -95,42 +105,28 @@ export async function GET(req: NextRequest) {
       searchParams.get("orderId") ||
       searchParams.get("id") ||
       "";
+    const query = searchParams.get("query") || "";
 
-    if (!phone && !code) {
+    if (!phone && !code && !query) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "لطفاً شماره موبایل یا کد رهگیری سفارش را وارد نمایید.",
-        },
+        { success: false, message: "لطفاً شماره موبایل یا کد رهگیری سفارش را وارد نمایید." },
         { status: 400 }
       );
     }
 
-    const matched = await searchOrders({ phone, code });
-
-    if (matched.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          orders: [],
-          order: null,
-          message: "سفارشی با این مشخصات یافت نشد.",
-        },
-        { status: 404 }
-      );
-    }
+    const matched = await searchOrders({ phone, code, query });
 
     return NextResponse.json(
       {
-        success: true,
-        order: matched[0],
+        success: matched.length > 0,
+        order: matched[0] || null,
         orders: matched,
-        data: matched[0],
+        data: matched[0] || null,
+        message: matched.length > 0 ? "سفارش یافت شد." : "سفارشی با این مشخصات یافت نشد.",
       },
       {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        },
+        status: matched.length > 0 ? 200 : 404,
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
       }
     );
   } catch (err: any) {
@@ -154,42 +150,28 @@ export async function POST(req: NextRequest) {
       body.order_number ||
       body.id ||
       "";
+    const query = body.query || "";
 
-    if (!phone && !code) {
+    if (!phone && !code && !query) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "لطفاً شماره موبایل یا کد رهگیری سفارش را وارد نمایید.",
-        },
+        { success: false, message: "لطفاً شماره موبایل یا کد رهگیری سفارش را وارد نمایید." },
         { status: 400 }
       );
     }
 
-    const matched = await searchOrders({ phone, code });
-
-    if (matched.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          orders: [],
-          order: null,
-          message: "سفارشی با این مشخصات یافت نشد.",
-        },
-        { status: 404 }
-      );
-    }
+    const matched = await searchOrders({ phone, code, query });
 
     return NextResponse.json(
       {
-        success: true,
-        order: matched[0],
+        success: matched.length > 0,
+        order: matched[0] || null,
         orders: matched,
-        data: matched[0],
+        data: matched[0] || null,
+        message: matched.length > 0 ? "سفارش یافت شد." : "سفارشی با این مشخصات یافت نشد.",
       },
       {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        },
+        status: matched.length > 0 ? 200 : 404,
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
       }
     );
   } catch (err: any) {

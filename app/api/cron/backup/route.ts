@@ -1,11 +1,21 @@
 // File Path: app/api/cron/backup/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyAdminSession } from "@/lib/authSecurityHelper";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const authHeader = req.headers.get("authorization");
+    const cronSecret = process.env.CRON_SECRET || process.env.ADMIN_SESSION_SECRET;
+    const isCronAuthorized = Boolean(cronSecret && authHeader === "Bearer " + cronSecret);
+    const adminSession = await verifyAdminSession(req);
+
+    if (!adminSession && !isCronAuthorized) {
+      return NextResponse.json({ success: false, message: "دسترسی غیرمجاز." }, { status: 401 });
+    }
+
     const todayKey = new Date().toISOString().slice(0, 10);
     const [prodsRes, ordersRes, siteRes] = await Promise.all([
       supabaseAdmin.from("products").select("id"),

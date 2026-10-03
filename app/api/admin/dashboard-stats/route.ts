@@ -1,3 +1,4 @@
+// File Path: app/api/admin/dashboard-stats/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/authSecurityHelper";
@@ -9,86 +10,110 @@ export async function GET(req: NextRequest) {
     const auth = await requireAdmin(req);
     if (!auth.ok) return auth.res;
 
-    // همه query‌ها موازی
     const [
-      prodRes, orderRes, couponRes, postRes, newsRes,
-      pendingRes, lowStockRes, paidRes, msgRes, custRes,
+      prodRes,
+      orderRes,
+      couponRes,
+      postRes,
+      newsRes,
+      msg1Res,
+      msg2Res,
     ] = await Promise.allSettled([
-      supabaseAdmin.from("products").select("id", { count: "exact", head: true }),
-      supabaseAdmin.from("orders").select("id,status,final_amount,total_amount,created_at,phone,customer_name").order("created_at", { ascending: false }).limit(200),
+      supabaseAdmin.from("products").select("id, price, discount_price, purchase_price, stock"),
+      supabaseAdmin
+        .from("orders")
+        .select("id, order_number, status, payment_status, final_amount, total_amount, created_at, phone, customer_phone, customer_name")
+        .order("created_at", { ascending: false })
+        .limit(250),
       supabaseAdmin.from("coupons").select("id", { count: "exact", head: true }).eq("is_active", true),
       supabaseAdmin.from("posts").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("tech_news").select("id", { count: "exact", head: true }),
-      supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).in("status", ["pending","pending_manual_review"]),
-      supabaseAdmin.from("products").select("id", { count: "exact", head: true }).lte("stock", 3).gt("stock", 0),
-      supabaseAdmin.from("orders").select("final_amount,total_amount").in("status", ["paid","delivered","shipped"]),
       supabaseAdmin.from("messages").select("id", { count: "exact", head: true }).eq("is_read", false),
-      supabaseAdmin.from("orders").select("phone").not("phone", "is", null),
+      supabaseAdmin.from("contact_messages").select("id", { count: "exact", head: true }).eq("is_read", false),
     ]);
 
-    const totalProducts   = prodRes.status    === "fulfilled" ? (prodRes.value.count    || 0) : 0;
-    const allOrders       = orderRes.status   === "fulfilled" ? (orderRes.value.data    || []) : [];
-    const activeCoupons   = couponRes.status  === "fulfilled" ? (couponRes.value.count  || 0) : 0;
-    const totalPosts      = postRes.status    === "fulfilled" ? (postRes.value.count    || 0) : 0;
-    const totalNews       = newsRes.status    === "fulfilled" ? (newsRes.value.count    || 0) : 0;
-    const pendingOrders   = pendingRes.status === "fulfilled" ? (pendingRes.value.count || 0) : 0;
-    const lowStockCount   = lowStockRes.status=== "fulfilled" ? (lowStockRes.value.count|| 0) : 0;
-    const paidOrders      = paidRes.status    === "fulfilled" ? (paidRes.value.data     || []) : [];
-    const unreadMessages  = msgRes.status     === "fulfilled" ? (msgRes.value.count     || 0) : 0;
-    const allCustOrders   = custRes.status    === "fulfilled" ? (custRes.value.data     || []) : [];
+    const allProducts = prodRes.status === "fulfilled" ? prodRes.value.data || [] : [];
+    const allOrders = orderRes.status === "fulfilled" ? orderRes.value.data || [] : [];
+    const activeCoupons = couponRes.status === "fulfilled" ? couponRes.value.count || 0 : 0;
+    const totalPosts = postRes.status === "fulfilled" ? postRes.value.count || 0 : 0;
+    const totalNews = newsRes.status === "fulfilled" ? newsRes.value.count || 0 : 0;
+    const unread1 = msg1Res.status === "fulfilled" ? msg1Res.value.count || 0 : 0;
+    const unread2 = msg2Res.status === "fulfilled" ? msg2Res.value.count || 0 : 0;
 
-    // جمع فروش — safe
-    const totalSales = paidOrders.reduce((sum: number, o: any) => {
-      const v = Number(o?.final_amount || o?.total_amount || 0);
-      return sum + (isNaN(v) ? 0 : v);
-    }, 0);
-
-    // مشتریان یکتا
-    const uniquePhones = new Set(allCustOrders.map((o: any) => o?.phone).filter(Boolean));
-    const totalCustomers = uniquePhones.size;
-
-    // VIP — بیش از ۲ خرید
-    const phoneCounts: Record<string, number> = {};
-    for (const o of allCustOrders) {
-      if (o?.phone) phoneCounts[o.phone] = (phoneCounts[o.phone] || 0) + 1;
+    let inventoryValuation = 0;
+    let lowStockCount = 0;
+    for (const p of allProducts) {
+      const stk = Math.max(0, Number(p.stock ?? 0));
+      if (stk > 0 && stk <= 3) lowStockCount++;
+      const unitCost = Number(
+        p.purchase_price || Math.round(Number(p.discount_price || p.price || 0) * 0.7)
+      );
+      inventoryValuation += stk * unitCost;
     }
-    const vipCustomersCount = Object.values(phoneCounts).filter(c => c >= 2).length;
 
-    // ۱۰ سفارش اخیر
+    let totalSales = 0;
+    let pendingOrders = 0;
+    const phoneCounts: Record<string, number> = {};
+
+    for (const o of allOrders) {
+      const st = String(o.status || o.payment_status || "pending");
+      if (st === "pending" || st === "pending_manual_review" || st === "processing") {
+        pendingOrders++;
+      }
+      if (st !== "cancelled" && st !== "failed") {
+        const amt = Number(o.final_amount || o.total_amount || 0);
+        if (Number.isFinite(amt)) totalSales += amt;
+      }
+      const ph = String(o.phone || o.customer_phone || "").trim();
+      if (ph) phoneCounts[ph] = (phoneCounts[ph] || 0) + 1;
+    }
+
+    const totalCustomers = Object.keys(phoneCounts).length;
+    const vipCustomersCount = Object.values(phoneCounts).filter((c) => c >= 2).length;
+
     const recentOrders = allOrders.slice(0, 10).map((o: any) => ({
-      id:           String(o?.id || ""),
-      customerName: String(o?.customer_name || o?.full_name || "مشتری"),
-      phone:        String(o?.phone || ""),
-      amount:       Number(o?.final_amount || o?.total_amount || 0),
-      status:       String(o?.status || "pending"),
-      date:         String(o?.created_at || new Date().toISOString()),
+      id: String(o.order_number || o.id || ""),
+      customerName: String(o.customer_name || "مشتری گرامی"),
+      phone: String(o.phone || o.customer_phone || ""),
+      amount: Number(o.final_amount || o.total_amount || 0),
+      status: String(o.payment_status === "paid" ? "paid" : o.status || "pending"),
+      date: String(o.created_at || new Date().toISOString()),
     }));
 
     return NextResponse.json({
       success: true,
       stats: {
-        totalProducts:      Number(totalProducts)   || 0,
-        totalOrders:        allOrders.length         || 0,
-        pendingOrders:      Number(pendingOrders)   || 0,
-        totalSales:         Number(totalSales)       || 0,
-        inventoryValuation: 0,
-        lowStockCount:      Number(lowStockCount)   || 0,
-        unreadMessages:     Number(unreadMessages)  || 0,
-        totalCustomers:     Number(totalCustomers)  || 0,
-        vipCustomersCount:  Number(vipCustomersCount)||0,
-        totalPosts:         Number(totalPosts)      || 0,
-        totalNews:          Number(totalNews)       || 0,
-        activeCoupons:      Number(activeCoupons)   || 0,
+        totalProducts: allProducts.length,
+        totalOrders: allOrders.length,
+        pendingOrders,
+        totalSales,
+        inventoryValuation,
+        lowStockCount,
+        unreadMessages: unread1 + unread2,
+        totalCustomers,
+        vipCustomersCount,
+        totalPosts,
+        totalNews,
+        activeCoupons,
       },
       recentOrders,
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({
       success: true,
       stats: {
-        totalProducts:0,totalOrders:0,pendingOrders:0,totalSales:0,
-        inventoryValuation:0,lowStockCount:0,unreadMessages:0,
-        totalCustomers:0,vipCustomersCount:0,totalPosts:0,totalNews:0,activeCoupons:0,
+        totalProducts: 0,
+        totalOrders: 0,
+        pendingOrders: 0,
+        totalSales: 0,
+        inventoryValuation: 0,
+        lowStockCount: 0,
+        unreadMessages: 0,
+        totalCustomers: 0,
+        vipCustomersCount: 0,
+        totalPosts: 0,
+        totalNews: 0,
+        activeCoupons: 0,
       },
       recentOrders: [],
     });

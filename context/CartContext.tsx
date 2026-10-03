@@ -18,7 +18,9 @@ export interface CartItem {
 
 export interface AppliedCoupon {
   code: string;
+  discountType?: "percent" | "fixed";
   discountPercent: number;
+  fixedAmount?: number;
   maxDiscount?: number;
 }
 
@@ -102,7 +104,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
-  // مقدار پیش‌فرض openDrawer برابر false است تا انیمیشن چرخ‌دستی به آرامی و بدون قطع شدن اجرا شود
   const addToCart = useCallback((item: any, openDrawer: boolean = false) => {
     const itemId = String(item.id);
     const itemTitle = item.title || item.name || "کالای دیجیتال";
@@ -207,12 +208,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [cartItems]);
 
   const discountAmount = useMemo(() => {
-    if (!appliedCoupon) return 0;
-    let disc = Math.round((totalPrice * appliedCoupon.discountPercent) / 100);
+    if (!appliedCoupon || totalPrice <= 0) return 0;
+    if (appliedCoupon.discountType === "fixed" && appliedCoupon.fixedAmount) {
+      return Math.min(totalPrice, appliedCoupon.fixedAmount);
+    }
+    let disc = Math.round((totalPrice * (appliedCoupon.discountPercent || 0)) / 100);
     if (appliedCoupon.maxDiscount && disc > appliedCoupon.maxDiscount) {
       disc = appliedCoupon.maxDiscount;
     }
-    return disc;
+    return Math.min(totalPrice, disc);
   }, [totalPrice, appliedCoupon]);
 
   const finalPayable = useMemo(() => {
@@ -227,20 +231,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const clean = code.trim().toUpperCase();
     const res = await couponService.validateCoupon(clean, totalPrice);
     if (res.valid && res.coupon) {
-      const discountPercent =
-        res.coupon.type === "percent" || res.coupon.discount_type === "percent"
-          ? Number(res.coupon.value || res.coupon.discount_value || 0)
-          : Math.round((res.discount / (totalPrice || 1)) * 100);
+      const cpn: any = res.coupon;
+      const isFixed = cpn.type === "fixed" || cpn.discount_type === "fixed";
+      const rawVal = Number(
+        cpn.value ??
+          cpn.discount_value ??
+          cpn.discount_percent ??
+          cpn.discount_amount ??
+          0
+      );
 
-      const newCoupon = {
+      const newCoupon: AppliedCoupon = {
         code: clean,
-        discountPercent,
-        maxDiscount: res.coupon.max_discount || res.coupon.max_discount_amount || undefined,
+        discountType: isFixed ? "fixed" : "percent",
+        discountPercent: isFixed ? 0 : rawVal,
+        fixedAmount: isFixed ? rawVal : undefined,
+        maxDiscount: Number(cpn.max_discount || cpn.max_discount_amount || 0) || undefined,
       };
 
       setAppliedCoupon(newCoupon);
       localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(newCoupon));
-      return { success: true, message: res.message };
+      return { success: true, message: res.message || "✓ کد تخفیف با موفقیت اعمال شد." };
     }
     return { success: false, message: res.message || "کد تخفیف نامعتبر است." };
   };

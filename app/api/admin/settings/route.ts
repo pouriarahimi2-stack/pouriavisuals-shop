@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     const { data: existingRow } = await supabaseAdmin
       .from("site_info")
-      .select("id, homepage_layout_config")
+      .select("*")
       .limit(1)
       .maybeSingle();
 
@@ -79,22 +79,32 @@ export async function POST(req: NextRequest) {
       allowGuestCheckout:
         typeof input.allowGuestCheckout === "boolean"
           ? input.allowGuestCheckout
+          : typeof input.allow_guest_checkout === "boolean"
+          ? input.allow_guest_checkout
           : currentSys.allowGuestCheckout,
       autoSendOrderSms:
         typeof input.autoSendOrderSms === "boolean"
           ? input.autoSendOrderSms
+          : typeof input.sms_notifications_enabled === "boolean"
+          ? input.sms_notifications_enabled
           : currentSys.autoSendOrderSms,
       maintenanceMode:
         typeof input.maintenanceMode === "boolean"
           ? input.maintenanceMode
+          : typeof input.maintenance_mode === "boolean"
+          ? input.maintenance_mode
           : currentSys.maintenanceMode,
       maintenanceMessage:
         input.maintenanceMessage !== undefined
           ? String(input.maintenanceMessage).trim()
+          : input.maintenance_message !== undefined
+          ? String(input.maintenance_message).trim()
           : currentSys.maintenanceMessage,
       noIndex:
         typeof input.noIndex === "boolean"
           ? input.noIndex
+          : typeof input.seo_noindex === "boolean"
+          ? input.seo_noindex
           : typeof input.disallowRobots === "boolean"
           ? input.disallowRobots
           : currentSys.noIndex,
@@ -103,6 +113,8 @@ export async function POST(req: NextRequest) {
           ? input.disallowRobots
           : typeof input.noIndex === "boolean"
           ? input.noIndex
+          : typeof input.seo_noindex === "boolean"
+          ? input.seo_noindex
           : currentSys.noIndex,
       updatedAt: new Date().toISOString(),
     };
@@ -123,13 +135,26 @@ export async function POST(req: NextRequest) {
     };
 
     if (existingRow?.id) {
-      await supabaseAdmin
+      const { error: fullErr } = await supabaseAdmin
         .from("site_info")
         .update({
           homepage_layout_config: nextLayoutConfig,
+          allow_google_index: !updatedSettings.noIndex,
+          maintenance_mode: updatedSettings.maintenanceMode ? "indefinite" : "none",
+          free_shipping_threshold: updatedSettings.freeShippingThreshold,
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingRow.id);
+
+      if (fullErr) {
+        await supabaseAdmin
+          .from("site_info")
+          .update({
+            homepage_layout_config: nextLayoutConfig,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingRow.id);
+      }
     } else {
       await supabaseAdmin.from("site_info").insert([
         {

@@ -21,7 +21,19 @@ function normalizePhone(val: any): string {
 function normalizeOrderRecord(row: any) {
   if (!row || typeof row !== "object") return row;
   const resolvedPhone = row.phone || row.customer_phone || "";
-  const resolvedOrderNum = row.order_number || row.id || "";
+  const rawAddress = String(row.address || "");
+  const cleanAddress = rawAddress.replace(/\s*\[مالیات\s*\d+%:\s*\d+\s*تومان\]/g, "").trim();
+
+  const shortDigits =
+    String(row.tracking_code || "").replace(/\D/g, "").slice(0, 6) ||
+    String(row.id || "").replace(/\D/g, "").slice(0, 6) ||
+    String(row.id || "").slice(0, 6).toUpperCase();
+
+  const resolvedOrderNum =
+    row.order_number && !String(row.order_number).includes("-4")
+      ? row.order_number
+      : "AXN-" + shortDigits;
+
   const resolvedTracking = row.tracking_code || resolvedOrderNum;
   const resolvedFinal = Number(row.final_amount ?? row.total_amount ?? row.total_price ?? 0);
 
@@ -29,6 +41,8 @@ function normalizeOrderRecord(row: any) {
     ...row,
     phone: resolvedPhone,
     customer_phone: resolvedPhone,
+    address: rawAddress,
+    clean_address: cleanAddress,
     order_number: resolvedOrderNum,
     tracking_code: resolvedTracking,
     final_amount: resolvedFinal,
@@ -63,10 +77,11 @@ async function searchOrders(params: { phone?: string; code?: string; query?: str
 
   return allOrders
     .filter((row: any) => {
-      const rowPhone = normalizePhone(row.phone || row.customer_phone || "");
+      const normalized = normalizeOrderRecord(row);
+      const rowPhone = normalizePhone(normalized.phone || "");
       const rowId = String(row.id || "").toUpperCase();
-      const rowOrderNum = String(row.order_number || "").toUpperCase();
-      const rowTracking = String(row.tracking_code || "").toUpperCase();
+      const rowOrderNum = String(normalized.order_number || "").toUpperCase();
+      const rowTracking = String(normalized.tracking_code || "").toUpperCase();
 
       const phoneMatches =
         Boolean(cleanPhone) &&
@@ -118,14 +133,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(
       {
-        success: matched.length > 0,
+        success: true,
         order: matched[0] || null,
         orders: matched,
         data: matched[0] || null,
-        message: matched.length > 0 ? "سفارش یافت شد." : "سفارشی با این مشخصات یافت نشد.",
       },
       {
-        status: matched.length > 0 ? 200 : 404,
         headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
       }
     );
@@ -179,5 +192,73 @@ export async function POST(req: NextRequest) {
       { success: false, message: err.message || "خطا در رهگیری سفارش." },
       { status: 500 }
     );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const cleanPhone = normalizePhone(body.phone);
+    const fullName = String(body.fullName || "").trim();
+
+    if (!cleanPhone || cleanPhone.length !== 11) {
+      return NextResponse.json({ success: false, message: "شماره معتبر نیست." }, { status: 400 });
+    }
+
+    await supabaseAdmin.from("crm_customers").upsert([
+      {
+        id: "cust_" + cleanPhone,
+        full_name: fullName || "مشتری گرامی",
+        phone: cleanPhone,
+        province: body.province || "فارس",
+        city: body.city || "شیراز",
+        address: body.address || "",
+        postal_code: body.postalCode || null,
+        updated_at: new Date().toISOString(),
+      },
+    ]);
+
+    return NextResponse.json({ success: true, message: "پروفایل بروزرسانی شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id") || "";
+    const phone = normalizePhone(searchParams.get("phone") || "");
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
+    }
+
+    const { data: ord } = await supabaseAdmin
+      .from("orders")
+      .select("id, phone, customer_phone, status, payment_status")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!ord) {
+      return NextResponse.json({ success: false, message: "سفارش یافت نشد." }, { status: 404 });
+    }
+
+    const ordPhone = normalizePhone(ord.phone || ord.customer_phone || "");
+    if (phone && ordPhone && ordPhone !== phone) {
+      return NextResponse.json({ success: false, message: "عدم تطابق شماره همراه." }, { status: 403 });
+    }
+
+    if (ord.status === "paid" || ord.payment_status === "paid" || ord.status === "shipped") {
+      return NextResponse.json(
+        { success: false, message: "سفارش‌های پرداخت‌شده قابل حذف مستقیم نیستند." },
+        { status: 400 }
+      );
+    }
+
+    await supabaseAdmin.from("orders").delete().eq("id", id);
+    return NextResponse.json({ success: true, message: "سفارش ناتمام حذف شد." });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }

@@ -169,11 +169,11 @@ export async function POST(req: NextRequest) {
       city +
       " — " +
       address +
-      (notes ? " (" + notes + ")" : "") +
-      (vatAmount > 0 ? " [مالیات " + vatPercent + "%: " + vatAmount + " تومان]" : "");
+      (notes ? " (" + notes + ")" : "");
 
+    const generatedUuid = randomUUID();
     const orderPayload: Record<string, any> = {
-      id: orderNumber,
+      id: generatedUuid,
       order_number: orderNumber,
       customer_name: fullName,
       phone: cleanPhone,

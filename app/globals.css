@@ -312,19 +312,7 @@ body {
 }
 
 /* اطمینان از اینکه در موبایل تم اعمال میشه */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg-primary:    #0a0c10;
-    --bg-secondary:  #0f1117;
-    --text-primary:  #f1f5f9;
-    --text-secondary:#94a3b8;
-    --modal-bg:      #111827;
-    --input-bg:      #1e2330;
-    --card-border:   #1e2a3a;
-    --card-hover:    #1a2235;
-    --card-bg:       #1a2235;
-  }
-}
+/* System theme handled cleanly via .dark class on html */
 
 /* ═══ AI Chat لوگوی شناور کوچک ═══ */
 .ai-chat-float-btn {
@@ -435,19 +423,7 @@ img { max-width: 100%; height: auto; }
   --card-hover:    #111827;
   --card-bg:       #111827;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg-primary:    #07090e;
-    --bg-secondary:  #0c1017;
-    --text-primary:  #f8fafc;
-    --text-secondary:#94a3b8;
-    --modal-bg:      #0c1017;
-    --input-bg:      rgba(255,255,255,0.04);
-    --card-border:   rgba(255,255,255,0.08);
-    --card-hover:    #111827;
-    --card-bg:       #111827;
-  }
-}
+/* System theme handled cleanly via .dark class on html */
 
 /* ═══ Box sizing ═══ */
 *, *::before, *::after { box-sizing: border-box; }

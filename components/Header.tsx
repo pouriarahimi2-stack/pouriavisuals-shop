@@ -71,9 +71,17 @@ export default function Header() {
   };
 
   useEffect(() => {
+    themeEngine.initThemeListener();
     if (typeof document !== "undefined") {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
     }
+    const onThemeChange = (e: any) => {
+      if (e?.detail) setIsDarkMode(e.detail === "dark");
+      else if (typeof document !== "undefined") {
+        setIsDarkMode(document.documentElement.classList.contains("dark"));
+      }
+    };
+    window.addEventListener("theme_changed", onThemeChange);
     syncUserSession();
 
     const handleScroll = () => {
@@ -113,11 +121,16 @@ export default function Header() {
 
   const variantMode = themeHeader.variant || headerCfg.variant || "capsule";
   const isCapsule = variantMode !== "full-width";
+  const hasTopAnnouncement = Boolean(
+    (themeHeader.announcementEnabled !== undefined ? themeHeader.announcementEnabled : headerCfg?.announcement?.show) &&
+    (themeHeader.announcementText || headerCfg?.announcement?.text || siteInfo?.header_announcement)
+  );
+  const topOffsetCls = hasTopAnnouncement && !isScrolled ? "top-11" : "top-3";
   const positionClass =
     headerCfg.position === "fixed"
-      ? "fixed top-3 inset-x-0 z-40"
+      ? "fixed " + topOffsetCls + " inset-x-0 z-40"
       : headerCfg.position === "sticky"
-      ? "sticky top-3 z-40"
+      ? "sticky " + topOffsetCls + " z-40"
       : "relative z-40";
 
   const brandName =

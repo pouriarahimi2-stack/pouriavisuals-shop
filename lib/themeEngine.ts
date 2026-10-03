@@ -1,34 +1,24 @@
 // File Path: lib/themeEngine.ts
 export const themeEngine = {
-  isNightTime(): boolean {
-    const hours = new Date().getHours();
-    const minutes = new Date().getMinutes();
-    const current = hours + minutes / 60;
-    return current >= 18.5 || current < 6.0;
+  getSystemTheme(): "dark" | "light" {
+    if (typeof window === "undefined") return "light";
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
+    return "light";
   },
 
   getRecommendedTheme(): "dark" | "light" {
     if (typeof window === "undefined") return "light";
-
     try {
+      const isManual = sessionStorage.getItem("axon_theme_manual_override") === "true";
       const savedTheme = localStorage.getItem("theme");
-      const isManual = localStorage.getItem("axon_theme_manual_override") === "true";
-
       if (isManual && (savedTheme === "dark" || savedTheme === "light")) {
         return savedTheme;
       }
-
-      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        return "dark";
-      }
-
-      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
-        return "light";
-      }
-
-      return this.isNightTime() ? "dark" : "light";
+      return this.getSystemTheme();
     } catch {
-      return "light";
+      return this.getSystemTheme();
     }
   },
 
@@ -37,17 +27,20 @@ export const themeEngine = {
 
     const targetTheme = theme || this.getRecommendedTheme();
 
-    if (isManualUserAction) {
-      localStorage.setItem("axon_theme_manual_override", "true");
+    try {
+      if (isManualUserAction) {
+        sessionStorage.setItem("axon_theme_manual_override", "true");
+      }
       localStorage.setItem("theme", targetTheme);
-    } else {
-      localStorage.setItem("theme", targetTheme);
-    }
+    } catch {}
 
+    const root = document.documentElement;
     if (targetTheme === "dark") {
-      document.documentElement.classList.add("dark");
+      root.classList.add("dark");
+      root.setAttribute("data-theme", "dark");
     } else {
-      document.documentElement.classList.remove("dark");
+      root.classList.remove("dark");
+      root.setAttribute("data-theme", "light");
     }
 
     window.dispatchEvent(new CustomEvent("theme_changed", { detail: targetTheme }));
@@ -59,11 +52,10 @@ export const themeEngine = {
 
     if (window.matchMedia) {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handleChange = () => {
-        const isManual = localStorage.getItem("axon_theme_manual_override") === "true";
-        if (!isManual) {
-          this.applyTheme();
-        }
+      const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+        // اگر کاربر سیستم‌عامل خود را بین Dark و Light تغییر دهد، سایت بلافاصله با سیستم هماهنگ می‌شود
+        sessionStorage.removeItem("axon_theme_manual_override");
+        this.applyTheme(e.matches ? "dark" : "light", false);
       };
 
       try {

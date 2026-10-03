@@ -1,13 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSiteInfo } from "@/context/SiteInfoContext";
 import AnimatedLogo from "@/components/AnimatedLogo";
 import EnamadBadge from "@/components/EnamadBadge";
 
 export default function Footer() {
-  const { siteInfo } = useSiteInfo();
+  const { siteInfo, refresh } = useSiteInfo();
+  const [logoImgFailed, setLogoImgFailed] = useState(false);
 
   const info = siteInfo || {};
   const layoutCfg = info?.homepage_layout_config || {};
@@ -17,17 +18,30 @@ export default function Footer() {
     {};
   const footerCfg = layoutCfg?.footer || {};
 
-  if (footerCfg.show === false) return null;
+  const footerLogoUrl = String(
+    tbFooter.footerLogoUrl ??
+      footerCfg.footerLogoUrl ??
+      footerCfg.logoUrl ??
+      info.footer_logo_url ??
+      info.footerLogoUrl ??
+      info.logo_url ??
+      info.logoUrl ??
+      ""
+  ).trim();
 
-  const footerLogoUrl =
-    tbFooter.footerLogoUrl ||
-    footerCfg.footerLogoUrl ||
-    footerCfg.logoUrl ||
-    info.footer_logo_url ||
-    info.footerLogoUrl ||
-    info.logo_url ||
-    info.logoUrl ||
-    "";
+  useEffect(() => {
+    setLogoImgFailed(false);
+  }, [footerLogoUrl]);
+
+  useEffect(() => {
+    const onStudioSave = () => {
+      if (typeof refresh === "function") refresh();
+    };
+    window.addEventListener("theme_builder_updated", onStudioSave);
+    return () => window.removeEventListener("theme_builder_updated", onStudioSave);
+  }, [refresh]);
+
+  if (footerCfg.show === false) return null;
 
   const brandTitle =
     tbFooter.brandTitle ||
@@ -43,9 +57,9 @@ export default function Footer() {
     "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال";
 
   const brandDescription =
-    tbFooter.brandDescription ||
-    footerCfg.description ||
-    info.description ||
+    tbFooter.brandDescription ??
+    footerCfg.description ??
+    info.description ??
     "";
 
   const supportPhone =
@@ -75,6 +89,7 @@ export default function Footer() {
   const copyrightText =
     tbFooter.copyright ||
     footerCfg?.bottomBar?.copyrightText ||
+    info.footer_text ||
     "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026";
 
   const enamadEnabled =
@@ -89,7 +104,15 @@ export default function Footer() {
 
   const scaleMode = tbFooter.scaleMode || footerCfg.scaleMode || "normal";
   const paddingMode = tbFooter.paddingMode || footerCfg.paddingMode || "normal";
-  const customBgColor = tbFooter.bgColor || "";
+
+  // اگر رنگ پس‌زمینه خالی باشد یا همان کد سیاه پیش‌فرض (#07090e) باشد، از متغیر تم (روشن در روز / تیره در شب) استفاده شود
+  const rawCustomBg = String(tbFooter.bgColor || "").trim().toLowerCase();
+  const useCustomBg =
+    rawCustomBg !== "" &&
+    rawCustomBg !== "#07090e" &&
+    rawCustomBg !== "#0a0c10" &&
+    rawCustomBg !== "#000000" &&
+    rawCustomBg !== "transparent";
 
   const quickLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
     Array.isArray(tbFooter.quickLinks) && tbFooter.quickLinks.length > 0
@@ -140,10 +163,11 @@ export default function Footer() {
         <div key="col_brand" className="lg:col-span-4 space-y-4">
           <div className="flex items-center gap-3.5">
             <div className="w-14 h-14 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
-              {footerLogoUrl ? (
+              {footerLogoUrl && !logoImgFailed ? (
                 <img
                   src={footerLogoUrl}
                   alt={brandTitle}
+                  onError={() => setLogoImgFailed(true)}
                   className="w-11 h-11 object-contain rounded-xl"
                 />
               ) : (
@@ -161,17 +185,17 @@ export default function Footer() {
           </div>
 
           {brandDescription && (
-            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed text-justify">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed text-justify font-medium">
               {brandDescription}
             </p>
           )}
 
           <div className="grid grid-cols-2 gap-2.5 pt-1 text-[11px] font-bold">
-            <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2">
+            <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
               <span>🛡️</span>
               <span>ضمانت اصالت کالا</span>
             </div>
-            <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2">
+            <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
               <span>🚀</span>
               <span>ارسال سریع سراسری</span>
             </div>
@@ -268,8 +292,8 @@ export default function Footer() {
 
   return (
     <footer
-      style={customBgColor ? { backgroundColor: customBgColor } : undefined}
-      className="mt-16 border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10"
+      style={useCustomBg ? { backgroundColor: rawCustomBg } : undefined}
+      className="mt-16 border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10 transition-colors duration-300"
       dir="rtl"
     >
       <div className={"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 " + pyClass}>

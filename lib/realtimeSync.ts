@@ -1,13 +1,13 @@
+// File Path: lib/realtimeSync.ts
 import { supabase } from "./supabase";
 
-// جدول سفارشات از این لیست حذف شده تا حریم خصوصی مشتریان افشا نشود
 const SAFE_PUBLIC_TABLES = [
   "products",
   "banners",
   "site_info",
   "categories",
   "posts",
-  "tech_news"
+  "tech_news",
 ];
 
 let activeChannel: any = null;
@@ -20,12 +20,16 @@ export const realtimeEngine = {
     const ch = supabase.channel("axon_public_realtime_stream");
 
     SAFE_PUBLIC_TABLES.forEach((tbl) => {
-      ch.on("postgres_changes", { event: "*", schema: "public", table: tbl }, (payload) => {
-        if (debounceTimers[tbl]) clearTimeout(debounceTimers[tbl] as NodeJS.Timeout);
-        debounceTimers[tbl] = setTimeout(() => {
-          window.dispatchEvent(new CustomEvent(`db_${tbl}_updated`, { detail: payload }));
-        }, 180);
-      });
+      ch.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: tbl },
+        (payload) => {
+          if (debounceTimers[tbl]) clearTimeout(debounceTimers[tbl] as NodeJS.Timeout);
+          debounceTimers[tbl] = setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("db_" + tbl + "_updated", { detail: payload }));
+          }, 180);
+        }
+      );
     });
 
     ch.subscribe();
@@ -43,13 +47,13 @@ export const realtimeEngine = {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(eventName, { detail: data }));
     }
-  }
+  },
 };
 
 export function applyTitleToDOM(tagline?: string, siteName?: string) {
   if (typeof document !== "undefined") {
     if (tagline && siteName) {
-      document.title = `${siteName} | ${tagline}`;
+      document.title = siteName + " | " + tagline;
     } else if (tagline || siteName) {
       document.title = tagline || siteName || "آکسون کور | Axon";
     }
@@ -57,13 +61,23 @@ export function applyTitleToDOM(tagline?: string, siteName?: string) {
 }
 
 export function applyFaviconToDOM(iconUrl: string) {
-  if (typeof document !== "undefined" && iconUrl) {
-    let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "shortcut icon";
-      document.getElementsByTagName("head")[0].appendChild(link);
+  if (typeof document === "undefined" || !iconUrl || !iconUrl.trim()) return;
+  try {
+    const cleanHref = iconUrl.trim();
+    const existingLinks = document.querySelectorAll(
+      "link[rel*='icon'], link[rel='apple-touch-icon']"
+    );
+    existingLinks.forEach((el) => {
+      (el as HTMLLinkElement).href = cleanHref;
+    });
+
+    let dynamicIcon = document.getElementById("axon-dynamic-favicon") as HTMLLinkElement | null;
+    if (!dynamicIcon) {
+      dynamicIcon = document.createElement("link");
+      dynamicIcon.id = "axon-dynamic-favicon";
+      dynamicIcon.rel = "icon";
+      document.head.appendChild(dynamicIcon);
     }
-    link.href = iconUrl;
-  }
+    dynamicIcon.href = cleanHref;
+  } catch {}
 }

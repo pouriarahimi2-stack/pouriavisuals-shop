@@ -373,7 +373,7 @@ export default function StorefrontLayoutStudio({
         textColor: "#ffffff",
       },
       globalFooter: {
-        footerLogoUrl: footerLogoUrl.trim() || logoUrl.trim(),
+        footerLogoUrl: footerLogoUrl.trim(),
         logoWidth,
         logoHeight,
         logoRadius,
@@ -407,44 +407,55 @@ export default function StorefrontLayoutStudio({
     };
 
     try {
-      const [tRes, sRes] = await Promise.all([
-        fetch("/api/theme-builder", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ config: themeConfig }),
-        }),
-        fetch("/api/site-info", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            site_name: brandName.trim(),
-            logo_url: logoUrl.trim(),
-            favicon_url: faviconUrl.trim() || "/favicon.ico",
-            phone: supportPhone.trim(),
-            email: supportEmail.trim(),
-            address: warehouseAddress.trim(),
-            working_hours: workingHours.trim(),
-            header_announcement: announcementText.trim(),
-            theme_builder_config: themeConfig,
-          }),
-        }),
-      ]);
+      const res = await fetch("/api/theme-builder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: themeConfig }),
+      });
 
-      if (tRes.ok || sRes.ok) {
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+
+        // اعمال آنی فاوآیکون در تب مرورگر در همان لحظه ذخیره
+        if (typeof document !== "undefined" && themeConfig.globalHeader.faviconUrl) {
+          const favHref = themeConfig.globalHeader.faviconUrl;
+          document
+            .querySelectorAll("link[rel*='icon'], link[rel='apple-touch-icon']")
+            .forEach((el) => {
+              (el as HTMLLinkElement).href = favHref;
+            });
+          let dynFav = document.getElementById("axon-dynamic-favicon") as HTMLLinkElement | null;
+          if (!dynFav) {
+            dynFav = document.createElement("link");
+            dynFav.id = "axon-dynamic-favicon";
+            dynFav.rel = "icon";
+            document.head.appendChild(dynFav);
+          }
+          dynFav.href = favHref;
+        }
+
         if (typeof window !== "undefined") {
           localStorage.removeItem("axon_site_info_cache_permanent_v2026");
-          window.dispatchEvent(new CustomEvent("site_info_updated", { detail: themeConfig }));
-          window.dispatchEvent(new CustomEvent("theme_builder_updated", { detail: themeConfig }));
+          window.dispatchEvent(
+            new CustomEvent("site_info_updated", {
+              detail: json.siteInfo || { config: themeConfig },
+            })
+          );
+          window.dispatchEvent(
+            new CustomEvent("theme_builder_updated", { detail: themeConfig })
+          );
         }
-        soundEngine.playSuccess();
+
         setFeedback(
-          "✓ تمامی تغییرات هدر، لوگو، چیدمان و ستون‌های فوتر، اینماد و سکشن‌ها در دیتابیس ذخیره شد و در کل سایت فعال گردید."
+          json.message ||
+            "✓ تمامی تنظیمات هدر، نوار اعلان، فاوآیکون، فوتر و چیدمان موبایل/دسکتاپ ذخیره و به صورت زنده در سایت اعمال شد."
         );
       } else {
-        setFeedback("خطا در ذخیره اطلاعات در سرور.");
+        setFeedback(json.message || "خطا در ذخیره تنظیمات.");
       }
     } catch {
-      setFeedback("خطا در ارتباط با سرور.");
+      setFeedback("خطا در برقراری ارتباط با سرور.");
     } finally {
       setSaving(false);
       setTimeout(() => setFeedback(null), 4500);

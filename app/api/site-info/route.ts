@@ -37,18 +37,31 @@ export async function GET() {
     const tbHeader = cleanLayoutCfg?.theme_builder_config?.globalHeader || {};
 
     const resolvedHeaderLogo =
-      tbHeader.logoUrl ||
-      cleanLayoutCfg?.header?.brand?.logoUrl ||
-      safeRow.logo_url ||
-      "";
+      tbHeader.logoUrl !== undefined
+        ? tbHeader.logoUrl
+        : cleanLayoutCfg?.header?.brand?.logoUrl || safeRow.logo_url || "";
 
     const resolvedFooterLogo =
-      tbFooter.footerLogoUrl ||
-      cleanLayoutCfg?.footer?.footerLogoUrl ||
-      cleanLayoutCfg?.footer?.logoUrl ||
-      safeRow.footer_logo_url ||
-      resolvedHeaderLogo ||
-      "";
+      tbFooter.footerLogoUrl !== undefined
+        ? tbFooter.footerLogoUrl
+        : cleanLayoutCfg?.footer?.footerLogoUrl ??
+          cleanLayoutCfg?.footer?.logoUrl ??
+          safeRow.footer_logo_url ??
+          resolvedHeaderLogo ??
+          "";
+
+    const resolvedFavicon =
+      tbHeader.faviconUrl || safeRow.favicon_url || "/favicon.ico";
+
+    const resolvedDesc =
+      tbFooter.brandDescription !== undefined
+        ? tbFooter.brandDescription
+        : cleanLayoutCfg?.footer?.description || safeRow.description || "";
+
+    const resolvedAnnouncement =
+      tbHeader.announcementText !== undefined
+        ? tbHeader.announcementText
+        : safeRow.header_announcement || cleanLayoutCfg?.header?.announcement?.text || "";
 
     const enrichedPayload = {
       ...safeRow,
@@ -62,10 +75,22 @@ export async function GET() {
         safeRow.site_name ||
         safeRow.store_name ||
         "آکسون کور | Axon Core",
+      tagline:
+        tbFooter.brandSubtitle ||
+        safeRow.tagline ||
+        "فروشگاه تخصصی محصولات تکنولوژی و گجت‌های هوشمند",
+      description: resolvedDesc,
+      footer_text:
+        tbFooter.copyright ||
+        cleanLayoutCfg?.footer?.bottomBar?.copyrightText ||
+        safeRow.footer_text ||
+        "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
       logo_url: resolvedHeaderLogo,
       logoUrl: resolvedHeaderLogo,
       footer_logo_url: resolvedFooterLogo,
       footerLogoUrl: resolvedFooterLogo,
+      favicon_url: resolvedFavicon,
+      header_announcement: resolvedAnnouncement,
       phone:
         tbFooter.supportPhone ||
         safeRow.phone ||
@@ -91,6 +116,7 @@ export async function GET() {
           ...(cleanLayoutCfg.footer || {}),
           logoUrl: resolvedFooterLogo,
           footerLogoUrl: resolvedFooterLogo,
+          description: resolvedDesc,
         },
         system_settings: systemSettings,
         store_settings: systemSettings,
@@ -207,7 +233,7 @@ export async function POST(req: NextRequest) {
 
     if (mergedLayout.header?.brand) {
       mergedLayout.header.brand.name = siteName;
-      if (logoUrl) mergedLayout.header.brand.logoUrl = logoUrl;
+      if (logoUrl !== undefined) mergedLayout.header.brand.logoUrl = logoUrl;
     }
 
     if (mergedLayout.footer) {
@@ -224,7 +250,6 @@ export async function POST(req: NextRequest) {
       description:
         incoming.description ??
         incoming.site_description ??
-        incoming.tagline ??
         existing?.description ??
         "",
       phone:

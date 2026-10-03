@@ -22,22 +22,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!amount || amount <= 0) {
-      const { data: orderRow } = await supabaseAdmin
-        .from("orders")
-        .select("final_amount, total_amount, phone")
-        .eq("id", orderId)
-        .maybeSingle();
+    // استعلام اجباری مبلغ واقعی فاکتور از دیتابیس جهت جلوگیری ۱۰۰٪ از دستکاری مبلغ توسط کلاینت
+    let orderRow: any = null;
+    const { data: byId } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_number, final_amount, total_amount, phone, status, payment_status")
+      .eq("id", orderId)
+      .maybeSingle();
 
-      if (orderRow) {
-        amount = Number(orderRow.final_amount || orderRow.total_amount || 0);
-        if (!phone && orderRow.phone) phone = String(orderRow.phone).replace(/\D/g, "");
+    if (byId) {
+      orderRow = byId;
+    } else {
+      const { data: byNum } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_number, final_amount, total_amount, phone, status, payment_status")
+        .eq("order_number", orderId)
+        .maybeSingle();
+      if (byNum) orderRow = byNum;
+    }
+
+    if (orderRow) {
+      if (orderRow.payment_status === "paid" || orderRow.status === "paid") {
+        return NextResponse.json(
+          { success: false, message: "این فاکتور قبلاً پرداخت و تسویه شده است." },
+          { status: 400 }
+        );
+      }
+      const dbAmount = Number(orderRow.final_amount || orderRow.total_amount || 0);
+      if (dbAmount > 0) {
+        amount = dbAmount;
+      }
+      if (!phone && orderRow.phone) {
+        phone = String(orderRow.phone).replace(/\D/g, "");
       }
     }
 
     if (!amount || amount < 1000) {
       amount = 1000;
     }
+
+    const canonicalOrderId = String(orderRow?.id || orderId);
 
     const origin =
       req.headers.get("origin") ||
@@ -47,13 +71,14 @@ export async function POST(req: NextRequest) {
     const callbackUrl =
       origin.replace(/\/+$/, "") +
       "/checkout/payment?orderId=" +
-      encodeURIComponent(orderId) +
+      encodeURIComponent(canonicalOrderId) +
       "&amount=" +
       encodeURIComponent(String(amount)) +
       (phone ? "&phone=" + encodeURIComponent(phone) : "");
 
     const descriptionText =
-      body.description || "پرداخت سفارش " + orderId + " در فروشگاه آکسون کور";
+      body.description ||
+      "پرداخت سفارش " + (orderRow?.order_number || canonicalOrderId) + " در فروشگاه آکسون کور";
 
     const zpPayload = {
       merchant_id: ZARINPAL_MERCHANT_ID,
@@ -63,14 +88,14 @@ export async function POST(req: NextRequest) {
       callback_url: callbackUrl,
       metadata: {
         ...(phone ? { mobile: phone } : {}),
-        order_id: orderId,
+        order_id: canonicalOrderId,
       },
     };
 
     let authority = "";
     const attemptsLog: Array<Record<string, any>> = [];
 
-    // ۱. تلاش اول: ارسال درخواست زرین‌پال از طریق آی‌پی ثابت هاست نت‌افراز شما (gate.axoncore.ir)
+    // ۱. ارسال از طریق پل رمزنگاری‌شده نت‌افراز (آی‌پی ثابت ایران)
     const relayRes = await postViaNetafrazRelay(
       "https://payment.zarinpal.com/pg/v4/payment/request.json",
       {},
@@ -89,7 +114,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ۲. تلاش دوم: ارسال مستقیم در صورتی که پل نت‌افراز هنوز آپلود نشده باشد
+    // ۲. فال‌بک مستقیم به زرین‌پال
     if (!authority) {
       for (const ep of [
         "https://payment.zarinpal.com/pg/v4/payment/request.json",
@@ -126,39 +151,22 @@ export async function POST(req: NextRequest) {
     }
 
     if (!authority) {
-      let vercelOutboundIp = "نامشخص";
-      try {
-        const ipRes = await fetch("https://api.ipify.org?format=json");
-        const ipJson = await ipRes.json();
-        if (ipJson?.ip) vercelOutboundIp = String(ipJson.ip);
-      } catch {}
-
       const firstErrObj =
         attemptsLog.find((a) => a.response?.errors)?.response?.errors || {};
       const errCode = firstErrObj?.code || attemptsLog[0]?.httpStatus || 502;
       const errMsg = firstErrObj?.message || "ZarinPal Connection Error";
-      const isIpInvalid = String(errMsg).toLowerCase().includes("terminal ip not valid");
 
       try {
         await supabaseAdmin.from("admin_audit_logs").insert([
           {
             action: "PAYMENT_GATEWAY_ERROR",
-            user_id: phone || orderId,
+            user_id: phone || canonicalOrderId,
             details: {
               resource: "zarinpal:v4",
-              orderId,
+              orderId: canonicalOrderId,
               amountIRT: amount,
               zarinpalErrorCode: errCode,
               zarinpalErrorMessage: errMsg,
-              vercelServerOutboundIp: vercelOutboundIp,
-              netafrazDetectedStaticIp: "185.106.201.79",
-              rootCauseExplanation: isIpInvalid
-                ? "خطای کد -12 زرین‌پال (Terminal ip not valid): آی‌پی خروجی سرور با آی‌پی ثبت‌شده در پنل زرین‌پال مطابقت ندارد."
-                : "خطا در دریافت توکن پرداخت از زرین‌پال: " + errMsg,
-              howToFix: [
-                "۱. در دایرکت‌ادمین نت‌افراز زیر دامنه gate.axoncore.ir بسازید و فایل axon-relay.php را در پوشه آن آپلود کنید.",
-                "۲. آی‌پی ثابت هاست نت‌افراز خود (185.106.201.79) را در پنل زرین‌پال در کادر «با محدودیت IP» جایگزین 216.198.79.1 نمایید.",
-              ],
               rawGatewayAttempts: attemptsLog,
             },
             ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",

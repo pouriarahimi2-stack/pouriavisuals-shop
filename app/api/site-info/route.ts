@@ -26,6 +26,9 @@ export async function GET() {
 
     const systemSettings = normalizeSystemSettings(layoutCfg);
     const cleanLayoutCfg = { ...layoutCfg };
+    delete cleanLayoutCfg.ai_provider_config;
+    delete (safeRow as any).gemini_api_key;
+    delete (safeRow as any).auth_security_config;
     if (cleanLayoutCfg.auth_security_config) {
       cleanLayoutCfg.auth_security_config = {
         userDeck: cleanLayoutCfg.auth_security_config.userDeck || { otpLength: 4 },

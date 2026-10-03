@@ -1,7 +1,7 @@
 // File Path: app/api/torob/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { FLAGSHIP_7_PRODUCTS } from "@/services/productCatalog";
+import { unpackProductRow } from "@/lib/productUnpacker";
 
 export const dynamic = "force-dynamic";
 
@@ -10,60 +10,48 @@ export async function GET() {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://axoncore.ir";
     let rawProducts: any[] = [];
 
-    try {
-      if (supabaseAdmin) {
-        const { data: dbProducts } = await supabaseAdmin
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(500);
+    if (supabaseAdmin) {
+      const { data: dbProducts } = await supabaseAdmin
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500);
 
-        if (dbProducts && dbProducts.length > 0) {
-          rawProducts = dbProducts;
-        }
+      if (Array.isArray(dbProducts)) {
+        rawProducts = dbProducts.map(unpackProductRow);
       }
-    } catch (dbErr) {
-      console.warn("Torob DB fallback warning:", dbErr);
-    }
-
-    if (rawProducts.length === 0 && Array.isArray(FLAGSHIP_7_PRODUCTS)) {
-      rawProducts = [...FLAGSHIP_7_PRODUCTS];
-    } else if (Array.isArray(FLAGSHIP_7_PRODUCTS)) {
-      const dbIds = new Set(rawProducts.map((p) => String(p.id)));
-      const extras = FLAGSHIP_7_PRODUCTS.filter((f) => !dbIds.has(String(f.id)));
-      rawProducts = [...rawProducts, ...extras];
     }
 
     const formattedList = rawProducts.map((p: any) => {
       const basePrice = Number(p.price || 0);
       const discountVal =
-        p.discount_price || p.discountPrice
-          ? Number(p.discount_price || p.discountPrice)
+        p.discount_price && Number(p.discount_price) > 0
+          ? Number(p.discount_price)
           : undefined;
-      const finalPrice = discountVal && discountVal > 0 ? discountVal : basePrice;
+      const finalPrice =
+        discountVal && discountVal < basePrice ? discountVal : basePrice;
       const isAvailable =
-        p.is_available !== false &&
-        p.isAvailable !== false &&
-        (p.stock === undefined || p.stock === null || Number(p.stock) > 0);
+        p.is_available !== false && Number(p.stock ?? 0) > 0;
 
-      let images: string[] = [];
-      if (Array.isArray(p.images) && p.images.length > 0) {
-        images = p.images.map((img: string) => (img.startsWith("http") ? img : baseUrl + img));
-      } else if (p.image_url || p.image) {
-        const single = String(p.image_url || p.image);
-        images = [single.startsWith("http") ? single : baseUrl + single];
-      } else {
-        images = [baseUrl + "/placeholder.png"];
-      }
+      const images: string[] =
+        Array.isArray(p.images) && p.images.length > 0
+          ? p.images.map((img: string) =>
+              img.startsWith("http") ? img : baseUrl + img
+            )
+          : [
+              p.image && p.image.startsWith("http")
+                ? p.image
+                : baseUrl + (p.image || "/placeholder.png"),
+            ];
 
       return {
         page_unique_id: String(p.id),
-        title: p.title || p.name || "محصولات دیجیتال و تکنولوژی آکسون",
-        subtitle: p.title_fa || p.short_description || "",
+        title: p.title || p.name || "محصول دیجیتال آکسون",
+        subtitle: p.short_description || "",
         price: finalPrice,
         old_price: discountVal && discountVal < basePrice ? basePrice : undefined,
         availability: isAvailable ? "instock" : "outofstock",
-        category_name: p.category || p.category_name || "کالای دیجیتال و تکنولوژی",
+        category_name: p.category || "کالای دیجیتال و تکنولوژی",
         image_links: images,
         page_url: baseUrl + "/products/" + p.id,
         spec: p.specs && typeof p.specs === "object" ? p.specs : undefined,
@@ -85,6 +73,9 @@ export async function GET() {
       }
     );
   } catch (err: any) {
-    return NextResponse.json({ count: 0, products: [], error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { count: 0, products: [], error: err.message },
+      { status: 500 }
+    );
   }
 }

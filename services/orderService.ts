@@ -117,11 +117,16 @@ export function normalizeOrder(o: any): Order {
 export const orderService = {
   async getAll(): Promise<Order[]> {
     try {
+      const res = await fetch("/api/admin/orders?t=" + Date.now(), { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        const list = json.orders || json.data || [];
+        if (Array.isArray(list)) return list.map(normalizeOrder);
+      }
       const { data, error } = await supabase
         .from("orders")
         .select("*")
         .order("created_at", { ascending: false });
-
       if (error || !data) return [];
       return data.map(normalizeOrder);
     } catch {

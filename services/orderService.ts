@@ -56,8 +56,9 @@ export interface Order {
 
 export function normalizeOrder(o: any): Order {
   const customerName = o.customer_name || o.customerName || o.customer?.fullName || o.customer?.name || "خریدار محترم";
-  const phone = o.phone || o.customer?.phone || "";
-  const address = o.address || o.customer?.address || "";
+  const phone = o.phone || o.customer_phone || o.customer?.phone || "";
+  const rawAddress = String(o.address || o.customer?.address || "");
+  const address = rawAddress.replace(/\s*\[مالیات\s*\d+%:\s*\d+\s*تومان\]/g, "").trim();
   const postalCode = o.postal_code || o.postalCode || o.customer?.postalCode || undefined;
   const province = o.province || o.customer?.province || undefined;
   const city = o.city || o.customer?.city || undefined;
@@ -65,11 +66,24 @@ export function normalizeOrder(o: any): Order {
   const finalAmount = Number(o.final_amount || o.finalAmount || totalAmount);
   const discountAmount = Number(o.discount_amount || o.discountAmount || 0);
 
+  const rawId = String(o.id || o.order_number || "");
+  const shortDigits =
+    String(o.tracking_code || "").replace(/\D/g, "").slice(0, 6) ||
+    rawId.replace(/\D/g, "").slice(0, 6) ||
+    rawId.slice(0, 6).toUpperCase();
+
+  const readableOrderNumber =
+    o.order_number && !String(o.order_number).includes("-4")
+      ? String(o.order_number).toUpperCase()
+      : rawId.startsWith("AXN-") || rawId.startsWith("ORD-")
+      ? rawId.toUpperCase()
+      : "AXN-" + shortDigits;
+
   return {
     ...o,
-    id: String(o.id || o.order_number || ""),
-    orderNumber: String(o.order_number || o.id || ""),
-    order_number: String(o.order_number || o.id || ""),
+    id: rawId,
+    orderNumber: readableOrderNumber,
+    order_number: readableOrderNumber,
     customerName,
     customer_name: customerName,
     phone,

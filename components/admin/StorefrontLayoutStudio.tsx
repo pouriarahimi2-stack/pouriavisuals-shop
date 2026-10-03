@@ -412,50 +412,26 @@ export default function StorefrontLayoutStudio({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ config: themeConfig }),
       });
-
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-
-        // اعمال آنی فاوآیکون در تب مرورگر در همان لحظه ذخیره
         if (typeof document !== "undefined" && themeConfig.globalHeader.faviconUrl) {
           const favHref = themeConfig.globalHeader.faviconUrl;
-          document
-            .querySelectorAll("link[rel*='icon'], link[rel='apple-touch-icon']")
-            .forEach((el) => {
-              (el as HTMLLinkElement).href = favHref;
-            });
-          let dynFav = document.getElementById("axon-dynamic-favicon") as HTMLLinkElement | null;
-          if (!dynFav) {
-            dynFav = document.createElement("link");
-            dynFav.id = "axon-dynamic-favicon";
-            dynFav.rel = "icon";
-            document.head.appendChild(dynFav);
-          }
-          dynFav.href = favHref;
+          document.querySelectorAll("link[rel*='icon']").forEach((el) => {
+            (el as HTMLLinkElement).href = favHref;
+          });
         }
-
         if (typeof window !== "undefined") {
           localStorage.removeItem("axon_site_info_cache_permanent_v2026");
-          window.dispatchEvent(
-            new CustomEvent("site_info_updated", {
-              detail: json.siteInfo || { config: themeConfig },
-            })
-          );
-          window.dispatchEvent(
-            new CustomEvent("theme_builder_updated", { detail: themeConfig })
-          );
+          window.dispatchEvent(new CustomEvent("site_info_updated", { detail: json.siteInfo || { config: themeConfig } }));
+          window.dispatchEvent(new CustomEvent("theme_builder_updated", { detail: themeConfig }));
         }
-
-        setFeedback(
-          json.message ||
-            "✓ تمامی تنظیمات هدر، نوار اعلان، فاوآیکون، فوتر و چیدمان موبایل/دسکتاپ ذخیره و به صورت زنده در سایت اعمال شد."
-        );
+        setFeedback(json.message || "✓ تمامی تغییرات هدر، نوار اعلان، فاوآیکون و فوتر ذخیره و در کل سایت اعمال شد.");
       } else {
         setFeedback(json.message || "خطا در ذخیره تنظیمات.");
       }
     } catch {
-      setFeedback("خطا در برقراری ارتباط با سرور.");
+      setFeedback("خطا در ارتباط با سرور.");
     } finally {
       setSaving(false);
       setTimeout(() => setFeedback(null), 4500);

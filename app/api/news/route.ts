@@ -5,7 +5,10 @@ import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
+let lastAutoNewsSeedCheckAt = 0;
 async function autoSeedWeeklySeoNewsIfNeeded() {
+  if (Date.now() - lastAutoNewsSeedCheckAt < 6 * 60 * 60 * 1000) return;
+  lastAutoNewsSeedCheckAt = Date.now();
   try {
     const { data: existing } = await supabaseAdmin
       .from("tech_news")

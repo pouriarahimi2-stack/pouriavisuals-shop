@@ -85,38 +85,78 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // استعلام یکجای تمام اقلام سفارش از دیتابیس جهت سرعت بالا و جلوگیری از Overselling در خریدهای هم‌زمان
+    const productIds = Array.from(
+      new Set(
+        items
+          .map((it: any) => String(it.id || it.productId || it.product_id || ""))
+          .filter(Boolean)
+      )
+    );
+
+    const { data: dbProducts } = await supabaseAdmin
+      .from("products")
+      .select("id, title, name, price, discount_price, purchase_price, stock, is_available")
+      .in("id", productIds);
+
+    const dbProdMap = new Map<string, any>();
+    (dbProducts || []).forEach((p: any) => dbProdMap.set(String(p.id), p));
+
     let verifiedSubtotal = 0;
     const verifiedItems: any[] = [];
 
     for (const item of items) {
       const prodId = String(item.id || item.productId || item.product_id || "");
       const qty = Math.max(1, Math.min(99, Number(item.quantity || 1)));
-      let unitPrice = Number(item.discountPrice ?? item.discount_price ?? item.price ?? 0);
+      const dbProd = prodId ? dbProdMap.get(prodId) : null;
 
-      if (prodId) {
-        const { data: dbProd } = await supabaseAdmin
-          .from("products")
-          .select("id, title, name, price, discount_price, stock, is_available")
-          .eq("id", prodId)
-          .maybeSingle();
-
-        if (dbProd) {
-          const dbDiscount = Number(dbProd.discount_price || 0);
-          const dbRegular = Number(dbProd.price || 0);
-          unitPrice = dbDiscount > 0 && dbDiscount < dbRegular ? dbDiscount : dbRegular;
+      if (dbProd) {
+        const availableStock =
+          dbProd.stock !== undefined && dbProd.stock !== null ? Number(dbProd.stock) : 10;
+        if (dbProd.is_available === false || availableStock < qty) {
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                "موجودی کالای «" +
+                (dbProd.title || dbProd.name || item.title) +
+                "» در انبار کافی نیست (موجودی فعلی: " +
+                Math.max(0, availableStock) +
+                " عدد).",
+            },
+            { status: 400 }
+          );
         }
-      }
 
-      verifiedSubtotal += unitPrice * qty;
-      verifiedItems.push({
-        ...item,
-        quantity: qty,
-        price: unitPrice,
-      });
+        const dbDiscount = Number(dbProd.discount_price || 0);
+        const dbRegular = Number(dbProd.price || 0);
+        const unitPrice = dbDiscount > 0 && dbDiscount < dbRegular ? dbDiscount : dbRegular;
+
+        verifiedSubtotal += unitPrice * qty;
+        verifiedItems.push({
+          ...item,
+          id: String(dbProd.id),
+          productId: String(dbProd.id),
+          title: dbProd.title || dbProd.name || item.title,
+          quantity: qty,
+          price: unitPrice,
+        });
+      } else {
+        const fallbackPrice = Number(item.discountPrice ?? item.discount_price ?? item.price ?? 0);
+        verifiedSubtotal += fallbackPrice * qty;
+        verifiedItems.push({
+          ...item,
+          quantity: qty,
+          price: fallbackPrice,
+        });
+      }
     }
 
+    // اعتبارسنجی دقیق کوپن در سمت سرور (تاریخ شروع/انقضا، سقف مصرف، محصول هدف و سقف مبلغ تخفیف)
     let verifiedDiscount = 0;
+    let validCouponRow: any = null;
     const couponCode = body.couponCode ? String(body.couponCode).trim().toUpperCase() : null;
+
     if (couponCode) {
       const { data: couponRow } = await supabaseAdmin
         .from("coupons")
@@ -125,19 +165,44 @@ export async function POST(req: NextRequest) {
         .eq("is_active", true)
         .maybeSingle();
 
-      if (couponRow) {
-        const dtype = String(couponRow.discount_type || "percent");
-        const dval = Number(couponRow.discount_value || 0);
-        if (dtype === "percent") {
-          verifiedDiscount = Math.round((verifiedSubtotal * dval) / 100);
-        } else {
-          verifiedDiscount = Math.min(verifiedSubtotal, dval);
+      const nowMs = Date.now();
+      const notStarted = couponRow?.starts_at && new Date(couponRow.starts_at).getTime() > nowMs;
+      const isExpired = couponRow?.expires_at && new Date(couponRow.expires_at).getTime() < nowMs;
+      const limitReached =
+        couponRow?.usage_limit &&
+        Number(couponRow.usage_limit) > 0 &&
+        Number(couponRow.times_used ?? couponRow.used_count ?? 0) >= Number(couponRow.usage_limit);
+      const minSpend = Number(couponRow?.min_order_amount ?? couponRow?.min_purchase ?? 0);
+
+      if (couponRow && !notStarted && !isExpired && !limitReached && verifiedSubtotal >= minSpend) {
+        let targetSubtotal = verifiedSubtotal;
+        if (couponRow.target_type === "product" && couponRow.target_id) {
+          const matching = verifiedItems.filter(
+            (vi) => String(vi.id || vi.productId) === String(couponRow.target_id)
+          );
+          targetSubtotal = matching.reduce((acc, vi) => acc + vi.price * vi.quantity, 0);
         }
-      } else {
-        verifiedDiscount = Math.min(
-          verifiedSubtotal,
-          Math.max(0, Number(body.discountAmount ?? 0))
-        );
+
+        if (targetSubtotal > 0) {
+          validCouponRow = couponRow;
+          const dtype = String(couponRow.discount_type || couponRow.type || "percent");
+          const dval = Number(
+            couponRow.discount_value ??
+              couponRow.value ??
+              couponRow.discount_percent ??
+              couponRow.discount_amount ??
+              0
+          );
+          if (dtype === "percent") {
+            verifiedDiscount = Math.round((targetSubtotal * dval) / 100);
+            const maxDisc = Number(couponRow.max_discount || couponRow.max_discount_amount || 0);
+            if (maxDisc > 0 && verifiedDiscount > maxDisc) {
+              verifiedDiscount = maxDisc;
+            }
+          } else {
+            verifiedDiscount = Math.min(targetSubtotal, dval);
+          }
+        }
       }
     }
 
@@ -185,7 +250,7 @@ export async function POST(req: NextRequest) {
       total_amount: verifiedSubtotal,
       discount_amount: verifiedDiscount,
       final_amount: finalAmount,
-      coupon_code: couponCode,
+      coupon_code: validCouponRow ? validCouponRow.code : null,
       status: "pending",
       payment_status: "pending",
       tracking_code: trackingCode,
@@ -204,7 +269,7 @@ export async function POST(req: NextRequest) {
       savedOrder = insertedOrder;
     } else {
       const minimalOrder: Record<string, any> = {
-        id: randomUUID(),
+        id: generatedUuid,
         customer_name: fullName,
         phone: cleanPhone,
         address: fullAddress,
@@ -223,47 +288,51 @@ export async function POST(req: NextRequest) {
       if (minInserted) savedOrder = minInserted;
     }
 
+    // کسر اتمیک موجودی انبار و ثبت لاگ حسابداری
     for (const item of verifiedItems) {
-      const prodId = String(item.id || item.productId || item.product_id || "");
+      const prodId = String(item.id || item.productId || "");
       const qty = Math.max(1, Number(item.quantity || 1));
-      if (!prodId) continue;
+      const prodRow = prodId ? dbProdMap.get(prodId) : null;
+      if (!prodRow) continue;
 
       try {
-        const { data: prodRow } = await supabaseAdmin
+        const currentStock = Number(prodRow.stock ?? 10);
+        const nextStock = Math.max(0, currentStock - qty);
+        await supabaseAdmin
           .from("products")
-          .select("id, title, name, stock, price, purchase_price")
-          .eq("id", prodId)
-          .maybeSingle();
+          .update({
+            stock: nextStock,
+            is_available: nextStock > 0,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", prodRow.id);
 
-        if (prodRow) {
-          const currentStock = Number(prodRow.stock ?? 10);
-          const nextStock = Math.max(0, currentStock - qty);
-          await supabaseAdmin
-            .from("products")
-            .update({
-              stock: nextStock,
-              is_available: nextStock > 0,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", prodRow.id);
+        await supabaseAdmin.from("inventory_logs").insert([
+          {
+            id: "sale_" + Date.now() + "_" + Math.random().toString(36).slice(2, 5),
+            product_id: String(prodRow.id),
+            product_title: prodRow.title || prodRow.name || item.title,
+            change_type: "sale",
+            quantity: qty,
+            cost_price: Number(
+              prodRow.purchase_price || Math.round(Number(prodRow.price || 0) * 0.7)
+            ),
+            supplier: "فروش آنلاین سایت",
+            reference_note: "کسر خودکار بابت فاکتور " + orderNumber,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch {}
+    }
 
-          await supabaseAdmin.from("inventory_logs").insert([
-            {
-              id: "sale_" + Date.now() + "_" + Math.random().toString(36).slice(2, 5),
-              product_id: String(prodRow.id),
-              product_title: prodRow.title || prodRow.name || item.title,
-              change_type: "sale",
-              quantity: qty,
-              cost_price: Number(
-                prodRow.purchase_price || Math.round(Number(prodRow.price || 0) * 0.7)
-              ),
-              supplier: "فروش آنلاین سایت",
-              reference_note:
-                "کسر خودکار بابت فاکتور " + (savedOrder.order_number || savedOrder.id),
-              created_at: new Date().toISOString(),
-            },
-          ]);
-        }
+    // افزایش شمارنده مصرف کوپن در صورت استفاده
+    if (validCouponRow?.id) {
+      try {
+        const nextUsed = Number(validCouponRow.times_used ?? validCouponRow.used_count ?? 0) + 1;
+        await supabaseAdmin
+          .from("coupons")
+          .update({ times_used: nextUsed, used_count: nextUsed })
+          .eq("id", validCouponRow.id);
       } catch {}
     }
 
@@ -291,6 +360,7 @@ export async function POST(req: NextRequest) {
       success: true,
       order: {
         ...savedOrder,
+        order_number: orderNumber,
         subtotal: verifiedSubtotal,
         discount_amount: verifiedDiscount,
         vat_percent: vatPercent,

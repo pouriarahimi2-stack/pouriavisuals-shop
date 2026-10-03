@@ -14,10 +14,13 @@ interface OtpRecord {
 }
 
 const memoryOtpStore = new Map<string, OtpRecord>();
+let cachedOtpLength = 4;
+let lastConfigFetchAt = 0;
 
 function getHmacSecret(): string {
   return (
     process.env.OTP_HMAC_SECRET ||
+    process.env.ADMIN_SESSION_SECRET ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "axon-core-otp-hmac-secret-2026"
   );
@@ -28,6 +31,51 @@ function hashOtp(phone: string, code: string): string {
     .createHmac("sha256", getHmacSecret())
     .update(phone + ":" + code)
     .digest("hex");
+}
+
+function createSignedChallengeCookie(phone: string, codeHash: string, expiresAt: number): string {
+  const payload = phone + ":" + expiresAt + ":" + codeHash;
+  const sig = crypto
+    .createHmac("sha256", getHmacSecret())
+    .update("OTP_CHALLENGE:" + payload)
+    .digest("hex");
+  return Buffer.from(payload + ":" + sig).toString("base64");
+}
+
+function verifySignedChallengeCookie(
+  cookieVal: string,
+  phone: string,
+  suppliedCode: string
+): { valid: boolean; expired?: boolean } {
+  try {
+    if (!cookieVal) return { valid: false };
+    const decoded = Buffer.from(cookieVal, "base64").toString("utf8");
+    const [cPhone, expStr, cHash, sig] = decoded.split(":");
+    if (!cPhone || !expStr || !cHash || !sig) return { valid: false };
+    if (cPhone !== phone) return { valid: false };
+
+    const expectedSig = crypto
+      .createHmac("sha256", getHmacSecret())
+      .update("OTP_CHALLENGE:" + cPhone + ":" + expStr + ":" + cHash)
+      .digest("hex");
+
+    if (!crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expectedSig, "hex"))) {
+      return { valid: false };
+    }
+
+    if (Date.now() > Number(expStr)) {
+      return { valid: false, expired: true };
+    }
+
+    const expectedCodeHash = hashOtp(phone, suppliedCode);
+    const isCodeMatch = crypto.timingSafeEqual(
+      Buffer.from(cHash, "hex"),
+      Buffer.from(expectedCodeHash, "hex")
+    );
+    return { valid: isCodeMatch };
+  } catch {
+    return { valid: false };
+  }
 }
 
 export function createPhoneVerifiedToken(phone: string): string {
@@ -57,15 +105,23 @@ export function verifyPhoneTokenSignature(phone: string, token: string): boolean
   }
 }
 
-function cleanupExpiredOtps(otps: Record<string, any>) {
-  const now = Date.now();
-  const clean: Record<string, any> = {};
-  Object.keys(otps || {}).forEach((k) => {
-    if (otps[k]?.expiresAt && now < Number(otps[k].expiresAt)) {
-      clean[k] = otps[k];
-    }
-  });
-  return clean;
+async function getOtpLengthFast(): Promise<number> {
+  if (Date.now() - lastConfigFetchAt < 60 * 1000) {
+    return cachedOtpLength;
+  }
+  try {
+    const { data: siteRow } = await supabaseAdmin
+      .from("site_info")
+      .select("homepage_layout_config")
+      .limit(1)
+      .maybeSingle();
+    const len = Number(
+      siteRow?.homepage_layout_config?.auth_security_config?.userDeck?.otpLength || 4
+    );
+    cachedOtpLength = len >= 4 && len <= 8 ? len : 4;
+    lastConfigFetchAt = Date.now();
+  } catch {}
+  return cachedOtpLength;
 }
 
 export async function POST(req: NextRequest) {
@@ -88,19 +144,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: siteRow } = await supabaseAdmin
-      .from("site_info")
-      .select("id, homepage_layout_config")
-      .limit(1)
-      .maybeSingle();
-
-    const layoutCfg =
-      siteRow?.homepage_layout_config && typeof siteRow.homepage_layout_config === "object"
-        ? siteRow.homepage_layout_config
-        : {};
-    const currentSec = layoutCfg.auth_security_config || {};
-    const otpLength = Number(currentSec?.userDeck?.otpLength || 4);
-
     if (action === "verify") {
       const code = String(body.code || "")
         .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
@@ -114,12 +157,69 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const activeOtps = currentSec.active_otps || {};
-      const dbRecord: OtpRecord | undefined = activeOtps[rawPhone];
-      const memRecord: OtpRecord | undefined = memoryOtpStore.get(rawPhone);
-      const record = dbRecord || memRecord;
+      const memRecord = memoryOtpStore.get(rawPhone);
+      const challengeCookie = req.cookies.get("axon_otp_challenge")?.value || "";
 
-      if (!record || !record.hash || !record.expiresAt) {
+      if (memRecord) {
+        if (Date.now() > memRecord.expiresAt) {
+          memoryOtpStore.delete(rawPhone);
+          return NextResponse.json(
+            {
+              success: false,
+              verified: false,
+              message: "مهلت کد تایید به پایان رسیده است. لطفاً مجدداً تلاش کنید.",
+            },
+            { status: 400 }
+          );
+        }
+
+        memRecord.attempts += 1;
+        if (memRecord.attempts > 5) {
+          memoryOtpStore.delete(rawPhone);
+          return NextResponse.json(
+            {
+              success: false,
+              verified: false,
+              message: "تعداد تلاش‌های ناموفق بیش از حد مجاز بود. لطفاً مجدداً درخواست کد دهید.",
+            },
+            { status: 429 }
+          );
+        }
+
+        const expectedHash = hashOtp(rawPhone, code);
+        const isHashValid = crypto.timingSafeEqual(
+          Buffer.from(memRecord.hash, "hex"),
+          Buffer.from(expectedHash, "hex")
+        );
+
+        if (!isHashValid) {
+          memoryOtpStore.set(rawPhone, memRecord);
+          return NextResponse.json(
+            { success: false, verified: false, message: "کد تایید وارد شده اشتباه است." },
+            { status: 400 }
+          );
+        }
+
+        memoryOtpStore.delete(rawPhone);
+      } else if (challengeCookie) {
+        const cookieCheck = verifySignedChallengeCookie(challengeCookie, rawPhone, code);
+        if (cookieCheck.expired) {
+          return NextResponse.json(
+            {
+              success: false,
+              verified: false,
+              message: "مهلت کد تایید به پایان رسیده است. لطفاً مجدداً تلاش کنید.",
+            },
+            { status: 400 }
+          );
+        }
+        if (!cookieCheck.valid) {
+          return NextResponse.json(
+            { success: false, verified: false, message: "کد تایید وارد شده اشتباه است." },
+            { status: 400 }
+          );
+        }
+      } else {
         return NextResponse.json(
           {
             success: false,
@@ -128,89 +228,6 @@ export async function POST(req: NextRequest) {
           },
           { status: 400 }
         );
-      }
-
-      if (Date.now() > Number(record.expiresAt)) {
-        memoryOtpStore.delete(rawPhone);
-        return NextResponse.json(
-          {
-            success: false,
-            verified: false,
-            message: "مهلت کد تایید به پایان رسیده است. لطفاً مجدداً تلاش کنید.",
-          },
-          { status: 400 }
-        );
-      }
-
-      const currentAttempts = Number(record.attempts || 0) + 1;
-      if (currentAttempts > 5) {
-        memoryOtpStore.delete(rawPhone);
-        if (siteRow && siteRow.id && activeOtps[rawPhone]) {
-          const updatedOtps = { ...activeOtps };
-          delete updatedOtps[rawPhone];
-          await supabaseAdmin
-            .from("site_info")
-            .update({
-              homepage_layout_config: {
-                ...layoutCfg,
-                auth_security_config: { ...currentSec, active_otps: updatedOtps },
-              },
-            })
-            .eq("id", siteRow.id);
-        }
-        return NextResponse.json(
-          {
-            success: false,
-            verified: false,
-            message: "تعداد تلاش‌های ناموفق بیش از حد مجاز بود. لطفاً مجدداً درخواست کد دهید.",
-          },
-          { status: 429 }
-        );
-      }
-
-      const expectedHash = hashOtp(rawPhone, code);
-      const isHashValid = crypto.timingSafeEqual(
-        Buffer.from(record.hash, "hex"),
-        Buffer.from(expectedHash, "hex")
-      );
-
-      if (!isHashValid) {
-        record.attempts = currentAttempts;
-        memoryOtpStore.set(rawPhone, record);
-        if (siteRow && siteRow.id && activeOtps[rawPhone]) {
-          const updatedOtps = { ...activeOtps, [rawPhone]: record };
-          await supabaseAdmin
-            .from("site_info")
-            .update({
-              homepage_layout_config: {
-                ...layoutCfg,
-                auth_security_config: { ...currentSec, active_otps: updatedOtps },
-              },
-            })
-            .eq("id", siteRow.id);
-        }
-        return NextResponse.json(
-          { success: false, verified: false, message: "کد تایید وارد شده اشتباه است." },
-          { status: 400 }
-        );
-      }
-
-      memoryOtpStore.delete(rawPhone);
-      if (siteRow && siteRow.id && activeOtps[rawPhone]) {
-        const updatedOtps = { ...activeOtps };
-        delete updatedOtps[rawPhone];
-        await supabaseAdmin
-          .from("site_info")
-          .update({
-            homepage_layout_config: {
-              ...layoutCfg,
-              auth_security_config: {
-                ...currentSec,
-                active_otps: cleanupExpiredOtps(updatedOtps),
-              },
-            },
-          })
-          .eq("id", siteRow.id);
       }
 
       const verifiedToken = createPhoneVerifiedToken(rawPhone);
@@ -223,6 +240,7 @@ export async function POST(req: NextRequest) {
         message: "شماره همراه شما با موفقیت تایید شد.",
       });
 
+      res.cookies.delete("axon_otp_challenge");
       res.cookies.set("axon_verified_phone_token", verifiedToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -234,10 +252,8 @@ export async function POST(req: NextRequest) {
       return res;
     }
 
-    const existingActive =
-      (currentSec.active_otps && currentSec.active_otps[rawPhone]) ||
-      memoryOtpStore.get(rawPhone);
-
+    // بررسی محدودیت زمانی ارسال مجدد (۵۵ ثانیه)
+    const existingActive = memoryOtpStore.get(rawPhone);
     if (
       existingActive &&
       existingActive.createdAt &&
@@ -256,6 +272,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const otpLength = await getOtpLengthFast();
     const minVal = Math.pow(10, Math.max(3, otpLength - 1));
     const maxVal = Math.pow(10, Math.max(4, otpLength)) - 1;
     const generatedCode = crypto.randomInt(minVal, maxVal).toString();
@@ -269,14 +286,6 @@ export async function POST(req: NextRequest) {
     });
 
     if (!smsResult.ok) {
-      let vercelOutboundIp = "نامشخص";
-      try {
-        const ipRes = await fetch("https://api.ipify.org?format=json");
-        const ipJson = await ipRes.json();
-        if (ipJson?.ip) vercelOutboundIp = String(ipJson.ip);
-      } catch {}
-
-      // ثبت گزارش کامل فنی، کد خطا، آی‌پی سرور و راه‌حل در لاگ‌های امنیتی ادمین (/admin/audit-logs)
       try {
         await supabaseAdmin.from("admin_audit_logs").insert([
           {
@@ -286,13 +295,8 @@ export async function POST(req: NextRequest) {
               resource: "ippanel:edge",
               httpStatusCode: smsResult.status,
               errorCode: smsResult.errorCode,
-              vercelServerOutboundIp: vercelOutboundIp,
               targetMobile: rawPhone,
-              patternCode: "3d6fa1f8ud3ma1w",
-              patternVariable: "vefification-code",
               rootCauseExplanation: smsResult.adminTechnicalDiagnosis,
-              howToFix: smsResult.adminSolutionGuide,
-              gatewayAttemptsRaw: smsResult.rawResponse,
             },
             ip_address: req.headers.get("x-forwarded-for") || "127.0.0.1",
             severity: "error",
@@ -301,7 +305,6 @@ export async function POST(req: NextRequest) {
         ]);
       } catch {}
 
-      // به کاربر فقط پیام استاندارد و مختصر نمایش داده می‌شود (بدون هیچ جزئیات فنی)
       return NextResponse.json(
         {
           success: false,
@@ -312,39 +315,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newRecord: OtpRecord = {
+    // پاکسازی رکوردهای منقضی‌شده در حافظه برای جلوگیری از مصرف رم در ترافیک بالا
+    if (memoryOtpStore.size > 500) {
+      for (const [k, v] of memoryOtpStore.entries()) {
+        if (now > v.expiresAt) memoryOtpStore.delete(k);
+      }
+    }
+
+    memoryOtpStore.set(rawPhone, {
       hash: codeHash,
       expiresAt,
       createdAt: now,
       attempts: 0,
-    };
+    });
 
-    memoryOtpStore.set(rawPhone, newRecord);
-
-    if (siteRow && siteRow.id) {
-      const activeOtps = cleanupExpiredOtps({ ...(currentSec.active_otps || {}) });
-      activeOtps[rawPhone] = newRecord;
-      await supabaseAdmin
-        .from("site_info")
-        .update({
-          homepage_layout_config: {
-            ...layoutCfg,
-            auth_security_config: {
-              ...currentSec,
-              active_otps: activeOtps,
-            },
-          },
-        })
-        .eq("id", siteRow.id);
-    }
-
-    return NextResponse.json({
+    const signedChallenge = createSignedChallengeCookie(rawPhone, codeHash, expiresAt);
+    const res = NextResponse.json({
       success: true,
       sent: true,
       otpLength,
       expiresInSeconds: 120,
       message: "کد تایید پیامکی به شماره " + rawPhone + " ارسال گردید.",
     });
+
+    res.cookies.set("axon_otp_challenge", signedChallenge, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 120,
+    });
+
+    return res;
   } catch {
     return NextResponse.json(
       {

@@ -1,3 +1,4 @@
+// File Path: app/api/admin/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { signPayload, COOKIE_NAME } from "@/lib/session";
@@ -6,17 +7,35 @@ import { authSecurity } from "@/lib/authSecurity";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "127.0.0.1";
+
   try {
+    const rateStatus = authSecurity.checkRateLimit(clientIp);
+    if (!rateStatus.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "تعداد تلاش‌های ناموفق بیش از حد مجاز است. لطفاً " +
+            (rateStatus.waitMinutes || 15) +
+            " دقیقه دیگر تلاش کنید.",
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const cleanUsername = String(body.username || "").trim().toLowerCase();
     const cleanPassword = String(body.password || "").trim();
 
     if (!cleanUsername || !cleanPassword) {
-      return NextResponse.json({ success: false, message: "نام کاربری و رمز عبور الزامی است." }, { status: 400 });
-    }
-
-    if (!supabaseAdmin) {
-      return NextResponse.json({ success: false, message: "پایگاه داده در دسترس نیست." }, { status: 500 });
+      return NextResponse.json(
+        { success: false, message: "نام کاربری و رمز عبور الزامی است." },
+        { status: 400 }
+      );
     }
 
     const { data: adminUser, error } = await supabaseAdmin
@@ -26,15 +45,40 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (error || !adminUser) {
-      return NextResponse.json({ success: false, message: "نام کاربری یا رمز عبور اشتباه است." }, { status: 401 });
+      authSecurity.recordFailedAttempt(clientIp);
+      return NextResponse.json(
+        { success: false, message: "نام کاربری یا رمز عبور اشتباه است." },
+        { status: 401 }
+      );
     }
 
     const storedHash = adminUser.password_hash || adminUser.password;
-    const isValid = authSecurity.verifyPassword(cleanPassword, storedHash) || storedHash === cleanPassword;
+    const isValid =
+      authSecurity.verifyPassword(cleanPassword, storedHash) ||
+      storedHash === cleanPassword;
 
     if (!isValid) {
-      return NextResponse.json({ success: false, message: "نام کاربری یا رمز عبور اشتباه است." }, { status: 401 });
+      authSecurity.recordFailedAttempt(clientIp);
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert([
+          {
+            action: "ADMIN_LOGIN_FAILED",
+            user_id: cleanUsername,
+            details: { resource: "admin:auth", ip: clientIp },
+            ip_address: clientIp,
+            severity: "warning",
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch {}
+
+      return NextResponse.json(
+        { success: false, message: "نام کاربری یا رمز عبور اشتباه است." },
+        { status: 401 }
+      );
     }
+
+    authSecurity.resetAttempts(clientIp);
 
     const token = await signPayload({
       id: String(adminUser.id),
@@ -72,6 +116,9 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message || "خطای سرور در احراز هویت." }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message || "خطای سرور در احراز هویت." },
+      { status: 500 }
+    );
   }
 }

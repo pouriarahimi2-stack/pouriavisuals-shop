@@ -1,6 +1,7 @@
 // File Path: app/api/orders/track/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { verifyCustomerToken, CUSTOMER_COOKIE_NAME } from "@/lib/customerSession";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ function normalizeOrderRecord(row: any) {
   };
 }
 
-async function searchOrders(params: { phone?: string; code?: string; query?: string }) {
+async function searchOrdersOptimized(params: { phone?: string; code?: string; query?: string }) {
   let cleanPhone = normalizePhone(params.phone);
   let cleanCode = normalizeDigits(params.code).toUpperCase();
   const rawQuery = normalizeDigits(params.query);
@@ -65,17 +66,31 @@ async function searchOrders(params: { phone?: string; code?: string; query?: str
     }
   }
 
-  const { data: allOrders, error } = await supabaseAdmin
+  // اگر فقط بر اساس شماره موبایل جستجو می‌شود، ابتدا کوئری مستقیم و سریع روی ستون phone زده شود
+  if (cleanPhone && !cleanCode) {
+    const { data: directPhoneOrders, error: directErr } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("phone", cleanPhone)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (!directErr && Array.isArray(directPhoneOrders) && directPhoneOrders.length > 0) {
+      return directPhoneOrders.map(normalizeOrderRecord);
+    }
+  }
+
+  const { data: recentOrders, error } = await supabaseAdmin
     .from("orders")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(300);
+    .limit(120);
 
-  if (error || !Array.isArray(allOrders)) {
+  if (error || !Array.isArray(recentOrders)) {
     return [];
   }
 
-  return allOrders
+  return recentOrders
     .filter((row: any) => {
       const normalized = normalizeOrderRecord(row);
       const rowPhone = normalizePhone(normalized.phone || "");
@@ -129,7 +144,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const matched = await searchOrders({ phone, code, query });
+    const matched = await searchOrdersOptimized({ phone, code, query });
 
     return NextResponse.json(
       {
@@ -172,7 +187,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const matched = await searchOrders({ phone, code, query });
+    const matched = await searchOrdersOptimized({ phone, code, query });
 
     return NextResponse.json(
       {
@@ -228,15 +243,26 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id") || "";
-    const phone = normalizePhone(searchParams.get("phone") || "");
+    let phone = normalizePhone(searchParams.get("phone") || "");
 
-    if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه سفارش الزامی است." }, { status: 400 });
+    if (!phone) {
+      const custCookie = req.cookies.get(CUSTOMER_COOKIE_NAME)?.value || "";
+      if (custCookie) {
+        const session = await verifyCustomerToken(custCookie);
+        if (session?.phone) phone = normalizePhone(session.phone);
+      }
+    }
+
+    if (!id || !phone) {
+      return NextResponse.json(
+        { success: false, message: "شناسه سفارش و شماره همراه تاییدشده الزامی است." },
+        { status: 400 }
+      );
     }
 
     const { data: ord } = await supabaseAdmin
       .from("orders")
-      .select("id, phone, customer_phone, status, payment_status")
+      .select("id, phone, customer_phone, status, payment_status, items")
       .eq("id", id)
       .maybeSingle();
 
@@ -245,8 +271,11 @@ export async function DELETE(req: NextRequest) {
     }
 
     const ordPhone = normalizePhone(ord.phone || ord.customer_phone || "");
-    if (phone && ordPhone && ordPhone !== phone) {
-      return NextResponse.json({ success: false, message: "عدم تطابق شماره همراه." }, { status: 403 });
+    if (!ordPhone || ordPhone !== phone) {
+      return NextResponse.json(
+        { success: false, message: "عدم تطابق شماره همراه مالک سفارش." },
+        { status: 403 }
+      );
     }
 
     if (ord.status === "paid" || ord.payment_status === "paid" || ord.status === "shipped") {
@@ -256,8 +285,34 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
+    // بازگردانی خودکار موجودی کالاهای این سفارش ناتمام به انبار قبل از حذف
+    if (ord.status !== "cancelled" && Array.isArray(ord.items)) {
+      for (const it of ord.items) {
+        const pId = String(it.id || it.productId || it.product_id || "");
+        const qty = Math.max(1, Number(it.quantity || 1));
+        if (!pId) continue;
+        try {
+          const { data: pRow } = await supabaseAdmin
+            .from("products")
+            .select("id, stock")
+            .eq("id", pId)
+            .maybeSingle();
+          if (pRow) {
+            const restored = Number(pRow.stock || 0) + qty;
+            await supabaseAdmin
+              .from("products")
+              .update({ stock: restored, is_available: restored > 0 })
+              .eq("id", pRow.id);
+          }
+        } catch {}
+      }
+    }
+
     await supabaseAdmin.from("orders").delete().eq("id", id);
-    return NextResponse.json({ success: true, message: "سفارش ناتمام حذف شد." });
+    return NextResponse.json({
+      success: true,
+      message: "✓ سفارش ناتمام حذف شد و موجودی کالا به انبار بازگردانده شد.",
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

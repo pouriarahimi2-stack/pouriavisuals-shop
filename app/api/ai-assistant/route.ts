@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/authSecurityHelper";
 // File Path: app/api/ai-assistant/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -103,6 +104,10 @@ export async function POST(req: NextRequest) {
     const siteRow = siteRes.data;
 
     // ۱. اکشن تست زنده و ذخیره امن کلید هوش مصنوعی در ستون‌های واقعی دیتابیس
+    if (action === "test_and_save_key" || action === "fetch_market_matrix" || action === "generate_growth_strategy") {
+      const authCheck = await requireAdmin(req);
+      if (!authCheck.ok) return authCheck.res;
+    }
     if (action === "test_and_save_key") {
       const cleanKey = String(targetKey || "").trim();
       if (!cleanKey || cleanKey.length < 10) {

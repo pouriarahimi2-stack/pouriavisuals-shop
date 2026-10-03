@@ -57,6 +57,28 @@ async function handleVerify(params: {
   // اگر کاربر در صفحه بانک دکمه انصراف را زده باشد
   if (status && status.toUpperCase() !== "OK") {
     if (orderRow?.id) {
+      // [AUTO_RESTORE_STOCK_ON_CANCEL] بازگردانی خودکار موجودی کالا به انبار در صورت انصراف از پرداخت بانکی
+      if (orderRow.status !== "cancelled" && Array.isArray(orderRow.items)) {
+        for (const it of orderRow.items) {
+          const pId = String(it.id || it.productId || it.product_id || "");
+          const qty = Math.max(1, Number(it.quantity || 1));
+          if (!pId) continue;
+          try {
+            const { data: pRow } = await supabaseAdmin
+              .from("products")
+              .select("id, stock")
+              .eq("id", pId)
+              .maybeSingle();
+            if (pRow) {
+              const restored = Number(pRow.stock || 0) + qty;
+              await supabaseAdmin
+                .from("products")
+                .update({ stock: restored, is_available: restored > 0 })
+                .eq("id", pRow.id);
+            }
+          } catch {}
+        }
+      }
       await supabaseAdmin
         .from("orders")
         .update({

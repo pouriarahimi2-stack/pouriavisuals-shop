@@ -1,3 +1,4 @@
+// File Path: components/Footer.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,7 +8,7 @@ import AnimatedLogo from "@/components/AnimatedLogo";
 import EnamadBadge from "@/components/EnamadBadge";
 
 export default function Footer() {
-  const { siteInfo, refresh } = useSiteInfo();
+  const { siteInfo } = useSiteInfo();
   const [logoImgFailed, setLogoImgFailed] = useState(false);
 
   const info = siteInfo || {};
@@ -19,21 +20,18 @@ export default function Footer() {
   const footerCfg = layoutCfg?.footer || {};
 
   const footerLogoUrl = String(
-    tbFooter.footerLogoUrl ??
-      footerCfg.footerLogoUrl ??
-      footerCfg.logoUrl ??
-      info.footer_logo_url ??
-      info.footerLogoUrl ??
-      info.logo_url ??
-      info.logoUrl ??
-      ""
+    tbFooter.footerLogoUrl !== undefined
+      ? tbFooter.footerLogoUrl
+      : footerCfg.footerLogoUrl ??
+        footerCfg.logoUrl ??
+        info.footer_logo_url ??
+        info.footerLogoUrl ??
+        ""
   ).trim();
 
   useEffect(() => {
     setLogoImgFailed(false);
   }, [footerLogoUrl]);
-
-  
 
   if (footerCfg.show === false) return null;
 
@@ -50,30 +48,17 @@ export default function Footer() {
     info.tagline ||
     "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال";
 
-  const brandDescription =
-    tbFooter.brandDescription ??
-    footerCfg.description ??
-    info.description ??
-    "";
+  const brandDescription = String(
+    tbFooter.brandDescription !== undefined
+      ? tbFooter.brandDescription
+      : footerCfg.description ?? info.description ?? ""
+  ).trim();
 
-  const supportPhone =
-    tbFooter.supportPhone ||
-    footerCfg.supportPhone ||
-    info.phone ||
-    "09376110200";
-
+  const supportPhone = tbFooter.supportPhone || footerCfg.supportPhone || info.phone || "09376110200";
   const supportEmail =
-    tbFooter.supportEmail ||
-    footerCfg.supportEmail ||
-    info.email ||
-    "Pouriarahimi@yahoo.com";
-
+    tbFooter.supportEmail || footerCfg.supportEmail || info.email || "Pouriarahimi@yahoo.com";
   const warehouseAddress =
-    tbFooter.warehouseAddress ||
-    footerCfg.warehouseAddress ||
-    info.address ||
-    "شیراز - ستارخان";
-
+    tbFooter.warehouseAddress || footerCfg.warehouseAddress || info.address || "شیراز - ستارخان";
   const workingHours =
     tbFooter.workingHours ||
     footerCfg.workingHours ||
@@ -99,20 +84,9 @@ export default function Footer() {
   const scaleMode = tbFooter.scaleMode || footerCfg.scaleMode || "normal";
   const paddingMode = tbFooter.paddingMode || footerCfg.paddingMode || "normal";
 
-  // اگر رنگ پس‌زمینه خالی باشد یا همان کد سیاه پیش‌فرض (#07090e) باشد، از متغیر تم (روشن در روز / تیره در شب) استفاده شود
-  const rawCustomBg = String(tbFooter.bgColor || "").trim().toLowerCase();
-  const useCustomBg =
-    rawCustomBg !== "" &&
-    rawCustomBg !== "#07090e" &&
-    rawCustomBg !== "#0a0c10" &&
-    rawCustomBg !== "#000000" &&
-    rawCustomBg !== "transparent";
-
   const quickLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
     Array.isArray(tbFooter.quickLinks) && tbFooter.quickLinks.length > 0
       ? tbFooter.quickLinks.filter((l: any) => l.show !== false)
-      : Array.isArray(footerCfg?.quickLinks?.links) && footerCfg.quickLinks.links.length > 0
-      ? footerCfg.quickLinks.links
       : [
           { id: "q1", title: "🛍️ کاتالوگ محصولات", url: "/products" },
           { id: "q2", title: "📦 پیگیری آنلاین سفارش", url: "/track-order" },
@@ -125,8 +99,6 @@ export default function Footer() {
   const externalLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
     Array.isArray(tbFooter.externalLinks) && tbFooter.externalLinks.length > 0
       ? tbFooter.externalLinks.filter((l: any) => l.show !== false)
-      : Array.isArray(footerCfg.externalLinks) && footerCfg.externalLinks.length > 0
-      ? footerCfg.externalLinks
       : [
           { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob" },
           { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml" },
@@ -145,18 +117,14 @@ export default function Footer() {
       : "py-10 sm:py-12";
 
   const textScaleClass =
-    scaleMode === "compact"
-      ? "text-[11px]"
-      : scaleMode === "large"
-      ? "text-sm"
-      : "text-xs";
+    scaleMode === "compact" ? "text-[11px]" : scaleMode === "large" ? "text-sm" : "text-xs";
 
   const renderColumn = (colKey: string) => {
     if (colKey === "brand") {
       return (
         <div key="col_brand" className="lg:col-span-4 space-y-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-14 h-14 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+            <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
               {footerLogoUrl && !logoImgFailed ? (
                 <img
                   src={footerLogoUrl}
@@ -185,11 +153,11 @@ export default function Footer() {
           )}
 
           <div className="grid grid-cols-2 gap-2.5 pt-1 text-[11px] font-bold">
-            <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
+            <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
               <span>🛡️</span>
               <span>ضمانت اصالت کالا</span>
             </div>
-            <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
+            <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center gap-2 text-[var(--text-primary)]">
               <span>🚀</span>
               <span>ارسال سریع سراسری</span>
             </div>
@@ -232,7 +200,7 @@ export default function Footer() {
         <div key="col_support" className={"lg:col-span-3 space-y-3 " + textScaleClass}>
           <h4 className="font-black text-sm text-[var(--accent-blue)]">مرکز ارتباط و پشتیبانی</h4>
           <div className="space-y-2.5 text-[var(--text-secondary)] font-bold">
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)]">
               <span>تلفن پشتیبانی:</span>
               <a
                 href={"tel:" + supportPhone}
@@ -242,7 +210,7 @@ export default function Footer() {
                 {supportPhone}
               </a>
             </div>
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)]">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)]">
               <span>ایمیل رسمی:</span>
               <a
                 href={"mailto:" + supportEmail}
@@ -252,7 +220,7 @@ export default function Footer() {
                 {supportEmail}
               </a>
             </div>
-            <div className="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1">
+            <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--card-border)] space-y-1">
               <div className="text-[var(--text-primary)]">📍 نشانی: {warehouseAddress}</div>
               <div className="text-[11px] text-[var(--text-secondary)]">
                 🕒 ساعات کاری: {workingHours}
@@ -270,7 +238,7 @@ export default function Footer() {
           className="lg:col-span-2 flex flex-col items-center justify-center space-y-2"
         >
           {enamadEnabled && (
-            <div className="p-3 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col items-center justify-center shadow-inner">
+            <div className="p-3 rounded-3xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex flex-col items-center justify-center shadow-sm">
               <EnamadBadge code={enamadCode} link={enamadLink} />
               <span className="text-[10px] font-bold text-[var(--text-secondary)] mt-1">
                 نماد اعتماد الکترونیکی
@@ -286,8 +254,7 @@ export default function Footer() {
 
   return (
     <footer
-      style={useCustomBg ? { backgroundColor: rawCustomBg } : undefined}
-      className="mt-16 border-t border-[var(--card-border)] bg-[var(--modal-bg)] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10 transition-colors duration-300"
+      className="mt-16 border-t border-[var(--card-border)] bg-slate-100/90 dark:bg-[#0b0f17] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10 transition-colors duration-300"
       dir="rtl"
     >
       <div className={"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 " + pyClass}>

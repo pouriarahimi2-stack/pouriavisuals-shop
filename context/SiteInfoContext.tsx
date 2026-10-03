@@ -22,9 +22,9 @@ export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(false);
   const channelRef = useRef<any>(null);
-  const fetchingRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
-  const applyPayload = useCallback((payload: any) => {
+  const applyIncomingData = useCallback((payload: any) => {
     if (!payload || typeof payload !== "object") return;
     setSiteInfo(payload);
     const fav =
@@ -35,19 +35,19 @@ export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    if (fetchingRef.current) return;
-    fetchingRef.current = true;
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
-      const res = await fetch("/api/site-info", { cache: "no-store" });
+      const res = await fetch("/api/site-info?t=" + Date.now(), { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       const payload = json.data || json.siteInfo || json;
-      applyPayload(payload);
+      applyIncomingData(payload);
     } catch {
     } finally {
-      fetchingRef.current = false;
+      isFetchingRef.current = false;
     }
-  }, [applyPayload]);
+  }, [applyIncomingData]);
 
   useEffect(() => {
     if (mountedRef.current) return;
@@ -64,21 +64,20 @@ export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
       .channel(chName)
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
         clearTimeout(debounce);
-        debounce = setTimeout(refresh, 600);
+        debounce = setTimeout(refresh, 500);
       })
       .subscribe();
 
     channelRef.current = channel;
 
-    const handleStudioUpdate = (e: any) => {
+    const onStudioSaved = (e: any) => {
       if (e?.detail && typeof e.detail === "object" && e.detail.homepage_layout_config) {
-        applyPayload(e.detail);
-      } else {
-        refresh();
+        applyIncomingData(e.detail);
       }
+      refresh();
     };
 
-    window.addEventListener("theme_builder_updated", handleStudioUpdate);
+    window.addEventListener("theme_builder_updated", onStudioSaved);
     window.addEventListener("menus_updated", refresh);
 
     return () => {
@@ -87,10 +86,10 @@ export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-      window.removeEventListener("theme_builder_updated", handleStudioUpdate);
+      window.removeEventListener("theme_builder_updated", onStudioSaved);
       window.removeEventListener("menus_updated", refresh);
     };
-  }, [refresh, applyPayload]);
+  }, [refresh, applyIncomingData]);
 
   return <Ctx.Provider value={{ siteInfo, loading, refresh }}>{children}</Ctx.Provider>;
 }

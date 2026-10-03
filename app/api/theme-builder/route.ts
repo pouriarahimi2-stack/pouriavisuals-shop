@@ -8,12 +8,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { data } = await supabaseAdmin
+    const { data: rows } = await supabaseAdmin
       .from("site_info")
       .select("*")
-      .limit(1)
-      .maybeSingle();
+      .order("updated_at", { ascending: false })
+      .limit(5);
 
+    const data = rows && rows.length > 0 ? rows[0] : null;
     const layoutCfg =
       data?.homepage_layout_config && typeof data.homepage_layout_config === "object"
         ? data.homepage_layout_config
@@ -23,70 +24,47 @@ export async function GET() {
     const existingGh = existingTb.globalHeader || {};
     const existingGf = existingTb.globalFooter || {};
 
-    const resolvedFooterLogo =
-      existingGf.footerLogoUrl !== undefined
-        ? existingGf.footerLogoUrl
-        : layoutCfg?.footer?.footerLogoUrl ??
-          layoutCfg?.footer?.logoUrl ??
-          data?.footer_logo_url ??
-          data?.logo_url ??
-          "";
-
     const storedTheme = {
       ...existingTb,
       globalHeader: {
-        brandName:
-          existingGh.brandName ||
-          layoutCfg?.header?.brand?.name ||
-          data?.site_name ||
-          "آکسون کور | Axon Core",
-        logoText:
-          existingGh.logoText ||
-          layoutCfg?.header?.brand?.name ||
-          data?.site_name ||
-          "آکسون کور",
-        logoUrl:
-          existingGh.logoUrl !== undefined
-            ? existingGh.logoUrl
-            : layoutCfg?.header?.brand?.logoUrl || data?.logo_url || "",
-        logoWidth: Number(existingGh.logoWidth || layoutCfg?.header?.brand?.logoWidth || 38),
-        logoHeight: Number(existingGh.logoHeight || layoutCfg?.header?.brand?.logoHeight || 38),
+        brandName: existingGh.brandName || data?.site_name || "آکسون کور | Axon Core",
+        logoText: existingGh.logoText || data?.site_name || "آکسون کور",
+        logoUrl: existingGh.logoUrl !== undefined ? existingGh.logoUrl : data?.logo_url || "",
+        logoWidth: Number(existingGh.logoWidth || 38),
+        logoHeight: Number(existingGh.logoHeight || 38),
         logoRadius: existingGh.logoRadius || "12px",
         logoObjectFit: existingGh.logoObjectFit || "contain",
         faviconUrl: existingGh.faviconUrl || data?.favicon_url || "/favicon.ico",
-        variant: existingGh.variant || layoutCfg?.header?.variant || "capsule",
-        height: Number(existingGh.height || layoutCfg?.header?.height || 60),
+        variant: existingGh.variant || "capsule",
+        height: Number(existingGh.height || 60),
         announcementText:
           existingGh.announcementText !== undefined
             ? existingGh.announcementText
-            : data?.header_announcement || layoutCfg?.header?.announcement?.text || "",
-        announcementEnabled:
-          existingGh.announcementEnabled !== undefined
-            ? Boolean(existingGh.announcementEnabled)
-            : Boolean(layoutCfg?.header?.announcement?.show),
+            : data?.header_announcement || "",
+        announcementEnabled: Boolean(
+          existingGh.announcementEnabled ?? layoutCfg?.header?.announcement?.show ?? false
+        ),
         ctaText: existingGh.ctaText || "کاتالوگ محصولات",
         ctaUrl: existingGh.ctaUrl || "/products",
-        bgColor: existingGh.bgColor || "#07090e",
-        textColor: existingGh.textColor || "#ffffff",
+        bgColor: existingGh.bgColor || "",
       },
       globalFooter: {
         ...existingGf,
-        footerLogoUrl: resolvedFooterLogo,
-        brandTitle:
-          existingGf.brandTitle ||
-          layoutCfg?.footer?.brandTitle ||
-          data?.site_name ||
-          "آکسون کور | Axon Core",
+        footerLogoUrl:
+          existingGf.footerLogoUrl !== undefined
+            ? existingGf.footerLogoUrl
+            : data?.footer_logo_url || "",
+        brandTitle: existingGf.brandTitle || data?.site_name || "آکسون کور | Axon Core",
         brandSubtitle:
           existingGf.brandSubtitle ||
-          layoutCfg?.footer?.brandSubtitle ||
+          data?.tagline ||
           "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال",
         brandDescription:
           existingGf.brandDescription !== undefined
             ? existingGf.brandDescription
-            : layoutCfg?.footer?.description || data?.description || "",
-        scaleMode: existingGf.scaleMode || layoutCfg?.footer?.scaleMode || "normal",
-        paddingMode: existingGf.paddingMode || layoutCfg?.footer?.paddingMode || "normal",
+            : data?.description || "",
+        scaleMode: existingGf.scaleMode || "normal",
+        paddingMode: existingGf.paddingMode || "normal",
         bgColor: existingGf.bgColor || "",
         columnOrder:
           Array.isArray(existingGf.columnOrder) && existingGf.columnOrder.length === 4
@@ -101,34 +79,29 @@ export async function GET() {
         enamadLink:
           existingGf.enamadLink ||
           "https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD",
-        enamadEnabled:
-          existingGf.enamadEnabled !== undefined ? Boolean(existingGf.enamadEnabled) : true,
+        enamadEnabled: existingGf.enamadEnabled !== false,
         copyright:
           existingGf.copyright ||
-          layoutCfg?.footer?.bottomBar?.copyrightText ||
+          data?.footer_text ||
           "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
-        quickLinks:
-          existingGf.quickLinks ||
-          layoutCfg?.footer?.quickLinks?.links || [
-            { id: "q1", title: "🛍️ کاتالوگ محصولات دیجیتال", url: "/products", show: true },
-            { id: "q2", title: "📡 رادار اخبار تکنولوژی", url: "/news", show: true },
-            { id: "q3", title: "📚 مجله تخصصی و راهنمای خرید", url: "/blog", show: true },
-            { id: "q4", title: "📦 پیگیری لحظه‌ای سفارشات", url: "/track-order", show: true },
-          ],
-        externalLinks:
-          existingGf.externalLinks ||
-          layoutCfg?.footer?.externalLinks || [
-            { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob", show: true },
-            { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml", show: true },
-          ],
+        quickLinks: existingGf.quickLinks || [
+          { id: "q1", title: "🛍️️ کاتالوگ محصولات دیجیتال", url: "/products", show: true },
+          { id: "q2", title: "📡 رادار اخبار تکنولوژی", url: "/news", show: true },
+          { id: "q3", title: "📚 مجله تخصصی و راهنمای خرید", url: "/blog", show: true },
+          { id: "q4", title: "📦 پیگیری لحظه‌ای سفارشات", url: "/track-order", show: true },
+        ],
+        externalLinks: existingGf.externalLinks || [
+          { id: "ext_torob", title: "فید رسمی محصولات در ترب (Torob)", url: "/api/torob", show: true },
+          { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml", show: true },
+        ],
       },
       bannerSizing: existingTb.bannerSizing ||
         layoutCfg.bannerSizing || {
-          mobileHeight: 165,
+          mobileHeight: 160,
           tabletHeight: 250,
-          desktopHeight: 350,
-          mobileImageSize: 96,
-          desktopImageSize: 230,
+          desktopHeight: 340,
+          mobileImageSize: 90,
+          desktopImageSize: 220,
           mobileLayout: "horizontal",
         },
       homeSections: Array.isArray(existingTb.homeSections)
@@ -137,13 +110,8 @@ export async function GET() {
     };
 
     return NextResponse.json(
-      {
-        success: true,
-        config: storedTheme,
-      },
-      {
-        headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
-      }
+      { success: true, config: storedTheme },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
@@ -159,11 +127,20 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { config } = body;
 
-    const { data: existing } = await supabaseAdmin
+    const { data: allRows } = await supabaseAdmin
       .from("site_info")
       .select("*")
-      .limit(1)
-      .maybeSingle();
+      .order("updated_at", { ascending: false });
+
+    const existing = allRows && allRows.length > 0 ? allRows[0] : null;
+
+    // حذف ردیف‌های تکراری احتمالی در جدول site_info تا همیشه فقط ۱ ردیف واحد وجود داشته باشد
+    if (allRows && allRows.length > 1) {
+      const duplicateIds = allRows.slice(1).map((r: any) => r.id).filter(Boolean);
+      if (duplicateIds.length > 0) {
+        await supabaseAdmin.from("site_info").delete().in("id", duplicateIds);
+      }
+    }
 
     const prevLayout =
       existing?.homepage_layout_config && typeof existing.homepage_layout_config === "object"
@@ -181,41 +158,25 @@ export async function POST(req: NextRequest) {
     const bannerSizing = config?.bannerSizing ||
       prevTb.bannerSizing ||
       prevLayout.bannerSizing || {
-        mobileHeight: 165,
+        mobileHeight: 160,
         tabletHeight: 250,
-        desktopHeight: 350,
-        mobileImageSize: 96,
-        desktopImageSize: 230,
+        desktopHeight: 340,
+        mobileImageSize: 90,
+        desktopImageSize: 220,
         mobileLayout: "horizontal",
       };
 
-    const headerLogoUrl =
-      gh.logoUrl !== undefined ? String(gh.logoUrl).trim() : existing?.logo_url || "";
-
-    const dedicatedFooterLogoUrl =
-      gf.footerLogoUrl !== undefined
-        ? String(gf.footerLogoUrl).trim()
-        : prevLayout?.footer?.footerLogoUrl ?? prevLayout?.footer?.logoUrl ?? headerLogoUrl;
-
-    const faviconUrl =
-      gh.faviconUrl !== undefined
-        ? String(gh.faviconUrl).trim()
-        : existing?.favicon_url || "/favicon.ico";
+    const headerLogoUrl = gh.logoUrl !== undefined ? String(gh.logoUrl).trim() : "";
+    const footerLogoUrl = gf.footerLogoUrl !== undefined ? String(gf.footerLogoUrl).trim() : "";
+    const faviconUrl = gh.faviconUrl !== undefined ? String(gh.faviconUrl).trim() : "/favicon.ico";
 
     const updatedLayout = {
       ...prevLayout,
       theme_builder_config: {
         ...prevTb,
         ...config,
-        globalHeader: {
-          ...gh,
-          logoUrl: headerLogoUrl,
-          faviconUrl,
-        },
-        globalFooter: {
-          ...gf,
-          footerLogoUrl: dedicatedFooterLogoUrl,
-        },
+        globalHeader: { ...gh, logoUrl: headerLogoUrl, faviconUrl },
+        globalFooter: { ...gf, footerLogoUrl },
         bannerSizing,
         homeSections,
       },
@@ -223,11 +184,9 @@ export async function POST(req: NextRequest) {
       homeSections,
       header: {
         ...(prevLayout.header || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header),
-        variant: gh.variant || prevLayout?.header?.variant || "capsule",
-        height: Number(gh.height || prevLayout?.header?.height || 60),
+        variant: gh.variant || "capsule",
+        height: Number(gh.height || 60),
         brand: {
-          ...((prevLayout.header && prevLayout.header.brand) ||
-            DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header.brand),
           name: gh.brandName || "آکسون کور | Axon Core",
           logoUrl: headerLogoUrl,
           logoWidth: Number(gh.logoWidth || 38),
@@ -237,7 +196,7 @@ export async function POST(req: NextRequest) {
         },
         announcement: {
           show: Boolean(gh.announcementEnabled),
-          text: gh.announcementText !== undefined ? String(gh.announcementText) : "",
+          text: String(gh.announcementText || ""),
           backgroundColor: "#0284c7",
           textColor: "#ffffff",
           dismissible: true,
@@ -245,14 +204,11 @@ export async function POST(req: NextRequest) {
       },
       footer: {
         ...(prevLayout.footer || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer),
-        logoUrl: dedicatedFooterLogoUrl,
-        footerLogoUrl: dedicatedFooterLogoUrl,
+        logoUrl: footerLogoUrl,
+        footerLogoUrl,
         brandTitle: gf.brandTitle || gh.brandName || "آکسون کور | Axon Core",
         brandSubtitle: gf.brandSubtitle || "",
-        description:
-          gf.brandDescription !== undefined
-            ? String(gf.brandDescription)
-            : prevLayout?.footer?.description || "",
+        description: String(gf.brandDescription ?? ""),
         scaleMode: gf.scaleMode || "normal",
         paddingMode: gf.paddingMode || "normal",
         bgColor: gf.bgColor || "",
@@ -262,43 +218,31 @@ export async function POST(req: NextRequest) {
         warehouseAddress: gf.warehouseAddress || "شیراز - ستارخان",
         workingHours: gf.workingHours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
         enamadCode: gf.enamadCode || "7434404",
-        enamadLink:
-          gf.enamadLink ||
-          "https://trustseal.enamad.ir/?id=7434404&Code=RqxtofLwJnKsvqQACWz1mvYVVKykOrtD",
+        enamadLink: gf.enamadLink || "",
         enamadEnabled: gf.enamadEnabled !== false,
-        quickLinks: {
-          show: true,
-          title: "دسترسی سریع",
-          links: Array.isArray(gf.quickLinks) ? gf.quickLinks : [],
-        },
-        externalLinks: Array.isArray(gf.externalLinks) ? gf.externalLinks : [],
+        quickLinks: { show: true, title: "دسترسی سریع", links: gf.quickLinks || [] },
+        externalLinks: gf.externalLinks || [],
         bottomBar: {
-          ...((prevLayout.footer && prevLayout.footer.bottomBar) || {}),
           show: true,
-          copyrightText:
-            gf.copyright || "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
+          copyrightText: gf.copyright || "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
         },
       },
     };
 
     const fullUpdateObj: Record<string, any> = {
-      site_name: gh.brandName || gf.brandTitle || existing?.site_name || "آکسون کور | Axon Core",
-      tagline: gf.brandSubtitle || existing?.tagline || "فروشگاه تخصصی محصولات تکنولوژی و گجت‌های هوشمند",
-      description:
-        gf.brandDescription !== undefined
-          ? String(gf.brandDescription)
-          : existing?.description || "",
-      footer_text:
-        gf.copyright || existing?.footer_text || "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
+      site_name: gh.brandName || gf.brandTitle || "آکسون کور | Axon Core",
+      tagline: gf.brandSubtitle || "فروشگاه تخصصی محصولات تکنولوژی و گجت‌های هوشمند",
+      description: String(gf.brandDescription ?? ""),
+      footer_text: gf.copyright || "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026",
       logo_url: headerLogoUrl,
-      footer_logo_url: dedicatedFooterLogoUrl,
+      footer_logo_url: footerLogoUrl,
       favicon_url: faviconUrl,
-      phone: gf.supportPhone || existing?.phone || "09376110200",
-      email: gf.supportEmail || existing?.email || "Pouriarahimi@yahoo.com",
-      address: gf.warehouseAddress || existing?.address || "شیراز - ستارخان",
-      working_hours: gf.workingHours || existing?.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+      phone: gf.supportPhone || "09376110200",
+      email: gf.supportEmail || "Pouriarahimi@yahoo.com",
+      address: gf.warehouseAddress || "شیراز - ستارخان",
+      working_hours: gf.workingHours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
       homepage_layout_config: updatedLayout,
-      header_announcement: gh.announcementText !== undefined ? String(gh.announcementText) : "",
+      header_announcement: String(gh.announcementText || ""),
       updated_at: new Date().toISOString(),
     };
 
@@ -309,7 +253,6 @@ export async function POST(req: NextRequest) {
         .eq("id", existing.id);
 
       if (uErr) {
-        // در صورتی که برخی ستون‌های فرعی در اسکیمای دیتابیس نباشند، ستون‌های قطعی آپدیت می‌شوند
         await supabaseAdmin
           .from("site_info")
           .update({
@@ -323,13 +266,7 @@ export async function POST(req: NextRequest) {
           .eq("id", existing.id);
       }
     } else {
-      await supabaseAdmin.from("site_info").insert([
-        {
-          site_name: fullUpdateObj.site_name,
-          homepage_layout_config: updatedLayout,
-          header_announcement: fullUpdateObj.header_announcement,
-        },
-      ]);
+      await supabaseAdmin.from("site_info").insert([fullUpdateObj]);
     }
 
     return NextResponse.json({
@@ -340,7 +277,7 @@ export async function POST(req: NextRequest) {
         homepage_layout_config: updatedLayout,
         theme_builder_config: updatedLayout.theme_builder_config,
       },
-      message: "✓ تمامی تغییرات هدر، نوار اعلان، فاوآیکون، لوگوی فوتر، متون فوتر و چیدمان موبایل/دسکتاپ ذخیره و به صورت بلادرنگ منتشر شد.",
+      message: "✓ تغییرات با موفقیت در دیتابیس ذخیره و به صورت زنده در کل سایت اعمال شد.",
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });

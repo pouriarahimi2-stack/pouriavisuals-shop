@@ -38,11 +38,11 @@ export interface BannerSizingConfig {
 }
 
 export const DEFAULT_BANNER_SIZING: BannerSizingConfig = {
-  mobileHeight: 165,
+  mobileHeight: 160,
   tabletHeight: 250,
-  desktopHeight: 350,
-  mobileImageSize: 96,
-  desktopImageSize: 230,
+  desktopHeight: 340,
+  mobileImageSize: 90,
+  desktopImageSize: 220,
   mobileLayout: "horizontal",
 };
 
@@ -114,8 +114,6 @@ function normalizeProductRow(p: any) {
 }
 
 function getDeviceVisibilityClasses(sec: ResponsiveSectionItem): string {
-  // مقادیر پیش‌فرض استاندارد در صورتی که هنوز در دیتابیس ذخیره نشده باشند:
-  // اسلایدر سه‌بعدی فقط در موبایل | کاتالوگ گرید فقط در تبلت و دسکتاپ | بنر در همه
   const defaultMob = sec.type === "NativeProductCatalog" ? false : true;
   const defaultTab = sec.type === "NativePerspectiveSlider" ? false : true;
   const defaultDesk = sec.type === "NativePerspectiveSlider" ? false : true;
@@ -125,12 +123,7 @@ function getDeviceVisibilityClasses(sec: ResponsiveSectionItem): string {
   const desk = sec.showOnDesktop !== undefined ? Boolean(sec.showOnDesktop) : defaultDesk;
 
   if (!mob && !tab && !desk) return "hidden";
-
-  const mCls = mob ? "block" : "hidden";
-  const tCls = tab ? "md:block" : "md:hidden";
-  const dCls = desk ? "lg:block" : "lg:hidden";
-
-  return mCls + " " + tCls + " " + dCls;
+  return (mob ? "block" : "hidden") + " " + (tab ? "md:block" : "md:hidden") + " " + (desk ? "lg:block" : "lg:hidden");
 }
 
 export default function DynamicHomeSections({
@@ -138,7 +131,7 @@ export default function DynamicHomeSections({
   initialBanners = [],
   initialSiteInfo = null,
 }: Props) {
-  const { siteInfo: ctxSiteInfo, refresh } = useSiteInfo();
+  const { siteInfo: ctxSiteInfo } = useSiteInfo();
   const activeSiteInfo =
     ctxSiteInfo && Object.keys(ctxSiteInfo).length > 0 ? ctxSiteInfo : initialSiteInfo;
   const layoutCfg = activeSiteInfo?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
@@ -182,32 +175,21 @@ export default function DynamicHomeSections({
       fetchLiveHomeData();
     }
 
-    const handleStudioChange = () => {
-      fetchLiveHomeData();
-      if (typeof refresh === "function") refresh();
-    };
-
-    window.addEventListener("theme_builder_updated", handleStudioChange);
     window.addEventListener("banners_updated", fetchLiveHomeData);
     window.addEventListener("products_updated", fetchLiveHomeData);
 
     const chHome = supabase
       .channel("realtime-home-unified-stream")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        fetchLiveHomeData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
-        fetchLiveHomeData();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, fetchLiveHomeData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, fetchLiveHomeData)
       .subscribe();
 
     return () => {
-      window.removeEventListener("theme_builder_updated", handleStudioChange);
       window.removeEventListener("banners_updated", fetchLiveHomeData);
       window.removeEventListener("products_updated", fetchLiveHomeData);
       supabase.removeChannel(chHome);
     };
-  }, [fetchLiveHomeData, initialProducts.length, refresh]);
+  }, [fetchLiveHomeData, initialProducts.length]);
 
   const effectiveSlides =
     banners.length > 0
@@ -263,11 +245,11 @@ export default function DynamicHomeSections({
           <section
             style={
               {
-                "--axon-banner-h-mob": (bannerSizing.mobileHeight || 165) + "px",
+                "--axon-banner-h-mob": (bannerSizing.mobileHeight || 160) + "px",
                 "--axon-banner-h-tab": (bannerSizing.tabletHeight || 250) + "px",
-                "--axon-banner-h-desk": (bannerSizing.desktopHeight || 350) + "px",
-                "--axon-banner-img-mob": (bannerSizing.mobileImageSize || 96) + "px",
-                "--axon-banner-img-desk": (bannerSizing.desktopImageSize || 230) + "px",
+                "--axon-banner-h-desk": (bannerSizing.desktopHeight || 340) + "px",
+                "--axon-banner-img-mob": (bannerSizing.mobileImageSize || 90) + "px",
+                "--axon-banner-img-desk": (bannerSizing.desktopImageSize || 220) + "px",
               } as React.CSSProperties
             }
             className="axon-hero-banner-box relative w-full rounded-3xl sm:rounded-[2.5rem] overflow-hidden border border-[var(--card-border)] shadow-xl bg-[var(--modal-bg)] flex items-center"
@@ -301,8 +283,7 @@ export default function DynamicHomeSections({
                         : "flex flex-col-reverse md:flex-row items-center justify-between gap-4 sm:gap-6 p-4 sm:p-8 md:p-10"
                     }
                   >
-                    {/* ستون متن و دکمه */}
-                    <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-3.5 text-right">
+                    <div className="flex-1 min-w-0 space-y-1 sm:space-y-3 text-right">
                       <span className="inline-block px-2.5 py-0.5 sm:px-3.5 sm:py-1 rounded-full bg-[var(--accent-blue)]/15 border border-[var(--accent-blue)]/30 text-[var(--accent-blue)] text-[10px] sm:text-xs font-black">
                         🔥 {slide.badge}
                       </span>
@@ -318,7 +299,7 @@ export default function DynamicHomeSections({
                       )}
 
                       <div className="pt-1 sm:pt-2 flex flex-wrap items-center gap-2 sm:gap-4">
-                        <span className="px-3.5 py-1.5 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl bg-[var(--accent-blue)] text-white font-black text-[10px] sm:text-xs md:text-sm shadow-md hover:opacity-90 transition inline-flex items-center gap-1.5">
+                        <span className="px-3 py-1.5 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl bg-[var(--accent-blue)] text-white font-black text-[10px] sm:text-xs md:text-sm shadow-md hover:opacity-90 transition inline-flex items-center gap-1.5">
                           <span>{slide.cta}</span>
                           <span>←</span>
                         </span>
@@ -331,7 +312,6 @@ export default function DynamicHomeSections({
                       </div>
                     </div>
 
-                    {/* ستون تصویر محصول / بنر */}
                     <div className="shrink-0 flex items-center justify-center">
                       <div className="axon-hero-banner-img rounded-2xl sm:rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] p-2 sm:p-4 flex items-center justify-center overflow-hidden shadow-inner">
                         <img
@@ -359,9 +339,7 @@ export default function DynamicHomeSections({
                     }}
                     className={
                       "h-1.5 sm:h-2 rounded-full transition-all cursor-pointer " +
-                      (idx === activeSlide
-                        ? "w-5 sm:w-6 bg-[var(--accent-blue)]"
-                        : "w-1.5 sm:w-2 bg-white/50")
+                      (idx === activeSlide ? "w-5 sm:w-6 bg-[var(--accent-blue)]" : "w-1.5 sm:w-2 bg-white/50")
                     }
                     aria-label={"اسلاید " + (idx + 1)}
                   />

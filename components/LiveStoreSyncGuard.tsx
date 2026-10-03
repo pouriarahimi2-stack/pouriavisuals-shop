@@ -14,20 +14,11 @@ export default function LiveStoreSyncGuard() {
   const applyLiveStyles = useCallback((styleRow: any) => {
     if (!styleRow || typeof styleRow !== "object" || typeof document === "undefined") return;
     const root = document.documentElement;
-    if (styleRow.primary_color) {
-      root.style.setProperty("--accent-blue", String(styleRow.primary_color));
-    }
-    if (styleRow.secondary_color) {
-      root.style.setProperty("--accent-purple", String(styleRow.secondary_color));
-    }
-    if (styleRow.border_radius) {
-      root.style.setProperty("--border-radius-card", String(styleRow.border_radius));
-    }
+    if (styleRow.primary_color) root.style.setProperty("--accent-blue", String(styleRow.primary_color));
+    if (styleRow.secondary_color) root.style.setProperty("--accent-purple", String(styleRow.secondary_color));
+    if (styleRow.border_radius) root.style.setProperty("--border-radius-card", String(styleRow.border_radius));
     if (styleRow.font_family) {
-      root.style.setProperty(
-        "--font-primary",
-        JSON.stringify(styleRow.font_family) + ", Vazirmatn, sans-serif"
-      );
+      root.style.setProperty("--font-primary", JSON.stringify(styleRow.font_family) + ", Vazirmatn, sans-serif");
     }
     if (styleRow.custom_css !== undefined) {
       let styleTag = document.getElementById("axon-live-custom-css") as HTMLStyleElement | null;
@@ -43,28 +34,14 @@ export default function LiveStoreSyncGuard() {
   useEffect(() => {
     if (!siteInfo || typeof siteInfo !== "object" || Object.keys(siteInfo).length === 0) return;
 
-    const layoutCfg =
-      siteInfo.homepage_layout_config ||
-      siteInfo.siteInfo?.homepage_layout_config ||
-      siteInfo.data?.homepage_layout_config ||
-      {};
-
-    const sys =
-      siteInfo.settings ||
-      siteInfo.system_settings ||
-      layoutCfg.system_settings ||
-      siteInfo.siteInfo?.settings ||
-      {};
+    const layoutCfg = siteInfo.homepage_layout_config || {};
+    const sys = siteInfo.settings || siteInfo.system_settings || layoutCfg.system_settings || {};
 
     const isMaintenance =
       Boolean(sys.maintenanceMode) ||
-      (siteInfo.maintenance_mode &&
-        siteInfo.maintenance_mode !== "none" &&
-        siteInfo.maintenance_mode !== "false");
+      (siteInfo.maintenance_mode && siteInfo.maintenance_mode !== "none" && siteInfo.maintenance_mode !== "false");
 
-    const isNoIndex =
-      Boolean(sys.noIndex ?? sys.disallowRobots) ||
-      siteInfo.allow_google_index === false;
+    const isNoIndex = Boolean(sys.noIndex ?? sys.disallowRobots) || siteInfo.allow_google_index === false;
 
     if (typeof document !== "undefined") {
       let robotsMeta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
@@ -79,16 +56,11 @@ export default function LiveStoreSyncGuard() {
         robotsMeta.content = "index, follow";
       }
 
-      const fav =
-        layoutCfg?.theme_builder_config?.globalHeader?.faviconUrl ||
-        siteInfo.favicon_url;
+      const fav = layoutCfg?.theme_builder_config?.globalHeader?.faviconUrl || siteInfo.favicon_url;
       if (fav) applyFaviconToDOM(String(fav));
     }
 
-    const isAdminRoute =
-      pathname.startsWith("/admin") ||
-      pathname.startsWith("/api") ||
-      pathname.startsWith("/login");
+    const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/api") || pathname.startsWith("/login");
     const isMaintenancePage = pathname.startsWith("/maintenance");
 
     if (isMaintenance && !isAdminRoute && !isMaintenancePage) {
@@ -101,15 +73,9 @@ export default function LiveStoreSyncGuard() {
   useEffect(() => {
     const chStyles = supabase
       .channel("global-store-live-styles-single")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "site_styles" },
-        (payload) => {
-          if (payload?.new) {
-            applyLiveStyles(payload.new);
-          }
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "site_styles" }, (payload) => {
+        if (payload?.new) applyLiveStyles(payload.new);
+      })
       .subscribe();
 
     return () => {

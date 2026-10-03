@@ -136,6 +136,30 @@ export default function AdminOrders() {
     }
   };
 
+  const handleDeleteOrder = async (orderId: string | number) => {
+    if (!confirm("آیا از حذف کامل این سفارش از دیتابیس اطمینان دارید؟")) return;
+    soundEngine.playClick();
+    setUpdatingId(orderId);
+    try {
+      const res = await fetch("/api/admin/orders?id=" + encodeURIComponent(String(orderId)), {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        soundEngine.playSuccess();
+        setOrders((prev) => prev.filter((o) => String(o.id) !== String(orderId)));
+        if (selectedOrder && String(selectedOrder.id) === String(orderId)) {
+          setSelectedOrder(null);
+        }
+      } else {
+        alert("خطا در حذف سفارش.");
+      }
+    } catch {
+      alert("خطا در ارتباط با سرور.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const printOrderInvoice = (order: Order) => {
     soundEngine.playClick();
     const printWindow = window.open("", "_blank");
@@ -412,6 +436,14 @@ export default function AdminOrders() {
                             className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border border-emerald-500/20 text-[11px] font-bold transition cursor-pointer"
                           >
                             🖨️ فاکتور
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="p-1.5 px-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-500 border border-rose-500/20 text-[11px] font-bold transition cursor-pointer"
+                            title="حذف سفارش"
+                          >
+                            🗑️
                           </button>
 
                           <select

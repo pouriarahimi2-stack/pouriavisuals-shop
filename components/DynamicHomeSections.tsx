@@ -1,7 +1,7 @@
 // File Path: components/DynamicHomeSections.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
@@ -44,15 +44,18 @@ const DEFAULT_SECTIONS_ORDER = [
 export default function DynamicHomeSections({
   initialProducts = [],
   initialBanners = [],
+  initialSiteInfo = null,
 }: Props) {
-  const { siteInfo, refresh } = useSiteInfo();
-  const layoutCfg = siteInfo?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+  const { siteInfo: ctxSiteInfo, refresh } = useSiteInfo();
+  const activeSiteInfo =
+    ctxSiteInfo && Object.keys(ctxSiteInfo).length > 0 ? ctxSiteInfo : initialSiteInfo;
+  const layoutCfg = activeSiteInfo?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
 
   const [products, setProducts] = useState<any[]>(initialProducts);
   const [banners, setBanners] = useState<any[]>(initialBanners);
   const [activeSlide, setActiveSlide] = useState(0);
 
-  const fetchLiveHomeData = async () => {
+  const fetchLiveHomeData = useCallback(async () => {
     try {
       const [pRes, bRes] = await Promise.all([
         fetch("/api/products", { cache: "no-store" }).catch(() => null),
@@ -71,10 +74,13 @@ export default function DynamicHomeSections({
         setBanners(bList);
       }
     } catch {}
-  };
+  }, []);
 
   useEffect(() => {
-    fetchLiveHomeData();
+    // فقط در صورتی که دیتای SSR خالی باشد فچ اولیه انجام شود تا در ترافیک هم‌زمان بار اضافه به سرور تحمیل نشود
+    if (initialProducts.length === 0) {
+      fetchLiveHomeData();
+    }
 
     const handleStudioChange = () => {
       fetchLiveHomeData();
@@ -85,15 +91,11 @@ export default function DynamicHomeSections({
     window.addEventListener("banners_updated", fetchLiveHomeData);
     window.addEventListener("products_updated", fetchLiveHomeData);
 
-    const chProds = supabase
-      .channel("realtime-home-products")
+    const chHome = supabase
+      .channel("realtime-home-unified-stream")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
         fetchLiveHomeData();
       })
-      .subscribe();
-
-    const chBanners = supabase
-      .channel("realtime-home-banners")
       .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
         fetchLiveHomeData();
       })
@@ -103,10 +105,9 @@ export default function DynamicHomeSections({
       window.removeEventListener("theme_builder_updated", handleStudioChange);
       window.removeEventListener("banners_updated", fetchLiveHomeData);
       window.removeEventListener("products_updated", fetchLiveHomeData);
-      supabase.removeChannel(chProds);
-      supabase.removeChannel(chBanners);
+      supabase.removeChannel(chHome);
     };
-  }, [refresh]);
+  }, [fetchLiveHomeData, initialProducts.length, refresh]);
 
   const effectiveSlides =
     banners.length > 0
@@ -252,7 +253,7 @@ export default function DynamicHomeSections({
     if (sec.type === "NativePerspectiveSlider") {
       if (products.length === 0) return null;
       return (
-        <div key={sec.id} className="block md:hidden">
+        <div key={sec.id} className="w-full">
           <ProductPerspectiveSlider
             products={products}
             customTitle={sec.title}
@@ -264,7 +265,7 @@ export default function DynamicHomeSections({
 
     if (sec.type === "NativeProductCatalog") {
       return (
-        <div key={sec.id} className="hidden md:block">
+        <div key={sec.id} className="w-full">
           <ProductList
             initialProducts={products}
             customHeading={sec.title}

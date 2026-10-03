@@ -3,10 +3,13 @@
 import { useEffect, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useSiteInfo } from "@/context/SiteInfoContext";
+import { applyFaviconToDOM } from "@/lib/realtimeSync";
 
 export default function LiveStoreSyncGuard() {
   const pathname = usePathname() || "/";
   const router = useRouter();
+  const { siteInfo } = useSiteInfo();
 
   const applyLiveStyles = useCallback((styleRow: any) => {
     if (!styleRow || typeof styleRow !== "object" || typeof document === "undefined") return;
@@ -26,11 +29,20 @@ export default function LiveStoreSyncGuard() {
         JSON.stringify(styleRow.font_family) + ", Vazirmatn, sans-serif"
       );
     }
+    if (styleRow.custom_css !== undefined) {
+      let styleTag = document.getElementById("axon-live-custom-css") as HTMLStyleElement | null;
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = "axon-live-custom-css";
+        document.head.appendChild(styleTag);
+      }
+      styleTag.textContent = String(styleRow.custom_css || "");
+    }
   }, []);
 
-  const applyLiveSiteConfig = useCallback(
+  const enforceSiteRules = useCallback(
     (payload: any) => {
-      if (!payload || typeof payload !== "object") return;
+      if (!payload || typeof payload !== "object" || Object.keys(payload).length === 0) return;
 
       const layoutCfg =
         payload.homepage_layout_config ||
@@ -68,19 +80,10 @@ export default function LiveStoreSyncGuard() {
           robotsMeta.content = "index, follow";
         }
 
-        const customVars =
-          layoutCfg.cssVariables ||
-          layoutCfg.theme_variables ||
-          layoutCfg.styles?.variables;
-
-        if (customVars && typeof customVars === "object") {
-          const root = document.documentElement;
-          Object.entries(customVars).forEach(([k, v]) => {
-            if (typeof v === "string" && k.startsWith("--")) {
-              root.style.setProperty(k, v);
-            }
-          });
-        }
+        const fav =
+          layoutCfg?.theme_builder_config?.globalHeader?.faviconUrl ||
+          payload.favicon_url;
+        if (fav) applyFaviconToDOM(String(fav));
 
         window.dispatchEvent(new CustomEvent("site_info_updated", { detail: payload }));
       }
@@ -100,60 +103,37 @@ export default function LiveStoreSyncGuard() {
     [pathname, router]
   );
 
-  const fetchAndSyncAll = useCallback(async () => {
-    try {
-      const [infoRes, styleRes] = await Promise.allSettled([
-        fetch("/api/site-info", { cache: "no-store" }),
-        fetch("/api/styles", { cache: "no-store" }),
-      ]);
-
-      if (infoRes.status === "fulfilled" && infoRes.value.ok) {
-        const infoJson = await infoRes.value.json();
-        applyLiveSiteConfig(infoJson);
-      }
-      if (styleRes.status === "fulfilled" && styleRes.value.ok) {
-        const styleJson = await styleRes.value.json();
-        if (styleJson?.data) applyLiveStyles(styleJson.data);
-      }
-    } catch {}
-  }, [applyLiveSiteConfig, applyLiveStyles]);
+  useEffect(() => {
+    if (siteInfo && Object.keys(siteInfo).length > 0) {
+      enforceSiteRules(siteInfo);
+    }
+  }, [siteInfo, enforceSiteRules]);
 
   useEffect(() => {
-    fetchAndSyncAll();
-
-    const chInfo = supabase
-      .channel("global-store-live-sync-info")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "site_info" },
-        (payload) => {
-          if (payload?.new) applyLiveSiteConfig(payload.new);
-          fetchAndSyncAll();
-        }
-      )
-      .subscribe();
-
     const chStyles = supabase
-      .channel("global-store-live-sync-styles")
+      .channel("global-store-live-styles-single")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "site_styles" },
         (payload) => {
-          if (payload?.new) applyLiveStyles(payload.new);
-          fetchAndSyncAll();
+          if (payload?.new) {
+            applyLiveStyles(payload.new);
+          } else {
+            fetch("/api/styles", { cache: "no-store" })
+              .then((r) => r.json())
+              .then((j) => {
+                if (j?.data) applyLiveStyles(j.data);
+              })
+              .catch(() => {});
+          }
         }
       )
       .subscribe();
 
-    const onFocus = () => fetchAndSyncAll();
-    window.addEventListener("focus", onFocus);
-
     return () => {
-      window.removeEventListener("focus", onFocus);
-      supabase.removeChannel(chInfo);
       supabase.removeChannel(chStyles);
     };
-  }, [fetchAndSyncAll, applyLiveSiteConfig, applyLiveStyles]);
+  }, [applyLiveStyles]);
 
   return null;
 }

@@ -17,10 +17,13 @@ export default function Header() {
   const { siteInfo, refresh } = useSiteInfo();
 
   const headerCfg = siteInfo?.homepage_layout_config?.header || DEFAULT_HEADER_CONFIG;
-  const themeHeader = siteInfo?.homepage_layout_config?.theme_builder_config?.globalHeader || {};
+  const themeHeader =
+    siteInfo?.theme_builder_config?.globalHeader ||
+    siteInfo?.homepage_layout_config?.theme_builder_config?.globalHeader ||
+    {};
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
-  const [userName, setUserName] = useState<string | null>(null);
+  const [userLabel, setUserLabel] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
@@ -37,16 +40,34 @@ export default function Header() {
 
   const syncUserSession = () => {
     try {
+      let resolvedName = "";
+      const draftRaw = localStorage.getItem("axon_checkout_form_draft_v2026");
+      if (draftRaw) {
+        const draft = JSON.parse(draftRaw);
+        if (draft?.fullName && String(draft.fullName).trim().length > 1) {
+          resolvedName = String(draft.fullName).trim();
+        }
+      }
+
       const local = localStorage.getItem("axon_user_session");
       if (local) {
         const parsed = JSON.parse(local);
-        if (parsed?.name) setUserName(parsed.name);
-        else if (parsed?.username) setUserName(parsed.username);
-        else if (parsed?.phone) setUserName(parsed.phone);
+        const rawName = parsed?.full_name || parsed?.name || parsed?.username || "";
+        if (rawName && !/^0?9\d{9}$/.test(String(rawName).trim())) {
+          setUserLabel(String(rawName).trim());
+        } else if (resolvedName) {
+          setUserLabel(resolvedName);
+        } else if (parsed?.phone) {
+          setUserLabel(String(parsed.phone).trim());
+        } else {
+          setUserLabel("پنل کاربری");
+        }
       } else {
-        setUserName(null);
+        setUserLabel(null);
       }
-    } catch {}
+    } catch {
+      setUserLabel(null);
+    }
   };
 
   useEffect(() => {
@@ -90,7 +111,8 @@ export default function Header() {
 
   if (headerCfg.show === false) return null;
 
-  const isCapsule = headerCfg.variant !== "full-width";
+  const variantMode = themeHeader.variant || headerCfg.variant || "capsule";
+  const isCapsule = variantMode !== "full-width";
   const positionClass =
     headerCfg.position === "fixed"
       ? "fixed top-3 inset-x-0 z-40"
@@ -106,8 +128,12 @@ export default function Header() {
 
   const logoWidth = Number(themeHeader.logoWidth || headerCfg?.brand?.logoWidth || 38);
   const logoHeight = Number(themeHeader.logoHeight || headerCfg?.brand?.logoHeight || 38);
+  const logoRadius = themeHeader.logoRadius || "12px";
+  const logoFit = themeHeader.logoObjectFit || "contain";
+  const baseHeight = Number(themeHeader.height || headerCfg.height || 60);
 
-  const navMenuFromDb = siteInfo?.homepage_layout_config?.navigation_menu;
+  const navMenuFromDb =
+    siteInfo?.navigation_menu || siteInfo?.homepage_layout_config?.navigation_menu;
   const menuItems =
     Array.isArray(navMenuFromDb) && navMenuFromDb.length > 0
       ? navMenuFromDb
@@ -122,6 +148,8 @@ export default function Header() {
           (m: any) => m.show !== false
         );
 
+  const isPhoneLabel = Boolean(userLabel && /^0?9\d{9}$/.test(userLabel));
+
   return (
     <>
       <header
@@ -134,8 +162,8 @@ export default function Header() {
             maxWidth: (headerCfg.maxWidth || 1280) + "px",
             height:
               isScrolled && headerCfg.shrinkOnScroll
-                ? Math.max(48, (headerCfg.height || 60) - 8) + "px"
-                : (headerCfg.height || 60) + "px",
+                ? Math.max(48, baseHeight - 8) + "px"
+                : baseHeight + "px",
           }}
           className={
             "mx-auto w-full px-4 sm:px-8 transition-all duration-300 flex items-center justify-between gap-4 border shadow-xl backdrop-blur-2xl " +
@@ -157,8 +185,9 @@ export default function Header() {
                   style={{
                     width: logoWidth + "px",
                     height: logoHeight + "px",
+                    borderRadius: String(logoRadius),
+                    objectFit: logoFit as any,
                   }}
-                  className="object-contain rounded-lg"
                 />
               ) : (
                 <AnimatedLogo size={36} />
@@ -231,12 +260,22 @@ export default function Header() {
             </button>
 
             <Link
-              href={userName ? "/account" : "/login"}
+              href={userLabel ? "/account" : "/login"}
               onClick={() => soundEngine.playClick()}
-              className="hidden sm:flex px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition items-center gap-1.5 max-w-[160px] truncate"
+              className="hidden sm:flex px-4 py-2 rounded-full bg-[var(--input-bg)] border border-[var(--card-border)] hover:border-[var(--accent-blue)] text-xs font-bold text-[var(--text-primary)] transition items-center gap-1.5 max-w-[220px]"
             >
               <span>👤</span>
-              <span className="truncate">{userName ? "سلام، " + userName : "حساب کاربری"}</span>
+              {userLabel ? (
+                isPhoneLabel ? (
+                  <span className="font-mono font-bold tracking-tight" dir="ltr">
+                    {userLabel}
+                  </span>
+                ) : (
+                  <span className="truncate">سلام، {userLabel}</span>
+                )
+              ) : (
+                <span>حساب کاربری</span>
+              )}
             </Link>
 
             <button
@@ -272,12 +311,14 @@ export default function Header() {
         <div className="md:hidden fixed inset-x-0 top-[76px] z-30 px-3" dir="rtl">
           <div className="rounded-3xl bg-[var(--modal-bg)]/98 backdrop-blur-2xl border border-[var(--card-border)] shadow-2xl p-4 space-y-1 max-h-[75vh] overflow-y-auto">
             <Link
-              href={userName ? "/account" : "/login"}
+              href={userLabel ? "/account" : "/login"}
               onClick={() => soundEngine.playClick()}
               className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--accent-blue)]/10 border border-[var(--accent-blue)]/20 text-xs font-black text-[var(--accent-blue)] mb-3"
             >
               <span className="text-base">👤</span>
-              <span>{userName ? "پنل کاربری (" + userName + ")" : "ورود / ثبت‌نام سریع"}</span>
+              <span>
+                {userLabel ? "پنل کاربری (" + userLabel + ")" : "ورود / ثبت‌نام سریع"}
+              </span>
             </Link>
 
             {menuItems.map((item: any) => {

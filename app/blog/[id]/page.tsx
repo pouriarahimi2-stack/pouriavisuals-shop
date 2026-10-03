@@ -1,3 +1,4 @@
+import sanitizeHtml from "sanitize-html";
 // File Path: app/blog/[id]/page.tsx
 import React from "react";
 import { notFound } from "next/navigation";
@@ -186,9 +187,19 @@ export default async function BlogPostPage({ params }: PageProps) {
         </div>
       )}
 
-      <div className="rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-5 sm:p-10 shadow-sm leading-loose text-sm sm:text-base text-[var(--text-secondary)] font-medium space-y-4 whitespace-pre-line text-justify">
-        {post.content}
-      </div>
+      <div
+        className="rounded-3xl sm:rounded-[2.5rem] bg-[var(--modal-bg)] border border-[var(--card-border)] p-5 sm:p-10 shadow-sm leading-loose text-sm sm:text-base text-[var(--text-secondary)] font-medium space-y-4 whitespace-pre-line text-justify prose dark:prose-invert max-w-none"
+        dangerouslySetInnerHTML={{
+          __html: sanitizeHtml(String(post.content || ""), {
+            allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2", "h3", "table", "thead", "tbody", "tr", "th", "td"]),
+            allowedAttributes: {
+              ...sanitizeHtml.defaults.allowedAttributes,
+              "*": ["class", "style", "href", "target"],
+              img: ["src", "alt", "width", "height"],
+            },
+          }),
+        }}
+      />
 
       <div className="p-5 sm:p-6 rounded-3xl bg-[var(--input-bg)] border border-[var(--card-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

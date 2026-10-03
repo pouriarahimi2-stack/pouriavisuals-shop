@@ -229,7 +229,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const applyCoupon = async (code: string) => {
     const clean = code.trim().toUpperCase();
-    const res = await couponService.validateCoupon(clean, totalPrice);
+    const res = await couponService.validateCoupon(clean, totalPrice, cartItems);
     if (res.valid && res.coupon) {
       const cpn: any = res.coupon;
       const isFixed = cpn.type === "fixed" || cpn.discount_type === "fixed";

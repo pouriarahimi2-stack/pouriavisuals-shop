@@ -1,3 +1,4 @@
+// File Path: app/api/categories/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
@@ -12,7 +13,11 @@ export async function GET() {
       .order("created_at", { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json({ success: true, categories: categories || [], data: categories || [] });
+    return NextResponse.json({
+      success: true,
+      categories: categories || [],
+      data: categories || [],
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
@@ -29,7 +34,10 @@ export async function POST(req: NextRequest) {
     const name = String(body.name || body.title || "").trim();
 
     if (!name) {
-      return NextResponse.json({ success: false, message: "نام دسته‌بندی الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "نام دسته‌بندی الزامی است." },
+        { status: 400 }
+      );
     }
 
     const slug = String(body.slug || name)
@@ -57,7 +65,12 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (error) throw error;
-      return NextResponse.json({ success: true, message: "دسته‌بندی با موفقیت به‌روزرسانی شد.", category: updated });
+      return NextResponse.json({
+        success: true,
+        message: "دسته‌بندی با موفقیت به‌روزرسانی شد.",
+        category: updated,
+        data: updated,
+      });
     } else {
       const { data: inserted, error } = await supabaseAdmin
         .from("categories")
@@ -66,11 +79,20 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (error) throw error;
-      return NextResponse.json({ success: true, message: "دسته‌بندی جدید با موفقیت ایجاد شد.", category: inserted });
+      return NextResponse.json({
+        success: true,
+        message: "دسته‌‌بندی جدید با موفقیت ایجاد شد.",
+        category: inserted,
+        data: inserted,
+      });
     }
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
+}
+
+export async function PUT(req: NextRequest) {
+  return POST(req);
 }
 
 export async function DELETE(req: NextRequest) {
@@ -79,15 +101,15 @@ export async function DELETE(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ success: false, message: "دسترسی غیرمجاز" }, { status: 401 });
     }
-    if (session.role !== "superadmin") {
-      return NextResponse.json({ success: false, message: "تنها مدیر ارشد مجاز به حذف دسته‌بندی است." }, { status: 403 });
-    }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ success: false, message: "شناسه دسته‌بندی الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "شناسه دسته‌بندی الزامی است." },
+        { status: 400 }
+      );
     }
 
     const { error } = await supabaseAdmin.from("categories").delete().eq("id", id);

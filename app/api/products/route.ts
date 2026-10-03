@@ -2,58 +2,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { unpackProductRow, packProductDescription } from "@/lib/productUnpacker";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function unpackProductRow(p: any) {
-  let rawDesc = String(p.description || "");
-  let meta: Record<string, any> = {};
-  const match = rawDesc.match(/<!--MEDIA_METADATA:([\s\S]*?)-->/);
-  if (match && match[1]) {
-    try {
-      meta = JSON.parse(match[1]);
-    } catch {}
-    rawDesc = rawDesc.replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "").trim();
-  }
-
-  const primaryImg =
-    p.image ||
-    p.image_url ||
-    (Array.isArray(p.images) && p.images[0]) ||
-    (Array.isArray(meta.images) && meta.images[0]) ||
-    "/placeholder.png";
-
-  const imagesArr =
-    Array.isArray(p.images) && p.images.length > 0
-      ? p.images
-      : Array.isArray(meta.images) && meta.images.length > 0
-      ? meta.images
-      : [primaryImg];
-
-  return {
-    ...p,
-    id: String(p.id),
-    title: p.title || p.name || "کالای دیجیتال",
-    name: p.name || p.title || "کالای دیجیتال",
-    sku: p.sku || meta.sku || ("SKU-" + String(p.id).slice(-6).toUpperCase()),
-    brand: p.brand || meta.brand || "Axon",
-    category: p.category || "کالای دیجیتال",
-    price: Number(p.price || 0),
-    discount_price: p.discount_price ? Number(p.discount_price) : null,
-    purchase_price: Number(p.purchase_price || meta.purchase_price || Math.round(Number(p.price || 0) * 0.7)),
-    stock: p.stock !== undefined && p.stock !== null ? Number(p.stock) : 10,
-    is_available: p.is_available !== false && Number(p.stock ?? 10) > 0,
-    image: primaryImg,
-    image_url: primaryImg,
-    images: imagesArr,
-    description: rawDesc,
-    warranty: p.warranty || meta.warranty || "۱۸ ماه گارانتی اصالت طلایی",
-    specs: (typeof p.specs === "object" && p.specs) || meta.specs || {},
-  };
-}
 
 export async function GET() {
   try {
@@ -64,9 +18,15 @@ export async function GET() {
 
     if (error) throw error;
     const unpacked = (data || []).map(unpackProductRow);
-    return NextResponse.json({ success: true, data: unpacked, products: unpacked });
+    return NextResponse.json(
+      { success: true, data: unpacked, products: unpacked },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (err: any) {
-    return NextResponse.json({ success: false, data: [], products: [], message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, data: [], products: [], message: err.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -86,47 +46,57 @@ export async function POST(req: NextRequest) {
     const rawId = String(body.id || "").trim();
     const productId = UUID_REGEX.test(rawId) ? rawId : randomUUID();
 
+    const rawImages = Array.isArray(body.images)
+      ? body.images.map((x: any) => String(x || "").trim()).filter(Boolean)
+      : [];
+
     const primaryImage =
-      body.image ||
-      body.image_url ||
-      (Array.isArray(body.images) && body.images[0]) ||
+      String(body.image || body.image_url || rawImages[0] || "/placeholder.png").trim() ||
       "/placeholder.png";
 
-    const imagesList =
-      Array.isArray(body.images) && body.images.length > 0
-        ? body.images
-        : [primaryImage];
+    const imagesList = Array.from(new Set([primaryImage, ...rawImages]));
 
-    const mediaMeta = {
-      images: imagesList,
-      specs: typeof body.specs === "object" && body.specs ? body.specs : {},
-      warranty: body.warranty || "۱۸ ماه گارانتی اصالت طلایی",
-      sku: body.sku || ("SKU-" + productId.slice(-6).toUpperCase()),
-      brand: body.brand || "Axon",
-      purchase_price: Number(body.purchase_price || Math.round(Number(body.price || 0) * 0.7)),
-    };
+    const basePrice = Math.max(0, Number(body.price || 0));
+    const discountPrice =
+      body.discountPrice && Number(body.discountPrice) > 0
+        ? Number(body.discountPrice)
+        : body.discount_price && Number(body.discount_price) > 0
+        ? Number(body.discount_price)
+        : null;
+
+    const effectivePrice = discountPrice && discountPrice < basePrice ? discountPrice : basePrice;
+    const purchasePrice =
+      body.purchase_price !== undefined && body.purchase_price !== "" && Number(body.purchase_price) >= 0
+        ? Number(body.purchase_price)
+        : Math.round(effectivePrice * 0.7);
+
+    const numericStock = body.stock !== undefined ? Math.max(0, Number(body.stock)) : 10;
 
     const cleanDesc = String(body.description || "")
       .replace(/<!--MEDIA_METADATA:[\s\S]*?-->/g, "")
       .trim();
-    const packagedDescription =
-      cleanDesc + "\n\n<!--MEDIA_METADATA:" + JSON.stringify(mediaMeta) + "-->";
 
-    const numericStock = body.stock !== undefined ? Math.max(0, Number(body.stock)) : 10;
-    const discountPrice =
-      body.discountPrice
-        ? Number(body.discountPrice)
-        : body.discount_price
-        ? Number(body.discount_price)
-        : null;
+    const mediaMeta = {
+      images: imagesList,
+      specs: typeof body.specs === "object" && body.specs ? body.specs : {},
+      warranty: String(body.warranty || "۱۸ ماه گارانتی اصالت طلایی").trim(),
+      sku: String(body.sku || "SKU-" + productId.slice(-6).toUpperCase()).trim(),
+      brand: String(body.brand || "Axon").trim(),
+      purchase_price: purchasePrice,
+      discount_price: discountPrice,
+      meta_title: String(body.meta_title || cleanTitle).trim(),
+      meta_description: String(body.meta_description || cleanDesc.slice(0, 155)).trim(),
+      short_description: String(body.short_description || cleanDesc.slice(0, 140)).trim(),
+    };
 
-    // پی로드 استاندارد سازگار با جدول products دیتابیس
+    const packagedDescription = packProductDescription(cleanDesc, mediaMeta);
+
     const safePayload: Record<string, any> = {
       id: productId,
       title: cleanTitle,
       name: cleanTitle,
-      category: body.category || "کالای دیجیتال",
-      price: Math.max(0, Number(body.price || 0)),
+      category: String(body.category || "کالای دیجیتال").trim(),
+      price: basePrice,
       discount_price: discountPrice,
       stock: numericStock,
       is_available: body.is_available !== undefined ? Boolean(body.is_available) : numericStock > 0,
@@ -168,11 +138,15 @@ export async function POST(req: NextRequest) {
       success: true,
       data: unpacked,
       product: unpacked,
-      message: "✓ محصول با موفقیت در دیتابیس ذخیره شد.",
+      message: "✓ محصول با موفقیت در کاتالوگ و انبار ذخیره شد.",
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
+}
+
+export async function PUT(req: NextRequest) {
+  return POST(req);
 }
 
 export async function DELETE(req: NextRequest) {
@@ -191,7 +165,7 @@ export async function DELETE(req: NextRequest) {
     const { error } = await supabaseAdmin.from("products").delete().eq("id", id);
     if (error) throw error;
 
-    return NextResponse.json({ success: true, message: "کالا با موفقیت حذف شد." });
+    return NextResponse.json({ success: true, message: "کالا با موفقیت از کاتالوگ حذف شد." });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }

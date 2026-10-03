@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { verifyAdminSession } from "@/lib/authSecurityHelper";
+import { unpackProductRow, packProductDescription } from "@/lib/productUnpacker";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,14 @@ export async function GET(req: NextRequest) {
     const [prodsRes, ordersRes, logsRes] = await Promise.all([
       supabaseAdmin.from("products").select("*").order("created_at", { ascending: false }),
       supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false }),
-      supabaseAdmin.from("inventory_logs").select("*").order("created_at", { ascending: false }).limit(80),
+      supabaseAdmin
+        .from("inventory_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(80),
     ]);
 
-    const products = prodsRes.data || [];
+    const products = (prodsRes.data || []).map(unpackProductRow);
     const orders = ordersRes.data || [];
     const logs = logsRes.data || [];
 
@@ -27,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     const monthlyOrders = orders.filter((o: any) => {
       const orderDate = new Date(o.created_at || Date.now());
-      return orderDate >= thirtyDaysAgo && o.status !== "cancelled";
+      return orderDate >= thirtyDaysAgo && o.status !== "cancelled" && o.payment_status !== "failed";
     });
 
     const productFinancials = products.map((p: any) => {
@@ -46,26 +51,30 @@ export async function GET(req: NextRequest) {
       });
 
       const basePrice = Number(p.price || 0);
-      const discountPrice = p.discount_price || p.discountPrice ? Number(p.discount_price || p.discountPrice) : null;
+      const discountPrice = p.discount_price ? Number(p.discount_price) : null;
       const sellingPrice = discountPrice && discountPrice > 0 ? discountPrice : basePrice;
-      const purchasePrice = Number(p.purchase_price || p.purchasePrice || Math.round(sellingPrice * 0.7));
+      const purchasePrice = Number(p.purchase_price || Math.round(sellingPrice * 0.7));
       const vatPerUnit = Math.round(sellingPrice * 0.1);
       const netSellingRevenuePerUnit = sellingPrice - vatPerUnit;
       const netProfitPerUnit = Math.max(0, netSellingRevenuePerUnit - purchasePrice);
 
       const totalPurchaseCostMonthly = unitsSoldMonthly * purchasePrice;
       const totalVatMonthly = Math.round(totalRevenueMonthly * 0.1);
-      const totalNetProfitMonthly = Math.max(0, totalRevenueMonthly - totalVatMonthly - totalPurchaseCostMonthly);
-      const profitMarginPercent = sellingPrice > 0 ? Math.round((netProfitPerUnit / sellingPrice) * 100) : 0;
+      const totalNetProfitMonthly = Math.max(
+        0,
+        totalRevenueMonthly - totalVatMonthly - totalPurchaseCostMonthly
+      );
+      const profitMarginPercent =
+        sellingPrice > 0 ? Math.round((netProfitPerUnit / sellingPrice) * 100) : 0;
 
       return {
         id: String(p.id),
-        title: p.title || p.name || "کالای بدون عنوان",
-        sku: p.sku || ("SKU-" + String(p.id).slice(-6).toUpperCase()),
+        title: p.title || "کالای بدون عنوان",
+        sku: p.sku || "SKU-" + String(p.id).slice(-6).toUpperCase(),
         brand: p.brand || "Axon",
-        category: p.category || p.category_name || "کالای دیجیتال",
+        category: p.category || "کالای دیجیتال",
         warranty: p.warranty || "۱۸ ماه گارانتی اصالت طلایی",
-        stock: p.stock !== undefined && p.stock !== null ? Number(p.stock) : 0,
+        stock: Number(p.stock ?? 0),
         isAvailable: p.is_available !== false,
         basePrice,
         discountPrice,
@@ -83,10 +92,19 @@ export async function GET(req: NextRequest) {
     });
 
     const summary = {
-      totalInventoryAssets: productFinancials.reduce((acc, p) => acc + p.stock * p.purchasePrice, 0),
-      totalMonthlySalesGross: productFinancials.reduce((acc, p) => acc + p.totalRevenueMonthly, 0),
+      totalInventoryAssets: productFinancials.reduce(
+        (acc, p) => acc + p.stock * p.purchasePrice,
+        0
+      ),
+      totalMonthlySalesGross: productFinancials.reduce(
+        (acc, p) => acc + p.totalRevenueMonthly,
+        0
+      ),
       totalMonthlyVAT: productFinancials.reduce((acc, p) => acc + p.totalVatMonthly, 0),
-      totalMonthlyNetProfit: productFinancials.reduce((acc, p) => acc + p.totalNetProfitMonthly, 0),
+      totalMonthlyNetProfit: productFinancials.reduce(
+        (acc, p) => acc + p.totalNetProfitMonthly,
+        0
+      ),
       totalUnitsSold: productFinancials.reduce((acc, p) => acc + p.unitsSoldMonthly, 0),
       totalOrdersMonthlyCount: monthlyOrders.length,
     };
@@ -116,22 +134,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "شناسه کالا الزامی است." }, { status: 400 });
     }
 
-    const { data: product } = await supabaseAdmin.from("products").select("*").eq("id", productId).single();
-    if (!product) {
+    const { data: rawProd } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .eq("id", productId)
+      .maybeSingle();
+
+    if (!rawProd) {
       return NextResponse.json({ success: false, message: "کالا یافت نشد." }, { status: 404 });
     }
 
+    const product = unpackProductRow(rawProd);
     const currentStock = Number(product.stock || 0);
     const newStock = Math.max(0, currentStock + Number(stockDelta || 0));
     const newPurchasePrice =
-      purchasePrice !== undefined && purchasePrice !== "" ? Number(purchasePrice) : Number(product.purchase_price || 0);
+      purchasePrice !== undefined && purchasePrice !== ""
+        ? Number(purchasePrice)
+        : Number(product.purchase_price || 0);
+
+    const updatedMeta = {
+      images: product.images || [product.image],
+      specs: product.specs || {},
+      warranty: product.warranty || "۱۸ ماه گارانتی اصالت طلایی",
+      sku: product.sku,
+      brand: product.brand,
+      purchase_price: newPurchasePrice,
+      discount_price: product.discount_price,
+      meta_title: product.meta_title,
+      meta_description: product.meta_description,
+    };
+
+    const packagedDesc = packProductDescription(product.description, updatedMeta);
 
     await supabaseAdmin
       .from("products")
       .update({
         stock: newStock,
-        purchase_price: newPurchasePrice,
         is_available: newStock > 0,
+        description: packagedDesc,
         updated_at: new Date().toISOString(),
       })
       .eq("id", productId);
@@ -141,7 +181,7 @@ export async function POST(req: NextRequest) {
         {
           id: "log_" + Date.now(),
           product_id: String(productId),
-          product_title: product.title || product.name,
+          product_title: product.title,
           change_type: Number(stockDelta || 0) >= 0 ? "restock" : "adjustment",
           quantity: Math.abs(Number(stockDelta || 0)),
           cost_price: newPurchasePrice,
@@ -184,22 +224,51 @@ export async function PUT(req: NextRequest) {
     } = body;
 
     if (!id || !title) {
-      return NextResponse.json({ success: false, message: "شناسه و عنوان کالا الزامی است." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "شناسه و عنوان کالا الزامی است." },
+        { status: 400 }
+      );
     }
 
+    const { data: rawExisting } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    const unpackedExisting = rawExisting ? unpackProductRow(rawExisting) : {};
+
     const numericStock = Math.max(0, Number(stock ?? 0));
+    const cleanDiscount =
+      discountPrice && Number(discountPrice) > 0 ? Number(discountPrice) : null;
+    const cleanPurchase = Math.max(0, Number(purchasePrice ?? unpackedExisting.purchase_price ?? 0));
+
+    const updatedMeta = {
+      images: unpackedExisting.images || [unpackedExisting.image || "/placeholder.png"],
+      specs: unpackedExisting.specs || {},
+      warranty: warranty ? String(warranty).trim() : unpackedExisting.warranty || "۱۸ ماه گارانتی اصالت طلایی",
+      sku: sku ? String(sku).trim() : unpackedExisting.sku,
+      brand: brand ? String(brand).trim() : unpackedExisting.brand || "Axon",
+      purchase_price: cleanPurchase,
+      discount_price: cleanDiscount,
+      meta_title: unpackedExisting.meta_title || String(title).trim(),
+      meta_description: unpackedExisting.meta_description || "",
+    };
+
+    const packagedDesc = packProductDescription(
+      unpackedExisting.description || "",
+      updatedMeta
+    );
+
     const updatePayload: Record<string, any> = {
       title: String(title).trim(),
       name: String(title).trim(),
       category: category ? String(category).trim() : "کالای دیجیتال",
-      sku: sku ? String(sku).trim() : undefined,
-      brand: brand ? String(brand).trim() : undefined,
-      warranty: warranty ? String(warranty).trim() : "۱۸ ماه گارانتی اصالت طلایی",
       price: Math.max(0, Number(basePrice ?? 0)),
-      discount_price: discountPrice && Number(discountPrice) > 0 ? Number(discountPrice) : null,
-      purchase_price: Math.max(0, Number(purchasePrice ?? 0)),
+      discount_price: cleanDiscount,
       stock: numericStock,
       is_available: isAvailable !== undefined ? Boolean(isAvailable) : numericStock > 0,
+      description: packagedDesc,
       updated_at: new Date().toISOString(),
     };
 
@@ -220,9 +289,9 @@ export async function PUT(req: NextRequest) {
           product_title: updatePayload.title,
           change_type: "edit_product",
           quantity: numericStock,
-          cost_price: updatePayload.purchase_price,
+          cost_price: cleanPurchase,
           supplier: "ویرایش مستقیم حسابداری و انبار",
-          reference_note: "بروزرسانی کامل مشخصات، قیمت فروش، بهای خرید و موجودی کالا",
+          reference_note: "بروزرسانی مشخصات، قیمت فروش، بهای خرید و موجودی کالا",
           created_at: new Date().toISOString(),
         },
       ]);
@@ -230,7 +299,7 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      product: updated,
+      product: unpackProductRow(updated),
       message: "✓ تمامی مشخصات، قیمت‌ها و موجودی کالا با موفقیت در دیتابیس ویرایش شد.",
     });
   } catch (err: any) {

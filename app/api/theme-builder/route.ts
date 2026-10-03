@@ -97,6 +97,14 @@ export async function GET() {
             { id: "ext_sitemap", title: "نقشه سایت گوگل (Sitemap)", url: "/sitemap.xml" },
           ],
       },
+      bannerSizing: existingTb.bannerSizing || layoutCfg.bannerSizing || {
+        mobileHeight: 165,
+        tabletHeight: 250,
+        desktopHeight: 350,
+        mobileImageSize: 96,
+        desktopImageSize: 230,
+        mobileLayout: "horizontal",
+      },
       homeSections: Array.isArray(existingTb.homeSections)
         ? existingTb.homeSections
         : layoutCfg.homeSections || [],
@@ -138,7 +146,15 @@ export async function POST(req: NextRequest) {
 
     const gh = config?.globalHeader || {};
     const gf = config?.globalFooter || {};
-    const homeSections = Array.isArray(config?.homeSections) ? config.homeSections : [];
+    const homeSections = Array.isArray(config?.homeSections) ? config.homeSections : prevLayout.homeSections || [];
+    const bannerSizing = config?.bannerSizing || prevLayout.bannerSizing || {
+      mobileHeight: 165,
+      tabletHeight: 250,
+      desktopHeight: 350,
+      mobileImageSize: 96,
+      desktopImageSize: 230,
+      mobileLayout: "horizontal",
+    };
 
     const headerLogoUrl =
       gh.logoUrl !== undefined ? String(gh.logoUrl).trim() : existing?.logo_url || "";
@@ -165,6 +181,7 @@ export async function POST(req: NextRequest) {
         },
       },
       homeSections,
+      bannerSizing,
       header: {
         ...(prevLayout.header || DEFAULT_HOMEPAGE_LAYOUT_CONFIG.header),
         brand: {

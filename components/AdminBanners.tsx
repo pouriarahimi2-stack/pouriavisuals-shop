@@ -53,6 +53,13 @@ export default function AdminBanners() {
   const [isActive, setIsActive] = useState(true);
 
   const [linkMode, setLinkMode] = useState<"product" | "category" | "page" | "custom">("product");
+  const [fullThemeConfig, setFullThemeConfig] = useState<any>(null);
+  const [bannerMobileHeight, setBannerMobileHeight] = useState<number>(165);
+  const [bannerTabletHeight, setBannerTabletHeight] = useState<number>(250);
+  const [bannerDesktopHeight, setBannerDesktopHeight] = useState<number>(350);
+  const [bannerMobileImgSize, setBannerMobileImgSize] = useState<number>(96);
+  const [bannerDesktopImgSize, setBannerDesktopImgSize] = useState<number>(230);
+  const [savingSizing, setSavingSizing] = useState(false);
   const [productSearch, setProductSearch] = useState("");
 
   const showFeedback = (text: string, type: "success" | "error" = "success") => {
@@ -62,6 +69,23 @@ export default function AdminBanners() {
 
   const fetchBannersAndCatalog = async () => {
     try {
+      fetch("/api/theme-builder", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((tJson) => {
+          if (tJson?.config) {
+            setFullThemeConfig(tJson.config);
+            const bs = tJson.config.bannerSizing;
+            if (bs) {
+              if (bs.mobileHeight) setBannerMobileHeight(Number(bs.mobileHeight));
+              if (bs.tabletHeight) setBannerTabletHeight(Number(bs.tabletHeight));
+              if (bs.desktopHeight) setBannerDesktopHeight(Number(bs.desktopHeight));
+              if (bs.mobileImageSize) setBannerMobileImgSize(Number(bs.mobileImageSize));
+              if (bs.desktopImageSize) setBannerDesktopImgSize(Number(bs.desktopImageSize));
+            }
+          }
+        })
+        .catch(() => {});
+
       const [bannersRes, prodsRes, catsRes] = await Promise.all([
         fetch("/api/admin/banners", { cache: "no-store" }).catch(() => null),
         fetch("/api/products", { cache: "no-store" }).catch(() => null),
@@ -128,6 +152,36 @@ export default function AdminBanners() {
       supabase.removeChannel(chProducts);
     };
   }, []);
+
+  const handleSaveBannerSizing = async () => {
+    soundEngine.playClick();
+    setSavingSizing(true);
+    try {
+      const nextConfig = {
+        ...(fullThemeConfig || {}),
+        bannerSizing: {
+          mobileHeight: bannerMobileHeight,
+          tabletHeight: bannerTabletHeight,
+          desktopHeight: bannerDesktopHeight,
+          mobileImageSize: bannerMobileImgSize,
+          desktopImageSize: bannerDesktopImgSize,
+          mobileLayout: "horizontal",
+        },
+      };
+      const res = await fetch("/api/theme-builder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: nextConfig }),
+      });
+      if (res.ok) {
+        soundEngine.playSuccess();
+        showFeedback("✓ ارتفاع و ابعاد بنر برای موبایل، تبلت و دسکتاپ ذخیره و در سایت اعمال شد.");
+        window.dispatchEvent(new CustomEvent("theme_builder_updated"));
+      }
+    } finally {
+      setSavingSizing(false);
+    }
+  };
 
   const resetForm = () => {
     setEditingId(null);
@@ -285,6 +339,94 @@ export default function AdminBanners() {
           {statusMsg.text}
         </div>
       )}
+
+      {/* نوار تنظیم مستقیم ارتفاع و اندازه بنر در موبایل، تبلت و دسکتاپ */}
+      <div className="p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-3">
+          <div>
+            <h3 className="font-black text-sm text-[var(--accent-blue)]">
+              📐 تنظیم مستقیم ارتفاع و ابعاد بنر در موبایل، تبلت و دسکتاپ
+            </h3>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+              ارتفاع کادر بنر و اندازه تصویر داخل بنر را برای نسخه موبایل و دسکتاپ به دلخواه تنظیم کنید:
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={savingSizing}
+            onClick={handleSaveBannerSizing}
+            className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-lg cursor-pointer transition disabled:opacity-50"
+          >
+            {savingSizing ? "در حال اعمال..." : "💾 ذخیره ابعاد بنر در سایت"}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
+            <div className="flex justify-between font-bold">
+              <span>📱 ارتفاع بنر در موبایل:</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">{bannerMobileHeight}px</span>
+            </div>
+            <input
+              type="range"
+              min={120}
+              max={320}
+              step={5}
+              value={bannerMobileHeight}
+              onChange={(e) => setBannerMobileHeight(Number(e.target.value))}
+              className="w-full accent-[var(--accent-blue)] cursor-pointer"
+            />
+          </div>
+
+          <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
+            <div className="flex justify-between font-bold">
+              <span>📱 اندازه عکس در موبایل:</span>
+              <span className="font-mono font-black text-emerald-500">{bannerMobileImgSize}px</span>
+            </div>
+            <input
+              type="range"
+              min={64}
+              max={150}
+              step={4}
+              value={bannerMobileImgSize}
+              onChange={(e) => setBannerMobileImgSize(Number(e.target.value))}
+              className="w-full accent-emerald-500 cursor-pointer"
+            />
+          </div>
+
+          <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
+            <div className="flex justify-between font-bold">
+              <span>📟 ارتفاع بنر در تبلت:</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">{bannerTabletHeight}px</span>
+            </div>
+            <input
+              type="range"
+              min={180}
+              max={400}
+              step={5}
+              value={bannerTabletHeight}
+              onChange={(e) => setBannerTabletHeight(Number(e.target.value))}
+              className="w-full accent-[var(--accent-blue)] cursor-pointer"
+            />
+          </div>
+
+          <div className="p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1.5">
+            <div className="flex justify-between font-bold">
+              <span>🖥️ ارتفاع بنر در دسکتاپ:</span>
+              <span className="font-mono font-black text-[var(--accent-blue)]">{bannerDesktopHeight}px</span>
+            </div>
+            <input
+              type="range"
+              min={240}
+              max={500}
+              step={10}
+              value={bannerDesktopHeight}
+              onChange={(e) => setBannerDesktopHeight(Number(e.target.value))}
+              className="w-full accent-[var(--accent-blue)] cursor-pointer"
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <form

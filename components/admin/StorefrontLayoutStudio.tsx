@@ -15,6 +15,9 @@ export interface HomeSectionConfig {
   title: string;
   subtitle: string;
   enabled: boolean;
+  showOnMobile?: boolean;
+  showOnTablet?: boolean;
+  showOnDesktop?: boolean;
 }
 
 export interface FooterLinkItem {
@@ -31,13 +34,19 @@ const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
     title: "اسلایدر بنرهای تبلیغاتی و محصولات ویژه (بالای صفحه)",
     subtitle: "نمایش بنرهای کلیک‌پذیر متصل به صفحات محصول در بالاترین بخش سایت",
     enabled: true,
+    showOnMobile: true,
+    showOnTablet: true,
+    showOnDesktop: true,
   },
   {
     id: "sec_perspective",
     type: "NativePerspectiveSlider",
     title: "نمایشگاه تعاملی سه‌بعدی محصولات پرچمدار (ویژه موبایل)",
-    subtitle: "بررسی لایه‌به‌‌لایه و ساختار مهندسی قطعات با کنترل لمسی در موبایل",
+    subtitle: "بررسی لایه‌به‌لایه و ساختار مهندسی قطعات با کنترل لمسی در موبایل",
     enabled: true,
+    showOnMobile: true,
+    showOnTablet: false,
+    showOnDesktop: false,
   },
   {
     id: "sec_catalog",
@@ -45,6 +54,9 @@ const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
     title: "کاتالوگ تجهیزات و محصولات (ویژه دسکتاپ و تبلت)",
     subtitle: "تمامی کالاها با گارانتی اصالت طلایی، تست سلامت فیزیکی و ارسال پیشتاز عرضه می‌شوند",
     enabled: true,
+    showOnMobile: false,
+    showOnTablet: true,
+    showOnDesktop: true,
   },
 ];
 
@@ -133,6 +145,12 @@ export default function StorefrontLayoutStudio({
 
   // استیت چینش سکشن‌های صفحه اصلی
   const [sections, setSections] = useState<HomeSectionConfig[]>(DEFAULT_HOME_SECTIONS);
+  const [bannerMobileHeight, setBannerMobileHeight] = useState<number>(165);
+  const [bannerTabletHeight, setBannerTabletHeight] = useState<number>(250);
+  const [bannerDesktopHeight, setBannerDesktopHeight] = useState<number>(350);
+  const [bannerMobileImgSize, setBannerMobileImgSize] = useState<number>(96);
+  const [bannerDesktopImgSize, setBannerDesktopImgSize] = useState<number>(230);
+  const [bannerMobileLayout, setBannerMobileLayout] = useState<"horizontal" | "vertical">("horizontal");
 
   const loadStudioConfig = async () => {
     try {
@@ -200,8 +218,38 @@ export default function StorefrontLayoutStudio({
             if (Array.isArray(gf.quickLinks)) setQuickLinks(gf.quickLinks);
             if (Array.isArray(gf.externalLinks)) setExternalLinks(gf.externalLinks);
           }
+          if (cfg.bannerSizing) {
+            if (cfg.bannerSizing.mobileHeight) setBannerMobileHeight(Number(cfg.bannerSizing.mobileHeight));
+            if (cfg.bannerSizing.tabletHeight) setBannerTabletHeight(Number(cfg.bannerSizing.tabletHeight));
+            if (cfg.bannerSizing.desktopHeight) setBannerDesktopHeight(Number(cfg.bannerSizing.desktopHeight));
+            if (cfg.bannerSizing.mobileImageSize) setBannerMobileImgSize(Number(cfg.bannerSizing.mobileImageSize));
+            if (cfg.bannerSizing.desktopImageSize) setBannerDesktopImgSize(Number(cfg.bannerSizing.desktopImageSize));
+            if (cfg.bannerSizing.mobileLayout) setBannerMobileLayout(cfg.bannerSizing.mobileLayout);
+          }
           if (Array.isArray(cfg.homeSections) && cfg.homeSections.length > 0) {
-            setSections(cfg.homeSections);
+            setSections(
+              cfg.homeSections.map((s: any) => ({
+                ...s,
+                showOnMobile:
+                  s.showOnMobile !== undefined
+                    ? Boolean(s.showOnMobile)
+                    : s.type === "NativeProductCatalog"
+                    ? false
+                    : true,
+                showOnTablet:
+                  s.showOnTablet !== undefined
+                    ? Boolean(s.showOnTablet)
+                    : s.type === "NativePerspectiveSlider"
+                    ? false
+                    : true,
+                showOnDesktop:
+                  s.showOnDesktop !== undefined
+                    ? Boolean(s.showOnDesktop)
+                    : s.type === "NativePerspectiveSlider"
+                    ? false
+                    : true,
+              }))
+            );
           }
         }
       }
@@ -241,6 +289,25 @@ export default function StorefrontLayoutStudio({
   const toggleSection = (id: string) => {
     soundEngine.playClick();
     setSections((prev) => prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
+  };
+
+  const toggleSectionDevice = (
+    id: string,
+    deviceField: "showOnMobile" | "showOnTablet" | "showOnDesktop"
+  ) => {
+    soundEngine.playClick();
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        const currentVal =
+          s[deviceField] !== undefined
+            ? Boolean(s[deviceField])
+            : deviceField === "showOnMobile"
+            ? s.type !== "NativeProductCatalog"
+            : s.type !== "NativePerspectiveSlider";
+        return { ...s, [deviceField]: !currentVal };
+      })
+    );
   };
 
   const updateSectionText = (id: string, field: "title" | "subtitle", val: string) => {
@@ -327,6 +394,14 @@ export default function StorefrontLayoutStudio({
         quickLinks,
         externalLinks,
         copyright: copyrightText.trim(),
+      },
+      bannerSizing: {
+        mobileHeight: bannerMobileHeight,
+        tabletHeight: bannerTabletHeight,
+        desktopHeight: bannerDesktopHeight,
+        mobileImageSize: bannerMobileImgSize,
+        desktopImageSize: bannerDesktopImgSize,
+        mobileLayout: bannerMobileLayout,
       },
       homeSections: sections,
     };
@@ -1131,6 +1206,44 @@ export default function StorefrontLayoutStudio({
                       >
                         {sec.enabled ? "فعال ✓" : "مخفی ✕"}
                       </button>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleSectionDevice(sec.id, "showOnMobile")}
+                          className={
+                            "px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition cursor-pointer " +
+                            ((sec.showOnMobile ?? (sec.type !== "NativeProductCatalog"))
+                              ? "bg-sky-500/15 border-sky-500/40 text-sky-400"
+                              : "bg-[var(--modal-bg)] border-[var(--card-border)] text-slate-400 opacity-60")
+                          }
+                        >
+                          📱 موبایل: {(sec.showOnMobile ?? (sec.type !== "NativeProductCatalog")) ? "روشن ✓" : "خاموش"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleSectionDevice(sec.id, "showOnTablet")}
+                          className={
+                            "px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition cursor-pointer " +
+                            ((sec.showOnTablet ?? (sec.type !== "NativePerspectiveSlider"))
+                              ? "bg-indigo-500/15 border-indigo-500/40 text-indigo-400"
+                              : "bg-[var(--modal-bg)] border-[var(--card-border)] text-slate-400 opacity-60")
+                          }
+                        >
+                          📟 تبلت: {(sec.showOnTablet ?? (sec.type !== "NativePerspectiveSlider")) ? "روشن ✓" : "خاموش"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleSectionDevice(sec.id, "showOnDesktop")}
+                          className={
+                            "px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition cursor-pointer " +
+                            ((sec.showOnDesktop ?? (sec.type !== "NativePerspectiveSlider"))
+                              ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                              : "bg-[var(--modal-bg)] border-[var(--card-border)] text-slate-400 opacity-60")
+                          }
+                        >
+                          🖥️ دسکتاپ: {(sec.showOnDesktop ?? (sec.type !== "NativePerspectiveSlider")) ? "روشن ✓" : "خاموش"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

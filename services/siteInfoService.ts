@@ -434,44 +434,56 @@ export const siteInfoService = {
     }
     return DEFAULT_SITE_INFO;
   },
-
   async getSiteInfo(): Promise<SiteInfo | null> {
     try {
-      const res = await fetch("/api/site-info", { cache: "no-store" });
+      const res = await fetch("/api/site-info?t=" + Date.now(), { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
-        if (json.data) {
-          const data = json.data;
-          let parsedLayout: HomepageLayoutConfig = DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+        const data = json.data || json.siteInfo || json;
+        if (data && typeof data === "object") {
+          const layoutCfg = data.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG;
+          const tbHeader = layoutCfg?.theme_builder_config?.globalHeader || {};
+          const tbFooter = layoutCfg?.theme_builder_config?.globalFooter || {};
+          const persisted = layoutCfg?._persisted_identity || {};
 
-          if (data.homepage_layout_config) {
-            try {
-              const incoming = typeof data.homepage_layout_config === "string"
-                ? JSON.parse(data.homepage_layout_config)
-                : data.homepage_layout_config;
-              parsedLayout = {
-                ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG,
-                ...incoming,
-                header: { ...DEFAULT_HEADER_CONFIG, ...(incoming.header || {}) },
-                footer: { ...DEFAULT_HOMEPAGE_LAYOUT_CONFIG.footer, ...(incoming.footer || {}) },
-              };
-            } catch (err) {
-              console.error("[LAYOUT_PARSE_ERROR]:", err);
-            }
-          }
+          const finalHeaderLogo =
+            tbHeader.logoUrl ||
+            persisted.logo_url ||
+            data.logo_url ||
+            data.logoUrl ||
+            layoutCfg?.header?.brand?.logoUrl ||
+            "";
 
-          const finalHeaderLogo = parsedLayout.header.brand.logoUrl || data.logo_url || "";
-          const finalFooterLogo = parsedLayout.footer.logoUrl || data.footer_logo_url || "";
-          const finalSiteName = parsedLayout.header.brand.name || data.site_name || data.store_name || "آکسون کور | Axon Core";
-          const finalTagline = parsedLayout.header.brand.tagline || data.tagline || "فروشگاه تخصصی محصولات تکنولوژی و دیجیتال";
-          const finalFavicon = data.favicon_url || "";
+          const finalFooterLogo =
+            tbFooter.footerLogoUrl ||
+            persisted.footer_logo_url ||
+            data.footer_logo_url ||
+            data.footerLogoUrl ||
+            layoutCfg?.footer?.footerLogoUrl ||
+            layoutCfg?.footer?.logoUrl ||
+            "";
 
-          parsedLayout.header.brand.logoUrl = finalHeaderLogo;
-          parsedLayout.footer.logoUrl = finalFooterLogo;
-          parsedLayout.header.brand.name = finalSiteName;
-          parsedLayout.header.brand.tagline = finalTagline;
+          const finalFavicon =
+            tbHeader.faviconUrl ||
+            persisted.favicon_url ||
+            data.favicon_url ||
+            "/favicon.ico";
+
+          const finalSiteName =
+            tbHeader.brandName ||
+            persisted.site_name ||
+            data.site_name ||
+            data.storeName ||
+            "آکسون کور | Axon Core";
+
+          const finalTagline =
+            tbFooter.brandSubtitle ||
+            persisted.tagline ||
+            data.tagline ||
+            "فروشگاه تخصصی محصولات تکنولوژی و دیجیتال";
 
           const mapped: SiteInfo = {
+            ...data,
             id: data.id,
             site_name: finalSiteName,
             siteName: finalSiteName,
@@ -491,11 +503,9 @@ export const siteInfoService = {
             maintenance_mode: (data.maintenance_mode as MaintenanceMode) || "none",
             header_announcement: data.header_announcement || "",
             free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
-            description: data.description || data.footer_text || "",
-            footer_text: data.footer_text || data.description || "",
-            custom_css: data.custom_css || "",
-            active_font_id: data.active_font_id || "Vazirmatn",
-            homepage_layout_config: parsedLayout,
+            description: data.description || "",
+            footer_text: data.footer_text || "",
+            homepage_layout_config: layoutCfg,
             updated_at: data.updated_at,
           };
 
@@ -512,51 +522,30 @@ export const siteInfoService = {
       return this.getSiteInfoSync();
     }
   },
-
   async updateSiteInfo(payload: Partial<SiteInfo>): Promise<SiteInfo | null> {
     try {
-      const current = await this.getSiteInfo();
-      const sName = payload.site_name || payload.siteName || payload.storeName || current?.site_name || "آکسون کور | Axon Core";
-
-      const mergedPayload: any = {
-        ...current,
-        ...payload,
-        site_name: sName,
-        store_name: sName,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (payload.homepage_layout_config) {
-        if (payload.homepage_layout_config.header?.brand?.logoUrl) {
-          mergedPayload.logo_url = payload.homepage_layout_config.header.brand.logoUrl;
-        }
-        if (payload.homepage_layout_config.footer?.logoUrl) {
-          mergedPayload.footer_logo_url = payload.homepage_layout_config.footer.logoUrl;
-        }
-      }
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mergedPayload));
-        realtimeEngine.broadcastLocally("site_info_updated", mergedPayload);
-      }
-
       const res = await fetch("/api/site-info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mergedPayload),
+        body: JSON.stringify(payload),
       });
-
       const json = await res.json();
-      if (json.success) {
+      if (res.ok && json.success) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(LOCAL_STORAGE_SITE_INFO);
+        }
         const fresh = await this.getSiteInfo();
-        return fresh || mergedPayload;
+        if (typeof window !== "undefined" && fresh) {
+          realtimeEngine.broadcastLocally("site_info_updated", fresh);
+          window.dispatchEvent(new CustomEvent("theme_builder_updated", { detail: fresh }));
+        }
+        return fresh;
       }
-      return mergedPayload;
+      return null;
     } catch (e) {
       console.error("siteInfoService.updateSiteInfo Error:", e);
       return null;
     }
   },
 };
-
 export default siteInfoService;

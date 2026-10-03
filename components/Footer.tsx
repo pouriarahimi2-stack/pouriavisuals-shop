@@ -7,27 +7,42 @@ import { useSiteInfo } from "@/context/SiteInfoContext";
 import AnimatedLogo from "@/components/AnimatedLogo";
 import EnamadBadge from "@/components/EnamadBadge";
 
+function firstNonEmptyStr(...vals: any[]): string {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim().length > 0) return v.trim();
+  }
+  return "";
+}
+
 export default function Footer() {
   const { siteInfo } = useSiteInfo();
   const [logoImgFailed, setLogoImgFailed] = useState(false);
 
   const info = siteInfo || {};
   const layoutCfg = info?.homepage_layout_config || {};
+  const persisted = layoutCfg?._persisted_identity || {};
   const tbFooter =
     info?.theme_builder_config?.globalFooter ||
     layoutCfg?.theme_builder_config?.globalFooter ||
     {};
+  const tbHeader =
+    info?.theme_builder_config?.globalHeader ||
+    layoutCfg?.theme_builder_config?.globalHeader ||
+    {};
   const footerCfg = layoutCfg?.footer || {};
 
-  const footerLogoUrl = String(
-    tbFooter.footerLogoUrl !== undefined
-      ? tbFooter.footerLogoUrl
-      : footerCfg.footerLogoUrl ??
-        footerCfg.logoUrl ??
-        info.footer_logo_url ??
-        info.footerLogoUrl ??
-        ""
-  ).trim();
+  // استخراج قطعی لوگوی فوتر (و در صورت خالی بودن، استفاده از لوگوی اصلی برند)
+  const footerLogoUrl = firstNonEmptyStr(
+    tbFooter.footerLogoUrl,
+    persisted.footer_logo_url,
+    footerCfg.footerLogoUrl,
+    footerCfg.logoUrl,
+    info.footer_logo_url,
+    info.footerLogoUrl,
+    tbHeader.logoUrl,
+    persisted.logo_url,
+    info.logo_url
+  );
 
   useEffect(() => {
     setLogoImgFailed(false);
@@ -35,41 +50,69 @@ export default function Footer() {
 
   if (footerCfg.show === false) return null;
 
-  const brandTitle =
-    tbFooter.brandTitle ||
-    footerCfg.brandTitle ||
-    info.site_name ||
-    info.storeName ||
-    "آکسون کور | Axon Core";
+  const brandTitle = firstNonEmptyStr(
+    tbFooter.brandTitle,
+    persisted.site_name,
+    footerCfg.brandTitle,
+    info.site_name,
+    info.storeName,
+    "آکسون کور | Axon Core"
+  );
 
-  const brandSubtitle =
-    tbFooter.brandSubtitle ||
-    footerCfg.brandSubtitle ||
-    info.tagline ||
-    "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال";
+  const brandSubtitle = firstNonEmptyStr(
+    tbFooter.brandSubtitle,
+    persisted.tagline,
+    footerCfg.brandSubtitle,
+    info.tagline,
+    "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال"
+  );
 
-  const brandDescription = String(
-    tbFooter.brandDescription !== undefined
-      ? tbFooter.brandDescription
-      : footerCfg.description ?? info.description ?? ""
-  ).trim();
+  const brandDescription = firstNonEmptyStr(
+    tbFooter.brandDescription,
+    persisted.description,
+    footerCfg.description,
+    info.description
+  );
 
-  const supportPhone = tbFooter.supportPhone || footerCfg.supportPhone || info.phone || "09376110200";
-  const supportEmail =
-    tbFooter.supportEmail || footerCfg.supportEmail || info.email || "Pouriarahimi@yahoo.com";
-  const warehouseAddress =
-    tbFooter.warehouseAddress || footerCfg.warehouseAddress || info.address || "شیراز - ستارخان";
-  const workingHours =
-    tbFooter.workingHours ||
-    footerCfg.workingHours ||
-    info.working_hours ||
-    "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰";
+  const supportPhone = firstNonEmptyStr(
+    tbFooter.supportPhone,
+    persisted.phone,
+    footerCfg.supportPhone,
+    info.phone,
+    "09376110200"
+  );
 
-  const copyrightText =
-    tbFooter.copyright ||
-    footerCfg?.bottomBar?.copyrightText ||
-    info.footer_text ||
-    "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026";
+  const supportEmail = firstNonEmptyStr(
+    tbFooter.supportEmail,
+    persisted.email,
+    footerCfg.supportEmail,
+    info.email,
+    "Pouriarahimi@yahoo.com"
+  );
+
+  const warehouseAddress = firstNonEmptyStr(
+    tbFooter.warehouseAddress,
+    persisted.address,
+    footerCfg.warehouseAddress,
+    info.address,
+    "شیراز - ستارخان"
+  );
+
+  const workingHours = firstNonEmptyStr(
+    tbFooter.workingHours,
+    persisted.working_hours,
+    footerCfg.workingHours,
+    info.working_hours,
+    "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"
+  );
+
+  const copyrightText = firstNonEmptyStr(
+    tbFooter.copyright,
+    persisted.footer_text,
+    footerCfg?.bottomBar?.copyrightText,
+    info.footer_text,
+    "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026"
+  );
 
   const enamadEnabled =
     tbFooter.enamadEnabled !== undefined
@@ -127,6 +170,7 @@ export default function Footer() {
             <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md">
               {footerLogoUrl && !logoImgFailed ? (
                 <img
+                  key={footerLogoUrl}
                   src={footerLogoUrl}
                   alt={brandTitle}
                   onError={() => setLogoImgFailed(true)}

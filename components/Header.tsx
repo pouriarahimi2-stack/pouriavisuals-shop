@@ -11,17 +11,24 @@ import { themeEngine } from "@/lib/themeEngine";
 import { DEFAULT_HEADER_CONFIG } from "@/services/siteInfoService";
 import AnimatedLogo from "@/components/AnimatedLogo";
 
+function firstNonEmptyStr(...vals: any[]): string {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim().length > 0) return v.trim();
+  }
+  return "";
+}
+
 export default function Header() {
   const pathname = usePathname() || "/";
   const { openCart, totalItems } = useCart();
-  const { siteInfo, refresh } = useSiteInfo();
+  const { siteInfo } = useSiteInfo();
 
   const layoutCfg = siteInfo?.homepage_layout_config || {};
+  const persisted = layoutCfg?._persisted_identity || {};
   const headerCfg = layoutCfg?.header || DEFAULT_HEADER_CONFIG;
-  const themeHeader =
-    siteInfo?.theme_builder_config?.globalHeader ||
-    layoutCfg?.theme_builder_config?.globalHeader ||
-    {};
+  const tbCfg = siteInfo?.theme_builder_config || layoutCfg?.theme_builder_config || {};
+  const themeHeader = tbCfg?.globalHeader || {};
+  const deviceOffers = tbCfg?.deviceOffers || layoutCfg?.deviceOffers || {};
   const annCfg = headerCfg?.announcement || {};
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
@@ -30,19 +37,31 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const [annDismissed, setAnnDismissed] = useState(false);
+  const [offerDismissed, setOfferDismissed] = useState(false);
+  const [copiedCoupon, setCopiedCoupon] = useState(false);
+  const [currentDevice, setCurrentDevice] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
-  const logoSrc = String(
-    themeHeader.logoUrl ?? headerCfg?.brand?.logoUrl ?? siteInfo?.logo_url ?? ""
-  ).trim();
+  // استخراج قطعی آدرس لوگوی هدر بدون تله رشته خالی عملگر ??
+  const logoSrc = firstNonEmptyStr(
+    themeHeader.logoUrl,
+    persisted.logo_url,
+    headerCfg?.brand?.logoUrl,
+    siteInfo?.logo_url,
+    siteInfo?.logoUrl
+  );
 
   const announcementEnabled = Boolean(
     themeHeader.announcementEnabled !== undefined
       ? themeHeader.announcementEnabled
       : annCfg.show
   );
-  const announcementText = String(
-    themeHeader.announcementText ?? annCfg.text ?? siteInfo?.header_announcement ?? ""
-  ).trim();
+
+  const announcementText = firstNonEmptyStr(
+    themeHeader.announcementText,
+    persisted.header_announcement,
+    annCfg.text,
+    siteInfo?.header_announcement
+  );
 
   useEffect(() => {
     setLogoError(false);
@@ -51,6 +70,32 @@ export default function Header() {
   useEffect(() => {
     setAnnDismissed(false);
   }, [announcementText, announcementEnabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const detectViewportDevice = () => {
+      const w = window.innerWidth;
+      if (w < 768) setCurrentDevice("mobile");
+      else if (w < 1024) setCurrentDevice("tablet");
+      else setCurrentDevice("desktop");
+    };
+    detectViewportDevice();
+    window.addEventListener("resize", detectViewportDevice, { passive: true });
+
+    // ثبت بازدید دستگاه یک بار در هر نشست
+    if (!sessionStorage.getItem("axon_device_tracked")) {
+      sessionStorage.setItem("axon_device_tracked", "1");
+      const w = window.innerWidth;
+      const dev = w < 768 ? "mobile" : w < 1024 ? "tablet" : "desktop";
+      fetch("/api/analytics/device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device: dev, event: "view" }),
+      }).catch(() => {});
+    }
+
+    return () => window.removeEventListener("resize", detectViewportDevice);
+  }, []);
 
   const syncUserSession = () => {
     try {
@@ -62,7 +107,6 @@ export default function Header() {
           resolvedName = String(draft.fullName).trim();
         }
       }
-
       const local = localStorage.getItem("axon_user_session");
       if (local) {
         const parsed = JSON.parse(local);
@@ -105,7 +149,7 @@ export default function Header() {
       window.removeEventListener("user_auth_changed", syncUserSession);
       window.removeEventListener("theme_changed", onThemeChanged);
     };
-  }, [refresh]);
+  }, []);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -122,11 +166,13 @@ export default function Header() {
 
   const variantMode = themeHeader.variant || headerCfg.variant || "capsule";
   const isCapsule = variantMode !== "full-width";
-  const brandName =
-    themeHeader.brandName ||
-    headerCfg?.brand?.name ||
-    siteInfo?.site_name ||
-    "آکسون کور | Axon Core";
+  const brandName = firstNonEmptyStr(
+    themeHeader.brandName,
+    persisted.site_name,
+    headerCfg?.brand?.name,
+    siteInfo?.site_name,
+    "آکسون کور | Axon Core"
+  );
 
   const logoWidth = Number(themeHeader.logoWidth || headerCfg?.brand?.logoWidth || 38);
   const logoHeight = Number(themeHeader.logoHeight || headerCfg?.brand?.logoHeight || 38);
@@ -152,10 +198,16 @@ export default function Header() {
   const isPhoneLabel = Boolean(userLabel && /^0?9\d{9}$/.test(userLabel));
   const showAnnouncement = announcementEnabled && announcementText.length > 0 && !annDismissed;
 
+  const activeDeviceOffer = deviceOffers?.[currentDevice];
+  const showDeviceOffer =
+    Boolean(activeDeviceOffer?.enabled) &&
+    Boolean(activeDeviceOffer?.text) &&
+    !offerDismissed;
+
   return (
     <>
       <div className="fixed top-0 inset-x-0 z-40 flex flex-col items-center pointer-events-none" dir="rtl">
-        {/* نوار اعلان بالای سایت (مستقیماً بالای هدر بدون هیچ همپوشانی) */}
+        {/* ۱. نوار اعلان سراسری بالای سایت */}
         {showAnnouncement && (
           <div
             style={{
@@ -176,7 +228,54 @@ export default function Header() {
           </div>
         )}
 
-        {/* هدر اصلی سایت */}
+        {/* ۲. نوار آفر هوشمند اختصاصی هر دستگاه (موبایل / تبلت / دسکتاپ) */}
+        {showDeviceOffer && (
+          <div
+            style={{
+              backgroundColor: activeDeviceOffer.bgColor || "#0f172a",
+              color: activeDeviceOffer.textColor || "#38bdf8",
+            }}
+            className="w-full px-3 py-1.5 text-[11px] font-black flex flex-wrap items-center justify-center gap-2 border-b border-white/10 shadow-md pointer-events-auto font-sans select-text"
+          >
+            {activeDeviceOffer.badge && (
+              <span className="px-2 py-0.5 rounded-full bg-white/15 text-[10px]">
+                {activeDeviceOffer.badge}
+              </span>
+            )}
+            <span>{activeDeviceOffer.text}</span>
+            {activeDeviceOffer.couponCode && (
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(activeDeviceOffer.couponCode);
+                  soundEngine.playSuccess();
+                  setCopiedCoupon(true);
+                  setTimeout(() => setCopiedCoupon(false), 2500);
+                }}
+                className="px-2.5 py-0.5 rounded-lg bg-emerald-500 text-slate-950 font-mono text-[10px] font-black cursor-pointer hover:opacity-90 transition"
+              >
+                {copiedCoupon ? "کپی شد ✓" : "کد: " + activeDeviceOffer.couponCode}
+              </button>
+            )}
+            {activeDeviceOffer.ctaText && (
+              <Link
+                href={activeDeviceOffer.ctaUrl || "/products"}
+                className="underline hover:opacity-80 text-[10px]"
+              >
+                {activeDeviceOffer.ctaText} ←
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => setOfferDismissed(true)}
+              className="w-4 h-4 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-[9px] cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* ۳. هدر اصلی سایت */}
         <header
           data-axon-header="main"
           className="w-full px-3 sm:px-6 pt-2.5 pointer-events-auto transition-all duration-300"
@@ -203,6 +302,7 @@ export default function Header() {
               >
                 {logoSrc && !logoError ? (
                   <img
+                    key={logoSrc}
                     src={logoSrc}
                     alt={brandName}
                     onError={() => setLogoError(true)}
@@ -332,8 +432,8 @@ export default function Header() {
         </header>
       </div>
 
-      {/* اسپیسر خودکار در صورت فعال بودن نوار اعلان تا محتوای صفحه زیر هدر نرود */}
       {showAnnouncement && <div className="h-7 w-full" />}
+      {showDeviceOffer && <div className="h-7 w-full" />}
 
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-x-0 top-[88px] z-30 px-3" dir="rtl">

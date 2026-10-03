@@ -40,74 +40,63 @@ export default function LiveStoreSyncGuard() {
     }
   }, []);
 
-  const enforceSiteRules = useCallback(
-    (payload: any) => {
-      if (!payload || typeof payload !== "object" || Object.keys(payload).length === 0) return;
-
-      const layoutCfg =
-        payload.homepage_layout_config ||
-        payload.siteInfo?.homepage_layout_config ||
-        payload.data?.homepage_layout_config ||
-        {};
-
-      const sys =
-        payload.settings ||
-        payload.system_settings ||
-        layoutCfg.system_settings ||
-        payload.siteInfo?.settings ||
-        {};
-
-      const isMaintenance =
-        Boolean(sys.maintenanceMode) ||
-        (payload.maintenance_mode &&
-          payload.maintenance_mode !== "none" &&
-          payload.maintenance_mode !== "false");
-
-      const isNoIndex =
-        Boolean(sys.noIndex ?? sys.disallowRobots) ||
-        payload.allow_google_index === false;
-
-      if (typeof document !== "undefined") {
-        let robotsMeta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
-        if (isNoIndex) {
-          if (!robotsMeta) {
-            robotsMeta = document.createElement("meta");
-            robotsMeta.name = "robots";
-            document.head.appendChild(robotsMeta);
-          }
-          robotsMeta.content = "noindex, nofollow";
-        } else if (robotsMeta && robotsMeta.content === "noindex, nofollow") {
-          robotsMeta.content = "index, follow";
-        }
-
-        const fav =
-          layoutCfg?.theme_builder_config?.globalHeader?.faviconUrl ||
-          payload.favicon_url;
-        if (fav) applyFaviconToDOM(String(fav));
-
-        window.dispatchEvent(new CustomEvent("site_info_updated", { detail: payload }));
-      }
-
-      const isAdminRoute =
-        pathname.startsWith("/admin") ||
-        pathname.startsWith("/api") ||
-        pathname.startsWith("/login");
-      const isMaintenancePage = pathname.startsWith("/maintenance");
-
-      if (isMaintenance && !isAdminRoute && !isMaintenancePage) {
-        router.replace("/maintenance");
-      } else if (!isMaintenance && isMaintenancePage) {
-        router.replace("/");
-      }
-    },
-    [pathname, router]
-  );
-
   useEffect(() => {
-    if (siteInfo && Object.keys(siteInfo).length > 0) {
-      enforceSiteRules(siteInfo);
+    if (!siteInfo || typeof siteInfo !== "object" || Object.keys(siteInfo).length === 0) return;
+
+    const layoutCfg =
+      siteInfo.homepage_layout_config ||
+      siteInfo.siteInfo?.homepage_layout_config ||
+      siteInfo.data?.homepage_layout_config ||
+      {};
+
+    const sys =
+      siteInfo.settings ||
+      siteInfo.system_settings ||
+      layoutCfg.system_settings ||
+      siteInfo.siteInfo?.settings ||
+      {};
+
+    const isMaintenance =
+      Boolean(sys.maintenanceMode) ||
+      (siteInfo.maintenance_mode &&
+        siteInfo.maintenance_mode !== "none" &&
+        siteInfo.maintenance_mode !== "false");
+
+    const isNoIndex =
+      Boolean(sys.noIndex ?? sys.disallowRobots) ||
+      siteInfo.allow_google_index === false;
+
+    if (typeof document !== "undefined") {
+      let robotsMeta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
+      if (isNoIndex) {
+        if (!robotsMeta) {
+          robotsMeta = document.createElement("meta");
+          robotsMeta.name = "robots";
+          document.head.appendChild(robotsMeta);
+        }
+        robotsMeta.content = "noindex, nofollow";
+      } else if (robotsMeta && robotsMeta.content === "noindex, nofollow") {
+        robotsMeta.content = "index, follow";
+      }
+
+      const fav =
+        layoutCfg?.theme_builder_config?.globalHeader?.faviconUrl ||
+        siteInfo.favicon_url;
+      if (fav) applyFaviconToDOM(String(fav));
     }
-  }, [siteInfo, enforceSiteRules]);
+
+    const isAdminRoute =
+      pathname.startsWith("/admin") ||
+      pathname.startsWith("/api") ||
+      pathname.startsWith("/login");
+    const isMaintenancePage = pathname.startsWith("/maintenance");
+
+    if (isMaintenance && !isAdminRoute && !isMaintenancePage) {
+      router.replace("/maintenance");
+    } else if (!isMaintenance && isMaintenancePage) {
+      router.replace("/");
+    }
+  }, [siteInfo, pathname, router]);
 
   useEffect(() => {
     const chStyles = supabase
@@ -118,13 +107,6 @@ export default function LiveStoreSyncGuard() {
         (payload) => {
           if (payload?.new) {
             applyLiveStyles(payload.new);
-          } else {
-            fetch("/api/styles", { cache: "no-store" })
-              .then((r) => r.json())
-              .then((j) => {
-                if (j?.data) applyLiveStyles(j.data);
-              })
-              .catch(() => {});
           }
         }
       )

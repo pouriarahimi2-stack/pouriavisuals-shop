@@ -22,22 +22,32 @@ export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(false);
   const channelRef = useRef<any>(null);
+  const fetchingRef = useRef(false);
+
+  const applyPayload = useCallback((payload: any) => {
+    if (!payload || typeof payload !== "object") return;
+    setSiteInfo(payload);
+    const fav =
+      payload?.theme_builder_config?.globalHeader?.faviconUrl ||
+      payload?.homepage_layout_config?.theme_builder_config?.globalHeader?.faviconUrl ||
+      payload?.favicon_url;
+    if (fav) applyFaviconToDOM(String(fav));
+  }, []);
 
   const refresh = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
     try {
-      const res = await fetch("/api/site-info?t=" + Date.now(), { cache: "no-store" });
+      const res = await fetch("/api/site-info", { cache: "no-store" });
+      if (!res.ok) return;
       const json = await res.json();
       const payload = json.data || json.siteInfo || json;
-      if (payload && typeof payload === "object") {
-        setSiteInfo(payload);
-        const fav =
-          payload?.theme_builder_config?.globalHeader?.faviconUrl ||
-          payload?.homepage_layout_config?.theme_builder_config?.globalHeader?.faviconUrl ||
-          payload?.favicon_url;
-        if (fav) applyFaviconToDOM(String(fav));
-      }
-    } catch {}
-  }, []);
+      applyPayload(payload);
+    } catch {
+    } finally {
+      fetchingRef.current = false;
+    }
+  }, [applyPayload]);
 
   useEffect(() => {
     if (mountedRef.current) return;
@@ -54,16 +64,22 @@ export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
       .channel(chName)
       .on("postgres_changes", { event: "*", schema: "public", table: "site_info" }, () => {
         clearTimeout(debounce);
-        debounce = setTimeout(refresh, 300);
+        debounce = setTimeout(refresh, 600);
       })
       .subscribe();
 
     channelRef.current = channel;
 
-    const handleUpdate = () => refresh();
-    window.addEventListener("site_info_updated", handleUpdate);
-    window.addEventListener("theme_builder_updated", handleUpdate);
-    window.addEventListener("site_styles_updated", handleUpdate);
+    const handleStudioUpdate = (e: any) => {
+      if (e?.detail && typeof e.detail === "object" && e.detail.homepage_layout_config) {
+        applyPayload(e.detail);
+      } else {
+        refresh();
+      }
+    };
+
+    window.addEventListener("theme_builder_updated", handleStudioUpdate);
+    window.addEventListener("menus_updated", refresh);
 
     return () => {
       clearTimeout(debounce);
@@ -71,11 +87,10 @@ export function SiteInfoProvider({ children }: { children: React.ReactNode }) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-      window.removeEventListener("site_info_updated", handleUpdate);
-      window.removeEventListener("theme_builder_updated", handleUpdate);
-      window.removeEventListener("site_styles_updated", handleUpdate);
+      window.removeEventListener("theme_builder_updated", handleStudioUpdate);
+      window.removeEventListener("menus_updated", refresh);
     };
-  }, [refresh]);
+  }, [refresh, applyPayload]);
 
   return <Ctx.Provider value={{ siteInfo, loading, refresh }}>{children}</Ctx.Provider>;
 }

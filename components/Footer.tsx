@@ -33,13 +33,7 @@ export default function Footer() {
     setLogoImgFailed(false);
   }, [footerLogoUrl]);
 
-  useEffect(() => {
-    const onStudioSave = () => {
-      if (typeof refresh === "function") refresh();
-    };
-    window.addEventListener("theme_builder_updated", onStudioSave);
-    return () => window.removeEventListener("theme_builder_updated", onStudioSave);
-  }, [refresh]);
+  
 
   if (footerCfg.show === false) return null;
 

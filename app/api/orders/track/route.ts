@@ -1,111 +1,201 @@
+// File Path: app/api/orders/track/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { checkRateLimit } from "@/lib/rateLimiter";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+function normalizeDigits(val: any): string {
+  return String(val || "")
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .trim();
+}
+
+function normalizePhone(val: any): string {
+  const digits = normalizeDigits(val).replace(/\D/g, "");
+  if (digits.startsWith("98") && digits.length === 12) return "0" + digits.slice(2);
+  if (digits.startsWith("9") && digits.length === 10) return "0" + digits;
+  return digits;
+}
+
+function normalizeOrderRecord(row: any) {
+  if (!row || typeof row !== "object") return row;
+  const resolvedPhone = row.phone || row.customer_phone || "";
+  const resolvedOrderNum = row.order_number || row.id || "";
+  const resolvedTracking = row.tracking_code || resolvedOrderNum;
+  return {
+    ...row,
+    phone: resolvedPhone,
+    customer_phone: resolvedPhone,
+    order_number: resolvedOrderNum,
+    tracking_code: resolvedTracking,
+  };
+}
+
+async function searchOrders(params: {
+  phone?: string;
+  code?: string;
+}) {
+  const cleanPhone = normalizePhone(params.phone);
+  const cleanCode = normalizeDigits(params.code).toUpperCase();
+
+  const { data: allOrders, error } = await supabaseAdmin
+    .from("orders")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(300);
+
+  if (error || !Array.isArray(allOrders)) {
+    return [];
+  }
+
+  return allOrders
+    .filter((row: any) => {
+      const rowPhone = normalizePhone(row.phone || row.customer_phone || "");
+      const rowId = String(row.id || "").toUpperCase();
+      const rowOrderNum = String(row.order_number || "").toUpperCase();
+      const rowTracking = String(row.tracking_code || "").toUpperCase();
+
+      const phoneMatches = !cleanPhone || rowPhone === cleanPhone || rowPhone.endsWith(cleanPhone.slice(-10));
+      const codeMatches =
+        !cleanCode ||
+        rowId === cleanCode ||
+        rowOrderNum === cleanCode ||
+        rowTracking === cleanCode ||
+        rowId.includes(cleanCode) ||
+        rowOrderNum.includes(cleanCode) ||
+        rowTracking.includes(cleanCode);
+
+      if (cleanPhone && cleanCode) {
+        return phoneMatches && codeMatches;
+      }
+      if (cleanCode) {
+        return codeMatches;
+      }
+      if (cleanPhone) {
+        return phoneMatches;
+      }
+      return false;
+    })
+    .map(normalizeOrderRecord);
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const clientIp =
-      req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    const { searchParams } = new URL(req.url);
+    const phone =
+      searchParams.get("phone") ||
+      searchParams.get("mobile") ||
+      searchParams.get("customer_phone") ||
+      "";
+    const code =
+      searchParams.get("code") ||
+      searchParams.get("trackingCode") ||
+      searchParams.get("tracking_code") ||
+      searchParams.get("orderId") ||
+      searchParams.get("id") ||
+      "";
 
-    const rateCheck = await checkRateLimit(clientIp, "order_track", 15, 15);
-    if (!rateCheck.allowed) {
+    if (!phone && !code) {
       return NextResponse.json(
-        { success: false, message: "تعداد درخواست‌های پیگیری بیش از حد مجاز است." },
-        { status: 429 }
-      );
-    }
-
-    const { query } = await req.json();
-    if (!query || typeof query !== "string" || query.trim().length < 5) {
-      return NextResponse.json(
-        { success: false, message: "شماره موبایل یا شماره سفارش معتبر وارد نمایید." },
+        {
+          success: false,
+          message: "لطفاً شماره موبایل یا کد رهگیری سفارش را وارد نمایید.",
+        },
         { status: 400 }
       );
     }
 
-    const cleanQuery = query.trim().replace(/[^A-Za-z0-9\-\u0600-\u06FF]/g, "");
-    const isPhone    = /^0?9\d{9}$/.test(cleanQuery);
+    const matched = await searchOrders({ phone, code });
 
-    // هر دو نام فیلد (total_price و total_amount) select می‌شوند
-    let dbQuery = supabaseAdmin
-      .from("orders")
-      .select(
-        "id, order_number, customer_name, customer_phone, " +
-        "total_price, total_amount, final_amount, " +
-        "payment_status, status, created_at, items, tracking_code, shipping_address"
-      );
-
-    if (isPhone) {
-      const normalizedPhone = cleanQuery.replace(/^\+98/, "0");
-      dbQuery = dbQuery.eq("customer_phone", normalizedPhone);
-    } else {
-      dbQuery = dbQuery.or(
-        `order_number.eq.${cleanQuery},id.eq.${cleanQuery}`
-      );
-    }
-
-    const { data: orders, error } = await dbQuery.order("created_at", {
-      ascending: false,
-    });
-
-    if (error) {
+    if (matched.length === 0) {
       return NextResponse.json(
-        { success: false, message: "خطا در بازیابی سفارشات." },
-        { status: 500 }
+        {
+          success: false,
+          orders: [],
+          order: null,
+          message: "سفارشی با این مشخصات یافت نشد.",
+        },
+        { status: 404 }
       );
     }
 
-    // نرمال‌سازی مبلغ — هر نام فیلدی که در DB باشد، پاسخ یکسان است
-    const normalized = (orders || []).map((o: any) => ({
-      ...o,
-      total_amount: Number(
-        o.final_amount || o.total_amount || o.total_price || 0
-      ),
-    }));
-
-    return NextResponse.json({ success: true, orders: normalized });
+    return NextResponse.json(
+      {
+        success: true,
+        order: matched[0],
+        orders: matched,
+        data: matched[0],
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: err.message },
+      { success: false, message: err.message || "خطا در رهگیری سفارش." },
       { status: 500 }
     );
   }
 }
 
-// پشتیبانی از GET برای سازگاری با my-orders که phone query می‌فرستد
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const phone = searchParams.get("phone");
-    if (!phone) {
-      return NextResponse.json({ success: false, message: "شماره الزامی است." }, { status: 400 });
+    const body = await req.json();
+    const phone =
+      body.phone || body.mobile || body.customer_phone || body.customerPhone || "";
+    const code =
+      body.code ||
+      body.trackingCode ||
+      body.tracking_code ||
+      body.orderId ||
+      body.order_number ||
+      body.id ||
+      "";
+
+    if (!phone && !code) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "لطفاً شماره موبایل یا کد رهگیری سفارش را وارد نمایید.",
+        },
+        { status: 400 }
+      );
     }
 
-    const normalizedPhone = phone.trim().replace(/^\+98/, "0");
+    const matched = await searchOrders({ phone, code });
 
-    const { data: orders, error } = await supabaseAdmin
-      .from("orders")
-      .select(
-        "id, order_number, customer_name, customer_phone, " +
-        "total_price, total_amount, final_amount, " +
-        "payment_status, status, created_at, items, tracking_code, shipping_address"
-      )
-      .eq("customer_phone", normalizedPhone)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      return NextResponse.json({ success: false, message: "خطا در بازیابی." }, { status: 500 });
+    if (matched.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          orders: [],
+          order: null,
+          message: "سفارشی با این مشخصات یافت نشد.",
+        },
+        { status: 404 }
+      );
     }
 
-    const normalized = (orders || []).map((o: any) => ({
-      ...o,
-      total_amount: Number(o.final_amount || o.total_amount || o.total_price || 0),
-    }));
-
-    return NextResponse.json({ success: true, orders: normalized });
+    return NextResponse.json(
+      {
+        success: true,
+        order: matched[0],
+        orders: matched,
+        data: matched[0],
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err.message || "خطا در رهگیری سفارش." },
+      { status: 500 }
+    );
   }
 }

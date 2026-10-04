@@ -8,7 +8,7 @@ import AdminAiSeoAutopilot from "@/components/admin/AdminAiSeoAutopilot";
 
 interface SeoItem {
   id: string;
-  type: "product" | "post" | "page";
+  type: "product" | "post" | "news" | "page";
   title: string;
   meta_title: string;
   meta_description: string;
@@ -18,7 +18,7 @@ interface SeoItem {
 
 interface SeoIssue {
   id: string;
-  type: "product" | "post" | "page";
+  type: "product" | "post" | "news" | "page";
   title: string;
   severity: "high" | "medium" | "low";
   message: string;
@@ -45,6 +45,28 @@ export default function AdminSeoPage() {
   const [metaTitleInput, setMetaTitleInput] = useState("");
   const [metaDescInput, setMetaDescInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [autoFixingAll, setAutoFixingAll] = useState(false);
+
+  const handleAutoFixAllSeo = async () => {
+    soundEngine.playClick();
+    setAutoFixingAll(true);
+    try {
+      const res = await fetch("/api/admin/seo-audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto_fix_all_seo" }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        soundEngine.playSuccess();
+        setFeedback(json.message);
+        fetchSeoAudit();
+        setTimeout(() => setFeedback(null), 5000);
+      }
+    } finally {
+      setAutoFixingAll(false);
+    }
+  };
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const fetchSeoAudit = async () => {
@@ -97,7 +119,7 @@ export default function AdminSeoPage() {
 
   const handleOpenMetaEditor = (item: {
     id: string;
-    type: "product" | "post" | "page";
+    type: "product" | "post" | "news" | "page";
     title: string;
     meta_title: string;
     meta_description: string;
@@ -237,8 +259,16 @@ export default function AdminSeoPage() {
 
       {activeTab === "audit" && (
         <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] pb-3">
             <h2 className="text-sm font-black">لیست هشدارهای سئو و نقص متاتگ‌ها</h2>
+            <button
+              type="button"
+              disabled={autoFixingAll}
+              onClick={handleAutoFixAllSeo}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-lg cursor-pointer transition disabled:opacity-50"
+            >
+              {autoFixingAll ? "در حال بهینه‌سازی..." : "⚡ بهینه‌سازی خودکار ۱-کلیکی تمام متاتگ‌های سایت"}
+            </button>
             <button
               onClick={() => {
                 soundEngine.playClick();
@@ -389,6 +419,20 @@ export default function AdminSeoPage() {
                 />
               </div>
 
+              <div className="p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] space-y-1 text-right">
+                <span className="text-[10px] font-bold text-slate-400 block">
+                  🌐 پیش‌‌نمایش زنده در نتایج صفحه اول گوگل (Google SERP Preview):
+                </span>
+                <div className="text-xs font-mono text-emerald-500 truncate" dir="ltr">
+                  https://axoncore.ir{editingItem.url || "/products/" + editingItem.id}
+                </div>
+                <div className="text-sm font-black text-sky-400 truncate">
+                  {metaTitleInput || editingItem.title}
+                </div>
+                <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
+                  {metaDescInput || "توضیحات متا در زیر عنوان لینک شما در گوگل نمایش داده می‌شود..."}
+                </p>
+              </div>
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--card-border)]">
                 <button
                   type="button"

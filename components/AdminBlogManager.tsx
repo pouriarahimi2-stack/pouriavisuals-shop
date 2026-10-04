@@ -288,6 +288,44 @@ export function AdminBlogManager() {
     }
   };
 
+  const wordCount = content
+    .replace(/<[^>]*>/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+  const hasH2 = /<h2/i.test(content);
+  const hasProductLink = /\/products\//i.test(content);
+  const hasTable = /<table/i.test(content);
+  const liveBlogSeoScore = Math.min(
+    100,
+    25 +
+      (title.trim().length >= 20 ? 15 : 0) +
+      (metaDescription.trim().length >= 50 ? 15 : 0) +
+      (wordCount >= 150 ? 20 : Math.round((wordCount / 150) * 20)) +
+      (hasH2 ? 10 : 0) +
+      (hasProductLink ? 10 : 0) +
+      (hasTable ? 5 : 0)
+  );
+
+  const injectComparisonTableSnippet = () => {
+    soundEngine.playClick();
+    const selProd = products.find((p) => p.id === selectedProductId) || products[0];
+    const pName = selProd ? selProd.title : "محصول منتخب آکسون";
+    const pHref = selProd ? "/products/" + selProd.id : "/products";
+    const snippet = [
+      "<h3>جدول مقایسه فنی و ارزش خرید " + pName + "</h3>",
+      '<table border="1" cellpadding="10" style="width:100%;border-collapse:collapse;margin:16px 0;">',
+      '  <thead><tr style="background:#0f172a;color:#38bdf8;"><th>ویژگی تخصصی</th><th>نسخه‌های متداول</th><th>' + pName + "</th></tr></thead>",
+      "  <tbody>",
+      "    <tr><td>کیفیت ساخت و متریال</td><td>معمولی</td><td>درجه یک اورجینال با طول عمر بالا</td></tr>",
+      "    <tr><td>گارانتی و خدمات</td><td>فاقد ضمانت معتبر</td><td>۱۸ ماه گارانتی اصالت طلایی آکسون</td></tr>",
+      "  </tbody>",
+      "</table>",
+      '<p><a href="' + pHref + '"><strong>🛒 مشاهده قیمت روز و خرید مستقیم ' + pName + " ←</strong></a></p>",
+    ].join("");
+    setContent((prev) => (prev ? prev + "\n\n" + snippet : snippet));
+  };
+
   const filteredPosts = posts.filter((p) =>
     (p.title || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -445,9 +483,23 @@ export function AdminBlogManager() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block mb-1 font-bold text-[var(--text-secondary)]">
-                محتوای کامل مقاله (پشتیبانی از تگ‌های HTML و لینک خرید) *
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <label className="font-bold text-[var(--text-secondary)]">
+                  محتوای کامل مقاله (پشتیبانی از تگ‌های HTML، جدول و لینک خرید) *
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-400 font-mono font-black text-[11px]">
+                    امتیاز زنده سئو: {liveBlogSeoScore}/100 ({wordCount} کلمه)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={injectComparisonTableSnippet}
+                    className="px-3 py-1 rounded-xl bg-[var(--input-bg)] border border-[var(--accent-blue)] text-[var(--accent-blue)] font-black text-[11px] cursor-pointer"
+                  >
+                    + درج جدول مقایسه و باکس خرید محصول
+                  </button>
+                </div>
+              </div>
               <textarea
                 rows={8}
                 required

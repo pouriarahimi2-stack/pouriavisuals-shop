@@ -32,6 +32,7 @@ export const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
   { id: "messages", permKey: "messages", label: "تیکت‌ها و پیام‌های کاربران", href: "/admin/messages", icon: "📩", requiredPerm: ["messages", "all"] },
   { id: "reviews", permKey: "reviews", label: "دیدگاه‌ها و رضایت خریداران", href: "/admin/reviews", icon: "⭐", requiredPerm: ["reviews", "all"] },
   { id: "roles", permKey: "roles", label: "مدیران و ماتریس دسترسی‌ها", href: "/admin/roles", icon: "🛡️", requiredPerm: ["roles", "all"] },
+  { id: "monitoring", permKey: "roles", label: "رادار نظارت زنده بر مدیران", href: "/admin/monitoring", icon: "👁️‍🗨️", badge: "ویژه مالک", requiredPerm: ["roles"] },
   { id: "change_pin", permKey: "change_pin", label: "تغییر رمز عبور و پین امنیتی", href: "/admin/change-pin", icon: "🔐", requiredPerm: ["settings", "all"] },
   { id: "audit_logs", permKey: "audit_logs", label: "لاگ‌های امنیتی و اسکنر هوشمند", href: "/admin/audit-logs", icon: "🚨", requiredPerm: ["audit_logs", "all"] },
   { id: "backup", permKey: "backup", label: "بکاپ خودکار روزانه و بازیابی", href: "/admin/backup", icon: "💾", requiredPerm: ["backup", "all"] },
@@ -127,7 +128,7 @@ export function AdminSidebar(props: any = {}) {
     if (!sessionLoaded) return item.id === "dashboard";
     if (isSuper) return true;
     // صفحه مدیریت مدیران (/admin/roles) و تغییر پین فقط مخصوص مالک سایت (superadmin) است
-    if (item.id === "roles" || item.id === "change_pin") return false;
+    if (item.id === "roles" || item.id === "monitoring" || item.id === "change_pin") return false;
     return item.requiredPerm.some((p) => userPerms.includes(p));
   });
 

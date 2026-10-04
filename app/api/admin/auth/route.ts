@@ -1,3 +1,4 @@
+import { recordSubAdminActivity } from "@/lib/subAdminMonitor";
 // File Path: app/api/admin/auth/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPayload, signPayload, COOKIE_NAME } from "@/lib/session";
@@ -88,6 +89,18 @@ export async function POST(req: NextRequest) {
 
     const subUserMatch = await verifySubAdminCredentials(rawUser, rawPass);
     if (subUserMatch) {
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
+      recordSubAdminActivity({
+        username: subUserMatch.username,
+        full_name: subUserMatch.full_name,
+        role: subUserMatch.role,
+        eventType: "login",
+        path: "/admin/login",
+        method: "LOGIN",
+        details: "🔑 ورود موفق به پنل مدیریت با نقش " + subUserMatch.role,
+        ip,
+        userAgent: req.headers.get("user-agent") || "",
+      }).catch(() => {});
       const resolvedTheme = subUserMatch.ui_theme === "light" ? "light" : "dark";
       const token = await signPayload({
         userId: subUserMatch.id,

@@ -86,6 +86,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     } catch {}
   }, []);
 
+  // ارسال لحظه‌ای صفحه در حال بازدید و وضعیت آنلاین (Heartbeat) به رادار نظارت مدیر ارشد
+  useEffect(() => {
+    if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
+    fetch("/api/admin/monitoring", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventType: "page_view",
+        path: pathname,
+        method: "VIEW",
+        details: "👁️ ورود و مشاهده صفحه " + pathname,
+      }),
+    }).catch(() => {});
+
+    const hbTimer = setInterval(() => {
+      fetch("/api/admin/monitoring", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType: "heartbeat",
+          path: pathname,
+        }),
+      }).catch(() => {});
+    }, 20000);
+
+    return () => clearInterval(hbTimer);
+  }, [pathname]);
+
   useEffect(() => {
     if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
     syncAdminSessionAndTheme();
@@ -147,6 +175,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = async () => {
     soundEngine.playClick();
     try {
+      await fetch("/api/admin/monitoring", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType: "logout",
+          path: pathname,
+          method: "LOGOUT",
+          details: "🚪 خروج از پنل مدیریت",
+        }),
+      }).catch(() => {});
       await fetch("/api/admin/logout", { method: "POST" });
     } catch {}
     router.replace("/admin/login");

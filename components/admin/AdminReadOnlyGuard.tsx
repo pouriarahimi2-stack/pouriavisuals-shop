@@ -111,7 +111,7 @@ export default function AdminReadOnlyGuard() {
     const isSuper = adminUser.role === "superadmin";
     if (isSuper) return;
 
-    if (pathname.startsWith("/admin/roles") || pathname.startsWith("/admin/change-pin")) {
+    if (pathname.startsWith("/admin/roles") || pathname.startsWith("/admin/monitoring") || pathname.startsWith("/admin/change-pin")) {
       router.replace("/admin/dashboard");
       return;
     }
@@ -245,7 +245,7 @@ export default function AdminReadOnlyGuard() {
       const urlStr = typeof input === "string" ? input : input.toString();
 
       if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-        if (urlStr.includes("/api/analytics/device") || urlStr.includes("/api/admin/logout")) {
+        if (urlStr.includes("/api/analytics/device") || urlStr.includes("/api/admin/logout") || urlStr.includes("/api/admin/monitoring")) {
           return originalFetch.apply(this, [input, init as any]);
         }
 

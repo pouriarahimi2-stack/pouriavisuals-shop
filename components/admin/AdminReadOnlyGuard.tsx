@@ -31,61 +31,59 @@ const ROUTE_PERM_MAP: Array<{ prefix: string; perms: string[] }> = [
   { prefix: "/admin/roles", perms: ["roles", "all"] },
 ];
 
-// تنها دکمه‌هایی که در حالت «فقط مشاهده» باز می‌مانند (جابه‌جایی بین تب‌ها، بستن پنجره، چاپ و دریافت گزارش)
-function isSafeNavigationOrViewButton(btn: HTMLElement): boolean {
-  const text = (
-    (btn.innerText || btn.textContent || "") +
-    " " +
-    (btn.getAttribute("title") || "") +
-    " " +
-    (btn.getAttribute("aria-label") || "")
-  )
-    .trim()
-    .toLowerCase();
+// تنها دکمه‌های تغییر تب نمایشی (۱. / ۲. / ۳. / ۴. / ۵.) که هیچ عملیاتی انجام نمی‌دهند و فقط بین تب‌های صفحه جابه‌جا می‌شوند
+function isPureSubTabSwitcher(btn: HTMLElement): boolean {
+  if (btn.getAttribute("type")?.toLowerCase() === "submit") return false;
+  const text = (btn.innerText || btn.textContent || "").trim();
 
-  if (
-    text.includes("ذخیره") ||
-    text.includes("حذف") ||
-    text.includes("ویرایش") ||
-    text.includes("افزودن") ||
-    text.includes("ایجاد") ||
-    text.includes("آپلود") ||
-    text.includes("بهینه‌سازی") ||
-    text.includes("ارتقا") ||
-    text.includes("تولید") ||
-    text.includes("ارسال")
-  ) {
+  // اگر دکمه شامل هرگونه عبارت عملیاتی، دانلود، کپی، استعلام، بروزرسانی یا بازیابی باشد، قطعا باید قفل شود
+  const forbiddenWords = [
+    "ذخیره",
+    "ثبت",
+    "حذف",
+    "ویرایش",
+    "افزودن",
+    "ایجاد",
+    "جدید",
+    "آپلود",
+    "بارگذاری",
+    "بازیابی",
+    "دانلود",
+    "خروجی",
+    "اکسل",
+    "csv",
+    "json",
+    "کپی",
+    "استعلام",
+    "بروزرسانی",
+    "تازه‌سازی",
+    "پایش",
+    "اسکن",
+    "بهینه‌سازی",
+    "ارتقا",
+    "تولید",
+    "ارسال",
+    "پاکسازی",
+    "بکاپ",
+    "تغییر",
+    "اعمال",
+    "تعمیرات",
+    "ایندکس",
+    "پاسخ",
+    "تایید",
+    "لغو",
+    "صدور",
+    "درج",
+    "پیشنهاد",
+  ];
+
+  const lower = text.toLowerCase();
+  if (forbiddenWords.some((w) => lower.includes(w))) {
     return false;
   }
 
-  const allowedViewKeywords = [
-    "✕",
-    "بستن",
-    "انصراف",
-    "مشاهده",
-    "چاپ",
-    "اکسل",
-    "csv",
-    "استعلام",
-    "بروزرسانی",
-    "دسکتاپ",
-    "موبایل",
-    "تبلت",
-    "۱.",
-    "۲.",
-    "۳.",
-    "۴.",
-    "۵.",
-    "تب ",
-    "حسابداری و انبار",
-    "سفارشات و صدور",
-    "گزارشات مالی",
-    "رادار سلامت",
-    "اتوپایلوت",
-    "کوپایلوت بازار",
-  ];
-
-  return allowedViewKeywords.some((kw) => text.includes(kw.toLowerCase()));
+  // فقط تب‌های شماره‌دار بالای صفحات چندتبی (مثل ۱. حسابداری / ۲. سفارشات / ۳. گزارش مالی)
+  return /^[🧭🏛📑🌳⚡🏭📦📈🎯✏️📡💻📊📋🔍🚀📚🤖]*s*[۱۱۲۳۴۵12345]./.test(text);
 }
 
 export default function AdminReadOnlyGuard() {
@@ -136,81 +134,108 @@ export default function AdminReadOnlyGuard() {
   useEffect(() => {
     if (!isCurrentPageReadOnly || typeof document === "undefined") return;
 
-    const lockWorkspaceElements = () => {
+    const lockAllInteractiveElements = () => {
       const workspace = document.getElementById("axon-admin-main-workspace");
       if (!workspace) return;
 
-      const inputs = workspace.querySelectorAll<
+      // ۱. قفل کردن ۱۰۰٪ تمامی input، textarea و select (شامل کادرهای جستجو، فایل، چک‌باکس و اسلایدر)
+      const formControls = workspace.querySelectorAll<
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
       >("input, textarea, select");
 
-      inputs.forEach((el) => {
-        const placeholder = (el.getAttribute("placeholder") || "").toLowerCase();
-        const isSearchBox =
-          placeholder.includes("جستجو") ||
-          placeholder.includes("search") ||
-          placeholder.includes("فیلتر");
-        if (isSearchBox) return;
-
+      formControls.forEach((el) => {
         el.setAttribute("data-axon-readonly-locked", "1");
         if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
           el.readOnly = true;
         }
         el.disabled = true;
-        el.style.opacity = "0.5";
+        el.style.opacity = "0.4";
         el.style.cursor = "not-allowed";
         el.style.pointerEvents = "none";
+        el.style.filter = "grayscale(100%)";
       });
 
-      // قفل کردن تمام دکمه‌های داخل صفحه (شامل دکمه‌های تغییر وضعیت تعمیرات و ایندکس گوگل) به جز تب‌ها و دکمه‌های مشاهده
-      const buttons = workspace.querySelectorAll<HTMLButtonElement>("button");
-      buttons.forEach((btn) => {
-        if (btn.getAttribute("data-axon-readonly-btn") === "1") return;
-        if (!isSafeNavigationOrViewButton(btn)) {
-          btn.setAttribute("data-axon-readonly-btn", "1");
-          btn.disabled = true;
-          btn.style.opacity = "0.4";
-          btn.style.cursor = "not-allowed";
-          btn.style.pointerEvents = "none";
-          btn.style.filter = "grayscale(100%)";
+      // ۲. قفل کردن تگ‌های <label> که نقش دکمه آپلود/بازیابی فایل دارند (مانند دکمه سبز «بازیابی سایت از فایل پشتیبان»)
+      const labels = workspace.querySelectorAll<HTMLLabelElement>("label");
+      labels.forEach((lbl) => {
+        const hasFileOrCheckbox = lbl.querySelector("input");
+        const cls = lbl.className || "";
+        if (hasFileOrCheckbox || cls.includes("cursor-pointer") || cls.includes("bg-")) {
+          lbl.setAttribute("data-axon-readonly-locked", "1");
+          lbl.style.opacity = "0.35";
+          lbl.style.cursor = "not-allowed";
+          lbl.style.pointerEvents = "none";
+          lbl.style.filter = "grayscale(100%)";
         }
+      });
+
+      // ۳. قفل کردن تمامی دکمه‌ها (<button>) و المان‌های دارای role="button"
+      const buttons = workspace.querySelectorAll<HTMLElement>('button, [role="button"]');
+      buttons.forEach((btn) => {
+        if (isPureSubTabSwitcher(btn)) return;
+        btn.setAttribute("data-axon-readonly-btn", "1");
+        if (btn instanceof HTMLButtonElement) {
+          btn.disabled = true;
+        }
+        btn.style.opacity = "0.35";
+        btn.style.cursor = "not-allowed";
+        btn.style.pointerEvents = "none";
+        btn.style.filter = "grayscale(100%)";
+      });
+
+      // ۴. قفل کردن لینک‌های دانلود یا عملیاتی داخل محیط کاری
+      const actionLinks = workspace.querySelectorAll<HTMLAnchorElement>("a[download], a[target='_blank']");
+      actionLinks.forEach((a) => {
+        a.style.opacity = "0.35";
+        a.style.cursor = "not-allowed";
+        a.style.pointerEvents = "none";
+        a.style.filter = "grayscale(100%)";
       });
     };
 
-    lockWorkspaceElements();
+    lockAllInteractiveElements();
     const observer = new MutationObserver(() => {
-      lockWorkspaceElements();
+      lockAllInteractiveElements();
     });
 
     const workspace = document.getElementById("axon-admin-main-workspace") || document.body;
     observer.observe(workspace, { childList: true, subtree: true });
 
-    const handleCaptureClick = (e: MouseEvent) => {
+    const blockCaptureEvent = (e: Event) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      const btn = target.closest("button");
       const workspaceEl = document.getElementById("axon-admin-main-workspace");
-      if (btn && workspaceEl && workspaceEl.contains(btn) && !isSafeNavigationOrViewButton(btn)) {
+      if (!workspaceEl || !workspaceEl.contains(target)) return;
+
+      const btn = target.closest("button");
+      if (btn && isPureSubTabSwitcher(btn)) {
+        return;
+      }
+
+      const interactive = target.closest(
+        'button, input, select, textarea, label, a[download], [role="button"]'
+      );
+      if (interactive) {
         e.preventDefault();
         e.stopPropagation();
       }
     };
 
-    const handleCaptureSubmit = (e: Event) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    document.addEventListener("click", handleCaptureClick, true);
-    document.addEventListener("submit", handleCaptureSubmit, true);
+    document.addEventListener("click", blockCaptureEvent, true);
+    document.addEventListener("change", blockCaptureEvent, true);
+    document.addEventListener("input", blockCaptureEvent, true);
+    document.addEventListener("submit", blockCaptureEvent, true);
 
     return () => {
       observer.disconnect();
-      document.removeEventListener("click", handleCaptureClick, true);
-      document.removeEventListener("submit", handleCaptureSubmit, true);
+      document.removeEventListener("click", blockCaptureEvent, true);
+      document.removeEventListener("change", blockCaptureEvent, true);
+      document.removeEventListener("input", blockCaptureEvent, true);
+      document.removeEventListener("submit", blockCaptureEvent, true);
     };
   }, [isCurrentPageReadOnly, pathname]);
 
+  // مسدودسازی هرگونه درخواست تغییر، آپلود، استعلام یا دانلود در لایه شبکه
   useEffect(() => {
     if (!adminUser || isSuperAdmin || typeof window === "undefined") return;
 
@@ -220,7 +245,6 @@ export default function AdminReadOnlyGuard() {
       const urlStr = typeof input === "string" ? input : input.toString();
 
       if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-        // اجازه ارسال تله‌متری بازدید دستگاه در پس‌زمینه بدون خطا
         if (urlStr.includes("/api/analytics/device") || urlStr.includes("/api/admin/logout")) {
           return originalFetch.apply(this, [input, init as any]);
         }

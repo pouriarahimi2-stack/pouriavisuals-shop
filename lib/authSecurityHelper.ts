@@ -41,6 +41,14 @@ function isRoleMutationBlocked(req: NextRequest, session: AdminSessionPayload | 
   if (!session) return true;
   const method = String(req.method || "GET").toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    const pathname = req.nextUrl?.pathname || "";
+    const dlParam = req.nextUrl?.searchParams?.get("download");
+    if (
+      String(session.role || "").toLowerCase() === "viewer_reporter" &&
+      (dlParam || pathname.startsWith("/api/admin/export-products"))
+    ) {
+      return true;
+    }
     return false;
   }
   const pathname = req.nextUrl?.pathname || "";

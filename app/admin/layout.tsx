@@ -1,6 +1,6 @@
 "use client";
 // File Path: app/admin/layout.tsx
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminSidebar from "@/components/admin/AdminSidebar";
@@ -66,7 +66,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ui_theme?: "dark" | "light";
   } | null>(null);
   const [activeTheme, setActiveTheme] = useState<"dark" | "light">("dark");
-  const wsChannelRef = useRef<any>(null);
+
+  const syncAdminSessionAndTheme = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/auth?t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.authenticated && json.user) {
+        setAdminUser(json.user);
+        const dbTheme: "dark" | "light" =
+          json.user.ui_theme === "light" ? "light" : "dark";
+
+        if (json.user.role === "superadmin" && typeof window !== "undefined") {
+          localStorage.setItem(SUPERADMIN_THEME_STORAGE_KEY, dbTheme);
+        }
+
+        setActiveTheme(dbTheme);
+        applyAdminDomTheme(dbTheme);
+      }
+    } catch {}
+  }, []);
 
   const pushLiveTelemetry = useCallback(
     (payload: {
@@ -86,21 +105,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         timestamp: new Date().toISOString(),
       };
 
-      // ۱. ارسال فوری از طریق وب‌سوکت Supabase Realtime و BroadcastChannel برای نمایش آنی زیر ۱۰۰ میلی‌ثانیه
       try {
-        if (wsChannelRef.current) {
-          wsChannelRef.current.send({
-            type: "broadcast",
-            event: "subadmin_live_action",
-            payload: bodyData,
-          });
-        }
         const bc = new BroadcastChannel("axon_subadmin_live_monitor");
         bc.postMessage(bodyData);
         bc.close();
       } catch {}
 
-      // ۲. ثبت پایدار در سرور و دیتابیس
       fetch("/api/admin/monitoring", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,11 +120,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     []
   );
 
-  // راه‌اندازی کانال وب‌سوکت سراسری پنل ادمین
+  // کانال وب‌سوکت اختصاصی Layout برای همگام‌سازی بلادرنگ تم و دسترسی‌ها
   useEffect(() => {
-    if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
+    const channelId = "axon-admin-layout-sync-" + Math.random().toString(36).slice(2, 8);
     const ch = supabase
-      .channel("axon-live-monitoring-bus")
+      .channel(channelId)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "site_info" },
@@ -123,11 +133,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
       )
       .subscribe();
-    wsChannelRef.current = ch;
+
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [pathname]);
+  }, [syncAdminSessionAndTheme]);
 
   // رصد بلادرنگ تغییر صفحه، کلیک روی تب‌ها و دکمه‌ها، و جستجوها
   useEffect(() => {
@@ -148,7 +158,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       });
     }, 8000);
 
-    // شنود تمام کلیک‌های کاربر روی تب‌ها و دکمه‌های محیط کاری
     const handleGlobalClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
@@ -166,17 +175,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           method: "TAB",
           details: "📑 تغییر تب به: «" + text + "»",
         });
-      } else if (!text.includes("خروج امن")) {
+      } else if (!text.includes("خروج امن") && !text.includes("استریم بلادرنگ")) {
         pushLiveTelemetry({
           eventType: "click_action",
           path: pathname,
           method: "CLICK",
-          details: "🖱️ کلیک روی دکمه/گزینه: «" + text + "»",
+          details: "🖱️ کلیک روی گزینه: «" + text + "»",
         });
       }
     };
 
-    // شنود جستجوها و فیلترهایی که کاربر تایپ یا انتخاب می‌کند
     let searchDebounce: any = null;
     const handleGlobalInput = (e: Event) => {
       const el = e.target as HTMLInputElement | HTMLSelectElement | null;
@@ -207,26 +215,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       document.removeEventListener("change", handleGlobalInput, true);
     };
   }, [pathname, pushLiveTelemetry]);
-
-  const syncAdminSessionAndTheme = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/auth?t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) return;
-      const json = await res.json();
-      if (json.authenticated && json.user) {
-        setAdminUser(json.user);
-        const dbTheme: "dark" | "light" =
-          json.user.ui_theme === "light" ? "light" : "dark";
-
-        if (json.user.role === "superadmin" && typeof window !== "undefined") {
-          localStorage.setItem(SUPERADMIN_THEME_STORAGE_KEY, dbTheme);
-        }
-
-        setActiveTheme(dbTheme);
-        applyAdminDomTheme(dbTheme);
-      }
-    } catch {}
-  }, []);
 
   useEffect(() => {
     if (pathname.startsWith("/admin/login") || pathname.startsWith("/admin/setup")) return;
@@ -363,7 +351,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       `
       }</style>
 
-      {/* نوار ارشد بالای پنل فرماندهی */}
       <header className="w-full px-4 sm:px-6 py-3 bg-[var(--modal-bg)] border-b border-[var(--card-border)] flex flex-wrap items-center justify-between gap-3 shadow-md z-30">
         <div className="flex items-center gap-3">
           <span className="text-sm sm:text-base font-black text-[var(--accent-blue)]">

@@ -168,11 +168,9 @@ export default function AdminMonitoringPage() {
   useEffect(() => {
     fetchMonitoringData();
 
+    const uniqueChannelName = "axon-monitoring-page-" + Math.random().toString(36).slice(2, 8);
     const ch = supabase
-      .channel("axon-live-monitoring-bus")
-      .on("broadcast", { event: "subadmin_live_action" }, () => {
-        fetchMonitoringData();
-      })
+      .channel(uniqueChannelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "site_info" },

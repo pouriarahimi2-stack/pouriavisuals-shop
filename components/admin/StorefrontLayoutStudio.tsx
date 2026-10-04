@@ -624,7 +624,7 @@ export default function StorefrontLayoutStudio({
                     <div className="flex items-center gap-3">
                       <div className="w-16 h-14 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 p-1">
                         {logoUrl ? (
-                          <img src={logoUrl} alt="Header Logo" className="w-full h-full object-contain" />
+                          <img key={logoUrl.slice(-32) + "_" + logoUrl.length} src={logoUrl} alt="Header Logo" className="w-full h-full object-contain" />
                         ) : (
                           <span className="text-[10px] text-slate-400">پیش‌فرض</span>
                         )}
@@ -867,9 +867,10 @@ export default function StorefrontLayoutStudio({
 
                   <div className="flex flex-col sm:flex-row items-center gap-4">
                     <div className="p-3 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] flex items-center justify-center min-w-[140px] min-h-[70px]">
-                      {footerLogoUrl || logoUrl ? (
+                      {footerLogoUrl ? (
                         <img
-                          src={footerLogoUrl || logoUrl}
+                          key={footerLogoUrl.slice(-32) + "_" + footerLogoUrl.length}
+                          src={footerLogoUrl}
                           alt="Footer Logo Preview"
                           style={{
                             width: Math.min(200, footerLogoWidth) + "px",
@@ -1430,9 +1431,10 @@ export default function StorefrontLayoutStudio({
                 {/* پیش‌نمایش فوتر و لوگوی بزرگ فوتر */}
                 <div className="p-4 rounded-2xl bg-[var(--modal-bg)] border border-[var(--card-border)] space-y-2.5">
                   <div className="flex flex-wrap items-center gap-3">
-                    {(footerLogoUrl || logoUrl) && (
+                    {footerLogoUrl && (
                       <img
-                        src={footerLogoUrl || logoUrl}
+                        key={footerLogoUrl.slice(-32) + "_" + footerLogoUrl.length}
+                        src={footerLogoUrl}
                         alt="Footer"
                         style={{
                           width: Math.min(180, footerLogoWidth) + "px",

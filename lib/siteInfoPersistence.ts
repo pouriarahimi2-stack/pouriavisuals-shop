@@ -66,38 +66,65 @@ export async function saveMasterSiteInfoRow(
   const finalLogoUrl =
     topLevelFields.logo_url !== undefined
       ? String(topLevelFields.logo_url).trim()
-      : prevPersisted.logo_url ?? existingRow?.logo_url ?? "";
+      : prevPersisted.logo_url ?? "";
 
   const finalFooterLogoUrl =
     topLevelFields.footer_logo_url !== undefined
       ? String(topLevelFields.footer_logo_url).trim()
-      : prevPersisted.footer_logo_url ?? existingRow?.footer_logo_url ?? "";
+      : prevPersisted.footer_logo_url ?? "";
 
   const finalFaviconUrl =
     topLevelFields.favicon_url !== undefined
       ? String(topLevelFields.favicon_url).trim()
-      : prevPersisted.favicon_url ?? existingRow?.favicon_url ?? "/favicon.ico";
+      : prevPersisted.favicon_url ?? "";
+
+  // جلوگیری از کپی شدن چندباره رشته‌های سنگین Base64 در زیرشاخه‌های قدیمی
+  const cleanUpdatedLayout = { ...updatedLayout };
+  delete cleanUpdatedLayout.theme_builder_config?.siteInfo;
 
   const safeLayout = {
     ...(existingRow?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG),
-    ...updatedLayout,
+    ...cleanUpdatedLayout,
     _persisted_identity: {
-      site_name: topLevelFields.site_name || prevPersisted.site_name || "آکسون کور | Axon Core",
-      tagline: topLevelFields.tagline ?? prevPersisted.tagline ?? "",
-      description: topLevelFields.description ?? prevPersisted.description ?? "",
-      footer_text: topLevelFields.footer_text ?? prevPersisted.footer_text ?? "",
+      site_name:
+        topLevelFields.site_name !== undefined
+          ? String(topLevelFields.site_name)
+          : prevPersisted.site_name ?? "",
+      tagline:
+        topLevelFields.tagline !== undefined
+          ? String(topLevelFields.tagline)
+          : prevPersisted.tagline ?? "",
+      description:
+        topLevelFields.description !== undefined
+          ? String(topLevelFields.description)
+          : prevPersisted.description ?? "",
+      footer_text:
+        topLevelFields.footer_text !== undefined
+          ? String(topLevelFields.footer_text)
+          : prevPersisted.footer_text ?? "",
       logo_url: finalLogoUrl,
       footer_logo_url: finalFooterLogoUrl,
       favicon_url: finalFaviconUrl,
-      phone: topLevelFields.phone || prevPersisted.phone || "09376110200",
-      email: topLevelFields.email || prevPersisted.email || "Pouriarahimi@yahoo.com",
-      address: topLevelFields.address || prevPersisted.address || "شیراز - ستارخان",
+      phone:
+        topLevelFields.phone !== undefined
+          ? String(topLevelFields.phone)
+          : prevPersisted.phone ?? "",
+      email:
+        topLevelFields.email !== undefined
+          ? String(topLevelFields.email)
+          : prevPersisted.email ?? "",
+      address:
+        topLevelFields.address !== undefined
+          ? String(topLevelFields.address)
+          : prevPersisted.address ?? "",
       working_hours:
-        topLevelFields.working_hours ||
-        prevPersisted.working_hours ||
-        "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+        topLevelFields.working_hours !== undefined
+          ? String(topLevelFields.working_hours)
+          : prevPersisted.working_hours ?? "",
       header_announcement:
-        topLevelFields.header_announcement ?? prevPersisted.header_announcement ?? "",
+        topLevelFields.header_announcement !== undefined
+          ? String(topLevelFields.header_announcement)
+          : prevPersisted.header_announcement ?? "",
       updated_at: nowIso,
     },
   };
@@ -110,30 +137,28 @@ export async function saveMasterSiteInfoRow(
       await supabaseAdmin
         .from("site_info")
         .update({
-          site_name: safeLayout._persisted_identity.site_name,
+          site_name: safeLayout._persisted_identity.site_name || "Axon Core",
           homepage_layout_config: safeLayout,
         })
         .eq("id", r.id);
 
-      try {
-        await supabaseAdmin
-          .from("site_info")
-          .update({
-            logo_url: finalLogoUrl,
-            favicon_url: finalFaviconUrl,
-            updated_at: nowIso,
-          })
-          .eq("id", r.id);
-      } catch {}
-
-      try {
-        await supabaseAdmin
-          .from("site_info")
-          .update({
-            footer_logo_url: finalFooterLogoUrl,
-          })
-          .eq("id", r.id);
-      } catch {}
+      // اگر آدرس لوگو کوتاه (URL معمولی) یا خالی است در ستون‌های جدول هم ثبت شود تا خطای طول ستون رخ ندهد
+      if (finalLogoUrl.length < 500) {
+        try {
+          await supabaseAdmin
+            .from("site_info")
+            .update({ logo_url: finalLogoUrl, updated_at: nowIso })
+            .eq("id", r.id);
+        } catch {}
+      }
+      if (finalFooterLogoUrl.length < 500) {
+        try {
+          await supabaseAdmin
+            .from("site_info")
+            .update({ footer_logo_url: finalFooterLogoUrl })
+            .eq("id", r.id);
+        } catch {}
+      }
     }
 
     return {
@@ -150,7 +175,7 @@ export async function saveMasterSiteInfoRow(
       .from("site_info")
       .insert([
         {
-          site_name: safeLayout._persisted_identity.site_name,
+          site_name: safeLayout._persisted_identity.site_name || "Axon Core",
           homepage_layout_config: safeLayout,
         },
       ])

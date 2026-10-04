@@ -1,23 +1,18 @@
-// File Path: components/Footer.tsx
 "use client";
-
+// File Path: components/Footer.tsx
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSiteInfo } from "@/context/SiteInfoContext";
-import AnimatedLogo from "@/components/AnimatedLogo";
 import EnamadBadge from "@/components/EnamadBadge";
 
-function resolveSafeImgUrl(...vals: any[]): string {
-  for (const v of vals) {
-    if (typeof v === "string" && v.trim().length > 0) {
-      const clean = v.trim();
-      if (clean.includes(".supabase.co/storage/")) {
-        return "/api/media-proxy?url=" + encodeURIComponent(clean);
-      }
-      return clean;
-    }
+function resolveSafeUrl(val: any): string {
+  if (typeof val !== "string") return "";
+  const clean = val.trim();
+  if (!clean) return "";
+  if (clean.includes(".supabase.co/storage/")) {
+    return "/api/media-proxy?url=" + encodeURIComponent(clean);
   }
-  return "";
+  return clean;
 }
 
 export default function Footer() {
@@ -31,23 +26,17 @@ export default function Footer() {
     info?.theme_builder_config?.globalFooter ||
     layoutCfg?.theme_builder_config?.globalFooter ||
     {};
-  const tbHeader =
-    info?.theme_builder_config?.globalHeader ||
-    layoutCfg?.theme_builder_config?.globalHeader ||
-    {};
   const footerCfg = layoutCfg?.footer || {};
 
-  const footerLogoUrl = resolveSafeImgUrl(
-    tbFooter.footerLogoUrl,
-    persisted.footer_logo_url,
-    footerCfg.footerLogoUrl,
-    footerCfg.logoUrl,
-    info.footer_logo_url,
-    info.footerLogoUrl,
-    tbHeader.logoUrl,
-    persisted.logo_url,
-    info.logo_url
-  );
+  // خواندن منحصراً لوگوی فوتر از دیتابیس (بدون جایگزینی با لوگوی هدر یا لوگوی مثلثی هاردکد)
+  const rawFooterLogo =
+    tbFooter.footerLogoUrl !== undefined
+      ? String(tbFooter.footerLogoUrl)
+      : persisted.footer_logo_url !== undefined
+      ? String(persisted.footer_logo_url)
+      : String(info.footer_logo_url || info.footerLogoUrl || "");
+
+  const footerLogoUrl = resolveSafeUrl(rawFooterLogo);
 
   useEffect(() => {
     setLogoImgFailed(false);
@@ -55,20 +44,15 @@ export default function Footer() {
 
   if (footerCfg.show === false) return null;
 
-  // اگر ادمین فیلد عنوان برند یا زیرعنوان را در استودیوی ظاهر خالی گذاشت، دقیقاً خالی بماند و متن پیش‌فرض جایگزین نشود!
   const brandTitle =
     tbFooter.brandTitle !== undefined
       ? String(tbFooter.brandTitle).trim()
-      : footerCfg.brandTitle !== undefined
-      ? String(footerCfg.brandTitle).trim()
-      : "آکسون کور | Axon Core";
+      : String(footerCfg.brandTitle ?? "").trim();
 
   const brandSubtitle =
     tbFooter.brandSubtitle !== undefined
       ? String(tbFooter.brandSubtitle).trim()
-      : footerCfg.brandSubtitle !== undefined
-      ? String(footerCfg.brandSubtitle).trim()
-      : "مرجع تخصصی تجهیزات تکنولوژی، سخت‌افزار و کالای دیجیتال";
+      : String(footerCfg.brandSubtitle ?? info.tagline ?? "").trim();
 
   const brandDescription =
     tbFooter.brandDescription !== undefined
@@ -97,28 +81,24 @@ export default function Footer() {
   const supportPhone =
     tbFooter.supportPhone !== undefined
       ? String(tbFooter.supportPhone).trim()
-      : String(footerCfg.supportPhone || info.phone || "09376110200");
+      : String(footerCfg.supportPhone ?? info.phone ?? "").trim();
   const supportEmail =
     tbFooter.supportEmail !== undefined
       ? String(tbFooter.supportEmail).trim()
-      : String(footerCfg.supportEmail || info.email || "Pouriarahimi@yahoo.com");
+      : String(footerCfg.supportEmail ?? info.email ?? "").trim();
   const warehouseAddress =
     tbFooter.warehouseAddress !== undefined
       ? String(tbFooter.warehouseAddress).trim()
-      : String(footerCfg.warehouseAddress || info.address || "شیراز - ستارخان");
+      : String(footerCfg.warehouseAddress ?? info.address ?? "").trim();
   const workingHours =
     tbFooter.workingHours !== undefined
       ? String(tbFooter.workingHours).trim()
-      : String(footerCfg.workingHours || info.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰");
+      : String(footerCfg.workingHours ?? info.working_hours ?? "").trim();
 
   const copyrightText =
     tbFooter.copyright !== undefined
       ? String(tbFooter.copyright).trim()
-      : String(
-          footerCfg?.bottomBar?.copyrightText ||
-            info.footer_text ||
-            "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026"
-        );
+      : String(footerCfg?.bottomBar?.copyrightText ?? info.footer_text ?? "").trim();
 
   const enamadEnabled =
     tbFooter.enamadEnabled !== undefined
@@ -136,16 +116,8 @@ export default function Footer() {
   const quickLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
     Array.isArray(tbFooter.quickLinks)
       ? tbFooter.quickLinks.filter((l: any) => l.show !== false && String(l.title || "").trim() !== "")
-      : [
-          { id: "q1", title: "🛍️ کاتالوگ محصولات", url: "/products" },
-          { id: "q2", title: "📦 پیگیری آنلاین سفارش", url: "/track-order" },
-          { id: "q3", title: "📚 مجله تخصصی دیجیتال", url: "/blog" },
-          { id: "q4", title: "📡 رادار اخبار تکنولوژی", url: "/news" },
-          { id: "q5", title: "ℹ️ درباره ما", url: "/about" },
-          { id: "q6", title: "📞 تماس و پشتیبانی", url: "/contact" },
-        ];
+      : [];
 
-  // حذف کامل لینک‌های فنی ترب (/api/torob) و نقشه سایت (/sitemap.xml) از دید مشتریان در فوتر
   const externalLinks: Array<{ id?: string; title: string; url: string; show?: boolean }> =
     Array.isArray(tbFooter.externalLinks)
       ? tbFooter.externalLinks.filter(
@@ -172,23 +144,27 @@ export default function Footer() {
   const textScaleClass =
     scaleMode === "compact" ? "text-[11px]" : scaleMode === "large" ? "text-sm" : "text-xs";
 
+  const footerImgKey = footerLogoUrl
+    ? footerLogoUrl.slice(-32) + "_" + footerLogoUrl.length
+    : "no_footer_logo";
+
   const renderColumn = (colKey: string) => {
     if (colKey === "brand") {
       return (
         <div key="col_brand" className="lg:col-span-4 space-y-4">
           <div className="flex flex-wrap items-center gap-4">
-            <div
-              className={
-                showFooterLogoBox
-                  ? "p-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md"
-                  : "flex items-center justify-center shrink-0"
-              }
-            >
-              {footerLogoUrl && !logoImgFailed ? (
+            {footerLogoUrl && !logoImgFailed ? (
+              <div
+                className={
+                  showFooterLogoBox
+                    ? "p-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-[var(--card-border)] flex items-center justify-center overflow-hidden shrink-0 shadow-md"
+                    : "flex items-center justify-center shrink-0"
+                }
+              >
                 <img
-                  key={footerLogoUrl}
+                  key={footerImgKey}
                   src={footerLogoUrl}
-                  alt={brandTitle || "Logo"}
+                  alt={brandTitle || ""}
                   onError={() => setLogoImgFailed(true)}
                   style={{
                     width: footerLogoWidth + "px",
@@ -198,10 +174,8 @@ export default function Footer() {
                   }}
                   className="transition-all duration-300"
                 />
-              ) : (
-                <AnimatedLogo size={Math.max(38, Math.min(80, footerLogoHeight))} />
-              )}
-            </div>
+              </div>
+            ) : null}
 
             {(brandTitle || brandSubtitle) && (
               <div className="min-w-[180px] flex-1">
@@ -347,7 +321,6 @@ export default function Footer() {
 
   return (
     <footer
-      
       className="mt-16 border-t border-[var(--card-border)] bg-[var(--bg-secondary)] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10 transition-colors duration-300"
       dir="rtl"
     >

@@ -1,6 +1,5 @@
-// File Path: components/Header.tsx
 "use client";
-
+// File Path: components/Header.tsx
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,19 +8,15 @@ import { useSiteInfo } from "@/context/SiteInfoContext";
 import { soundEngine } from "@/lib/soundEngine";
 import { themeEngine } from "@/lib/themeEngine";
 import { DEFAULT_HEADER_CONFIG } from "@/services/siteInfoService";
-import AnimatedLogo from "@/components/AnimatedLogo";
 
-function firstNonEmptyStr(...vals: any[]): string {
-  for (const v of vals) {
-    if (typeof v === "string" && v.trim().length > 0) {
-      const clean = v.trim();
-      if (clean.includes(".supabase.co/storage/")) {
-        return "/api/media-proxy?url=" + encodeURIComponent(clean);
-      }
-      return clean;
-    }
+function resolveSafeUrl(val: any): string {
+  if (typeof val !== "string") return "";
+  const clean = val.trim();
+  if (!clean) return "";
+  if (clean.includes(".supabase.co/storage/")) {
+    return "/api/media-proxy?url=" + encodeURIComponent(clean);
   }
-  return "";
+  return clean;
 }
 
 export default function Header() {
@@ -47,13 +42,14 @@ export default function Header() {
   const [copiedCoupon, setCopiedCoupon] = useState(false);
   const [currentDevice, setCurrentDevice] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
-  const logoSrc = firstNonEmptyStr(
-    themeHeader.logoUrl,
-    persisted.logo_url,
-    headerCfg?.brand?.logoUrl,
-    siteInfo?.logo_url,
-    siteInfo?.logoUrl
-  );
+  // خواندن مستقیم لوگوی هدر از تنظیمات ادمین (اگر ادمین حذف کرد، دقیقاً خالی بماند و لوگوی مثلثی هاردکد نشان ندهد)
+  const rawHeaderLogo =
+    themeHeader.logoUrl !== undefined
+      ? String(themeHeader.logoUrl)
+      : persisted.logo_url !== undefined
+      ? String(persisted.logo_url)
+      : String(siteInfo?.logo_url || "");
+  const logoSrc = resolveSafeUrl(rawHeaderLogo);
 
   const announcementEnabled = Boolean(
     themeHeader.announcementEnabled !== undefined
@@ -61,12 +57,10 @@ export default function Header() {
       : annCfg.show
   );
 
-  const announcementText = firstNonEmptyStr(
-    themeHeader.announcementText,
-    persisted.header_announcement,
-    annCfg.text,
-    siteInfo?.header_announcement
-  );
+  const announcementText =
+    themeHeader.announcementText !== undefined
+      ? String(themeHeader.announcementText).trim()
+      : String(persisted.header_announcement || annCfg.text || siteInfo?.header_announcement || "").trim();
 
   useEffect(() => {
     setLogoError(false);
@@ -171,16 +165,10 @@ export default function Header() {
   const variantMode = themeHeader.variant || headerCfg.variant || "capsule";
   const isCapsule = variantMode !== "full-width";
 
-  // اگر ادمین نام برند در هدر را خالی گذاشت، خالی بماند تا فقط لوگو نمایش داده شود
   const brandName =
     themeHeader.brandName !== undefined
       ? String(themeHeader.brandName).trim()
-      : firstNonEmptyStr(
-          persisted.site_name,
-          headerCfg?.brand?.name,
-          siteInfo?.site_name,
-          "آکسون کور | Axon Core"
-        );
+      : String(persisted.site_name ?? siteInfo?.site_name ?? "").trim();
 
   const menuFontSize = Number(themeHeader.menuFontSize || headerCfg?.menu?.fontSize || 12);
   const logoWidth = Number(themeHeader.logoWidth || headerCfg?.brand?.logoWidth || 44);
@@ -212,6 +200,8 @@ export default function Header() {
     Boolean(activeDeviceOffer?.enabled) &&
     Boolean(activeDeviceOffer?.text) &&
     !offerDismissed;
+
+  const imgKey = logoSrc ? logoSrc.slice(-32) + "_" + logoSrc.length : "no_header_logo";
 
   return (
     <>
@@ -308,9 +298,9 @@ export default function Header() {
               >
                 {logoSrc && !logoError ? (
                   <img
-                    key={logoSrc}
+                    key={imgKey}
                     src={logoSrc}
-                    alt={brandName || "Logo"}
+                    alt={brandName || ""}
                     onError={() => setLogoError(true)}
                     style={{
                       width: logoWidth + "px",
@@ -319,11 +309,9 @@ export default function Header() {
                       objectFit: logoFit as any,
                     }}
                   />
-                ) : (
-                  <AnimatedLogo size={36} />
-                )}
+                ) : null}
                 {brandName ? (
-                  <span className="font-black whitespace-nowrap hidden sm:inline">{brandName}</span>
+                  <span className="font-black whitespace-nowrap">{brandName}</span>
                 ) : null}
               </Link>
 

@@ -447,40 +447,29 @@ export const siteInfoService = {
           const persisted = layoutCfg?._persisted_identity || {};
 
           const finalHeaderLogo =
-            tbHeader.logoUrl ||
-            persisted.logo_url ||
-            data.logo_url ||
-            data.logoUrl ||
-            layoutCfg?.header?.brand?.logoUrl ||
-            "";
+            tbHeader.logoUrl !== undefined
+              ? String(tbHeader.logoUrl)
+              : String(persisted.logo_url ?? data.logo_url ?? "");
 
           const finalFooterLogo =
-            tbFooter.footerLogoUrl ||
-            persisted.footer_logo_url ||
-            data.footer_logo_url ||
-            data.footerLogoUrl ||
-            layoutCfg?.footer?.footerLogoUrl ||
-            layoutCfg?.footer?.logoUrl ||
-            "";
+            tbFooter.footerLogoUrl !== undefined
+              ? String(tbFooter.footerLogoUrl)
+              : String(persisted.footer_logo_url ?? data.footer_logo_url ?? "");
 
           const finalFavicon =
-            tbHeader.faviconUrl ||
-            persisted.favicon_url ||
-            data.favicon_url ||
-            "/favicon.ico";
+            tbHeader.faviconUrl !== undefined
+              ? String(tbHeader.faviconUrl)
+              : String(persisted.favicon_url ?? data.favicon_url ?? "/favicon.ico");
 
           const finalSiteName =
-            tbHeader.brandName ||
-            persisted.site_name ||
-            data.site_name ||
-            data.storeName ||
-            "آکسون کور | Axon Core";
+            tbHeader.brandName !== undefined
+              ? String(tbHeader.brandName)
+              : String(persisted.site_name ?? data.site_name ?? "");
 
           const finalTagline =
-            tbFooter.brandSubtitle ||
-            persisted.tagline ||
-            data.tagline ||
-            "فروشگاه تخصصی محصولات تکنولوژی و دیجیتال";
+            tbFooter.brandSubtitle !== undefined
+              ? String(tbFooter.brandSubtitle)
+              : String(persisted.tagline ?? data.tagline ?? "");
 
           const mapped: SiteInfo = {
             ...data,
@@ -489,10 +478,10 @@ export const siteInfoService = {
             siteName: finalSiteName,
             storeName: finalSiteName,
             tagline: finalTagline,
-            phone: data.phone || "09376110200",
-            email: data.email || "Pouriarahimi@yahoo.com",
-            address: data.address || "شیراز - ستارخان",
-            working_hours: data.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+            phone: String(data.phone ?? ""),
+            email: String(data.email ?? ""),
+            address: String(data.address ?? ""),
+            working_hours: String(data.working_hours ?? ""),
             logo_url: finalHeaderLogo,
             logoUrl: finalHeaderLogo,
             footer_logo_url: finalFooterLogo,
@@ -501,16 +490,23 @@ export const siteInfoService = {
             allow_google_index: data.allow_google_index !== false,
             allowGoogleIndex: data.allow_google_index !== false,
             maintenance_mode: (data.maintenance_mode as MaintenanceMode) || "none",
-            header_announcement: data.header_announcement || "",
+            header_announcement: String(data.header_announcement ?? ""),
             free_shipping_threshold: Number(data.free_shipping_threshold || 2000000),
-            description: data.description || "",
-            footer_text: data.footer_text || "",
+            description: String(data.description ?? ""),
+            footer_text: String(data.footer_text ?? ""),
             homepage_layout_config: layoutCfg,
             updated_at: data.updated_at,
           };
 
           if (typeof window !== "undefined") {
-            localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
+            // قرار دادن localStorage در بلوک try/catch مستقل تا پر شدن حافظه هرگز باعث بازگشت به کش قدیمی نشود
+            try {
+              localStorage.setItem(LOCAL_STORAGE_SITE_INFO, JSON.stringify(mapped));
+            } catch {
+              try {
+                localStorage.removeItem(LOCAL_STORAGE_SITE_INFO);
+              } catch {}
+            }
             if (mapped.favicon_url) applyFaviconToDOM(mapped.favicon_url);
             if (mapped.tagline || mapped.site_name) applyTitleToDOM(mapped.tagline, mapped.site_name);
           }
@@ -532,7 +528,9 @@ export const siteInfoService = {
       const json = await res.json();
       if (res.ok && json.success) {
         if (typeof window !== "undefined") {
-          localStorage.removeItem(LOCAL_STORAGE_SITE_INFO);
+          try {
+            localStorage.removeItem(LOCAL_STORAGE_SITE_INFO);
+          } catch {}
         }
         const fresh = await this.getSiteInfo();
         if (typeof window !== "undefined" && fresh) {

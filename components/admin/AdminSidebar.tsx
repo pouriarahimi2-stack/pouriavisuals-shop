@@ -20,7 +20,6 @@ export const UNIFIED_ADMIN_NAV: SidebarNavItem[] = [
   { id: "dashboard", permKey: "dashboard", label: "داشبورد تحلیلی و فرماندهی", href: "/admin/dashboard", icon: "📊", requiredPerm: ["dashboard", "all"] },
   { id: "inventory_hub", permKey: "inventory", label: "حسابداری، انبار، سفارشات و مالی", href: "/admin/inventory", icon: "🏛️", badge: "یکپارچه", requiredPerm: ["inventory", "orders", "financial", "reports", "all"] },
   { id: "products", permKey: "products", label: "کاتالوگ محصولات و قیمت‌ها", href: "/admin/products", icon: "🛍️", requiredPerm: ["products", "all"] },
-  { id: "torob", permKey: "products", label: "مرکز آمار و رادار زنده تُرب", href: "/admin/torob", icon: "🔍", badge: "ترب", requiredPerm: ["products", "seo", "reports", "all"] },
   { id: "banners", permKey: "banners", label: "بنرها و اسلایدر محصولات", href: "/admin/banners", icon: "🖼️", requiredPerm: ["banners", "all"] },
   { id: "customers", permKey: "customers", label: "مشتریان (CRM) و پیامک", href: "/admin/customers", icon: "👥", requiredPerm: ["customers", "all"] },
   { id: "coupons", permKey: "coupons", label: "کدهای تخفیف زمان‌دار و هدفمند", href: "/admin/coupons", icon: "🏷️", requiredPerm: ["coupons", "all"] },

@@ -1,4 +1,5 @@
 "use client";
+// File Path: components/admin/MediaUploadModal.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { soundEngine } from "@/lib/soundEngine";
 
@@ -9,6 +10,70 @@ interface MediaUploadModalProps {
   bucket?: string;
   title?: string;
   currentValue?: string;
+}
+
+async function optimizeRasterImageIfNeeded(file: File, isLogoAsset: boolean): Promise<File> {
+  if (
+    file.type === "image/svg+xml" ||
+    file.type === "image/gif" ||
+    file.type.includes("icon") ||
+    typeof document === "undefined"
+  ) {
+    return file;
+  }
+  if (!isLogoAsset && file.size < 300 * 1024) {
+    return file;
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objUrl);
+      const maxDim = isLogoAsset ? 520 : 1280;
+      let w = img.width;
+      let h = img.height;
+      if (w <= maxDim && h <= maxDim && file.size <= 140 * 1024) {
+        resolve(file);
+        return;
+      }
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, w);
+      canvas.height = Math.max(1, h);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const outMime = file.type === "image/jpeg" ? "image/jpeg" : "image/webp";
+      canvas.toBlob(
+        (blob) => {
+          if (blob && blob.size < file.size) {
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: outMime }));
+          } else {
+            resolve(file);
+          }
+        },
+        outMime,
+        0.92
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objUrl);
+      resolve(file);
+    };
+    img.src = objUrl;
+  });
 }
 
 export default function MediaUploadModal({
@@ -32,24 +97,33 @@ export default function MediaUploadModal({
       setPreviewUrl(currentValue || null);
       setErrorMsg(null);
       setActiveTab("upload");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   }, [isOpen, currentValue, title]);
 
   if (!isOpen) return null;
 
-  const handleFile = async (file: File) => {
+  const handleFile = async (rawFile: File) => {
     setErrorMsg(null);
-    if (file.size > 5 * 1024 * 1024) {
+    if (rawFile.size > 5 * 1024 * 1024) {
       setErrorMsg("حجم فایل نباید بیش از ۵ مگابایت باشد.");
       return;
     }
-    setPreviewUrl(URL.createObjectURL(file));
     setUploading(true);
     try {
+      const processedFile = await optimizeRasterImageIfNeeded(
+        rawFile,
+        bucket === "site-assets"
+      );
+      setPreviewUrl(URL.createObjectURL(processedFile));
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", processedFile);
       formData.append("bucket", bucket);
-      const res = await fetch("/api/admin/upload", {
+
+      const res = await fetch("/api/admin/upload?t=" + Date.now(), {
         method: "POST",
         body: formData,
       });
@@ -65,6 +139,9 @@ export default function MediaUploadModal({
       setErrorMsg("ارتباط با سرور برقرار نشد.");
     } finally {
       setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -137,7 +214,10 @@ export default function MediaUploadModal({
 
         {activeTab === "upload" && (
           <div
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              if (fileInputRef.current) fileInputRef.current.value = "";
+              fileInputRef.current?.click();
+            }}
             className="border-2 border-dashed border-[var(--card-border)] hover:border-[var(--accent-blue)] rounded-2xl p-8 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[160px] bg-[var(--input-bg)]"
           >
             <input
@@ -154,12 +234,13 @@ export default function MediaUploadModal({
             {previewUrl ? (
               <div className="space-y-2">
                 <img
+                  key={previewUrl.slice(-24) + "_" + previewUrl.length}
                   src={previewUrl}
                   alt=""
-                  className="w-20 h-20 object-contain mx-auto rounded-xl border border-[var(--card-border)] p-1 bg-white/5"
+                  className="w-24 h-20 object-contain mx-auto rounded-xl border border-[var(--card-border)] p-1 bg-white/5"
                 />
                 <span className="text-[11px] text-[var(--accent-blue)] font-bold block">
-                  {uploading ? "در حال آپلود و ذخیره‌سازی..." : "برای تغییر تصویر کلیک کنید"}
+                  {uploading ? "در حال آپلود و ذخیره‌سازی..." : "برای انتخاب تصویر جدید کلیک کنید"}
                 </span>
               </div>
             ) : (

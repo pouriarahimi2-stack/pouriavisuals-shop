@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/authSecurityHelper";
 import { normalizeSystemSettings } from "@/lib/systemSettings";
-import { getMasterSiteInfoRow, saveMasterSiteInfoRow, pickNonEmpty } from "@/lib/siteInfoPersistence";
+import { getMasterSiteInfoRow, saveMasterSiteInfoRow } from "@/lib/siteInfoPersistence";
 import { DEFAULT_DEVICE_OFFERS } from "@/lib/defaultDeviceConfig";
 
 export const dynamic = "force-dynamic";
@@ -35,50 +35,56 @@ export async function GET() {
     const tbFooter = cleanLayoutCfg?.theme_builder_config?.globalFooter || {};
     const tbHeader = cleanLayoutCfg?.theme_builder_config?.globalHeader || {};
 
+    // احترام ۱۰۰٪ به مقدار ذخیره شده در استودیوی ظاهر (حتی اگر رشته خالی "" باشد)
     const resolvedHeaderLogo =
-      tbHeader.logoUrl !== undefined && String(tbHeader.logoUrl).trim() !== ""
+      tbHeader.logoUrl !== undefined
         ? String(tbHeader.logoUrl).trim()
-        : pickNonEmpty(
-            persisted.logo_url,
-            cleanLayoutCfg?.header?.brand?.logoUrl,
-            safeRow.logo_url
-          );
+        : persisted.logo_url !== undefined
+        ? String(persisted.logo_url).trim()
+        : String(safeRow.logo_url || "").trim();
 
     const resolvedFooterLogo =
-      tbFooter.footerLogoUrl !== undefined && String(tbFooter.footerLogoUrl).trim() !== ""
+      tbFooter.footerLogoUrl !== undefined
         ? String(tbFooter.footerLogoUrl).trim()
-        : pickNonEmpty(
-            persisted.footer_logo_url,
-            cleanLayoutCfg?.footer?.footerLogoUrl,
-            cleanLayoutCfg?.footer?.logoUrl,
-            safeRow.footer_logo_url
-          );
+        : persisted.footer_logo_url !== undefined
+        ? String(persisted.footer_logo_url).trim()
+        : String(safeRow.footer_logo_url || "").trim();
 
-    const resolvedFavicon = pickNonEmpty(
-      tbHeader.faviconUrl,
-      persisted.favicon_url,
-      safeRow.favicon_url,
-      "/favicon.ico"
-    );
+    const resolvedFavicon =
+      tbHeader.faviconUrl !== undefined
+        ? String(tbHeader.faviconUrl).trim()
+        : String(persisted.favicon_url || safeRow.favicon_url || "/favicon.ico").trim();
+
+    const resolvedSiteName =
+      tbHeader.brandName !== undefined
+        ? String(tbHeader.brandName)
+        : String(persisted.site_name ?? safeRow.site_name ?? "");
+
+    const resolvedTagline =
+      tbFooter.brandSubtitle !== undefined
+        ? String(tbFooter.brandSubtitle)
+        : String(persisted.tagline ?? safeRow.tagline ?? "");
 
     const resolvedDesc =
       tbFooter.brandDescription !== undefined
         ? String(tbFooter.brandDescription)
-        : pickNonEmpty(persisted.description, cleanLayoutCfg?.footer?.description, safeRow.description);
+        : String(persisted.description ?? safeRow.description ?? "");
+
+    const resolvedFooterText =
+      tbFooter.copyright !== undefined
+        ? String(tbFooter.copyright)
+        : String(persisted.footer_text ?? safeRow.footer_text ?? "");
 
     const resolvedAnnouncement =
       tbHeader.announcementText !== undefined
         ? String(tbHeader.announcementText)
-        : pickNonEmpty(
-            persisted.header_announcement,
-            safeRow.header_announcement,
-            cleanLayoutCfg?.header?.announcement?.text
-          );
+        : String(persisted.header_announcement ?? safeRow.header_announcement ?? "");
 
     const enrichedTbConfig = {
       ...(cleanLayoutCfg.theme_builder_config || {}),
       globalHeader: {
         ...tbHeader,
+        brandName: resolvedSiteName,
         logoUrl: resolvedHeaderLogo,
         faviconUrl: resolvedFavicon,
       },
@@ -94,52 +100,33 @@ export async function GET() {
 
     const enrichedPayload = {
       ...safeRow,
-      site_name: pickNonEmpty(
-        tbHeader.brandName,
-        persisted.site_name,
-        safeRow.site_name,
-        "آکسون کور | Axon Core"
-      ),
-      storeName: pickNonEmpty(
-        tbHeader.brandName,
-        persisted.site_name,
-        safeRow.site_name,
-        "آکسون کور | Axon Core"
-      ),
-      tagline: pickNonEmpty(tbFooter.brandSubtitle, persisted.tagline, safeRow.tagline),
+      site_name: resolvedSiteName,
+      storeName: resolvedSiteName,
+      tagline: resolvedTagline,
       description: resolvedDesc,
-      footer_text: pickNonEmpty(
-        tbFooter.copyright,
-        persisted.footer_text,
-        cleanLayoutCfg?.footer?.bottomBar?.copyrightText,
-        safeRow.footer_text,
-        "تمامی حقوق مادی و معنوی برای آکسون کور محفوظ است © 2026"
-      ),
+      footer_text: resolvedFooterText,
       logo_url: resolvedHeaderLogo,
       logoUrl: resolvedHeaderLogo,
       footer_logo_url: resolvedFooterLogo,
       footerLogoUrl: resolvedFooterLogo,
       favicon_url: resolvedFavicon,
       header_announcement: resolvedAnnouncement,
-      phone: pickNonEmpty(tbFooter.supportPhone, persisted.phone, safeRow.phone, "09376110200"),
-      email: pickNonEmpty(
-        tbFooter.supportEmail,
-        persisted.email,
-        safeRow.email,
-        "Pouriarahimi@yahoo.com"
-      ),
-      address: pickNonEmpty(
-        tbFooter.warehouseAddress,
-        persisted.address,
-        safeRow.address,
-        "شیراز - ستارخان"
-      ),
-      working_hours: pickNonEmpty(
-        tbFooter.workingHours,
-        persisted.working_hours,
-        safeRow.working_hours,
-        "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰"
-      ),
+      phone:
+        tbFooter.supportPhone !== undefined
+          ? String(tbFooter.supportPhone)
+          : String(persisted.phone ?? safeRow.phone ?? ""),
+      email:
+        tbFooter.supportEmail !== undefined
+          ? String(tbFooter.supportEmail)
+          : String(persisted.email ?? safeRow.email ?? ""),
+      address:
+        tbFooter.warehouseAddress !== undefined
+          ? String(tbFooter.warehouseAddress)
+          : String(persisted.address ?? safeRow.address ?? ""),
+      working_hours:
+        tbFooter.workingHours !== undefined
+          ? String(tbFooter.workingHours)
+          : String(persisted.working_hours ?? safeRow.working_hours ?? ""),
       homepage_layout_config: {
         ...cleanLayoutCfg,
         theme_builder_config: enrichedTbConfig,
@@ -193,28 +180,26 @@ export async function POST(req: NextRequest) {
         ? String(incoming.logo_url).trim()
         : incoming.logoUrl !== undefined
         ? String(incoming.logoUrl).trim()
-        : prevGh.logoUrl ?? prevPersisted.logo_url ?? existing?.logo_url ?? "";
+        : String(prevGh.logoUrl ?? prevPersisted.logo_url ?? "");
 
     const nextFooterLogo =
       incoming.footer_logo_url !== undefined
         ? String(incoming.footer_logo_url).trim()
         : incoming.footerLogoUrl !== undefined
         ? String(incoming.footerLogoUrl).trim()
-        : prevGf.footerLogoUrl ?? prevPersisted.footer_logo_url ?? existing?.footer_logo_url ?? "";
+        : String(prevGf.footerLogoUrl ?? prevPersisted.footer_logo_url ?? "");
 
     const nextFavicon =
       incoming.favicon_url !== undefined
         ? String(incoming.favicon_url).trim()
-        : prevGh.faviconUrl ?? prevPersisted.favicon_url ?? existing?.favicon_url ?? "/favicon.ico";
+        : String(prevGh.faviconUrl ?? prevPersisted.favicon_url ?? "/favicon.ico");
 
-    const nextSiteName = pickNonEmpty(
-      incoming.site_name,
-      incoming.siteName,
-      incoming.storeName,
-      prevGh.brandName,
-      existing?.site_name,
-      "آکسون کور | Axon Core"
-    );
+    const nextSiteName =
+      incoming.site_name !== undefined
+        ? String(incoming.site_name)
+        : incoming.siteName !== undefined
+        ? String(incoming.siteName)
+        : String(prevGh.brandName ?? prevPersisted.site_name ?? "");
 
     const mergedLayout: Record<string, any> = {
       ...prevLayout,
@@ -249,25 +234,17 @@ export async function POST(req: NextRequest) {
 
     const topLevelFields = {
       site_name: nextSiteName,
-      tagline: incoming.tagline ?? prevPersisted.tagline ?? existing?.tagline ?? "",
-      description: incoming.description ?? prevPersisted.description ?? existing?.description ?? "",
-      footer_text: incoming.footer_text ?? prevPersisted.footer_text ?? existing?.footer_text ?? "",
+      tagline: incoming.tagline ?? prevPersisted.tagline ?? "",
+      description: incoming.description ?? prevPersisted.description ?? "",
+      footer_text: incoming.footer_text ?? prevPersisted.footer_text ?? "",
       logo_url: nextHeaderLogo,
       footer_logo_url: nextFooterLogo,
       favicon_url: nextFavicon,
-      phone: incoming.phone ?? prevPersisted.phone ?? existing?.phone ?? "09376110200",
-      email: incoming.email ?? prevPersisted.email ?? existing?.email ?? "Pouriarahimi@yahoo.com",
-      address: incoming.address ?? prevPersisted.address ?? existing?.address ?? "شیراز - ستارخان",
-      working_hours:
-        incoming.working_hours ??
-        prevPersisted.working_hours ??
-        existing?.working_hours ??
-        "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-      header_announcement:
-        incoming.header_announcement ??
-        prevPersisted.header_announcement ??
-        existing?.header_announcement ??
-        "",
+      phone: incoming.phone ?? prevPersisted.phone ?? "",
+      email: incoming.email ?? prevPersisted.email ?? "",
+      address: incoming.address ?? prevPersisted.address ?? "",
+      working_hours: incoming.working_hours ?? prevPersisted.working_hours ?? "",
+      header_announcement: incoming.header_announcement ?? prevPersisted.header_announcement ?? "",
     };
 
     const { savedRow } = await saveMasterSiteInfoRow(existing, mergedLayout, topLevelFields);

@@ -137,7 +137,7 @@ export function AdminSidebar(props: any = {}) {
     if (role === "product_manager") return "📦 مدیر کاتالوگ و انبار";
     if (role === "order_manager") return "💳 پشتیبان سفارشات و مالی";
     if (role === "content_seo_manager") return "🚀 کارشناس محتوا و سئو";
-    if (role === "viewer_reporter") return "👁️ بیننده و گزارش‌دهنده (فقط مشاهده)";
+    if (role === "viewer_reporter") return "👁️ بیننده و گزارش‌دهنده";
     return "🛡 مدیر سیستم";
   };
 
@@ -308,19 +308,7 @@ export function AdminSidebar(props: any = {}) {
                   <span className="text-sm shrink-0">{displayIcon}</span>
                   <span className="truncate">{displayLabel}</span>
                 </div>
-                {isReadOnlyItem ? (
-                  <span
-                    className={
-                      "px-1.5 py-0.5 rounded-md text-[9px] font-black shrink-0 " +
-                      (isActive
-                        ? "bg-black/25 text-amber-200"
-                        : "bg-amber-500/15 text-amber-400")
-                    }
-                    title="فقط مشاهده (بدون امکان ویرایش)"
-                  >
-                    👁️ مشاهده
-                  </span>
-                ) : item.badge ? (
+                {item.badge ? (
                   <span
                     className={
                       "px-2 py-0.5 rounded-md text-[9px] font-black shrink-0 " +

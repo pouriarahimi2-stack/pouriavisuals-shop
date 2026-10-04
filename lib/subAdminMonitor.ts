@@ -150,7 +150,14 @@ export async function recordSubAdminActivity(params: {
   userAgent?: string;
 }): Promise<void> {
   try {
-    const uname = String(params.username || "admin").trim();
+    // عدم ثبت فعالیت‌های خود مدیر ارشد کل سیستم (superadmin) در رادار نظارت
+    if (
+      String(params.role || "").toLowerCase() === "superadmin" ||
+      String(params.username || "").trim().toLowerCase() === "admin"
+    ) {
+      return;
+    }
+    const uname = String(params.username || "").trim();
     const lowerKey = uname.toLowerCase();
     const nowIso = new Date().toISOString();
     const sec = resolveSectionFromPath(params.path);

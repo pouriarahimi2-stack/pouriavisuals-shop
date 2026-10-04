@@ -1,304 +1,307 @@
 "use client";
+// File Path: app/admin/messages/page.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
 import { soundEngine } from "@/lib/soundEngine";
+import { supabase } from "@/lib/supabase";
 
-interface MsgItem {
-  id: string;
-  name?: string;
-  full_name?: string;
-  email?: string;
-  phone?: string;
-  subject?: string;
-  message: string;
-  is_read: boolean;
-  admin_reply?: string;
-  created_at: string;
-}
-
-export default function AdminMessagesPage() {
-  const [messages, setMessages] = useState<MsgItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<MsgItem | null>(null);
+export default function AdminLiveChatAndMessagesPage() {
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+  const [canReply, setCanReply] = useState<boolean>(true);
+  const [responder, setResponder] = useState<any>(null);
   const [replyText, setReplyText] = useState("");
-  const [editingMsgText, setEditingMsgText] = useState("");
-  const [isEditingMsg, setIsEditingMsg] = useState(false);
+  const [replyLink, setReplyLink] = useState("");
   const [sending, setSending] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  const fetchMessages = useCallback(async () => {
+  const fetchAllChats = useCallback(async () => {
     try {
-      const r = await fetch("/api/admin/messages", { cache: "no-store" });
-      const d = await r.json();
-      if (d.success) {
-        const list: MsgItem[] = d.messages || [];
-        setMessages(list);
-        setUnread(Number(d.unread || 0));
-        if (selected) {
-          const found = list.find((x) => x.id === selected.id);
-          if (found) setSelected(found);
-        }
-      }
-    } catch {} finally {
-      setLoading(false);
-    }
-  }, [selected]);
-
-  useEffect(() => {
-    fetchMessages();
-    const ch1 = supabase
-      .channel("admin-messages-live-1")
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => fetchMessages())
-      .subscribe();
-    const ch2 = supabase
-      .channel("admin-messages-live-2")
-      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => fetchMessages())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(ch1);
-      supabase.removeChannel(ch2);
-    };
-  }, []);
-
-  const handleSelect = async (msg: MsgItem) => {
-    soundEngine.playClick();
-    setSelected(msg);
-    setReplyText(msg.admin_reply || "");
-    setEditingMsgText(msg.message || "");
-    setIsEditingMsg(false);
-
-    if (!msg.is_read) {
-      await fetch("/api/admin/messages", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: msg.id, is_read: true }),
-      });
-      setMessages((ms) => ms.map((m) => (m.id === msg.id ? { ...m, is_read: true } : m)));
-      setUnread((u) => Math.max(0, u - 1));
-    }
-  };
-
-  const handleSaveUserMessageEdit = async () => {
-    if (!selected || !editingMsgText.trim()) return;
-    soundEngine.playClick();
-    setSending(true);
-    try {
-      const res = await fetch("/api/admin/messages", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selected.id, message: editingMsgText.trim() }),
+      const res = await fetch("/api/live-chat?mode=admin&t=" + Date.now(), {
+        cache: "no-store",
       });
       if (res.ok) {
-        soundEngine.playSuccess();
-        setIsEditingMsg(false);
-        setFeedback("✓ متن پیام کاربر با موفقیت ویرایش شد.");
-        fetchMessages();
-        setTimeout(() => setFeedback(null), 3500);
+        const json = await res.json();
+        if (json.success) {
+          setSessions(json.sessions || []);
+          setCanReply(Boolean(json.canReply));
+          setResponder(json.responder || null);
+          if (!selectedSessionId && json.sessions?.length > 0) {
+            setSelectedSessionId(json.sessions[0].sessionId);
+          }
+        }
       }
+    } catch {
     } finally {
-      setSending(false);
+      setLoading(false);
     }
-  };
+  }, [selectedSessionId]);
 
-  const handleReply = async (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchAllChats();
+    const ch = supabase
+      .channel("axon-admin-live-chat-console-" + Math.random().toString(36).slice(2, 7))
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_info" },
+        () => {
+          fetchAllChats();
+        }
+      )
+      .subscribe();
+
+    const timer = setInterval(fetchAllChats, 3000);
+    return () => {
+      supabase.removeChannel(ch);
+      clearInterval(timer);
+    };
+  }, [fetchAllChats]);
+
+  const activeSession = sessions.find((s) => s.sessionId === selectedSessionId) || null;
+
+  const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selected || !replyText.trim()) return;
+    if (!canReply || !activeSession || (!replyText.trim() && !replyLink.trim())) return;
     soundEngine.playClick();
     setSending(true);
     try {
-      const res = await fetch("/api/admin/messages", {
-        method: "PATCH",
+      const res = await fetch("/api/live-chat", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: selected.id,
-          reply: replyText.trim(),
-          phone: selected.phone,
-          is_read: true,
+          action: "send_admin_reply",
+          sessionId: activeSession.sessionId,
+          text: replyText,
+          linkUrl: replyLink.trim() || undefined,
         }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         soundEngine.playSuccess();
-        setFeedback("✓ پاسخ ثبت شد و پیامک اطلاع‌رسانی به شماره کاربر ارسال گردید.");
-        fetchMessages();
-        setTimeout(() => setFeedback(null), 4000);
+        setReplyText("");
+        setReplyLink("");
+        fetchAllChats();
       }
     } finally {
       setSending(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف کامل این تیکت اطمینان دارید؟")) return;
-    soundEngine.playClick();
-    await fetch("/api/admin/messages?id=" + encodeURIComponent(id), { method: "DELETE" });
-    setMessages((ms) => ms.filter((m) => m.id !== id));
-    if (selected?.id === id) setSelected(null);
-  };
-
-  const filtered = messages.filter((m) => {
-    if (filter === "unread") return !m.is_read;
-    if (filter === "read") return m.is_read;
-    return true;
-  });
+  const filteredSessions = sessions.filter(
+    (s) =>
+      !search.trim() ||
+      (s.fullName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (s.phone || "").includes(search)
+  );
 
   return (
-    <div className="space-y-6 font-sans text-[var(--text-primary)] select-text" dir="rtl">
-      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6 font-sans select-text text-[var(--text-primary)]" dir="rtl">
+      <div className="p-5 sm:p-6 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl font-black text-[var(--accent-blue)] flex items-center gap-2">
-            <span>📩</span> مدیریت یکپارچه پیام‌ها و تیکت‌های پشتیبانی (Realtime + SMS)
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1">
-            {unread > 0 && <span className="font-black text-rose-500">{unread} پیام جدید · </span>}
-            مجموع {messages.length} تیکت ثبت‌شده با قابلیت ویرایش و ارسال پاسخ پیامکی
+          <div className="flex items-center gap-2">
+            <h1 className="text-base sm:text-xl font-black text-[var(--accent-blue)]">
+              💬 مرکز گفتگوی زنده بلادرنگ و سرنخ‌های فروش (Live Support & Verified Leads)
+            </h1>
+            <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-black">
+              وب‌سوکت بلادرنگ فعال ●
+            </span>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+            تمامی مخاطبانی که شماره موبایل خود را در چت زنده تایید کرده‌اند به عنوان «مخاطب تاییدشده گفتگوی زنده (سرنخ فروش)» ذخیره شده و تمامی نقش‌ها (به‌جز بیننده) قادر به پاسخگویی آنی هستند.
           </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2 text-xs font-bold">
-          {(["all", "unread", "read"] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={
-                "px-3.5 py-2 rounded-xl border transition cursor-pointer " +
-                (filter === f
-                  ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)]"
-                  : "bg-[var(--input-bg)] border-[var(--card-border)] text-[var(--text-secondary)]")
-              }
-            >
-              {f === "all" ? "همه پیام‌ها" : f === "unread" ? "خوانده‌نشده" : "پاسخ‌داده‌شده / خوانده‌شده"}
-            </button>
-          ))}
         </div>
       </div>
 
-      {feedback && (
-        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold animate-fadeIn">
-          {feedback}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
-        <div className="lg:col-span-4 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl overflow-hidden shadow-xl flex flex-col max-h-[620px]">
-          <div className="p-3.5 border-b border-[var(--card-border)] font-black text-[var(--text-secondary)]">
-            لیست پیام‌های دریافتی ({filtered.length})
-          </div>
-          <div className="flex-1 overflow-y-auto divide-y divide-[var(--card-border)]">
+        {/* لیست مخاطبان تاییدشده گفتگوی زنده */}
+        <div className="lg:col-span-4 p-4 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl space-y-3 h-fit">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 جستجوی نام یا شماره موبایل مخاطب..."
+            className="w-full p-2.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none"
+          />
+
+          <div className="space-y-2 max-h-[520px] overflow-y-auto">
             {loading ? (
-              <div className="p-8 text-center text-slate-400">در حال بارگذاری تیکت‌ها...</div>
-            ) : filtered.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 font-bold">هیچ تیکتی یافت نشد.</div>
+              <div className="py-10 text-center text-slate-400">در حال بارگذاری گفتگوها...</div>
+            ) : filteredSessions.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 font-bold">
+                هنوز گفتگوی زنده‌ای ثبت نشده است.
+              </div>
             ) : (
-              filtered.map((msg) => (
-                <div
-                  key={msg.id}
-                  onClick={() => handleSelect(msg)}
-                  className={
-                    "p-4 cursor-pointer transition hover:bg-[var(--input-bg)] " +
-                    (selected?.id === msg.id ? "bg-[var(--accent-blue)]/15 border-r-4 border-[var(--accent-blue)]" : "")
-                  }
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-black truncate">{msg.name || msg.full_name}</span>
-                    <span className="text-[10px] font-mono text-slate-400">
-                      {new Date(msg.created_at).toLocaleDateString("fa-IR")}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[var(--text-secondary)] truncate mt-1">
-                    {msg.subject || msg.message}
-                  </p>
-                </div>
-              ))
+              filteredSessions.map((s) => {
+                const isSelected = s.sessionId === selectedSessionId;
+                return (
+                  <button
+                    key={s.sessionId}
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setSelectedSessionId(s.sessionId);
+                    }}
+                    className={
+                      "w-full p-3.5 rounded-2xl border text-right transition cursor-pointer space-y-1.5 " +
+                      (isSelected
+                        ? "bg-[var(--accent-blue)]/15 border-[var(--accent-blue)] shadow-md"
+                        : "bg-[var(--input-bg)] border-[var(--card-border)] hover:border-[var(--accent-blue)]/50")
+                    }
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-sm">{s.fullName}</span>
+                      {s.unreadForAdmin > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[10px] font-black">
+                          {s.unreadForAdmin} پیام جدید
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-emerald-400 font-bold">پاسخ‌داده‌شده</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-[var(--accent-blue)]">
+                      <span>📱 {s.phone}</span>
+                      <span>{s.platform}</span>
+                    </div>
+                    <div className="text-[10px] text-amber-400 font-bold">
+                      🎯 {s.leadCategory || "مخاطب تاییدشده گفتگوی زنده"}
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
 
-        <div className="lg:col-span-8 bg-[var(--modal-bg)] border border-[var(--card-border)] rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between min-h-[460px]">
-          {!selected ? (
-            <div className="my-auto text-center text-slate-400 space-y-2">
-              <span className="text-4xl block">✉️</span>
-              <p className="font-bold">یک پیام را از ستون سمت راست جهت مشاهده، ویرایش یا پاسخ انتخاب کنید.</p>
+        {/* پنجره پیام‌ها و ارسال پاسخ */}
+        <div className="lg:col-span-8 p-5 rounded-3xl bg-[var(--modal-bg)] border border-[var(--card-border)] shadow-xl flex flex-col min-h-[540px]">
+          {!activeSession ? (
+            <div className="flex-1 flex items-center justify-center text-slate-400 font-bold">
+              یک گفتگو را از ستون سمت راست انتخاب کنید.
             </div>
           ) : (
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--card-border)] pb-4">
+            <>
+              <div className="pb-3 border-b border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="font-black text-sm text-[var(--accent-blue)]">
-                    {selected.subject || "تیکت پشتیبانی"}
-                  </h3>
-                  <div className="flex flex-wrap gap-3 mt-1 font-mono text-[11px] text-slate-400">
-                    <span>👤 {selected.name || selected.full_name}</span>
-                    {selected.phone && <span>📱 {selected.phone}</span>}
-                    {selected.email && <span>✉️ {selected.email}</span>}
-                  </div>
+                  <h2 className="font-black text-sm">
+                    {activeSession.fullName} —{" "}
+                    <span className="font-mono text-[var(--accent-blue)]">
+                      {activeSession.phone}
+                    </span>
+                  </h2>
+                  <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
+                    دستگاه: {activeSession.platform} | IP: {activeSession.ip} | وضعیت شماره: وریفای‌شده ✓
+                  </p>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingMsg(!isEditingMsg)}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold cursor-pointer"
-                  >
-                    ✏️ ویرایش پیام
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(selected.id)}
-                    className="px-3 py-1.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold cursor-pointer"
-                  >
-                    🗑️ حذف
-                  </button>
-                </div>
+                <span className="px-3 py-1 rounded-xl bg-emerald-500/15 text-emerald-400 font-bold text-[10px]">
+                  فایل‌های ارسالی کاربر: {activeSession.filesSentCount || 0} از 3
+                </span>
               </div>
 
-              {isEditingMsg ? (
-                <div className="space-y-2">
-                  <textarea
-                    rows={3}
-                    value={editingMsgText}
-                    onChange={(e) => setEditingMsgText(e.target.value)}
-                    className="w-full p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--accent-blue)] outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveUserMessageEdit}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-black cursor-pointer"
-                  >
-                    ذخیره متن ویرایش‌شده ✓
-                  </button>
-                </div>
+              <div className="flex-1 py-4 overflow-y-auto space-y-3 max-h-[380px]">
+                {(activeSession.messages || []).map((m: any) => {
+                  const isCust = m.senderType === "customer";
+                  return (
+                    <div
+                      key={m.id}
+                      className={
+                        "flex flex-col max-w-[80%] " +
+                        (isCust ? "ml-auto items-start" : "mr-auto items-end")
+                      }
+                    >
+                      <span className="text-[10px] font-bold text-slate-400 mb-1">
+                        {isCust
+                          ? `👤 مشتری (${m.senderName})`
+                          : `🛡️ ${m.senderName} (${m.senderRole || "پشتیبانی"})`}
+                      </span>
+                      <div
+                        className={
+                          "p-3.5 rounded-2xl space-y-2 " +
+                          (isCust
+                            ? "bg-[var(--input-bg)] border border-[var(--card-border)] text-[var(--text-primary)]"
+                            : "bg-[var(--accent-blue)] text-white")
+                        }
+                      >
+                        <p className="whitespace-pre-wrap leading-relaxed font-medium">{m.text}</p>
+                        {m.linkUrl && (
+                          <a
+                            href={m.linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            dir="ltr"
+                            className="block p-2 rounded-xl bg-black/20 font-mono text-[11px] underline"
+                          >
+                            🔗 {m.linkUrl}
+                          </a>
+                        )}
+                        {m.attachmentUrl && (
+                          <div className="pt-1">
+                            {String(m.attachmentUrl).startsWith("data:image/") ? (
+                              <a
+                                href={m.attachmentUrl}
+                                download={m.attachmentName || "image.png"}
+                              >
+                                <img
+                                  src={m.attachmentUrl}
+                                  alt=""
+                                  className="max-h-44 rounded-xl border border-white/20 object-contain"
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                href={m.attachmentUrl}
+                                download={m.attachmentName || "file.pdf"}
+                                className="inline-block px-3 py-1.5 rounded-xl bg-black/25 font-bold"
+                              >
+                                📄 دانلود فایل پیوست ({m.attachmentName || "PDF"})
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[9px] font-mono text-slate-400 mt-1">
+                        {new Date(m.createdAt).toLocaleString("fa-IR")}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {canReply ? (
+                <form
+                  onSubmit={handleSendReply}
+                  className="pt-3 border-t border-[var(--card-border)] space-y-2"
+                >
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder={`پاسخ خود را به عنوان «${responder?.fullName || "پشتیبانی"}» بنویسید...`}
+                      className="flex-1 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-bold outline-none focus:border-[var(--accent-blue)]"
+                    />
+                    <input
+                      type="url"
+                      dir="ltr"
+                      value={replyLink}
+                      onChange={(e) => setReplyLink(e.target.value)}
+                      placeholder="https://... (لینک اختیاری)"
+                      className="sm:w-56 p-3 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] font-mono outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sending}
+                      className="px-6 py-3 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg cursor-pointer shrink-0 disabled:opacity-50"
+                    >
+                      {sending ? "در حال ارسال..." : "ارسال پاسخ زنده ←"}
+                    </button>
+                  </div>
+                </form>
               ) : (
-                <div className="p-4 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] leading-relaxed whitespace-pre-wrap">
-                  {selected.message}
+                <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold text-center">
+                  👁️ حساب شما دارای نقش «بیننده و گزارش‌دهنده» است و صرفاً مجاز به مشاهده گفتگوها هستید.
                 </div>
               )}
-
-              <form onSubmit={handleReply} className="space-y-3 pt-3 border-t border-[var(--card-border)]">
-                <label className="block font-black text-[var(--accent-blue)]">
-                  ✍️ ثبت یا ویرایش پاسخ رسمی مدیریت (همراه با ارسال پیامک به {selected.phone || "کاربر"}):
-                </label>
-                <textarea
-                  rows={4}
-                  required
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="پاسخ خود را بنویسید..."
-                  className="w-full p-3.5 rounded-2xl bg-[var(--input-bg)] border border-[var(--card-border)] outline-none focus:border-[var(--accent-blue)] leading-relaxed"
-                />
-                <button
-                  type="submit"
-                  disabled={sending}
-                  className="w-full py-3.5 rounded-2xl bg-[var(--accent-blue)] text-white font-black shadow-lg hover:opacity-90 transition cursor-pointer disabled:opacity-50"
-                >
-                  {sending ? "در حال ثبت و ارسال پیامک..." : "💾 ثبت پاسخ در دیتابیس و ارسال پیامک"}
-                </button>
-              </form>
-            </div>
+            </>
           )}
         </div>
       </div>

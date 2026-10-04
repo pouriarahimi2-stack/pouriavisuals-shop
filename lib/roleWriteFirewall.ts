@@ -4,9 +4,9 @@
 // هر ماژول دیگری که توسط مدیر ارشد برای این نقش‌ها تیک بخورد، صرفاً در حالت «فقط مشاهده (Read-Only)» باز می‌شود.
 export const ROLE_WRITABLE_MODULES_MAP: Record<string, string[]> = {
   superadmin: ["all"],
-  product_manager: ["products", "inventory", "menu", "banners", "reviews"],
+  product_manager: ["products", "inventory", "menu", "banners", "reviews", "messages"],
   order_manager: ["orders", "customers", "financial", "coupons", "messages"],
-  content_seo_manager: ["blog", "news", "seo", "ai", "pages"],
+  content_seo_manager: ["blog", "news", "seo", "ai", "pages", "messages"],
   viewer_reporter: [], // بیننده و گزارش‌دهنده در تمام بخش‌ها ۱۰۰٪ فقط خواندنی است
 };
 
@@ -74,6 +74,10 @@ export function canRoleMutateApi(role: string | undefined, apiPathname: string):
 
   // خروج از حساب برای همه مجاز است
   if (apiPathname.startsWith("/api/admin/logout")) return true;
+  // تمام نقش‌های مدیریتی به‌جز بیننده (viewer_reporter) مجاز به پاسخگویی در گفتگوی زنده هستند
+  if (apiPathname.startsWith("/api/live-chat") || apiPathname.startsWith("/api/admin/messages")) {
+    return cleanRole !== "viewer_reporter";
+  }
 
   // بخش‌های حیاتی مالک سایت که هیچ نقشی به جز superadmin حق تغییر آن‌ها را ندارد
   const ownerOnlyApis = [

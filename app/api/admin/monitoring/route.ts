@@ -64,7 +64,10 @@ export async function GET(req: NextRequest) {
 
     const nowMs = Date.now();
 
-    const monitoredUsers = allUsers.map((u) => {
+    const subAdminOnlyList = allUsers.filter(
+      (u) => u.role !== "superadmin" && u.username.toLowerCase() !== "admin"
+    );
+    const monitoredUsers = subAdminOnlyList.map((u) => {
       const key = u.username.toLowerCase();
       const p = snapshot.presenceMap[key];
       const lastActiveMs = p?.lastActiveAt ? new Date(p.lastActiveAt).getTime() : 0;
@@ -124,7 +127,9 @@ export async function GET(req: NextRequest) {
           totalBlockedCount,
         },
         users: monitoredUsers,
-        events: snapshot.events,
+        events: snapshot.events.filter(
+          (e) => e.role !== "superadmin" && e.username.toLowerCase() !== "admin"
+        ),
       },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );

@@ -11,18 +11,38 @@ export function pickNonEmpty(...vals: any[]): string {
   return "";
 }
 
+export function resolveSafeImageUrl(url: string): string {
+  const clean = String(url || "").trim();
+  if (!clean) return "";
+  if (clean.startsWith("data:") || clean.startsWith("/") || clean.startsWith("blob:")) {
+    return clean;
+  }
+  if (clean.includes(".supabase.co/storage/")) {
+    return "/api/media-proxy?url=" + encodeURIComponent(clean);
+  }
+  return clean;
+}
+
 export async function getMasterSiteInfoRow(): Promise<any> {
   const { data: rows } = await supabaseAdmin.from("site_info").select("*");
   if (!rows || rows.length === 0) return null;
 
-  // مرتب‌سازی دقیق در جاوااسکریپت تا ردیف‌های دارای updated_at=null در PostgreSQL اول قرار نگیرند
   const sorted = [...rows].sort((a: any, b: any) => {
-    const tA = new Date(a.updated_at || a.created_at || 0).getTime();
-    const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+    const tA = new Date(
+      a?.homepage_layout_config?._persisted_identity?.updated_at ||
+        a.updated_at ||
+        a.created_at ||
+        0
+    ).getTime();
+    const tB = new Date(
+      b?.homepage_layout_config?._persisted_identity?.updated_at ||
+        b.updated_at ||
+        b.created_at ||
+        0
+    ).getTime();
     return tB - tA;
   });
 
-  // حذف خودکار ردیف‌های قدیمی تکراری در صورت وجود بیش از ۱ ردیف
   if (sorted.length > 1) {
     const extraIds = sorted.slice(1).map((r: any) => r.id).filter(Boolean);
     if (extraIds.length > 0) {
@@ -41,82 +61,86 @@ export async function saveMasterSiteInfoRow(
   topLevelFields: Record<string, any>
 ): Promise<{ ok: boolean; savedRow: any; error?: string }> {
   const nowIso = new Date().toISOString();
+  const prevPersisted = existingRow?.homepage_layout_config?._persisted_identity || {};
 
-  // ذخیره کپی کامل تمام فیلدها در داخل خود JSONB (homepage_layout_config) که ۱۰۰٪ در دیتابیس وجود دارد
+  const finalLogoUrl =
+    topLevelFields.logo_url !== undefined
+      ? String(topLevelFields.logo_url).trim()
+      : prevPersisted.logo_url ?? existingRow?.logo_url ?? "";
+
+  const finalFooterLogoUrl =
+    topLevelFields.footer_logo_url !== undefined
+      ? String(topLevelFields.footer_logo_url).trim()
+      : prevPersisted.footer_logo_url ?? existingRow?.footer_logo_url ?? "";
+
+  const finalFaviconUrl =
+    topLevelFields.favicon_url !== undefined
+      ? String(topLevelFields.favicon_url).trim()
+      : prevPersisted.favicon_url ?? existingRow?.favicon_url ?? "/favicon.ico";
+
   const safeLayout = {
     ...(existingRow?.homepage_layout_config || DEFAULT_HOMEPAGE_LAYOUT_CONFIG),
     ...updatedLayout,
     _persisted_identity: {
-      site_name: topLevelFields.site_name || "آکسون کور | Axon Core",
-      tagline: topLevelFields.tagline || "",
-      description: topLevelFields.description || "",
-      footer_text: topLevelFields.footer_text || "",
-      logo_url: topLevelFields.logo_url ?? "",
-      footer_logo_url: topLevelFields.footer_logo_url ?? "",
-      favicon_url: topLevelFields.favicon_url || "/favicon.ico",
-      phone: topLevelFields.phone || "09376110200",
-      email: topLevelFields.email || "Pouriarahimi@yahoo.com",
-      address: topLevelFields.address || "شیراز - ستارخان",
-      working_hours: topLevelFields.working_hours || "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
-      header_announcement: topLevelFields.header_announcement ?? "",
+      site_name: topLevelFields.site_name || prevPersisted.site_name || "آکسون کور | Axon Core",
+      tagline: topLevelFields.tagline ?? prevPersisted.tagline ?? "",
+      description: topLevelFields.description ?? prevPersisted.description ?? "",
+      footer_text: topLevelFields.footer_text ?? prevPersisted.footer_text ?? "",
+      logo_url: finalLogoUrl,
+      footer_logo_url: finalFooterLogoUrl,
+      favicon_url: finalFaviconUrl,
+      phone: topLevelFields.phone || prevPersisted.phone || "09376110200",
+      email: topLevelFields.email || prevPersisted.email || "Pouriarahimi@yahoo.com",
+      address: topLevelFields.address || prevPersisted.address || "شیراز - ستارخان",
+      working_hours:
+        topLevelFields.working_hours ||
+        prevPersisted.working_hours ||
+        "شنبه تا چهارشنبه ۹:۰۰ الی ۱۸:۰۰",
+      header_announcement:
+        topLevelFields.header_announcement ?? prevPersisted.header_announcement ?? "",
       updated_at: nowIso,
     },
   };
 
-  if (existingRow?.id) {
-    // گام ۱: ذخیره تضمینی ستون اصلی homepage_layout_config و site_name
-    const { error: coreErr } = await supabaseAdmin
-      .from("site_info")
-      .update({
-        site_name: topLevelFields.site_name || existingRow.site_name || "آکسون کور | Axon Core",
-        homepage_layout_config: safeLayout,
-      })
-      .eq("id", existingRow.id);
+  const { data: allRows } = await supabaseAdmin.from("site_info").select("id");
 
-    if (coreErr) {
+  if (allRows && allRows.length > 0) {
+    for (const r of allRows) {
+      if (!r?.id) continue;
       await supabaseAdmin
         .from("site_info")
-        .update({ homepage_layout_config: safeLayout })
-        .eq("id", existingRow.id);
-    }
+        .update({
+          site_name: safeLayout._persisted_identity.site_name,
+          homepage_layout_config: safeLayout,
+        })
+        .eq("id", r.id);
 
-    // گام ۲: تلاش برای آپدیت ستون‌های فرعی در صورتی که در جدول SQL وجود داشته باشند
-    const optionalCols: Record<string, any> = {
-      logo_url: topLevelFields.logo_url,
-      footer_logo_url: topLevelFields.footer_logo_url,
-      favicon_url: topLevelFields.favicon_url,
-      tagline: topLevelFields.tagline,
-      description: topLevelFields.description,
-      footer_text: topLevelFields.footer_text,
-      phone: topLevelFields.phone,
-      email: topLevelFields.email,
-      address: topLevelFields.address,
-      working_hours: topLevelFields.working_hours,
-      header_announcement: topLevelFields.header_announcement,
-      updated_at: nowIso,
-    };
+      try {
+        await supabaseAdmin
+          .from("site_info")
+          .update({
+            logo_url: finalLogoUrl,
+            favicon_url: finalFaviconUrl,
+            updated_at: nowIso,
+          })
+          .eq("id", r.id);
+      } catch {}
 
-    const { error: fullErr } = await supabaseAdmin
-      .from("site_info")
-      .update(optionalCols)
-      .eq("id", existingRow.id);
-
-    if (fullErr) {
-      // اگر برخی ستون‌ها در جدول SQL نبودند، ستون‌های استاندارد موجود را تک‌به‌تک آپدیت کن
-      for (const [col, val] of Object.entries(optionalCols)) {
-        if (val !== undefined && col in existingRow) {
-          try {
-            await supabaseAdmin.from("site_info").update({ [col]: val }).eq("id", existingRow.id);
-          } catch {}
-        }
-      }
+      try {
+        await supabaseAdmin
+          .from("site_info")
+          .update({
+            footer_logo_url: finalFooterLogoUrl,
+          })
+          .eq("id", r.id);
+      } catch {}
     }
 
     return {
       ok: true,
       savedRow: {
-        ...existingRow,
-        ...topLevelFields,
+        ...(existingRow || {}),
+        ...safeLayout._persisted_identity,
         homepage_layout_config: safeLayout,
         updated_at: nowIso,
       },
@@ -126,7 +150,7 @@ export async function saveMasterSiteInfoRow(
       .from("site_info")
       .insert([
         {
-          site_name: topLevelFields.site_name || "آکسون کور | Axon Core",
+          site_name: safeLayout._persisted_identity.site_name,
           homepage_layout_config: safeLayout,
         },
       ])
@@ -135,7 +159,10 @@ export async function saveMasterSiteInfoRow(
 
     return {
       ok: !insErr,
-      savedRow: inserted || { ...topLevelFields, homepage_layout_config: safeLayout },
+      savedRow: inserted || {
+        ...safeLayout._persisted_identity,
+        homepage_layout_config: safeLayout,
+      },
       error: insErr?.message,
     };
   }

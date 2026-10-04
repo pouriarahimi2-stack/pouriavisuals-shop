@@ -13,6 +13,18 @@ import AnimatedLogo from "@/components/AnimatedLogo";
 
 function firstNonEmptyStr(...vals: any[]): string {
   for (const v of vals) {
+    if (typeof v === "string" && v.trim().length > 0) {
+      const clean = v.trim();
+      if (clean.includes(".supabase.co/storage/")) {
+        return "/api/media-proxy?url=" + encodeURIComponent(clean);
+      }
+      return clean;
+    }
+  }
+  return "";
+}
+function _unusedFirstNonEmpty(...vals: any[]): string {
+  for (const v of vals) {
     if (typeof v === "string" && v.trim().length > 0) return v.trim();
   }
   return "";

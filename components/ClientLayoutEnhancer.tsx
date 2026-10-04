@@ -1,6 +1,5 @@
 // File Path: components/ClientLayoutEnhancer.tsx
 "use client";
-
 import React, { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
@@ -10,9 +9,10 @@ export function ClientLayoutEnhancer({ children }: { children?: React.ReactNode 
   const pathname = usePathname();
 
   useEffect(() => {
-    if (typeof window === "undefined" || !pathname) return;
-    const storageKey = DRAFT_STORAGE_PREFIX + pathname;
+    // عدم دخالت در فرم‌های پنل ادمین (زیرا پنل ادمین مقادیر زنده را مستقیماً از دیتابیس می‌خواند)
+    if (typeof window === "undefined" || !pathname || pathname.startsWith("/admin")) return;
 
+    const storageKey = DRAFT_STORAGE_PREFIX + pathname;
     const getFieldKey = (
       el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
       idx: number
@@ -45,7 +45,6 @@ export function ClientLayoutEnhancer({ children }: { children?: React.ReactNode 
         if (!raw) return;
         const savedMap = JSON.parse(raw);
         if (!savedMap || typeof savedMap !== "object") return;
-
         const elements = document.querySelectorAll<
           HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
         >("input, textarea, select");
@@ -61,7 +60,6 @@ export function ClientLayoutEnhancer({ children }: { children?: React.ReactNode 
               window.HTMLTextAreaElement.prototype,
               "value"
             )?.set;
-
             if (el instanceof HTMLInputElement && nativeInputValueSetter) {
               nativeInputValueSetter.call(el, savedMap[k]);
               el.dispatchEvent(new Event("input", { bubbles: true }));

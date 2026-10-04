@@ -1,3 +1,4 @@
+import { verifySubAdminCredentials } from "@/lib/adminUsersStorage";
 // File Path: app/api/admin/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
@@ -28,6 +29,37 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    const subUserMatch = await verifySubAdminCredentials(
+      body.username || body.email || "",
+      body.password || body.pin || ""
+    );
+    if (subUserMatch) {
+      const token = await signPayload({
+        userId: subUserMatch.id,
+        username: subUserMatch.username,
+        role: subUserMatch.role as any,
+        permissions: subUserMatch.permissions,
+        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 12,
+      } as any);
+      const res = NextResponse.json({
+        success: true,
+        authenticated: true,
+        user: {
+          id: subUserMatch.id,
+          username: subUserMatch.username,
+          full_name: subUserMatch.full_name,
+          role: subUserMatch.role,
+          permissions: subUserMatch.permissions,
+        },
+      });
+      res.cookies.set(COOKIE_NAME, token, {
+        httpOnly: true,
+        path: "/",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 12,
+      });
+      return res;
+    }
     const cleanUsername = String(body.username || "").trim().toLowerCase();
     const cleanPassword = String(body.password || "").trim();
 

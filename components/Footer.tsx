@@ -347,8 +347,8 @@ export default function Footer() {
 
   return (
     <footer
-      style={tbFooter.bgColor ? { backgroundColor: tbFooter.bgColor } : undefined}
-      className="mt-16 border-t border-[var(--card-border)] bg-slate-100/90 dark:bg-[#0b0f17] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10 transition-colors duration-300"
+      
+      className="mt-16 border-t border-[var(--card-border)] bg-[var(--bg-secondary)] text-[var(--text-primary)] font-sans select-text pb-24 lg:pb-10 transition-colors duration-300"
       dir="rtl"
     >
       <div className={"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 " + pyClass}>
